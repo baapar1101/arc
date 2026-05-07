@@ -4661,7 +4661,23 @@
   "appearanceSidebarTabBehaviorReuseTitle": "رفتن به تب موجود یا باز کردن تب جدید",
   "appearanceSidebarTabBehaviorReuseSubtitle": "اگر همان صفحه در یکی از تب‌ها باز است به همان می‌رود؛ وگرنه تب جدید اضافه می‌شود (همان پیش‌فرض قبلی).",
   "appearanceSidebarTabBehaviorLongPressTitle": "جایگزینی تب فعال؛ لانگ‌پرس مثل پیش‌فرض",
-  "appearanceSidebarTabBehaviorLongPressSubtitle": "کلیک معمولی فقط محتوای تب فعلی را عوض می‌کند. لانگ‌پرس روی آیتم منو همان رفتار گزینهٔ بالا را دارد (تب موجود یا تب جدید)."
+  "appearanceSidebarTabBehaviorLongPressSubtitle": "کلیک معمولی فقط محتوای تب فعلی را عوض می‌کند. لانگ‌پرس روی آیتم منو همان رفتار گزینهٔ بالا را دارد (تب موجود یا تب جدید).",
+  "mobileLauncherTitle": "لانچر موبایل",
+  "mobileLauncherAppearanceTile": "ظاهر لانچر",
+  "mobileLauncherAppearancePageTitle": "تنظیمات ظاهری لانچر",
+  "mobileLauncherBackgroundColorSection": "رنگ پس‌زمینه",
+  "mobileLauncherSaveColors": "ذخیره",
+  "mobileLauncherColorsSaved": "ذخیره شد",
+  "mobileLauncherBackToAccount": "حساب کاربری",
+  "mobileLauncherOpenFullPanel": "پنل کامل",
+  "mobileLauncherChooseModeTitle": "این کسب‌وکار را چطور باز کنید؟",
+  "mobileLauncherModeStandard": "نمای استاندارد پنل",
+  "mobileLauncherModeLauncher": "لانچر موبایل",
+  "mobileLauncherInvalidBusiness": "شناسهٔ کسب‌وکار نامعتبر است",
+  "mobileLauncherDisableHomeLauncherMenu": "ورود به اپ از پروفایل",
+  "mobileLauncherDisableHomeLauncherDone": "از این به بعد با باز کردن اپ به پروفایل می‌روید؛ برای لانچر دوباره از لیست کسب‌وکار انتخاب کنید.",
+  "mobileLauncherBusinessNoAccess": "به این کسب‌وکار دسترسی ندارید یا حذف شده است.",
+  "mobileLauncherExitAppHint": "برای خروج دوباره بازگشت را بزنید"
 }
 
 

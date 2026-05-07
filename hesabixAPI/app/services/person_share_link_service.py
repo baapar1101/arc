@@ -547,6 +547,7 @@ def build_public_payload(
             "mobile": business.mobile,
             "address": business.address,
             "city": business.city,
+            "has_logo": bool(getattr(business, "logo_file_id", None)),
         },
         "summary": {
             "balance": balance,

@@ -8,6 +8,7 @@ import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../models/business_user_model.dart';
 import '../../core/auth_store.dart';
+import '../../core/mobile_launcher_prefs.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
@@ -184,16 +185,64 @@ class _BusinessesPageState extends State<BusinessesPage> {
       (b) => b.id == businessId,
       orElse: () => throw Exception('کسب و کار یافت نشد'),
     );
-    
+
     if (business.isDeletionPending) {
       SnackBarHelper.showError(
         context,
-        message: 'این کسب و کار در حال حذف است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.',
+        message:
+            'این کسب و کار در حال حذف است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.',
       );
       return;
     }
-    
-    context.go('/business/$businessId/dashboard');
+
+    final t = AppLocalizations.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                  child: Text(
+                    t.mobileLauncherChooseModeTitle,
+                    style: Theme.of(sheetCtx).textTheme.titleMedium,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.dashboard_outlined),
+                  title: Text(t.mobileLauncherModeStandard),
+                  onTap: () async {
+                    Navigator.of(sheetCtx).pop();
+                    await MobileLauncherPrefs.clearResumeLauncher(_authStore.currentUserId);
+                    if (!mounted) return;
+                    context.go('/business/$businessId/dashboard');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.apps_outlined),
+                  title: Text(t.mobileLauncherModeLauncher),
+                  onTap: () async {
+                    Navigator.of(sheetCtx).pop();
+                    await MobileLauncherPrefs.setResumeLauncher(
+                      _authStore.currentUserId,
+                      businessId,
+                    );
+                    if (!mounted) return;
+                    context.go('/mobile-launcher/$businessId');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override

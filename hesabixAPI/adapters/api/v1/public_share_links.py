@@ -1,9 +1,13 @@
+import base64
+import io
 import re
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import Response
 from fastapi.responses import RedirectResponse
+from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 
 from adapters.db.models.person import Person
@@ -13,12 +17,16 @@ from app.core.settings import get_settings
 from app.core.calendar import CalendarConverter
 from app.services.pdf.template_renderer import render_template
 from app.services.person_share_link_service import (
-    get_share_link_by_code,
     get_public_invoice_details,
     resolve_public_payload_by_code,
 )
 from app.services.document_share_link_service import (
     resolve_public_payload_by_code as resolve_invoice_document_share_by_code,
+)
+from app.services.file_storage_service import FileStorageService
+from app.services.share_link_logo_service import (
+	business_logo_file_id_for_invoice_share,
+	business_logo_file_id_for_person_share,
 )
 from app.services.system_settings_service import get_share_link_settings
 
@@ -67,6 +75,33 @@ async def get_public_person_link(
 		data=payload,
 		request=request,
 		message="اطلاعات کارت حساب دریافت شد",
+	)
+
+
+@router.get(
+	"/api/v1/public/person-links/{code}/business-logo",
+	summary="لوگوی کسب‌وکار برای لینک اشتراک کارت حساب (بدون شمارش بازدید)",
+)
+async def get_public_person_share_business_logo(
+	code: str,
+	db: Session = Depends(get_db),
+):
+	file_uuid = business_logo_file_id_for_person_share(db, code)
+	if not file_uuid:
+		raise HTTPException(status_code=404, detail="لوگو یافت نشد")
+	storage = FileStorageService(db)
+	try:
+		file_data = await storage.download_file(file_uuid)
+	except Exception:
+		raise HTTPException(status_code=404, detail="لوگو یافت نشد")
+	content = file_data.get("content") or b""
+	if not content:
+		raise HTTPException(status_code=404, detail="لوگو یافت نشد")
+	filename = file_data.get("filename") or "logo"
+	return StreamingResponse(
+		io.BytesIO(content),
+		media_type=file_data.get("mime_type") or "image/png",
+		headers={"Content-Disposition": f'inline; filename="{filename}"'},
 	)
 
 
@@ -124,6 +159,33 @@ async def get_public_invoice_document_link(
 		data=payload,
 		request=request,
 		message="اطلاعات فاکتور دریافت شد",
+	)
+
+
+@router.get(
+	"/api/v1/public/invoice-links/{code}/business-logo",
+	summary="لوگوی کسب‌وکار برای لینک اشتراک فاکتور (بدون شمارش بازدید)",
+)
+async def get_public_invoice_share_business_logo(
+	code: str,
+	db: Session = Depends(get_db),
+):
+	file_uuid = business_logo_file_id_for_invoice_share(db, code)
+	if not file_uuid:
+		raise HTTPException(status_code=404, detail="لوگو یافت نشد")
+	storage = FileStorageService(db)
+	try:
+		file_data = await storage.download_file(file_uuid)
+	except Exception:
+		raise HTTPException(status_code=404, detail="لوگو یافت نشد")
+	content = file_data.get("content") or b""
+	if not content:
+		raise HTTPException(status_code=404, detail="لوگو یافت نشد")
+	filename = file_data.get("filename") or "logo"
+	return StreamingResponse(
+		io.BytesIO(content),
+		media_type=file_data.get("mime_type") or "image/png",
+		headers={"Content-Disposition": f'inline; filename="{filename}"'},
 	)
 
 
@@ -311,6 +373,25 @@ async def get_public_invoice_document_pdf(
 	invoice_view["amount_before_discount_and_tax"] = _num(totals.get("gross"))
 	invoice_view["amount_without_tax"] = _num(totals.get("gross")) - _num(totals.get("discount"))
 
+	storage = FileStorageService(db)
+
+	async def _load_logo_data_uri(logo_uuid: Optional[UUID]) -> Optional[str]:
+		if not logo_uuid:
+			return None
+		try:
+			file_data = await storage.download_file(logo_uuid)
+		except Exception:
+			return None
+		content_bytes = file_data.get("content") or b""
+		if not content_bytes:
+			return None
+		mime = file_data.get("mime_type") or "image/png"
+		b64 = base64.b64encode(content_bytes).decode("ascii")
+		return f"data:{mime};base64,{b64}"
+
+	logo_uuid = business_logo_file_id_for_invoice_share(db, code)
+	business_logo_data_uri = await _load_logo_data_uri(logo_uuid)
+
 	installment_plan = None
 	if installments.get("has_installments"):
 		installment_plan = {
@@ -349,7 +430,7 @@ async def get_public_invoice_document_pdf(
 		"has_line_tax": has_line_tax,
 		"payments": [],
 		"installment_plan": installment_plan,
-		"business_logo_data_uri": None,
+		"business_logo_data_uri": business_logo_data_uri,
 		"business_stamp_data_uri": None,
 		"owner_signature_data_uri": None,
 		"show_invoice_verify_qr": False,

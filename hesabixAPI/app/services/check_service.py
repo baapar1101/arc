@@ -840,8 +840,14 @@ def update_check(db: Session, check_id: int, data: Dict[str, Any]) -> Optional[D
 
 def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> bool:
     """
-    حذف چک با بررسی کامل اسناد حسابداری و لینک‌ها
-    
+    حذف چک با بررسی کامل اسناد حسابداری و لینک‌ها.
+
+    برای چک پاس‌شده (CLEARED): در صورت وجود سال مالی جاری، اگر تاریخ صدور چک در
+    بازهٔ همان سال باشد و همهٔ اسناد دارای خط با این check_id نیز متعلق به همان سال
+    مالی باشند، حذف فیزیکی چک و اسناد نوع check مجاز است؛ در غیر این صورت خطا برمی‌گردد.
+
+    چک سپرده‌شده (DEPOSITED): همچنان حذف مستقیم مجاز نیست.
+
     Args:
         db: جلسه دیتابیس
         check_id: شناسه چک
@@ -863,14 +869,7 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
     
     business_id = obj.business_id
     
-    # 2. بررسی وضعیت چک
-    if obj.status == CheckStatus.CLEARED:
-        raise ApiError(
-            "CHECK_CLEARED",
-            "Cannot delete a cleared check. The check has been cleared and cannot be deleted.",
-            http_status=400
-        )
-    
+    # 2. چک سپرده‌شده هنوز قابل حذف مستقیم نیست
     if obj.status == CheckStatus.DEPOSITED:
         raise ApiError(
             "CHECK_DEPOSITED",
@@ -878,13 +877,29 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
             http_status=400
         )
     
-    # 3. دریافت سال مالی جاری
+    # 3. سال مالی جاری (برای چک پاس‌شده الزامی است)
     current_fiscal_year = None
     try:
         current_fiscal_year = _get_business_fiscal_year(db, business_id)
     except Exception:
-        # اگر سال مالی جاری پیدا نشد، بررسی نمی‌کنیم
-        pass
+        current_fiscal_year = None
+
+    cleared_delete_allowed = False
+    if obj.status == CheckStatus.CLEARED:
+        if current_fiscal_year is None:
+            raise ApiError(
+                "FISCAL_YEAR_NOT_FOUND",
+                "برای حذف چک پاس‌شده، سال مالی جاری باید وجود داشته باشد.",
+                http_status=404,
+            )
+        issue_d = obj.issue_date.date() if isinstance(obj.issue_date, datetime) else obj.issue_date
+        if issue_d < current_fiscal_year.start_date or issue_d > current_fiscal_year.end_date:
+            raise ApiError(
+                "CHECK_NOT_IN_CURRENT_FISCAL_YEAR",
+                "تاریخ صدور چک در سال مالی جاری نیست؛ حذف چک پاس‌شده مجاز نیست.",
+                http_status=400,
+            )
+        cleared_delete_allowed = True
     
     # 4. شناسایی اسناد حسابداری مرتبط
     related_documents: List[Document] = []
@@ -944,6 +959,34 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
         if last_action_doc and last_action_doc not in related_documents:
             related_documents.append(last_action_doc)
     
+    # 4.4. چک پاس‌شده: هر سندی که خطی با این check_id دارد باید در سال مالی جاری باشد
+    if cleared_delete_allowed:
+        if current_fiscal_year is None:
+            raise ApiError(
+                "FISCAL_YEAR_NOT_FOUND",
+                "برای حذف چک پاس‌شده، سال مالی جاری باید وجود داشته باشد.",
+                http_status=404,
+            )
+        line_doc_ids = {ln.document_id for ln in document_lines_with_check}
+        for did in line_doc_ids:
+            fd = db.query(Document).filter(Document.id == did).first()
+            if fd is None:
+                continue
+            if fd.fiscal_year_id != current_fiscal_year.id:
+                raise ApiError(
+                    "FISCAL_YEAR_CLOSED",
+                    f"سند حسابداری مرتبط با این چک (شناسه {fd.id}) متعلق به سال مالی جاری نیست؛ حذف مجاز نیست.",
+                    http_status=400,
+                )
+        if obj.last_action_document_id:
+            lad = db.query(Document).filter(Document.id == obj.last_action_document_id).first()
+            if lad is not None and lad.fiscal_year_id != current_fiscal_year.id:
+                raise ApiError(
+                    "FISCAL_YEAR_CLOSED",
+                    f"آخرین سند عملیات چک (شناسه {lad.id}) متعلق به سال مالی جاری نیست؛ حذف مجاز نیست.",
+                    http_status=400,
+                )
+    
     # 5. بررسی وجود استفاده حسابداری قطعی در اسناد غیرچکی
     # حذف فیزیکی چک فقط زمانی مجاز است که رد آن صرفا در اسناد نوع check باشد.
     # اگر چک در اسناد قطعی غیرچکی استفاده شده باشد، حذف باید متوقف شود.
@@ -998,14 +1041,14 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
                 http_status=400
             )
     
-    # 6. بررسی سال مالی اسناد
+    # 6. بررسی سال مالی اسناد (برای سایر وضعیت‌ها اگر سال جاری شناخته نشد، این بخش رد می‌شود)
     if current_fiscal_year:
         for doc in related_documents:
             if doc.fiscal_year_id != current_fiscal_year.id:
                 raise ApiError(
                     "FISCAL_YEAR_CLOSED",
-                    f"Cannot delete check. Related document {doc.id} belongs to a closed fiscal year.",
-                    http_status=400
+                    f"سند مرتبط با این چک (شناسه {doc.id}) متعلق به سال مالی جاری نیست؛ حذف مجاز نیست.",
+                    http_status=400,
                 )
     
     # 7. بررسی وضعیت اسناد (فقط اسناد قطعی قابل بررسی)

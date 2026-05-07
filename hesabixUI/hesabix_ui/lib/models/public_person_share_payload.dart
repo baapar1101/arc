@@ -85,6 +85,8 @@ class PublicBusinessInfo {
   final String? mobile;
   final String? address;
   final String? city;
+  /// آیا کسب‌وکار لوگو دارد؛ تصویر از مسیر عمومی بدون احتمال افزودن به view بارگذاری می‌شود.
+  final bool hasLogo;
 
   const PublicBusinessInfo({
     required this.id,
@@ -93,6 +95,7 @@ class PublicBusinessInfo {
     required this.mobile,
     required this.address,
     required this.city,
+    this.hasLogo = false,
   });
 
   factory PublicBusinessInfo.fromJson(Map<String, dynamic> json) {
@@ -103,6 +106,7 @@ class PublicBusinessInfo {
       mobile: json['mobile']?.toString(),
       address: json['address']?.toString(),
       city: json['city']?.toString(),
+      hasLogo: json['has_logo'] == true,
     );
   }
 }

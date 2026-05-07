@@ -18,13 +18,19 @@ class AdminSystemSettingsService {
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
 
-  Future<Map<String, dynamic>> registerTelegramWebhook() async {
-    final res = await _api.post<Map<String, dynamic>>('/api/v1/admin/system-settings/notifications/telegram/webhook');
+  Future<Map<String, dynamic>> registerTelegramWebhook({bool dropPendingUpdates = false}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/system-settings/notifications/telegram/webhook',
+      query: {'drop_pending_updates': dropPendingUpdates},
+    );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
 
-  Future<Map<String, dynamic>> registerBaleWebhook() async {
-    final res = await _api.post<Map<String, dynamic>>('/api/v1/admin/system-settings/notifications/bale/webhook');
+  Future<Map<String, dynamic>> registerBaleWebhook({bool dropPendingUpdates = false}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/system-settings/notifications/bale/webhook',
+      query: {'drop_pending_updates': dropPendingUpdates},
+    );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }
 

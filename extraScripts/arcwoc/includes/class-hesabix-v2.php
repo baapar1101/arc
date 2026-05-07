@@ -95,6 +95,11 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-invoice-helper.php';
 
 		/**
+		 * متا و فلگ‌های همگام‌سازی سفارش (مثلاً توقف خودکار).
+		 */
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-order-sync-meta.php';
+
+		/**
 		 * The class responsible for validation.
 		 */
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-validation.php';
@@ -113,6 +118,7 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-customer-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-invoice-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-sync-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-opening-inventory-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-queue-service.php';
 
 		$this->loader = new Hesabix_V2_Loader();
@@ -161,6 +167,9 @@ class Hesabix_V2
 			$this->loader->add_action('user_register', $plugin_admin, 'on_customer_register');
 			$this->loader->add_action('profile_update', $plugin_admin, 'on_customer_update');
 			$this->loader->add_action('woocommerce_update_customer', $plugin_admin, 'on_customer_update', 10, 1);
+
+			$this->loader->add_action('add_meta_boxes', $plugin_admin, 'add_order_hesabix_meta_box');
+			$this->loader->add_action('woocommerce_update_order', $plugin_admin, 'save_order_hesabix_meta_box', 10, 2);
 		}
 
 		// AJAX actions
@@ -172,6 +181,13 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_import_customers_from_hesabix', $plugin_admin, 'ajax_import_customers_from_hesabix');
 		$this->loader->add_action('wp_ajax_hesabix_v2_get_warehouses_and_banks', $plugin_admin, 'ajax_get_warehouses_and_banks');
 		$this->loader->add_action('wp_ajax_hesabix_v2_get_invoice_tags', $plugin_admin, 'ajax_get_invoice_tags');
+		$this->loader->add_action('wp_ajax_hesabix_v2_orders_sync_batch', $plugin_admin, 'ajax_orders_sync_batch');
+		$this->loader->add_action('wp_ajax_hesabix_v2_orders_unsync_batch', $plugin_admin, 'ajax_orders_unsync_batch');
+		$this->loader->add_action('wp_ajax_hesabix_v2_orders_set_pause', $plugin_admin, 'ajax_orders_set_pause');
+		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_accounts', $plugin_admin, 'ajax_opening_inventory_accounts');
+		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_prepare', $plugin_admin, 'ajax_opening_inventory_prepare');
+		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_batch', $plugin_admin, 'ajax_opening_inventory_batch');
+		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_finalize', $plugin_admin, 'ajax_opening_inventory_finalize');
 
 		// Setup wizard AJAX
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_verify_api_key', $plugin_admin, 'ajax_setup_verify_api_key');

@@ -577,18 +577,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
   }
 
-  /// باز کردن دیالوگ افزودن کالا با نام پیش‌فرض و افزودن به سبد بعد از ثبت
-  Future<void> _openAddProductDialog(String productName) async {
-    if (productName.trim().isEmpty) return;
-    
+  /// باز کردن دیالوگ افزودن کالا؛ [presetName] در صورت خالی بودن از متن فیلد جستجو استفاده می‌شود.
+  Future<void> _openAddProductDialog({String? presetName}) async {
+    _removeBarcodeOverlay();
+    final name = (presetName ?? _barcodeController.text).trim();
     try {
-      // باز کردن دیالوگ با نام پیش‌فرض
       final result = await showDialog<dynamic>(
         context: context,
         builder: (context) => ProductFormDialog(
           businessId: widget.businessId,
           authStore: widget.authStore,
-          product: {'name': productName.trim()}, // پاس دادن نام به عنوان product برای پیش‌پردازش
+          product: name.isNotEmpty ? {'name': name} : null,
           onSuccess: () {},
         ),
       );
@@ -2919,9 +2918,19 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           prefixIcon: compact ? null : const Icon(Icons.qr_code_scanner),
           isDense: compact,
           border: const OutlineInputBorder(),
+          suffixIconConstraints: BoxConstraints(
+            minHeight: compact ? 40 : 48,
+            minWidth: compact ? 120 : 160,
+          ),
           suffixIcon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              IconButton(
+                icon: const Icon(Icons.add),
+                tooltip: 'افزودن کالای جدید',
+                onPressed: () => _openAddProductDialog(),
+                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+              ),
               if (_supportsInlineCameraScan)
                 IconButton(
                   icon: const Icon(Icons.photo_camera_outlined),
@@ -2933,7 +2942,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                 IconButton(
                   icon: const Icon(Icons.add_circle, color: Colors.green),
                   tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
-                  onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
+                  onPressed: () => _openAddProductDialog(presetName: _lastFailedSearchQuery),
                   visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
                 ),
               IconButton(

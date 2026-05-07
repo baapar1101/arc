@@ -87,7 +87,15 @@ class Hesabix_V2_Queue_Service
 						$res = $sync->sync_customer((int) $row['entity_id']);
 						break;
 					case 'order':
-						$res = $sync->sync_order((int) $row['entity_id']);
+						if (class_exists('Hesabix_V2_Order_Sync_Meta') && Hesabix_V2_Order_Sync_Meta::is_pause_auto_sync((int) $row['entity_id'])) {
+							$res = array(
+								'success' => true,
+								'message' => __('رد شده — همگام‌سازی خودکار برای این سفارش متوقف است.', 'hesabix-v2'),
+								'skipped_pause' => true,
+							);
+						} else {
+							$res = $sync->sync_order((int) $row['entity_id']);
+						}
 						break;
 					default:
 						$res = array(
@@ -191,5 +199,29 @@ class Hesabix_V2_Queue_Service
 		$wpdb->insert($table, $data, $formats);
 
 		return (bool) $wpdb->insert_id;
+	}
+
+	/**
+	 * حذف کارهای در انتظار/در حال پردازش صف برای یک سفارش (مثلاً پس از لغو ارسال).
+	 *
+	 * @param int $order_id
+	 * @return int تعداد ردیف‌های حذف‌شده
+	 */
+	public static function cancel_pending_for_order($order_id)
+	{
+		global $wpdb;
+		$table = $wpdb->prefix . 'hesabix_v2_queue';
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return 0;
+		}
+
+		return (int) $wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$table} WHERE entity_type = %s AND entity_id = %d AND status IN ('pending','processing')",
+				'order',
+				$order_id
+			)
+		);
 	}
 }

@@ -33,7 +33,9 @@ class _UrlTrackerState extends State<UrlTracker> {
               currentUrl.isNotEmpty && 
               currentUrl != '/' && 
               currentUrl != '/login' &&
-              (currentUrl.startsWith('/user/profile/') || currentUrl.startsWith('/business/'))) {
+              (currentUrl.startsWith('/user/profile/') ||
+                  currentUrl.startsWith('/business/') ||
+                  currentUrl.startsWith('/mobile-launcher/'))) {
             _lastTrackedUrl = currentUrl;
             widget.authStore.saveLastUrl(currentUrl);
           }

@@ -16,6 +16,24 @@ $debug_mode = get_option('hesabix_v2_debug_mode', false);
 $add_checkout_fields = get_option('hesabix_v2_add_checkout_fields', false);
 $api_key = get_option('hesabix_v2_api_key');
 $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
+$ob_inv_done = (bool) get_option('hesabix_v2_opening_inventory_completed');
+$ob_inv_prefs = get_option('hesabix_v2_opening_inventory_prefs', array());
+if (!is_array($ob_inv_prefs)) {
+	$ob_inv_prefs = array();
+}
+$ob_inv_prefs = wp_parse_args(
+	$ob_inv_prefs,
+	array(
+		'include_tax' => false,
+		'cost_basis' => 'regular',
+		'auto_balance_to_equity' => true,
+		'do_post' => false,
+		'batch_size' => 12,
+		'inventory_account_id' => 0,
+		'equity_account_id' => 0,
+		'warehouse_override' => 0,
+	)
+);
 $invoice_payment_destination = get_option('hesabix_v2_invoice_payment_destination', 'bank');
 if ($invoice_payment_destination !== 'cash_register') {
 	$invoice_payment_destination = 'bank';
@@ -162,6 +180,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			<a href="#" class="nav-tab nav-tab-active" role="tab" aria-selected="true" data-tab="connection"><?php esc_html_e('اتصال', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="sync"><?php esc_html_e('همگام‌سازی', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="invoice"><?php esc_html_e('فاکتور', 'hesabix-v2'); ?></a>
+			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="opening_inv"><?php esc_html_e('موجودی افتتاحیه', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="extra"><?php esc_html_e('سایر', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="update"><?php esc_html_e('به‌روزرسانی افزونه', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="system"><?php esc_html_e('اطلاعات سیستم', 'hesabix-v2'); ?></a>
@@ -563,6 +582,101 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			});
 		})(jQuery);
 		</script>
+		</div>
+
+		<div class="hesabix-v2-tab-panel" data-tab="opening_inv" hidden>
+			<h2 class="screen-reader-text"><?php esc_html_e('موجودی افتتاحیه ووکامرس در حسابیکس', 'hesabix-v2'); ?></h2>
+			<?php if ($ob_inv_done) : ?>
+				<div class="notice notice-success inline"><p><?php esc_html_e('ثبت موجودی اولیه از ووکامرس به تراز افتتاحیه یک‌بار با موفقیت انجام شده است. این بخش غیرفعال است.', 'hesabix-v2'); ?></p></div>
+			<?php elseif (!get_option('hesabix_v2_enabled')) : ?>
+				<div class="notice notice-warning inline"><p><?php esc_html_e('ابتدا افزونه را فعال و متصل کنید.', 'hesabix-v2'); ?></p></div>
+			<?php else : ?>
+				<p class="description" style="max-width:50rem;">
+					<?php esc_html_e('کالاهای منتشرشده با مدیریت موجودی و تعداد › ۰ به‌صورت دسته‌ای در حسابیکس همگام، سپس در «تراز افتتاحیه» سال مالی جاری ادغام می‌شوند. قبل از اجرا گزینه‌ها را ذخیره کنید و دسترسی API به opening_balance و chart_of_accounts را بررسی کنید.', 'hesabix-v2'); ?>
+				</p>
+				<div id="hesabix-v2-obinv-initial" hidden
+					data-inventory-id="<?php echo esc_attr((string) (int) $ob_inv_prefs['inventory_account_id']); ?>"
+					data-equity-id="<?php echo esc_attr((string) (int) $ob_inv_prefs['equity_account_id']); ?>"></div>
+				<table class="form-table" id="hesabix-v2-opening-inv-form">
+					<tr>
+						<th scope="row"><?php esc_html_e('مالیات در بهای واحد', 'hesabix-v2'); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="ob_inv_include_tax" id="ob_inv_include_tax" value="1" <?php checked(!empty($ob_inv_prefs['include_tax'])); ?>>
+								<?php esc_html_e('بله — مالیات بر ارزش افزوده (در صورت تنظیم در ووکامرس) در بهای واحد ارزش‌گذاری موجودی لحاظ شود؛ در غیر این صورت بهای خالص (بدون مالیات) استفاده می‌شود.', 'hesabix-v2'); ?>
+							</label>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e('مبنای بهای تمام‌شده', 'hesabix-v2'); ?></th>
+						<td>
+							<select name="ob_inv_cost_basis" id="ob_inv_cost_basis">
+								<option value="regular" <?php selected($ob_inv_prefs['cost_basis'], 'regular'); ?>><?php esc_html_e('قیمت اصلی (یا قیمت فروش در صورت خالی بودن اصلی)', 'hesabix-v2'); ?></option>
+								<option value="sale" <?php selected($ob_inv_prefs['cost_basis'], 'sale'); ?>><?php esc_html_e('قیمت فروش جاری', 'hesabix-v2'); ?></option>
+								<option value="zero" <?php selected($ob_inv_prefs['cost_basis'], 'zero'); ?>><?php esc_html_e('صفر — فقط تعداد (بدون بدهکار به حساب موجودی مگر تراز خودکار)', 'hesabix-v2'); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e('بستن خودکار تراز', 'hesabix-v2'); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="ob_inv_auto_balance" id="ob_inv_auto_balance" value="1" <?php checked(!empty($ob_inv_prefs['auto_balance_to_equity'])); ?>>
+								<?php esc_html_e('اختلاف بدهکار/بستانکار تراز افتتاحیه به‌صورت خودکار به حساب حقوق صاحبان سهام بسته شود.', 'hesabix-v2'); ?>
+							</label>
+						</td>
+					</tr>
+					<tr class="hesabix-v2-obinv-equity-row">
+						<th scope="row"><?php esc_html_e('حساب حقوق صاحبان سهام', 'hesabix-v2'); ?></th>
+						<td>
+							<select name="ob_inv_equity_account_id" id="ob_inv_equity_account_id" class="regular-text hesabix-v2-obinv-accounts">
+								<option value="0"><?php esc_html_e('— انتخاب —', 'hesabix-v2'); ?></option>
+							</select>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e('حساب موجودی کالا', 'hesabix-v2'); ?></th>
+						<td>
+							<select name="ob_inv_inventory_account_id" id="ob_inv_inventory_account_id" class="regular-text hesabix-v2-obinv-accounts">
+								<option value="0"><?php esc_html_e('— انتخاب —', 'hesabix-v2'); ?></option>
+							</select>
+							<button type="button" class="button" id="hesabix_v2_obinv_load_accounts"><?php esc_html_e('بارگذاری حساب‌ها از حسابیکس', 'hesabix-v2'); ?></button>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e('انبار (اختیاری)', 'hesabix-v2'); ?></th>
+						<td>
+							<input type="number" name="ob_inv_warehouse_override" id="ob_inv_warehouse_override" class="small-text" min="0" step="1"
+								value="<?php echo esc_attr((string) (int) $ob_inv_prefs['warehouse_override']); ?>"
+								placeholder="<?php esc_attr_e('۰ = انبار پیش‌فرض تب فاکتور', 'hesabix-v2'); ?>">
+							<p class="description"><?php esc_html_e('در صورت ۰، همان انبار پیش‌فرض ذخیره‌شده در تب فاکتور استفاده می‌شود.', 'hesabix-v2'); ?></p>
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e('اندازهٔ هر دسته', 'hesabix-v2'); ?></th>
+						<td>
+							<input type="number" name="ob_inv_batch_size" id="ob_inv_batch_size" class="small-text" min="3" max="40" step="1"
+								value="<?php echo esc_attr((string) (int) $ob_inv_prefs['batch_size']); ?>">
+						</td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e('نهایی‌سازی سند', 'hesabix-v2'); ?></th>
+						<td>
+							<label>
+								<input type="checkbox" name="ob_inv_do_post" id="ob_inv_do_post" value="1" <?php checked(!empty($ob_inv_prefs['do_post'])); ?>>
+								<?php esc_html_e('پس از ذخیرهٔ کامل، سند تراز افتتاحیه در حسابیکس نهایی (قفل) شود.', 'hesabix-v2'); ?>
+							</label>
+						</td>
+					</tr>
+				</table>
+				<p>
+					<button type="button" class="button button-primary" id="hesabix_v2_obinv_run" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
+						<?php esc_html_e('شروع ثبت موجودی اولیه (گروهی)', 'hesabix-v2'); ?>
+					</button>
+					<span id="hesabix_v2_obinv_status" class="description" style="margin-right:12px;" aria-live="polite"></span>
+				</p>
+				<pre id="hesabix_v2_obinv_log" style="max-height:220px;overflow:auto;background:#f6f7f7;padding:10px;font-size:12px;display:none;"></pre>
+			<?php endif; ?>
 		</div>
 
 		<div class="hesabix-v2-tab-panel" data-tab="extra" hidden>

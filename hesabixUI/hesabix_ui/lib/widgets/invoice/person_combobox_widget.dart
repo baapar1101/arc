@@ -532,11 +532,13 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     widget.onChanged(person);
   }
 
+  Future<void> _applyNewPersonDialogResult(Person? result) async {
+    if (result == null || !mounted) return;
+    _selectPerson(result);
+  }
+
   Future<void> _addNewPerson(BuildContext bottomSheetContext) async {
-    // ذخیره متن جستجو شده
     final searchQuery = _searchController.text.trim();
-    
-    // بستن bottom sheet قبل از باز کردن dialog
     Navigator.pop(bottomSheetContext);
 
     final result = await showDialog<Person?>(
@@ -547,26 +549,26 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
       ),
     );
-    
-    if (result != null && mounted) {
-      // اگر Person ایجاد شده را دریافت کردیم، مستقیماً آن را انتخاب کنیم
-      _selectPerson(result);
-    } else if (result == true && mounted) {
-      // Fallback: اگر true برگردانده شد (برای سازگاری با کد قدیمی)
-      // Refresh لیست و پیدا کردن شخص جدید
-      await _performSearch(_latestQuery);
-      
-      // پیدا کردن شخص جدید (با بیشترین ID)
-      if (_persons.isNotEmpty) {
-        final sortedPersons = List<Person>.from(_persons);
-        sortedPersons.sort((a, b) {
-          final idA = a.id ?? 0;
-          final idB = b.id ?? 0;
-          return idB.compareTo(idA);
-        });
-        _selectPerson(sortedPersons.first);
-      }
-    }
+
+    await _applyNewPersonDialogResult(result);
+  }
+
+  /// افزودن شخص از دکمه + داخل فیلد
+  Future<void> _addNewPersonFromField() async {
+    _removeDesktopOverlay();
+    FocusManager.instance.primaryFocus?.unfocus();
+    final searchQuery = _searchController.text.trim();
+
+    final result = await showDialog<Person?>(
+      context: context,
+      builder: (context) => PersonFormDialog(
+        businessId: widget.businessId,
+        onSuccess: () {},
+        initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
+      ),
+    );
+
+    await _applyNewPersonDialogResult(result);
   }
 
   void _showPersonPicker() {
@@ -664,8 +666,19 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
                     child: Icon(Icons.clear, color: colorScheme.error, size: 18),
                   ),
                 )
-              else
+              else ...[
+                Tooltip(
+                  message: 'افزودن شخص جدید',
+                  child: IconButton(
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(Icons.add, color: colorScheme.primary, size: 22),
+                    onPressed: _addNewPersonFromField,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  ),
+                ),
                 Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+              ],
             ],
           ),
         ),
@@ -696,9 +709,16 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
                 hintText: widget.hintText,
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.person_search),
+                suffixIconConstraints: const BoxConstraints(minHeight: 48, minWidth: 140),
                 suffixIcon: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      tooltip: 'افزودن شخص جدید',
+                      icon: Icon(Icons.add, color: colorScheme.primary),
+                      onPressed: _addNewPersonFromField,
+                      visualDensity: VisualDensity.compact,
+                    ),
                     if (_isSearching)
                       const SizedBox(
                         width: 18,
@@ -709,6 +729,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
                       tooltip: 'انتخاب پیشرفته',
                       icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
                       onPressed: _showPersonPicker,
+                      visualDensity: VisualDensity.compact,
                     ),
                   ],
                 ),

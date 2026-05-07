@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'api_client.dart';
 import 'business_panel_ui_store.dart';
+import 'mobile_launcher_prefs.dart';
 import '../models/business_dashboard_models.dart';
 
 class AuthStore with ChangeNotifier {
@@ -13,6 +14,7 @@ class AuthStore with ChangeNotifier {
   static const _kAppPermissions = 'app_permissions';
   static const _kIsSuperAdmin = 'is_superadmin';
   static const _kLastUrl = 'last_url';
+  static const _kCurrentUserId = 'auth_current_user_id';
   static const _kUserName = 'user_name';
   static const _kUserMobile = 'user_mobile';
   static const _kCurrentBusiness = 'current_business';
@@ -91,6 +93,7 @@ class AuthStore with ChangeNotifier {
       _isSuperAdmin = prefs.getBool(_kIsSuperAdmin) ?? false;
       _currentUserName = prefs.getString(_kUserName);
       _currentUserMobile = prefs.getString(_kUserMobile);
+      _currentUserId = prefs.getInt(_kCurrentUserId);
     } else {
       try {
         final permissionsJson = await _secure.read(key: _kAppPermissions);
@@ -111,6 +114,7 @@ class AuthStore with ChangeNotifier {
         _currentUserName = null;
         _currentUserMobile = null;
       }
+      _currentUserId = prefs.getInt(_kCurrentUserId);
     }
   }
 
@@ -126,6 +130,8 @@ class AuthStore with ChangeNotifier {
         } catch (_) {}
         await prefs.remove(_kApiKey);
       }
+      final uid = _currentUserId;
+      await MobileLauncherPrefs.clearSession(userId: uid);
       // پاک کردن دسترسی‌ها و آخرین URL هنگام خروج
       await _clearAppPermissions();
       await clearLastUrl();
@@ -207,6 +213,9 @@ class AuthStore with ChangeNotifier {
           }
         }
       }
+      if (userId != null) {
+        await prefs.setInt(_kCurrentUserId, userId);
+      }
     }
     notifyListeners();
   }
@@ -215,6 +224,7 @@ class AuthStore with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _appPermissions = null;
     _isSuperAdmin = false;
+    _currentUserId = null;
     _currentUserName = null;
     _currentUserMobile = null;
 
@@ -223,6 +233,7 @@ class AuthStore with ChangeNotifier {
       await prefs.remove(_kIsSuperAdmin);
       await prefs.remove(_kUserName);
       await prefs.remove(_kUserMobile);
+      await prefs.remove(_kCurrentUserId);
     } else {
       try {
         await _secure.delete(key: _kAppPermissions);
@@ -234,6 +245,7 @@ class AuthStore with ChangeNotifier {
       await prefs.remove(_kIsSuperAdmin);
       await prefs.remove(_kUserName);
       await prefs.remove(_kUserMobile);
+      await prefs.remove(_kCurrentUserId);
     }
   }
 

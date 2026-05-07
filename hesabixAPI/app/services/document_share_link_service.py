@@ -329,6 +329,7 @@ def build_public_payload(
             "phone": getattr(business, "phone", None),
             "mobile": getattr(business, "mobile", None),
             "address": getattr(business, "address", None),
+            "has_logo": bool(getattr(business, "logo_file_id", None)),
         },
         "invoice": public_invoice,
         "installments": installments,

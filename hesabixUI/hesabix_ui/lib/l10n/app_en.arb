@@ -4619,5 +4619,21 @@
   "appearanceSidebarTabBehaviorReuseTitle": "Reuse open tab or open a new one",
   "appearanceSidebarTabBehaviorReuseSubtitle": "If that page is already open in a tab, switch to it; otherwise add a new tab. This matches the previous default behavior.",
   "appearanceSidebarTabBehaviorLongPressTitle": "Replace the active tab; long press for the default behavior",
-  "appearanceSidebarTabBehaviorLongPressSubtitle": "A normal click loads the destination in the current tab only. Long press on a sidebar item reuses an open tab or opens a new tab, like the option above."
+  "appearanceSidebarTabBehaviorLongPressSubtitle": "A normal click loads the destination in the current tab only. Long press on a sidebar item reuses an open tab or opens a new tab, like the option above.",
+  "mobileLauncherTitle": "Mobile launcher",
+  "mobileLauncherAppearanceTile": "Launcher look",
+  "mobileLauncherAppearancePageTitle": "Launcher appearance",
+  "mobileLauncherBackgroundColorSection": "Background color",
+  "mobileLauncherSaveColors": "Save",
+  "mobileLauncherColorsSaved": "Saved",
+  "mobileLauncherBackToAccount": "Account",
+  "mobileLauncherOpenFullPanel": "Full panel",
+  "mobileLauncherChooseModeTitle": "How do you want to open this business?",
+  "mobileLauncherModeStandard": "Standard panel",
+  "mobileLauncherModeLauncher": "Mobile launcher",
+  "mobileLauncherInvalidBusiness": "Invalid business id",
+  "mobileLauncherDisableHomeLauncherMenu": "Open app to profile home",
+  "mobileLauncherDisableHomeLauncherDone": "The app will open to your profile until you choose launcher again.",
+  "mobileLauncherBusinessNoAccess": "You no longer have access to this business.",
+  "mobileLauncherExitAppHint": "Press back again to exit"
 }

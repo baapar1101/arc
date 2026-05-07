@@ -118,6 +118,28 @@ class BusinessDashboardService {
     }
   }
 
+  /// بررسی سبک دسترسی به کسب‌وکار (مثلاً برای لانچر). در خطای شبکه [true] تا دستگاه POS بی‌دلیل مسدود نشود.
+  Future<bool> hasBusinessAccess(int businessId) async {
+    try {
+      final res = await _apiClient.get<Map<String, dynamic>>(
+        '/api/v1/business/$businessId/fiscal-years/current',
+      );
+      final data = res.data;
+      if (data is Map<String, dynamic> && data['success'] == true) {
+        return true;
+      }
+      return false;
+    } on DioException catch (e) {
+      final code = e.response?.statusCode;
+      if (code == 403 || code == 404) {
+        return false;
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
+
   /// ویرایش سال مالی جاری (فقط عنوان و تاریخ‌ها)
   Future<Map<String, dynamic>> updateCurrentFiscalYear(
     int businessId, {

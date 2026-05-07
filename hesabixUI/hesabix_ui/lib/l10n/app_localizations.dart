@@ -62,8 +62,7 @@ import 'app_localizations_fa.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -71,8 +70,7 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate =
-      _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -84,18 +82,17 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-      <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('fa'),
+    Locale('fa')
   ];
 
   /// No description provided for @appTitle.
@@ -678,11 +675,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Requested: {total} | Found: {found} | Will update: {willUpdate}'**
-  String bulkDefaultWarehousePreviewSummary(
-    String total,
-    String found,
-    String willUpdate,
-  );
+  String bulkDefaultWarehousePreviewSummary(String total, String found, String willUpdate);
 
   /// No description provided for @bulkDefaultWarehouseSkippedCount.
   ///
@@ -706,12 +699,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Requested: {total} | Found: {found} | Updated: {updated} | Skipped: {skipped}'**
-  String bulkDefaultWarehouseApplySummary(
-    String total,
-    String found,
-    String updated,
-    String skipped,
-  );
+  String bulkDefaultWarehouseApplySummary(String total, String found, String updated, String skipped);
 
   /// No description provided for @bulkDefaultWarehouseReasonAlreadySet.
   ///
@@ -10108,6 +10096,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to save advanced notification settings.'**
   String get notificationsAdvancedSaveError;
+
+  /// No description provided for @notificationsWebhookRegisterOptionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Webhook registration options'**
+  String get notificationsWebhookRegisterOptionsTitle;
+
+  /// No description provided for @notificationsWebhookDropPendingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear pending messenger updates when registering'**
+  String get notificationsWebhookDropPendingLabel;
+
+  /// No description provided for @notificationsWebhookDropPendingHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Default (off): when you re-register the webhook, updates the messenger has queued are kept and will be delivered in the next delivery cycle to your server.\n\nIf you turn this on, that queue is cleared at registration time and those updates will not be sent to your webhook; useful after URL changes or to recover from a stuck queue. Does not remove outgoing bot messages.'**
+  String get notificationsWebhookDropPendingHelp;
 
   /// No description provided for @notificationsTelegramConnectionStatus.
   ///
@@ -22498,10 +22504,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A normal click loads the destination in the current tab only. Long press on a sidebar item reuses an open tab or opens a new tab, like the option above.'**
   String get appearanceSidebarTabBehaviorLongPressSubtitle;
+
+  /// Mobile launcher (compact entry point on phones/POS).
+  String get mobileLauncherTitle;
+
+  String get mobileLauncherAppearanceTile;
+
+  String get mobileLauncherAppearancePageTitle;
+
+  String get mobileLauncherBackgroundColorSection;
+
+  String get mobileLauncherSaveColors;
+
+  String get mobileLauncherColorsSaved;
+
+  String get mobileLauncherBackToAccount;
+
+  String get mobileLauncherOpenFullPanel;
+
+  String get mobileLauncherChooseModeTitle;
+
+  String get mobileLauncherModeStandard;
+
+  String get mobileLauncherModeLauncher;
+
+  String get mobileLauncherInvalidBusiness;
+
+  String get mobileLauncherDisableHomeLauncherMenu;
+
+  String get mobileLauncherDisableHomeLauncherDone;
+
+  String get mobileLauncherBusinessNoAccess;
+
+  String get mobileLauncherExitAppHint;
 }
 
-class _AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -22510,26 +22548,25 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      <String>['en', 'fa'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['en', 'fa'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'en':
-      return AppLocalizationsEn();
-    case 'fa':
-      return AppLocalizationsFa();
+    case 'en': return AppLocalizationsEn();
+    case 'fa': return AppLocalizationsFa();
   }
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
     'an issue with the localizations generation tool. Please file an issue '
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
+    'that was used.'
   );
 }

@@ -157,6 +157,7 @@ import 'core/api_client.dart';
 import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
+import 'core/mobile_launcher_prefs.dart';
 import 'core/permission_guard.dart';
 import 'core/keyboard_shortcut_listener.dart';
 import 'core/route_registry.dart';
@@ -174,6 +175,8 @@ import 'pages/business/document_monetization_page.dart';
 import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/business_ftp_backup_settings_page.dart';
 import 'pages/business/backup/restore_page.dart';
+import 'pages/mobile_launcher/mobile_launcher_page.dart';
+import 'pages/mobile_launcher/mobile_launcher_appearance_page.dart';
 import 'pages/profile/delete_business_page.dart';
 import 'pages/business/fiscal_year_rollback_page.dart';
 import 'pages/public/public_person_share_link_page.dart';
@@ -303,7 +306,9 @@ class _MyAppState extends State<MyApp> {
         if (currentUrl.isNotEmpty && 
             currentUrl != '/' && 
             currentUrl != '/login' &&
-            (currentUrl.startsWith('/user/profile/') || currentUrl.startsWith('/business/'))) {
+            (currentUrl.startsWith('/user/profile/') ||
+                currentUrl.startsWith('/business/') ||
+                currentUrl.startsWith('/mobile-launcher/'))) {
           await _authStore!.saveLastUrl(currentUrl);
         }
       } catch (e) {
@@ -368,6 +373,8 @@ class _MyAppState extends State<MyApp> {
       const AnnouncementsPage();
       NewBusinessPage(calendarController: calendarController);
       const BusinessesPage();
+      MobileLauncherPage(businessId: 1, authStore: authStore);
+      MobileLauncherAppearancePage(businessId: 1, authStore: authStore);
       SupportPage(calendarController: calendarController);
       MarketingPage(calendarController: calendarController);
       const UserSignaturePage();
@@ -820,9 +827,11 @@ class _MyAppState extends State<MyApp> {
         
         // اگر API key دارد
         
-        // اگر در login است، به dashboard برود
+        // اگر در login است، ترجیح لانچر یا داشبورد پروفایل
         if (currentPath == '/login') {
-          return '/user/profile/dashboard';
+          final launcherLoc =
+              await MobileLauncherPrefs.resumeHomeLocation(_authStore!.currentUserId);
+          return launcherLoc ?? '/user/profile/dashboard';
         }
 
         // مسیرهای قدیمی پنل بدون segment «tabN» با StatefulShellRoute هم‌خوان نیستند؛ اینجا نرمال می‌شوند.
@@ -831,16 +840,22 @@ class _MyAppState extends State<MyApp> {
           if (normalized != null) return normalized;
         }
 
-        // اگر در root است، آخرین URL را بررسی کن
+        // اگر در root است؛ ابتدا لانچر موبایل در صورت فعال بودن، سپس آخرین URL
         if (currentPath == '/') {
-          // اگر آخرین URL موجود است و معتبر است، به آن برود
+          final launcherLoc =
+              await MobileLauncherPrefs.resumeHomeLocation(_authStore!.currentUserId);
+          if (launcherLoc != null) {
+            return launcherLoc;
+          }
           final lastUrl = await _authStore!.getLastUrl();
           
           if (lastUrl != null && 
               lastUrl.isNotEmpty && 
               lastUrl != '/' && 
               lastUrl != '/login' &&
-              (lastUrl.startsWith('/user/profile/') || lastUrl.startsWith('/business/'))) {
+              (lastUrl.startsWith('/user/profile/') ||
+                  lastUrl.startsWith('/business/') ||
+                  lastUrl.startsWith('/mobile-launcher/'))) {
             return lastUrl;
           }
           // وگرنه به dashboard برود (فقط اگر در root باشیم)
@@ -854,7 +869,9 @@ class _MyAppState extends State<MyApp> {
             currentPath.isNotEmpty &&
             currentPath != '/' &&
             currentPath != '/login' &&
-            (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/business/'))) {
+            (currentPath.startsWith('/user/profile/') ||
+                currentPath.startsWith('/business/') ||
+                currentPath.startsWith('/mobile-launcher/'))) {
           try {
             await _authStore!.saveLastUrl(currentPath);
           } catch (e) {
@@ -969,6 +986,46 @@ class _MyAppState extends State<MyApp> {
             // ثبت صفحه برای preload خودکار
             registerRoutePage(() => WalletPaymentResultPage(authStore: _authStore!));
             return WalletPaymentResultPage(authStore: _authStore!);
+          },
+        ),
+        GoRoute(
+          path: '/mobile-launcher/:businessId',
+          name: 'mobile_launcher',
+          builder: (context, state) {
+            final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
+            if (businessId == null || businessId <= 0) {
+              return Scaffold(
+                body: Center(child: Text(AppLocalizations.of(context).mobileLauncherInvalidBusiness)),
+              );
+            }
+            registerRoutePage(() => MobileLauncherPage(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                ));
+            return MobileLauncherPage(
+              businessId: businessId,
+              authStore: _authStore!,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/mobile-launcher/:businessId/appearance',
+          name: 'mobile_launcher_appearance',
+          builder: (context, state) {
+            final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
+            if (businessId == null || businessId <= 0) {
+              return Scaffold(
+                body: Center(child: Text(AppLocalizations.of(context).mobileLauncherInvalidBusiness)),
+              );
+            }
+            registerRoutePage(() => MobileLauncherAppearancePage(
+                  businessId: businessId,
+                  authStore: _authStore!,
+                ));
+            return MobileLauncherAppearancePage(
+              businessId: businessId,
+              authStore: _authStore!,
+            );
           },
         ),
         ShellRoute(

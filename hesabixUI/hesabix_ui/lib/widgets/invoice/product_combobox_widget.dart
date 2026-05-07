@@ -875,64 +875,84 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     }
   }
 
+  Future<void> _handleProductFormDialogResult(dynamic result) async {
+    if (result == null || result == false || !mounted) return;
+
+    int? newProductId;
+    if (result is int) {
+      newProductId = result;
+    } else if (result == true) {
+      // اگر true برگردانده شد، از روش fallback استفاده می‌کنیم
+    }
+
+    if (newProductId != null) {
+      try {
+        final product = await _service.getProduct(
+          businessId: widget.businessId,
+          productId: newProductId,
+        );
+        if (product.isNotEmpty && mounted) {
+          _select(product);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    await _loadRecent();
+
+    if (_items.isNotEmpty) {
+      final sortedItems = List<Map<String, dynamic>>.from(_items);
+      sortedItems.sort((a, b) {
+        final idA = (a['id'] as num?)?.toInt() ?? 0;
+        final idB = (b['id'] as num?)?.toInt() ?? 0;
+        return idB.compareTo(idA);
+      });
+      _select(sortedItems.first);
+    }
+  }
+
   Future<void> _addNewProduct(BuildContext bottomSheetContext) async {
     final authStore = widget.authStore;
     if (authStore == null) {
-      // اگر AuthStore ارائه نشده باشد، نمی‌توانیم کالای جدید اضافه کنیم
       return;
     }
 
-    // بستن bottom sheet قبل از باز کردن dialog
     Navigator.pop(bottomSheetContext);
 
+    final preset = _searchCtrl.text.trim();
     final result = await showDialog<dynamic>(
       context: context,
       builder: (context) => ProductFormDialog(
         businessId: widget.businessId,
         authStore: authStore,
+        product: preset.isNotEmpty ? {'name': preset} : null,
         onSuccess: () {},
       ),
     );
-    
-    if (result != null && result != false && mounted) {
-      int? newProductId;
-      if (result is int) {
-        newProductId = result;
-      } else if (result == true) {
-        // اگر true برگردانده شد، از روش fallback استفاده می‌کنیم
-      }
-      
-      // اگر ID کالای جدید را داریم، مستقیماً آن را جستجو و انتخاب کنیم
-      if (newProductId != null) {
-        try {
-          final product = await _service.getProduct(
-            businessId: widget.businessId,
-            productId: newProductId,
-          );
-          if (product.isNotEmpty && mounted) {
-            _select(product);
-            return;
-          }
-        } catch (_) {
-          // اگر خطا رخ داد، به روش قبلی برمی‌گردیم
-        }
-      }
-      
-      // Refresh لیست و پیدا کردن کالای جدید
-      await _loadRecent();
-      
-      // پیدا کردن کالای جدید (احتمالاً آخرین آیتم در لیست یا آیتمی با بیشترین ID)
-      if (_items.isNotEmpty) {
-        // مرتب‌سازی بر اساس ID (بزرگترین = جدیدترین)
-        final sortedItems = List<Map<String, dynamic>>.from(_items);
-        sortedItems.sort((a, b) {
-          final idA = (a['id'] as num?)?.toInt() ?? 0;
-          final idB = (b['id'] as num?)?.toInt() ?? 0;
-          return idB.compareTo(idA);
-        });
-        _select(sortedItems.first);
-      }
-    }
+
+    await _handleProductFormDialogResult(result);
+  }
+
+  /// افزودن کالا از دکمه + کنار فیلد (بدون بستن باتم‌شیت)
+  Future<void> _addNewProductFromField() async {
+    final authStore = widget.authStore;
+    if (authStore == null) return;
+
+    _removeDesktopOverlay();
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    final preset = _searchCtrl.text.trim();
+    final result = await showDialog<dynamic>(
+      context: context,
+      builder: (context) => ProductFormDialog(
+        businessId: widget.businessId,
+        authStore: authStore,
+        product: preset.isNotEmpty ? {'name': preset} : null,
+        onSuccess: () {},
+      ),
+    );
+
+    await _handleProductFormDialogResult(result);
   }
 
   void _openPicker() {
@@ -1055,6 +1075,19 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                     ),
                   ),
                 ),
+                if (widget.authStore != null) ...[
+                  Tooltip(
+                    message: 'افزودن کالای جدید',
+                    child: IconButton(
+                      visualDensity: VisualDensity.compact,
+                      icon: Icon(Icons.add, color: colorScheme.primary, size: 22),
+                      onPressed: _addNewProductFromField,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                ],
                 const SizedBox(width: 4),
                 Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
               ],
@@ -1107,7 +1140,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                     child: Icon(Icons.inventory_2_outlined, color: colorScheme.primary, size: 20),
                   ),
                   prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  suffixIconConstraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+                  suffixIconConstraints: const BoxConstraints(minHeight: 44, minWidth: 140),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1119,6 +1152,15 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
+                        ),
+                      if (widget.authStore != null)
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'افزودن کالای جدید',
+                          icon: Icon(Icons.add, color: colorScheme.primary),
+                          onPressed: _addNewProductFromField,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                         ),
                       IconButton(
                         visualDensity: VisualDensity.compact,

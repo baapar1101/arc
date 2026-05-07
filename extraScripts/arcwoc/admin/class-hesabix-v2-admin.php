@@ -243,6 +243,35 @@ class Hesabix_V2_Admin
 				)
 			);
 
+			if (isset($_GET['page']) && sanitize_text_field(wp_unslash((string) $_GET['page'])) === 'hesabix-v2-orders') {
+				wp_enqueue_script(
+					'hesabix-v2-orders',
+					HESABIX_V2_PLUGIN_URL . 'assets/js/hesabix-v2-orders.js',
+					array('jquery'),
+					$this->version,
+					true
+				);
+				wp_localize_script(
+					'hesabix-v2-orders',
+					'hesabix_v2_orders',
+					array(
+						'ajax_url' => admin_url('admin-ajax.php'),
+						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
+						'chunk_size' => 5,
+						'strings' => array(
+							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
+							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
+							'confirmSync' => __('ارسال یا به‌روزرسانی این سفارش در حسابیکس انجام شود؟', 'hesabix-v2'),
+							'confirmUnsync' => __('فاکتور این سفارش در حسابیکس حذف و پیوند افزونه پاک شود؟ این کار برگشت‌پذیر نیست.', 'hesabix-v2'),
+							'confirmBulkSync' => __('برای همهٔ سفارش‌های انتخاب‌شده ارسال یا به‌روزرسانی انجام شود؟', 'hesabix-v2'),
+							'confirmBulkUnsync' => __('برای همهٔ موارد انتخاب‌شده لغو ارسال (حذف فاکتور) انجام شود؟', 'hesabix-v2'),
+							'confirmPause' => __('همگام‌سازی خودکار این سفارش متوقف شود؟ (فاکتورهای دستی در حسابیکس با به‌روزرسانی خودکار بازنویسی نمی‌شوند.)', 'hesabix-v2'),
+							'confirmResume' => __('همگام‌سازی خودکار دوباره فعال شود؟ در رویدادهای بعدی، محتوای ووکامرس ممکن است فاکتور حسابیکس را به‌روز کند.', 'hesabix-v2'),
+						),
+					)
+				);
+			}
+
 			$on_settings_page = ($hook_suffix === 'hesabix-v2_page_hesabix-v2-settings')
 				|| (isset($_GET['page']) && sanitize_text_field(wp_unslash((string) $_GET['page'])) === 'hesabix-v2-settings');
 
@@ -281,6 +310,44 @@ class Hesabix_V2_Admin
 							'blockedEnv' => __('نسخهٔ جدید روی مخزن است؛ ولی وردپرس یا PHP الزامات را نمی‌گذرد.', 'hesabix-v2'),
 							'requirementsUnknown' => __('نامشخص', 'hesabix-v2'),
 							'requirementsFmt' => __('وردپرس ≥ {{w}}؛ PHP ≥ {{p}}', 'hesabix-v2'),
+						),
+					)
+				);
+
+				wp_enqueue_script(
+					'hesabix-v2-opening-inventory',
+					HESABIX_V2_PLUGIN_URL . 'assets/js/hesabix-v2-opening-inventory.js',
+					array('jquery'),
+					$this->version,
+					true
+				);
+				wp_localize_script(
+					'hesabix-v2-opening-inventory',
+					'hesabix_v2_ob_inv',
+					array(
+						'ajax_url' => admin_url('admin-ajax.php'),
+						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
+						'completed' => (bool) get_option('hesabix_v2_opening_inventory_completed'),
+						'strings' => array(
+							'loadAccounts' => __('در حال بارگذاری حساب‌ها…', 'hesabix-v2'),
+							'accountsError' => __('خطا در دریافت حساب‌ها از حسابیکس.', 'hesabix-v2'),
+							'confirmTitle' => __('تأیید قبل از ثبت موجودی افتتاحیه', 'hesabix-v2'),
+							'confirmIntro' => __('پس از اتمام موفق، این بخش دیگر در دسترس نخواهد بود. موارد زیر را بررسی کنید:', 'hesabix-v2'),
+							'running' => __('در حال پردازش دسته‌ها…', 'hesabix-v2'),
+							'finalizing' => __('در حال نهایی‌سازی…', 'hesabix-v2'),
+							'needInventoryAccount' => __('حساب موجودی (کالا) را انتخاب کنید.', 'hesabix-v2'),
+							'needEquity' => __('حساب حقوق صاحبان سهام را انتخاب کنید.', 'hesabix-v2'),
+							'needWarehouse' => __('انبار پیش‌فرض در تب فاکتور یا شناسه انبار در همین صفحه لازم است.', 'hesabix-v2'),
+							'genericFail' => __('عملیات ناموفق بود.', 'hesabix-v2'),
+							'requestFail' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
+							'taxYes' => __('بله — مالیات بر ارزش افزوده در بهای واحد لحاظ شود', 'hesabix-v2'),
+							'taxNo' => __('خیر — بهای واحد بدون مالیات (خالص)', 'hesabix-v2'),
+							'postYes' => __('بله، سند تراز افتتاحیه در حسابیکس نهایی شود', 'hesabix-v2'),
+							'postNo' => __('خیر، فقط ذخیره شود (نهایی‌سازی بعداً در حسابیکس)', 'hesabix-v2'),
+							'autoBalYes' => __('بله، اختلاف تراز به حساب حقوق صاحبان سهام بسته شود', 'hesabix-v2'),
+							'autoBalNo' => __('خیر، بستن خودکار غیرفعال', 'hesabix-v2'),
+							'done' => __('انجام شد.', 'hesabix-v2'),
+							'resumedHint' => __('ادامهٔ نشست', 'hesabix-v2'),
 						),
 					)
 				);
@@ -343,6 +410,15 @@ class Hesabix_V2_Admin
 			'manage_woocommerce',
 			'hesabix-v2-logs',
 			array($this, 'display_logs')
+		);
+
+		add_submenu_page(
+			'hesabix-v2',
+			__('سفارش‌ها و حسابیکس', 'hesabix-v2'),
+			__('سفارش‌ها و حسابیکس', 'hesabix-v2'),
+			'manage_woocommerce',
+			'hesabix-v2-orders',
+			array($this, 'display_orders')
 		);
 
 		// Hide setup wizard from menu
@@ -461,6 +537,23 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * فهرست سفارش‌ها، وضعیت حسابیکس، ارسال/لغو دستی
+	 *
+	 * @return void
+	 */
+	public function display_orders()
+	{
+		if (!current_user_can('manage_woocommerce')) {
+			wp_die(esc_html__('شما اجازهٔ دسترسی ندارید.', 'hesabix-v2'));
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/class-wp-list-table.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/class-hesabix-v2-orders-list-table.php';
+		$list_table = new Hesabix_V2_Orders_List_Table();
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/partials/hesabix-v2-orders.php';
+	}
+
+	/**
 	 * Display setup wizard
 	 *
 	 * @since    2.0.0
@@ -524,6 +617,22 @@ class Hesabix_V2_Admin
 		update_option('hesabix_v2_sync_settings', $sync_settings);
 		update_option('hesabix_v2_debug_mode', isset($_POST['debug_mode']));
 		update_option('hesabix_v2_add_checkout_fields', isset($_POST['add_checkout_fields']));
+
+		$ob_cost = isset($_POST['ob_inv_cost_basis']) ? sanitize_key(wp_unslash($_POST['ob_inv_cost_basis'])) : 'regular';
+		if (!in_array($ob_cost, array('regular', 'sale', 'zero'), true)) {
+			$ob_cost = 'regular';
+		}
+		$ob_inv_prefs = array(
+			'include_tax' => isset($_POST['ob_inv_include_tax']),
+			'cost_basis' => $ob_cost,
+			'auto_balance_to_equity' => isset($_POST['ob_inv_auto_balance']),
+			'do_post' => isset($_POST['ob_inv_do_post']),
+			'batch_size' => isset($_POST['ob_inv_batch_size']) ? max(3, min(40, absint(wp_unslash($_POST['ob_inv_batch_size'])))) : 12,
+			'inventory_account_id' => isset($_POST['ob_inv_inventory_account_id']) ? absint(wp_unslash($_POST['ob_inv_inventory_account_id'])) : 0,
+			'equity_account_id' => isset($_POST['ob_inv_equity_account_id']) ? absint(wp_unslash($_POST['ob_inv_equity_account_id'])) : 0,
+			'warehouse_override' => isset($_POST['ob_inv_warehouse_override']) ? absint(wp_unslash($_POST['ob_inv_warehouse_override'])) : 0,
+		);
+		update_option('hesabix_v2_opening_inventory_prefs', $ob_inv_prefs);
 
 		// API base URL - allow configuring server address
 		if (isset($_POST['api_base_url'])) {
@@ -631,6 +740,35 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * رد کردن همگام‌سازی خودکار برای این سفارش (فلگ توقف توسط کاربر).
+	 *
+	 * @param int $order_id
+	 * @return bool اگر true باشد نباید sync_order از هوک‌های خودکار صدا زده شود.
+	 */
+	private function should_skip_auto_order_sync($order_id)
+	{
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return false;
+		}
+		if (!class_exists('Hesabix_V2_Order_Sync_Meta')) {
+			return false;
+		}
+		if (!Hesabix_V2_Order_Sync_Meta::is_pause_auto_sync($order_id)) {
+			return false;
+		}
+
+		Hesabix_V2_Log_Service::info(
+			'Order auto sync skipped (pause_auto_sync meta)',
+			array(
+				'entity_type' => 'order',
+				'entity_id' => $order_id,
+			)
+		);
+		return true;
+	}
+
+	/**
 	 * فقط کاربران با نقش customer (مشتری فروشگاه) همگام شوند، نه هر کاربر وردپرس.
 	 *
 	 * @param int $user_id
@@ -665,6 +803,9 @@ class Hesabix_V2_Admin
 		if (empty($sync['sync_order_on_checkout'])) {
 			return;
 		}
+		if ($this->should_skip_auto_order_sync($order_id)) {
+			return;
+		}
 		$sync_service = new Hesabix_V2_Sync_Service();
 		$sync_service->sync_order($order_id);
 	}
@@ -681,6 +822,9 @@ class Hesabix_V2_Admin
 		}
 		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
 		if (empty($sync['sync_order_on_payment_complete'])) {
+			return;
+		}
+		if ($this->should_skip_auto_order_sync($order_id)) {
 			return;
 		}
 		$sync_service = new Hesabix_V2_Sync_Service();
@@ -707,8 +851,317 @@ class Hesabix_V2_Admin
 		if (empty($allowed) || !in_array($new_status, $allowed, true)) {
 			return;
 		}
+		if ($this->should_skip_auto_order_sync($order_id)) {
+			return;
+		}
 		$sync_service = new Hesabix_V2_Sync_Service();
 		$sync_service->sync_order($order_id);
+	}
+
+	/**
+	 * متاباکس سفارش: توقف همگام خودکار + لینک به فهرست
+	 *
+	 * @return void
+	 */
+	public function add_order_hesabix_meta_box()
+	{
+		$screens = array('shop_order');
+		if (function_exists('wc_get_page_screen_id')) {
+			$screens[] = wc_get_page_screen_id('shop-order');
+		}
+		foreach (array_unique($screens) as $screen) {
+			if (!$screen) {
+				continue;
+			}
+			add_meta_box(
+				'hesabix_v2_order_sync_panel',
+				__('حسابیکس — همگام‌سازی', 'hesabix-v2'),
+				array($this, 'render_order_hesabix_meta_box'),
+				$screen,
+				'side',
+				'default'
+			);
+		}
+	}
+
+	/**
+	 * @param WP_Post|WC_Order $post_or_order_object
+	 * @return void
+	 */
+	public function render_order_hesabix_meta_box($post_or_order_object)
+	{
+		if (!current_user_can('manage_woocommerce')) {
+			return;
+		}
+
+		$order = ($post_or_order_object instanceof WP_Post)
+			? wc_get_order($post_or_order_object->ID)
+			: $post_or_order_object;
+		if (!$order instanceof WC_Order) {
+			return;
+		}
+
+		$oid = (int) $order->get_id();
+		wp_nonce_field('hesabix_v2_order_panel', 'hesabix_v2_order_panel_nonce');
+		$paused = Hesabix_V2_Order_Sync_Meta::is_pause_auto_sync($oid);
+		$row = Hesabix_V2_Invoice_Service::get_sync_status($oid);
+		$hx_status = __('ارسال نشده', 'hesabix-v2');
+		if ($row && !empty($row['hesabix_id'])) {
+			$st = isset($row['sync_status']) ? (string) $row['sync_status'] : 'synced';
+			if ($st === 'error') {
+				$hx_status = __('خطا', 'hesabix-v2');
+			} elseif ($st === 'pending') {
+				$hx_status = __('در انتظار', 'hesabix-v2');
+			} else {
+				$hx_status = sprintf(
+					/* translators: %d: Hesabix invoice id */
+					__('ارسال شده (فاکتور %d)', 'hesabix-v2'),
+					(int) $row['hesabix_id']
+				);
+			}
+		}
+
+		echo '<p><strong>' . esc_html__('وضعیت حسابیکس:', 'hesabix-v2') . '</strong> ' . esc_html($hx_status) . '</p>';
+		echo '<p class="description">' . esc_html__(
+			'اگر فاکتور را در حسابیکس دستی ویرایش کرده‌اید، با فعال کردن گزینهٔ زیر از بازنویسی خودکار توسط ووکامرس جلوگیری کنید.',
+			'hesabix-v2'
+		) . '</p>';
+		echo '<p><label><input type="checkbox" name="hesabix_v2_pause_auto_sync" value="1" ' . checked($paused, true, false) . ' /> ';
+		echo esc_html__('توقف همگام‌سازی خودکار برای این سفارش', 'hesabix-v2');
+		echo '</label></p>';
+		printf(
+			'<p><a href="%s">%s</a></p>',
+			esc_url(admin_url('admin.php?page=hesabix-v2-orders')),
+			esc_html__('فهرست سفارش‌ها و عملیات دسته‌ای…', 'hesabix-v2')
+		);
+	}
+
+	/**
+	 * @param int|mixed        $order_id
+	 * @param WC_Order|null    $order
+	 * @return void
+	 */
+	public function save_order_hesabix_meta_box($order_id, $order = null)
+	{
+		if (!isset($_POST['hesabix_v2_order_panel_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['hesabix_v2_order_panel_nonce'])), 'hesabix_v2_order_panel')) {
+			return;
+		}
+		if (!current_user_can('manage_woocommerce')) {
+			return;
+		}
+
+		if ($order instanceof WC_Order) {
+			$oid = (int) $order->get_id();
+		} else {
+			$oid = (int) $order_id;
+		}
+		if ($oid < 1) {
+			return;
+		}
+
+		$pause = !empty($_POST['hesabix_v2_pause_auto_sync']);
+		Hesabix_V2_Order_Sync_Meta::set_pause_auto_sync($oid, $pause);
+	}
+
+	/**
+	 * AJAX: ارسال/به‌روزرسانی دستهٔ کوچک سفارش‌ها در حسابیکس
+	 *
+	 * @return void
+	 */
+	public function ajax_orders_sync_batch()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$raw = isset($_POST['order_ids']) ? wp_unslash($_POST['order_ids']) : array();
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, 8);
+		if (empty($ids)) {
+			wp_send_json_error(array('message' => __('سفارشی انتخاب نشده است.', 'hesabix-v2')));
+		}
+
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$results = array();
+		foreach ($ids as $oid) {
+			$r = $sync_service->sync_order($oid);
+			$results[] = array(
+				'order_id' => $oid,
+				'success' => !empty($r['success']),
+				'message' => isset($r['message']) ? (string) $r['message'] : '',
+			);
+		}
+
+		wp_send_json_success(array('results' => $results));
+	}
+
+	/**
+	 * AJAX: لغو ارسال (حذف فاکتور) برای چند سفارش
+	 *
+	 * @return void
+	 */
+	public function ajax_orders_unsync_batch()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$raw = isset($_POST['order_ids']) ? wp_unslash($_POST['order_ids']) : array();
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, 8);
+		if (empty($ids)) {
+			wp_send_json_error(array('message' => __('سفارشی انتخاب نشده است.', 'hesabix-v2')));
+		}
+
+		$results = array();
+		foreach ($ids as $oid) {
+			$r = Hesabix_V2_Invoice_Service::unsync_order_from_hesabix($oid);
+			$results[] = array(
+				'order_id' => $oid,
+				'success' => !empty($r['success']),
+				'message' => isset($r['message']) ? (string) $r['message'] : '',
+			);
+		}
+
+		wp_send_json_success(array('results' => $results));
+	}
+
+	/**
+	 * AJAX: تنظیم توقف همگام‌سازی خودکار
+	 *
+	 * @return void
+	 */
+	public function ajax_orders_set_pause()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		$order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+		$pause = !empty($_POST['pause']);
+		if ($order_id < 1) {
+			wp_send_json_error(array('message' => __('سفارش نامعتبر است.', 'hesabix-v2')));
+		}
+		if (!current_user_can('manage_woocommerce')) {
+			wp_send_json_error(array('message' => __('مجوز کافی نیست.', 'hesabix-v2')));
+		}
+
+		Hesabix_V2_Order_Sync_Meta::set_pause_auto_sync($order_id, $pause);
+		wp_send_json_success(array('pause' => $pause));
+	}
+
+	/**
+	 * AJAX: فهرست حساب‌ها برای تراز افتتاحیه
+	 *
+	 * @return void
+	 */
+	public function ajax_opening_inventory_accounts()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$api = new Hesabix_V2_Api();
+		$res = $api->get_accounts_flat();
+		$items = array();
+		$data = Hesabix_V2_Opening_Inventory_Service::get_api_data_array($res);
+		if (is_array($data) && isset($data['items']) && is_array($data['items'])) {
+			foreach ($data['items'] as $row) {
+				if (!is_array($row) || empty($row['id'])) {
+					continue;
+				}
+				$code = isset($row['code']) ? (string) $row['code'] : '';
+				$name = isset($row['name']) ? (string) $row['name'] : '';
+				$items[] = array(
+					'id' => (int) $row['id'],
+					'label' => trim($code . ' — ' . $name),
+				);
+			}
+		}
+
+		wp_send_json_success(
+			array(
+				'accounts' => $items,
+				'message' => empty($items) ? __('حسابی برنگشت؛ دسترسی chart_of_accounts.view و اتصال را بررسی کنید.', 'hesabix-v2') : '',
+			)
+		);
+	}
+
+	/**
+	 * @return void
+	 */
+	public function ajax_opening_inventory_prepare()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$cost = isset($_POST['cost_basis']) ? sanitize_key(wp_unslash($_POST['cost_basis'])) : 'regular';
+		if (!in_array($cost, array('regular', 'sale', 'zero'), true)) {
+			$cost = 'regular';
+		}
+
+		$options = array(
+			'include_tax' => !empty($_POST['include_tax']),
+			'cost_basis' => $cost,
+			'auto_balance_to_equity' => !empty($_POST['auto_balance_to_equity']),
+			'do_post' => !empty($_POST['do_post']),
+			'inventory_account_id' => isset($_POST['inventory_account_id']) ? absint(wp_unslash($_POST['inventory_account_id'])) : 0,
+			'equity_account_id' => isset($_POST['equity_account_id']) ? absint(wp_unslash($_POST['equity_account_id'])) : 0,
+			'batch_size' => isset($_POST['batch_size']) ? absint(wp_unslash($_POST['batch_size'])) : 12,
+			'warehouse_id' => isset($_POST['warehouse_id']) ? absint(wp_unslash($_POST['warehouse_id'])) : 0,
+		);
+
+		$res = Hesabix_V2_Opening_Inventory_Service::job_prepare(get_current_user_id(), $options);
+		if (empty($res['success'])) {
+			wp_send_json_error(array('message' => $res['message'] ?? __('آماده‌سازی ناموفق', 'hesabix-v2')));
+		}
+
+		unset($res['success']);
+		wp_send_json_success($res);
+	}
+
+	/**
+	 * @return void
+	 */
+	public function ajax_opening_inventory_batch()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+		$job_id = isset($_POST['job_id']) ? sanitize_key(wp_unslash((string) $_POST['job_id'])) : '';
+		$res = Hesabix_V2_Opening_Inventory_Service::job_run_batch($job_id, get_current_user_id());
+		if (empty($res['success'])) {
+			wp_send_json_error($res);
+		}
+		wp_send_json_success($res);
+	}
+
+	/**
+	 * @return void
+	 */
+	public function ajax_opening_inventory_finalize()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+		$job_id = isset($_POST['job_id']) ? sanitize_key(wp_unslash((string) $_POST['job_id'])) : '';
+		$res = Hesabix_V2_Opening_Inventory_Service::job_finalize($job_id, get_current_user_id());
+		if (empty($res['success'])) {
+			wp_send_json_error($res);
+		}
+		wp_send_json_success($res);
 	}
 
 	/**

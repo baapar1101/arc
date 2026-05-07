@@ -508,11 +508,48 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
 
 
 
+  Future<void> _applyNewCustomerDialogResult(Person? result) async {
+    if (result == null || !mounted) return;
+
+    final personId = result.id;
+
+    if (personId != null) {
+      try {
+        final customer = await _customerService.getCustomerById(
+          businessId: widget.businessId,
+          customerId: personId,
+        );
+
+        if (customer != null && mounted) {
+          widget.onCustomerChanged(customer);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    await _loadRecentCustomers();
+
+    if (_customers.isEmpty) return;
+
+    Customer pickLatestCustomer() {
+      final sorted = List<Customer>.from(_customers);
+      sorted.sort((a, b) => b.id.compareTo(a.id));
+      return sorted.first;
+    }
+
+    final Customer resolved;
+    if (personId != null) {
+      final sameId = _customers.where((c) => c.id == personId).toList();
+      resolved = sameId.isNotEmpty ? sameId.first : pickLatestCustomer();
+    } else {
+      resolved = pickLatestCustomer();
+    }
+
+    widget.onCustomerChanged(resolved);
+  }
+
   Future<void> _addNewPerson(BuildContext bottomSheetContext) async {
-    // ذخیره متن جستجو شده
     final searchQuery = _searchController.text.trim();
-    
-    // بستن bottom sheet قبل از باز کردن dialog
     Navigator.pop(bottomSheetContext);
 
     final result = await showDialog<Person?>(
@@ -523,52 +560,26 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
       ),
     );
-    
-    if (result != null && mounted) {
-      // Customer ID همان Person ID است (چون Customer یک view از Person است)
-      final personId = result.id;
-      
-      if (personId != null) {
-        // سعی می‌کنیم Customer را با ID پیدا کنیم
-        try {
-          final customer = await _customerService.getCustomerById(
-            businessId: widget.businessId,
-            customerId: personId,
-          );
-          
-          if (customer != null && mounted) {
-            widget.onCustomerChanged(customer);
-            return;
-          }
-        } catch (_) {
-          // اگر خطا رخ داد، به روش fallback برمی‌گردیم
-        }
-      }
-      
-      // Fallback: Refresh لیست و پیدا کردن Customer جدید
-      await _loadRecentCustomers();
-      
-      // پیدا کردن Customer جدید (با بیشترین ID یا با Person ID)
-      if (_customers.isNotEmpty) {
-        Customer? foundCustomer;
-        if (personId != null) {
-          // سعی می‌کنیم Customer را با Person ID پیدا کنیم
-          foundCustomer = _customers.firstWhere(
-            (c) => c.id == personId,
-            orElse: () => _customers.first,
-          );
-        }
-        
-        if (foundCustomer == null) {
-          // اگر پیدا نشد، جدیدترین Customer را انتخاب می‌کنیم
-          final sortedCustomers = List<Customer>.from(_customers);
-          sortedCustomers.sort((a, b) => b.id.compareTo(a.id));
-          foundCustomer = sortedCustomers.first;
-        }
-        
-        widget.onCustomerChanged(foundCustomer);
-      }
-    }
+
+    await _applyNewCustomerDialogResult(result);
+  }
+
+  /// افزودن طرف حساب از دکمه + داخل فیلد
+  Future<void> _addNewCustomerFromField() async {
+    _removeDesktopOverlay();
+    FocusManager.instance.primaryFocus?.unfocus();
+    final searchQuery = _searchController.text.trim();
+
+    final result = await showDialog<Person?>(
+      context: context,
+      builder: (context) => PersonFormDialog(
+        businessId: widget.businessId,
+        onSuccess: () {},
+        initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
+      ),
+    );
+
+    await _applyNewCustomerDialogResult(result);
   }
 
   void _showCustomerPicker() {
@@ -674,6 +685,16 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                         maxLines: 1,
                       ),
               ),
+              Tooltip(
+                message: 'افزودن طرف حساب جدید',
+                child: IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.add, color: colorScheme.primary, size: 22),
+                  onPressed: _addNewCustomerFromField,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                ),
+              ),
               Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6)),
             ],
           ),
@@ -705,10 +726,23 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                 hintText: widget.hintText,
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.person_search),
-                suffixIcon: IconButton(
-                  tooltip: 'انتخاب پیشرفته',
-                  icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
-                  onPressed: _showCustomerPicker,
+                suffixIconConstraints: const BoxConstraints(minHeight: 48, minWidth: 120),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'افزودن طرف حساب جدید',
+                      icon: Icon(Icons.add, color: colorScheme.primary),
+                      onPressed: _addNewCustomerFromField,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    IconButton(
+                      tooltip: 'انتخاب پیشرفته',
+                      icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                      onPressed: _showCustomerPicker,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
                 ),
               ),
               onTap: () {

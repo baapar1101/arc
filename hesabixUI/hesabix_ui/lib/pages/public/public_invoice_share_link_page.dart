@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:hesabix_ui/config/app_config.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/services/public_invoice_share_service.dart';
@@ -449,11 +450,20 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     return num.tryParse(v.toString());
   }
 
+  bool _businessHasLogo(Map<String, dynamic> b) => b['has_logo'] == true;
+
+  String _invoiceShareLogoImageUrl() {
+    final base = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    final c = Uri.encodeComponent(widget.code);
+    return '$base/api/v1/public/invoice-links/$c/business-logo';
+  }
+
   Widget _buildBusinessCard(ThemeData theme, Map<String, dynamic> b) {
     final name = b['name']?.toString() ?? '—';
     final address = b['address']?.toString();
     final phone = b['phone']?.toString();
     final mobile = b['mobile']?.toString();
+    final showLogo = _businessHasLogo(b);
 
     return Card(
       elevation: 1,
@@ -462,6 +472,24 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (showLogo) ...[
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    _invoiceShareLogoImageUrl(),
+                    height: 76,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.storefront_outlined,
+                      size: 56,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
             Text(
               'کسب‌وکار',
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),

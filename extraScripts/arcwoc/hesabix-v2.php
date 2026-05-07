@@ -8,7 +8,7 @@
  * Plugin Name:       Hesabix V2: WooCommerce
  * Plugin URI:        https://hesabix.ir/
  * Description:       اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید
- * Version:           3.1.2
+ * Version:           3.3.1
  * Author:            Hesabix Team
  * Author URI:        https://hesabix.ir
  * License:           GPL-3.0+
@@ -28,7 +28,7 @@ if (!defined('WPINC')) {
 /**
  * Currently plugin version.
  */
-define('HESABIX_V2_VERSION', '3.1.2');
+define('HESABIX_V2_VERSION', '3.3.1');
 define('HESABIX_V2_PLUGIN_FILE', __FILE__);
 define('HESABIX_V2_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HESABIX_V2_PLUGIN_DIR', plugin_dir_path(__FILE__));

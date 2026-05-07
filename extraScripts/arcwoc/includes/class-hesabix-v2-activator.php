@@ -107,6 +107,9 @@ class Hesabix_V2_Activator
 			update_option('hesabix_v2_debug_mode', false);
 		}
 
+		add_option('hesabix_v2_opening_inventory_completed', false);
+		add_option('hesabix_v2_opening_inventory_prefs', array());
+
 		// Default sync settings
 		$default_sync_settings = array(
 			'auto_sync_products' => true,

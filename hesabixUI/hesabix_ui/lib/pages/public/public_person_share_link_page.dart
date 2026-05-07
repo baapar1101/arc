@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../config/app_config.dart';
 import '../../core/date_utils.dart';
 import '../../models/public_person_share_payload.dart';
 import '../../models/public_invoice_details.dart';
@@ -237,6 +238,12 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
     );
   }
 
+  String _personShareLogoImageUrl() {
+    final base = AppConfig.apiBaseUrl.replaceAll(RegExp(r'/+$'), '');
+    final c = Uri.encodeComponent(widget.code);
+    return '$base/api/v1/public/person-links/$c/business-logo';
+  }
+
   Widget _buildBusinessCard(ThemeData theme, PublicPersonSharePayload data) {
     final business = data.business;
     return Card(
@@ -246,6 +253,24 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (business.hasLogo) ...[
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.network(
+                    _personShareLogoImageUrl(),
+                    height: 76,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.business,
+                      size: 56,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
             Text('اطلاعات کسب‌وکار', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             _businessInfoRow(theme, Icons.business, business.name ?? 'نامشخص'),

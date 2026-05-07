@@ -1153,8 +1153,41 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   Future<void> _exportData(String format, bool selectedOnly) async {
+    await _runExport(
+      format,
+      selectedOnly,
+      mergedBodyParamsOverride: null,
+      useGetExportParams: true,
+      pdfTemplateOverride: null,
+    );
+  }
+
+  /// فراخوانی از بیرون (مثلاً [ProductsPage]): خروجی با پارامترهای اضافی، بدون ادغام [DataTableConfig.getExportParams].
+  /// مقدار `true` یعنی فایل با موفقیت ذخیره شد.
+  Future<bool> exportWithMergedBodyParams({
+    required String format,
+    required bool selectedOnly,
+    required Map<String, dynamic> mergedBodyParams,
+    int? pdfTemplateId,
+  }) async {
+    return _runExport(
+      format,
+      selectedOnly,
+      mergedBodyParamsOverride: mergedBodyParams,
+      useGetExportParams: false,
+      pdfTemplateOverride: pdfTemplateId,
+    );
+  }
+
+  Future<bool> _runExport(
+    String format,
+    bool selectedOnly, {
+    Map<String, dynamic>? mergedBodyParamsOverride,
+    required bool useGetExportParams,
+    int? pdfTemplateOverride,
+  }) async {
     if (widget.config.excelEndpoint == null && widget.config.pdfEndpoint == null) {
-      return;
+      return false;
     }
 
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
@@ -1165,14 +1198,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     try {
       final api = ApiClient();
-      final endpoint = format == 'excel' 
-          ? widget.config.excelEndpoint! 
+      final endpoint = format == 'excel'
+          ? widget.config.excelEndpoint!
           : widget.config.pdfEndpoint!;
-      
+
       // Build QueryInfo object
       final filters = <Map<String, dynamic>>[];
-      
-      // Add column filters
+
       _columnSearchValues.forEach((column, value) {
         if (value.isNotEmpty) {
           final searchType = _columnSearchTypes[column] ?? 'contains';
@@ -1201,15 +1233,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
       });
 
-
       final queryInfo = <String, dynamic>{
         'sort_by': _sortBy,
         'sort_desc': _sortDesc,
         'take': _limit,
         'skip': (_page - 1) * _limit,
         'search': _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null,
-        'search_fields': _searchCtrl.text.isNotEmpty && widget.config.searchFields.isNotEmpty 
-            ? widget.config.searchFields 
+        'search_fields': _searchCtrl.text.isNotEmpty && widget.config.searchFields.isNotEmpty
+            ? widget.config.searchFields
             : null,
         'filters': filters.isNotEmpty ? filters : null,
       };
@@ -1223,10 +1254,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         'selected_only': selectedOnly,
       };
 
-      // Add selected row indices if exporting selected only
       if (selectedOnly && _selectedRows.isNotEmpty) {
         params['selected_indices'] = _selectedRows.toList();
-        // Prefer stable keys for selected rows (avoids index mismatch when backend exports with different paging/sort)
         try {
           final keys = <Map<String, dynamic>>[];
           for (final i in _selectedRows) {
@@ -1241,25 +1270,27 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           }
         } catch (_) {}
       }
-      // Optional report template for PDF
-      if (format == 'pdf' && _templateIdForExport != null) {
-        params['template_id'] = _templateIdForExport;
-      }
 
-      // Add export columns in current visible order (excluding ActionColumn)
       final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
           ? _visibleColumns
           : widget.config.columns;
       final dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
       params['export_columns'] = dataColumnsToShow.map((c) => {
-        'key': c.key,
-        'label': c.label,
-      }).toList();
+            'key': c.key,
+            'label': c.label,
+          }).toList();
 
-      // Add custom export parameters if provided
-      if (widget.config.getExportParams != null) {
-        final customParams = widget.config.getExportParams!();
-        params.addAll(customParams);
+      if (useGetExportParams && widget.config.getExportParams != null) {
+        params.addAll(widget.config.getExportParams!());
+      }
+
+      final tid = pdfTemplateOverride ?? _templateIdForExport;
+      if (format == 'pdf' && tid != null) {
+        params['template_id'] = tid;
+      }
+
+      if (mergedBodyParamsOverride != null && mergedBodyParamsOverride.isNotEmpty) {
+        params.addAll(mergedBodyParamsOverride);
       }
 
       final response = await api.post(
@@ -1270,21 +1301,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         },
         options: Options(
           headers: {
-            // Calendar type based on current locale
             'X-Calendar-Type': (() {
-              // Prefer user-selected calendar if calendarController is provided
               final cc = widget.calendarController;
               if (cc != null) {
                 return cc.isJalali ? 'jalali' : 'gregorian';
               }
-              // Fallback: use persisted app_calendar_type (loaded earlier)
               final pref = _exportCalendarType;
               if (pref == 'jalali' || pref == 'gregorian') return pref;
               final loc = Localizations.localeOf(context);
               final lang = (loc.languageCode).toLowerCase();
               return (lang == 'fa') ? 'jalali' : 'gregorian';
             })(),
-            // Send full locale code if available (e.g., fa-IR)
             'Accept-Language': (() {
               final loc = Localizations.localeOf(context);
               final lang = loc.languageCode;
@@ -1293,11 +1320,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             })(),
           },
         ),
-        responseType: ResponseType.bytes, // Both PDF and Excel now return binary data
+        responseType: ResponseType.bytes,
       );
 
       if (response.data != null) {
-        // Determine filename from Content-Disposition header if present
         String? contentDisposition = response.headers.value('content-disposition');
         String filename = 'export_${DateTime.now().millisecondsSinceEpoch}.${format == 'pdf' ? 'pdf' : 'xlsx'}';
         if (contentDisposition != null) {
@@ -1329,11 +1355,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         } else if (format == 'excel') {
           await _downloadExcel(response.data, filename);
         }
-        
+
         if (mounted) {
           SnackBarHelper.showSuccess(context, message: t.exportSuccess);
         }
+        return true;
       }
+      return false;
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -1341,6 +1369,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           message: '${t.exportError}: ${ErrorExtractor.forContext(e, context)}',
         );
       }
+      return false;
     } finally {
       if (mounted) {
         setState(() {
@@ -1736,24 +1765,38 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           ),
           const SizedBox(width: 12),
         ],
-        if (widget.config.title != null)
-          Text(
-            widget.config.title!,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
+        if (widget.config.title != null || widget.config.subtitle != null)
+          Flexible(
+            flex: isMobileHeader ? 1 : 2,
+            child: Row(
+              children: [
+                if (widget.config.title != null)
+                  Expanded(
+                    child: Text(
+                      widget.config.title!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                if (widget.config.title != null && widget.config.subtitle != null) const SizedBox(width: 8),
+                if (widget.config.subtitle != null)
+                  Flexible(
+                    child: Text(
+                      widget.config.subtitle!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-        if (widget.config.title != null && widget.config.subtitle != null) ...[
-          const SizedBox(width: 8),
-          Text(
-            widget.config.subtitle!,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-        const Spacer(),
         
         if (isMobileHeader)
           Tooltip(
@@ -1764,32 +1807,44 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               tooltip: 'امکانات بیشتر',
             ),
           )
-        else ...[
-          // Clear filters button (only show when filters are applied)
-          if (widget.config.showClearFiltersButton && _hasActiveFilters()) ...[
-            Tooltip(
-              message: t.clear,
-              child: IconButton(
-                onPressed: _clearAllFilters,
-                icon: const Icon(Icons.clear_all),
-                tooltip: t.clear,
-              ),
+        else
+          Expanded(
+            flex: 3,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  reverse: true,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.config.customHeaderActions != null) ...widget.config.customHeaderActions!,
+                        if (widget.config.showExportButtons &&
+                            (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null)) ...[
+                          const SizedBox(width: 8),
+                          _buildExportButtons(t, theme),
+                        ],
+                        if (widget.config.showClearFiltersButton && _hasActiveFilters()) ...[
+                          const SizedBox(width: 4),
+                          Tooltip(
+                            message: t.clear,
+                            child: IconButton(
+                              onPressed: _clearAllFilters,
+                              icon: const Icon(Icons.clear_all),
+                              tooltip: t.clear,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
-            const SizedBox(width: 4),
-          ],
-          
-          // Export buttons
-          if (widget.config.showExportButtons && (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null)) ...[
-            _buildExportButtons(t, theme),
-            const SizedBox(width: 8),
-          ],
-          
-          // Custom header actions
-          if (widget.config.customHeaderActions != null) ...[
-            const SizedBox(width: 8),
-            ...widget.config.customHeaderActions!,
-          ],
-        ],
+          ),
         
         // Actions menu
         PopupMenuButton<String>(
@@ -1809,6 +1864,21 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 });
                 _saveDensityPreference();
                 break;
+              case 'exportOptions':
+                _showExportOptions(t, theme);
+                break;
+              case 'exportExcelAll':
+                _exportData('excel', false);
+                break;
+              case 'exportPdfAll':
+                _exportData('pdf', false);
+                break;
+              case 'exportExcelSelected':
+                _exportData('excel', true);
+                break;
+              case 'exportPdfSelected':
+                _exportData('pdf', true);
+                break;
             }
           },
           itemBuilder: (context) => [
@@ -1820,6 +1890,97 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     const Icon(Icons.refresh, size: 20),
                     const SizedBox(width: 8),
                     Text(t.refresh),
+                  ],
+                ),
+              ),
+            if (widget.config.showExportButtons &&
+                widget.config.excelEndpoint != null) ...[
+              PopupMenuItem(
+                value: 'exportExcelAll',
+                enabled: !_isExporting,
+                child: Row(
+                  children: [
+                    Icon(Icons.table_chart, size: 20, color: Colors.green[700]),
+                    const SizedBox(width: 8),
+                    Text(t.exportToExcel),
+                    const SizedBox(width: 6),
+                    Text('(${t.exportAll})', style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              if (widget.config.enableRowSelection && _selectedRows.isNotEmpty)
+                PopupMenuItem(
+                  value: 'exportExcelSelected',
+                  enabled: !_isExporting,
+                  child: Row(
+                    children: [
+                      Icon(Icons.table_chart_outlined, size: 20, color: Colors.green[700]),
+                      const SizedBox(width: 8),
+                      Text(t.exportToExcel),
+                      const SizedBox(width: 6),
+                      Text('(${t.exportSelected})', style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+            ],
+            if (widget.config.showExportButtons &&
+                widget.config.pdfEndpoint != null) ...[
+              PopupMenuItem(
+                value: 'exportPdfAll',
+                enabled: !_isExporting,
+                child: Row(
+                  children: [
+                    Icon(Icons.picture_as_pdf, size: 20, color: Colors.red[700]),
+                    const SizedBox(width: 8),
+                    Text(t.exportToPdf),
+                    const SizedBox(width: 6),
+                    Text('(${t.exportAll})', style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              if (widget.config.enableRowSelection && _selectedRows.isNotEmpty)
+                PopupMenuItem(
+                  value: 'exportPdfSelected',
+                  enabled: !_isExporting,
+                  child: Row(
+                    children: [
+                      Icon(Icons.picture_as_pdf_outlined, size: 20, color: Colors.red[700]),
+                      const SizedBox(width: 8),
+                      Text(t.exportToPdf),
+                      const SizedBox(width: 6),
+                      Text('(${t.exportSelected})', style: theme.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+            ],
+            if (widget.config.showExportButtons &&
+                (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null))
+              PopupMenuItem(
+                value: 'exportOptions',
+                enabled: !_isExporting,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 2),
+                      child: Icon(Icons.settings_outlined, size: 20),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(t.export),
+                          Text(
+                            t.crmNotesEditorMoreOptions,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1896,10 +2057,70 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
-                if (hasExportButtons)
+                if (hasExportButtons) ...[
+                  Text(
+                    t.export,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (widget.config.excelEndpoint != null)
+                    ListTile(
+                      leading: Icon(Icons.table_chart, color: Colors.green[700]),
+                      title: Text(t.exportToExcel),
+                      subtitle: Text(t.exportAll),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _exportData('excel', false);
+                      },
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  if (widget.config.excelEndpoint != null &&
+                      widget.config.enableRowSelection &&
+                      _selectedRows.isNotEmpty)
+                    ListTile(
+                      leading: Icon(Icons.table_chart_outlined, color: Colors.green[700]),
+                      title: Text(t.exportToExcel),
+                      subtitle: Text(t.exportSelected),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _exportData('excel', true);
+                      },
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  if (widget.config.pdfEndpoint != null)
+                    ListTile(
+                      leading: Icon(Icons.picture_as_pdf, color: Colors.red[700]),
+                      title: Text(t.exportToPdf),
+                      subtitle: Text(t.exportAll),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _exportData('pdf', false);
+                      },
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  if (widget.config.pdfEndpoint != null &&
+                      widget.config.enableRowSelection &&
+                      _selectedRows.isNotEmpty)
+                    ListTile(
+                      leading: Icon(Icons.picture_as_pdf_outlined, color: Colors.red[700]),
+                      title: Text(t.exportToPdf),
+                      subtitle: Text(t.exportSelected),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        _exportData('pdf', true);
+                      },
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
                   ListTile(
-                    leading: const Icon(Icons.download),
+                    leading: const Icon(Icons.settings_outlined),
                     title: Text(t.export),
+                    subtitle: Text(t.crmNotesEditorMoreOptions),
                     onTap: () {
                       Navigator.of(sheetContext).pop();
                       _showExportOptions(t, theme);
@@ -1907,6 +2128,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
+                  const SizedBox(height: 8),
+                ],
                 if (customActions.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(

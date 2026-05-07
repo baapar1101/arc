@@ -12,7 +12,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../core/calendar_controller.dart';
 import '../core/auth_store.dart';
 import '../core/locale_controller.dart';
-import '../core/referral_store.dart';
+import '../core/mobile_launcher_prefs.dart';
 import '../theme/theme_controller.dart';
 import '../utils/number_normalizer.dart';
 import '../utils/password_validator.dart';
@@ -535,9 +535,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   
                   if (!mounted) return true;
                   SnackBarHelper.show(context, message: AppLocalizations.of(context).homeWelcome);
-                  
-                  // هدایت به dashboard
-                  context.go('/user/profile/dashboard');
+
+                  final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
+                  if (!mounted) return true;
+                  context.go(home);
                   return true;
                 }
                 return false;
@@ -741,12 +742,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           // اگر در صفحه محافظت شده بود، همان صفحه را refresh کند
           context.go(currentPath);
         } else {
-          // وگرنه به dashboard برود
-          context.go('/user/profile/dashboard');
+          final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
+          if (!mounted) return;
+          context.go(home);
         }
       } catch (e) {
         // اگر GoRouterState در دسترس نیست، به dashboard برود
-        context.go('/user/profile/dashboard');
+        final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
+        if (!mounted) return;
+        context.go(home);
       }
     } catch (e) {
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
@@ -872,7 +876,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       // پاکسازی کد معرف پس از ثبت‌نام موفق
       unawaited(ReferralStore.clearReferrer());
       if (mounted) {
-        context.go('/user/profile/dashboard');
+        final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
+        if (!mounted) return;
+        context.go(home);
       }
     } catch (e) {
       if (!mounted) return;

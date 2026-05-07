@@ -83,7 +83,7 @@ class Hesabix_V2_Api
 		}
 
 		// Add business and fiscal year headers for business endpoints
-		if (strpos($endpoint, '/business/') !== false || strpos($endpoint, '/businesses/') !== false) {
+		if (strpos($endpoint, '/business/') !== false || strpos($endpoint, '/businesses/') !== false || strpos($endpoint, '/accounts/') !== false) {
 			if ($this->business_id) {
 				$headers['X-Business-ID'] = $this->business_id;
 			}
@@ -1079,5 +1079,105 @@ class Hesabix_V2_Api
 			"/currencies/business/" . (int) $this->business_id
 		);
 	}
-}
 
+	// ==================== Opening balance ====================
+
+	/**
+	 * تراز افتتاحیه سال مالی
+	 *
+	 * @param int|null $fiscal_year_id
+	 * @return array
+	 */
+	public function get_opening_balance($fiscal_year_id = null)
+	{
+		$bid = (int) $this->business_id;
+		if (!$bid) {
+			return array(
+				'success' => false,
+				'message' => __('شناسه کسب‌وکار تنظیم نشده است.', 'hesabix-v2'),
+			);
+		}
+		$q = '';
+		if ($fiscal_year_id !== null && (int) $fiscal_year_id > 0) {
+			$q = '?fiscal_year_id=' . (int) $fiscal_year_id;
+		}
+		return $this->request(
+			'GET',
+			"/businesses/{$bid}/opening-balance{$q}",
+			null,
+			45
+		);
+	}
+
+	/**
+	 * ذخیره / به‌روزرسانی تراز افتتاحیه
+	 *
+	 * @param array $body
+	 * @return array
+	 */
+	public function upsert_opening_balance($body)
+	{
+		$bid = (int) $this->business_id;
+		if (!$bid) {
+			return array(
+				'success' => false,
+				'message' => __('شناسه کسب‌وکار تنظیم نشده است.', 'hesabix-v2'),
+			);
+		}
+		return $this->request(
+			'PUT',
+			"/businesses/{$bid}/opening-balance",
+			$body,
+			120
+		);
+	}
+
+	/**
+	 * نهایی‌سازی تراز افتتاحیه
+	 *
+	 * @param int|null $fiscal_year_id
+	 * @return array
+	 */
+	public function post_opening_balance($fiscal_year_id = null)
+	{
+		$bid = (int) $this->business_id;
+		if (!$bid) {
+			return array(
+				'success' => false,
+				'message' => __('شناسه کسب‌وکار تنظیم نشده است.', 'hesabix-v2'),
+			);
+		}
+		$q = '';
+		if ($fiscal_year_id !== null && (int) $fiscal_year_id > 0) {
+			$q = '?fiscal_year_id=' . (int) $fiscal_year_id;
+		}
+		return $this->request(
+			'POST',
+			"/businesses/{$bid}/opening-balance/post{$q}",
+			null,
+			60
+		);
+	}
+
+	/**
+	 * لیست تخت حساب‌ها (کد + نام)
+	 *
+	 * @return array
+	 */
+	public function get_accounts_flat()
+	{
+		$bid = (int) $this->business_id;
+		if (!$bid) {
+			return array(
+				'success' => false,
+				'message' => __('شناسه کسب‌وکار تنظیم نشده است.', 'hesabix-v2'),
+			);
+		}
+		return $this->request(
+			'GET',
+			'/accounts/business/' . $bid,
+			null,
+			60
+		);
+	}
+}
