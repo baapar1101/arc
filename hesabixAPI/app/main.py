@@ -427,6 +427,10 @@ def create_app() -> FastAPI:
             }
         },
         {
+            "name": "admin-system-services",
+            "description": "لاگ/وضعیت systemd؛ استقرار Docker و مجوزها: docs/SERVICE_LOGS_ADMIN_API.md",
+        },
+        {
             "name": "هوش مصنوعی",
             "description": """
 چت با هوش مصنوعی، تحلیل داده‌ها و پیشنهادات هوشمند

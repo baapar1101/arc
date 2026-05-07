@@ -32,7 +32,6 @@ from app.core.permissions import require_app_permission
 router = APIRouter(
 	prefix="/admin/system-services",
 	tags=["admin-system-services"],
-	description="لاگ/وضعیت systemd؛ استقرار Docker و مجوزها: docs/SERVICE_LOGS_ADMIN_API.md",
 )
 
 logger = logging.getLogger(__name__)
