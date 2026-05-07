@@ -47,8 +47,12 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
     final cs = theme.colorScheme;
     final title = _pickerProductDisplayLine(item);
     final itemType = item['item_type']?.toString() ?? '';
-    final purchaseStr = _pickerFormatMoney(item['base_purchase_price']);
-    final salesStr = _pickerFormatMoney(item['base_sales_price']);
+    final purchaseStr = item['base_purchase_price'] == null
+        ? '—'
+        : _pickerFormatMoney(item['base_purchase_price']);
+    final salesStr = item['base_sales_price'] == null
+        ? '—'
+        : _pickerFormatMoney(item['base_sales_price']);
     final trackInventory = item['track_inventory'] == true;
     final String metricsLine;
     if (!trackInventory) {
@@ -292,6 +296,16 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   bool _loadingCategories = false;
   int? _selectedCategoryId;
 
+  double _desktopOverlayHeight(_ProductPickerState state) {
+    if (state.isLoading && state.items.isEmpty) return 120;
+    if (!state.isLoading && state.items.isEmpty) return 100;
+    final extraRow = (state.isLoadingMore || (state.isLoading && state.items.isNotEmpty)) ? 1 : 0;
+    final rows = state.items.length + extraRow;
+    const rowHeight = 84.0;
+    final raw = (rows * rowHeight) + (state.isLoading ? 6 : 0) + 8;
+    return raw.clamp(100.0, 360.0);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -518,6 +532,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
           child: ValueListenableBuilder<_ProductPickerState>(
             valueListenable: _pickerStateNotifier,
             builder: (context, state, _) {
+              final overlayHeight = _desktopOverlayHeight(state);
               return Material(
                 elevation: 14,
                 surfaceTintColor: cs.surfaceTint,
@@ -525,21 +540,19 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 clipBehavior: Clip.antiAlias,
                 shadowColor: Colors.black.withValues(alpha: 0.22),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 360),
-                  child: SizedBox(
-                    width: width,
-                    child: _buildProductSuggestionsScrollArea(
-                      context: context,
-                      state: state,
-                      scrollController: _overlayScrollController,
-                      onProductSelected: (p) {
-                        _select(p);
-                        _removeDesktopOverlay();
-                      },
-                      highlightedIndex: _highlightedIndex,
-                      dense: true,
-                    ),
+                child: SizedBox(
+                  width: width,
+                  height: overlayHeight,
+                  child: _buildProductSuggestionsScrollArea(
+                    context: context,
+                    state: state,
+                    scrollController: _overlayScrollController,
+                    onProductSelected: (p) {
+                      _select(p);
+                      _removeDesktopOverlay();
+                    },
+                    highlightedIndex: _highlightedIndex,
+                    dense: true,
                   ),
                 ),
               );

@@ -3482,6 +3482,8 @@
   "settingsSystemMonitoringDescription": "Check system status, hardware resources and services",
   "settingsServiceLogs": "Service Logs",
   "settingsServiceLogsDescription": "View logs for hesabix-api, hesabix-rq-worker, and hesabix-notification-moderation and manage services",
+  "settingsBusinessActivityLogs": "Business Activity Logs",
+  "settingsBusinessActivityLogsDescription": "View activity logs across all businesses with filters by date, business, user, and action type",
   "serviceLogsPauseAutoRefreshTooltip": "Pause auto-refresh",
   "serviceLogsResumeAutoRefreshTooltip": "Resume auto-refresh",
   "serviceLogsRefreshTooltip": "Refresh",

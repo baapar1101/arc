@@ -314,6 +314,7 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
                             isRequired: false,
                             documentTypeFilter: docTypeFilter,
                             dense: true,
+                            fixedHeight: 56,
                             onChanged: (a) {
                               r.account = a;
                               onChanged();

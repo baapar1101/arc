@@ -64,175 +64,173 @@ def _get_business_fiscal_year(db: Session, business_id: int) -> FiscalYear:
 
 
 def create_check(db: Session, business_id: int, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
-    ctype = str(data.get('type', '')).lower()
-    if ctype not in ("received", "transferred"):
-        raise ApiError("INVALID_CHECK_TYPE", "Invalid check type", http_status=400)
-
-    person_id = data.get('person_id')
-    if ctype == "received" and not person_id:
-        raise ApiError("PERSON_REQUIRED", "person_id is required for received checks", http_status=400)
-
-    issue_date = _parse_iso(str(data.get('issue_date')))
-    due_date = _parse_iso(str(data.get('due_date')))
-    if due_date < issue_date:
-        raise ApiError("INVALID_DATES", "due_date must be >= issue_date", http_status=400)
-
-    sayad = data.get('sayad_code')
-    if sayad is not None:
-        s = str(sayad).strip()
-        if s and (len(s) != 16 or not s.isdigit()):
-            raise ApiError("INVALID_SAYAD", "sayad_code must be 16 digits", http_status=400)
-
-    amount = data.get('amount')
     try:
-        amount_val = float(amount)
+        ctype = str(data.get('type', '')).lower()
+        if ctype not in ("received", "transferred"):
+            raise ApiError("INVALID_CHECK_TYPE", "Invalid check type", http_status=400)
+
+        person_id = data.get('person_id')
+        if ctype == "received" and not person_id:
+            raise ApiError("PERSON_REQUIRED", "person_id is required for received checks", http_status=400)
+
+        issue_date = _parse_iso(str(data.get('issue_date')))
+        due_date = _parse_iso(str(data.get('due_date')))
+        if due_date < issue_date:
+            raise ApiError("INVALID_DATES", "due_date must be >= issue_date", http_status=400)
+
+        sayad = data.get('sayad_code')
+        if sayad is not None:
+            s = str(sayad).strip()
+            if s and (len(s) != 16 or not s.isdigit()):
+                raise ApiError("INVALID_SAYAD", "sayad_code must be 16 digits", http_status=400)
+
+        amount = data.get('amount')
+        try:
+            amount_val = float(amount)
+        except Exception:
+            raise ApiError("INVALID_AMOUNT", "amount must be a number", http_status=400)
+        if amount_val <= 0:
+            raise ApiError("INVALID_AMOUNT", "amount must be > 0", http_status=400)
+
+        check_number = str(data.get('check_number', '')).strip()
+        if not check_number:
+            raise ApiError("CHECK_NUMBER_REQUIRED", "check_number is required", http_status=400)
+
+        # یونیک بودن در سطح کسب‌وکار
+        exists = db.query(Check).filter(and_(Check.business_id == business_id, Check.check_number == check_number)).first()
+        if exists is not None:
+            raise ApiError("DUPLICATE_CHECK_NUMBER", "Duplicate check number in this business", http_status=400)
+
+        if sayad:
+            exists_sayad = db.query(Check).filter(and_(Check.business_id == business_id, Check.sayad_code == sayad)).first()
+            if exists_sayad is not None:
+                raise ApiError("DUPLICATE_SAYAD", "Duplicate sayad_code in this business", http_status=400)
+
+        obj = Check(
+            business_id=business_id,
+            type=CheckType[ctype.upper()],
+            person_id=int(person_id) if person_id else None,
+            issue_date=issue_date,
+            due_date=due_date,
+            check_number=check_number,
+            sayad_code=str(sayad).strip() if sayad else None,
+            bank_name=(str(data.get('bank_name')).strip() if data.get('bank_name') else None),
+            branch_name=(str(data.get('branch_name')).strip() if data.get('branch_name') else None),
+            amount=amount_val,
+            currency_id=int(data.get('currency_id')),
+        )
+
+        # تعیین وضعیت اولیه
+        if ctype == "received":
+            obj.status = CheckStatus.RECEIVED_ON_HAND
+            obj.current_holder_type = HolderType.BUSINESS
+            obj.current_holder_id = None
+        else:
+            obj.status = CheckStatus.TRANSFERRED_ISSUED
+            obj.current_holder_type = HolderType.PERSON if person_id else HolderType.BUSINESS
+            obj.current_holder_id = int(person_id) if person_id else None
+
+        db.add(obj)
+        db.flush()
+
+        # ایجاد سند حسابداری (الزامی)
+        document_date: date = _parse_iso_date_only(data.get("document_date") or issue_date)
+
+        # تعیین حساب‌ها و سطرها
+        amount_dec = Decimal(str(amount_val))
+        lines: List[Dict[str, Any]] = []
+        description = (str(data.get("document_description")).strip() or None) if data.get("document_description") is not None else None
+
+        if ctype == "received":
+            # بدهکار: اسناد دریافتنی 10403
+            acc_notes_recv = _get_fixed_account_by_code(db, "10403")
+            lines.append({
+                "account_id": acc_notes_recv.id,
+                "debit": amount_dec,
+                "credit": Decimal(0),
+                "description": description or "ثبت چک دریافتی",
+                "check_id": obj.id,
+            })
+            # بستانکار: حساب دریافتنی شخص 10401
+            acc_ar = _get_fixed_account_by_code(db, "10401")
+            lines.append({
+                "account_id": acc_ar.id,
+                "person_id": int(person_id) if person_id else None,
+                "debit": Decimal(0),
+                "credit": amount_dec,
+                "description": description or "ثبت چک دریافتی",
+                "check_id": obj.id,
+            })
+        else:  # transferred
+            # برای چک واگذار شده، person_id الزامی است
+            if not person_id:
+                raise ApiError("PERSON_REQUIRED", "person_id is required for transferred checks", http_status=400)
+            # بدهکار: حساب پرداختنی شخص 20201
+            acc_ap = _get_fixed_account_by_code(db, "20201")
+            lines.append({
+                "account_id": acc_ap.id,
+                "person_id": int(person_id),
+                "debit": amount_dec,
+                "credit": Decimal(0),
+                "description": description or "ثبت چک واگذار شده",
+                "check_id": obj.id,
+            })
+            # بستانکار: اسناد پرداختنی 20202
+            acc_notes_pay = _get_fixed_account_by_code(db, "20202")
+            lines.append({
+                "account_id": acc_notes_pay.id,
+                "debit": Decimal(0),
+                "credit": amount_dec,
+                "description": description or "ثبت چک واگذار شده",
+                "check_id": obj.id,
+            })
+
+        # بررسی تراز سند
+        debit_total = Decimal(0)
+        credit_total = Decimal(0)
+        for line in lines:
+            debit_total += Decimal(str(line.get("debit") or 0))
+            credit_total += Decimal(str(line.get("credit") or 0))
+        if debit_total != credit_total:
+            raise ApiError("UNBALANCED_DOCUMENT", f"Document is not balanced: debit={debit_total}, credit={credit_total}", http_status=400)
+
+        # ایجاد سند
+        amount_for_policy = _calculate_document_amount_from_lines(lines)
+        ensure_document_policy_allows_creation(
+            db,
+            business_id=business_id,
+            document_type="check",
+            document_date=document_date,
+            amount=amount_for_policy,
+        )
+        created_document_id = _create_document_for_check_action(
+            db,
+            business_id=business_id,
+            user_id=user_id,
+            currency_id=int(data.get("currency_id")),
+            document_date=document_date,
+            description=description,
+            lines=lines,
+            extra_info={
+                "source": "check_create",
+                "check_id": obj.id,
+                "check_type": ctype,
+            },
+        )
+        obj.last_action_document_id = created_document_id
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        db.refresh(obj)
+
+        result = check_to_dict(db, obj)
+        result["document_id"] = created_document_id
+        return result
     except Exception:
-        raise ApiError("INVALID_AMOUNT", "amount must be a number", http_status=400)
-    if amount_val <= 0:
-        raise ApiError("INVALID_AMOUNT", "amount must be > 0", http_status=400)
-
-    check_number = str(data.get('check_number', '')).strip()
-    if not check_number:
-        raise ApiError("CHECK_NUMBER_REQUIRED", "check_number is required", http_status=400)
-
-    # یونیک بودن در سطح کسب‌وکار
-    exists = db.query(Check).filter(and_(Check.business_id == business_id, Check.check_number == check_number)).first()
-    if exists is not None:
-        raise ApiError("DUPLICATE_CHECK_NUMBER", "Duplicate check number in this business", http_status=400)
-
-    if sayad:
-        exists_sayad = db.query(Check).filter(and_(Check.business_id == business_id, Check.sayad_code == sayad)).first()
-        if exists_sayad is not None:
-            raise ApiError("DUPLICATE_SAYAD", "Duplicate sayad_code in this business", http_status=400)
-
-    obj = Check(
-        business_id=business_id,
-        type=CheckType[ctype.upper()],
-        person_id=int(person_id) if person_id else None,
-        issue_date=issue_date,
-        due_date=due_date,
-        check_number=check_number,
-        sayad_code=str(sayad).strip() if sayad else None,
-        bank_name=(str(data.get('bank_name')).strip() if data.get('bank_name') else None),
-        branch_name=(str(data.get('branch_name')).strip() if data.get('branch_name') else None),
-        amount=amount_val,
-        currency_id=int(data.get('currency_id')),
-    )
-
-    # تعیین وضعیت اولیه
-    if ctype == "received":
-        obj.status = CheckStatus.RECEIVED_ON_HAND
-        obj.current_holder_type = HolderType.BUSINESS
-        obj.current_holder_id = None
-    else:
-        obj.status = CheckStatus.TRANSFERRED_ISSUED
-        obj.current_holder_type = HolderType.PERSON if person_id else HolderType.BUSINESS
-        obj.current_holder_id = int(person_id) if person_id else None
-
-    db.add(obj)
-    db.commit()
-    db.refresh(obj)
-
-    # ایجاد سند حسابداری (الزامی)
-    document_date: date = _parse_iso_date_only(data.get("document_date") or issue_date)
-    fiscal_year = _get_business_fiscal_year(db, business_id)
-
-    # تعیین حساب‌ها و سطرها
-    amount_dec = Decimal(str(amount_val))
-    lines: List[Dict[str, Any]] = []
-    description = (str(data.get("document_description")).strip() or None) if data.get("document_description") is not None else None
-
-    if ctype == "received":
-        # بدهکار: اسناد دریافتنی 10403
-        acc_notes_recv = _get_fixed_account_by_code(db, "10403")
-        lines.append({
-            "account_id": acc_notes_recv.id,
-            "debit": amount_dec,
-            "credit": Decimal(0),
-            "description": description or "ثبت چک دریافتی",
-            "check_id": obj.id,
-        })
-        # بستانکار: حساب دریافتنی شخص 10401
-        acc_ar = _get_fixed_account_by_code(db, "10401")
-        lines.append({
-            "account_id": acc_ar.id,
-            "person_id": int(person_id) if person_id else None,
-            "debit": Decimal(0),
-            "credit": amount_dec,
-            "description": description or "ثبت چک دریافتی",
-            "check_id": obj.id,
-        })
-    else:  # transferred
-        # برای چک واگذار شده، person_id الزامی است
-        if not person_id:
-            raise ApiError("PERSON_REQUIRED", "person_id is required for transferred checks", http_status=400)
-        # بدهکار: حساب پرداختنی شخص 20201
-        acc_ap = _get_fixed_account_by_code(db, "20201")
-        lines.append({
-            "account_id": acc_ap.id,
-            "person_id": int(person_id),
-            "debit": amount_dec,
-            "credit": Decimal(0),
-            "description": description or "ثبت چک واگذار شده",
-            "check_id": obj.id,
-        })
-        # بستانکار: اسناد پرداختنی 20202
-        acc_notes_pay = _get_fixed_account_by_code(db, "20202")
-        lines.append({
-            "account_id": acc_notes_pay.id,
-            "debit": Decimal(0),
-            "credit": amount_dec,
-            "description": description or "ثبت چک واگذار شده",
-            "check_id": obj.id,
-        })
-
-    # بررسی تراز سند
-    debit_total = Decimal(0)
-    credit_total = Decimal(0)
-    for line in lines:
-        debit_total += Decimal(str(line.get("debit") or 0))
-        credit_total += Decimal(str(line.get("credit") or 0))
-    if debit_total != credit_total:
-        raise ApiError("UNBALANCED_DOCUMENT", f"Document is not balanced: debit={debit_total}, credit={credit_total}", http_status=400)
-
-    # ایجاد سند
-    amount_for_policy = _calculate_document_amount_from_lines(lines)
-    ensure_document_policy_allows_creation(
-        db,
-        business_id=business_id,
-        document_type="check",
-        document_date=document_date,
-        amount=amount_for_policy,
-    )
-    document = Document(
-        code=f"CHK-{document_date.strftime('%Y%m%d')}-{int(datetime.utcnow().timestamp())%100000}",
-        business_id=business_id,
-        fiscal_year_id=fiscal_year.id,
-        currency_id=int(data.get("currency_id")),
-        created_by_user_id=int(user_id),
-        document_date=document_date,
-        document_type="check",
-        is_proforma=False,
-        description=description,
-        extra_info={
-            "source": "check_create",
-            "check_id": obj.id,
-            "check_type": ctype,
-        },
-    )
-    db.add(document)
-    db.flush()
-
-    for line in lines:
-        db.add(DocumentLine(document_id=document.id, **line))
-
-    db.commit()
-    db.refresh(document)
-    created_document_id = document.id
-
-    result = check_to_dict(db, obj)
-    result["document_id"] = created_document_id
-    return result
+        db.rollback()
+        raise
 
 
 def get_check_by_id(db: Session, check_id: int) -> Optional[Dict[str, Any]]:
@@ -279,8 +277,6 @@ def _create_document_for_check_action(
     db.flush()
     for line in lines:
         db.add(DocumentLine(document_id=document.id, **line))
-    db.commit()
-    db.refresh(document)
     return document.id
 
 
@@ -334,7 +330,7 @@ def endorse_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]
             "check_id": obj.id,
         })
         
-        deposit_return_doc_id = _create_document_for_check_action(
+        _create_document_for_check_action(
             db,
             business_id=obj.business_id,
             user_id=user_id,
@@ -346,8 +342,6 @@ def endorse_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]
         )
         obj.status = CheckStatus.RECEIVED_ON_HAND
         obj.status_at = datetime.utcnow()
-        db.commit()
-        db.refresh(obj)
     
     # اجازه واگذاری از وضعیت‌های RECEIVED_ON_HAND, RETURNED, BOUNCED یا وضعیت خالی (None)
     if obj.status is not None and obj.status not in (CheckStatus.RECEIVED_ON_HAND, CheckStatus.RETURNED, CheckStatus.BOUNCED):
@@ -394,7 +388,12 @@ def endorse_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]
     obj.current_holder_type = HolderType.PERSON
     obj.current_holder_id = target_person_id
     obj.last_action_document_id = document_id
-    db.commit(); db.refresh(obj)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(obj)
     res = check_to_dict(db, obj)
     res["document_id"] = document_id
     return res
@@ -408,6 +407,8 @@ def clear_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]) 
     lines: List[Dict[str, Any]] = []
 
     if obj.type == CheckType.RECEIVED:
+        if obj.status not in (CheckStatus.RECEIVED_ON_HAND, CheckStatus.DEPOSITED):
+            raise ApiError("INVALID_STATE", f"Cannot clear received check from status {obj.status}", http_status=400)
         # Dr 10203 (bank), Cr 10403 یا 10404 بسته به وضعیت
         credit_code = "10404" if obj.status == CheckStatus.DEPOSITED else "10403"
         lines.append({
@@ -426,6 +427,8 @@ def clear_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]) 
             "check_id": obj.id,
         })
     else:
+        if obj.status not in (CheckStatus.TRANSFERRED_ISSUED, CheckStatus.BOUNCED):
+            raise ApiError("INVALID_STATE", f"Cannot pay transferred check from status {obj.status}", http_status=400)
         # transferred/pay: Dr 20202, Cr 10203
         lines.append({
             "account_id": _ensure_account(db, "20202"),
@@ -460,7 +463,12 @@ def clear_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]) 
     obj.current_holder_type = HolderType.BANK
     obj.current_holder_id = int(data.get("bank_account_id"))
     obj.last_action_document_id = document_id
-    db.commit(); db.refresh(obj)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(obj)
     res = check_to_dict(db, obj)
     res["document_id"] = document_id
     return res
@@ -501,7 +509,7 @@ def return_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any])
             "check_id": obj.id,
         })
         
-        deposit_return_doc_id = _create_document_for_check_action(
+        _create_document_for_check_action(
             db,
             business_id=obj.business_id,
             user_id=user_id,
@@ -513,8 +521,6 @@ def return_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any])
         )
         obj.status = CheckStatus.RECEIVED_ON_HAND
         obj.status_at = datetime.utcnow()
-        db.commit()
-        db.refresh(obj)
     
     document_date = _parse_optional_date(data.get("document_date"), obj.issue_date.date())
     description = (data.get("description") or None)
@@ -579,7 +585,12 @@ def return_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any])
     obj.status = CheckStatus.RETURNED
     obj.status_at = datetime.utcnow()
     obj.last_action_document_id = document_id
-    db.commit(); db.refresh(obj)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(obj)
     res = check_to_dict(db, obj)
     res["document_id"] = document_id
     return res
@@ -633,6 +644,8 @@ def bounce_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any])
                 "check_id": obj.id,
             })
     else:
+        if obj.status != CheckStatus.CLEARED:
+            raise ApiError("INVALID_STATE", f"Cannot bounce transferred check from status {obj.status}", http_status=400)
         # transferred: Dr 20202, Cr 20201(person) (increase AP again)
         if not obj.person_id:
             raise ApiError("PERSON_REQUIRED", "person_id is required on transferred check to bounce", http_status=400)
@@ -690,7 +703,12 @@ def bounce_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any])
     obj.current_holder_type = HolderType.BUSINESS
     obj.current_holder_id = None
     obj.last_action_document_id = document_id
-    db.commit(); db.refresh(obj)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(obj)
     res = check_to_dict(db, obj)
     res["document_id"] = document_id
     return res
@@ -742,7 +760,12 @@ def deposit_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]
     obj.status_at = datetime.utcnow()
     obj.current_holder_type = HolderType.BANK
     obj.last_action_document_id = document_id
-    db.commit(); db.refresh(obj)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    db.refresh(obj)
     res = check_to_dict(db, obj)
     res["document_id"] = document_id
     return res
@@ -806,7 +829,11 @@ def update_check(db: Session, check_id: int, data: Dict[str, Any]) -> Optional[D
     if 'currency_id' in data and data['currency_id'] is not None:
         obj.currency_id = int(data['currency_id'])
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(obj)
     return check_to_dict(db, obj)
 
@@ -917,16 +944,9 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
         if last_action_doc and last_action_doc not in related_documents:
             related_documents.append(last_action_doc)
     
-    # 5. بررسی وجود اسناد حسابداری قطعی مرتبط (غیر پیش‌نویس)
-    # اگر چک در اسناد حسابداری قطعی استفاده شده است، نباید حذف شود
-    final_documents_with_check = []
-    for doc in related_documents:
-        if not doc.is_proforma:  # فقط اسناد قطعی
-            # اگر سند از نوع check یا manual نیست، یعنی در اسناد دیگری استفاده شده است
-            if doc.document_type not in ("check", "manual"):
-                final_documents_with_check.append(doc)
-    
-    # بررسی DocumentLine ها با check_id در اسناد قطعی
+    # 5. بررسی وجود استفاده حسابداری قطعی در اسناد غیرچکی
+    # حذف فیزیکی چک فقط زمانی مجاز است که رد آن صرفا در اسناد نوع check باشد.
+    # اگر چک در اسناد قطعی غیرچکی استفاده شده باشد، حذف باید متوقف شود.
     document_lines_with_check_final = db.query(DocumentLine).join(
         Document, DocumentLine.document_id == Document.id
     ).filter(
@@ -944,6 +964,9 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
         ).distinct().all()
         
         types_list = [doc_type[0] for doc_type in document_types if doc_type[0]]
+        blocking_types = [t for t in types_list if t != "check"]
+        if not blocking_types:
+            blocking_types = []
         
         # تبدیل انواع اسناد به نام‌های فارسی
         type_names = []
@@ -960,21 +983,20 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
             "expense": "هزینه",
             "income": "درآمد",
             "transfer": "انتقال",
-            "manual": "سند دستی",
             "check": "چک",
         }
         
-        for doc_type in types_list:
+        for doc_type in blocking_types:
             type_name = type_mapping.get(doc_type, doc_type)
             if type_name not in type_names:
                 type_names.append(type_name)
-        
-        types_str = "، ".join(type_names)
-        raise ApiError(
-            "CHECK_HAS_ACCOUNTING_DOCUMENTS",
-            f"امکان حذف این چک وجود ندارد زیرا دارای اسناد حسابداری مرتبط است. انواع اسناد: {types_str}",
-            http_status=400
-        )
+        if type_names:
+            types_str = "، ".join(type_names)
+            raise ApiError(
+                "CHECK_HAS_ACCOUNTING_DOCUMENTS",
+                f"امکان حذف این چک وجود ندارد زیرا در اسناد قطعی غیرچکی استفاده شده است. انواع اسناد: {types_str}",
+                http_status=400
+            )
     
     # 6. بررسی سال مالی اسناد
     if current_fiscal_year:
@@ -992,16 +1014,20 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
             # اسناد پیش‌نویس قابل حذف هستند
             continue
         
-        # بررسی اینکه آیا سند از نوع check است یا نه
-        if doc.document_type not in ("check", "manual"):
+        # اسناد قطعی غیرچکی باید حذف را متوقف کنند
+        if doc.document_type != "check":
             # اگر سند از نوع دیگری است (مثلاً invoice)، فقط لینک را حذف می‌کنیم
-            continue
+            raise ApiError(
+                "CHECK_HAS_ACCOUNTING_DOCUMENTS",
+                "امکان حذف چک وجود ندارد چون در سند قطعی غیرچکی استفاده شده است",
+                http_status=400
+            )
     
-    # 8. حذف لینک‌ها از DocumentLine (فقط برای اسناد پیش‌نویس)
+    # 8. حذف لینک‌ها از DocumentLine (فقط برای اسناد غیرچکی و پیش‌نویس)
     for line in document_lines_with_check:
         # بررسی اینکه آیا سند مربوطه پیش‌نویس است یا نه
         doc = db.query(Document).filter(Document.id == line.document_id).first()
-        if doc and doc.is_proforma:
+        if doc and doc.is_proforma and doc.document_type != "check":
             line.check_id = None
             db.flush()
     
@@ -1082,7 +1108,7 @@ def delete_check(db: Session, check_id: int, user_id: Optional[int] = None) -> b
                     invoice_doc.extra_info = extra_info
                     db.flush()
     
-    # 11. حذف اسناد حسابداری مرتبط (فقط اسناد از نوع check و پیش‌نویس)
+    # 11. حذف اسناد حسابداری مرتبط (همه اسناد از نوع check)
     for doc in related_documents:
         if doc.document_type == "check":
             # حذف DocumentLine ها (به صورت خودکار با cascade)
@@ -1374,7 +1400,7 @@ def get_check_history_and_documents(db: Session, check_id: int) -> Dict[str, Any
     for doc in related_documents:
         extra_info = doc.extra_info or {}
         if extra_info.get("source") == "check_action":
-            action_type = extra_info.get("action_type", "unknown")
+            action_type = extra_info.get("action_type") or extra_info.get("action") or "unknown"
             action_names = {
                 "endorse": "واگذاری",
                 "clear": "وصول/پاس",
@@ -1382,6 +1408,8 @@ def get_check_history_and_documents(db: Session, check_id: int) -> Dict[str, Any
                 "bounce": "برگشت",
                 "pay": "پرداخت",
                 "deposit": "سپرده",
+                "deposit_return_for_endorse": "برگشت از سپرده برای واگذاری",
+                "deposit_return_for_return": "برگشت از سپرده برای عودت",
             }
             action_name = action_names.get(action_type, "عملیات")
             history.append({

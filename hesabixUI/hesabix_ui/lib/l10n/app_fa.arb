@@ -3524,6 +3524,8 @@
   "settingsSystemMonitoringDescription": "بررسی وضعیت سیستم، منابع سخت‌افزاری و سرویس‌ها",
   "settingsServiceLogs": "لاگ‌های سرویس‌ها",
   "settingsServiceLogsDescription": "مشاهده لاگ سرویس‌های hesabix-api، hesabix-rq-worker و hesabix-notification-moderation و مدیریت سرویس‌ها",
+  "settingsBusinessActivityLogs": "لاگ کسب و کارها",
+  "settingsBusinessActivityLogsDescription": "مشاهده فعالیت کاربران در همه کسب و کارها با فیلترهای تاریخ، کسب و کار، کاربر و نوع عمل",
   "serviceLogsPauseAutoRefreshTooltip": "توقف بروزرسانی خودکار",
   "serviceLogsResumeAutoRefreshTooltip": "شروع بروزرسانی خودکار",
   "serviceLogsRefreshTooltip": "بروزرسانی",

@@ -1028,6 +1028,19 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'draft': '${t.draft} ${t.invoices}',
         'export': '${t.export} ${t.invoices}',
       },
+      'invoice_types': {
+        'sales': 'فاکتور فروش',
+        'sales_return': 'برگشت از فروش',
+        'purchase': 'فاکتور خرید',
+        'purchase_return': 'برگشت از خرید',
+        'waste': 'ضایعات',
+        'direct_consumption': 'مصرف مستقیم',
+        'production': 'تولید',
+      },
+      'pricing': {
+        'sales_price_view': 'مشاهده قیمت فروش',
+        'purchase_price_view': 'مشاهده قیمت خرید',
+      },
       'expenses_income': {
         'add': '${t.add} ${t.expensesIncome}',
         'view': '${t.view} ${t.expensesIncome}',
@@ -1396,7 +1409,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': 'فاکتورها و هزینه‌ها',
         'icon': Icons.receipt,
-        'sections': ['invoices', 'expenses_income'],
+        'sections': ['invoices', 'invoice_types', 'pricing', 'expenses_income'],
       },
       {
         'title': 'حسابداری',
@@ -1531,6 +1544,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'wallet': [(AppLocalizations.of(context).wallet)],
       'transfers': [(AppLocalizations.of(context).transfers)],
       'invoices': [(AppLocalizations.of(context).invoices)],
+      'invoice_types': ['نوع فاکتور', 'invoice type'],
+      'pricing': ['قیمت', 'pricing'],
       'expenses_income': [(AppLocalizations.of(context).expensesIncome)],
       'accounting_documents': [(AppLocalizations.of(context).accountingDocuments)],
       'chart_of_accounts': [(AppLocalizations.of(context).chartOfAccounts)],
@@ -1577,6 +1592,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       'wallet': 'کیف پول',
       'transfers': 'انتقال',
       'invoices': 'فاکتورها',
+      'invoice_types': 'نوع‌های مجاز فاکتور',
+      'pricing': 'سطح دسترسی قیمت',
       'expenses_income': 'هزینه و درآمد',
       'accounting_documents': 'اسناد حسابداری',
       'chart_of_accounts': 'جدول حساب‌ها',

@@ -97,11 +97,22 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   int _highlightedIndex = -1;
   double _desktopFieldWidth = 0;
 
+  double _desktopOverlayHeight(_CustomerPickerState state) {
+    if (state.isLoading && state.customers.isEmpty) return 120;
+    if (!state.isLoading && state.customers.isEmpty) return 95;
+    final extraRow = (state.isLoadingMore || (state.isLoading && state.customers.isNotEmpty)) ? 1 : 0;
+    final rows = state.customers.length + extraRow;
+    const rowHeight = 62.0;
+    final raw = (rows * rowHeight) + (state.isLoading ? 4 : 0);
+    return raw.clamp(95.0, 360.0);
+  }
+
   @override
   void initState() {
     super.initState();
     _searchController.text = widget.selectedCustomer?.name ?? '';
     _fieldFocus.addListener(_onDesktopFocusChanged);
+    _overlayScrollController.addListener(_onDesktopOverlayScroll);
     _loadRecentCustomers();
   }
 
@@ -119,6 +130,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     _removeDesktopOverlay();
     _fieldFocus.removeListener(_onDesktopFocusChanged);
     _fieldFocus.dispose();
+    _overlayScrollController.removeListener(_onDesktopOverlayScroll);
     _overlayScrollController.dispose();
     _searchController.dispose();
     _pickerStateNotifier.dispose();
@@ -161,6 +173,14 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     _highlightedIndex = -1;
   }
 
+  void _onDesktopOverlayScroll() {
+    if (!_overlayScrollController.hasClients) return;
+    final pos = _overlayScrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 140) {
+      _loadMoreCustomers();
+    }
+  }
+
   Widget _buildDesktopOverlay(BuildContext context) {
     final width = _desktopFieldWidth > 280 ? _desktopFieldWidth : 280.0;
     return Stack(
@@ -189,7 +209,10 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                 width: width,
                 child: ValueListenableBuilder<_CustomerPickerState>(
                   valueListenable: _pickerStateNotifier,
-                  builder: (context, state, _) => _buildDesktopCustomersList(context, state),
+                  builder: (context, state, _) => SizedBox(
+                    height: _desktopOverlayHeight(state),
+                    child: _buildDesktopCustomersList(context, state),
+                  ),
                 ),
               ),
             ),
@@ -214,8 +237,22 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         Flexible(
           child: ListView.builder(
             controller: _overlayScrollController,
-            itemCount: state.customers.length,
+            itemCount: state.customers.length +
+                ((state.isLoadingMore || (state.isLoading && state.customers.isNotEmpty)) ? 1 : 0),
             itemBuilder: (context, index) {
+              if (index == state.customers.length &&
+                  (state.isLoadingMore || (state.isLoading && state.customers.isNotEmpty))) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                );
+              }
               final customer = state.customers[index];
               final selected = index == _highlightedIndex;
               return Material(

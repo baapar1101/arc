@@ -81,6 +81,19 @@ class ReportTemplateService {
     return res.data ?? const <String, dynamic>{};
   }
 
+  Future<List<Map<String, dynamic>>> statusEvents({
+    required int businessId,
+    required int templateId,
+    int limit = 50,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/report-templates/$templateId/business/$businessId/status-events',
+      query: {'limit': limit},
+    );
+    final items = (res.data?['items'] as List?) ?? const [];
+    return items.cast<Map<String, dynamic>>();
+  }
+
   Future<void> deleteTemplate({
     required int businessId,
     required int templateId,
@@ -98,6 +111,22 @@ class ReportTemplateService {
     final res = await _api.post<Map<String, dynamic>>(
       '/report-templates/$templateId/business/$businessId/publish',
       data: {'published': published},
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> transitionStatus({
+    required int businessId,
+    required int templateId,
+    required String toStatus,
+    String? reason,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/$templateId/business/$businessId/transition',
+      data: {
+        'to_status': toStatus,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      },
     );
     return res.data ?? const <String, dynamic>{};
   }
@@ -161,6 +190,16 @@ class ReportTemplateService {
     return res.data ?? const <String, dynamic>{};
   }
 
+  Future<List<Map<String, dynamic>>> scopeCatalog({
+    required int businessId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/scope-catalog',
+    );
+    final items = (res.data?['items'] as List?) ?? const [];
+    return items.cast<Map<String, dynamic>>();
+  }
+
   Future<List<int>> previewPdf({
     required int businessId,
     String? contentHtml,
@@ -193,6 +232,50 @@ class ReportTemplateService {
       },
     );
     return res;
+  }
+
+  Future<Map<String, dynamic>> validateBuilderDesign({
+    required int businessId,
+    required String moduleKey,
+    String? subtype,
+    required Map<String, dynamic> design,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/validate-builder-design',
+      data: {
+        'module_key': moduleKey,
+        if (subtype != null) 'subtype': subtype,
+        'design': design,
+      },
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> statusEventsReport({
+    required int businessId,
+    String? status,
+    int? actorUserId,
+    String? fromDate,
+    String? toDate,
+    int offset = 0,
+    String sortBy = 'created_at',
+    String sortOrder = 'desc',
+    int limit = 100,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/status-events',
+      query: {
+        if (status != null && status.trim().isNotEmpty) 'status': status.trim(),
+        if (actorUserId != null) 'actor_user_id': actorUserId,
+        if (fromDate != null && fromDate.trim().isNotEmpty) 'from_date': fromDate.trim(),
+        if (toDate != null && toDate.trim().isNotEmpty) 'to_date': toDate.trim(),
+        'offset': offset,
+        'sort_by': sortBy,
+        'sort_order': sortOrder,
+        'limit': limit,
+      },
+    );
+    return res.data ?? const <String, dynamic>{};
   }
 }
 

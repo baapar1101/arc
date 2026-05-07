@@ -25,6 +25,7 @@ import '../../core/auth_store.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/date_formatters.dart';
 import '../../services/warehouse_service.dart';
+import '../../services/price_list_service.dart';
 import '../../utils/image_cache.dart';
 import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
@@ -104,6 +105,10 @@ class _ProductsPageState extends State<ProductsPage> {
   List<CategoryNode> _categoryTree = const [];
   bool _categoriesLoading = false;
   int? _quickCategoryFilterId;
+  final PriceListService _priceListService = PriceListService();
+  String _priceExportMode = 'base_plus_price_lists';
+  List<int> _priceExportPriceListIds = const [];
+  int? _priceExportMaxItems;
 
   @override
   void initState() {
@@ -143,6 +148,199 @@ class _ProductsPageState extends State<ProductsPage> {
     try {
       (_tableKey.currentState as dynamic)?.applyCategoryIdFilter(ids);
     } catch (_) {}
+  }
+
+  Future<void> _showPriceExportConfigDialog() async {
+    final t = AppLocalizations.of(context);
+    List<Map<String, dynamic>> priceLists = const [];
+    bool loading = true;
+    String? loadError;
+    final selectedIds = _priceExportPriceListIds.toSet();
+    String draftMode = _priceExportMode;
+    int? draftMaxItems = _priceExportMaxItems;
+    final maxItemsCtrl = TextEditingController(
+      text: draftMaxItems != null ? draftMaxItems.toString() : '',
+    );
+
+    try {
+      final res = await _priceListService.listPriceLists(
+        businessId: widget.businessId,
+        page: 1,
+        limit: 200,
+      );
+      final items = (res['items'] as List<dynamic>? ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      priceLists = items;
+    } catch (_) {
+      loadError = t.error;
+    } finally {
+      loading = false;
+    }
+
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('تنظیمات خروجی قیمت کالا'),
+              content: SizedBox(
+                width: 520,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        value: draftMode,
+                        decoration: const InputDecoration(
+                          labelText: 'نوع خروجی',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'base_only',
+                            child: Text('فقط قیمت پایه خرید/فروش'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'price_lists_only',
+                            child: Text('فقط لیست‌های قیمت'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'base_plus_price_lists',
+                            child: Text('قیمت پایه + لیست‌های قیمت'),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setDialogState(() => draftMode = v);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: maxItemsCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'تعداد کالا (اختیاری)',
+                          hintText: 'مثلاً 100',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (v) {
+                          final parsed = int.tryParse(v.trim());
+                          setDialogState(() {
+                            draftMaxItems = parsed != null && parsed > 0 ? parsed : null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'لیست‌های قیمت',
+                        style: Theme.of(ctx).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      if (loading)
+                        const LinearProgressIndicator(minHeight: 2)
+                      else if (loadError != null)
+                        Text(loadError!, style: TextStyle(color: Theme.of(ctx).colorScheme.error))
+                      else if (priceLists.isEmpty)
+                        const Text('لیست قیمتی یافت نشد.')
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final row in priceLists)
+                              FilterChip(
+                                label: Text((row['name'] ?? '#').toString()),
+                                selected: selectedIds.contains((row['id'] as num?)?.toInt()),
+                                onSelected: (selected) {
+                                  final id = (row['id'] as num?)?.toInt();
+                                  if (id == null) return;
+                                  setDialogState(() {
+                                    if (selected) {
+                                      selectedIds.add(id);
+                                    } else {
+                                      selectedIds.remove(id);
+                                    }
+                                  });
+                                },
+                              ),
+                          ],
+                        ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'برای «کالاهای انتخابی» از گزینهٔ Export Selected استفاده کنید.',
+                        style: Theme.of(ctx).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(t.cancel),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    setState(() {
+                      _priceExportMode = draftMode;
+                      _priceExportPriceListIds = selectedIds.toList()..sort();
+                      _priceExportMaxItems = draftMaxItems;
+                    });
+                    Navigator.of(ctx).pop();
+                  },
+                  child: Text(t.save),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _priceExportConfigBadgeText() {
+    String modeLabel;
+    switch (_priceExportMode) {
+      case 'base_only':
+        modeLabel = 'پایه';
+        break;
+      case 'price_lists_only':
+        modeLabel = 'لیست قیمت';
+        break;
+      default:
+        modeLabel = 'پایه+لیست';
+    }
+    final listCount = _priceExportPriceListIds.length;
+    final limitLabel = _priceExportMaxItems != null ? ' • $_priceExportMaxItems' : '';
+    return '$modeLabel • $listCount لیست$limitLabel';
+  }
+
+  Color _priceExportBadgeBackgroundColor(ThemeData theme) {
+    switch (_priceExportMode) {
+      case 'base_only':
+        return Colors.blue.withValues(alpha: 0.16);
+      case 'price_lists_only':
+        return Colors.purple.withValues(alpha: 0.16);
+      default:
+        return Colors.green.withValues(alpha: 0.16);
+    }
+  }
+
+  Color _priceExportBadgeForegroundColor(ThemeData theme) {
+    switch (_priceExportMode) {
+      case 'base_only':
+        return Colors.blue.shade800;
+      case 'price_lists_only':
+        return Colors.purple.shade800;
+      default:
+        return Colors.green.shade800;
+    }
   }
   
   String? _buildFullImageUrl(String? imageUrl) {
@@ -1941,6 +2139,51 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               ),
             Tooltip(
+              message: 'تنظیمات خروجی قیمت کالا',
+              child: IconButton(
+                onPressed: _showPriceExportConfigDialog,
+                icon: const Icon(Icons.tune),
+              ),
+            ),
+            Tooltip(
+              message: 'وضعیت تنظیمات خروجی',
+              child: Builder(
+                builder: (ctx) {
+                  final theme = Theme.of(ctx);
+                  final bg = _priceExportBadgeBackgroundColor(theme);
+                  final fg = _priceExportBadgeForegroundColor(theme);
+                  return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: bg,
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: fg.withValues(alpha: 0.45),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.settings_suggest_outlined,
+                      size: 14,
+                      color: fg,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _priceExportConfigBadgeText(),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                            color: fg,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ],
+                ),
+                  );
+                },
+              ),
+            ),
+            Tooltip(
               message: t.addProduct,
               child: IconButton(
                 onPressed: () async {
@@ -1991,6 +2234,11 @@ class _ProductsPageState extends State<ProductsPage> {
           ],
                 additionalParams: {
                   'include_inventory': true,
+                },
+                getExportParams: () => {
+                  'report_mode': _priceExportMode,
+                  'price_list_ids': _priceExportPriceListIds,
+                  if (_priceExportMaxItems != null) 'limit': _priceExportMaxItems,
                 },
                 onRowTap: (item) => _showProductDetailsDialog(item),
                 expandBodyHeightToFitRows: true,

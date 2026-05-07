@@ -49,6 +49,7 @@ from .business_currency_rate import BusinessCurrencyRate  # noqa: F401
 # Documents
 from .document import Document  # noqa: F401
 from .document_invoice_tag import DocumentInvoiceTag, DocumentInvoiceTagLink  # noqa: F401
+from .report_template_status_event import ReportTemplateStatusEvent  # noqa: F401
 from .document_line import DocumentLine  # noqa: F401
 from .account import Account  # noqa: F401
 from .category import BusinessCategory  # noqa: F401

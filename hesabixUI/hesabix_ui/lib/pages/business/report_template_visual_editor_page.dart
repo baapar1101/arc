@@ -83,11 +83,17 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
   // History for undo/redo
   final List<Map<String, dynamic>> _history = [];
   int _historyIndex = -1;
+  String _lastSavedFingerprint = '';
   
   // Variables schema
   List<Map<String, dynamic>> _variables = [];
+  List<Map<String, dynamic>> _scopeCatalog = [];
   bool _showVariablesPanel = false;
   bool _showBlockPalette = false;
+  bool _showValidationPanel = false;
+  bool _validationLoading = false;
+  List<String> _validationErrors = const [];
+  List<String> _validationWarnings = const [];
   
   // View mode: 'list' or 'canvas'
   String _viewMode = 'list';
@@ -103,8 +109,50 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     _moduleKey = widget.moduleKey ?? 'invoices';
     _subtype = widget.subtype ?? 'list';
     _loadTemplate();
+    _loadScopeCatalog();
     _loadVariablesSchema();
     _focusNode.requestFocus();
+  }
+
+  String _fingerprint() {
+    final payload = {
+      'name': _nameCtrl.text.trim(),
+      'desc': _descCtrl.text.trim(),
+      'module': _moduleKey,
+      'subtype': _subtype,
+      'design': _design,
+      'paperSize': _paperSize,
+      'orientation': _orientation,
+      'margins': {
+        'top': _marginTopCtrl.text.trim(),
+        'right': _marginRightCtrl.text.trim(),
+        'bottom': _marginBottomCtrl.text.trim(),
+        'left': _marginLeftCtrl.text.trim(),
+      },
+      'paperCustom': _paperCustomCtrl.text.trim(),
+    };
+    return jsonEncode(payload);
+  }
+
+  bool get _hasUnsavedChanges {
+    if (_lastSavedFingerprint.isEmpty) return false;
+    return _fingerprint() != _lastSavedFingerprint;
+  }
+
+  Future<bool> _confirmDiscardIfDirty() async {
+    if (!_hasUnsavedChanges) return true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('خروج بدون ذخیره؟'),
+        content: const Text('تغییرات ذخیره‌نشده دارید. آیا مطمئن هستید که می‌خواهید خارج شوید؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('خروج')),
+        ],
+      ),
+    );
+    return ok == true;
   }
 
   @override
@@ -123,6 +171,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
   Future<void> _loadTemplate() async {
     if (widget.template == null) {
       _nameCtrl.text = 'قالب جدید';
+      _lastSavedFingerprint = _fingerprint();
       return;
     }
     
@@ -165,6 +214,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
       }
       
       _pushHistory();
+      _lastSavedFingerprint = _fingerprint();
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -193,6 +243,203 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     } catch (e) {
       debugPrint('خطا در بارگذاری schema: $e');
     }
+  }
+
+  Future<Map<String, dynamic>> _samplePreviewContext() async {
+    try {
+      final schema = await _service.schema(
+        businessId: widget.businessId,
+        moduleKey: _moduleKey ?? 'invoices',
+        subtype: _subtype,
+      );
+      final sample = (schema['sample_context'] as Map?)?.cast<String, dynamic>();
+      return sample ?? const <String, dynamic>{};
+    } catch (_) {
+      return const <String, dynamic>{};
+    }
+  }
+
+  Future<bool> _validateDesignBeforeSave() async {
+    try {
+      final out = await _runDesignValidation(showPanel: false);
+      final errors = out['errors'] ?? const <String>[];
+      final warnings = out['warnings'] ?? const <String>[];
+      if (errors.isNotEmpty) {
+        if (mounted) {
+          SnackBarHelper.showError(context, message: errors.join(' | '));
+        }
+        return false;
+      }
+      if (warnings.isNotEmpty && mounted) {
+        SnackBarHelper.show(context, message: warnings.join(' | '));
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در اعتبارسنجی قالب: ${ErrorExtractor.forContext(e, context)}',
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<Map<String, List<String>>> _runDesignValidation({bool showPanel = true}) async {
+    if (showPanel) {
+      setState(() {
+        _validationLoading = true;
+      });
+    }
+    try {
+      final out = await _service.validateBuilderDesign(
+        businessId: widget.businessId,
+        moduleKey: _moduleKey ?? 'invoices',
+        subtype: _subtype,
+        design: _design,
+      );
+      final errors = ((out['errors'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .where((e) => e.trim().isNotEmpty)
+          .toList();
+      final warnings = ((out['warnings'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .where((e) => e.trim().isNotEmpty)
+          .toList();
+      if (mounted) {
+        setState(() {
+          _validationErrors = errors;
+          _validationWarnings = warnings;
+          if (showPanel) _showValidationPanel = true;
+        });
+      }
+      return {'errors': errors, 'warnings': warnings};
+    } finally {
+      if (showPanel && mounted) {
+        setState(() {
+          _validationLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadScopeCatalog() async {
+    try {
+      final items = await _service.scopeCatalog(businessId: widget.businessId);
+      setState(() {
+        _scopeCatalog = items;
+      });
+    } catch (e) {
+      debugPrint('خطا در بارگذاری scope catalog: $e');
+    }
+  }
+
+  String _currentScopeId() {
+    final mk = (_moduleKey ?? '').trim();
+    final st = (_subtype ?? '').trim();
+    return '$mk:$st';
+  }
+
+  void _setScopeFromId(String scopeId) {
+    final idx = scopeId.indexOf(':');
+    if (idx <= 0) return;
+    final mk = scopeId.substring(0, idx);
+    final st = scopeId.substring(idx + 1);
+    setState(() {
+      _moduleKey = mk;
+      _subtype = st.isEmpty ? null : st;
+    });
+    _loadVariablesSchema();
+  }
+
+  List<Map<String, dynamic>> _availableBlockTypes() {
+    final mk = (_moduleKey ?? '').trim();
+    final st = (_subtype ?? '').trim();
+    const all = [
+      {'type': 'text', 'label': 'متن', 'icon': Icons.text_fields, 'color': Colors.blue},
+      {'type': 'image', 'label': 'تصویر', 'icon': Icons.image, 'color': Colors.green},
+      {'type': 'table', 'label': 'جدول', 'icon': Icons.table_chart, 'color': Colors.orange},
+      {'type': 'divider', 'label': 'خط جداکننده', 'icon': Icons.horizontal_rule, 'color': Colors.grey},
+      {'type': 'spacer', 'label': 'فاصله', 'icon': Icons.space_bar, 'color': Colors.purple},
+      {'type': 'qr', 'label': 'QR Code', 'icon': Icons.qr_code, 'color': Colors.teal},
+      {'type': 'totals', 'label': 'جمع‌بندی', 'icon': Icons.summarize, 'color': Colors.red},
+    ];
+    if (mk == 'invoices' && st == 'detail') return all;
+    if ((mk == 'invoices' && st == 'list') ||
+        (mk == 'documents' && st == 'list') ||
+        (mk == 'receipts_payments' && st == 'list') ||
+        (mk == 'expense_income' && st == 'list') ||
+        (mk == 'transfers' && st == 'list')) {
+      return all.where((b) => b['type'] != 'totals' && b['type'] != 'qr').toList();
+    }
+    if (mk == 'warehouse_documents' && st == 'postal_label') {
+      return all.where((b) => b['type'] != 'table' && b['type'] != 'totals').toList();
+    }
+    return all;
+  }
+
+  void _applyInvoiceDetailPreset() {
+    if (!((_moduleKey ?? '') == 'invoices' && (_subtype ?? '') == 'detail')) return;
+    setState(() {
+      _design = {
+        'css': '''
+.invoice-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+.invoice-meta { font-size: 12px; margin-bottom: 4px; }
+.sig-box { border: 1px solid #333; border-radius: 8px; height: 72px; margin-top: 6px; }
+.sig-label { font-size: 11px; margin-top: 4px; text-align: center; }
+''',
+        'header': <Map<String, dynamic>>[
+          {
+            'type': 'text',
+            'props': {'text': '<div class="invoice-title">{{ title_text | default("فاکتور") }}</div>', 'align': 'right', 'showIf': ''},
+          },
+          {
+            'type': 'text',
+            'props': {'text': '<div class="invoice-meta">کد: {{ invoice.code | default("-") }} | تاریخ: {{ invoice.issue_date | default("-") }}</div>', 'align': 'right', 'showIf': ''},
+          },
+          {
+            'type': 'divider',
+            'props': {'thickness': 1.0, 'showIf': ''},
+          },
+        ],
+        'blocks': <Map<String, dynamic>>[
+          {
+            'type': 'table',
+            'props': {
+              'items': 'items',
+              'columns': [
+                {'key': 'product_name', 'title': 'شرح', 'format': ''},
+                {'key': 'quantity', 'title': 'تعداد', 'format': ''},
+                {'key': 'unit_price', 'title': 'فی', 'format': 'money'},
+                {'key': 'line_total', 'title': 'مبلغ', 'format': 'money'},
+              ],
+              'showIf': '',
+            },
+          },
+          {
+            'type': 'totals',
+            'props': {
+              'items': [
+                {'title': 'جمع کل', 'expr': "invoice.payable_total", 'format': 'money'},
+                {'title': 'مالیات', 'expr': "invoice.tax_total", 'format': 'money'},
+              ],
+              'showIf': '',
+            },
+          },
+          {'type': 'spacer', 'props': {'height': 16.0, 'showIf': ''}},
+          {
+            'type': 'text',
+            'props': {
+              'text': '<div style="display:flex;gap:16px;"><div style="flex:1;"><div class="sig-box"></div><div class="sig-label">امضای فروشنده</div></div><div style="flex:1;"><div class="sig-box"></div><div class="sig-label">امضای خریدار</div></div></div>',
+              'align': 'right',
+              'showIf': '',
+            },
+          },
+        ],
+        'footer': <Map<String, dynamic>>[],
+      };
+      _pushHistory();
+    });
   }
 
   void _pushHistory() {
@@ -255,9 +502,20 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
       SnackBarHelper.showError(context, message: 'نام قالب الزامی است');
       return;
     }
+    if (_scopeCatalog.isNotEmpty &&
+        !_scopeCatalog.any(
+          (s) =>
+              (s['module_key'] ?? '').toString() == (_moduleKey ?? '') &&
+              (s['subtype'] ?? '').toString() == (_subtype ?? ''),
+        )) {
+      SnackBarHelper.showError(context, message: 'ابتدا کاربرد معتبر قالب را انتخاب کنید');
+      return;
+    }
 
     setState(() => _saving = true);
     try {
+      final ok = await _validateDesignBeforeSave();
+      if (!ok) return;
       Map<String, dynamic>? margins;
       double? _parse(String s) {
         try {
@@ -296,6 +554,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
         );
         if (mounted) {
           SnackBarHelper.showSuccess(context, message: 'قالب با موفقیت ایجاد شد');
+          _lastSavedFingerprint = _fingerprint();
           Navigator.of(context).pop(true);
         }
       } else {
@@ -315,6 +574,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
         );
         if (mounted) {
           SnackBarHelper.showSuccess(context, message: 'قالب با موفقیت به‌روزرسانی شد');
+          _lastSavedFingerprint = _fingerprint();
           Navigator.of(context).pop(true);
         }
       }
@@ -340,13 +600,14 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     });
 
     try {
+      final sampleContext = await _samplePreviewContext();
       // Get HTML preview first
       final res = await _service.preview(
         businessId: widget.businessId,
         engine: 'builder',
         design: _design,
         assets: _assets,
-        context: const <String, dynamic>{},
+        context: sampleContext,
       );
 
       if (!mounted) return;
@@ -381,7 +642,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
           engine: 'builder',
           design: _design,
           assets: _assets,
-          context: const <String, dynamic>{},
+          context: sampleContext,
           paperSize: _effectivePaperSize(),
           orientation: _orientation,
           margins: margins,
@@ -607,6 +868,22 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     );
   }
 
+  String _scopeTitle() {
+    final mk = (_moduleKey ?? '').trim();
+    final st = (_subtype ?? '').trim();
+    if (mk == 'invoices' && st == 'list') return 'فاکتورها (لیست)';
+    if (mk == 'invoices' && st == 'detail') return 'فاکتور (جزئیات)';
+    if (mk == 'receipts_payments' && st == 'list') return 'دریافت/پرداخت (لیست)';
+    if (mk == 'receipts_payments' && st == 'detail') return 'دریافت/پرداخت (جزئیات)';
+    if (mk == 'expense_income' && st == 'list') return 'هزینه/درآمد (لیست)';
+    if (mk == 'documents' && st == 'list') return 'اسناد (لیست)';
+    if (mk == 'documents' && st == 'detail') return 'سند (جزئیات)';
+    if (mk == 'transfers' && st == 'list') return 'انتقالات (لیست)';
+    if (mk == 'transfers' && st == 'detail') return 'انتقال (جزئیات)';
+    if (mk == 'warehouse_documents' && st == 'postal_label') return 'حواله انبار (برچسب پستی)';
+    return '$mk / ${st.isEmpty ? '—' : st}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -624,7 +901,8 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
       canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        if (Navigator.of(context).canPop()) {
+        final canLeave = await _confirmDiscardIfDirty();
+        if (canLeave && Navigator.of(context).canPop()) {
           Navigator.of(context).pop();
         }
       },
@@ -633,7 +911,11 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
           title: Text(title),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () async {
+              final canLeave = await _confirmDiscardIfDirty();
+              if (!canLeave || !mounted) return;
+              Navigator.of(context).pop();
+            },
           ),
           actions: [
             IconButton(
@@ -721,6 +1003,53 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                 ),
               ),
               const SizedBox(width: 8),
+              SizedBox(
+                width: 260,
+                child: DropdownButtonFormField<String>(
+                  value: _scopeCatalog.any(
+                    (s) =>
+                        '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}' ==
+                        _currentScopeId(),
+                  )
+                      ? _currentScopeId()
+                      : null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'کاربرد قالب',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  items: _scopeCatalog
+                      .map(
+                        (s) => DropdownMenuItem<String>(
+                          value: '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}',
+                          child: Text((s['label_fa'] ?? '').toString()),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) _setScopeFromId(v);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Chip(
+                label: Text(
+                  _scopeTitle(),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                avatar: const Icon(Icons.description_outlined, size: 16),
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 8),
+              if ((_moduleKey ?? '') == 'invoices' && (_subtype ?? '') == 'detail')
+                TextButton.icon(
+                  onPressed: _applyInvoiceDetailPreset,
+                  icon: const Icon(Icons.auto_fix_high),
+                  label: const Text('قالب آماده فاکتور'),
+                ),
+              if ((_moduleKey ?? '') == 'invoices' && (_subtype ?? '') == 'detail')
+                const SizedBox(width: 8),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.settings),
                 tooltip: 'تنظیمات صفحه',
@@ -773,7 +1102,10 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                 onPressed: () {
                   setState(() {
                     _showBlockPalette = !_showBlockPalette;
-                    if (_showBlockPalette) _showVariablesPanel = false;
+                    if (_showBlockPalette) {
+                      _showVariablesPanel = false;
+                      _showValidationPanel = false;
+                    }
                   });
                 },
                 tooltip: 'پالت بلوک‌ها',
@@ -784,10 +1116,30 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                 onPressed: () {
                   setState(() {
                     _showVariablesPanel = !_showVariablesPanel;
-                    if (_showVariablesPanel) _showBlockPalette = false;
+                    if (_showVariablesPanel) {
+                      _showBlockPalette = false;
+                      _showValidationPanel = false;
+                    }
                   });
                 },
                 tooltip: 'راهنمای متغیرها',
+              ),
+              const SizedBox(width: 4),
+              IconButton(
+                icon: Icon(_showValidationPanel ? Icons.rule : Icons.rule_outlined),
+                onPressed: () async {
+                  if (_showValidationPanel) {
+                    setState(() => _showValidationPanel = false);
+                    return;
+                  }
+                  setState(() {
+                    _showValidationPanel = true;
+                    _showVariablesPanel = false;
+                    _showBlockPalette = false;
+                  });
+                  await _runDesignValidation();
+                },
+                tooltip: 'اعتبارسنجی قالب',
               ),
             ],
           ),
@@ -797,7 +1149,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
           child: Row(
             children: [
               // Sidebar panels
-              if (_showVariablesPanel || _showBlockPalette)
+              if (_showVariablesPanel || _showBlockPalette || _showValidationPanel)
                 Container(
                   width: 300,
                   decoration: BoxDecoration(
@@ -808,7 +1160,9 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                   ),
                   child: _showVariablesPanel
                       ? _buildVariablesPanel()
-                      : _buildBlockPalette(),
+                      : _showBlockPalette
+                          ? _buildBlockPalette()
+                          : _buildValidationPanel(),
                 ),
               // Editor tabs
               Expanded(
@@ -904,15 +1258,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
   }
 
   Widget _buildBlockPalette() {
-    final blockTypes = [
-      {'type': 'text', 'label': 'متن', 'icon': Icons.text_fields, 'color': Colors.blue},
-      {'type': 'image', 'label': 'تصویر', 'icon': Icons.image, 'color': Colors.green},
-      {'type': 'table', 'label': 'جدول', 'icon': Icons.table_chart, 'color': Colors.orange},
-      {'type': 'divider', 'label': 'خط جداکننده', 'icon': Icons.horizontal_rule, 'color': Colors.grey},
-      {'type': 'spacer', 'label': 'فاصله', 'icon': Icons.space_bar, 'color': Colors.purple},
-      {'type': 'qr', 'label': 'QR Code', 'icon': Icons.qr_code, 'color': Colors.teal},
-      {'type': 'totals', 'label': 'جمع‌بندی', 'icon': Icons.summarize, 'color': Colors.red},
-    ];
+    final blockTypes = _availableBlockTypes();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -985,10 +1331,74 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     );
   }
 
+  Widget _buildValidationPanel() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: Border(
+              bottom: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Text('اعتبارسنجی قالب', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh, size: 20),
+                onPressed: _validationLoading ? null : () => _runDesignValidation(),
+                tooltip: 'بازبینی',
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 20),
+                onPressed: () {
+                  setState(() => _showValidationPanel = false);
+                },
+              ),
+            ],
+          ),
+        ),
+        if (_validationLoading)
+          const Expanded(child: Center(child: LoadingIndicator()))
+        else
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(8),
+              children: [
+                if (_validationErrors.isEmpty && _validationWarnings.isEmpty)
+                  const ListTile(
+                    leading: Icon(Icons.check_circle, color: Colors.green),
+                    title: Text('موردی برای اصلاح پیدا نشد'),
+                  ),
+                ..._validationErrors.map(
+                  (e) => ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.error_outline, color: Colors.red),
+                    title: Text(e),
+                  ),
+                ),
+                ..._validationWarnings.map(
+                  (w) => ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    title: Text(w),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
   Widget _buildBlocksEditor(String section) {
     final blocks = List<Map<String, dynamic>>.from(
       (_design[section] as List?) ?? const [],
     );
+    final blockTypes = _availableBlockTypes();
 
     return Column(
       children: [
@@ -1004,21 +1414,24 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              _buildAddBlockButton('text', 'متن', Icons.text_fields, section),
-              _buildAddBlockButton('image', 'تصویر', Icons.image, section),
-              _buildAddBlockButton('table', 'جدول', Icons.table_chart, section),
-              _buildAddBlockButton('divider', 'خط جداکننده', Icons.horizontal_rule, section),
-              _buildAddBlockButton('spacer', 'فاصله', Icons.space_bar, section),
-              _buildAddBlockButton('qr', 'QR Code', Icons.qr_code, section),
-              _buildAddBlockButton('totals', 'جمع‌بندی', Icons.summarize, section),
-            ],
+            children: blockTypes
+                .map(
+                  (b) => _buildAddBlockButton(
+                    (b['type'] as String),
+                    (b['label'] as String),
+                    (b['icon'] as IconData),
+                    section,
+                  ),
+                )
+                .toList(),
           ),
         ),
         // Blocks list
         Expanded(
           child: DragTarget<String>(
             onAccept: (blockType) {
+              final allowed = blockTypes.any((b) => b['type'] == blockType);
+              if (!allowed) return;
               setState(() {
                 blocks.add(_createBlock(blockType));
                 _design[section] = blocks;
@@ -1088,6 +1501,21 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
           },
         };
       case 'table':
+        if ((_moduleKey ?? '') == 'invoices' && (_subtype ?? '') == 'detail') {
+          return {
+            'type': 'table',
+            'props': {
+              'items': 'items',
+              'columns': [
+                {'key': 'product_name', 'title': 'شرح', 'format': ''},
+                {'key': 'quantity', 'title': 'تعداد', 'format': ''},
+                {'key': 'unit_price', 'title': 'فی', 'format': 'money'},
+                {'key': 'line_total', 'title': 'مبلغ', 'format': 'money'},
+              ],
+              'showIf': '',
+            },
+          };
+        }
         return {
           'type': 'table',
           'props': {
@@ -1126,6 +1554,18 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
           },
         };
       case 'totals':
+        if ((_moduleKey ?? '') == 'invoices' && (_subtype ?? '') == 'detail') {
+          return {
+            'type': 'totals',
+            'props': {
+              'items': [
+                {'title': 'جمع کل', 'expr': "invoice.payable_total", 'format': 'money'},
+                {'title': 'مالیات', 'expr': "invoice.tax_total", 'format': 'money'},
+              ],
+              'showIf': '',
+            },
+          };
+        }
         return {
           'type': 'totals',
           'props': {
@@ -2351,6 +2791,8 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
         Expanded(
           child: DragTarget<String>(
             onAccept: (blockType) {
+              final allowed = _availableBlockTypes().any((b) => b['type'] == blockType);
+              if (!allowed) return;
               setState(() {
                 blocks.add(_createBlock(blockType));
                 _design[section] = blocks;

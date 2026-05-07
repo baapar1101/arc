@@ -12,8 +12,10 @@ from jinja2.sandbox import SandboxedEnvironment
 from jinja2 import StrictUndefined, BaseLoader, TemplateSyntaxError, UndefinedError
 
 from adapters.db.models.report_template import ReportTemplate
+from adapters.db.models.report_template_status_event import ReportTemplateStatusEvent
 from app.core.responses import ApiError
 from app.services.template_builder_compiler import compile_design_to_jinja_html
+from app.services.report_template_scope_registry import get_scope_meta, is_known_scope
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +27,20 @@ _MAX_DESC_LEN = 512
 _MAX_MODULE_LEN = 64
 _MAX_ASSETS_JSON_LEN = 2_000_000
 _ALLOWED_ENGINES = frozenset({"jinja2", "builder"})
-_ALLOWED_STATUS = frozenset({"draft", "published"})
+_ALLOWED_STATUS = frozenset({"draft", "in_review", "approved", "published", "deprecated"})
 _ALLOWED_ORIENTATION = frozenset({"portrait", "landscape"})
 _MAX_PAPER_LEN = 32
 
 
 class ReportTemplateService:
+	_ALLOWED_TRANSITIONS = {
+		"draft": frozenset({"in_review", "deprecated"}),
+		"in_review": frozenset({"draft", "approved", "deprecated"}),
+		"approved": frozenset({"draft", "published", "deprecated"}),
+		"published": frozenset({"draft", "deprecated"}),
+		"deprecated": frozenset({"draft"}),
+	}
+
 	"""سرویس مدیریت قالب‌های گزارش"""
 	
 	# سیستم کش برای قالب‌ها — کلید (template_id, business_id)
@@ -57,6 +67,41 @@ class ReportTemplateService:
 			q = q.filter(ReportTemplate.status == "published")
 		q = q.order_by(ReportTemplate.updated_at.desc())
 		return q.all()
+
+	@staticmethod
+	def latest_status_event(
+		db: Session,
+		template_id: int,
+		business_id: int,
+	) -> Optional[ReportTemplateStatusEvent]:
+		return (
+			db.query(ReportTemplateStatusEvent)
+			.filter(
+				ReportTemplateStatusEvent.report_template_id == int(template_id),
+				ReportTemplateStatusEvent.business_id == int(business_id),
+			)
+			.order_by(ReportTemplateStatusEvent.created_at.desc())
+			.first()
+		)
+
+	@staticmethod
+	def list_status_events(
+		db: Session,
+		template_id: int,
+		business_id: int,
+		limit: int = 50,
+	) -> List[ReportTemplateStatusEvent]:
+		lim = max(1, min(int(limit or 50), 200))
+		return (
+			db.query(ReportTemplateStatusEvent)
+			.filter(
+				ReportTemplateStatusEvent.report_template_id == int(template_id),
+				ReportTemplateStatusEvent.business_id == int(business_id),
+			)
+			.order_by(ReportTemplateStatusEvent.created_at.desc())
+			.limit(lim)
+			.all()
+		)
 
 	@staticmethod
 	def get_template(db: Session, template_id: int, business_id: Optional[int] = None) -> Optional[ReportTemplate]:
@@ -97,6 +142,73 @@ class ReportTemplateService:
 			keys_to_del = [k for k in ReportTemplateService._template_cache if k[0] == int(template_id)]
 			for k in keys_to_del:
 				ReportTemplateService._template_cache.pop(k, None)
+
+	@staticmethod
+	def _validate_known_scope(module_key: str, subtype: Optional[str]) -> None:
+		if not is_known_scope(module_key, subtype):
+			st = subtype or "none"
+			raise ApiError(
+				"VALIDATION_ERROR",
+				f"Unknown template scope: {module_key}/{st}",
+				http_status=400,
+			)
+
+	@staticmethod
+	def validate_builder_design_scope(
+		module_key: str,
+		subtype: Optional[str],
+		design: Dict[str, Any],
+	) -> Dict[str, List[str]]:
+		errors: List[str] = []
+		warnings: List[str] = []
+		meta = get_scope_meta(module_key, subtype)
+		if not meta:
+			errors.append("Unknown template scope")
+			return {"errors": errors, "warnings": warnings}
+		allowed = set(meta.allowed_blocks or set())
+		all_blocks: List[Dict[str, Any]] = []
+		for section in ("header", "blocks", "footer"):
+			for b in (design.get(section) or []):
+				if isinstance(b, dict):
+					all_blocks.append(b)
+		if not all_blocks:
+			errors.append("Builder design is empty")
+			return {"errors": errors, "warnings": warnings}
+		for b in all_blocks:
+			bt = str((b.get("type") or "")).strip().lower()
+			if not bt:
+				errors.append("Block type is missing")
+				continue
+			if allowed and bt not in allowed:
+				errors.append(f"Block '{bt}' is not allowed for this scope")
+			props = (b.get("props") or {}) if isinstance(b.get("props"), dict) else {}
+			show_if = str(props.get("showIf") or "").strip()
+			if show_if:
+				try:
+					SandboxedEnvironment(loader=BaseLoader(), autoescape=True).from_string(
+						f"{{% if {show_if} %}}ok{{% endif %}}"
+					)
+				except TemplateSyntaxError as ex:
+					errors.append(f"Invalid showIf expression in block '{bt}': {ex.message}")
+			if bt == "totals":
+				for idx, item in enumerate((props.get("items") or []), start=1):
+					expr = str((item or {}).get("expr") or "").strip()
+					if not expr:
+						errors.append(f"Missing totals expression in row {idx}")
+						continue
+					try:
+						SandboxedEnvironment(loader=BaseLoader(), autoescape=True).from_string(
+							f"{{{{ {expr} }}}}"
+						)
+					except TemplateSyntaxError as ex:
+						errors.append(f"Invalid totals expression in row {idx}: {ex.message}")
+		if module_key == "invoices" and (subtype or "") == "detail":
+			found_types = {str((b.get("type") or "")).strip().lower() for b in all_blocks}
+			if "table" not in found_types:
+				warnings.append("Invoice detail template usually needs an items table block")
+			if "totals" not in found_types:
+				warnings.append("Invoice detail template usually needs a totals block")
+		return {"errors": errors, "warnings": warnings}
 
 	@staticmethod
 	def validate_template_payload(data: Dict[str, Any], *, is_update: bool) -> None:
@@ -217,6 +329,10 @@ class ReportTemplateService:
 	def create_template(db: Session, data: Dict[str, Any], user_id: int) -> ReportTemplate:
 		data = dict(data or {})
 		ReportTemplateService.validate_template_payload(data, is_update=False)
+		ReportTemplateService._validate_known_scope(
+			str(data.get("module_key") or ""),
+			(data.get("subtype") or None),
+		)
 		entity = ReportTemplate(
 			business_id=int(data["business_id"]),
 			module_key=str(data["module_key"]),
@@ -250,6 +366,9 @@ class ReportTemplateService:
 		data = dict(data or {})
 		if data:
 			ReportTemplateService.validate_template_payload(data, is_update=True)
+		next_module_key = str(data.get("module_key") if "module_key" in data else entity.module_key)
+		next_subtype = (data.get("subtype") if "subtype" in data else entity.subtype) or None
+		ReportTemplateService._validate_known_scope(next_module_key, next_subtype)
 		for field in [
 			"module_key", "subtype", "name", "description", "engine", "status",
 			"content_html", "content_css", "header_html", "footer_html",
@@ -291,7 +410,52 @@ class ReportTemplateService:
 		entity = ReportTemplateService.get_template(db, template_id, business_id)
 		if not entity:
 			raise ApiError("NOT_FOUND", "Template not found", http_status=404)
-		entity.status = "published" if is_published else "draft"
+		target = "published" if is_published else "draft"
+		return ReportTemplateService.transition_status(
+			db=db,
+			template_id=template_id,
+			business_id=business_id,
+			to_status=target,
+			reason=None,
+			actor_user_id=None,
+		)
+
+	@staticmethod
+	def transition_status(
+		db: Session,
+		template_id: int,
+		business_id: int,
+		to_status: str,
+		reason: Optional[str] = None,
+		actor_user_id: Optional[int] = None,
+	) -> ReportTemplate:
+		entity = ReportTemplateService.get_template(db, template_id, business_id)
+		if not entity:
+			raise ApiError("NOT_FOUND", "Template not found", http_status=404)
+		dst = str(to_status or "").strip().lower()
+		if dst not in _ALLOWED_STATUS:
+			raise ApiError("VALIDATION_ERROR", "Invalid destination status", http_status=400)
+		src = str(entity.status or "draft").strip().lower()
+		if src == dst:
+			return entity
+		allowed = ReportTemplateService._ALLOWED_TRANSITIONS.get(src, frozenset())
+		if dst not in allowed:
+			raise ApiError(
+				"VALIDATION_ERROR",
+				f"Invalid status transition: {src} -> {dst}",
+				http_status=400,
+			)
+		entity.status = dst
+		db.add(
+			ReportTemplateStatusEvent(
+				report_template_id=int(entity.id),
+				business_id=int(business_id),
+				from_status=src,
+				to_status=dst,
+				reason=(reason or None),
+				actor_user_id=(int(actor_user_id) if actor_user_id is not None else None),
+			)
+		)
 		db.commit()
 		db.refresh(entity)
 		return entity

@@ -27,6 +27,7 @@ import '../../models/invoice_transaction.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../access_denied_page.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/category_tree_widget.dart';
 import '../../widgets/date_input_field.dart';
@@ -117,6 +118,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   OverlayEntry? _barcodeOverlayEntry;
   List<Map<String, dynamic>> _barcodeSuggestions = const <Map<String, dynamic>>[];
   bool _barcodeSuggestionsLoading = false;
+  bool _barcodeSuggestionsLoadingMore = false;
+  bool _barcodeSuggestionsHasMore = false;
+  int _barcodeSuggestionsSkip = 0;
+  String _barcodeSuggestionsQuery = '';
   int _barcodeHighlightedIndex = -1;
   late final TabController _mobileTabController;
   int _mobileTabIndex = 0;
@@ -145,6 +150,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     _loadRecentProducts();
     _loadCategories();
     _barcodeFocus.addListener(_onBarcodeFocusChanged);
+    _barcodeOverlayScrollController.addListener(_onBarcodeOverlayScroll);
     // فوکوس خودکار روی فیلد بارکد
     // فوکوس خودکار روی فیلد بارکد؛ در حالت ریل دسکتاپ فضای بیشتر با جمع شدن نوار کناری
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -261,6 +267,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     _barcodeController.dispose();
     _documentDescriptionController.dispose();
     _globalDiscountValueController.dispose();
+    _barcodeOverlayScrollController.removeListener(_onBarcodeOverlayScroll);
     _barcodeOverlayScrollController.dispose();
     _barcodeFocus.removeListener(_onBarcodeFocusChanged);
     _barcodeFocus.dispose();
@@ -313,7 +320,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         _enableWarehouseDocument = settings['enable_warehouse_document'] ?? true;
         _warehouseDocumentType = settings['warehouse_document_type'] ?? 'posted';
         _showInventory = settings['show_inventory'] ?? true;
-        _showPurchasePrice = settings['show_purchase_price'] ?? false;
+        _showPurchasePrice = (settings['show_purchase_price'] ?? false) &&
+            widget.authStore.canViewPurchasePrice();
         _printTemplateId = settings['print_template_id'];
       });
       
@@ -1431,6 +1439,24 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     _barcodeHighlightedIndex = -1;
   }
 
+  double _barcodeOverlayHeight() {
+    if (_barcodeSuggestionsLoading && _barcodeSuggestions.isEmpty) return 110;
+    if (!_barcodeSuggestionsLoading && _barcodeSuggestions.isEmpty) return 90;
+    final extra = _barcodeSuggestionsLoadingMore ? 1 : 0;
+    final rows = _barcodeSuggestions.length + extra;
+    const rowHeight = 56.0;
+    final raw = (rows * rowHeight) + (_barcodeSuggestionsLoading ? 4 : 0);
+    return raw.clamp(90.0, 320.0);
+  }
+
+  void _onBarcodeOverlayScroll() {
+    if (!_barcodeOverlayScrollController.hasClients) return;
+    final pos = _barcodeOverlayScrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 120) {
+      _loadMoreBarcodeSuggestions();
+    }
+  }
+
   Widget _buildBarcodeOverlay(BuildContext overlayContext) {
     return Stack(
       children: [
@@ -1452,9 +1478,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           child: Material(
             elevation: 10,
             borderRadius: BorderRadius.circular(10),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 620, maxHeight: 320, minWidth: 300),
-              child: _buildBarcodeSuggestionList(overlayContext),
+            child: SizedBox(
+              width: 620,
+              height: _barcodeOverlayHeight(),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 620, minWidth: 300),
+                child: _buildBarcodeSuggestionList(overlayContext),
+              ),
             ),
           ),
         ),
@@ -1485,9 +1515,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           child: ListView.separated(
             controller: _barcodeOverlayScrollController,
             padding: const EdgeInsets.symmetric(vertical: 4),
-            itemCount: _barcodeSuggestions.length,
+            itemCount: _barcodeSuggestions.length + (_barcodeSuggestionsLoadingMore ? 1 : 0),
             separatorBuilder: (_, __) => Divider(height: 1, color: cs.outline.withOpacity(0.2)),
             itemBuilder: (context, index) {
+              if (_barcodeSuggestionsLoadingMore && index == _barcodeSuggestions.length) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Center(
+                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  ),
+                );
+              }
               final product = _barcodeSuggestions[index];
               final selected = index == _barcodeHighlightedIndex;
               final name = product['name']?.toString() ?? 'نامشخص';
@@ -1523,6 +1561,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       setState(() {
         _barcodeSuggestions = const <Map<String, dynamic>>[];
         _barcodeSuggestionsLoading = false;
+        _barcodeSuggestionsLoadingMore = false;
+        _barcodeSuggestionsHasMore = false;
+        _barcodeSuggestionsSkip = 0;
+        _barcodeSuggestionsQuery = '';
         _barcodeHighlightedIndex = -1;
       });
       _barcodeOverlayEntry?.markNeedsBuild();
@@ -1535,13 +1577,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       final products = await _productService.searchProducts(
         businessId: widget.businessId,
         searchQuery: query,
-        limit: 10,
+        limit: 20,
+        skip: 0,
         searchFields: const ['code', 'barcode', 'name', 'general_barcodes'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       if (!mounted) return;
       setState(() {
         _barcodeSuggestions = products;
+        _barcodeSuggestionsLoadingMore = false;
+        _barcodeSuggestionsHasMore = products.length >= 20;
+        _barcodeSuggestionsSkip = products.length;
+        _barcodeSuggestionsQuery = query;
         _barcodeHighlightedIndex = products.isEmpty ? -1 : 0;
       });
       _ensureHighlightedSuggestionVisible();
@@ -1549,6 +1596,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       if (!mounted) return;
       setState(() {
         _barcodeSuggestions = const <Map<String, dynamic>>[];
+        _barcodeSuggestionsLoadingMore = false;
+        _barcodeSuggestionsHasMore = false;
+        _barcodeSuggestionsSkip = 0;
         _barcodeHighlightedIndex = -1;
       });
     } finally {
@@ -1556,6 +1606,40 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         setState(() => _barcodeSuggestionsLoading = false);
         _barcodeOverlayEntry?.markNeedsBuild();
       }
+    }
+  }
+
+  Future<void> _loadMoreBarcodeSuggestions() async {
+    if (!_barcodeSuggestionsHasMore ||
+        _barcodeSuggestionsLoadingMore ||
+        _barcodeSuggestionsLoading ||
+        _barcodeSuggestionsQuery.isEmpty) {
+      return;
+    }
+    setState(() => _barcodeSuggestionsLoadingMore = true);
+    _barcodeOverlayEntry?.markNeedsBuild();
+    try {
+      final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
+      final products = await _productService.searchProducts(
+        businessId: widget.businessId,
+        searchQuery: _barcodeSuggestionsQuery,
+        limit: 20,
+        skip: _barcodeSuggestionsSkip,
+        searchFields: const ['code', 'barcode', 'name', 'general_barcodes'],
+        categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _barcodeSuggestions = [..._barcodeSuggestions, ...products];
+        _barcodeSuggestionsHasMore = products.length >= 20;
+        _barcodeSuggestionsSkip = _barcodeSuggestions.length;
+        _barcodeSuggestionsLoadingMore = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _barcodeSuggestionsLoadingMore = false);
+    } finally {
+      _barcodeOverlayEntry?.markNeedsBuild();
     }
   }
 
@@ -1935,6 +2019,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         appBar: AppBar(title: const Text('فروش سریع')),
         body: const Center(child: CircularProgressIndicator()),
       );
+    }
+    if (!widget.authStore.canAccessInvoiceType('invoice_sales', action: 'add')) {
+      return const AccessDeniedPage(message: 'دسترسی شما برای فروش سریع محدود شده است');
     }
     
     return KeyboardListener(

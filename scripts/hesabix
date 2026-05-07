@@ -63,6 +63,18 @@ reload_hesabix_cli() {
   return 0
 }
 
+# Ensure API service gets journalctl sudo fallback env.
+ensure_api_journalctl_env() {
+  local dropin_dir="/etc/systemd/system/hesabix-api.service.d"
+  local dropin_file="${dropin_dir}/10-journalctl-env.conf"
+  mkdir -p "${dropin_dir}"
+  cat > "${dropin_file}" <<'EOF'
+[Service]
+Environment=HESABIX_ALLOW_SUDO_JOURNALCTL=1
+EOF
+  systemctl daemon-reload
+}
+
 # Core application units (order: start forward, stop reverse). pgadmin4 is optional if installed.
 run_hesabix_services() {
   local action="$1"
@@ -101,6 +113,7 @@ run_hesabix_services() {
       echo "Stopped Hesabix services."
       ;;
     restart)
+      ensure_api_journalctl_env
       systemctl daemon-reload
       for u in "${core[@]}"; do
         systemctl restart "${u}.service"
@@ -214,6 +227,8 @@ if [[ -z "${UPDATE_MODE}" ]]; then
   usage
   exit 0
 fi
+
+ensure_api_journalctl_env
 
 set -a
 # shellcheck source=/dev/null

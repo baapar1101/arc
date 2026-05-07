@@ -16,6 +16,9 @@ class AccountTreeComboboxWidget extends StatefulWidget {
   final String? documentTypeFilter;
   /// هم‌ارتفاع با سایر فیلدهای Outline فشرده (دیالوگ هزینه/درآمد و مشابه).
   final bool dense;
+  /// در صورت تنظیم، ارتفاع فیلد را به‌صورت دقیق قفل می‌کند.
+  /// پیش‌فرض null است تا رفتار استفاده‌های قبلی بدون تغییر بماند.
+  final double? fixedHeight;
 
   const AccountTreeComboboxWidget({
     super.key,
@@ -27,6 +30,7 @@ class AccountTreeComboboxWidget extends StatefulWidget {
     this.isRequired = false,
     this.documentTypeFilter,
     this.dense = false,
+    this.fixedHeight,
   });
 
   @override
@@ -80,8 +84,9 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
+    final field = TextFormField(
       controller: _searchController,
+      textAlignVertical: TextAlignVertical.center,
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hintText,
@@ -115,6 +120,11 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
           : null,
       onTap: () => _showAccountTreeDialog(),
     );
+    final h = widget.fixedHeight;
+    if (h != null) {
+      return SizedBox(height: h, child: field);
+    }
+    return field;
   }
 
   void _showAccountTreeDialog() {

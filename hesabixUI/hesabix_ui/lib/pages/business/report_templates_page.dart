@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -55,6 +56,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   final _paperCustomCtrl = TextEditingController();
 
   bool get _canWrite => widget.authStore.hasBusinessPermission('report_templates', 'write');
+  bool get _canApprove => widget.authStore.hasBusinessPermission('report_templates', 'approve');
+  bool get _canAudit =>
+      widget.authStore.hasBusinessPermission('report_templates', 'approve') ||
+      widget.authStore.hasBusinessPermission('report_templates', 'export');
 
   /// فیلتر از پیش: all، انواع گزارش، یا custom برای ورود دستی module/subtype
   String _filterPresetId = 'invoices_list';
@@ -134,7 +139,35 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   String _statusLabel(AppLocalizations t, String status) {
     if (status == 'published') return t.reportTemplateStatusPublished;
     if (status == 'draft') return t.reportTemplateStatusDraft;
+    if (status == 'in_review') return 'در انتظار بررسی';
+    if (status == 'approved') return 'تایید شده';
+    if (status == 'deprecated') return 'منسوخ';
     return status;
+  }
+
+  String _statusFlowLabel(String? status) {
+    final s = (status ?? '').trim();
+    if (s == 'draft') return 'پیش‌نویس';
+    if (s == 'in_review') return 'در انتظار بررسی';
+    if (s == 'approved') return 'تایید شده';
+    if (s == 'published') return 'منتشر شده';
+    if (s == 'deprecated') return 'منسوخ';
+    return s.isEmpty ? '—' : s;
+  }
+
+  String _scopeLabel(AppLocalizations t, String moduleKey, String? subtype) {
+    final st = (subtype ?? '').trim();
+    if (moduleKey == 'invoices' && st == 'list') return t.presetInvoicesList;
+    if (moduleKey == 'invoices' && st == 'detail') return t.presetInvoicesDetail;
+    if (moduleKey == 'receipts_payments' && st == 'list') return t.presetReceiptsPaymentsList;
+    if (moduleKey == 'receipts_payments' && st == 'detail') return t.presetReceiptsPaymentsDetail;
+    if (moduleKey == 'expense_income' && st == 'list') return t.presetExpenseIncomeList;
+    if (moduleKey == 'documents' && st == 'list') return t.presetDocumentsList;
+    if (moduleKey == 'documents' && st == 'detail') return t.presetDocumentsDetail;
+    if (moduleKey == 'transfers' && st == 'list') return t.presetTransfersList;
+    if (moduleKey == 'transfers' && st == 'detail') return t.presetTransfersDetail;
+    if (moduleKey == 'warehouse_documents' && st == 'postal_label') return t.presetWarehousePostalLabel;
+    return '$moduleKey / ${st.isEmpty ? '—' : st}';
   }
 
   Map<String, dynamic>? _marginsFromFull(Map<String, dynamic> full) {
@@ -772,12 +805,703 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   Future<void> _togglePublish(Map<String, dynamic> item) async {
     final published = (item['status'] == 'published');
     final next = !published;
-    await _service.publish(
-      businessId: widget.businessId,
-      templateId: (item['id'] as num).toInt(),
-      published: next,
+    if (next && !_canApprove) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: 'دسترسی تایید/انتشار قالب را ندارید');
+      }
+      return;
+    }
+    try {
+      if (next) {
+        final full = await _service.getTemplate(
+          businessId: widget.businessId,
+          templateId: (item['id'] as num).toInt(),
+        );
+        if ((full['engine'] ?? '').toString().toLowerCase() == 'builder') {
+          final mk = (full['module_key'] ?? '').toString();
+          final st = full['subtype']?.toString();
+          final assets = (full['assets'] as Map?)?.cast<String, dynamic>() ?? const {};
+          final design = (assets['builder_design'] as Map?)?.cast<String, dynamic>() ?? const {};
+          final validation = await _service.validateBuilderDesign(
+            businessId: widget.businessId,
+            moduleKey: mk,
+            subtype: st,
+            design: design,
+          );
+          final errors = ((validation['errors'] as List?) ?? const [])
+              .map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toList();
+          final warnings = ((validation['warnings'] as List?) ?? const [])
+              .map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toList();
+          if (errors.isNotEmpty) {
+            await showDialog<void>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(AppLocalizations.of(ctx).reportTemplatePublish),
+                content: SizedBox(
+                  width: 520,
+                  child: SingleChildScrollView(
+                    child: Text('• ${errors.join('\n• ')}'),
+                  ),
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(ctx).close)),
+                ],
+              ),
+            );
+            return;
+          }
+          if (warnings.isNotEmpty) {
+            final proceed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(AppLocalizations.of(ctx).reportTemplatePublish),
+                content: SizedBox(
+                  width: 520,
+                  child: SingleChildScrollView(
+                    child: Text(
+                      'این قالب هشدارهایی دارد:\n\n• ${warnings.join('\n• ')}\n\nبا وجود هشدار منتشر شود؟',
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(ctx).cancel)),
+                  FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(AppLocalizations.of(ctx).confirm)),
+                ],
+              ),
+            );
+            if (proceed != true) return;
+          }
+        }
+      }
+      await _service.publish(
+        businessId: widget.businessId,
+        templateId: (item['id'] as num).toInt(),
+        published: next,
+      );
+      await _fetch();
+    } catch (e) {
+      if (!mounted) return;
+      final message = ErrorExtractor.forContext(e, context);
+      if (next && message.contains('Cannot publish builder template')) {
+        final details = message.split(':').length > 1
+            ? message.substring(message.indexOf(':') + 1).trim()
+            : message;
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(AppLocalizations.of(ctx).reportTemplatePublish),
+            content: SizedBox(
+              width: 520,
+              child: SingleChildScrollView(
+                child: Text(details.replaceAll('; ', '\n• ')),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(ctx).close)),
+            ],
+          ),
+        );
+      } else {
+        SnackBarHelper.showError(context, message: message);
+      }
+    }
+  }
+
+  Future<void> _transitionStatus(Map<String, dynamic> item, String toStatus) async {
+    try {
+      String? reason;
+      if (toStatus == 'deprecated' || toStatus == 'draft') {
+        final ctrl = TextEditingController();
+        final ok = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(toStatus == 'deprecated' ? 'دلیل منسوخ کردن' : 'دلیل بازگشت به پیش‌نویس'),
+            content: TextField(
+              controller: ctrl,
+              minLines: 2,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                hintText: 'دلیل را وارد کنید',
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(AppLocalizations.of(ctx).cancel)),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(AppLocalizations.of(ctx).confirm)),
+            ],
+          ),
+        );
+        if (ok != true) return;
+        reason = ctrl.text.trim();
+        if (reason.isEmpty) {
+          if (mounted) {
+            SnackBarHelper.showError(context, message: 'ثبت دلیل الزامی است');
+          }
+          return;
+        }
+      }
+      if ((toStatus == 'approved' || toStatus == 'published') && !_canApprove) {
+        if (mounted) {
+          SnackBarHelper.showError(context, message: 'دسترسی تایید قالب را ندارید');
+        }
+        return;
+      }
+      await _service.transitionStatus(
+        businessId: widget.businessId,
+        templateId: (item['id'] as num).toInt(),
+        toStatus: toStatus,
+        reason: reason,
+      );
+      await _fetch();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _showStatusHistory(Map<String, dynamic> item) async {
+    try {
+      final events = await _service.statusEvents(
+        businessId: widget.businessId,
+        templateId: (item['id'] as num).toInt(),
+      );
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('تاریخچه وضعیت قالب'),
+          content: SizedBox(
+            width: 620,
+            height: 420,
+            child: events.isEmpty
+                ? const Center(child: Text('تاریخچه‌ای ثبت نشده است'))
+                : ListView.separated(
+                    itemCount: events.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final e = events[i];
+                      final fromS = _statusFlowLabel(e['from_status']?.toString());
+                      final toS = _statusFlowLabel(e['to_status']?.toString());
+                      final at = (e['created_at'] ?? '').toString();
+                      final reason = (e['reason'] ?? '').toString();
+                      final actor = (e['actor_display'] ?? '').toString();
+                      return ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.timeline),
+                        title: Text('$fromS ← $toS'),
+                        subtitle: Text(
+                          '${at.isEmpty ? '—' : at}'
+                          '${actor.isNotEmpty ? '\nکاربر: $actor' : ''}'
+                          '${reason.isNotEmpty ? '\nدلیل: $reason' : ''}',
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(ctx).close)),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _showAuditReportDialog() async {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = widget.authStore.currentUserId ?? 0;
+    final prefKey = 'report_template_audit_filters_${widget.businessId}_$userId';
+    final savedRaw = prefs.getString(prefKey);
+    Map<String, dynamic> saved = const {};
+    if (savedRaw != null && savedRaw.trim().isNotEmpty) {
+      try {
+        final m = jsonDecode(savedRaw);
+        if (m is Map<String, dynamic>) saved = m;
+      } catch (_) {}
+    }
+    String? status;
+    final actorCtrl = TextEditingController();
+    final fromCtrl = TextEditingController();
+    final toCtrl = TextEditingController();
+    List<Map<String, dynamic>> events = const [];
+    Map<String, dynamic> summary = const {};
+    bool loading = false;
+    int totalCount = 0;
+    int offset = 0;
+    const int pageSize = 50;
+    String sortBy = 'created_at';
+    String sortOrder = 'desc';
+    bool initialLoaded = false;
+    status = saved['status']?.toString();
+    actorCtrl.text = (saved['actor_user_id'] ?? '').toString();
+    fromCtrl.text = (saved['from_date'] ?? '').toString();
+    toCtrl.text = (saved['to_date'] ?? '').toString();
+    sortBy = (saved['sort_by'] ?? 'created_at').toString();
+    sortOrder = (saved['sort_order'] ?? 'desc').toString();
+
+    Future<void> saveFilters() async {
+      final payload = {
+        'status': status,
+        'actor_user_id': actorCtrl.text.trim(),
+        'from_date': fromCtrl.text.trim(),
+        'to_date': toCtrl.text.trim(),
+        'sort_by': sortBy,
+        'sort_order': sortOrder,
+      };
+      await prefs.setString(prefKey, jsonEncode(payload));
+    }
+
+    Future<void> load(StateSetter setLocal) async {
+      setLocal(() => loading = true);
+      try {
+        final data = await _service.statusEventsReport(
+          businessId: widget.businessId,
+          status: status,
+          actorUserId: int.tryParse(actorCtrl.text.trim()),
+          fromDate: fromCtrl.text.trim().isEmpty ? null : fromCtrl.text.trim(),
+          toDate: toCtrl.text.trim().isEmpty ? null : toCtrl.text.trim(),
+          offset: offset,
+          limit: pageSize,
+          sortBy: sortBy,
+          sortOrder: sortOrder,
+        );
+        final items = (data['items'] as List?) ?? const [];
+        events = items.cast<Map<String, dynamic>>();
+        totalCount = ((data['total_count'] as num?)?.toInt()) ?? events.length;
+        summary = (data['summary'] as Map?)?.cast<String, dynamic>() ?? const {};
+        await saveFilters();
+      } catch (e) {
+        if (mounted) {
+          SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+        }
+      } finally {
+        setLocal(() => loading = false);
+      }
+    }
+
+    String isoDayStart(DateTime d) => DateTime(d.year, d.month, d.day).toIso8601String();
+    String isoDayEnd(DateTime d) => DateTime(d.year, d.month, d.day, 23, 59, 59).toIso8601String();
+
+    void applyDatePreset(String preset, StateSetter setLocal) {
+      final now = DateTime.now();
+      if (preset == 'today') {
+        fromCtrl.text = isoDayStart(now);
+        toCtrl.text = isoDayEnd(now);
+      } else if (preset == '7d') {
+        final from = now.subtract(const Duration(days: 6));
+        fromCtrl.text = isoDayStart(from);
+        toCtrl.text = isoDayEnd(now);
+      } else if (preset == '30d') {
+        final from = now.subtract(const Duration(days: 29));
+        fromCtrl.text = isoDayStart(from);
+        toCtrl.text = isoDayEnd(now);
+      } else if (preset == 'clear') {
+        fromCtrl.clear();
+        toCtrl.clear();
+      }
+      setLocal(() {});
+    }
+
+    Future<List<Map<String, dynamic>>> loadAllFiltered() async {
+      final all = <Map<String, dynamic>>[];
+      var off = 0;
+      const chunk = 500;
+      while (true) {
+        final data = await _service.statusEventsReport(
+          businessId: widget.businessId,
+          status: status,
+          actorUserId: int.tryParse(actorCtrl.text.trim()),
+          fromDate: fromCtrl.text.trim().isEmpty ? null : fromCtrl.text.trim(),
+          toDate: toCtrl.text.trim().isEmpty ? null : toCtrl.text.trim(),
+          offset: off,
+          limit: chunk,
+          sortBy: sortBy,
+          sortOrder: sortOrder,
+        );
+        final items = ((data['items'] as List?) ?? const []).cast<Map<String, dynamic>>();
+        if (items.isEmpty) break;
+        all.addAll(items);
+        final total = ((data['total_count'] as num?)?.toInt()) ?? all.length;
+        off += items.length;
+        if (off >= total) break;
+      }
+      return all;
+    }
+
+    String toCsv(List<Map<String, dynamic>> rows) {
+      String esc(String v) {
+        final needQuote = v.contains(',') || v.contains('\n') || v.contains('"');
+        final s = v.replaceAll('"', '""');
+        return needQuote ? '"$s"' : s;
+      }
+
+      final buf = StringBuffer();
+      buf.writeln('event_id,template_id,from_status,to_status,actor_user_id,actor_display,created_at,reason');
+      for (final r in rows) {
+        buf.writeln([
+          esc((r['id'] ?? '').toString()),
+          esc((r['report_template_id'] ?? '').toString()),
+          esc((r['from_status'] ?? '').toString()),
+          esc((r['to_status'] ?? '').toString()),
+          esc((r['actor_user_id'] ?? '').toString()),
+          esc((r['actor_display'] ?? '').toString()),
+          esc((r['created_at'] ?? '').toString()),
+          esc((r['reason'] ?? '').toString()),
+        ].join(','));
+      }
+      return buf.toString();
+    }
+
+    String toExcelHtml(List<Map<String, dynamic>> rows) {
+      String esc(String s) => s
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;');
+      final sb = StringBuffer();
+      sb.writeln('<html><head><meta charset="utf-8"></head><body>');
+      sb.writeln('<table border="1"><thead><tr>');
+      const headers = [
+        'event_id',
+        'template_id',
+        'from_status',
+        'to_status',
+        'actor_user_id',
+        'actor_display',
+        'created_at',
+        'reason',
+      ];
+      for (final h in headers) {
+        sb.write('<th>${esc(h)}</th>');
+      }
+      sb.writeln('</tr></thead><tbody>');
+      for (final r in rows) {
+        final vals = [
+          (r['id'] ?? '').toString(),
+          (r['report_template_id'] ?? '').toString(),
+          (r['from_status'] ?? '').toString(),
+          (r['to_status'] ?? '').toString(),
+          (r['actor_user_id'] ?? '').toString(),
+          (r['actor_display'] ?? '').toString(),
+          (r['created_at'] ?? '').toString(),
+          (r['reason'] ?? '').toString(),
+        ];
+        sb.write('<tr>');
+        for (final v in vals) {
+          sb.write('<td>${esc(v)}</td>');
+        }
+        sb.writeln('</tr>');
+      }
+      sb.writeln('</tbody></table></body></html>');
+      return sb.toString();
+    }
+
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            if (!initialLoaded) {
+              initialLoaded = true;
+              Future.microtask(() => load(setLocal));
+            }
+            return AlertDialog(
+            title: const Text('گزارش مدیریتی تغییر وضعیت قالب‌ها'),
+            content: SizedBox(
+              width: 980,
+              height: 560,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      SizedBox(
+                        width: 170,
+                        child: DropdownButtonFormField<String?>(
+                          value: status,
+                          decoration: const InputDecoration(
+                            labelText: 'وضعیت',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: null, child: Text('همه')),
+                            DropdownMenuItem(value: 'draft', child: Text('پیش‌نویس')),
+                            DropdownMenuItem(value: 'in_review', child: Text('در انتظار بررسی')),
+                            DropdownMenuItem(value: 'approved', child: Text('تایید شده')),
+                            DropdownMenuItem(value: 'published', child: Text('منتشر شده')),
+                            DropdownMenuItem(value: 'deprecated', child: Text('منسوخ')),
+                          ],
+                          onChanged: (v) => setLocal(() => status = v),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 140,
+                        child: TextField(
+                          controller: actorCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'شناسه کاربر',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 220,
+                        child: TextField(
+                          controller: fromCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'از تاریخ (ISO)',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 220,
+                        child: TextField(
+                          controller: toCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'تا تاریخ (ISO)',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      FilledButton.icon(
+                        onPressed: loading
+                            ? null
+                            : () {
+                                offset = 0;
+                                load(setLocal);
+                              },
+                        icon: const Icon(Icons.search),
+                        label: const Text('جستجو'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: loading ? null : () => applyDatePreset('today', setLocal),
+                        icon: const Icon(Icons.today, size: 18),
+                        label: const Text('امروز'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: loading ? null : () => applyDatePreset('7d', setLocal),
+                        icon: const Icon(Icons.date_range, size: 18),
+                        label: const Text('۷ روز اخیر'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: loading ? null : () => applyDatePreset('30d', setLocal),
+                        icon: const Icon(Icons.calendar_month, size: 18),
+                        label: const Text('۳۰ روز اخیر'),
+                      ),
+                      TextButton(
+                        onPressed: loading ? null : () => applyDatePreset('clear', setLocal),
+                        child: const Text('پاک‌سازی تاریخ'),
+                      ),
+                      SizedBox(
+                        width: 170,
+                        child: DropdownButtonFormField<String>(
+                          value: sortBy,
+                          decoration: const InputDecoration(
+                            labelText: 'مرتب‌سازی',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'created_at', child: Text('تاریخ')),
+                            DropdownMenuItem(value: 'to_status', child: Text('وضعیت مقصد')),
+                            DropdownMenuItem(value: 'actor_user_id', child: Text('کاربر')),
+                          ],
+                          onChanged: (v) => setLocal(() => sortBy = v ?? 'created_at'),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 120,
+                        child: DropdownButtonFormField<String>(
+                          value: sortOrder,
+                          decoration: const InputDecoration(
+                            labelText: 'ترتیب',
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'desc', child: Text('نزولی')),
+                            DropdownMenuItem(value: 'asc', child: Text('صعودی')),
+                          ],
+                          onChanged: (v) => setLocal(() => sortOrder = v ?? 'desc'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (summary.isNotEmpty)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        Chip(
+                          label: Text('کل رخدادها: $totalCount'),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Chip(
+                          label: Text('تعداد انتشار: ${(summary['publish_count'] ?? 0)}'),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        Chip(
+                          label: Text('تعداد بازگشت/رد: ${(summary['reject_count'] ?? 0)}'),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                  if ((summary['top_actors'] as List?)?.isNotEmpty == true) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'بیشترین کاربران: ${(summary['top_actors'] as List).map((e) => '${e['actor_display'] ?? e['actor_user_id']} (${e['count']})').join('، ')}',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
+                  ],
+                  if ((summary['top_reasons'] as List?)?.isNotEmpty == true) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'دلایل پرتکرار: ${(summary['top_reasons'] as List).map((e) => '${e['reason']} (${e['count']})').join('، ')}',
+                      style: Theme.of(ctx).textTheme.bodySmall,
+                    ),
+                  ],
+                  if (summary.isNotEmpty) const SizedBox(height: 8),
+                  Expanded(
+                    child: loading
+                        ? const Center(child: CircularProgressIndicator())
+                        : events.isEmpty
+                            ? const Center(child: Text('داده‌ای یافت نشد'))
+                            : ListView.separated(
+                                itemCount: events.length,
+                                separatorBuilder: (_, _) => const Divider(height: 1),
+                                itemBuilder: (_, i) {
+                                  final e = events[i];
+                                  return ListTile(
+                                    dense: true,
+                                    leading: const Icon(Icons.event_note),
+                                    title: Text(
+                                      '#${e['id'] ?? ''} · قالب ${e['report_template_id'] ?? ''} · '
+                                      '${_statusFlowLabel(e['from_status']?.toString())} ← ${_statusFlowLabel(e['to_status']?.toString())}',
+                                    ),
+                                    subtitle: Text(
+                                      '${e['created_at'] ?? ''}'
+                                      '${(e['actor_display'] ?? '').toString().isNotEmpty ? '\nکاربر: ${e['actor_display']}' : ''}'
+                                      '${(e['reason'] ?? '').toString().isNotEmpty ? '\nدلیل: ${e['reason']}' : ''}',
+                                    ),
+                                  );
+                                },
+                              ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text('نمایش ${events.length} از $totalCount'),
+                      const Spacer(),
+                      OutlinedButton.icon(
+                        onPressed: loading || offset <= 0
+                            ? null
+                            : () {
+                                offset = (offset - pageSize).clamp(0, 1 << 30);
+                                load(setLocal);
+                              },
+                        icon: const Icon(Icons.chevron_left),
+                        label: const Text('قبلی'),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: loading || (offset + events.length) >= totalCount
+                            ? null
+                            : () {
+                                offset += pageSize;
+                                load(setLocal);
+                              },
+                        icon: const Icon(Icons.chevron_right),
+                        label: const Text('بعدی'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(AppLocalizations.of(ctx).close),
+              ),
+              TextButton.icon(
+                onPressed: events.isEmpty
+                    ? null
+                    : () async {
+                        try {
+                          final rows = await loadAllFiltered();
+                          final csv = toCsv(rows);
+                          final bytes = utf8.encode(csv);
+                          if (kIsWeb) {
+                            await web_utils.saveBytesAsFileWeb(
+                              bytes,
+                              'report_template_status_audit.csv',
+                              mimeType: 'text/csv;charset=utf-8',
+                            );
+                          } else {
+                            await FileSaver.saveBytes(bytes, 'report_template_status_audit.csv');
+                          }
+                          if (ctx.mounted) {
+                            SnackBarHelper.show(ctx, message: 'فایل گزارش کامل (${rows.length} ردیف) ذخیره شد');
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            SnackBarHelper.showError(ctx, message: ErrorExtractor.forContext(e, ctx));
+                          }
+                        }
+                      },
+                icon: const Icon(Icons.download),
+                label: const Text('خروجی CSV'),
+              ),
+              TextButton.icon(
+                onPressed: events.isEmpty
+                    ? null
+                    : () async {
+                        try {
+                          final rows = await loadAllFiltered();
+                          final html = toExcelHtml(rows);
+                          final bytes = utf8.encode(html);
+                          if (kIsWeb) {
+                            await web_utils.saveBytesAsFileWeb(
+                              bytes,
+                              'report_template_status_audit.xls',
+                              mimeType: 'application/vnd.ms-excel;charset=utf-8',
+                            );
+                          } else {
+                            await FileSaver.saveBytes(bytes, 'report_template_status_audit.xls');
+                          }
+                          if (ctx.mounted) {
+                            SnackBarHelper.show(ctx, message: 'فایل Excel (${rows.length} ردیف) ذخیره شد');
+                          }
+                        } catch (e) {
+                          if (ctx.mounted) {
+                            SnackBarHelper.showError(ctx, message: ErrorExtractor.forContext(e, ctx));
+                          }
+                        }
+                      },
+                icon: const Icon(Icons.table_chart_outlined),
+                label: const Text('خروجی Excel'),
+              ),
+            ],
+          );
+          },
+        );
+      },
     );
-    await _fetch();
   }
 
   Future<void> _previewTemplate(Map<String, dynamic> item) async {
@@ -801,6 +1525,18 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         businessId: widget.businessId,
         templateId: (item['id'] as num).toInt(),
       );
+      Map<String, dynamic> sampleContext = const <String, dynamic>{};
+      try {
+        final schema = await _service.schema(
+          businessId: widget.businessId,
+          moduleKey: (full['module_key'] ?? 'invoices').toString(),
+          subtype: full['subtype']?.toString(),
+        );
+        sampleContext = (schema['sample_context'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{};
+      } catch (_) {
+        sampleContext = const <String, dynamic>{};
+      }
       final engine = (full['engine'] ?? 'jinja2').toString().toLowerCase();
       final Map<String, dynamic> res;
       if (engine == 'builder') {
@@ -814,7 +1550,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
           engine: 'builder',
           design: builderDesign,
           assets: builderAssets,
-          context: const <String, dynamic>{},
+          context: sampleContext,
         );
       } else {
         res = await _service.preview(
@@ -823,7 +1559,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
           contentCss: (full['content_css'] ?? '').toString().isEmpty ? null : (full['content_css'] ?? '').toString(),
           headerHtml: (full['header_html'] ?? '').toString().isEmpty ? null : (full['header_html'] ?? '').toString(),
           footerHtml: (full['footer_html'] ?? '').toString().isEmpty ? null : (full['footer_html'] ?? '').toString(),
-          context: const <String, dynamic>{},
+          context: sampleContext,
         );
       }
 
@@ -837,7 +1573,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             engine: 'builder',
             design: builderDesign,
             assets: builderAssets,
-            context: const <String, dynamic>{},
+            context: sampleContext,
             paperSize: full['paper_size']?.toString(),
             orientation: full['orientation']?.toString(),
             margins: marginsMap,
@@ -849,6 +1585,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             contentCss: (full['content_css'] ?? '').toString().isEmpty ? null : (full['content_css'] ?? '').toString(),
             headerHtml: (full['header_html'] ?? '').toString().isEmpty ? null : (full['header_html'] ?? '').toString(),
             footerHtml: (full['footer_html'] ?? '').toString().isEmpty ? null : (full['footer_html'] ?? '').toString(),
+            context: sampleContext,
             paperSize: full['paper_size']?.toString(),
             orientation: full['orientation']?.toString(),
             margins: marginsMap,
@@ -1233,6 +1970,12 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
               },
             ),
           ],
+          if (_canAudit)
+            IconButton(
+              tooltip: 'گزارش Audit قالب‌ها',
+              onPressed: _showAuditReportDialog,
+              icon: const Icon(Icons.analytics_outlined),
+            ),
         ],
       ),
       body: Padding(
@@ -1363,6 +2106,9 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                     DropdownMenuItem(value: null, child: Text(t.all)),
                     DropdownMenuItem(value: 'published', child: Text(t.reportTemplateStatusPublished)),
                     DropdownMenuItem(value: 'draft', child: Text(t.reportTemplateStatusDraft)),
+                    const DropdownMenuItem(value: 'in_review', child: Text('در انتظار بررسی')),
+                    const DropdownMenuItem(value: 'approved', child: Text('تایید شده')),
+                    const DropdownMenuItem(value: 'deprecated', child: Text('منسوخ')),
                   ],
                   onChanged: (v) {
                     setState(() => _statusFilter = v);
@@ -1463,12 +2209,34 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${it['module_key'] ?? '-'} / ${it['subtype'] ?? '—'} · v${it['version'] ?? '-'}'
+                                      '${_scopeLabel(t, (it['module_key'] ?? '-').toString(), it['subtype']?.toString())} · v${it['version'] ?? '-'}'
                                       '${updated.isNotEmpty ? ' · $updated' : ''}',
                                       style: Theme.of(context).textTheme.bodySmall,
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    if (it['last_status_event'] is Map) ...[
+                                      const SizedBox(height: 2),
+                                      Builder(builder: (_) {
+                                        final ev = (it['last_status_event'] as Map);
+                                        final actor = (ev['actor_display'] ?? '').toString();
+                                        final actorText = actor.isNotEmpty ? ' · $actor' : '';
+                                        return Text(
+                                          'آخرین تغییر: ${_statusFlowLabel(ev['to_status']?.toString())}$actorText',
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        );
+                                      }),
+                                    ] else ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'آخرین تغییر: —',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
                                   ],
                                 ),
                                 leading: Icon(isDefault ? Icons.star : Icons.description),
@@ -1485,6 +2253,15 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                                               contentPadding: EdgeInsets.zero,
                                             ),
                                           ),
+                                          const PopupMenuItem(
+                                            value: 'history',
+                                            child: ListTile(
+                                              leading: Icon(Icons.history),
+                                              title: Text('تاریخچه وضعیت'),
+                                              dense: true,
+                                              contentPadding: EdgeInsets.zero,
+                                            ),
+                                          ),
                                           PopupMenuItem(
                                             value: 'edit',
                                             child: ListTile(
@@ -1494,15 +2271,56 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                                               contentPadding: EdgeInsets.zero,
                                             ),
                                           ),
-                                          PopupMenuItem(
-                                            value: 'publish',
-                                            child: ListTile(
-                                              leading: Icon(status == 'published' ? Icons.visibility_off : Icons.publish),
-                                              title: Text(status == 'published' ? t.reportTemplateUnpublish : t.reportTemplatePublish),
-                                              dense: true,
-                                              contentPadding: EdgeInsets.zero,
+                                          if (status == 'published' || _canApprove)
+                                            PopupMenuItem(
+                                              value: 'publish',
+                                              child: ListTile(
+                                                leading: Icon(status == 'published' ? Icons.visibility_off : Icons.publish),
+                                                title: Text(status == 'published' ? t.reportTemplateUnpublish : t.reportTemplatePublish),
+                                                dense: true,
+                                                contentPadding: EdgeInsets.zero,
+                                              ),
                                             ),
-                                          ),
+                                          if (status == 'draft')
+                                            const PopupMenuItem(
+                                              value: 'submit_review',
+                                              child: ListTile(
+                                                leading: Icon(Icons.rate_review_outlined),
+                                                title: Text('ارسال برای بررسی'),
+                                                dense: true,
+                                                contentPadding: EdgeInsets.zero,
+                                              ),
+                                            ),
+                                          if (status == 'in_review' && _canApprove)
+                                            const PopupMenuItem(
+                                              value: 'approve',
+                                              child: ListTile(
+                                                leading: Icon(Icons.verified_outlined),
+                                                title: Text('تایید قالب'),
+                                                dense: true,
+                                                contentPadding: EdgeInsets.zero,
+                                              ),
+                                            ),
+                                          if (status != 'deprecated')
+                                            const PopupMenuItem(
+                                              value: 'deprecate',
+                                              child: ListTile(
+                                                leading: Icon(Icons.archive_outlined),
+                                                title: Text('منسوخ کردن'),
+                                                dense: true,
+                                                contentPadding: EdgeInsets.zero,
+                                              ),
+                                            ),
+                                          if (status == 'in_review' || status == 'approved' || status == 'deprecated')
+                                            const PopupMenuItem(
+                                              value: 'back_to_draft',
+                                              child: ListTile(
+                                                leading: Icon(Icons.edit_note_outlined),
+                                                title: Text('بازگشت به پیش‌نویس'),
+                                                dense: true,
+                                                contentPadding: EdgeInsets.zero,
+                                              ),
+                                            ),
                                           PopupMenuItem(
                                             value: 'default',
                                             child: ListTile(
@@ -1536,6 +2354,9 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                                             case 'preview':
                                               _previewTemplate(it);
                                               break;
+                                            case 'history':
+                                              _showStatusHistory(it);
+                                              break;
                                             case 'edit':
                                               _editDialog(it);
                                               break;
@@ -1544,6 +2365,18 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                                               break;
                                             case 'default':
                                               _setDefault(it);
+                                              break;
+                                            case 'submit_review':
+                                              _transitionStatus(it, 'in_review');
+                                              break;
+                                            case 'approve':
+                                              _transitionStatus(it, 'approved');
+                                              break;
+                                            case 'deprecate':
+                                              _transitionStatus(it, 'deprecated');
+                                              break;
+                                            case 'back_to_draft':
+                                              _transitionStatus(it, 'draft');
                                               break;
                                             case 'export':
                                               _exportTemplateJson(it, t);

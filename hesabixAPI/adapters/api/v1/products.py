@@ -8,7 +8,12 @@ from sqlalchemy import and_
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
+from app.core.permissions import (
+    require_business_access,
+    require_business_permission_dep,
+    require_business_permission_by_entity_dep,
+    has_business_permission_for_business,
+)
 from app.core.responses import success_response, ApiError, format_datetime_fields
 from app.core.cache import get_cache
 from adapters.api.v1.schemas import QueryInfo
@@ -53,6 +58,8 @@ from app.services.bulk_product_prices_sheet_service import (
 )
 from adapters.db.models.business import Business
 from adapters.db.models.product import Product
+from adapters.db.models.price_list import PriceList, PriceItem
+from adapters.db.models.currency import Currency
 from app.core.i18n import negotiate_locale
 from fastapi import UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
@@ -61,6 +68,28 @@ import os
 
 
 router = APIRouter(prefix="/products", tags=["محصولات و کالاها", "انبارداری"])
+
+
+def _apply_pricing_visibility_for_user(
+    auth_context: AuthContext,
+    db: Session,
+    business_id: int,
+    item: Dict[str, Any],
+) -> Dict[str, Any]:
+    can_view_sales = (
+        has_business_permission_for_business(auth_context, db, business_id, "pricing", "sales_price_view")
+        or has_business_permission_for_business(auth_context, db, business_id, "products", "view")
+    )
+    can_view_purchase = (
+        has_business_permission_for_business(auth_context, db, business_id, "pricing", "purchase_price_view")
+        or has_business_permission_for_business(auth_context, db, business_id, "products", "view")
+    )
+    masked = dict(item or {})
+    if not can_view_sales:
+        masked["base_sales_price"] = None
+    if not can_view_purchase:
+        masked["base_purchase_price"] = None
+    return masked
 
 
 async def _get_products_search_query_info(request: Request) -> QueryInfo:
@@ -423,6 +452,10 @@ def search_products_endpoint(
 		if cached is not None:
 			# پاسخ کش‌شده ممکن است فاقد pagination باشد (کش قدیمی)؛ برای فرانت همیشه pagination لازم است
 			_ensure_products_pagination(cached, query_info.take, query_info.skip)
+			cached["items"] = [
+				_apply_pricing_visibility_for_user(ctx, db, business_id, item)
+				for item in (cached.get("items") or [])
+			]
 			return success_response(data=cached, request=request)
 
 	try:
@@ -440,6 +473,10 @@ def search_products_endpoint(
 			"inventory_as_of_date": query_info.inventory_as_of_date,
 		})
 		_ensure_products_pagination(result, query_info.take, query_info.skip)
+		result["items"] = [
+			_apply_pricing_visibility_for_user(ctx, db, business_id, item)
+			for item in (result.get("items") or [])
+		]
 		formatted = format_datetime_fields(result, request)
 
 		if cache.enabled and cache_key:
@@ -603,7 +640,8 @@ def get_product_endpoint(
     item = get_product(db, product_id, business_id)
     if not item:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
-    return success_response(data=format_datetime_fields({"item": item}, request), request=request)
+    masked = _apply_pricing_visibility_for_user(ctx, db, business_id, item)
+    return success_response(data=format_datetime_fields({"item": masked}, request), request=request)
 
 
 @router.get(
@@ -1198,10 +1236,28 @@ async def export_products_excel(
     items = result.get("items", []) if isinstance(result, dict) else result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
 
-    # Apply selected indices filter if requested
+    # Apply selected rows filter if requested
     selected_only = bool(body.get('selected_only', False))
+    selected_row_keys = body.get('selected_row_keys')
     selected_indices = body.get('selected_indices')
-    if selected_only and selected_indices is not None and isinstance(items, list):
+    if selected_only and isinstance(selected_row_keys, list):
+        try:
+            wanted_ids = set()
+            for key in selected_row_keys:
+                if isinstance(key, dict) and key.get("id") is not None:
+                    wanted_ids.add(int(key.get("id")))
+            if wanted_ids:
+                filtered = []
+                for it in items:
+                    try:
+                        if int(it.get("id")) in wanted_ids:
+                            filtered.append(it)
+                    except Exception:
+                        continue
+                items = filtered
+        except Exception:
+            pass
+    if selected_only and selected_indices is not None and (not isinstance(selected_row_keys, list) or not selected_row_keys or not items):
         indices = None
         if isinstance(selected_indices, str):
             try:
@@ -1214,6 +1270,101 @@ async def export_products_excel(
         if isinstance(indices, list):
             items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
 
+    report_mode = str(body.get("report_mode") or "base_plus_price_lists").strip().lower()
+    if report_mode not in {"base_only", "price_lists_only", "base_plus_price_lists"}:
+        report_mode = "base_plus_price_lists"
+
+    raw_price_list_ids = body.get("price_list_ids") or []
+    price_list_ids = []
+    if isinstance(raw_price_list_ids, list):
+        seen = set()
+        for v in raw_price_list_ids:
+            try:
+                pid = int(v)
+            except Exception:
+                continue
+            if pid not in seen:
+                seen.add(pid)
+                price_list_ids.append(pid)
+
+    max_items = body.get("limit")
+    try:
+        max_items = int(max_items) if max_items is not None else None
+    except Exception:
+        max_items = None
+    if max_items is not None:
+        max_items = max(1, min(max_items, 10000))
+        items = items[:max_items]
+
+    def _format_price_list_value(rows):
+        if not rows:
+            return ""
+        parts = []
+        for price, currency_code, tier_name, min_qty in rows:
+            tier_label = (tier_name or "").strip() or "base"
+            cur_label = (currency_code or "").strip() or "-"
+            qty_text = ""
+            try:
+                if min_qty is not None and float(min_qty) > 0:
+                    qty_text = f" (>= {min_qty})"
+            except Exception:
+                qty_text = ""
+            parts.append(f"{tier_label}{qty_text} [{cur_label}]: {price}")
+        return " | ".join(parts)
+
+    dynamic_price_columns = []
+    if report_mode in {"price_lists_only", "base_plus_price_lists"} and price_list_ids and items:
+        product_ids = []
+        for it in items:
+            try:
+                product_ids.append(int(it.get("id")))
+            except Exception:
+                continue
+        if product_ids:
+            pl_rows = db.query(PriceList.id, PriceList.name).filter(
+                PriceList.business_id == business_id,
+                PriceList.id.in_(price_list_ids),
+            ).all()
+            price_list_name_by_id = {int(pid): (name or f"#{pid}") for pid, name in pl_rows}
+
+            pi_rows = (
+                db.query(
+                    PriceItem.product_id,
+                    PriceItem.price_list_id,
+                    PriceItem.price,
+                    Currency.code,
+                    PriceItem.tier_name,
+                    PriceItem.min_qty,
+                )
+                .join(PriceList, PriceList.id == PriceItem.price_list_id)
+                .outerjoin(Currency, Currency.id == PriceItem.currency_id)
+                .filter(
+                    PriceList.business_id == business_id,
+                    PriceItem.product_id.in_(product_ids),
+                    PriceItem.price_list_id.in_(price_list_ids),
+                )
+                .order_by(PriceItem.price_list_id.asc(), PriceItem.min_qty.asc(), PriceItem.tier_name.asc())
+                .all()
+            )
+
+            grouped = {}
+            for product_id, price_list_id, price, currency_code, tier_name, min_qty in pi_rows:
+                key = (int(product_id), int(price_list_id))
+                grouped.setdefault(key, []).append((price, currency_code, tier_name, min_qty))
+
+            for price_list_id in price_list_ids:
+                if price_list_id not in price_list_name_by_id:
+                    continue
+                col_key = f"price_list_{price_list_id}"
+                col_label = f"لیست قیمت: {price_list_name_by_id[price_list_id]}"
+                dynamic_price_columns.append((col_key, col_label))
+                for it in items:
+                    try:
+                        pid = int(it.get("id"))
+                    except Exception:
+                        continue
+                    it[col_key] = _format_price_list_value(grouped.get((pid, price_list_id), []))
+
     export_columns = body.get("export_columns")
     if export_columns and isinstance(export_columns, list):
         headers = [col.get("label") or col.get("key") for col in export_columns]
@@ -1223,14 +1374,21 @@ async def export_products_excel(
             ("code", "کد"),
             ("name", "نام"),
             ("item_type", "نوع"),
-            ("category_id", "دسته"),
-            ("base_sales_price", "قیمت فروش"),
-            ("base_purchase_price", "قیمت خرید"),
+            ("category_name", "دسته"),
+        ]
+        if report_mode in {"base_only", "base_plus_price_lists"}:
+            default_cols.extend([
+                ("base_sales_price", "قیمت فروش پایه"),
+                ("base_purchase_price", "قیمت خرید پایه"),
+            ])
+        if dynamic_price_columns:
+            default_cols.extend(dynamic_price_columns)
+        default_cols.extend([
             ("main_unit", "واحد اصلی"),
             ("secondary_unit", "واحد فرعی"),
             ("track_inventory", "کنترل موجودی"),
             ("created_at_formatted", "ایجاد"),
-        ]
+        ])
         keys = [k for k, _ in default_cols]
         headers = [v for _, v in default_cols]
 
@@ -2410,10 +2568,28 @@ async def export_products_pdf(
     items = result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
 
-    # Apply selected indices filter if requested
+    # Apply selected rows filter if requested
     selected_only = bool(body.get('selected_only', False))
+    selected_row_keys = body.get('selected_row_keys')
     selected_indices = body.get('selected_indices')
-    if selected_only and selected_indices is not None:
+    if selected_only and isinstance(selected_row_keys, list):
+        try:
+            wanted_ids = set()
+            for key in selected_row_keys:
+                if isinstance(key, dict) and key.get("id") is not None:
+                    wanted_ids.add(int(key.get("id")))
+            if wanted_ids:
+                filtered = []
+                for it in items:
+                    try:
+                        if int(it.get("id")) in wanted_ids:
+                            filtered.append(it)
+                    except Exception:
+                        continue
+                items = filtered
+        except Exception:
+            pass
+    if selected_only and selected_indices is not None and (not isinstance(selected_row_keys, list) or not selected_row_keys or not items):
         indices = None
         if isinstance(selected_indices, str):
             try:
@@ -2425,6 +2601,101 @@ async def export_products_pdf(
         if isinstance(indices, list):
             items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
 
+    report_mode = str(body.get("report_mode") or "base_plus_price_lists").strip().lower()
+    if report_mode not in {"base_only", "price_lists_only", "base_plus_price_lists"}:
+        report_mode = "base_plus_price_lists"
+
+    raw_price_list_ids = body.get("price_list_ids") or []
+    price_list_ids = []
+    if isinstance(raw_price_list_ids, list):
+        seen = set()
+        for v in raw_price_list_ids:
+            try:
+                pid = int(v)
+            except Exception:
+                continue
+            if pid not in seen:
+                seen.add(pid)
+                price_list_ids.append(pid)
+
+    max_items = body.get("limit")
+    try:
+        max_items = int(max_items) if max_items is not None else None
+    except Exception:
+        max_items = None
+    if max_items is not None:
+        max_items = max(1, min(max_items, 10000))
+        items = items[:max_items]
+
+    def _format_price_list_value(rows):
+        if not rows:
+            return ""
+        parts = []
+        for price, currency_code, tier_name, min_qty in rows:
+            tier_label = (tier_name or "").strip() or "base"
+            cur_label = (currency_code or "").strip() or "-"
+            qty_text = ""
+            try:
+                if min_qty is not None and float(min_qty) > 0:
+                    qty_text = f" (>= {min_qty})"
+            except Exception:
+                qty_text = ""
+            parts.append(f"{tier_label}{qty_text} [{cur_label}]: {price}")
+        return " | ".join(parts)
+
+    dynamic_price_columns = []
+    if report_mode in {"price_lists_only", "base_plus_price_lists"} and price_list_ids and items:
+        product_ids = []
+        for it in items:
+            try:
+                product_ids.append(int(it.get("id")))
+            except Exception:
+                continue
+        if product_ids:
+            pl_rows = db.query(PriceList.id, PriceList.name).filter(
+                PriceList.business_id == business_id,
+                PriceList.id.in_(price_list_ids),
+            ).all()
+            price_list_name_by_id = {int(pid): (name or f"#{pid}") for pid, name in pl_rows}
+
+            pi_rows = (
+                db.query(
+                    PriceItem.product_id,
+                    PriceItem.price_list_id,
+                    PriceItem.price,
+                    Currency.code,
+                    PriceItem.tier_name,
+                    PriceItem.min_qty,
+                )
+                .join(PriceList, PriceList.id == PriceItem.price_list_id)
+                .outerjoin(Currency, Currency.id == PriceItem.currency_id)
+                .filter(
+                    PriceList.business_id == business_id,
+                    PriceItem.product_id.in_(product_ids),
+                    PriceItem.price_list_id.in_(price_list_ids),
+                )
+                .order_by(PriceItem.price_list_id.asc(), PriceItem.min_qty.asc(), PriceItem.tier_name.asc())
+                .all()
+            )
+
+            grouped = {}
+            for product_id, price_list_id, price, currency_code, tier_name, min_qty in pi_rows:
+                key = (int(product_id), int(price_list_id))
+                grouped.setdefault(key, []).append((price, currency_code, tier_name, min_qty))
+
+            for price_list_id in price_list_ids:
+                if price_list_id not in price_list_name_by_id:
+                    continue
+                col_key = f"price_list_{price_list_id}"
+                col_label = f"لیست قیمت: {price_list_name_by_id[price_list_id]}"
+                dynamic_price_columns.append((col_key, col_label))
+                for it in items:
+                    try:
+                        pid = int(it.get("id"))
+                    except Exception:
+                        continue
+                    it[col_key] = _format_price_list_value(grouped.get((pid, price_list_id), []))
+
     export_columns = body.get("export_columns")
     if export_columns and isinstance(export_columns, list):
         headers = [col.get("label") or col.get("key") for col in export_columns]
@@ -2434,14 +2705,21 @@ async def export_products_pdf(
             ("code", "کد"),
             ("name", "نام"),
             ("item_type", "نوع"),
-            ("category_id", "دسته"),
-            ("base_sales_price", "قیمت فروش"),
-            ("base_purchase_price", "قیمت خرید"),
+            ("category_name", "دسته"),
+        ]
+        if report_mode in {"base_only", "base_plus_price_lists"}:
+            default_cols.extend([
+                ("base_sales_price", "قیمت فروش پایه"),
+                ("base_purchase_price", "قیمت خرید پایه"),
+            ])
+        if dynamic_price_columns:
+            default_cols.extend(dynamic_price_columns)
+        default_cols.extend([
             ("main_unit", "واحد اصلی"),
             ("secondary_unit", "واحد فرعی"),
             ("track_inventory", "کنترل موجودی"),
             ("created_at_formatted", "ایجاد"),
-        ]
+        ])
         keys = [k for k, _ in default_cols]
         headers = [v for _, v in default_cols]
 

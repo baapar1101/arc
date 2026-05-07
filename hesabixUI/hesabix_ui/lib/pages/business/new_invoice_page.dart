@@ -260,6 +260,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     return c != b;
   }
 
+  bool _canAccessInvoiceType(InvoiceType? type, {String action = 'add'}) {
+    if (type == null) return false;
+    return widget.authStore.canAccessInvoiceType(
+      'invoice_${type.value}',
+      action: action,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -270,7 +278,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     );
     _attachTabListener();
     // تنظیم نوع فاکتور پیش‌فرض
-    _selectedInvoiceType = InvoiceType.sales;
+    _selectedInvoiceType = _canAccessInvoiceType(InvoiceType.sales, action: 'add')
+        ? InvoiceType.sales
+        : InvoiceType.values.firstWhere(
+            (e) => _canAccessInvoiceType(e, action: 'add'),
+            orElse: () => InvoiceType.sales,
+          );
     // تنظیم ارز پیش‌فرض از AuthStore
     _selectedCurrencyId = widget.authStore.selectedCurrencyId;
     _loadBusinessCurrenciesAndMeta();
@@ -1960,6 +1973,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (!widget.authStore.canWriteSection('invoices')) {
       return AccessDeniedPage(message: t.accessDenied);
     }
+    if (!_canAccessInvoiceType(_selectedInvoiceType, action: 'add')) {
+      return AccessDeniedPage(message: t.accessDenied);
+    }
 
     if (_copyFromLoading && widget.copyFromInvoiceId != null) {
       return Scaffold(
@@ -3349,6 +3365,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   void _handleInvoiceTypeChange(InvoiceType? newType) {
     // اگر نوع جدید null باشد، کاری نکن
     if (newType == null) return;
+    if (!_canAccessInvoiceType(newType, action: 'add')) {
+      _showError('دسترسی به این نوع فاکتور برای شما فعال نیست');
+      return;
+    }
     
     final oldType = _selectedInvoiceType;
     final hasBomLines = _lineItems.any((item) => 

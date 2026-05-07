@@ -294,6 +294,14 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   }
 
   void _handleInvoiceTypeChanged(InvoiceType? type) {
+    if (type != null &&
+        !widget.authStore.canAccessInvoiceType('invoice_${type.value}', action: 'edit')) {
+      SnackBarHelper.showError(
+        context,
+        message: 'دسترسی به این نوع فاکتور برای شما فعال نیست',
+      );
+      return;
+    }
     setState(() {
       _selectedInvoiceType = type;
       if (type != null && !invoiceTypeSupportsGlobalDiscount(type.value)) {
@@ -835,6 +843,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final t = AppLocalizations.of(context);
 
     if (!widget.authStore.canWriteSection('invoices')) {
+      return AccessDeniedPage(message: t.accessDenied);
+    }
+    if (_selectedInvoiceType != null &&
+        !widget.authStore.canAccessInvoiceType(
+          'invoice_${_selectedInvoiceType!.value}',
+          action: 'edit',
+        )) {
       return AccessDeniedPage(message: t.accessDenied);
     }
 

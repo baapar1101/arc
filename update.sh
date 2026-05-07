@@ -77,6 +77,18 @@ configure_pip_hesabix_mirror() {
   log_info "pip user config: Hesabix PyPI (p.mirror.hesabix.ir/simple)"
 }
 
+ensure_api_journalctl_env() {
+  local dropin_dir="/etc/systemd/system/hesabix-api.service.d"
+  local dropin_file="${dropin_dir}/10-journalctl-env.conf"
+  mkdir -p "${dropin_dir}"
+  cat > "${dropin_file}" <<'EOF'
+[Service]
+Environment=HESABIX_ALLOW_SUDO_JOURNALCTL=1
+EOF
+  systemctl daemon-reload
+  log_info "Ensured systemd env: HESABIX_ALLOW_SUDO_JOURNALCTL=1 for hesabix-api."
+}
+
 if [[ $EUID -ne 0 ]]; then
   log_err "Please run as root (e.g. sudo hesabix -update)"
   exit 1
@@ -138,6 +150,7 @@ log_ok "Source updated."
 # --- 2. Backend: pip, migrations, restart services ---
 log_info "Step 2: Backend – install deps, migrations, restart services..."
 configure_pip_hesabix_mirror
+ensure_api_journalctl_env
 api_dir="${APP_ROOT}/app/hesabixAPI"
 if [[ ! -d "${api_dir}/.venv" ]]; then
   log_err "Backend venv not found. Run full deploy first."

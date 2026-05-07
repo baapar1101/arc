@@ -200,6 +200,48 @@ def _priority_to_str(value: Any) -> str:
 	return str(value)
 
 
+def _run_journalctl_with_optional_sudo(cmd: List[str]) -> subprocess.CompletedProcess[str]:
+	"""
+	اجرای journalctl با fallback اختیاری به sudo -n در خطای permission.
+	برای فعال‌سازی صریح fallback می‌توان ENV زیر را 1/true/yes کرد:
+	HESABIX_ALLOW_SUDO_JOURNALCTL=1
+	"""
+	result = subprocess.run(
+		cmd,
+		capture_output=True,
+		text=True,
+		timeout=10,
+		check=False,
+	)
+	if result.returncode == 0:
+		return result
+
+	combined = _combine_cmd_output(result.stdout, result.stderr).lower()
+	perm_denied = (
+		"insufficient permissions" in combined
+		or "permission denied" in combined
+		or "access denied" in combined
+	)
+	allow_sudo_env = os.getenv("HESABIX_ALLOW_SUDO_JOURNALCTL", "").strip().lower() in {
+		"1",
+		"true",
+		"yes",
+		"on",
+	}
+	if not perm_denied and not allow_sudo_env:
+		return result
+	if not shutil.which("sudo"):
+		return result
+
+	return subprocess.run(
+		["sudo", "-n", *cmd],
+		capture_output=True,
+		text=True,
+		timeout=10,
+		check=False,
+	)
+
+
 def _get_service_logs(service_name: str, lines: int = 100) -> Dict[str, Any]:
 	"""دریافت لاگ‌های یک سرویس از journalctl"""
 	service_name = _normalize_service_name(service_name)
@@ -217,13 +259,7 @@ def _get_service_logs(service_name: str, lines: int = 100) -> Dict[str, Any]:
 	try:
 		# دریافت لاگ‌ها با journalctl
 		cmd = ["journalctl", "-u", service_name, "-n", str(lines), "--no-pager", "-o", "json"]
-		result = subprocess.run(
-			cmd,
-			capture_output=True,
-			text=True,
-			timeout=10,
-			check=False
-		)
+		result = _run_journalctl_with_optional_sudo(cmd)
 
 		if result.returncode != 0:
 			combined = _combine_cmd_output(result.stdout, result.stderr)

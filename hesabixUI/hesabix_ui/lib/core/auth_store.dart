@@ -511,6 +511,35 @@ class AuthStore with ChangeNotifier {
     return hasBusinessPermission(section, 'delete');
   }
 
+  String _normalizeInvoiceTypePermissionKey(String invoiceTypeValue) {
+    final normalized = invoiceTypeValue.startsWith('invoice_')
+        ? invoiceTypeValue.substring('invoice_'.length)
+        : invoiceTypeValue;
+    return normalized;
+  }
+
+  bool canAccessInvoiceType(String invoiceTypeValue, {String action = 'view'}) {
+    if (_currentBusiness?.isOwner == true) return true;
+    if (hasBusinessPermission('invoices', action)) {
+      // Backward compatibility: legacy invoices.* grants access to all invoice types.
+      return true;
+    }
+    final key = _normalizeInvoiceTypePermissionKey(invoiceTypeValue);
+    return hasBusinessPermission('invoice_types', key);
+  }
+
+  bool canViewSalesPrice() {
+    if (_currentBusiness?.isOwner == true) return true;
+    return hasBusinessPermission('pricing', 'sales_price_view') ||
+        hasBusinessPermission('products', 'view');
+  }
+
+  bool canViewPurchasePrice() {
+    if (_currentBusiness?.isOwner == true) return true;
+    return hasBusinessPermission('pricing', 'purchase_price_view') ||
+        hasBusinessPermission('products', 'view');
+  }
+
   /// ثبت یا ویرایش سند حسابداری (شامل اسناد خودکار از چک، دریافت‌وپرداخت و …).
   /// هم‌ارز بررسیٔ `accounting.write` در سرور.
   bool canCreateOrEditAccountingDocuments() {

@@ -1,6 +1,7 @@
 from functools import wraps
-from typing import Callable, Any, get_type_hints
+from typing import Callable, Any, get_type_hints, Optional
 import inspect
+import json
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -366,6 +367,152 @@ def require_business_permission_dep(section: str, action: str = None, business_i
         logger.info(f"User {auth_context.get_user_id()} has permission '{section}.{action}' for business {business_id}")
         logger.info(f"=== require_business_permission_dep END ===")
     
+    return _dependency
+
+
+def _permission_action_match(section_perms: dict, action: str) -> bool:
+    if not isinstance(section_perms, dict):
+        return False
+    return (
+        section_perms.get(action, False) or
+        (action == "add" and (section_perms.get("write", False) or section_perms.get("edit", False))) or
+        (action == "write" and (section_perms.get("add", False) or section_perms.get("edit", False))) or
+        (action == "edit" and (section_perms.get("add", False) or section_perms.get("write", False))) or
+        (action == "view" and section_perms.get("read", False)) or
+        (action == "read" and section_perms.get("view", False))
+    )
+
+
+def get_business_permissions_for_user(auth_context: AuthContext, db: Session, business_id: int) -> Optional[dict]:
+    from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+    repo = BusinessPermissionRepository(db)
+    permission_obj = repo.get_by_user_and_business(auth_context.get_user_id(), business_id)
+    if not permission_obj or not permission_obj.business_permissions:
+        return None
+    return auth_context._normalize_permissions_value(permission_obj.business_permissions)
+
+
+def has_business_permission_for_business(
+    auth_context: AuthContext,
+    db: Session,
+    business_id: int,
+    section: str,
+    action: str,
+) -> bool:
+    if auth_context.is_superadmin() or auth_context.is_business_owner(business_id):
+        return True
+    permissions = get_business_permissions_for_user(auth_context, db, business_id)
+    if not permissions or section not in permissions:
+        return False
+    section_perms = permissions[section]
+    if not section_perms:
+        return action in ("read", "view")
+    return _permission_action_match(section_perms, action)
+
+
+_INVOICE_TYPE_PERMISSION_KEYS = {
+    "invoice_sales": "sales",
+    "invoice_sales_return": "sales_return",
+    "invoice_purchase": "purchase",
+    "invoice_purchase_return": "purchase_return",
+    "invoice_waste": "waste",
+    "invoice_direct_consumption": "direct_consumption",
+    "invoice_production": "production",
+}
+
+
+def normalize_invoice_type_value(raw_value: object) -> Optional[str]:
+    if raw_value is None:
+        return None
+    value = str(raw_value).strip()
+    if not value:
+        return None
+    if value.startswith("invoice_"):
+        return value
+    candidate = f"invoice_{value}"
+    if candidate in _INVOICE_TYPE_PERMISSION_KEYS:
+        return candidate
+    return value
+
+
+def has_invoice_type_permission_for_business(
+    auth_context: AuthContext,
+    db: Session,
+    business_id: int,
+    invoice_type: object,
+    action: str,
+) -> bool:
+    normalized_type = normalize_invoice_type_value(invoice_type)
+    if not normalized_type:
+        return False
+    if has_business_permission_for_business(auth_context, db, business_id, "invoices", action):
+        # Backward compatible default: legacy invoices.* means all invoice types.
+        return True
+    if auth_context.is_superadmin() or auth_context.is_business_owner(business_id):
+        return True
+    permissions = get_business_permissions_for_user(auth_context, db, business_id)
+    if not permissions:
+        return False
+    type_key = _INVOICE_TYPE_PERMISSION_KEYS.get(normalized_type)
+    if not type_key:
+        return False
+    section = permissions.get("invoice_types") or {}
+    return bool(section.get(type_key, False))
+
+
+def allowed_invoice_types_for_business(
+    auth_context: AuthContext,
+    db: Session,
+    business_id: int,
+    action: str,
+) -> list[str]:
+    all_types = list(_INVOICE_TYPE_PERMISSION_KEYS.keys())
+    if has_business_permission_for_business(auth_context, db, business_id, "invoices", action):
+        return all_types
+    if auth_context.is_superadmin() or auth_context.is_business_owner(business_id):
+        return all_types
+    permissions = get_business_permissions_for_user(auth_context, db, business_id) or {}
+    section = permissions.get("invoice_types") or {}
+    allowed = []
+    for doc_type, key in _INVOICE_TYPE_PERMISSION_KEYS.items():
+        if section.get(key, False):
+            allowed.append(doc_type)
+    return allowed
+
+
+def require_invoice_type_permission_from_payload_dep(
+    action: str,
+    business_id_param: str = "business_id",
+    payload_field: str = "invoice_type",
+):
+    async def _dependency(
+        request: Request,
+        auth_context: AuthContext = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> None:
+        try:
+            business_id = int(request.path_params.get(business_id_param))
+        except Exception:
+            raise ApiError("BAD_REQUEST", "business_id parameter not found in path", http_status=400)
+
+        if not auth_context.can_access_business(business_id):
+            raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
+
+        body = None
+        try:
+            body = await request.json()
+        except Exception:
+            raw = await request.body()
+            if raw:
+                try:
+                    body = json.loads(raw.decode("utf-8"))
+                except Exception:
+                    body = None
+
+        invoice_type = body.get(payload_field) if isinstance(body, dict) else None
+        if not has_invoice_type_permission_for_business(auth_context, db, business_id, invoice_type, action):
+            raise ApiError("FORBIDDEN", f"Missing invoice type permission for {invoice_type}", http_status=403)
+
     return _dependency
 
 

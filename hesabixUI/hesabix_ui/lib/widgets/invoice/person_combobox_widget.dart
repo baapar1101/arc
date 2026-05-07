@@ -13,12 +13,16 @@ class _PersonPickerState {
   final bool isLoading;
   final bool isSearching;
   final bool hasSearched;
+  final bool isLoadingMore;
+  final bool hasMore;
 
   _PersonPickerState({
     required this.persons,
     required this.isLoading,
     required this.isSearching,
     required this.hasSearched,
+    required this.isLoadingMore,
+    required this.hasMore,
   });
 
   _PersonPickerState copyWith({
@@ -26,12 +30,16 @@ class _PersonPickerState {
     bool? isLoading,
     bool? isSearching,
     bool? hasSearched,
+    bool? isLoadingMore,
+    bool? hasMore,
   }) {
     return _PersonPickerState(
       persons: persons ?? this.persons,
       isLoading: isLoading ?? this.isLoading,
       isSearching: isSearching ?? this.isSearching,
       hasSearched: hasSearched ?? this.hasSearched,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+      hasMore: hasMore ?? this.hasMore,
     );
   }
 }
@@ -76,12 +84,18 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   bool _isLoading = false;
   bool _isSearching = false;
   bool _hasSearched = false;
+  bool _isLoadingMore = false;
+  bool _hasMore = false;
+  int _currentPage = 1;
+  static const int _pageSize = 20;
   final ValueNotifier<_PersonPickerState> _pickerStateNotifier = ValueNotifier<_PersonPickerState>(
     _PersonPickerState(
       persons: [],
       isLoading: false,
       isSearching: false,
       hasSearched: false,
+      isLoadingMore: false,
+      hasMore: false,
     ),
   );
   final FocusNode _fieldFocus = FocusNode();
@@ -91,11 +105,22 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   int _highlightedIndex = -1;
   double _desktopFieldWidth = 0;
 
+  double _desktopOverlayHeight(_PersonPickerState state) {
+    if (state.isLoading && state.persons.isEmpty) return 120;
+    if (!state.isLoading && state.persons.isEmpty) return 95;
+    final extraRow = (state.isLoadingMore || (state.isSearching && state.persons.isNotEmpty)) ? 1 : 0;
+    final rows = state.persons.length + extraRow;
+    const rowHeight = 62.0;
+    final raw = (rows * rowHeight) + (state.isSearching ? 4 : 0);
+    return raw.clamp(95.0, 360.0);
+  }
+
   @override
   void initState() {
     super.initState();
     _searchController.text = widget.selectedPerson?.displayName ?? '';
     _fieldFocus.addListener(_onDesktopFocusChanged);
+    _overlayScrollController.addListener(_onDesktopOverlayScroll);
     _loadRecentPersons();
   }
 
@@ -113,6 +138,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     _removeDesktopOverlay();
     _fieldFocus.removeListener(_onDesktopFocusChanged);
     _fieldFocus.dispose();
+    _overlayScrollController.removeListener(_onDesktopOverlayScroll);
     _overlayScrollController.dispose();
     _searchController.dispose();
     _pickerStateNotifier.dispose();
@@ -155,6 +181,14 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     _highlightedIndex = -1;
   }
 
+  void _onDesktopOverlayScroll() {
+    if (!_overlayScrollController.hasClients) return;
+    final pos = _overlayScrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 140) {
+      _loadMorePersons();
+    }
+  }
+
   Widget _buildDesktopOverlay(BuildContext context) {
     final width = _desktopFieldWidth > 280 ? _desktopFieldWidth : 280.0;
     return Stack(
@@ -183,7 +217,10 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
                 width: width,
                 child: ValueListenableBuilder<_PersonPickerState>(
                   valueListenable: _pickerStateNotifier,
-                  builder: (context, state, _) => _buildDesktopPersonsList(context, state),
+                  builder: (context, state, _) => SizedBox(
+                    height: _desktopOverlayHeight(state),
+                    child: _buildDesktopPersonsList(context, state),
+                  ),
                 ),
               ),
             ),
@@ -207,8 +244,18 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         Flexible(
           child: ListView.builder(
             controller: _overlayScrollController,
-            itemCount: state.persons.length,
+            itemCount: state.persons.length +
+                ((state.isLoadingMore || (state.isSearching && state.persons.isNotEmpty)) ? 1 : 0),
             itemBuilder: (context, index) {
+              if (index == state.persons.length &&
+                  (state.isLoadingMore || (state.isSearching && state.persons.isNotEmpty))) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Center(
+                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  ),
+                );
+              }
               final person = state.persons[index];
               final selected = index == _highlightedIndex;
               return Material(
@@ -285,6 +332,8 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       isLoading: _isLoading,
       isSearching: _isSearching,
       hasSearched: _hasSearched,
+      isLoadingMore: _isLoadingMore,
+      hasMore: _hasMore,
     );
     _highlightedIndex = _persons.isEmpty ? -1 : 0;
     _desktopOverlayEntry?.markNeedsBuild();
@@ -320,6 +369,8 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         isLoading: _isLoading,
         isSearching: _isSearching,
         hasSearched: _hasSearched,
+        isLoadingMore: _isLoadingMore,
+        hasMore: _hasMore,
       );
       print('[PersonCombobox] setState called - isLoading: $_isLoading, isSearching: $_isSearching');
     }
@@ -328,8 +379,9 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       print('[PersonCombobox] Calling _personService.getPersons - businessId: ${widget.businessId}, search: ${query.isEmpty ? "null" : query}');
       final response = await _personService.getPersons(
         businessId: widget.businessId,
+        page: 1,
         search: query.isEmpty ? null : query,
-        limit: query.isEmpty ? 10 : 20,
+        limit: _pageSize,
         filters: widget.personTypes != null && widget.personTypes!.isNotEmpty
             ? {'person_types': widget.personTypes}
             : null,
@@ -355,6 +407,9 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         print('[PersonCombobox] Calling setState to update _persons...');
         setState(() {
           _persons = persons;
+          _currentPage = 1;
+          _isLoadingMore = false;
+          _hasMore = persons.length >= _pageSize;
           if (query.isEmpty) {
             _isLoading = false;
             _hasSearched = false;
@@ -371,6 +426,8 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
           isLoading: _isLoading,
           isSearching: _isSearching,
           hasSearched: _hasSearched,
+          isLoadingMore: _isLoadingMore,
+          hasMore: _hasMore,
         );
         _highlightedIndex = persons.isEmpty ? -1 : 0;
         _desktopOverlayEntry?.markNeedsBuild();
@@ -403,6 +460,8 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
           isLoading: _isLoading,
           isSearching: _isSearching,
           hasSearched: _hasSearched,
+          isLoadingMore: false,
+          hasMore: false,
         );
         _highlightedIndex = -1;
         _desktopOverlayEntry?.markNeedsBuild();
@@ -412,6 +471,47 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       } else {
         print('[PersonCombobox] ERROR: Widget is not mounted when handling error!');
       }
+    }
+  }
+
+  Future<void> _loadMorePersons() async {
+    if (_isLoading || _isSearching || _isLoadingMore || !_hasMore) return;
+    final query = _latestQuery.trim();
+    if (query.isEmpty) return;
+    final nextPage = _currentPage + 1;
+    setState(() => _isLoadingMore = true);
+    _pickerStateNotifier.value = _pickerStateNotifier.value.copyWith(isLoadingMore: true);
+    try {
+      final response = await _personService.getPersons(
+        businessId: widget.businessId,
+        page: nextPage,
+        limit: _pageSize,
+        search: query,
+        filters: widget.personTypes != null && widget.personTypes!.isNotEmpty
+            ? {'person_types': widget.personTypes}
+            : null,
+      );
+      final persons = _personService.parsePersonsList(response);
+      final existingIds = _persons.map((e) => e.id).toSet();
+      final uniqueNew = persons.where((p) => !existingIds.contains(p.id)).toList();
+      setState(() {
+        _persons = [..._persons, ...uniqueNew];
+        _currentPage = nextPage;
+        _isLoadingMore = false;
+        _hasMore = persons.length >= _pageSize;
+      });
+      _pickerStateNotifier.value = _PersonPickerState(
+        persons: _persons,
+        isLoading: _isLoading,
+        isSearching: _isSearching,
+        hasSearched: _hasSearched,
+        isLoadingMore: _isLoadingMore,
+        hasMore: _hasMore,
+      );
+      _desktopOverlayEntry?.markNeedsBuild();
+    } catch (_) {
+      setState(() => _isLoadingMore = false);
+      _pickerStateNotifier.value = _pickerStateNotifier.value.copyWith(isLoadingMore: false);
     }
   }
 
@@ -488,6 +588,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
               label: widget.label,
               searchHint: widget.searchHint ?? 'جست‌وجو در اشخاص...',
               personTypes: widget.personTypes,
+              onLoadMore: _loadMorePersons,
               onAddNew: () => _addNewPerson(context),
             );
       },
@@ -647,6 +748,7 @@ class _PersonPickerBottomSheet extends StatefulWidget {
   final String label;
   final String searchHint;
   final List<String>? personTypes;
+  final VoidCallback onLoadMore;
   final VoidCallback? onAddNew;
 
   const _PersonPickerBottomSheet({
@@ -658,6 +760,7 @@ class _PersonPickerBottomSheet extends StatefulWidget {
     required this.label,
     required this.searchHint,
     this.personTypes,
+    required this.onLoadMore,
     this.onAddNew,
   });
 
@@ -666,12 +769,29 @@ class _PersonPickerBottomSheet extends StatefulWidget {
 }
 
 class _PersonPickerBottomSheetState extends State<_PersonPickerBottomSheet> {
+  late final ScrollController _scrollController;
   final FocusNode _searchFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController()..addListener(_onScroll);
+  }
 
   @override
   void dispose() {
     _searchFocus.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      widget.onLoadMore();
+    }
   }
 
   @override
@@ -809,8 +929,19 @@ class _PersonPickerBottomSheetState extends State<_PersonPickerBottomSheet> {
 
     print('[PersonPickerBottomSheet] Building ListView with ${pickerState.persons.length} items');
     return ListView.builder(
-      itemCount: pickerState.persons.length,
+      controller: _scrollController,
+      itemCount: pickerState.persons.length +
+          ((pickerState.isLoadingMore || (pickerState.isSearching && pickerState.persons.isNotEmpty)) ? 1 : 0),
       itemBuilder: (context, index) {
+        if (index == pickerState.persons.length &&
+            (pickerState.isLoadingMore || (pickerState.isSearching && pickerState.persons.isNotEmpty))) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          );
+        }
         final person = pickerState.persons[index];
         final isSelected = widget.selectedPerson?.id == person.id;
         

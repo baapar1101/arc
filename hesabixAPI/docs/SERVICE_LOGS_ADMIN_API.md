@@ -14,6 +14,24 @@ The UI path **Profile → System settings → Service logs** calls these endpoin
 - API runs in a **container** without access to the host journal.
 - `journalctl` fails (permission, missing unit on that host, etc.). The API may include a short preview under `error.details.journalctl_preview` for debugging.
 
+## Optional sudo fallback for journalctl
+
+If the API user cannot read journald directly, you can allow a tightly-scoped non-interactive sudo fallback.
+
+1) Set:
+
+```bash
+HESABIX_ALLOW_SUDO_JOURNALCTL=1
+```
+
+2) Add a restricted sudoers rule for the API runtime user (example):
+
+```sudoers
+hesabix ALL=(root) NOPASSWD: /usr/bin/journalctl
+```
+
+The API uses `sudo -n journalctl ...` only when direct `journalctl` fails with a permission-style error (or when the env is enabled explicitly).
+
 ## Docker: give the API container host journal access
 
 Mount the host journal socket (preferred on most distros):

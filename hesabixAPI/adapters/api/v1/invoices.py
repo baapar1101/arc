@@ -16,7 +16,15 @@ import logging
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep, require_business_permission_by_entity_dep
+from app.core.permissions import (
+    require_business_access,
+    require_business_management_dep,
+    require_business_permission_dep,
+    require_business_permission_by_entity_dep,
+    require_invoice_type_permission_from_payload_dep,
+    has_invoice_type_permission_for_business,
+    allowed_invoice_types_for_business,
+)
 from app.core.responses import success_response, format_datetime_fields
 from app.core.cache import get_cache
 from adapters.api.v1.schemas import QueryInfo
@@ -183,6 +191,7 @@ def create_invoice_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("invoices", "add")),
+    __: None = Depends(require_invoice_type_permission_from_payload_dep("add")),
 ) -> Dict[str, Any]:
     can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
     result = create_invoice(
@@ -577,6 +586,8 @@ def update_invoice_endpoint(
         # Lazy import to avoid circular
         from app.core.responses import ApiError
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+    if not has_invoice_type_permission_for_business(ctx, db, business_id, doc.document_type, "edit"):
+        raise ApiError("FORBIDDEN", f"Missing invoice type permission for {doc.document_type}", http_status=403)
     try:
         can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
         result = update_invoice(
@@ -880,6 +891,8 @@ def get_invoice_endpoint(
     if not doc or doc.business_id != business_id or doc.document_type not in SUPPORTED_INVOICE_TYPES:
         from app.core.responses import ApiError
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+    if not has_invoice_type_permission_for_business(ctx, db, business_id, doc.document_type, "view"):
+        raise ApiError("FORBIDDEN", f"Missing invoice type permission for {doc.document_type}", http_status=403)
     # پاک‌سازی لینک‌های مرده در invoice_document_to_dict انجام می‌شود
     result = invoice_document_to_dict(db, doc)
     return success_response(data={"item": result}, request=request, message="INVOICE")
@@ -2276,6 +2289,7 @@ async def search_invoices_endpoint(
 	body_data: Dict[str, Any] = Body(...),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
+	_: None = Depends(require_business_permission_dep("invoices", "view")),
 ) -> Dict[str, Any]:
 	"""لیست فاکتورها با فیلتر، جست‌وجو، مرتب‌سازی و صفحه‌بندی استاندارد"""
 
@@ -2378,11 +2392,18 @@ async def search_invoices_endpoint(
 		if cached is not None:
 			return success_response(data=cached, request=request)
 
+	requested_doc_type = body_data.get("document_type")
+	allowed_doc_types = allowed_invoice_types_for_business(ctx, db, business_id, "view")
+	if not allowed_doc_types:
+		raise ApiError("FORBIDDEN", "No invoice type access", http_status=403)
+	if requested_doc_type and not has_invoice_type_permission_for_business(ctx, db, business_id, requested_doc_type, "view"):
+		raise ApiError("FORBIDDEN", f"Missing invoice type permission for {requested_doc_type}", http_status=403)
+
 	# Base query
 	q = db.query(Document).filter(
 		and_(
 			Document.business_id == business_id,
-			Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
+			Document.document_type.in_(allowed_doc_types),
 		)
 	)
 	# extra_info نوع JSON عمومی SQLAlchemy است؛ astext فقط روی JSONB است — برای PG ابتدا cast به JSONB
