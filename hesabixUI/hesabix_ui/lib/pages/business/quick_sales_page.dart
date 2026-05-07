@@ -27,7 +27,7 @@ import '../../models/invoice_transaction.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
-import '../access_denied_page.dart';
+import '../../widgets/permission/access_denied_page.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/category_tree_widget.dart';
 import '../../widgets/date_input_field.dart';
