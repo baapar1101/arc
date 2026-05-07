@@ -453,6 +453,7 @@ app/services/repair_shop_service.py
 app/services/report_template_scope_registry.py
 app/services/report_template_service.py
 app/services/session_service.py
+app/services/share_link_logo_service.py
 app/services/sms_destination_rate_limit.py
 app/services/sort_resolution.py
 app/services/sqlalchemy_sort_from_query.py

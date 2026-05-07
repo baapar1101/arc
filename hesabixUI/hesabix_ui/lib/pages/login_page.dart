@@ -13,6 +13,7 @@ import '../core/calendar_controller.dart';
 import '../core/auth_store.dart';
 import '../core/locale_controller.dart';
 import '../core/mobile_launcher_prefs.dart';
+import '../core/referral_store.dart';
 import '../theme/theme_controller.dart';
 import '../utils/number_normalizer.dart';
 import '../utils/password_validator.dart';
