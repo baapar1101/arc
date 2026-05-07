@@ -1161,7 +1161,7 @@ class _ProductsPageState extends State<ProductsPage> {
                             if (tabRules.showInstancesTab)
                               ProductUniqueInstancesTab(
                                 businessId: widget.businessId,
-                                productId: parsedProductId,
+                                productId: parsedProductId!,
                                 product: product,
                               ),
                             _buildProductStockTab(

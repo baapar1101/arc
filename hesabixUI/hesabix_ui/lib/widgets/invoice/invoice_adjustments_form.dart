@@ -339,7 +339,7 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
                               labelText: 'نرخ مالیات ٪ (اختیاری)',
                               border: OutlineInputBorder(),
                             ),
-                            inputFormatters: const [
+                            inputFormatters: [
                               EnglishDigitsFormatter(),
                               FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
                             ],

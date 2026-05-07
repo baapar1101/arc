@@ -3374,7 +3374,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productCommercialInsightsFxRateToBase => 'نرخ سند به پایه';
 
   @override
-  String get productCommercialInsightsChartDataMissing => 'دادهٔ نمودار موجود نیست.';
+  String get productCommercialInsightsChartDataMissing =>
+      'دادهٔ نمودار موجود نیست.';
 
   @override
   String get productCommercialInsightsChartNoPoints =>
@@ -3395,7 +3396,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'میانگین موزون فروش (پایه)';
 
   @override
-  String get productCommercialInsightsAvgUnitBaseLabel => 'میانگین واحد به پایه';
+  String get productCommercialInsightsAvgUnitBaseLabel =>
+      'میانگین واحد به پایه';
 
   @override
   String get productCommercialInsightsTotalQuantityLabel => 'مجموع مقدار';
