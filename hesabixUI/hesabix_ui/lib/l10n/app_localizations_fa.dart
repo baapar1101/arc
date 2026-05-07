@@ -3317,6 +3317,159 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productStockInWarehouses => 'موجودی کالا در انبارها';
 
   @override
+  String get productCommercialPricing => 'بازرگانی و قیمت';
+
+  @override
+  String get productCommercialPricingNoAccessHint =>
+      'برای مشاهده این تب، دسترسی مشاهده فاکتورها لازم است. لطفاً از مدیر سیستم مجوز invoices.view را درخواست کنید.';
+
+  @override
+  String get productCommercialInsightsNotEligibleTitle =>
+      'گزارش برای این کالا فعال نیست';
+
+  @override
+  String get productCommercialInsightsNotEligibleBody =>
+      'این خلاصه برای این محصول یا پیکربندی کسب‌وکار در دسترس نیست.';
+
+  @override
+  String get productCommercialInsightsChecklistTitle => 'پیشنهادهای بررسی:';
+
+  @override
+  String get productCommercialInsightsChecklistInventoryTracked =>
+      'کنترل موجودی کالا روشن باشد.';
+
+  @override
+  String get productCommercialInsightsChecklistConfirmedInvoice =>
+      'حداقل یک فاکتور خرید/فروش تأییدشده برای این کالا ثبت شده باشد.';
+
+  @override
+  String get productCommercialInsightsChecklistPostedWarehouseDoc =>
+      'برای فاکتورهای مرتبط، حوالهٔ انبار posted با مبدأ invoice وجود داشته باشد.';
+
+  @override
+  String get productCommercialInsightsReload => 'بارگذاری مجدد';
+
+  @override
+  String get productCommercialInsightsResetTooltip => 'بازنشانی';
+
+  @override
+  String get productCommercialInsightsNoData => 'داده‌ای نیست';
+
+  @override
+  String get productCommercialInsightsDocumentDate => 'تاریخ سند';
+
+  @override
+  String get productCommercialInsightsParty => 'طرف تجاری';
+
+  @override
+  String get productCommercialInsightsDocumentCode => 'کد سند';
+
+  @override
+  String get productCommercialInsightsQuantity => 'مقدار';
+
+  @override
+  String get productCommercialInsightsUnitPriceBase => 'قیمت واحد به ارز پایه';
+
+  @override
+  String get productCommercialInsightsFxRateToBase => 'نرخ سند به پایه';
+
+  @override
+  String get productCommercialInsightsChartDataMissing => 'دادهٔ نمودار موجود نیست.';
+
+  @override
+  String get productCommercialInsightsChartNoPoints =>
+      'برای بازهٔ انتخاب‌شده نقطهٔ نموداری نیست.';
+
+  @override
+  String get productCommercialInsightsLanePurchase => 'خرید';
+
+  @override
+  String get productCommercialInsightsLaneSale => 'فروش';
+
+  @override
+  String get productCommercialInsightsLegendPurchaseAvg =>
+      'میانگین موزون خرید (پایه)';
+
+  @override
+  String get productCommercialInsightsLegendSaleAvg =>
+      'میانگین موزون فروش (پایه)';
+
+  @override
+  String get productCommercialInsightsAvgUnitBaseLabel => 'میانگین واحد به پایه';
+
+  @override
+  String get productCommercialInsightsTotalQuantityLabel => 'مجموع مقدار';
+
+  @override
+  String get productCommercialInsightsBucketDay => 'روز';
+
+  @override
+  String get productCommercialInsightsBucketWeek => 'هفته';
+
+  @override
+  String get productCommercialInsightsBucketMonth => 'ماه';
+
+  @override
+  String get productCommercialInsightsPreset30Days => '۳۰ روز';
+
+  @override
+  String get productCommercialInsightsPreset90Days => '۹۰ روز';
+
+  @override
+  String get productCommercialInsightsPreset6Months => '۶ ماه';
+
+  @override
+  String get productCommercialInsightsPreset1Year => 'یک سال';
+
+  @override
+  String get productCommercialInsightsPresetCustom => 'سفارشی';
+
+  @override
+  String get productCommercialInsightsFromDate => 'از تاریخ';
+
+  @override
+  String get productCommercialInsightsToDate => 'تا تاریخ';
+
+  @override
+  String get productCommercialInsightsLastPurchase => 'آخرین خرید';
+
+  @override
+  String get productCommercialInsightsLastSale => 'آخرین فروش';
+
+  @override
+  String get productCommercialInsightsTotalsInRange => 'جمع در بازه';
+
+  @override
+  String get productCommercialInsightsPurchaseQuantity => 'مقدار خرید';
+
+  @override
+  String get productCommercialInsightsSaleQuantity => 'مقدار فروش';
+
+  @override
+  String get productCommercialInsightsPurchaseLinesCount => 'تعداد خطوط خرید';
+
+  @override
+  String get productCommercialInsightsSaleLinesCount => 'تعداد خطوط فروش';
+
+  @override
+  String get productCommercialInsightsTrendTitle =>
+      'روند میانگین موزون قیمت واحد (ارز پایه)';
+
+  @override
+  String get productCommercialInsightsTopSuppliers =>
+      'تأمین‌کنندگان پرحجم در بازه';
+
+  @override
+  String get productCommercialInsightsTopBuyers => 'خریداران پرحجم در بازه';
+
+  @override
+  String get productCommercialInsightsRecentEventsTitle =>
+      'رویدادهای اخیر (خطوط فاکتور)';
+
+  @override
+  String get productCommercialInsightsUnitShortLabel => 'واحد';
+
+  @override
   String get warehouseCode => 'کد انبار';
 
   @override

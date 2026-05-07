@@ -6479,6 +6479,288 @@ abstract class AppLocalizations {
   /// **'Product Stock in Warehouses'**
   String get productStockInWarehouses;
 
+  /// No description provided for @productCommercialPricing.
+  ///
+  /// In en, this message translates to:
+  /// **'Commercial & Pricing'**
+  String get productCommercialPricing;
+
+  /// No description provided for @productCommercialPricingNoAccessHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To view this tab, invoice read permission is required. Ask your admin to grant invoices.view.'**
+  String get productCommercialPricingNoAccessHint;
+
+  /// No description provided for @productCommercialInsightsNotEligibleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This report is not active for this product'**
+  String get productCommercialInsightsNotEligibleTitle;
+
+  /// No description provided for @productCommercialInsightsNotEligibleBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This summary is not available for this product or current business configuration.'**
+  String get productCommercialInsightsNotEligibleBody;
+
+  /// No description provided for @productCommercialInsightsChecklistTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Checklist:'**
+  String get productCommercialInsightsChecklistTitle;
+
+  /// No description provided for @productCommercialInsightsChecklistInventoryTracked.
+  ///
+  /// In en, this message translates to:
+  /// **'Ensure inventory tracking is enabled for this product.'**
+  String get productCommercialInsightsChecklistInventoryTracked;
+
+  /// No description provided for @productCommercialInsightsChecklistConfirmedInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Ensure at least one confirmed purchase/sales invoice exists for this product.'**
+  String get productCommercialInsightsChecklistConfirmedInvoice;
+
+  /// No description provided for @productCommercialInsightsChecklistPostedWarehouseDoc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ensure related invoices have a posted warehouse document with source type invoice.'**
+  String get productCommercialInsightsChecklistPostedWarehouseDoc;
+
+  /// No description provided for @productCommercialInsightsReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get productCommercialInsightsReload;
+
+  /// No description provided for @productCommercialInsightsResetTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get productCommercialInsightsResetTooltip;
+
+  /// No description provided for @productCommercialInsightsNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data'**
+  String get productCommercialInsightsNoData;
+
+  /// No description provided for @productCommercialInsightsDocumentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Document date'**
+  String get productCommercialInsightsDocumentDate;
+
+  /// No description provided for @productCommercialInsightsParty.
+  ///
+  /// In en, this message translates to:
+  /// **'Party'**
+  String get productCommercialInsightsParty;
+
+  /// No description provided for @productCommercialInsightsDocumentCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Document code'**
+  String get productCommercialInsightsDocumentCode;
+
+  /// No description provided for @productCommercialInsightsQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get productCommercialInsightsQuantity;
+
+  /// No description provided for @productCommercialInsightsUnitPriceBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit price in base currency'**
+  String get productCommercialInsightsUnitPriceBase;
+
+  /// No description provided for @productCommercialInsightsFxRateToBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Document to base FX rate'**
+  String get productCommercialInsightsFxRateToBase;
+
+  /// No description provided for @productCommercialInsightsChartDataMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Chart data is not available.'**
+  String get productCommercialInsightsChartDataMissing;
+
+  /// No description provided for @productCommercialInsightsChartNoPoints.
+  ///
+  /// In en, this message translates to:
+  /// **'No chart points for the selected range.'**
+  String get productCommercialInsightsChartNoPoints;
+
+  /// No description provided for @productCommercialInsightsLanePurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase'**
+  String get productCommercialInsightsLanePurchase;
+
+  /// No description provided for @productCommercialInsightsLaneSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale'**
+  String get productCommercialInsightsLaneSale;
+
+  /// No description provided for @productCommercialInsightsLegendPurchaseAvg.
+  ///
+  /// In en, this message translates to:
+  /// **'Weighted average purchase (base)'**
+  String get productCommercialInsightsLegendPurchaseAvg;
+
+  /// No description provided for @productCommercialInsightsLegendSaleAvg.
+  ///
+  /// In en, this message translates to:
+  /// **'Weighted average sale (base)'**
+  String get productCommercialInsightsLegendSaleAvg;
+
+  /// No description provided for @productCommercialInsightsAvgUnitBaseLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Average unit in base'**
+  String get productCommercialInsightsAvgUnitBaseLabel;
+
+  /// No description provided for @productCommercialInsightsTotalQuantityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total quantity'**
+  String get productCommercialInsightsTotalQuantityLabel;
+
+  /// No description provided for @productCommercialInsightsBucketDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get productCommercialInsightsBucketDay;
+
+  /// No description provided for @productCommercialInsightsBucketWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Week'**
+  String get productCommercialInsightsBucketWeek;
+
+  /// No description provided for @productCommercialInsightsBucketMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get productCommercialInsightsBucketMonth;
+
+  /// No description provided for @productCommercialInsightsPreset30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get productCommercialInsightsPreset30Days;
+
+  /// No description provided for @productCommercialInsightsPreset90Days.
+  ///
+  /// In en, this message translates to:
+  /// **'90 days'**
+  String get productCommercialInsightsPreset90Days;
+
+  /// No description provided for @productCommercialInsightsPreset6Months.
+  ///
+  /// In en, this message translates to:
+  /// **'6 months'**
+  String get productCommercialInsightsPreset6Months;
+
+  /// No description provided for @productCommercialInsightsPreset1Year.
+  ///
+  /// In en, this message translates to:
+  /// **'1 year'**
+  String get productCommercialInsightsPreset1Year;
+
+  /// No description provided for @productCommercialInsightsPresetCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get productCommercialInsightsPresetCustom;
+
+  /// No description provided for @productCommercialInsightsFromDate.
+  ///
+  /// In en, this message translates to:
+  /// **'From date'**
+  String get productCommercialInsightsFromDate;
+
+  /// No description provided for @productCommercialInsightsToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'To date'**
+  String get productCommercialInsightsToDate;
+
+  /// No description provided for @productCommercialInsightsLastPurchase.
+  ///
+  /// In en, this message translates to:
+  /// **'Last purchase'**
+  String get productCommercialInsightsLastPurchase;
+
+  /// No description provided for @productCommercialInsightsLastSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Last sale'**
+  String get productCommercialInsightsLastSale;
+
+  /// No description provided for @productCommercialInsightsTotalsInRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Totals in range'**
+  String get productCommercialInsightsTotalsInRange;
+
+  /// No description provided for @productCommercialInsightsPurchaseQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase quantity'**
+  String get productCommercialInsightsPurchaseQuantity;
+
+  /// No description provided for @productCommercialInsightsSaleQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale quantity'**
+  String get productCommercialInsightsSaleQuantity;
+
+  /// No description provided for @productCommercialInsightsPurchaseLinesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase lines count'**
+  String get productCommercialInsightsPurchaseLinesCount;
+
+  /// No description provided for @productCommercialInsightsSaleLinesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale lines count'**
+  String get productCommercialInsightsSaleLinesCount;
+
+  /// No description provided for @productCommercialInsightsTrendTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Weighted average unit price trend (base currency)'**
+  String get productCommercialInsightsTrendTitle;
+
+  /// No description provided for @productCommercialInsightsTopSuppliers.
+  ///
+  /// In en, this message translates to:
+  /// **'Top suppliers in range'**
+  String get productCommercialInsightsTopSuppliers;
+
+  /// No description provided for @productCommercialInsightsTopBuyers.
+  ///
+  /// In en, this message translates to:
+  /// **'Top buyers in range'**
+  String get productCommercialInsightsTopBuyers;
+
+  /// No description provided for @productCommercialInsightsRecentEventsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent events (invoice lines)'**
+  String get productCommercialInsightsRecentEventsTitle;
+
+  /// No description provided for @productCommercialInsightsUnitShortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'unit'**
+  String get productCommercialInsightsUnitShortLabel;
+
   /// No description provided for @warehouseCode.
   ///
   /// In en, this message translates to:

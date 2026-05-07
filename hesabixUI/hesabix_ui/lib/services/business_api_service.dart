@@ -104,6 +104,16 @@ class BusinessApiService {
     }
   }
 
+  /// دریافت خام جزئیات کسب‌وکار (برای تنظیمات توسعه‌پذیر/اختیاری)
+  static Future<Map<String, dynamic>> getBusinessRaw(int businessId) async {
+    final response = await _apiClient.get<Map<String, dynamic>>('$_basePath/$businessId');
+    final data = response.data;
+    if (data != null && data['success'] == true && data['data'] is Map) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    }
+    throw Exception(data?['message'] ?? 'خطا در دریافت جزئیات خام کسب و کار');
+  }
+
   // ویرایش کسب و کار
   static Future<BusinessResponse> updateBusiness(
     int businessId,

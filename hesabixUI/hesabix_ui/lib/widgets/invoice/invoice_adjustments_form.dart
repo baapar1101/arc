@@ -1,10 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/account_model.dart';
+import '../../utils/invoice_adjustments_account_filter.dart';
+import '../../utils/number_normalizer.dart';
 import '../../utils/number_formatters.dart';
-import 'account_combobox_widget.dart';
+import 'account_tree_combobox_widget.dart';
 
 /// ردیف فرم اضافات/کسورات فاکتور (فروش یا خرید) — هم‌خوان با `extra_info.invoice_adjustments` در API.
 class InvoiceAdjustmentFormRow {
@@ -33,9 +36,15 @@ class InvoiceAdjustmentFormRow {
       account: account,
     );
     final amt = m['amount'];
-    if (amt != null) row.amountController.text = amt.toString();
+    if (amt != null) {
+      final parsed = amt is num ? amt : num.tryParse(amt.toString());
+      row.amountController.text = formatNumberForInput(parsed);
+    }
     final tr = m['tax_rate'];
-    if (tr != null) row.taxRateController.text = tr.toString();
+    if (tr != null) {
+      final parsed = tr is num ? tr : num.tryParse(tr.toString());
+      row.taxRateController.text = formatNumberForInput(parsed);
+    }
     final d = m['description'];
     if (d != null) row.descriptionController.text = d.toString();
     return row;
@@ -113,6 +122,8 @@ bool adjustmentRowsHasNonEmpty(List<InvoiceAdjustmentFormRow> rows) {
 String? validateAdjustmentRows(
   List<InvoiceAdjustmentFormRow> rows, {
   required bool invoiceTypeSupportsAdjustments,
+  String? invoiceTypeValue,
+  Map<String, dynamic>? accountFilterRules,
 }) {
   if (!invoiceTypeSupportsAdjustments) {
     if (adjustmentRowsHasNonEmpty(rows)) {
@@ -134,6 +145,14 @@ String? validateAdjustmentRows(
     }
     if (!hasAcct) {
       return 'ردیف ${i + 1}: انتخاب حساب الزامی است';
+    }
+    final expectedDocType = adjustmentAccountDocumentType(
+      invoiceTypeValue: invoiceTypeValue,
+      kind: r.kind,
+      serverRules: accountFilterRules,
+    );
+    if (!isAdjustmentAccountAllowedForDocumentType(r.account, expectedDocType)) {
+      return 'ردیف ${i + 1}: حساب انتخابی با نوع ${r.kind == 'addition' ? 'اضافه' : 'کسر'} همخوانی ندارد';
     }
     final tr = _rowTaxRate(r);
     if (tr < 0 || tr > 100) {
@@ -175,6 +194,8 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
   final List<InvoiceAdjustmentFormRow> rows;
   final VoidCallback onChanged;
   final int decimalPlaces;
+  final String? invoiceTypeValue;
+  final Map<String, dynamic>? accountFilterRules;
 
   const InvoiceAdjustmentsTabContent({
     super.key,
@@ -182,6 +203,8 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
     required this.rows,
     required this.onChanged,
     this.decimalPlaces = 2,
+    this.invoiceTypeValue,
+    this.accountFilterRules,
   });
 
   @override
@@ -241,23 +264,56 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
                       child: LayoutBuilder(
                         builder: (context, c) {
                           final narrow = c.maxWidth < 560;
-                          Widget kindField = SegmentedButton<String>(
-                            segments: const [
-                              ButtonSegment(value: 'addition', label: Text('اضافه')),
-                              ButtonSegment(value: 'deduction', label: Text('کسر')),
-                            ],
-                            selected: {r.kind},
-                            onSelectionChanged: (s) {
-                              r.kind = s.first;
-                              onChanged();
-                            },
+                          Widget kindField = SizedBox(
+                            height: 56,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Theme.of(context).dividerColor),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Center(
+                                child: SegmentedButton<String>(
+                                  showSelectedIcon: false,
+                                  style: const ButtonStyle(
+                                    visualDensity: VisualDensity.compact,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  segments: const [
+                                    ButtonSegment(value: 'addition', label: Text('اضافه')),
+                                    ButtonSegment(value: 'deduction', label: Text('کسر')),
+                                  ],
+                                  selected: {r.kind},
+                                  onSelectionChanged: (s) {
+                                    r.kind = s.first;
+                                    final expectedDocType = adjustmentAccountDocumentType(
+                                      invoiceTypeValue: invoiceTypeValue,
+                                      kind: r.kind,
+                                      serverRules: accountFilterRules,
+                                    );
+                                    if (!isAdjustmentAccountAllowedForDocumentType(r.account, expectedDocType)) {
+                                      r.account = null;
+                                    }
+                                    onChanged();
+                                  },
+                                ),
+                              ),
+                            ),
                           );
-                          final accountField = AccountComboboxWidget(
+                          final docTypeFilter = adjustmentAccountDocumentType(
+                            invoiceTypeValue: invoiceTypeValue,
+                            kind: r.kind,
+                            serverRules: accountFilterRules,
+                          );
+                          final accountField = AccountTreeComboboxWidget(
                             businessId: businessId,
                             selectedAccount: r.account,
                             label: 'حساب',
-                            hintText: 'انتخاب حساب',
+                            hintText: docTypeFilter == 'expense'
+                                ? 'انتخاب حساب هزینه'
+                                : 'انتخاب حساب درآمد',
                             isRequired: false,
+                            documentTypeFilter: docTypeFilter,
+                            dense: true,
                             onChanged: (a) {
                               r.account = a;
                               onChanged();
@@ -270,6 +326,10 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
                               labelText: 'مبلغ خالص',
                               border: OutlineInputBorder(),
                             ),
+                            inputFormatters: const [
+                              EnglishDigitsFormatter(),
+                              ThousandsSeparatorInputFormatter(allowDecimal: true),
+                            ],
                             onChanged: (_) => onChanged(),
                           );
                           final taxField = TextField(
@@ -279,6 +339,10 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
                               labelText: 'نرخ مالیات ٪ (اختیاری)',
                               border: OutlineInputBorder(),
                             ),
+                            inputFormatters: const [
+                              EnglishDigitsFormatter(),
+                              FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                            ],
                             onChanged: (_) => onChanged(),
                           );
                           final descField = TextField(

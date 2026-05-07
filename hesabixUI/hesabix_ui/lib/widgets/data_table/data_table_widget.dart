@@ -20,6 +20,7 @@ import 'column_settings_dialog.dart';
 import 'helpers/data_table_utils.dart';
 import 'helpers/column_settings_service.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// مقایسهٔ مقدارمحور [additionalParams] تا با rebuild والد که هر بار Map جدید می‌سازد،
@@ -1701,6 +1702,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   Widget _buildHeader(AppLocalizations t, ThemeData theme) {
+    final bool isMobileHeader = ResponsiveHelper.isMobile(context);
+
     return Row(
       children: [
         if (widget.config.showBackButton) ...[
@@ -1752,30 +1755,40 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         ],
         const Spacer(),
         
-        
-        // Clear filters button (only show when filters are applied)
-        if (widget.config.showClearFiltersButton && _hasActiveFilters()) ...[
+        if (isMobileHeader)
           Tooltip(
-            message: t.clear,
+            message: 'امکانات بیشتر',
             child: IconButton(
-              onPressed: _clearAllFilters,
-              icon: const Icon(Icons.clear_all),
-              tooltip: t.clear,
+              onPressed: () => _showMobileHeaderActionsSheet(t, theme),
+              icon: const Icon(Icons.tune),
+              tooltip: 'امکانات بیشتر',
             ),
-          ),
-          const SizedBox(width: 4),
-        ],
-        
-        // Export buttons
-        if (widget.config.showExportButtons && (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null)) ...[
-          _buildExportButtons(t, theme),
-          const SizedBox(width: 8),
-        ],
-        
-        // Custom header actions
-        if (widget.config.customHeaderActions != null) ...[
-          const SizedBox(width: 8),
-          ...widget.config.customHeaderActions!,
+          )
+        else ...[
+          // Clear filters button (only show when filters are applied)
+          if (widget.config.showClearFiltersButton && _hasActiveFilters()) ...[
+            Tooltip(
+              message: t.clear,
+              child: IconButton(
+                onPressed: _clearAllFilters,
+                icon: const Icon(Icons.clear_all),
+                tooltip: t.clear,
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+          
+          // Export buttons
+          if (widget.config.showExportButtons && (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null)) ...[
+            _buildExportButtons(t, theme),
+            const SizedBox(width: 8),
+          ],
+          
+          // Custom header actions
+          if (widget.config.customHeaderActions != null) ...[
+            const SizedBox(width: 8),
+            ...widget.config.customHeaderActions!,
+          ],
         ],
         
         // Actions menu
@@ -1842,6 +1855,78 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           ],
         ),
       ],
+    );
+  }
+
+  void _showMobileHeaderActionsSheet(AppLocalizations t, ThemeData theme) {
+    final hasClearFilters =
+        widget.config.showClearFiltersButton && _hasActiveFilters();
+    final hasExportButtons = widget.config.showExportButtons &&
+        (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null);
+    final customActions = widget.config.customHeaderActions ?? const <Widget>[];
+
+    if (!hasClearFilters && !hasExportButtons && customActions.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'امکانات جدول',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (hasClearFilters)
+                  ListTile(
+                    leading: const Icon(Icons.clear_all),
+                    title: Text(t.clear),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _clearAllFilters();
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                if (hasExportButtons)
+                  ListTile(
+                    leading: const Icon(Icons.download),
+                    title: Text(t.export),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _showExportOptions(t, theme);
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                if (customActions.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'سایر عملیات',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: customActions,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

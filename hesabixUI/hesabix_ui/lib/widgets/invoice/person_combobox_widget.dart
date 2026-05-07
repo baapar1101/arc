@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../services/person_service.dart';
 import '../../models/person_model.dart';
 import '../../widgets/person/person_form_dialog.dart';
@@ -83,20 +84,196 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       hasSearched: false,
     ),
   );
+  final FocusNode _fieldFocus = FocusNode();
+  final LayerLink _layerLink = LayerLink();
+  final ScrollController _overlayScrollController = ScrollController();
+  OverlayEntry? _desktopOverlayEntry;
+  int _highlightedIndex = -1;
+  double _desktopFieldWidth = 0;
 
   @override
   void initState() {
     super.initState();
     _searchController.text = widget.selectedPerson?.displayName ?? '';
+    _fieldFocus.addListener(_onDesktopFocusChanged);
     _loadRecentPersons();
+  }
+
+  @override
+  void didUpdateWidget(covariant PersonComboboxWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedPerson?.id != widget.selectedPerson?.id) {
+      _searchController.text = widget.selectedPerson?.displayName ?? '';
+    }
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _removeDesktopOverlay();
+    _fieldFocus.removeListener(_onDesktopFocusChanged);
+    _fieldFocus.dispose();
+    _overlayScrollController.dispose();
     _searchController.dispose();
     _pickerStateNotifier.dispose();
     super.dispose();
+  }
+
+  bool get _isMobile => MediaQuery.sizeOf(context).width < 700;
+
+  void _onDesktopFocusChanged() {
+    if (!mounted || _isMobile) return;
+    if (_fieldFocus.hasFocus) {
+      _showDesktopOverlay();
+      if (_searchController.text.trim().isEmpty) {
+        _loadRecentPersons();
+      }
+    } else {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (!mounted || _fieldFocus.hasFocus) return;
+        _removeDesktopOverlay();
+      });
+    }
+  }
+
+  void _showDesktopOverlay() {
+    if (!mounted || _isMobile) return;
+    if (_desktopOverlayEntry != null) {
+      _desktopOverlayEntry!.markNeedsBuild();
+      return;
+    }
+    final overlay = Overlay.of(context);
+    _desktopOverlayEntry = OverlayEntry(
+      builder: (context) => _buildDesktopOverlay(context),
+    );
+    overlay.insert(_desktopOverlayEntry!);
+  }
+
+  void _removeDesktopOverlay() {
+    _desktopOverlayEntry?.remove();
+    _desktopOverlayEntry = null;
+    _highlightedIndex = -1;
+  }
+
+  Widget _buildDesktopOverlay(BuildContext context) {
+    final width = _desktopFieldWidth > 280 ? _desktopFieldWidth : 280.0;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () {
+              _fieldFocus.unfocus();
+              _removeDesktopOverlay();
+            },
+          ),
+        ),
+        CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          targetAnchor: Alignment.bottomCenter,
+          followerAnchor: Alignment.topCenter,
+          offset: const Offset(0, 6),
+          child: Material(
+            elevation: 12,
+            borderRadius: BorderRadius.circular(10),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 360),
+              child: SizedBox(
+                width: width,
+                child: ValueListenableBuilder<_PersonPickerState>(
+                  valueListenable: _pickerStateNotifier,
+                  builder: (context, state, _) => _buildDesktopPersonsList(context, state),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopPersonsList(BuildContext context, _PersonPickerState state) {
+    final cs = Theme.of(context).colorScheme;
+    if (state.isLoading && state.persons.isEmpty) {
+      return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+    }
+    if (!state.isLoading && state.persons.isEmpty) {
+      return const SizedBox(height: 90, child: Center(child: Text('شخصی یافت نشد')));
+    }
+    return Column(
+      children: [
+        if (state.isSearching) const LinearProgressIndicator(minHeight: 2),
+        Flexible(
+          child: ListView.builder(
+            controller: _overlayScrollController,
+            itemCount: state.persons.length,
+            itemBuilder: (context, index) {
+              final person = state.persons[index];
+              final selected = index == _highlightedIndex;
+              return Material(
+                color: selected ? cs.primary.withValues(alpha: 0.10) : Colors.transparent,
+                child: ListTile(
+                  dense: true,
+                  title: Text(person.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: person.personTypes.isNotEmpty ? Text(person.personTypes.first.persianName) : null,
+                  onTap: () => _selectPersonFromOverlay(person),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _selectPersonFromOverlay(Person person) {
+    _selectPerson(person);
+    _removeDesktopOverlay();
+    _fieldFocus.unfocus();
+  }
+
+  void _moveHighlight(int delta) {
+    final items = _pickerStateNotifier.value.persons;
+    if (items.isEmpty) return;
+    var idx = _highlightedIndex;
+    if (idx < 0 || idx >= items.length) {
+      idx = delta > 0 ? 0 : items.length - 1;
+    } else {
+      idx = (idx + delta).clamp(0, items.length - 1);
+    }
+    if (idx == _highlightedIndex) return;
+    setState(() => _highlightedIndex = idx);
+    _desktopOverlayEntry?.markNeedsBuild();
+  }
+
+  void _selectHighlighted() {
+    final items = _pickerStateNotifier.value.persons;
+    if (items.isEmpty) return;
+    final idx = (_highlightedIndex >= 0 && _highlightedIndex < items.length) ? _highlightedIndex : 0;
+    _selectPersonFromOverlay(items[idx]);
+  }
+
+  KeyEventResult _onFieldKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (_desktopOverlayEntry == null) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _moveHighlight(1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _moveHighlight(-1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _selectHighlighted();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _removeDesktopOverlay();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Future<void> _loadRecentPersons() async {
@@ -109,6 +286,8 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
       isSearching: _isSearching,
       hasSearched: _hasSearched,
     );
+    _highlightedIndex = _persons.isEmpty ? -1 : 0;
+    _desktopOverlayEntry?.markNeedsBuild();
   }
 
   void _onSearchChanged(String query) {
@@ -193,6 +372,8 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
           isSearching: _isSearching,
           hasSearched: _hasSearched,
         );
+        _highlightedIndex = persons.isEmpty ? -1 : 0;
+        _desktopOverlayEntry?.markNeedsBuild();
         print('[PersonCombobox] ValueNotifier updated - pickerStateNotifier.value.persons.length: ${_pickerStateNotifier.value.persons.length}');
       } else {
         print('[PersonCombobox] ERROR: Widget is not mounted!');
@@ -223,6 +404,8 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
           isSearching: _isSearching,
           hasSearched: _hasSearched,
         );
+        _highlightedIndex = -1;
+        _desktopOverlayEntry?.markNeedsBuild();
         _showErrorSnackBar(
           'خطا در جست‌وجو: ${ErrorExtractor.forContext(e, context)}',
         );
@@ -315,92 +498,143 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isMobile = _isMobile;
     
     final displayText = widget.selectedPerson?.displayName ?? widget.hintText;
     final isSelected = widget.selectedPerson != null;
     final bool inlineBalance =
         widget.showFinancialBalance && widget.selectedPerson?.id != null;
 
-    final field = InkWell(
-      onTap: _showPersonPicker,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: colorScheme.outline.withValues(alpha: 0.5),
+    if (isMobile) {
+      return InkWell(
+        onTap: _showPersonPicker,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+            borderRadius: BorderRadius.circular(8),
+            color: colorScheme.surface,
           ),
-          borderRadius: BorderRadius.circular(8),
-          color: colorScheme.surface,
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.person_search,
-              color: colorScheme.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: inlineBalance
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          displayText,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                            color: isSelected
-                                ? colorScheme.onSurface
-                                : colorScheme.onSurface.withValues(alpha: 0.6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(Icons.person_search, color: colorScheme.primary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: inlineBalance
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            displayText,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                              color: isSelected
+                                  ? colorScheme.onSurface
+                                  : colorScheme.onSurface.withValues(alpha: 0.6),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: PersonFinancialBalanceBanner(
-                            selectedPerson: widget.selectedPerson,
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: PersonFinancialBalanceBanner(selectedPerson: widget.selectedPerson),
                           ),
+                        ],
+                      )
+                    : Text(
+                        displayText,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
+                          color: isSelected
+                              ? colorScheme.onSurface
+                              : colorScheme.onSurface.withValues(alpha: 0.6),
                         ),
-                      ],
-                    )
-                  : Text(
-                      displayText,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                        color: isSelected
-                            ? colorScheme.onSurface
-                            : colorScheme.onSurface.withValues(alpha: 0.6),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-            ),
-            if (widget.selectedPerson != null)
-              GestureDetector(
-                onTap: () => _selectPerson(null),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(
-                    Icons.clear,
-                    color: colorScheme.error,
-                    size: 18,
-                  ),
-                ),
-              )
-            else
-              Icon(
-                Icons.arrow_drop_down,
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
               ),
-          ],
+              if (widget.selectedPerson != null)
+                GestureDetector(
+                  onTap: () => _selectPerson(null),
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(Icons.clear, color: colorScheme.error, size: 18),
+                  ),
+                )
+              else
+                Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+            ],
+          ),
         ),
+      );
+    }
+
+    return CompositedTransformTarget(
+      link: _layerLink,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          if ((_desktopFieldWidth - w).abs() > 0.5) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              if ((_desktopFieldWidth - w).abs() > 0.5) {
+                setState(() => _desktopFieldWidth = w);
+                _desktopOverlayEntry?.markNeedsBuild();
+              }
+            });
+          }
+          return Focus(
+            onKeyEvent: _onFieldKeyEvent,
+            child: TextField(
+              controller: _searchController,
+              focusNode: _fieldFocus,
+              decoration: InputDecoration(
+                labelText: widget.label,
+                hintText: widget.hintText,
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.person_search),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_isSearching)
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    IconButton(
+                      tooltip: 'انتخاب پیشرفته',
+                      icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                      onPressed: _showPersonPicker,
+                    ),
+                  ],
+                ),
+              ),
+              onTap: () {
+                _showDesktopOverlay();
+                if (_searchController.text.trim().isEmpty) {
+                  _loadRecentPersons();
+                }
+              },
+              onChanged: (query) {
+                final trimmed = query.trim();
+                if (trimmed.isEmpty && widget.selectedPerson != null) {
+                  widget.onChanged(null);
+                } else if (widget.selectedPerson != null &&
+                    trimmed != (widget.selectedPerson?.displayName ?? '').trim()) {
+                  widget.onChanged(null);
+                }
+                _onSearchChanged(query);
+                _showDesktopOverlay();
+              },
+              onSubmitted: (_) => _selectHighlighted(),
+            ),
+          );
+        },
       ),
     );
-
-    return field;
   }
 }
 

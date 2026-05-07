@@ -32,11 +32,13 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
     required this.item,
     required this.onTap,
     this.dense = false,
+    this.highlighted = false,
   });
 
   final Map<String, dynamic> item;
   final VoidCallback onTap;
   final bool dense;
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -64,7 +66,7 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
     final padV = dense ? 8.0 : 10.0;
 
     return Material(
-      color: Colors.transparent,
+      color: highlighted ? cs.primary.withValues(alpha: 0.08) : Colors.transparent,
       child: InkWell(
         onTap: onTap,
         mouseCursor: SystemMouseCursors.click,
@@ -131,6 +133,7 @@ Widget _buildProductSuggestionsScrollArea({
   required _ProductPickerState state,
   required ScrollController scrollController,
   required void Function(Map<String, dynamic> product) onProductSelected,
+  int highlightedIndex = -1,
   bool dense = false,
 }) {
   final theme = Theme.of(context);
@@ -198,6 +201,7 @@ Widget _buildProductSuggestionsScrollArea({
             return _ProductSearchSuggestionTile(
               item: it,
               dense: dense,
+              highlighted: index == highlightedIndex,
               onTap: () => onProductSelected(it),
             );
           },
@@ -280,6 +284,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   OverlayEntry? _desktopOverlayEntry;
   double _desktopFieldWidth = 0;
   bool _suppressFieldNotifications = false;
+  int _highlightedIndex = -1;
 
   // دسته‌بندی‌ها
   List<CategoryNode> _categoryTree = [];
@@ -470,6 +475,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   void _removeDesktopOverlay() {
     _desktopOverlayEntry?.remove();
     _desktopOverlayEntry = null;
+    _highlightedIndex = -1;
   }
 
   void _showDesktopOverlay() {
@@ -530,6 +536,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                         _select(p);
                         _removeDesktopOverlay();
                       },
+                      highlightedIndex: _highlightedIndex,
                       dense: true,
                     ),
                   ),
@@ -561,6 +568,72 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     }
   }
 
+  void _moveHighlightedSelection(int delta) {
+    if (_items.isEmpty) return;
+    var nextIndex = _highlightedIndex;
+    if (nextIndex < 0 || nextIndex >= _items.length) {
+      nextIndex = delta > 0 ? 0 : _items.length - 1;
+    } else {
+      nextIndex = (nextIndex + delta).clamp(0, _items.length - 1);
+    }
+    if (nextIndex == _highlightedIndex) return;
+    setState(() {
+      _highlightedIndex = nextIndex;
+    });
+    _desktopOverlayEntry?.markNeedsBuild();
+    _ensureHighlightedItemVisible();
+  }
+
+  void _ensureHighlightedItemVisible() {
+    if (_highlightedIndex < 0 || !_overlayScrollController.hasClients) return;
+    const itemExtent = 78.0;
+    final targetOffset = _highlightedIndex * itemExtent;
+    final pos = _overlayScrollController.position;
+    final viewportEnd = pos.pixels + pos.viewportDimension - itemExtent;
+    if (targetOffset < pos.pixels) {
+      _overlayScrollController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+      );
+    } else if (targetOffset > viewportEnd) {
+      _overlayScrollController.animateTo(
+        targetOffset - pos.viewportDimension + itemExtent,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _selectHighlightedOrFirst() {
+    if (_items.isEmpty) return;
+    final idx = (_highlightedIndex >= 0 && _highlightedIndex < _items.length) ? _highlightedIndex : 0;
+    _select(_items[idx]);
+    _removeDesktopOverlay();
+    _fieldFocus.unfocus();
+  }
+
+  KeyEventResult _onDesktopFieldKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (ResponsiveHelper.isMobile(context) || _desktopOverlayEntry == null) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      _moveHighlightedSelection(1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      _moveHighlightedSelection(-1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _selectHighlightedOrFirst();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   void dispose() {
     _debounce?.cancel();
@@ -577,6 +650,16 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   }
 
   void _syncPickerState() {
+    if (_items.isEmpty) {
+      _highlightedIndex = -1;
+    } else if (_highlightedIndex >= _items.length) {
+      _highlightedIndex = _items.length - 1;
+    } else if (_fieldFocus.hasFocus &&
+        !ResponsiveHelper.isMobile(context) &&
+        _desktopOverlayEntry != null &&
+        _highlightedIndex < 0) {
+      _highlightedIndex = 0;
+    }
     _pickerStateNotifier.value = _ProductPickerState(
       items: _items,
       isLoading: _loading,
@@ -985,66 +1068,69 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
           return Tooltip(
             message: displayTooltip.length > 120 ? '${displayTooltip.substring(0, 120)}…' : displayTooltip,
             waitDuration: const Duration(milliseconds: 600),
-            child: TextField(
-              controller: _searchCtrl,
-              focusNode: _fieldFocus,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-                fontSize: 13.5,
-              ),
-              minLines: 1,
-              maxLines: 1,
-              decoration: InputDecoration(
-                isDense: false,
-                hintText: widget.hintText,
-                labelText: widget.label,
-                floatingLabelBehavior: FloatingLabelBehavior.auto,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                prefixIcon: Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 8),
-                  child: Icon(Icons.inventory_2_outlined, color: colorScheme.primary, size: 20),
+            child: Focus(
+              onKeyEvent: _onDesktopFieldKeyEvent,
+              child: TextField(
+                controller: _searchCtrl,
+                focusNode: _fieldFocus,
+                textAlign: TextAlign.right,
+                textDirection: TextDirection.rtl,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13.5,
                 ),
-                prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                suffixIconConstraints: const BoxConstraints(minHeight: 44, minWidth: 44),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (_loading)
-                      const Padding(
-                        padding: EdgeInsetsDirectional.only(end: 6),
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                minLines: 1,
+                maxLines: 1,
+                decoration: InputDecoration(
+                  isDense: false,
+                  hintText: widget.hintText,
+                  labelText: widget.label,
+                  floatingLabelBehavior: FloatingLabelBehavior.auto,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  prefixIcon: Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: Icon(Icons.inventory_2_outlined, color: colorScheme.primary, size: 20),
+                  ),
+                  prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  suffixIconConstraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_loading)
+                        const Padding(
+                          padding: EdgeInsetsDirectional.only(end: 6),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                         ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        tooltip: 'انتخاب پیشرفته (دسته‌ها و افزودن)',
+                        icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                        onPressed: () => _openPicker(),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                       ),
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: 'انتخاب پیشرفته (دسته‌ها و افزودن)',
-                      icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
-                      onPressed: () => _openPicker(),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
+                onTap: () {
+                  final allowOverlay = !ResponsiveHelper.isMobile(context);
+                  Future.microtask(() {
+                    if (!mounted) return;
+                    if (!_fieldFocus.hasFocus) _fieldFocus.requestFocus();
+                    if (!allowOverlay) return;
+                    _showDesktopOverlay();
+                    if (_searchCtrl.text.trim().isEmpty) {
+                      unawaited(_loadRecent());
+                    }
+                  });
+                },
+                onChanged: _onDesktopFieldChanged,
               ),
-              onTap: () {
-                final allowOverlay = !ResponsiveHelper.isMobile(context);
-                Future.microtask(() {
-                  if (!mounted) return;
-                  if (!_fieldFocus.hasFocus) _fieldFocus.requestFocus();
-                  if (!allowOverlay) return;
-                  _showDesktopOverlay();
-                  if (_searchCtrl.text.trim().isEmpty) {
-                    unawaited(_loadRecent());
-                  }
-                });
-              },
-              onChanged: _onDesktopFieldChanged,
             ),
           );
         },
@@ -1260,6 +1346,7 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
                     state: state,
                     scrollController: widget.scrollController,
                     onProductSelected: widget.onProductSelected,
+                    highlightedIndex: -1,
                     dense: false,
                   );
                 },
@@ -1420,6 +1507,7 @@ class _ProductPickerDialog extends StatelessWidget {
                           state: state,
                           scrollController: scrollController,
                           onProductSelected: onProductSelected,
+                          highlightedIndex: -1,
                           dense: false,
                         );
                       },

@@ -53,6 +53,7 @@ import '../../widgets/invoice/invoice_fx_rate_field.dart';
 import '../../widgets/invoice/invoice_adjustments_form.dart';
 import '../../services/account_service.dart';
 import '../../utils/invoice_form_prefill.dart';
+import '../../utils/invoice_adjustments_account_filter.dart';
 import 'business_shell_side_nav_scope.dart';
 
 
@@ -145,6 +146,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   List<InvoiceTransaction> _transactions = [];
   // اضافات و کسورات (فقط فروش/خرید)
   List<InvoiceAdjustmentFormRow> _adjustmentRows = <InvoiceAdjustmentFormRow>[];
+  Map<String, dynamic>? _adjustmentsAccountFilterRules;
 
   // ردیف‌های فاکتور برای ساخت payload
   List<InvoiceLineItem> _lineItems = <InvoiceLineItem>[];
@@ -301,6 +303,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     // بارگذاری تنظیمات چاپ کسب‌وکار
     _loadPrintSettings();
     _loadPrintTemplates();
+    _loadAdjustmentsAccountFilterRules();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final shellScope = BusinessShellSideNavScope.readMaybeOf(context);
@@ -1744,6 +1747,19 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     } catch (_) {}
   }
 
+  Future<void> _loadAdjustmentsAccountFilterRules() async {
+    try {
+      final raw = await BusinessApiService.getBusinessRaw(widget.businessId);
+      final rules = extractInvoiceAdjustmentAccountFilterRules(raw);
+      if (!mounted) return;
+      setState(() {
+        _adjustmentsAccountFilterRules = rules;
+      });
+    } catch (_) {
+      // در صورت خطا از نگاشت پیش‌فرض داخلی استفاده می‌کنیم.
+    }
+  }
+
   Future<void> _reloadFxRates() async {
     if (!mounted) return;
     if (!_canPickFxRate) {
@@ -3061,6 +3077,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     final adjValidationMsg = validateAdjustmentRows(
       _adjustmentRows,
       invoiceTypeSupportsAdjustments: _invoiceTypeSupportsAdjustments,
+      invoiceTypeValue: _selectedInvoiceType?.value,
+      accountFilterRules: _adjustmentsAccountFilterRules,
     );
     if (adjValidationMsg != null) return adjValidationMsg;
 
@@ -3626,6 +3644,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       businessId: widget.businessId,
       rows: _adjustmentRows,
       decimalPlaces: _invoiceCurrencyDecimalPlaces,
+      invoiceTypeValue: _selectedInvoiceType?.value,
+      accountFilterRules: _adjustmentsAccountFilterRules,
       onChanged: () {
         if (mounted) setState(() {});
       },

@@ -56,6 +56,45 @@ class _InfoTileData {
   });
 }
 
+class _ProductDetailsTabRules {
+  final bool showInstancesTab;
+  final bool showCommercialTab;
+  final bool canReadCommercialInsights;
+
+  const _ProductDetailsTabRules({
+    required this.showInstancesTab,
+    required this.showCommercialTab,
+    required this.canReadCommercialInsights,
+  });
+
+  int get dialogTabCount {
+    var count = showInstancesTab ? 4 : 3;
+    if (showCommercialTab) {
+      count++;
+    }
+    return count;
+  }
+
+  static _ProductDetailsTabRules resolve({
+    required Map<String, dynamic> product,
+    required int? parsedProductId,
+    required AuthStore authStore,
+  }) {
+    final isUniqueProduct = product['inventory_mode']?.toString() == 'unique';
+    final canReadInstances = authStore.hasBusinessPermission('inventory', 'read');
+    final canReadInvoices = authStore.canReadSection('invoices');
+    final hasProductId = parsedProductId != null;
+
+    return _ProductDetailsTabRules(
+      showInstancesTab: isUniqueProduct && canReadInstances && hasProductId,
+      // این تب را در صورت ذخیره بودن کالا نشان می‌دهیم تا وضعیت عدم دسترسی/عدم eligibility
+      // به‌صورت شفاف در خود تب نمایش داده شود.
+      showCommercialTab: hasProductId,
+      canReadCommercialInsights: canReadInvoices && hasProductId,
+    );
+  }
+}
+
 class _ProductsPageState extends State<ProductsPage> {
   static const _productModuleContext = 'products';
   final GlobalKey _tableKey = GlobalKey();
@@ -963,17 +1002,11 @@ class _ProductsPageState extends State<ProductsPage> {
             final parsedProductId = productId is int
                 ? productId
                 : (productId is num ? productId.toInt() : int.tryParse(productId?.toString() ?? ''));
-            final isUniqueProduct = product['inventory_mode']?.toString() == 'unique';
-            final showInstancesTab = isUniqueProduct &&
-                widget.authStore.hasBusinessPermission('inventory', 'read') &&
-                parsedProductId != null;
-            final showCommercialTab = product['track_inventory'] == true &&
-                widget.authStore.canReadSection('invoices') &&
-                parsedProductId != null;
-            var dialogTabCount = showInstancesTab ? 4 : 3;
-            if (showCommercialTab) {
-              dialogTabCount++;
-            }
+            final tabRules = _ProductDetailsTabRules.resolve(
+              product: product,
+              parsedProductId: parsedProductId,
+              authStore: widget.authStore,
+            );
 
             Widget buildDocumentsTab() {
               final canUpload = widget.authStore.canWriteSection('products');
@@ -1039,13 +1072,26 @@ class _ProductsPageState extends State<ProductsPage> {
                 ),
               );
             }
+
+            Widget buildCommercialNoAccessTab() {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    t.productCommercialPricingNoAccessHint,
+                    style: theme.textTheme.bodyMedium,
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              );
+            }
             
             final isMobileDialog = ResponsiveHelper.isMobile(dialogContext);
             return Dialog(
               insetPadding: ResponsiveHelper.getDialogPadding(dialogContext),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: DefaultTabController(
-                length: dialogTabCount,
+                length: tabRules.dialogTabCount,
                 child: ConstrainedBox(
                   constraints: ResponsiveHelper.getDialogConstraints(dialogContext),
                   child: Column(
@@ -1073,7 +1119,7 @@ class _ProductsPageState extends State<ProductsPage> {
                                   icon: const Icon(Icons.info_outline),
                                   text: t.productGeneralInfo,
                                 ),
-                                if (showInstancesTab)
+                                if (tabRules.showInstancesTab)
                                   const Tab(
                                     icon: Icon(Icons.qr_code_2_outlined),
                                     text: 'سریال و بارکد',
@@ -1082,10 +1128,10 @@ class _ProductsPageState extends State<ProductsPage> {
                                   icon: const Icon(Icons.warehouse_outlined),
                                   text: t.productStock,
                                 ),
-                                if (showCommercialTab)
-                                  const Tab(
-                                    icon: Icon(Icons.show_chart_outlined),
-                                    text: 'بازرگانی و قیمت',
+                                if (tabRules.showCommercialTab)
+                                  Tab(
+                                    icon: const Icon(Icons.show_chart_outlined),
+                                    text: t.productCommercialPricing,
                                   ),
                                 Tab(
                                   icon: const Icon(Icons.attach_file),
@@ -1112,7 +1158,7 @@ class _ProductsPageState extends State<ProductsPage> {
                               barcode: barcode,
                               t: t,
                             ),
-                            if (showInstancesTab)
+                            if (tabRules.showInstancesTab)
                               ProductUniqueInstancesTab(
                                 businessId: widget.businessId,
                                 productId: parsedProductId,
@@ -1124,11 +1170,13 @@ class _ProductsPageState extends State<ProductsPage> {
                               trackInventory: product['track_inventory'] == true,
                               t: t,
                             ),
-                            if (showCommercialTab)
-                              ProductCommercialInsightsTab(
-                                businessId: widget.businessId,
-                                productId: parsedProductId!,
-                              ),
+                            if (tabRules.showCommercialTab)
+                              tabRules.canReadCommercialInsights
+                                  ? ProductCommercialInsightsTab(
+                                      businessId: widget.businessId,
+                                      productId: parsedProductId!,
+                                    )
+                                  : buildCommercialNoAccessTab(),
                             buildDocumentsTab(),
                           ],
                         ),

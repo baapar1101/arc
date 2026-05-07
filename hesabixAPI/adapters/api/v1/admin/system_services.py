@@ -17,10 +17,12 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
+import re
 import shutil
 import subprocess
 import time
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Set, Tuple
 from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
@@ -36,12 +38,106 @@ router = APIRouter(
 
 logger = logging.getLogger(__name__)
 
-# لیست سرویس‌های مجاز
-ALLOWED_SERVICES = [
-    "hesabix-api",
-    "hesabix-rq-worker",
-    "hesabix-notification-moderation"  # Worker بررسی قالب‌های نوتیفیکیشن
+# لیست پیش‌فرض سرویس‌های مجاز
+DEFAULT_ALLOWED_SERVICES = [
+	"hesabix-api",
+	"hesabix-rq-worker",
+	"hesabix-notification-moderation",  # Worker بررسی قالب‌های نوتیفیکیشن
 ]
+
+
+def _normalize_service_name(service_name: str) -> str:
+	"""یکپارچه‌سازی نام واحد systemd (حذف پسوند .service)."""
+	value = (service_name or "").strip()
+	if value.endswith(".service"):
+		return value[:-8]
+	return value
+
+
+def _extract_unit_from_cgroup_line(line: str) -> str | None:
+	"""
+	استخراج نام یونیت از خط cgroup.
+	نمونه: /system.slice/hesabix-api.service -> hesabix-api
+	"""
+	if ".service" not in line:
+		return None
+	match = re.search(r"/([^/\s]+)\.service(?:$|[/:])", line.strip())
+	if not match:
+		return None
+	return _normalize_service_name(match.group(1))
+
+
+def _detect_current_systemd_unit_candidates() -> List[str]:
+	"""
+	تشخیص سرویس systemd مربوط به پروسس فعلی API.
+	اولویت:
+	1) ENV: HESABIX_CURRENT_SYSTEMD_SERVICE
+	2) /proc/self/cgroup
+	3) systemctl show --pid <pid>
+	"""
+	candidates: List[str] = []
+
+	env_service = _normalize_service_name(os.getenv("HESABIX_CURRENT_SYSTEMD_SERVICE", ""))
+	if env_service:
+		candidates.append(env_service)
+
+	try:
+		with open("/proc/self/cgroup", "r", encoding="utf-8") as fh:
+			for line in fh:
+				unit = _extract_unit_from_cgroup_line(line)
+				if unit:
+					candidates.append(unit)
+	except Exception:
+		pass
+
+	if shutil.which("systemctl"):
+		try:
+			proc = subprocess.run(
+				["systemctl", "show", f"--pid={os.getpid()}", "--property=Id", "--value"],
+				capture_output=True,
+				text=True,
+				timeout=2,
+				check=False,
+			)
+			if proc.returncode == 0:
+				unit = _normalize_service_name(proc.stdout.strip())
+				if unit:
+					candidates.append(unit)
+		except Exception:
+			pass
+
+	# حفظ ترتیب و حذف تکراری
+	seen: Set[str] = set()
+	uniq: List[str] = []
+	for item in candidates:
+		if not item or item in seen:
+			continue
+		seen.add(item)
+		uniq.append(item)
+	return uniq
+
+
+def _allowed_services() -> List[str]:
+	"""ساخت لیست سرویس‌های مجاز با پشتیبانی از ENV و کشف خودکار سرویس فعلی."""
+	raw = list(DEFAULT_ALLOWED_SERVICES)
+	extra = os.getenv("HESABIX_ALLOWED_SYSTEMD_SERVICES", "").strip()
+	if extra:
+		for part in extra.split(","):
+			name = _normalize_service_name(part)
+			if name:
+				raw.append(name)
+
+	raw.extend(_detect_current_systemd_unit_candidates())
+
+	seen: Set[str] = set()
+	final_list: List[str] = []
+	for service in raw:
+		name = _normalize_service_name(service)
+		if not name or name in seen:
+			continue
+		seen.add(name)
+		final_list.append(name)
+	return final_list
 
 _LOGS_CACHE: Dict[Tuple[str, int], Tuple[float, Dict[str, Any]]] = {}
 _LOGS_CACHE_TTL_SEC = 2.0
@@ -106,7 +202,8 @@ def _priority_to_str(value: Any) -> str:
 
 def _get_service_logs(service_name: str, lines: int = 100) -> Dict[str, Any]:
 	"""دریافت لاگ‌های یک سرویس از journalctl"""
-	if service_name not in ALLOWED_SERVICES:
+	service_name = _normalize_service_name(service_name)
+	if service_name not in _allowed_services():
 		raise ApiError("INVALID_SERVICE", f"سرویس '{service_name}' مجاز نیست", http_status=400)
 
 	_require_journalctl()
@@ -187,7 +284,8 @@ def _get_service_logs(service_name: str, lines: int = 100) -> Dict[str, Any]:
 
 def _restart_service(service_name: str) -> Dict[str, Any]:
 	"""Restart کردن یک سرویس systemd"""
-	if service_name not in ALLOWED_SERVICES:
+	service_name = _normalize_service_name(service_name)
+	if service_name not in _allowed_services():
 		raise ApiError("INVALID_SERVICE", f"سرویس '{service_name}' مجاز نیست", http_status=400)
 
 	_require_systemctl()
@@ -232,7 +330,8 @@ def _restart_service(service_name: str) -> Dict[str, Any]:
 
 def _get_service_status(service_name: str) -> Dict[str, Any]:
 	"""دریافت وضعیت یک سرویس"""
-	if service_name not in ALLOWED_SERVICES:
+	service_name = _normalize_service_name(service_name)
+	if service_name not in _allowed_services():
 		raise ApiError("INVALID_SERVICE", f"سرویس '{service_name}' مجاز نیست", http_status=400)
 
 	_require_systemctl()
@@ -294,7 +393,7 @@ def list_allowed_services(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
-	return success_response({"services": list(ALLOWED_SERVICES)}, request)
+	return success_response({"services": _allowed_services()}, request)
 
 
 @router.get(
@@ -358,7 +457,7 @@ def get_all_services_status(
 	"""دریافت وضعیت همه سرویس‌ها"""
 	try:
 		services_status = {}
-		for service in ALLOWED_SERVICES:
+		for service in _allowed_services():
 			try:
 				services_status[service] = _get_service_status(service)
 			except Exception as e:

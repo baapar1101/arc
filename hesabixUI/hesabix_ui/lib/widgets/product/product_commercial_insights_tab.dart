@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/product_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/date_formatters.dart';
@@ -25,7 +26,6 @@ enum _Preset { month1, month3, month6, year, custom }
 
 class _ProductCommercialInsightsTabState extends State<ProductCommercialInsightsTab> {
   final _service = ProductService();
-  static const _bucketChoices = {'day': 'روز', 'week': 'هفته', 'month': 'ماه'};
 
   String _bucket = 'month';
   _Preset _preset = _Preset.year;
@@ -168,6 +168,7 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
     required Color color,
   }) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -185,22 +186,22 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
             const SizedBox(height: 10),
             if (payload == null)
               Text(
-                'داده‌ای نیست',
+                t.productCommercialInsightsNoData,
                 style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
               )
             else ...[
               _kv(
-                'تاریخ سند',
+                t.productCommercialInsightsDocumentDate,
                 DateFormatters.formatServerDate(payload['document_date']?.toString()),
               ),
-              _kv('طرف تجاری', (payload['person_name'] ?? '-').toString()),
-              _kv('کد سند', (payload['document_code'] ?? '-').toString()),
-              _kv('مقدار', _fmtQty(_parseNum(payload['quantity']))),
+              _kv(t.productCommercialInsightsParty, (payload['person_name'] ?? '-').toString()),
+              _kv(t.productCommercialInsightsDocumentCode, (payload['document_code'] ?? '-').toString()),
+              _kv(t.productCommercialInsightsQuantity, _fmtQty(_parseNum(payload['quantity']))),
               _kv(
-                'قیمت واحد به ارز پایه',
+                t.productCommercialInsightsUnitPriceBase,
                 _fmtMoney(_parseNum(payload['unit_price_base_currency'])),
               ),
-              _kv('نرخ سند به پایه', _fmtQty(_parseNum(payload['fx_rate_document_to_base']))),
+              _kv(t.productCommercialInsightsFxRateToBase, _fmtQty(_parseNum(payload['fx_rate_document_to_base']))),
             ],
           ],
         ),
@@ -222,9 +223,10 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
 
   Widget _chart() {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final chartRaw = _data['chart'];
     if (chartRaw is! List) {
-      return const SizedBox(height: 200, child: Center(child: Text('دادهٔ نمودار موجود نیست.')));
+      return SizedBox(height: 200, child: Center(child: Text(t.productCommercialInsightsChartDataMissing)));
     }
     final pts = chartRaw.whereType<Map<String, dynamic>>().toList();
     if (pts.isEmpty) {
@@ -232,7 +234,7 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
         height: 180,
         child: Center(
           child: Text(
-            'برای بازهٔ انتخاب‌شده نقطهٔ نموداری نیست.',
+            t.productCommercialInsightsChartNoPoints,
             style: theme.textTheme.bodyMedium?.copyWith(color: theme.hintColor),
           ),
         ),
@@ -264,10 +266,10 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
     maxY *= 1.15;
 
     String laneLabel(LineBarSpot sp) {
-      if (spotsP.isEmpty) return 'فروش';
-      if (spotsS.isEmpty) return 'خرید';
+      if (spotsP.isEmpty) return t.productCommercialInsightsLaneSale;
+      if (spotsS.isEmpty) return t.productCommercialInsightsLanePurchase;
       try {
-        return sp.barIndex == 0 ? 'خرید' : 'فروش';
+        return sp.barIndex == 0 ? t.productCommercialInsightsLanePurchase : t.productCommercialInsightsLaneSale;
       } catch (_) {
         return '';
       }
@@ -279,9 +281,9 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _legendRow(theme.colorScheme.tertiary, 'میانگین موزون خرید (پایه)'),
+            _legendRow(theme.colorScheme.tertiary, t.productCommercialInsightsLegendPurchaseAvg),
             const SizedBox(width: 16),
-            _legendRow(theme.colorScheme.primary, 'میانگین موزون فروش (پایه)'),
+            _legendRow(theme.colorScheme.primary, t.productCommercialInsightsLegendSaleAvg),
           ],
         ),
         const SizedBox(height: 12),
@@ -372,12 +374,14 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
                     return list.map((spot) {
                       final idx = spot.x.round().clamp(0, pts.length - 1);
                       final bucket = pts[idx];
-                      final isPur = laneLabel(spot) == 'خرید';
+                      final isPur = laneLabel(spot) == t.productCommercialInsightsLanePurchase;
                       final qtyField = isPur ? 'purchase_qty' : 'sale_qty';
                       final qty = _parseNum(bucket[qtyField]);
-                      final qStr = qty != null ? ' · مقدار ${formatWithThousands(qty, decimalPlaces: 3)}' : '';
+                      final qStr = qty != null
+                          ? ' · ${t.productCommercialInsightsQuantity} ${formatWithThousands(qty, decimalPlaces: 3)}'
+                          : '';
                       return LineTooltipItem(
-                        '${laneLabel(spot)}: ${_fmtMoney(spot.y)}$_currencySuffix()$qStr',
+                        '${laneLabel(spot)}: ${_fmtMoney(spot.y)}$qStr',
                         TextStyle(
                           color: theme.colorScheme.onSurface,
                           fontWeight: FontWeight.w600,
@@ -397,13 +401,14 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
 
   Widget _partyBlock(String title, List<dynamic> raw) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
         const SizedBox(height: 6),
         if (raw.isEmpty)
-          Text('داده‌ای نیست', style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor))
+          Text(t.productCommercialInsightsNoData, style: theme.textTheme.bodySmall?.copyWith(color: theme.hintColor))
         else
           ...raw.take(5).map((item) {
             if (item is! Map<String, dynamic>) return const SizedBox.shrink();
@@ -414,10 +419,82 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
               dense: true,
               contentPadding: EdgeInsets.zero,
               title: Text(name, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-              subtitle: Text('میانگین واحد به پایه: $avg  ·  مجموع مقدار: $q'),
+              subtitle: Text(
+                '${t.productCommercialInsightsAvgUnitBaseLabel}: $avg  ·  ${t.productCommercialInsightsTotalQuantityLabel}: $q',
+              ),
             );
           }),
       ],
+    );
+  }
+
+  Widget _notEligibleCard({required String note}) {
+    final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.info_outline, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  t.productCommercialInsightsNotEligibleTitle,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              note.isNotEmpty
+                  ? note
+                  : t.productCommercialInsightsNotEligibleBody,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              t.productCommercialInsightsChecklistTitle,
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            _hintRow(t.productCommercialInsightsChecklistInventoryTracked),
+            _hintRow(t.productCommercialInsightsChecklistConfirmedInvoice),
+            _hintRow(t.productCommercialInsightsChecklistPostedWarehouseDoc),
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: OutlinedButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh),
+                label: Text(t.productCommercialInsightsReload),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _hintRow(String text) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.check_circle_outline, size: 18, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -446,6 +523,7 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -465,6 +543,11 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
     final topSup = _data['top_suppliers'];
     final topBuy = _data['top_buyers'];
 
+    final bucketChoices = {
+      'day': t.productCommercialInsightsBucketDay,
+      'week': t.productCommercialInsightsBucketWeek,
+      'month': t.productCommercialInsightsBucketMonth,
+    };
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -476,8 +559,8 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               DropdownButton<String>(
-                value: _bucketChoices.containsKey(_bucket) ? _bucket : 'month',
-                items: _bucketChoices.entries
+                value: bucketChoices.containsKey(_bucket) ? _bucket : 'month',
+                items: bucketChoices.entries
                     .map((e) => DropdownMenuItem<String>(value: e.key, child: Text(e.value)))
                     .toList(),
                 onChanged: (v) async {
@@ -488,12 +571,12 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
               ),
               DropdownButton<_Preset>(
                 value: _preset,
-                items: const [
-                  DropdownMenuItem(value: _Preset.month1, child: Text('۳۰ روز')),
-                  DropdownMenuItem(value: _Preset.month3, child: Text('۹۰ روز')),
-                  DropdownMenuItem(value: _Preset.month6, child: Text('۶ ماه')),
-                  DropdownMenuItem(value: _Preset.year, child: Text('یک سال')),
-                  DropdownMenuItem(value: _Preset.custom, child: Text('سفارشی')),
+                items: [
+                  DropdownMenuItem(value: _Preset.month1, child: Text(t.productCommercialInsightsPreset30Days)),
+                  DropdownMenuItem(value: _Preset.month3, child: Text(t.productCommercialInsightsPreset90Days)),
+                  DropdownMenuItem(value: _Preset.month6, child: Text(t.productCommercialInsightsPreset6Months)),
+                  DropdownMenuItem(value: _Preset.year, child: Text(t.productCommercialInsightsPreset1Year)),
+                  DropdownMenuItem(value: _Preset.custom, child: Text(t.productCommercialInsightsPresetCustom)),
                 ],
                 onChanged: (v) async {
                   if (v == null || v == _preset) return;
@@ -508,7 +591,7 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
                   label: Text(
                     _customFrom != null
                         ? DateFormatters.formatServerDate(_customFrom!.toIso8601String())
-                        : 'از تاریخ',
+                        : t.productCommercialInsightsFromDate,
                   ),
                 ),
                 OutlinedButton.icon(
@@ -517,14 +600,18 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
                   label: Text(
                     _customTo != null
                         ? DateFormatters.formatServerDate(_customTo!.toIso8601String())
-                        : 'تا تاریخ',
+                        : t.productCommercialInsightsToDate,
                   ),
                 ),
               ],
-              IconButton.filledTonal(onPressed: _load, tooltip: 'بازنشانی', icon: const Icon(Icons.refresh)),
+              IconButton.filledTonal(
+                onPressed: _load,
+                tooltip: t.productCommercialInsightsResetTooltip,
+                icon: const Icon(Icons.refresh),
+              ),
             ],
           ),
-          if (note.isNotEmpty) ...[
+          if (note.isNotEmpty && eligible) ...[
             const SizedBox(height: 12),
             Text(
               note,
@@ -533,10 +620,7 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
           ],
           if (!eligible) ...[
             const SizedBox(height: 24),
-            Text(
-              'این خلاصه برای این محصول یا پیکربندی کسب‌وکار در دسترس نیست.',
-              style: theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor),
-            ),
+            _notEligibleCard(note: note),
           ] else ...[
             const SizedBox(height: 16),
             LayoutBuilder(
@@ -546,14 +630,14 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _lastCard(
-                        title: 'آخرین خرید',
+                        title: t.productCommercialInsightsLastPurchase,
                         payload: _data['last_purchase'] as Map<String, dynamic>?,
                         icon: Icons.shopping_cart_outlined,
                         color: theme.colorScheme.tertiary,
                       ),
                       const SizedBox(height: 12),
                       _lastCard(
-                        title: 'آخرین فروش',
+                        title: t.productCommercialInsightsLastSale,
                         payload: _data['last_sale'] as Map<String, dynamic>?,
                         icon: Icons.point_of_sale_outlined,
                         color: theme.colorScheme.primary,
@@ -565,7 +649,7 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
                   children: [
                     Expanded(
                       child: _lastCard(
-                        title: 'آخرین خرید',
+                        title: t.productCommercialInsightsLastPurchase,
                         payload: _data['last_purchase'] as Map<String, dynamic>?,
                         icon: Icons.shopping_cart_outlined,
                         color: theme.colorScheme.tertiary,
@@ -574,7 +658,7 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
                     const SizedBox(width: 12),
                     Expanded(
                       child: _lastCard(
-                        title: 'آخرین فروش',
+                        title: t.productCommercialInsightsLastSale,
                         payload: _data['last_sale'] as Map<String, dynamic>?,
                         icon: Icons.point_of_sale_outlined,
                         color: theme.colorScheme.primary,
@@ -592,12 +676,15 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Text('جمع در بازه', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                      Text(
+                        t.productCommercialInsightsTotalsInRange,
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
                       const SizedBox(height: 8),
-                      _kv('مقدار خرید', _fmtQty(_parseNum(totals['purchase_qty']))),
-                      _kv('مقدار فروش', _fmtQty(_parseNum(totals['sale_qty']))),
-                      _kv('تعداد خطوط خرید', (totals['purchase_lines'] ?? '-').toString()),
-                      _kv('تعداد خطوط فروش', (totals['sale_lines'] ?? '-').toString()),
+                      _kv(t.productCommercialInsightsPurchaseQuantity, _fmtQty(_parseNum(totals['purchase_qty']))),
+                      _kv(t.productCommercialInsightsSaleQuantity, _fmtQty(_parseNum(totals['sale_qty']))),
+                      _kv(t.productCommercialInsightsPurchaseLinesCount, (totals['purchase_lines'] ?? '-').toString()),
+                      _kv(t.productCommercialInsightsSaleLinesCount, (totals['sale_lines'] ?? '-').toString()),
                     ],
                   ),
                 ),
@@ -605,15 +692,15 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
               const SizedBox(height: 16),
             ],
             Text(
-              'روند میانگین موزون قیمت واحد (ارز پایه)',
+              t.productCommercialInsightsTrendTitle,
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             _chart(),
             const SizedBox(height: 24),
-            if (topSup is List<dynamic>) _partyBlock('تأمین‌کنندگان پرحجم در بازه', topSup),
+            if (topSup is List<dynamic>) _partyBlock(t.productCommercialInsightsTopSuppliers, topSup),
             const SizedBox(height: 16),
-            if (topBuy is List<dynamic>) _partyBlock('خریداران پرحجم در بازه', topBuy),
+            if (topBuy is List<dynamic>) _partyBlock(t.productCommercialInsightsTopBuyers, topBuy),
             const SizedBox(height: 16),
             _recentStrip(),
           ],
@@ -627,11 +714,12 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
     if (raw is! List<dynamic> || raw.isEmpty) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final rows = raw.whereType<Map<String, dynamic>>().take(15).toList();
     return Card(
       child: ExpansionTile(
         title: Text(
-          'رویدادهای اخیر (خطوط فاکتور)',
+          t.productCommercialInsightsRecentEventsTitle,
           style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         ),
         children: rows
@@ -645,13 +733,13 @@ class _ProductCommercialInsightsTabState extends State<ProductCommercialInsights
                       e['lane']?.toString() == 'purchase' ? theme.colorScheme.tertiary : theme.colorScheme.primary,
                 ),
                 title: Text(
-                  '${(e['lane']?.toString() == 'purchase') ? 'خرید' : 'فروش'} '
+                  '${(e['lane']?.toString() == 'purchase') ? t.productCommercialInsightsLanePurchase : t.productCommercialInsightsLaneSale} '
                   '• ${DateFormatters.formatServerDate(e['document_date'])} • ${e['person_name'] ?? '—'}',
                   style: theme.textTheme.bodySmall,
                 ),
                 subtitle: Text(
-                  '${e['document_code']} — ${_fmtQty(_parseNum(e['quantity']))} واحد؛ '
-                  'قیمت واحد به پایه ${_fmtMoney(_parseNum(e['unit_price_base_currency']))}',
+                  '${e['document_code']} — ${_fmtQty(_parseNum(e['quantity']))} ${t.productCommercialInsightsUnitShortLabel}; '
+                  '${t.productCommercialInsightsUnitPriceBase} ${_fmtMoney(_parseNum(e['unit_price_base_currency']))}',
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),

@@ -3332,6 +3332,163 @@ class AppLocalizationsEn extends AppLocalizations {
   String get productStockInWarehouses => 'Product Stock in Warehouses';
 
   @override
+  String get productCommercialPricing => 'Commercial & Pricing';
+
+  @override
+  String get productCommercialPricingNoAccessHint =>
+      'To view this tab, invoice read permission is required. Ask your admin to grant invoices.view.';
+
+  @override
+  String get productCommercialInsightsNotEligibleTitle =>
+      'This report is not active for this product';
+
+  @override
+  String get productCommercialInsightsNotEligibleBody =>
+      'This summary is not available for this product or current business configuration.';
+
+  @override
+  String get productCommercialInsightsChecklistTitle => 'Checklist:';
+
+  @override
+  String get productCommercialInsightsChecklistInventoryTracked =>
+      'Ensure inventory tracking is enabled for this product.';
+
+  @override
+  String get productCommercialInsightsChecklistConfirmedInvoice =>
+      'Ensure at least one confirmed purchase/sales invoice exists for this product.';
+
+  @override
+  String get productCommercialInsightsChecklistPostedWarehouseDoc =>
+      'Ensure related invoices have a posted warehouse document with source type invoice.';
+
+  @override
+  String get productCommercialInsightsReload => 'Reload';
+
+  @override
+  String get productCommercialInsightsResetTooltip => 'Reset';
+
+  @override
+  String get productCommercialInsightsNoData => 'No data';
+
+  @override
+  String get productCommercialInsightsDocumentDate => 'Document date';
+
+  @override
+  String get productCommercialInsightsParty => 'Party';
+
+  @override
+  String get productCommercialInsightsDocumentCode => 'Document code';
+
+  @override
+  String get productCommercialInsightsQuantity => 'Quantity';
+
+  @override
+  String get productCommercialInsightsUnitPriceBase =>
+      'Unit price in base currency';
+
+  @override
+  String get productCommercialInsightsFxRateToBase =>
+      'Document to base FX rate';
+
+  @override
+  String get productCommercialInsightsChartDataMissing =>
+      'Chart data is not available.';
+
+  @override
+  String get productCommercialInsightsChartNoPoints =>
+      'No chart points for the selected range.';
+
+  @override
+  String get productCommercialInsightsLanePurchase => 'Purchase';
+
+  @override
+  String get productCommercialInsightsLaneSale => 'Sale';
+
+  @override
+  String get productCommercialInsightsLegendPurchaseAvg =>
+      'Weighted average purchase (base)';
+
+  @override
+  String get productCommercialInsightsLegendSaleAvg =>
+      'Weighted average sale (base)';
+
+  @override
+  String get productCommercialInsightsAvgUnitBaseLabel =>
+      'Average unit in base';
+
+  @override
+  String get productCommercialInsightsTotalQuantityLabel => 'Total quantity';
+
+  @override
+  String get productCommercialInsightsBucketDay => 'Day';
+
+  @override
+  String get productCommercialInsightsBucketWeek => 'Week';
+
+  @override
+  String get productCommercialInsightsBucketMonth => 'Month';
+
+  @override
+  String get productCommercialInsightsPreset30Days => '30 days';
+
+  @override
+  String get productCommercialInsightsPreset90Days => '90 days';
+
+  @override
+  String get productCommercialInsightsPreset6Months => '6 months';
+
+  @override
+  String get productCommercialInsightsPreset1Year => '1 year';
+
+  @override
+  String get productCommercialInsightsPresetCustom => 'Custom';
+
+  @override
+  String get productCommercialInsightsFromDate => 'From date';
+
+  @override
+  String get productCommercialInsightsToDate => 'To date';
+
+  @override
+  String get productCommercialInsightsLastPurchase => 'Last purchase';
+
+  @override
+  String get productCommercialInsightsLastSale => 'Last sale';
+
+  @override
+  String get productCommercialInsightsTotalsInRange => 'Totals in range';
+
+  @override
+  String get productCommercialInsightsPurchaseQuantity => 'Purchase quantity';
+
+  @override
+  String get productCommercialInsightsSaleQuantity => 'Sale quantity';
+
+  @override
+  String get productCommercialInsightsPurchaseLinesCount =>
+      'Purchase lines count';
+
+  @override
+  String get productCommercialInsightsSaleLinesCount => 'Sale lines count';
+
+  @override
+  String get productCommercialInsightsTrendTitle =>
+      'Weighted average unit price trend (base currency)';
+
+  @override
+  String get productCommercialInsightsTopSuppliers => 'Top suppliers in range';
+
+  @override
+  String get productCommercialInsightsTopBuyers => 'Top buyers in range';
+
+  @override
+  String get productCommercialInsightsRecentEventsTitle =>
+      'Recent events (invoice lines)';
+
+  @override
+  String get productCommercialInsightsUnitShortLabel => 'unit';
+
+  @override
   String get warehouseCode => 'Warehouse Code';
 
   @override

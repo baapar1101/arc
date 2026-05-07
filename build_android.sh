@@ -35,10 +35,13 @@ BUILD_SPLIT_APK="$DEFAULT_BUILD_SPLIT_APK"
 API_BASE_URL="$DEFAULT_API_BASE_URL"
 CLEAN_BUILD=false
 INSTALL_DEPS=false
+AUTO_SETUP_ANDROID=false
+BOOTSTRAP_ONLY=false
+BUILD_FAILED=false
 
 print_usage() {
   cat <<EOF
-Usage: ./build_android.sh [--project <path>] [--mode <debug|profile|release>] [--api-base-url <url>] [--aab] [--no-aab] [--apk] [--no-apk] [--universal-apk] [--split-apk] [--clean] [--install-deps] [--help]
+Usage: ./build_android.sh [--project <path>] [--mode <debug|profile|release>] [--api-base-url <url>] [--aab] [--no-aab] [--apk] [--no-apk] [--universal-apk] [--split-apk] [--clean] [--install-deps] [--auto-setup-android] [--bootstrap-only] [--help]
 
 Options:
   --project PATH     Flutter project path (contains pubspec.yaml). If not specified, will be auto-detected.
@@ -52,6 +55,9 @@ Options:
   --split-apk        Build split APKs per ABI (default: enabled).
   --clean            Clean build directory before building.
   --install-deps     Install dependencies before building.
+  --auto-setup-android
+                     Try automatic Android toolchain setup (Java + SDK packages) on Debian/Ubuntu.
+  --bootstrap-only   Only setup/check prerequisites; skip pub get, clean, and build steps.
   -h, --help         Show help.
 
 Environment (optional overrides; defaults match deploy.sh Hesabix mirrors):
@@ -75,6 +81,196 @@ warn() { echo "[warn] $*" >&2; }
 die() { echo "[error] $*" >&2; exit 1; }
 
 cmd_exists() { command -v "$1" >/dev/null 2>&1; }
+
+is_debian_like() {
+  [ -f /etc/debian_version ]
+}
+
+ensure_flutter_command_available() {
+  local flutter_bin=""
+  if [ -x "/opt/flutter/bin/flutter" ]; then
+    flutter_bin="/opt/flutter/bin/flutter"
+  elif [ -n "${FLUTTER_SDK_INSTALL_DIR:-}" ] && [ -x "${FLUTTER_SDK_INSTALL_DIR}/bin/flutter" ]; then
+    flutter_bin="${FLUTTER_SDK_INSTALL_DIR}/bin/flutter"
+  elif [ -x "$REPO_ROOT/.flutter_sdk/bin/flutter" ]; then
+    flutter_bin="$REPO_ROOT/.flutter_sdk/bin/flutter"
+  fi
+
+  [ -n "$flutter_bin" ] || return 0
+
+  if cmd_exists flutter; then
+    return 0
+  fi
+
+  if [ "$(id -u)" -eq 0 ] && [ -d "/usr/local/bin" ]; then
+    ln -sf "$flutter_bin" /usr/local/bin/flutter 2>/dev/null || true
+    if [ -x /usr/local/bin/flutter ]; then
+      echo "✓ Flutter command linked globally: /usr/local/bin/flutter -> $flutter_bin"
+      return 0
+    fi
+  fi
+
+  warn "Flutter is installed at: $flutter_bin"
+  warn "Command not globally available in your shell PATH."
+  warn "Add this to your shell profile (~/.bashrc):"
+  warn "  export PATH=\"$(dirname "$flutter_bin"):\$PATH\""
+}
+
+resolve_invoking_user() {
+  if [ "$(id -u)" -ne 0 ]; then
+    return 1
+  fi
+  if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+    printf '%s' "$SUDO_USER"
+    return 0
+  fi
+  local ln=""
+  ln="$(logname 2>/dev/null || true)"
+  if [ -n "$ln" ] && [ "$ln" != "root" ]; then
+    printf '%s' "$ln"
+    return 0
+  fi
+  return 1
+}
+
+resolve_user_home() {
+  local u="$1"
+  if [ -z "$u" ]; then
+    return 1
+  fi
+  if cmd_exists getent; then
+    local h=""
+    h="$(getent passwd "$u" | cut -d: -f6 || true)"
+    if [ -n "$h" ] && [ -d "$h" ]; then
+      printf '%s' "$h"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+resolve_flutter_bin() {
+  local from_path=""
+  from_path="$(command -v flutter 2>/dev/null || true)"
+  if [ -n "$from_path" ]; then
+    printf '%s' "$from_path"
+    return 0
+  fi
+  if [ -x "/opt/flutter/bin/flutter" ]; then
+    printf '%s' "/opt/flutter/bin/flutter"
+    return 0
+  fi
+  if [ -n "${FLUTTER_SDK_INSTALL_DIR:-}" ] && [ -x "${FLUTTER_SDK_INSTALL_DIR}/bin/flutter" ]; then
+    printf '%s' "${FLUTTER_SDK_INSTALL_DIR}/bin/flutter"
+    return 0
+  fi
+  if [ -x "$REPO_ROOT/.flutter_sdk/bin/flutter" ]; then
+    printf '%s' "$REPO_ROOT/.flutter_sdk/bin/flutter"
+    return 0
+  fi
+  return 1
+}
+
+fix_flutter_sdk_permissions() {
+  [ "$(id -u)" -eq 0 ] || return 0
+  local invoke_user=""
+  invoke_user="$(resolve_invoking_user 2>/dev/null || true)"
+  [ -n "$invoke_user" ] || return 0
+
+  local flutter_bin=""
+  flutter_bin="$(resolve_flutter_bin 2>/dev/null || true)"
+  [ -n "$flutter_bin" ] || return 0
+
+  local flutter_root=""
+  flutter_root="$(cd "$(dirname "$flutter_bin")/.." && pwd)"
+  [ -d "$flutter_root" ] || return 0
+
+  # Root-owned caches from previous sudo/root runs break non-root flutter execution.
+  local repair_paths=(
+    "$flutter_root/bin/cache"
+    "$flutter_root/packages/flutter_tools/.dart_tool"
+    "$flutter_root/.pub-cache"
+  )
+  local p
+  for p in "${repair_paths[@]}"; do
+    [ -e "$p" ] || continue
+    chown -R "$invoke_user":"$invoke_user" "$p" 2>/dev/null || true
+  done
+}
+
+setup_gradle_mirror_init() {
+  write_gradle_init_file() {
+    local target_home="$1"
+    [ -n "$target_home" ] || return 0
+    local gradle_home="$target_home/.gradle"
+    local init_dir="$gradle_home/init.d"
+    local init_file="$init_dir/hesabix-mirror.init.gradle"
+    mkdir -p "$init_dir" 2>/dev/null || true
+    cat >"$init_file" <<'EOF'
+def base = (System.getenv("HESABIX_GRADLE_MIRROR") ?: "https://gradle.mirror.hesabix.ir").replaceAll('/+$','')
+def mirrorRepos = { repoHandler ->
+    repoHandler.maven { url = uri("${base}/android/maven2/") }
+    repoHandler.maven { url = uri("${base}/maven2/") }
+    repoHandler.maven { url = uri("${base}/gradle-plugins/") }
+    repoHandler.gradlePluginPortal()
+    repoHandler.google()
+    repoHandler.mavenCentral()
+}
+settingsEvaluated { settings ->
+    settings.pluginManagement { repositories { mirrorRepos(delegate) } }
+    settings.dependencyResolutionManagement { repositories { mirrorRepos(delegate) } }
+}
+allprojects { repositories { mirrorRepos(delegate) } }
+EOF
+  }
+
+  write_gradle_init_file "$HOME"
+  local invoke_user=""
+  invoke_user="$(resolve_invoking_user 2>/dev/null || true)"
+  if [ -n "$invoke_user" ] && cmd_exists getent; then
+    local user_home=""
+    user_home="$(getent passwd "$invoke_user" | cut -d: -f6 || true)"
+    write_gradle_init_file "$user_home"
+  fi
+  export HESABIX_GRADLE_MIRROR="${HESABIX_GRADLE_MIRROR:-https://gradle.mirror.hesabix.ir}"
+}
+
+check_gradle_mirror_health() {
+  local base="${HESABIX_GRADLE_MIRROR:-https://gradle.mirror.hesabix.ir}"
+  local urls=(
+    "$base/gradle-plugins/"
+    "$base/maven2/"
+    "$base/android/maven2/"
+  )
+  local u
+  for u in "${urls[@]}"; do
+    if ! curl -kfsS --connect-timeout 5 --max-time 12 -o /dev/null -I "$u" 2>/dev/null \
+      && ! curl -fsS --connect-timeout 5 --max-time 12 -o /dev/null -I "$u" 2>/dev/null; then
+      warn "Gradle mirror endpoint not reachable: $u"
+    fi
+  done
+}
+
+prepare_gradle_user_home() {
+  local invoke_user=""
+  invoke_user="$(resolve_invoking_user 2>/dev/null || true)"
+  local user_home=""
+
+  if [ -n "$invoke_user" ]; then
+    user_home="$(resolve_user_home "$invoke_user" 2>/dev/null || true)"
+  elif [ -n "${HOME:-}" ]; then
+    user_home="$HOME"
+  fi
+
+  [ -n "$user_home" ] || return 0
+
+  local gradle_home="${GRADLE_USER_HOME:-$user_home/.gradle}"
+  mkdir -p "$gradle_home/wrapper/dists" "$gradle_home/caches" "$gradle_home/init.d" 2>/dev/null || true
+
+  if [ "$(id -u)" -eq 0 ] && [ -n "$invoke_user" ]; then
+    chown -R "$invoke_user":"$invoke_user" "$gradle_home" 2>/dev/null || true
+  fi
+}
 
 set_flutter_mirror_env() {
   export PUB_HOSTED_URL="${PUB_HOSTED_URL:-$DEFAULT_PUB_HOSTED_URL}"
@@ -295,6 +491,10 @@ while [[ $# -gt 0 ]]; do
       CLEAN_BUILD=true; shift ;;
     --install-deps)
       INSTALL_DEPS=true; shift ;;
+    --auto-setup-android)
+      AUTO_SETUP_ANDROID=true; shift ;;
+    --bootstrap-only)
+      BOOTSTRAP_ONLY=true; shift ;;
     -h|--help)
       print_usage; exit 0 ;;
     *)
@@ -309,6 +509,8 @@ esac
 
 set_flutter_mirror_env
 ensure_flutter_sdk
+ensure_flutter_command_available
+fix_flutter_sdk_permissions
 
 APP_DIR="$(auto_detect_project_dir)"
 
@@ -328,15 +530,32 @@ echo "Using Flutter Storage URL: $FLUTTER_STORAGE_BASE_URL"
 
 # Configure Android SDK and Java environment
 setup_android_env() {
-  # Detect Android SDK
-  local android_sdk_path="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/opt/android-sdk}}"
+  # Detect Android SDK from common Linux locations
+  local android_sdk_path="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  local candidates=(
+    "$android_sdk_path"
+    "/opt/android-sdk"
+    "/usr/lib/android-sdk"
+    "$HOME/Android/Sdk"
+    "$HOME/Android/sdk"
+  )
+  local p
+  android_sdk_path=""
+  for p in "${candidates[@]}"; do
+    [ -n "$p" ] || continue
+    if [ -d "$p" ]; then
+      android_sdk_path="$p"
+      break
+    fi
+  done
+
   if [ -d "$android_sdk_path" ]; then
     export ANDROID_SDK_ROOT="$android_sdk_path"
     export ANDROID_HOME="$android_sdk_path"
     export PATH="$PATH:$android_sdk_path/cmdline-tools/latest/bin:$android_sdk_path/platform-tools"
     echo "✓ Android SDK found: $ANDROID_SDK_ROOT"
   else
-    warn "Android SDK not found at $android_sdk_path"
+    warn "Android SDK not found in common paths"
     warn "Please set ANDROID_SDK_ROOT or ANDROID_HOME environment variable"
   fi
 
@@ -363,17 +582,99 @@ setup_android_env() {
   fi
 }
 
+auto_setup_android_toolchain() {
+  [ "$AUTO_SETUP_ANDROID" = true ] || return 0
+  echo "Auto setup requested: checking Android toolchain dependencies..."
+
+  if ! is_debian_like; then
+    warn "Auto setup currently supports Debian/Ubuntu only. Skipping."
+    return 0
+  fi
+
+  if [ "$(id -u)" -ne 0 ]; then
+    warn "Auto setup requires root privileges for apt install. Re-run with sudo or install manually."
+    return 0
+  fi
+
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y || warn "apt-get update failed"
+
+  if ! cmd_exists java; then
+    echo "Installing Java 17..."
+    apt-get install -y openjdk-17-jdk || warn "Failed to install openjdk-17-jdk"
+  fi
+
+  if [ ! -d "${ANDROID_SDK_ROOT:-}" ] && [ ! -d "${ANDROID_HOME:-}" ]; then
+    echo "Installing Android SDK packages..."
+    apt-get install -y android-sdk android-sdk-platform-tools-common adb || warn "Failed to install Android SDK packages"
+  fi
+}
+
+flutter_run() {
+  local flutter_bin=""
+  flutter_bin="$(resolve_flutter_bin 2>/dev/null || true)"
+  [ -n "$flutter_bin" ] || flutter_bin="flutter"
+
+  local invoke_user=""
+  invoke_user="$(resolve_invoking_user 2>/dev/null || true)"
+  local target_home="${HOME:-}"
+  if [ -n "$invoke_user" ]; then
+    target_home="$(resolve_user_home "$invoke_user" 2>/dev/null || echo "$target_home")"
+  fi
+  local target_gradle_home="${GRADLE_USER_HOME:-$target_home/.gradle}"
+
+  if [ "$(id -u)" -eq 0 ] && [ -n "$invoke_user" ]; then
+    if cmd_exists runuser; then
+      runuser -u "$invoke_user" -- env HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" PATH="$PATH" PUB_HOSTED_URL="$PUB_HOSTED_URL" FLUTTER_STORAGE_BASE_URL="$FLUTTER_STORAGE_BASE_URL" ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-}" ANDROID_HOME="${ANDROID_HOME:-}" JAVA_HOME="${JAVA_HOME:-}" "$flutter_bin" "$@"
+    else
+      sudo -u "$invoke_user" --preserve-env=PATH,PUB_HOSTED_URL,FLUTTER_STORAGE_BASE_URL,ANDROID_SDK_ROOT,ANDROID_HOME,JAVA_HOME,HOME,GRADLE_USER_HOME HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" "$flutter_bin" "$@"
+    fi
+  else
+    HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" "$flutter_bin" "$@"
+  fi
+}
+
+ensure_android_prerequisites() {
+  local missing=0
+  if [ ! -d "${ANDROID_SDK_ROOT:-}" ] && [ ! -d "${ANDROID_HOME:-}" ]; then
+    warn "Android SDK is missing."
+    missing=1
+  fi
+  if [ -z "${JAVA_HOME:-}" ] && ! cmd_exists java; then
+    warn "Java runtime is missing."
+    missing=1
+  fi
+  return "$missing"
+}
+
+auto_setup_android_toolchain
 setup_android_env
+setup_gradle_mirror_init
+check_gradle_mirror_health
+prepare_gradle_user_home
+if ! ensure_android_prerequisites; then
+  die "Android prerequisites not satisfied. Use --auto-setup-android or install SDK/Java manually."
+fi
+
+if [ "$BOOTSTRAP_ONLY" = true ]; then
+  echo ""
+  echo "=========================================="
+  echo "✓ Bootstrap completed"
+  echo "=========================================="
+  echo "Flutter, Android SDK, and Java checks finished."
+  echo "No dependency install or build steps were executed (--bootstrap-only)."
+  exit 0
+fi
 
 # Install dependencies if requested
 if [ "$INSTALL_DEPS" = true ]; then
   echo "Installing dependencies..."
-  if ! flutter pub get; then
+  if ! flutter_run pub get; then
     die "Error downloading dependencies. Please check internet connection and DNS."
   fi
 elif [ ! -d "$APP_DIR/.dart_tool" ] || [ ! -f "$APP_DIR/pubspec.lock" ]; then
   echo "Dependencies not installed. Installing..."
-  if ! flutter pub get; then
+  if ! flutter_run pub get; then
     warn "Error downloading dependencies. Trying to continue without them..."
     warn "If build fails, please run: cd $APP_DIR && flutter pub get"
   fi
@@ -382,7 +683,7 @@ fi
 # Clean build directory if requested
 if [ "$CLEAN_BUILD" = true ]; then
   echo "Cleaning build directory..."
-  flutter clean
+  flutter_run clean
 fi
 
 # Check keystore for release builds
@@ -462,7 +763,7 @@ if [ "$BUILD_AAB" = true ]; then
   echo "=========================================="
   echo "Building Android App Bundle (AAB)..."
   echo "=========================================="
-  if flutter build appbundle "${BUILD_FLAGS[@]}"; then
+  if flutter_run build appbundle "${BUILD_FLAGS[@]}"; then
     aab_path="$APP_DIR/build/app/outputs/bundle/${MODE}/app-${MODE}.aab"
     if [ -f "$aab_path" ]; then
       echo "✓ AAB built successfully: $aab_path"
@@ -470,6 +771,7 @@ if [ "$BUILD_AAB" = true ]; then
     fi
   else
     warn "Failed to build AAB"
+    BUILD_FAILED=true
   fi
   echo ""
 fi
@@ -481,7 +783,7 @@ if [ "$BUILD_APK" = true ]; then
     echo "=========================================="
     echo "Building Universal APK (all ABIs)..."
     echo "=========================================="
-    if flutter build apk "${BUILD_FLAGS[@]}"; then
+    if flutter_run build apk "${BUILD_FLAGS[@]}"; then
       apk_path="$APP_DIR/build/app/outputs/flutter-apk/app-${MODE}.apk"
       if [ -f "$apk_path" ]; then
         echo "✓ Universal APK built successfully: $apk_path"
@@ -489,6 +791,7 @@ if [ "$BUILD_APK" = true ]; then
       fi
     else
       warn "Failed to build universal APK"
+      BUILD_FAILED=true
     fi
     echo ""
   fi
@@ -498,12 +801,13 @@ if [ "$BUILD_APK" = true ]; then
     echo "=========================================="
     echo "Building Split APKs (per ABI)..."
     echo "=========================================="
-    if flutter build apk "${BUILD_FLAGS[@]}" --split-per-abi; then
+    if flutter_run build apk "${BUILD_FLAGS[@]}" --split-per-abi; then
       apk_dir="$APP_DIR/build/app/outputs/flutter-apk"
       echo "✓ Split APKs built successfully:"
       ls -lh "$apk_dir"/*-${MODE}.apk 2>/dev/null | grep -v "app-${MODE}.apk" || true
     else
       warn "Failed to build split APKs"
+      BUILD_FAILED=true
     fi
     echo ""
   fi
@@ -511,7 +815,11 @@ fi
 
 # Summary
 echo "=========================================="
-echo "✓ Build completed!"
+if [ "$BUILD_FAILED" = true ]; then
+  echo "✗ Build completed with errors"
+else
+  echo "✓ Build completed!"
+fi
 echo "=========================================="
 echo ""
 echo "Build Configuration:"
@@ -554,4 +862,8 @@ fi
 echo "Build outputs are located at:"
 echo "  $APP_DIR/build/app/outputs/"
 echo ""
+
+if [ "$BUILD_FAILED" = true ]; then
+  exit 1
+fi
 

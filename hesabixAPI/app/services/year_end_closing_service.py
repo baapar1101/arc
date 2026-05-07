@@ -10,7 +10,7 @@ import io
 import json
 import zipfile
 from typing import Any, Dict, List, Optional, Tuple
-from datetime import date, timedelta, datetime
+from datetime import date, timedelta, datetime, timezone
 from decimal import Decimal
 import calendar
 
@@ -24,6 +24,7 @@ from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.account import Account
 from adapters.db.models.fiscal_year import FiscalYear
+from adapters.db.models.business import Business
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse import Warehouse
@@ -245,11 +246,64 @@ def _calculate_account_balance(
     
     date_from = fiscal_year.start_date
     
-    # محاسبه مانده ابتدای دوره (از تراز افتتاحیه)
-    opening_query = db.query(
-        func.sum(DocumentLine.debit).label('total_debit'),
-        func.sum(DocumentLine.credit).label('total_credit')
-    ).join(
+    business = db.get(Business, int(business_id))
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+
+    # کلید کش برای کاهش resolve نرخ در حلقه‌ها
+    fx_rate_cache: Dict[int, Decimal] = {}
+
+    def _line_amount_to_base(document: Document, amount: Decimal) -> Decimal:
+        amt = Decimal(str(amount or 0))
+        if amt == 0:
+            return Decimal(0)
+        base_currency_id = business.default_currency_id
+        if not base_currency_id:
+            return amt
+        if int(document.currency_id or 0) == int(base_currency_id):
+            return amt
+
+        doc_id = int(document.id)
+        cached_rate = fx_rate_cache.get(doc_id)
+        if cached_rate is not None:
+            return amt * cached_rate
+
+        rate = Decimal(1)
+        extra = document.extra_info or {}
+        fx = extra.get("fx") if isinstance(extra, dict) else None
+        if isinstance(fx, dict) and not fx.get("skipped") and fx.get("rate") is not None:
+            try:
+                candidate = Decimal(str(fx.get("rate")))
+                if candidate > 0:
+                    rate = candidate
+            except Exception:
+                rate = Decimal(1)
+        else:
+            # در صورت نبود snapshot نرخ روی سند، همان سیاست تسعیر فاکتور را برای fallback استفاده می‌کنیم.
+            try:
+                from app.services.invoice_fx_revaluation import compute_fx_as_of_utc, get_fx_revaluation_policy
+                from app.services.business_currency_rate_service import resolve_rate_to_base
+
+                reg = document.registered_at or datetime.now(timezone.utc)
+                if reg.tzinfo is None:
+                    reg = reg.replace(tzinfo=timezone.utc)
+                policy = get_fx_revaluation_policy(business)
+                as_of = compute_fx_as_of_utc(document.document_date, reg, policy)
+                rate_res = resolve_rate_to_base(
+                    db, int(business_id), int(document.currency_id), as_of
+                )
+                candidate = rate_res.get("rate")
+                candidate_dec = candidate if isinstance(candidate, Decimal) else Decimal(str(candidate))
+                if candidate_dec > 0:
+                    rate = candidate_dec
+            except Exception:
+                rate = Decimal(1)
+
+        fx_rate_cache[doc_id] = rate
+        return amt * rate
+
+    # محاسبه مانده ابتدای دوره (از تراز افتتاحیه) به ارز پایه
+    opening_rows = db.query(DocumentLine, Document).join(
         Document, DocumentLine.document_id == Document.id
     ).filter(
         and_(
@@ -259,17 +313,16 @@ def _calculate_account_balance(
             DocumentLine.account_id == account_id,
             Document.is_proforma == False,
         )
-    )
-    
-    opening_result = opening_query.first()
-    opening_debit = Decimal(str(opening_result.total_debit or 0))
-    opening_credit = Decimal(str(opening_result.total_credit or 0))
-    
-    # محاسبه گردش دوره
-    period_query = db.query(
-        func.sum(DocumentLine.debit).label('total_debit'),
-        func.sum(DocumentLine.credit).label('total_credit')
-    ).join(
+    ).all()
+
+    opening_debit = Decimal(0)
+    opening_credit = Decimal(0)
+    for line, document in opening_rows:
+        opening_debit += _line_amount_to_base(document, Decimal(str(line.debit or 0)))
+        opening_credit += _line_amount_to_base(document, Decimal(str(line.credit or 0)))
+
+    # محاسبه گردش دوره به ارز پایه
+    period_rows = db.query(DocumentLine, Document).join(
         Document, DocumentLine.document_id == Document.id
     ).filter(
         and_(
@@ -281,11 +334,13 @@ def _calculate_account_balance(
             Document.is_proforma == False,
             Document.document_type != "opening_balance",  # تراز افتتاحیه جدا محاسبه شد
         )
-    )
-    
-    period_result = period_query.first()
-    period_debit = Decimal(str(period_result.total_debit or 0))
-    period_credit = Decimal(str(period_result.total_credit or 0))
+    ).all()
+
+    period_debit = Decimal(0)
+    period_credit = Decimal(0)
+    for line, document in period_rows:
+        period_debit += _line_amount_to_base(document, Decimal(str(line.debit or 0)))
+        period_credit += _line_amount_to_base(document, Decimal(str(line.credit or 0)))
     
     # محاسبه مانده نهایی
     account = db.query(Account).filter(Account.id == account_id).first()
@@ -528,18 +583,22 @@ async def close_fiscal_year(
         retained_earnings_balance_check['period_debit'] - retained_earnings_balance_check['period_credit']
     )
     
-    # دریافت ارز پیش‌فرض (از اولین سند سال مالی)
-    first_doc = db.query(Document).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.fiscal_year_id == fiscal_year_id,
-        )
-    ).order_by(Document.id.asc()).first()
-    
-    if not first_doc:
-        raise ApiError("NO_DOCUMENTS_FOUND", "هیچ سندی در این سال مالی یافت نشد", http_status=400)
-    
-    currency_id = first_doc.currency_id
+    # ارز سند اختتامیه باید ارز پایه کسب‌وکار باشد تا با مانده‌های تسعیرشده هم‌راستا بماند.
+    business = db.get(Business, int(business_id))
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    currency_id = business.default_currency_id
+    if not currency_id:
+        # fallback برای کسب‌وکارهای قدیمی بدون ارز پایه
+        first_doc = db.query(Document).filter(
+            and_(
+                Document.business_id == business_id,
+                Document.fiscal_year_id == fiscal_year_id,
+            )
+        ).order_by(Document.id.asc()).first()
+        if not first_doc:
+            raise ApiError("NO_DOCUMENTS_FOUND", "هیچ سندی در این سال مالی یافت نشد", http_status=400)
+        currency_id = first_doc.currency_id
     
     # ساخت خطوط سند بستن سال مالی
     doc_repo = DocumentRepository(db)
@@ -1229,6 +1288,9 @@ def _create_opening_balance_for_new_fiscal_year(
     
     # تاریخ پایان سال مالی قبلی
     date_to = old_fiscal_year.end_date
+    from app.services.person_service import amount_in_document_currency_to_base
+    fx_rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
 
     ar_account = _get_fixed_account_by_code(db, "13101")
     ap_account = _get_fixed_account_by_code(db, "21101")
@@ -1337,11 +1399,8 @@ def _create_opening_balance_for_new_fiscal_year(
         if omit_inventory_gl_aggregate and acc_id == inventory_account_fixed.id:
             continue
             
-        # محاسبه مانده حساب تا پایان سال مالی قبلی (از تمام اسناد)
-        account_balance_query = db.query(
-            func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-            func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-        ).join(
+        # محاسبه مانده حساب تا پایان سال مالی قبلی (از تمام اسناد) به ارز پایه
+        account_rows = db.query(DocumentLine, Document).join(
             Document, DocumentLine.document_id == Document.id
         ).filter(
             and_(
@@ -1351,11 +1410,25 @@ def _create_opening_balance_for_new_fiscal_year(
                 Document.document_date <= date_to,
                 Document.is_proforma == False,
             )
-        )
-        
-        account_result = account_balance_query.first()
-        total_debit = Decimal(str(account_result.total_debit or 0))
-        total_credit = Decimal(str(account_result.total_credit or 0))
+        ).all()
+
+        total_debit = Decimal(0)
+        total_credit = Decimal(0)
+        for line, doc in account_rows:
+            total_debit += amount_in_document_currency_to_base(
+                db,
+                doc,
+                line.debit,
+                rate_cache=fx_rate_cache,
+                base_currency_by_business=base_currency_by_business,
+            )
+            total_credit += amount_in_document_currency_to_base(
+                db,
+                doc,
+                line.credit,
+                rate_cache=fx_rate_cache,
+                base_currency_by_business=base_currency_by_business,
+            )
         closing_balance = total_debit - total_credit
         
         # اگر مانده صفر است، از لیست خارج کن
@@ -1382,11 +1455,8 @@ def _create_opening_balance_for_new_fiscal_year(
     persons = db.query(Person).filter(Person.business_id == business_id).all()
     
     for person in persons:
-        # محاسبه مانده شخص تا پایان سال مالی قبلی
-        person_balance_query = db.query(
-            func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-            func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-        ).join(
+        # محاسبه مانده شخص تا پایان سال مالی قبلی به ارز پایه
+        person_rows = db.query(DocumentLine, Document).join(
             Document, DocumentLine.document_id == Document.id
         ).filter(
             and_(
@@ -1396,11 +1466,25 @@ def _create_opening_balance_for_new_fiscal_year(
                 Document.document_date <= date_to,
                 Document.is_proforma == False,
             )
-        )
-        
-        person_result = person_balance_query.first()
-        person_debit = Decimal(str(person_result.total_debit or 0))
-        person_credit = Decimal(str(person_result.total_credit or 0))
+        ).all()
+
+        person_debit = Decimal(0)
+        person_credit = Decimal(0)
+        for line, doc in person_rows:
+            person_debit += amount_in_document_currency_to_base(
+                db,
+                doc,
+                line.debit,
+                rate_cache=fx_rate_cache,
+                base_currency_by_business=base_currency_by_business,
+            )
+            person_credit += amount_in_document_currency_to_base(
+                db,
+                doc,
+                line.credit,
+                rate_cache=fx_rate_cache,
+                base_currency_by_business=base_currency_by_business,
+            )
         person_balance = person_debit - person_credit
         
         # اگر مانده صفر است، از لیست خارج کن
@@ -1428,15 +1512,8 @@ def _create_opening_balance_for_new_fiscal_year(
                 'description': f'مانده ابتدای دوره - {person.alias_name}',
             })
     
-    # محاسبه مانده حساب‌های بانکی و صندوق
-    bank_cash_query = db.query(
-        DocumentLine.bank_account_id,
-        DocumentLine.cash_register_id,
-        DocumentLine.petty_cash_id,
-        DocumentLine.account_id,
-        func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-        func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-    ).join(
+    # محاسبه مانده حساب‌های بانکی و صندوق به ارز پایه
+    bank_cash_rows = db.query(DocumentLine, Document).join(
         Document, DocumentLine.document_id == Document.id
     ).filter(
         and_(
@@ -1450,18 +1527,36 @@ def _create_opening_balance_for_new_fiscal_year(
                 DocumentLine.petty_cash_id.isnot(None),
             ),
         )
-    ).group_by(
-        DocumentLine.bank_account_id,
-        DocumentLine.cash_register_id,
-        DocumentLine.petty_cash_id,
-        DocumentLine.account_id,
+    ).all()
+
+    bank_cash_totals: Dict[Tuple[Optional[int], Optional[int], Optional[int], Optional[int]], Dict[str, Decimal]] = defaultdict(
+        lambda: {"debit": Decimal(0), "credit": Decimal(0)}
     )
-    
-    bank_cash_results = bank_cash_query.all()
-    
-    for result in bank_cash_results:
-        total_debit = Decimal(str(result.total_debit or 0))
-        total_credit = Decimal(str(result.total_credit or 0))
+    for line, doc in bank_cash_rows:
+        key = (
+            line.bank_account_id,
+            line.cash_register_id,
+            line.petty_cash_id,
+            line.account_id,
+        )
+        bank_cash_totals[key]["debit"] += amount_in_document_currency_to_base(
+            db,
+            doc,
+            line.debit,
+            rate_cache=fx_rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+        bank_cash_totals[key]["credit"] += amount_in_document_currency_to_base(
+            db,
+            doc,
+            line.credit,
+            rate_cache=fx_rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+
+    for (bank_account_id, cash_register_id, petty_cash_id, account_id), totals in bank_cash_totals.items():
+        total_debit = totals["debit"]
+        total_credit = totals["credit"]
         balance = total_debit - total_credit
         
         # اگر مانده صفر است، از لیست خارج کن
@@ -1469,20 +1564,20 @@ def _create_opening_balance_for_new_fiscal_year(
             continue
         
         line_data = {
-            'account_id': result.account_id,
+            'account_id': account_id,
             'debit': float(balance) if balance > 0 else 0.0,
             'credit': float(-balance) if balance < 0 else 0.0,
             'description': 'مانده ابتدای دوره',
         }
         
-        if result.bank_account_id:
-            line_data['bank_account_id'] = result.bank_account_id
+        if bank_account_id:
+            line_data['bank_account_id'] = bank_account_id
             line_data['description'] = f'مانده ابتدای دوره - حساب بانکی'
-        elif result.cash_register_id:
-            line_data['cash_register_id'] = result.cash_register_id
+        elif cash_register_id:
+            line_data['cash_register_id'] = cash_register_id
             line_data['description'] = f'مانده ابتدای دوره - صندوق'
-        elif result.petty_cash_id:
-            line_data['petty_cash_id'] = result.petty_cash_id
+        elif petty_cash_id:
+            line_data['petty_cash_id'] = petty_cash_id
             line_data['description'] = f'مانده ابتدای دوره - تنخواه'
         
         account_lines.append(line_data)

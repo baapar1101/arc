@@ -51,7 +51,7 @@ class QuickSalesPage extends StatefulWidget {
   State<QuickSalesPage> createState() => _QuickSalesPageState();
 }
 
-class _QuickSalesPageState extends State<QuickSalesPage> {
+class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProviderStateMixin {
   static const double _mobileBreakpoint = 700.0;
   /// نمایشگرهای خیلی باریک (مثلاً آیفون ۶ ~۳۷۵pt، SE قدیمی ~۳۲۰pt)
   static const double _compactBreakpoint = 400.0;
@@ -112,6 +112,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   final TextEditingController _barcodeController = TextEditingController();
   final FocusNode _barcodeFocus = FocusNode();
   final FocusNode _keyboardListenerFocus = FocusNode();
+  final LayerLink _barcodeFieldLayerLink = LayerLink();
+  final ScrollController _barcodeOverlayScrollController = ScrollController();
+  OverlayEntry? _barcodeOverlayEntry;
+  List<Map<String, dynamic>> _barcodeSuggestions = const <Map<String, dynamic>>[];
+  bool _barcodeSuggestionsLoading = false;
+  int _barcodeHighlightedIndex = -1;
+  late final TabController _mobileTabController;
+  int _mobileTabIndex = 0;
   Timer? _searchDebounce;
   String? _lastFailedSearchQuery; // آخرین جستجوی ناموفق برای نمایش دکمه افزودن کالا
   
@@ -125,6 +133,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   @override
   void initState() {
     super.initState();
+    _mobileTabController = TabController(length: 3, vsync: this, initialIndex: _mobileTabIndex);
+    _mobileTabController.addListener(() {
+      _mobileTabIndex = _mobileTabController.index;
+    });
     _globalDiscountValueController = TextEditingController();
     _globalDiscountValueController.addListener(() {
       if (mounted) setState(() {});
@@ -132,6 +144,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     _loadSettings();
     _loadRecentProducts();
     _loadCategories();
+    _barcodeFocus.addListener(_onBarcodeFocusChanged);
     // فوکوس خودکار روی فیلد بارکد
     // فوکوس خودکار روی فیلد بارکد؛ در حالت ریل دسکتاپ فضای بیشتر با جمع شدن نوار کناری
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -243,9 +256,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
   void dispose() {
     _restoreDesktopRailAfterQuit?.call();
     _searchDebounce?.cancel();
+    _removeBarcodeOverlay();
+    _mobileTabController.dispose();
     _barcodeController.dispose();
     _documentDescriptionController.dispose();
     _globalDiscountValueController.dispose();
+    _barcodeOverlayScrollController.dispose();
+    _barcodeFocus.removeListener(_onBarcodeFocusChanged);
     _barcodeFocus.dispose();
     _keyboardListenerFocus.dispose();
     super.dispose();
@@ -1380,10 +1397,259 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
     return ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 
+  bool get _isDesktopLike => MediaQuery.sizeOf(context).width >= _mobileBreakpoint;
+
+  void _onBarcodeFocusChanged() {
+    if (!mounted || !_isDesktopLike) return;
+    if (_barcodeFocus.hasFocus) {
+      _showBarcodeOverlay();
+      _scheduleBarcodeSuggestionSearch(_barcodeController.text);
+    } else {
+      Future.delayed(const Duration(milliseconds: 160), () {
+        if (!mounted || _barcodeFocus.hasFocus) return;
+        _removeBarcodeOverlay();
+      });
+    }
+  }
+
+  void _showBarcodeOverlay() {
+    if (!mounted || !_isDesktopLike) return;
+    if (_barcodeOverlayEntry != null) {
+      _barcodeOverlayEntry!.markNeedsBuild();
+      return;
+    }
+    final overlay = Overlay.of(context);
+    _barcodeOverlayEntry = OverlayEntry(
+      builder: (context) => _buildBarcodeOverlay(context),
+    );
+    overlay.insert(_barcodeOverlayEntry!);
+  }
+
+  void _removeBarcodeOverlay() {
+    _barcodeOverlayEntry?.remove();
+    _barcodeOverlayEntry = null;
+    _barcodeHighlightedIndex = -1;
+  }
+
+  Widget _buildBarcodeOverlay(BuildContext overlayContext) {
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () {
+              _barcodeFocus.unfocus();
+              _removeBarcodeOverlay();
+            },
+          ),
+        ),
+        CompositedTransformFollower(
+          link: _barcodeFieldLayerLink,
+          showWhenUnlinked: false,
+          targetAnchor: Alignment.bottomLeft,
+          followerAnchor: Alignment.topLeft,
+          offset: const Offset(0, 6),
+          child: Material(
+            elevation: 10,
+            borderRadius: BorderRadius.circular(10),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 620, maxHeight: 320, minWidth: 300),
+              child: _buildBarcodeSuggestionList(overlayContext),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBarcodeSuggestionList(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (_barcodeSuggestionsLoading && _barcodeSuggestions.isEmpty) {
+      return const SizedBox(
+        height: 110,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (!_barcodeSuggestionsLoading && _barcodeSuggestions.isEmpty) {
+      return const SizedBox(
+        height: 90,
+        child: Center(child: Text('کالایی یافت نشد')),
+      );
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_barcodeSuggestionsLoading) const LinearProgressIndicator(minHeight: 2),
+        Flexible(
+          child: ListView.separated(
+            controller: _barcodeOverlayScrollController,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            itemCount: _barcodeSuggestions.length,
+            separatorBuilder: (_, __) => Divider(height: 1, color: cs.outline.withOpacity(0.2)),
+            itemBuilder: (context, index) {
+              final product = _barcodeSuggestions[index];
+              final selected = index == _barcodeHighlightedIndex;
+              final name = product['name']?.toString() ?? 'نامشخص';
+              final code = product['code']?.toString() ?? '';
+              return Material(
+                color: selected ? cs.primary.withOpacity(0.10) : Colors.transparent,
+                child: ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.inventory_2_outlined),
+                  title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: code.isNotEmpty ? Text('کد: $code') : null,
+                  onTap: () => _selectBarcodeSuggestion(product),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _scheduleBarcodeSuggestionSearch(String rawQuery) {
+    if (!_isDesktopLike) return;
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 220), () {
+      _loadBarcodeSuggestions(rawQuery.trim());
+    });
+  }
+
+  Future<void> _loadBarcodeSuggestions(String query) async {
+    if (!mounted || !_isDesktopLike) return;
+    if (query.isEmpty) {
+      setState(() {
+        _barcodeSuggestions = const <Map<String, dynamic>>[];
+        _barcodeSuggestionsLoading = false;
+        _barcodeHighlightedIndex = -1;
+      });
+      _barcodeOverlayEntry?.markNeedsBuild();
+      return;
+    }
+    setState(() => _barcodeSuggestionsLoading = true);
+    _barcodeOverlayEntry?.markNeedsBuild();
+    try {
+      final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
+      final products = await _productService.searchProducts(
+        businessId: widget.businessId,
+        searchQuery: query,
+        limit: 10,
+        searchFields: const ['code', 'barcode', 'name', 'general_barcodes'],
+        categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
+      );
+      if (!mounted) return;
+      setState(() {
+        _barcodeSuggestions = products;
+        _barcodeHighlightedIndex = products.isEmpty ? -1 : 0;
+      });
+      _ensureHighlightedSuggestionVisible();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _barcodeSuggestions = const <Map<String, dynamic>>[];
+        _barcodeHighlightedIndex = -1;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _barcodeSuggestionsLoading = false);
+        _barcodeOverlayEntry?.markNeedsBuild();
+      }
+    }
+  }
+
+  void _moveSuggestionHighlight(int delta) {
+    if (_barcodeSuggestions.isEmpty) return;
+    var idx = _barcodeHighlightedIndex;
+    if (idx < 0 || idx >= _barcodeSuggestions.length) {
+      idx = delta > 0 ? 0 : _barcodeSuggestions.length - 1;
+    } else {
+      idx = (idx + delta).clamp(0, _barcodeSuggestions.length - 1);
+    }
+    if (idx == _barcodeHighlightedIndex) return;
+    setState(() => _barcodeHighlightedIndex = idx);
+    _barcodeOverlayEntry?.markNeedsBuild();
+    _ensureHighlightedSuggestionVisible();
+  }
+
+  void _ensureHighlightedSuggestionVisible() {
+    if (_barcodeHighlightedIndex < 0 || !_barcodeOverlayScrollController.hasClients) return;
+    const itemExtent = 56.0;
+    final pos = _barcodeOverlayScrollController.position;
+    final target = _barcodeHighlightedIndex * itemExtent;
+    final bottom = pos.pixels + pos.viewportDimension - itemExtent;
+    if (target < pos.pixels) {
+      _barcodeOverlayScrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+      );
+    } else if (target > bottom) {
+      _barcodeOverlayScrollController.animateTo(
+        target - pos.viewportDimension + itemExtent,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  Future<void> _selectHighlightedBarcodeSuggestion() async {
+    if (_barcodeSuggestions.isEmpty) return;
+    final idx = (_barcodeHighlightedIndex >= 0 &&
+            _barcodeHighlightedIndex < _barcodeSuggestions.length)
+        ? _barcodeHighlightedIndex
+        : 0;
+    await _selectBarcodeSuggestion(_barcodeSuggestions[idx]);
+  }
+
+  Future<void> _selectBarcodeSuggestion(Map<String, dynamic> product) async {
+    await _addToCart(product);
+    await _saveRecentProduct(product);
+    if (!mounted) return;
+    _barcodeController.clear();
+    _barcodeSuggestions = const <Map<String, dynamic>>[];
+    _barcodeHighlightedIndex = -1;
+    _barcodeFocus.requestFocus();
+    _barcodeOverlayEntry?.markNeedsBuild();
+    setState(() {
+      _lastFailedSearchQuery = null;
+    });
+    SnackBarHelper.show(
+      context,
+      message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
+    );
+  }
+
   bool _handleKeyEvent(KeyEvent event) {
     if (event is KeyDownEvent) {
       final isControlPressed = HardwareKeyboard.instance.isControlPressed;
       final isMetaPressed = HardwareKeyboard.instance.isMetaPressed;
+
+      // ناوبری لیست پیشنهادهای جستجو در دسکتاپ
+      if (_barcodeFocus.hasFocus && _barcodeOverlayEntry != null) {
+        if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+          _moveSuggestionHighlight(1);
+          return true;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+          _moveSuggestionHighlight(-1);
+          return true;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+          if (_barcodeSuggestions.isNotEmpty) {
+            unawaited(_selectHighlightedBarcodeSuggestion());
+            return true;
+          }
+        }
+        if (event.logicalKey == LogicalKeyboardKey.escape) {
+          if (_barcodeController.text.isNotEmpty || _barcodeSuggestions.isNotEmpty) {
+            _removeBarcodeOverlay();
+            return true;
+          }
+        }
+      }
       
       // Enter: ثبت فاکتور
       if (event.logicalKey == LogicalKeyboardKey.enter &&
@@ -1771,10 +2037,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
           ),
         ],
       ),
-      bottomNavigationBar: isMobile ? _buildMobileBottomBar(cs) : null,
+      bottomNavigationBar: null,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isCompact = constraints.maxWidth < _compactBreakpoint;
+          if (isMobile) {
+            return _buildMobileTabbedLayout(cs, isCompact: isCompact);
+          }
           final cartColumn = Column(
             children: [
               // جستجوی بارکد
@@ -2138,14 +2407,6 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
               ],
             );
 
-          if (isMobile) {
-            return Column(
-              children: [
-                Expanded(child: cartColumn),
-              ],
-            );
-          }
-
           return Row(
             children: [
               // ستون چپ: سبد خرید
@@ -2157,6 +2418,394 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
         },
       ),
       ),
+    );
+  }
+
+  Widget _buildMobileTabbedLayout(ColorScheme cs, {required bool isCompact}) {
+    return Column(
+      children: [
+        Material(
+          color: cs.surface,
+          child: TabBar(
+            controller: _mobileTabController,
+            tabs: const [
+              Tab(icon: Icon(Icons.shopping_cart_outlined), text: 'اقلام'),
+              Tab(icon: Icon(Icons.description_outlined), text: 'اطلاعات سند'),
+              Tab(icon: Icon(Icons.payments_outlined), text: 'پرداخت و ثبت'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _mobileTabController,
+            children: [
+              _buildMobileItemsTab(cs, isCompact: isCompact),
+              _buildMobileDocumentInfoTab(cs, isCompact: isCompact),
+              _buildMobileCheckoutTab(cs),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileItemsTab(ColorScheme cs, {required bool isCompact}) {
+    return Column(
+      children: [
+        Container(
+          padding: EdgeInsets.all(isCompact ? 12 : 16),
+          color: cs.surfaceContainerHighest,
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  if (_showInventory &&
+                      _cartItems.any((item) => item.trackInventory && item.productId != null))
+                    IconButton(
+                      icon: _loadingStocks
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh),
+                      onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
+                      tooltip: 'به‌روزرسانی موجودی',
+                    ),
+                  Expanded(child: _buildBarcodeSearchField(compact: isCompact)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        if (_recentProducts.isNotEmpty && _cartItems.isEmpty)
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 16, vertical: 8),
+            color: cs.surfaceContainerHighest,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.history, size: 18, color: cs.onSurface.withOpacity(0.7)),
+                    const SizedBox(width: 8),
+                    Text(
+                      'محصولات اخیر',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 60,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _recentProducts.length,
+                    itemBuilder: (context, index) {
+                      final product = _recentProducts[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: InkWell(
+                          onTap: () async {
+                            try {
+                              final productId = (product['id'] as num?)?.toInt();
+                              if (productId != null) {
+                                final fullProduct = await _productService.getProduct(
+                                  businessId: widget.businessId,
+                                  productId: productId,
+                                );
+                                await _addToCart(fullProduct);
+                                await _saveRecentProduct(fullProduct);
+                                if (mounted) {
+                                  SnackBarHelper.show(
+                                    context,
+                                    message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
+                                  );
+                                }
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                SnackBarHelper.show(
+                                  context,
+                                  message:
+                                      'خطا در افزودن محصول: ${ErrorExtractor.forContext(e, context)}',
+                                  isError: true,
+                                );
+                              }
+                            }
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: cs.surface,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: cs.outline.withOpacity(0.3)),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  product['name']?.toString() ?? 'نامشخص',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${_formatNumber(_toNum(product['base_sales_price'] ?? product['sales_price']))}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: cs.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Expanded(
+          child: _cartItems.isEmpty
+              ? Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: Column(
+                      key: ValueKey(_recentProducts.isEmpty),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.shopping_cart_outlined, size: 64, color: cs.outline),
+                        const SizedBox(height: 16),
+                        Text('سبد خرید خالی است', style: TextStyle(color: cs.outline)),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView.builder(
+                  padding: EdgeInsets.all(isCompact ? 6 : 8),
+                  itemCount: _cartItems.length,
+                  itemBuilder: (context, index) {
+                    final item = _cartItems[index];
+                    final hasInsufficientStock = _hasInsufficientStock(item);
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeInOut,
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      child: Card(
+                        color: hasInsufficientStock ? cs.errorContainer.withOpacity(0.3) : null,
+                        child: InkWell(
+                          onTap: () => _editCartItem(index),
+                          child: Padding(
+                            padding: EdgeInsets.all(isCompact ? 6 : 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (_showInventory && hasInsufficientStock)
+                                  Container(
+                                    padding:
+                                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    decoration: BoxDecoration(
+                                      color: cs.errorContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.warning_amber_rounded,
+                                          size: 16,
+                                          color: cs.onErrorContainer,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'موجودی کافی نیست! موجودی: ${_formatNumber(_getProductStock(item.productId) ?? 0)}، درخواست: ${_formatNumber(item.quantity)}',
+                                            style: TextStyle(
+                                              fontSize: isCompact ? 11 : 12,
+                                              color: cs.onErrorContainer,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            item.productName ?? 'نامشخص',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: isCompact ? 14 : 16,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'کد: ${item.productCode ?? '-'}',
+                                            style: TextStyle(
+                                              color: cs.onSurface.withOpacity(0.7),
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          if (_showPurchasePrice &&
+                                              item.basePurchasePriceMainUnit != null)
+                                            Padding(
+                                              padding: const EdgeInsets.only(top: 4),
+                                              child: Text(
+                                                'قیمت خرید: ${_formatNumber(item.basePurchasePriceMainUnit!)}',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: cs.onSurface.withOpacity(0.6),
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                            ),
+                                          if (_showInventory &&
+                                              item.trackInventory &&
+                                              item.productId != null &&
+                                              item.extraInfo?['instance_id'] == null)
+                                            Builder(
+                                              builder: (context) {
+                                                final stock = _getProductStock(item.productId);
+                                                if (stock == null &&
+                                                    !_loadingStocks &&
+                                                    _defaultWarehouseId != null) {
+                                                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                    if (mounted && _showInventory) {
+                                                      _loadProductStock(item.productId!);
+                                                    }
+                                                  });
+                                                }
+                                                final insufficient =
+                                                    stock != null && stock < item.quantity;
+                                                return Padding(
+                                                  padding: const EdgeInsets.only(top: 4),
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        insufficient
+                                                            ? Icons.warning
+                                                            : Icons.inventory_2,
+                                                        size: 14,
+                                                        color: insufficient
+                                                            ? cs.error
+                                                            : cs.onSurface.withOpacity(0.6),
+                                                      ),
+                                                      const SizedBox(width: 4),
+                                                      Text(
+                                                        stock != null
+                                                            ? 'موجودی: ${_formatNumber(stock)}'
+                                                            : 'در حال بررسی موجودی...',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                          color: insufficient
+                                                              ? cs.error
+                                                              : cs.onSurface.withOpacity(0.6),
+                                                          fontWeight: insufficient
+                                                              ? FontWeight.bold
+                                                              : FontWeight.normal,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, size: 20),
+                                      onPressed: () => _editCartItem(index),
+                                      tooltip: 'ویرایش',
+                                      visualDensity: isCompact
+                                          ? VisualDensity.compact
+                                          : VisualDensity.standard,
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete, size: 20),
+                                      onPressed: () => _removeFromCart(index),
+                                      tooltip: 'حذف',
+                                      visualDensity: isCompact
+                                          ? VisualDensity.compact
+                                          : VisualDensity.standard,
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: isCompact ? 6 : 8),
+                                _buildCartItemQuantityAndTotals(
+                                  item: item,
+                                  index: index,
+                                  cs: cs,
+                                  compact: isCompact,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileDocumentInfoTab(ColorScheme cs, {required bool isCompact}) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(isCompact ? 12 : 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CustomerComboboxWidget(
+            selectedCustomer: _selectedCustomer,
+            onCustomerChanged: (customer) {
+              setState(() {
+                _selectedCustomer = customer ?? _anonymousCustomer;
+              });
+            },
+            businessId: widget.businessId,
+            authStore: widget.authStore,
+            isRequired: false,
+            label: 'مشتری',
+            hintText: 'مشتری ناشناس',
+          ),
+          const SizedBox(height: 12),
+          _buildDocumentDateAndDescription(isMobile: true, compact: isCompact),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMobileCheckoutTab(ColorScheme cs) {
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 12),
+      children: [
+        _buildInvoiceSummarySection(cs),
+        const Divider(),
+        _buildPaymentSection(cs),
+        const SizedBox(height: 8),
+        _buildCheckoutButtons(cs),
+      ],
     );
   }
 
@@ -2172,50 +2821,65 @@ class _QuickSalesPageState extends State<QuickSalesPage> {
       visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
     );
 
-    Widget searchField = TextField(
-      controller: _barcodeController,
-      focusNode: _barcodeFocus,
-      decoration: InputDecoration(
-        labelText: compact ? 'جستجوی کالا' : 'بارکد / کد / نام محصول',
-        hintText: compact ? 'کد، نام یا بارکد' : 'اسکن یا وارد کردن بارکد، کد یا نام',
-        prefixIcon: compact ? null : const Icon(Icons.qr_code_scanner),
-        isDense: compact,
-        border: const OutlineInputBorder(),
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_supportsInlineCameraScan)
+    Widget searchField = CompositedTransformTarget(
+      link: _barcodeFieldLayerLink,
+      child: TextField(
+        controller: _barcodeController,
+        focusNode: _barcodeFocus,
+        decoration: InputDecoration(
+          labelText: compact ? 'جستجوی کالا' : 'بارکد / کد / نام محصول',
+          hintText: compact ? 'کد، نام یا بارکد' : 'اسکن یا وارد کردن بارکد، کد یا نام',
+          prefixIcon: compact ? null : const Icon(Icons.qr_code_scanner),
+          isDense: compact,
+          border: const OutlineInputBorder(),
+          suffixIcon: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_supportsInlineCameraScan)
+                IconButton(
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  tooltip: 'اسکن بارکد یا QR با دوربین',
+                  onPressed: _scanBarcodeWithCamera,
+                  visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                ),
+              if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.add_circle, color: Colors.green),
+                  tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
+                  onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
+                  visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                ),
               IconButton(
-                icon: const Icon(Icons.photo_camera_outlined),
-                tooltip: 'اسکن بارکد یا QR با دوربین',
-                onPressed: _scanBarcodeWithCamera,
+                icon: const Icon(Icons.search),
+                onPressed: () => _searchByBarcode(_barcodeController.text),
+                tooltip: 'جستجو',
                 visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
               ),
-            if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.add_circle, color: Colors.green),
-                tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
-                onPressed: () => _openAddProductDialog(_lastFailedSearchQuery!),
-                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
-              ),
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () => _searchByBarcode(_barcodeController.text),
-              tooltip: 'جستجو',
-              visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
-            ),
-          ],
+            ],
+          ),
         ),
+        onSubmitted: (value) {
+          if (_barcodeOverlayEntry != null && _barcodeSuggestions.isNotEmpty) {
+            unawaited(_selectHighlightedBarcodeSuggestion());
+          } else {
+            _searchByBarcode(value);
+          }
+        },
+        onChanged: (value) {
+          if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
+            setState(() {
+              _lastFailedSearchQuery = null;
+            });
+          }
+          if (_isDesktopLike) {
+            if (_barcodeOverlayEntry == null && _barcodeFocus.hasFocus) {
+              _showBarcodeOverlay();
+            }
+            _scheduleBarcodeSuggestionSearch(value);
+          }
+        },
+        textInputAction: TextInputAction.search,
       ),
-      onSubmitted: _searchByBarcode,
-      onChanged: (value) {
-        if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
-          setState(() {
-            _lastFailedSearchQuery = null;
-          });
-        }
-      },
-      textInputAction: TextInputAction.search,
     );
 
     final categoryChip = _selectedCategoryId != null
