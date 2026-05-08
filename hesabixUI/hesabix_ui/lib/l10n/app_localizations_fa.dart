@@ -12113,4 +12113,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get mobileLauncherGridPreview => 'پیش‌نمایش';
+
+  @override
+  String get mobileLauncherQuickSalesTile => 'فروش سریع';
 }

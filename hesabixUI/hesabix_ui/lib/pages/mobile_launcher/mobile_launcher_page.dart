@@ -174,6 +174,8 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
           final preferredColumns = snap.data?.$2 ?? MobileLauncherPrefs.defaultGridColumns;
           final preferredRows = snap.data?.$3 ?? MobileLauncherPrefs.defaultGridRows;
           final businessName = snap.data?.$4;
+          final canOpenQuickSales =
+              widget.authStore.hasBusinessPermission('invoices', 'add');
           final bg = Color(argb);
           final onBg = _isLight(bg) ? Colors.black87 : Colors.white;
           final cardBg = _isLight(bg)
@@ -325,6 +327,22 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
                             '/business/${widget.businessId}/dashboard',
                           ),
                         ),
+                      _LauncherTile(
+                        icon: Icons.point_of_sale_outlined,
+                        label: t.mobileLauncherQuickSalesTile,
+                        bg: cardBg,
+                        borderColor: cardBorder,
+                        fg: onBg,
+                        enabled: canOpenQuickSales,
+                        onTap: canOpenQuickSales
+                            ? () => context.go(
+                                  '/business/${widget.businessId}/quick-sales',
+                                )
+                            : () => SnackBarHelper.showError(
+                                  context,
+                                  message: t.noPermission,
+                                ),
+                      ),
                       ],
                     ),
                   ),
@@ -346,6 +364,7 @@ class _LauncherTile extends StatelessWidget {
     required this.borderColor,
     required this.fg,
     required this.onTap,
+    this.enabled = true,
   });
 
   final IconData icon;
@@ -354,6 +373,7 @@ class _LauncherTile extends StatelessWidget {
   final Color borderColor;
   final Color fg;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -362,10 +382,10 @@ class _LauncherTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        splashColor: fg.withValues(alpha: 0.12),
+        splashColor: enabled ? fg.withValues(alpha: 0.12) : Colors.transparent,
         child: Ink(
           decoration: BoxDecoration(
-            color: bg,
+            color: enabled ? bg : bg.withValues(alpha: 0.45),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: borderColor),
             boxShadow: [
@@ -381,7 +401,11 @@ class _LauncherTile extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(icon, size: 36, color: fg),
+                Icon(
+                  icon,
+                  size: 36,
+                  color: enabled ? fg : fg.withValues(alpha: 0.5),
+                ),
                 const SizedBox(height: 8),
                 Text(
                   label,
@@ -389,7 +413,7 @@ class _LauncherTile extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: fg,
+                        color: enabled ? fg : fg.withValues(alpha: 0.58),
                         fontWeight: FontWeight.w600,
                       ),
                 ),

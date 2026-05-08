@@ -4641,5 +4641,6 @@
   "mobileLauncherGridLayoutSection": "Grid layout",
   "mobileLauncherGridColumns": "Columns",
   "mobileLauncherGridRows": "Rows",
-  "mobileLauncherGridPreview": "Preview"
+  "mobileLauncherGridPreview": "Preview",
+  "mobileLauncherQuickSalesTile": "Quick sales"
 }

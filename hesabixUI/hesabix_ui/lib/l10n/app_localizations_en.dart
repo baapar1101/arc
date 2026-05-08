@@ -12177,4 +12177,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mobileLauncherGridPreview => 'Preview';
+
+  @override
+  String get mobileLauncherQuickSalesTile => 'Quick sales';
 }

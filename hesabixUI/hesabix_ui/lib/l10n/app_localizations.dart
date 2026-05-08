@@ -22630,6 +22630,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preview'**
   String get mobileLauncherGridPreview;
+
+  /// No description provided for @mobileLauncherQuickSalesTile.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sales'**
+  String get mobileLauncherQuickSalesTile;
 }
 
 class _AppLocalizationsDelegate
