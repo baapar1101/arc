@@ -110,6 +110,26 @@ class Hesabix_V2_Activator
 		add_option('hesabix_v2_opening_inventory_completed', false);
 		add_option('hesabix_v2_opening_inventory_prefs', array());
 
+		add_option(
+			'hesabix_v2_stock_pull',
+			array(
+				'enabled' => false,
+				'warehouse_scope' => 'default',
+				'warehouse_ids' => array(),
+				'cron_minutes' => 15,
+				'force_manage_stock' => true,
+				'disable_wc_stock_reduction' => false,
+			)
+		);
+
+		add_option(
+			'hesabix_v2_invoice_warehouse_rules',
+			array(
+				'resolution' => 'default',
+				'rules' => array(),
+			)
+		);
+
 		// Default sync settings
 		$default_sync_settings = array(
 			'auto_sync_products' => true,

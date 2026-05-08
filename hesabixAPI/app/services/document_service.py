@@ -19,6 +19,32 @@ from app.services.document_monetization_service import process_document_usage_fo
 
 logger = logging.getLogger(__name__)
 
+RECEIVED_LOAN_FACILITY_DOC_SOURCE = "received_loan_facility"
+
+
+def _is_received_loan_facility_manual_document(document: Any) -> bool:
+    ex = getattr(document, "extra_info", None)
+    if not isinstance(ex, dict):
+        return False
+    return ex.get("source") == RECEIVED_LOAN_FACILITY_DOC_SOURCE
+
+
+def _assert_received_loan_manual_fiscal_year_editable(db: Session, document: Any) -> None:
+    """اسناد تسهیلات دستی مانند اسناد فاکتور فقط در سال مالی آخر صف قابل حذف/ویرایش اند."""
+    if not _is_received_loan_facility_manual_document(document):
+        return
+    from adapters.db.models.fiscal_year import FiscalYear
+
+    fy = db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
+    if fy is None:
+        return
+    if getattr(fy, "is_last", False) is not True:
+        raise ApiError(
+            "FISCAL_YEAR_LOCKED",
+            "سند تسهیلات متعلق به سال مالی جاری نیست و قابل حذف یا ویرایش نمی‌باشد",
+            http_status=409,
+        )
+
 
 def invalidate_documents_cache(business_id: int, fiscal_year_id: Optional[int] = None, document_id: Optional[int] = None, document_type: Optional[str] = None):
 	"""
@@ -198,7 +224,14 @@ def delete_document(db: Session, document_id: int, *, commit: bool = True) -> bo
     except Exception:
         # اگر به هر دلیل نتوانستیم بررسی کنیم، حذف را متوقف نکن (برای backward compatibility)
         pass
-    
+
+    try:
+        _assert_received_loan_manual_fiscal_year_editable(db, document)
+    except ApiError:
+        raise
+    except Exception:
+        pass
+
     # دریافت اطلاعات قبل از حذف برای invalidation
     business_id = document.business_id
     fiscal_year_id = document.fiscal_year_id
@@ -259,6 +292,16 @@ def delete_multiple_documents(db: Session, document_ids: List[int]) -> Dict[str,
                     "code": document.code
                 })
                 continue
+
+            try:
+                _assert_received_loan_manual_fiscal_year_editable(db, document)
+            except ApiError as exc:
+                err = getattr(exc, "detail", None)
+                msg = str(err) if err is not None else str(exc)
+                errors.append({"id": doc_id, "error": msg})
+                continue
+            except Exception:
+                pass
             
             # حذف سند
             if repo.delete_document(doc_id):
@@ -613,7 +656,7 @@ def update_manual_document(
             "Document not found",
             http_status=404
         )
-    
+
     # بررسی اینکه فقط اسناد manual قابل ویرایش هستند
     if document.document_type != "manual":
         raise ApiError(
@@ -621,6 +664,13 @@ def update_manual_document(
             "Cannot edit automatically generated documents. Please edit from the original source.",
             http_status=400
         )
+
+    try:
+        _assert_received_loan_manual_fiscal_year_editable(db, document)
+    except ApiError:
+        raise
+    except Exception:
+        pass
     
     # اعتبارسنجی پروژه (اگر ارسال شده باشد)
     project_id = data.get("project_id")

@@ -676,6 +676,25 @@ class Hesabix_V2_Api
 	}
 
 	/**
+	 * گزارش موجودی انبار (نیاز به دسترسی reports.view در حسابیکس).
+	 * POST /products/businesses/{business_id}/reports/inventory-stock
+	 *
+	 * @since    3.3.2
+	 * @param    array $body پارامترها: product_ids، warehouse_ids، track_inventory، include_zero، skip، take، …
+	 * @param    int   $timeout
+	 * @return   array
+	 */
+	public function inventory_stock_report($body = array(), $timeout = 60)
+	{
+		return $this->request(
+			'POST',
+			'/products/businesses/' . (int) $this->business_id . '/reports/inventory-stock',
+			$body,
+			(int) max(25, min(180, $timeout))
+		);
+	}
+
+	/**
 	 * Delete product
 	 *
 	 * @since    2.0.0

@@ -38,6 +38,14 @@ $invoice_payment_destination = get_option('hesabix_v2_invoice_payment_destinatio
 if ($invoice_payment_destination !== 'cash_register') {
 	$invoice_payment_destination = 'bank';
 }
+
+$stock_pull_opts = Hesabix_V2_Stock_Pull_Service::get_options();
+$inv_wh_cfg = Hesabix_V2_Invoice_Warehouse_Service::get_config();
+$inv_wh_saved_wids = array();
+for ($iwp = 0; $iwp < 12; $iwp++) {
+	$rww = isset($inv_wh_cfg['rules'][ $iwp ]['warehouse_id']) ? absint($inv_wh_cfg['rules'][ $iwp ]['warehouse_id']) : 0;
+	$inv_wh_saved_wids[] = $rww;
+}
 $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 $saved_currency_id = (int) get_option('hesabix_v2_currency_id', 0);
 $hesabix_v2_upd_defaults = array(
@@ -440,6 +448,105 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				</td>
 			</tr>
 			<tr>
+				<th scope="row"><?php _e('انبار در خطوط فاکتور فروش', 'hesabix-v2'); ?></th>
+				<td>
+					<label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;">
+						<input type="radio" name="invoice_wh_resolution" value="default" <?php checked($inv_wh_cfg['resolution'], 'default'); ?>>
+						<?php _e('همیشه انبار پیش‌فرض (بالا)', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:inline-flex;align-items:center;gap:6px;">
+						<input type="radio" name="invoice_wh_resolution" value="rules" <?php checked($inv_wh_cfg['resolution'], 'rules'); ?>>
+						<?php _e('اولویت طبق جدول (روش حمل، سپس منطقه ارسال، سپس پیش‌فرض)', 'hesabix-v2'); ?>
+					</label>
+					<p class="description"><?php _e('برای هر سفارش یک انبار واحد برای تمام اقلام فاکتور انتخاب می‌شود. قوانین به‌ترتیب از بالا به پایین ارزیابی می‌شوند؛ اولین تطبیق برنده است. شناسه منطقه را از فروشگاه ووکامرس ← تنظیمات ← حمل‌ونقل ببینید (۱، ۲، …؛ «مکان‌های تحت پوشش» معمولاً ۰). کمبوی انبار با همان بارگذاری «انبار و بانک» از حسابیکس پر می‌شود.', 'hesabix-v2'); ?></p>
+					<table id="hesabix_v2_inv_wh_rules_table" class="widefat striped" style="max-width:720px;margin-top:10px;">
+						<thead>
+							<tr>
+								<th><?php _e('نوع', 'hesabix-v2'); ?></th>
+								<th><?php _e('کلید', 'hesabix-v2'); ?></th>
+								<th><?php _e('انبار (حسابیکس)', 'hesabix-v2'); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php
+							for ($rii = 0; $rii < 12; $rii++) :
+								$rr = isset($inv_wh_cfg['rules'][ $rii ]) ? $inv_wh_cfg['rules'][ $rii ] : array();
+								$r_type = isset($rr['type']) ? $rr['type'] : '';
+								$r_key = isset($rr['key']) ? $rr['key'] : '';
+								?>
+								<tr>
+									<td>
+										<select name="inv_wh_r_type[]">
+											<option value=""><?php _e('—', 'hesabix-v2'); ?></option>
+											<option value="shipping_method" <?php selected($r_type, 'shipping_method'); ?>><?php _e('روش حمل', 'hesabix-v2'); ?></option>
+											<option value="shipping_zone" <?php selected($r_type, 'shipping_zone'); ?>><?php _e('منطقه ارسال', 'hesabix-v2'); ?></option>
+										</select>
+									</td>
+									<td>
+										<input type="text" name="inv_wh_r_key[]" class="regular-text" dir="ltr" style="max-width:100%;"
+											value="<?php echo esc_attr($r_key); ?>"
+											placeholder="<?php echo esc_attr__('flat_rate:12 یا 2', 'hesabix-v2'); ?>">
+									</td>
+									<td>
+										<select name="inv_wh_r_wid[]" class="hesabix-v2-inv-wh-select regular-text" style="max-width:220px;">
+											<option value=""><?php _e('— انتخاب —', 'hesabix-v2'); ?></option>
+										</select>
+									</td>
+								</tr>
+								<?php
+							endfor;
+							?>
+						</tbody>
+					</table>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php _e('کشش موجودی به ووکامرس', 'hesabix-v2'); ?></th>
+				<td>
+					<label style="display:block;margin-bottom:8px;">
+						<input type="checkbox" name="stock_pull_enabled" value="1" <?php checked(!empty($stock_pull_opts['enabled'])); ?>>
+						<?php _e('زمان‌بندی خودکار از حسابیکس (Cron وردپرس)', 'hesabix-v2'); ?>
+					</label>
+					<p class="description" style="margin-bottom:12px;">
+						<?php _e('موجودی قابل‌فروش ووکامرس از گزارش انبار حسابیکس محاسبه و روی هر محصول متصل به‌روز می‌شود. نیاز به دسترسی گزارش (reports.view) برای کلید API دارد. جمع از چند انبار طبق حالت زیر خواهد بود.', 'hesabix-v2'); ?>
+					</p>
+					<label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;margin-bottom:6px;">
+						<input type="radio" name="stock_pull_warehouse_scope" value="default" <?php checked($stock_pull_opts['warehouse_scope'], 'default'); ?>>
+						<?php _e('فقط انبار پیش‌فرض (بالا)', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;margin-bottom:6px;">
+						<input type="radio" name="stock_pull_warehouse_scope" value="selected" <?php checked($stock_pull_opts['warehouse_scope'], 'selected'); ?>>
+						<?php _e('انبارهای انتخابی (جمع موجودی)', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:inline-flex;align-items:center;gap:6px;margin-bottom:6px;">
+						<input type="radio" name="stock_pull_warehouse_scope" value="all" <?php checked($stock_pull_opts['warehouse_scope'], 'all'); ?>>
+						<?php _e('همه انبارها (جمع)', 'hesabix-v2'); ?>
+					</label>
+					<p style="margin:10px 0 6px;"><?php _e('انتخاب انبارها برای حالت «انبارهای انتخابی»:', 'hesabix-v2'); ?></p>
+					<select name="stock_pull_warehouse_ids[]" id="hesabix_v2_stock_pull_wh_select" multiple size="6" style="min-width:280px;display:block;"></select>
+					<p class="description"><?php _e('پس از «بارگذاری از حسابیکس»، این لیست پر می‌شود (Ctrl برای چند انتخاب).', 'hesabix-v2'); ?></p>
+					<p style="margin-top:12px;">
+						<label>
+							<?php _e('فاصله اجرای Cron (دقیقه)', 'hesabix-v2'); ?>
+							<input type="number" name="stock_pull_cron_minutes" min="5" max="180" step="1" style="width:5em;margin-right:8px;"
+								value="<?php echo esc_attr((string) (int) $stock_pull_opts['cron_minutes']); ?>">
+						</label>
+					</p>
+					<label style="display:block;margin:10px 0;">
+						<input type="checkbox" name="stock_pull_force_manage_stock" value="1" <?php checked(!empty($stock_pull_opts['force_manage_stock'])); ?>>
+						<?php _e('روشن کردن «مدیریت موجودی» در ووکامرس هنگام به‌روزرسانی', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:block;margin:10px 0;">
+						<input type="checkbox" name="stock_pull_disable_wc_reduce" value="1" <?php checked(!empty($stock_pull_opts['disable_wc_stock_reduction'])); ?>>
+						<?php _e('کاهش خودکار موجودی ووکامرس هنگام سفارش را غیرفعال کن تا با خروج انبار حسابیکس تداخل نداشته باشد؛ بعد از هر سفارش تا اجرای «کشش موجودی» ممکن است عدد ویترین عقب بمانَد.', 'hesabix-v2'); ?>
+					</label>
+					<p>
+						<button type="button" class="button" id="hesabix_v2_stock_pull_now_btn"><?php _e('اجرا هم‌اکنون', 'hesabix-v2'); ?></button>
+						<span id="hesabix_v2_stock_pull_now_status" class="description" style="margin-right:12px;"></span>
+					</p>
+				</td>
+			</tr>
+			<tr>
 				<th scope="row"><?php _e('ثبت پرداخت فاکتور در', 'hesabix-v2'); ?></th>
 				<td>
 					<label style="display:block;margin-bottom:6px;">
@@ -476,6 +583,30 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			var savedBank = '<?php echo esc_js((string) get_option('hesabix_v2_default_bank_id', '')); ?>';
 			var savedCashRegister = '<?php echo esc_js((string) $saved_cash_register_id); ?>';
 			var savedCurrency = '<?php echo esc_js((string) $saved_currency_id); ?>';
+			var savedStockPullWhIds = <?php echo wp_json_encode(array_values(array_map('intval', isset($stock_pull_opts['warehouse_ids']) ? $stock_pull_opts['warehouse_ids'] : array()))); ?>;
+			var savedInvoiceWhRuleIds = <?php echo wp_json_encode(array_map('intval', $inv_wh_saved_wids)); ?>;
+
+			function hesabixV2FillInvoiceWarehouseRuleSelects(warehouses) {
+				var warehousesList = warehouses || [];
+				var pickLabelEmpty = <?php echo wp_json_encode(__('— انتخاب —', 'hesabix-v2')); ?>;
+				$('#hesabix_v2_inv_wh_rules_table .hesabix-v2-inv-wh-select').each(function(index){
+					var $sel = $(this);
+					var prev = $sel.val();
+					var fallback = '';
+					if (savedInvoiceWhRuleIds && typeof savedInvoiceWhRuleIds[index] !== 'undefined' && savedInvoiceWhRuleIds[index] > 0) {
+						fallback = String(savedInvoiceWhRuleIds[index]);
+					}
+					$sel.empty().append($('<option></option>').val('').text(pickLabelEmpty));
+					warehousesList.forEach(function(w){
+						var lbl = (w.code ? String(w.code) + ' — ' : '') + (w.name || String(w.id));
+						$sel.append($('<option></option>').val(String(w.id)).text(lbl));
+					});
+					var desired = prev || fallback;
+					if (desired !== '') {
+						$sel.val(desired);
+					}
+				});
+			}
 
 			function hesabixV2TogglePaymentRows() {
 				var v = $('input[name="hesabix_v2_invoice_payment_destination"]:checked').val();
@@ -507,6 +638,21 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						if (savedWarehouse !== '') {
 							$wh.val(String(savedWarehouse));
 						}
+						var $spwh = $('#hesabix_v2_stock_pull_wh_select');
+						if ($spwh.length) {
+							$spwh.empty();
+							(res.warehouses || []).forEach(function(w){
+								var label = (w.code ? w.code + ' - ' : '') + w.name;
+								$spwh.append($('<option></option>').val(String(w.id)).text(label));
+							});
+							if (savedStockPullWhIds && savedStockPullWhIds.length) {
+								savedStockPullWhIds.forEach(function(id){
+									$spwh.find('option[value="' + String(id) + '"]').prop('selected', true);
+								});
+							}
+						}
+						hesabixV2FillInvoiceWarehouseRuleSelects(res.warehouses || []);
+
 						var $bank = $('#hesabix_v2_default_bank_id');
 						$bank.find('option:not(:first)').remove();
 						(res.banks || []).forEach(function(b){
@@ -557,6 +703,27 @@ $hsx_post = ini_get('post_max_size') ?: '';
 
 			$(function(){
 				hesabixV2LoadWarehousesBanksCurrencies(true);
+			});
+
+			$('#hesabix_v2_stock_pull_now_btn').on('click', function(){
+				var $btn = $(this);
+				var $st = $('#hesabix_v2_stock_pull_now_status');
+				$btn.prop('disabled', true);
+				$st.text('<?php echo esc_js(__('در حال به‌روزرسانی موجودی...', 'hesabix-v2')); ?>').css('color', '');
+				$.post(hesabix_v2_ajax.ajax_url, {
+					action: 'hesabix_v2_pull_stock_now',
+					nonce: hesabix_v2_ajax.nonce
+				}).done(function(res){
+					if (res && res.success) {
+						$st.text(res.message || '<?php echo esc_js(__('انجام شد.', 'hesabix-v2')); ?>').css('color', 'green');
+					} else {
+						$st.text((res && res.message) ? res.message : '<?php echo esc_js(__('خطا', 'hesabix-v2')); ?>').css('color', 'red');
+					}
+				}).fail(function(){
+					$st.text('<?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?>').css('color', 'red');
+				}).always(function(){
+					$btn.prop('disabled', false);
+				});
 			});
 
 			$('#hesabix_v2_load_invoice_tags').on('click', function(){

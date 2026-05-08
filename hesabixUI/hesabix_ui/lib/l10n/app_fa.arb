@@ -258,6 +258,8 @@
   "newBusiness": "کسب‌وکار جدید",
   "businesses": "کسب‌وکارها",
   "deleteBusiness": "حذف کسب و کار",
+  "deleteBusinessConfirmTypeInstruction": "برای ادامه، کلمه «delete» به انگلیسی یا «حذف» به فارسی را وارد کنید.",
+  "deleteBusinessConfirmTypeHint": "delete یا حذف",
   "support": "پشتیبانی",
   "changePassword": "تغییر کلمه عبور",
   "marketing": "بازاریابی",
@@ -722,6 +724,7 @@
   "banking": "بانکداری",
   "accounts": "حساب‌ها",
   "pettyCash": "تنخواه",
+  "loanFacilities": "تسهیلات",
   "cashBox": "صندوق",
   "wallet": "کیف پول",
   "checks": "چک‌ها",
@@ -940,6 +943,30 @@
     "description": "صفحهٔ دسترسی کاربران: دامنهٔ مجوزهای اسناد حسابداری"
   },
   "permissionsGroupHintAccountingDocuments": "این مجوزها برای ثبت اسناد دستی و همچنین اسناد خودکاری که سیستم با عملیات‌هایی مانند چک، دریافت و پرداخت اشخاص یا فاکتور (در صورت کاربرد) ایجاد می‌کند، اعمال می‌شود.",
+  "permissionsCategoryInvoicesAndExpenses": "فاکتورها و هزینه‌ها",
+  "permissionSectionInvoiceTypes": "نوع‌های مجاز فاکتور",
+  "permissionSectionPricing": "نمایش قیمت فروش و خرید",
+  "permissionSectionCrmWebChat": "چت وب (ویجت CRM)",
+  "permissionCrmEditAndAdd": "ایجاد و ویرایش رکوردهای CRM",
+  "permissionCrmViewReports": "مشاهده گزارش‌های CRM",
+  "permissionCrmTeamPerformanceReports": "گزارش عملکرد کارمندان (کل تیم)",
+  "permissionCrmWebChatView": "مشاهده چت وب",
+  "permissionCrmWebChatReply": "پاسخ و ارسال پیام در چت وب",
+  "permissionCrmWebChatManageWidgets": "ایجاد و ویرایش ویجت چت",
+  "permissionCrmWebChatEditConversations": "ویرایش مکالمه (وضعیت، ارجاع، سرنخ)",
+  "permissionCrmWebChatDeleteMessages": "حذف پیام در چت وب",
+  "permissionFiscalYearEditCurrent": "ویرایش سال مالی جاری",
+  "permissionFiscalYearClose": "بستن سال مالی",
+  "permissionFiscalYearRollbackDangerous": "برگشت از سال مالی جاری (عملیات خطرناک)",
+  "@permissionsUpdateError": {
+    "description": "دیالوگ دسترسی کاربر: خطای ذخیره با جزئیات",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "permissionsUpdateError": "به‌روزرسانی دسترسی‌ها ناموفق بود: {error}",
   "@checkFormNeedsChecksWritePermission": {
     "description": "دیالوگ فرم چک وقتی مجوز افزودن/ویرایش چک نیست"
   },
@@ -1938,6 +1965,7 @@
   "@saveInvoiceErrorWithMessage": {"placeholders": {"error": {"type": "String"}}}
   ,
   "noRowsAdded": "ردیفی افزوده نشده است",
+  "invoiceLineItemsAddRowKeyboardHint": "میانبر: کلید Q و سپس بلافاصله I (وقتی فوکوس در فیلد متنی نیست) یک ردیف اضافه می‌کند.",
   "quantityUnit": "تعداد/واحد",
   "unitPrice": "قیمت واحد"
   ,

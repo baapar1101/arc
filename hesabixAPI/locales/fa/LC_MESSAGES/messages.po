@@ -884,3 +884,6 @@ msgstr "فایل در این مکالمه یافت نشد"
 
 msgid "CRM_CHAT_CONVERSATION_STATUS_INVALID"
 msgstr "وضعیت نامعتبر است"
+
+msgid "BUSINESS_USER_PERMISSIONS_UPDATED"
+msgstr "دسترسی‌ها با موفقیت به‌روزرسانی شد"

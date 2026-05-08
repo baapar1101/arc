@@ -3543,33 +3543,39 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                   ),
                 const SizedBox(height: 16),
               ],
-              InvoiceLineItemsTable(
-                businessId: widget.businessId,
-                authStore: widget.authStore,
-                selectedCurrencyId: _selectedCurrencyId,
-                currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
-                currencyUnitLabel: _invoiceCurrencyUnitLabel,
-                invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
-                postInventory: _postInventory,
-                initialRows: _lineItems,
-                calendarController: widget.calendarController,
-                onChanged: (rows) {
-                  setState(() {
-                    // بررسی bom_id های موجود در ردیف‌های جدید
-                    final bomIdsInRows = <int>{};
-                    for (final row in rows) {
-                      final bomId = row.extraInfo?['bom_id'];
-                      if (bomId is int) {
-                        bomIdsInRows.add(bomId);
-                      }
-                    }
-                    
-                    // حذف bom_id هایی که دیگر در ردیف‌ها نیستند
-                    _bomIds.removeWhere((bomId) => !bomIdsInRows.contains(bomId));
-                    
-                    _lineItems = rows;
-                    _recalculateTotalsFromLines();
-                  });
+              AnimatedBuilder(
+                animation: _tabController,
+                builder: (context, _) {
+                  return InvoiceLineItemsTable(
+                    businessId: widget.businessId,
+                    authStore: widget.authStore,
+                    selectedCurrencyId: _selectedCurrencyId,
+                    currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
+                    currencyUnitLabel: _invoiceCurrencyUnitLabel,
+                    invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
+                    postInventory: _postInventory,
+                    initialRows: _lineItems,
+                    calendarController: widget.calendarController,
+                    lineAddRowShortcutsLayerActive: _tabController.index == 1,
+                    onChanged: (rows) {
+                      setState(() {
+                        // بررسی bom_id های موجود در ردیف‌های جدید
+                        final bomIdsInRows = <int>{};
+                        for (final row in rows) {
+                          final bomId = row.extraInfo?['bom_id'];
+                          if (bomId is int) {
+                            bomIdsInRows.add(bomId);
+                          }
+                        }
+
+                        // حذف bom_id هایی که دیگر در ردیف‌ها نیستند
+                        _bomIds.removeWhere((bomId) => !bomIdsInRows.contains(bomId));
+
+                        _lineItems = rows;
+                        _recalculateTotalsFromLines();
+                      });
+                    },
+                  );
                 },
               ),
               if (showGlobalDisc) ...[

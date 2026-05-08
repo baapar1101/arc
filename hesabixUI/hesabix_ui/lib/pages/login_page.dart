@@ -86,6 +86,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   String? _otpLoginCaptchaId;
   Uint8List? _otpLoginCaptchaImage;
   Timer? _otpLoginCaptchaTimer;
+  final FocusNode _otpLoginCaptchaFocus = FocusNode();
   String? _otpLoginSessionId;
   String? _selectedChannel;
   List<String> _availableChannels = [];
@@ -131,6 +132,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _otpLoginIdentifierCtrl.dispose();
     _otpLoginCaptchaCtrl.dispose();
     _otpLoginCaptchaTimer?.cancel();
+    _otpLoginCaptchaFocus.dispose();
     _privacyTapRecognizer.dispose();
     _termsTapRecognizer.dispose();
     _tabController.removeListener(_onAuthTabChanged);
@@ -1327,6 +1329,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   decoration: InputDecoration(labelText: t.identifier),
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.identifier} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      FocusScope.of(context).nextFocus(),
                                                 ),
                                                 const SizedBox(height: 12),
                                                 TextFormField(
@@ -1338,7 +1342,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     if (passwordExceedsMaxBytes(v)) return t.passwordMaxLength;
                                                     return null;
                                                   },
-                                                  onFieldSubmitted: (_) => _onSubmit(),
+                                                  textInputAction: TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      FocusScope.of(context).nextFocus(),
                                                 ),
                                                 const SizedBox(height: 12),
                                                 Row(
@@ -1350,6 +1356,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
                                                         inputFormatters: _captchaInputFormatters,
+                                                        textInputAction: TextInputAction.done,
+                                                        onFieldSubmitted: (_) {
+                                                          if (_loadingLogin) return;
+                                                          unawaited(_onSubmit());
+                                                        },
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
@@ -1415,6 +1426,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   decoration: InputDecoration(labelText: t.firstName),
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.firstName} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      FocusScope.of(context).nextFocus(),
                                                 ),
                                                 const SizedBox(height: 12),
                                                 TextFormField(
@@ -1422,6 +1435,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   decoration: InputDecoration(labelText: t.lastName),
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.lastName} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      FocusScope.of(context).nextFocus(),
                                                 ),
                                                 const SizedBox(height: 12),
                                                 TextFormField(
@@ -1430,6 +1445,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   keyboardType: TextInputType.emailAddress,
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.email} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      FocusScope.of(context).nextFocus(),
                                                 ),
                                                 const SizedBox(height: 12),
                                                 TextFormField(
@@ -1438,6 +1455,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   keyboardType: TextInputType.phone,
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.mobile} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      FocusScope.of(context).nextFocus(),
                                                 ),
                                                 const SizedBox(height: 12),
                                                 TextFormField(
@@ -1451,7 +1470,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     getMaxLengthError: () => t.passwordMaxLength,
                                                     minLength: 8,
                                                   ),
-                                                  onFieldSubmitted: (_) => _onRegister(),
+                                                  textInputAction: TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      FocusScope.of(context).nextFocus(),
                                                 ),
                                                 const SizedBox(height: 12),
                                                 Row(
@@ -1463,6 +1484,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
                                                         inputFormatters: _captchaInputFormatters,
+                                                        textInputAction: TextInputAction.done,
+                                                        onFieldSubmitted: (_) {
+                                                          if (_loadingRegister) return;
+                                                          unawaited(_onRegister());
+                                                        },
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
@@ -1556,7 +1582,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   controller: _forgotIdentifierCtrl,
                                                   decoration: InputDecoration(labelText: t.identifier),
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.identifier} ${t.requiredField}' : null,
-                                                  onFieldSubmitted: (_) => _onForgot(),
+                                                  textInputAction: TextInputAction.next,
+                                                  onFieldSubmitted: (_) =>
+                                                      FocusScope.of(context).nextFocus(),
                                                 ),
                                                 const SizedBox(height: 12),
                                                 Row(
@@ -1568,6 +1596,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
                                                         inputFormatters: _captchaInputFormatters,
+                                                        textInputAction: TextInputAction.done,
+                                                        onFieldSubmitted: (_) {
+                                                          if (_loadingForgot) return;
+                                                          unawaited(_onForgot());
+                                                        },
                                                       ),
                                                     ),
                                                     const SizedBox(width: 8),
@@ -1663,6 +1696,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     }
                                                     return null;
                                                   },
+                                                  onFieldSubmitted: (_) {
+                                                    if (_otpLoginSessionId == null) {
+                                                      _otpLoginCaptchaFocus.requestFocus();
+                                                    } else {
+                                                      FocusScope.of(context).nextFocus();
+                                                    }
+                                                  },
                                                 ),
                                                 if (_otpLoginSessionId == null) ...[
                                                   const SizedBox(height: 16),
@@ -1721,6 +1761,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                       Expanded(
                                                         child: TextFormField(
                                                           controller: _otpLoginCaptchaCtrl,
+                                                          focusNode: _otpLoginCaptchaFocus,
                                                           enabled: !_loadingOtpLogin,
                                                           decoration: InputDecoration(
                                                             labelText: AppLocalizations.of(context).captcha,
@@ -1734,6 +1775,16 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                               return AppLocalizations.of(context).captchaRequired;
                                                             }
                                                             return null;
+                                                          },
+                                                          onFieldSubmitted: (_) {
+                                                            if (_loadingOtpLogin ||
+                                                                _loadingOtpChannelStatus ||
+                                                                _otpLoginSessionId != null ||
+                                                                _selectedChannel == null ||
+                                                                _otpChannelOnServer[_selectedChannel!] != true) {
+                                                              return;
+                                                            }
+                                                            unawaited(_sendOtpLogin());
                                                           },
                                                         ),
                                                       ),

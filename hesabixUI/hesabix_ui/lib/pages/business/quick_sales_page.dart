@@ -41,11 +41,15 @@ class QuickSalesPage extends StatefulWidget {
   final AuthStore authStore;
   final CalendarController calendarController;
 
+  /// اگر از لانچر موبایل باز شده؛ دکمهٔ عقب و اَندروید به این مسیر می‌رود.
+  final String? mobileLauncherHomePath;
+
   const QuickSalesPage({
     super.key,
     required this.businessId,
     required this.authStore,
     required this.calendarController,
+    this.mobileLauncherHomePath,
   });
 
   @override
@@ -2023,11 +2027,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       return const AccessDeniedPage(message: 'دسترسی شما برای فروش سریع محدود شده است');
     }
     
-    return KeyboardListener(
-      focusNode: _keyboardListenerFocus,
-      onKeyEvent: _handleKeyEvent,
-      child: Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: widget.mobileLauncherHomePath == null,
+        leading: widget.mobileLauncherHomePath != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                onPressed: () => context.go(widget.mobileLauncherHomePath!),
+              )
+            : null,
         title: isMobile
             ? (isCompactHeader
                 ? Row(
@@ -2503,7 +2512,23 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           );
         },
       ),
-      ),
+    );
+
+    final launcherHome = widget.mobileLauncherHomePath;
+    final guarded = launcherHome != null
+        ? PopScope(
+            canPop: false,
+            onPopInvoked: (didPop) {
+              if (!didPop) context.go(launcherHome);
+            },
+            child: scaffold,
+          )
+        : scaffold;
+
+    return KeyboardListener(
+      focusNode: _keyboardListenerFocus,
+      onKeyEvent: _handleKeyEvent,
+      child: guarded,
     );
   }
 

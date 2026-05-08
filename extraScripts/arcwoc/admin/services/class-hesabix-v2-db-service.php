@@ -331,5 +331,27 @@ class Hesabix_V2_DB_Service
 
 		return $wpdb->get_results($wpdb->prepare($query, $limit), ARRAY_A);
 	}
+
+	/**
+	 * همهٔ نگاشت‌های محصول (ساده و واریانت) برای کسب‌وکار جاری.
+	 *
+	 * @since 3.3.2
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_all_product_mappings()
+	{
+		global $wpdb;
+
+		$query = $wpdb->prepare(
+			"SELECT wc_id, wc_parent_id, hesabix_id FROM {$this->table}
+			WHERE entity_type = %s AND business_id = %d",
+			'product',
+			$this->business_id
+		);
+
+		$rows = $wpdb->get_results($query, ARRAY_A);
+
+		return is_array($rows) ? $rows : array();
+	}
 }
 

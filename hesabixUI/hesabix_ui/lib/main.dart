@@ -127,6 +127,7 @@ import 'pages/business/price_lists_page.dart';
 import 'pages/business/price_list_items_page.dart';
 import 'pages/business/cash_registers_page.dart';
 import 'pages/business/petty_cash_page.dart';
+import 'pages/business/loan_facilities_page.dart';
 import 'pages/business/checks_page.dart';
 import 'pages/business/plugin_marketplace_page.dart';
 import 'pages/business/marketplace_invoices_page.dart';
@@ -177,6 +178,7 @@ import 'pages/business/backup/backup_page.dart';
 import 'pages/business/backup/business_ftp_backup_settings_page.dart';
 import 'pages/business/backup/restore_page.dart';
 import 'pages/mobile_launcher/mobile_launcher_page.dart';
+import 'pages/mobile_launcher/mobile_launcher_shell.dart';
 import 'pages/mobile_launcher/mobile_launcher_appearance_page.dart';
 import 'pages/profile/delete_business_page.dart';
 import 'pages/business/fiscal_year_rollback_page.dart';
@@ -377,7 +379,7 @@ class _MyAppState extends State<MyApp> {
       const AnnouncementsPage();
       NewBusinessPage(calendarController: calendarController);
       const BusinessesPage();
-      MobileLauncherPage(businessId: 1, authStore: authStore);
+      MobileLauncherHomePage(businessId: 1, authStore: authStore);
       MobileLauncherAppearancePage(businessId: 1, authStore: authStore);
       SupportPage(calendarController: calendarController);
       MarketingPage(calendarController: calendarController);
@@ -1001,52 +1003,121 @@ class _MyAppState extends State<MyApp> {
             if (!ResponsiveHelper.isMobile(context)) {
               return '/business/$businessId/dashboard';
             }
-            return null;
-          },
-          builder: (context, state) {
-            final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
-            if (businessId == null || businessId <= 0) {
-              return Scaffold(
-                body: Center(child: Text(AppLocalizations.of(context).mobileLauncherInvalidBusiness)),
-              );
-            }
-            registerRoutePage(() => MobileLauncherPage(
-                  businessId: businessId,
-                  authStore: _authStore!,
-                ));
-            return MobileLauncherPage(
-              businessId: businessId,
-              authStore: _authStore!,
-            );
-          },
-        ),
-        GoRoute(
-          path: '/mobile-launcher/:businessId/appearance',
-          name: 'mobile_launcher_appearance',
-          redirect: (context, state) {
-            final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
-            if (businessId == null || businessId <= 0) return null;
-            if (!ResponsiveHelper.isMobile(context)) {
-              return '/business/$businessId/dashboard';
+            if (state.uri.path == '/mobile-launcher/$businessId') {
+              return MobileLauncherPrefs.launcherHomePath(businessId);
             }
             return null;
           },
-          builder: (context, state) {
-            final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
-            if (businessId == null || businessId <= 0) {
-              return Scaffold(
-                body: Center(child: Text(AppLocalizations.of(context).mobileLauncherInvalidBusiness)),
-              );
-            }
-            registerRoutePage(() => MobileLauncherAppearancePage(
+          routes: [
+            ShellRoute(
+              builder: (context, state, child) {
+                final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
+                if (businessId == null || businessId <= 0) {
+                  return Scaffold(
+                    body: Center(
+                      child: Text(AppLocalizations.of(context).mobileLauncherInvalidBusiness),
+                    ),
+                  );
+                }
+                return MobileLauncherShell(
                   businessId: businessId,
                   authStore: _authStore!,
-                ));
-            return MobileLauncherAppearancePage(
-              businessId: businessId,
-              authStore: _authStore!,
-            );
-          },
+                  child: child,
+                );
+              },
+              routes: [
+                GoRoute(
+                  path: 'home',
+                  name: 'mobile_launcher_home',
+                  builder: (context, state) {
+                    final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
+                    if (businessId == null || businessId <= 0) {
+                      return Scaffold(
+                        body: Center(
+                          child: Text(AppLocalizations.of(context).mobileLauncherInvalidBusiness),
+                        ),
+                      );
+                    }
+                    registerRoutePage(
+                      () => MobileLauncherHomePage(
+                        businessId: businessId,
+                        authStore: _authStore!,
+                      ),
+                    );
+                    return MobileLauncherHomePage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'appearance',
+                  name: 'mobile_launcher_appearance',
+                  builder: (context, state) {
+                    final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
+                    if (businessId == null || businessId <= 0) {
+                      return Scaffold(
+                        body: Center(
+                          child: Text(AppLocalizations.of(context).mobileLauncherInvalidBusiness),
+                        ),
+                      );
+                    }
+                    registerRoutePage(
+                      () => MobileLauncherAppearancePage(
+                        businessId: businessId,
+                        authStore: _authStore!,
+                      ),
+                    );
+                    return MobileLauncherAppearancePage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'quick-sales',
+                  name: 'mobile_launcher_quick_sales',
+                  pageBuilder: (context, state) {
+                    final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
+                    if (businessId == null || businessId <= 0) {
+                      return hesabixNoTransitionPage(
+                        state,
+                        Scaffold(
+                          body: Center(
+                            child: Text(AppLocalizations.of(context).mobileLauncherInvalidBusiness),
+                          ),
+                        ),
+                      );
+                    }
+                    if (!_authStore!.hasBusinessPermission('invoices', 'add')) {
+                      return hesabixNoTransitionPage(
+                        state,
+                        PermissionGuard.buildAccessDeniedPage(),
+                      );
+                    }
+                    final homePath = MobileLauncherPrefs.launcherHomePath(businessId);
+                    registerRoutePage(
+                      () => QuickSalesPage(
+                        businessId: businessId,
+                        authStore: _authStore!,
+                        calendarController: _calendarController!,
+                        mobileLauncherHomePath: homePath,
+                      ),
+                    );
+                    return hesabixNoTransitionPage(
+                      state,
+                      QuickSalesPage(
+                        businessId: businessId,
+                        authStore: _authStore!,
+                        calendarController: _calendarController!,
+                        mobileLauncherHomePath: homePath,
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
         ),
         ShellRoute(
           builder: (context, state, child) => ProfileShell(
@@ -1780,6 +1851,20 @@ class _MyAppState extends State<MyApp> {
                 return hesabixNoTransitionPage(state, WalletPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'loan-facilities',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  LoanFacilitiesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
                   ),
                 );
               },

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import select, and_, or_, func, exists, text
+from sqlalchemy import select, and_, or_, func, exists, text, case, literal
 from app.core.query_timeout import query_timeout
 
 from adapters.api.v1.schemas import QueryInfo
@@ -16,6 +17,34 @@ from ..models.category import BusinessCategory
 
 from app.services.product_general_barcode_service import split_raw_general_barcodes
 
+# فاصله، خط جدید، انواع خط تیره (بدون نیم‌فاصلهٔ ZWNJ که در فارسی پیوند واژه است)
+_SEARCH_SPLIT_RE = re.compile(r"(?:\s+|(?:[\-‐‑–—])+)+")
+
+
+def _search_query_tokens(search: str) -> List[str]:
+    """جدا کردن عبارت جستجو به توکن‌های غیرخالی (فاصله، خط تیره و مشابه)."""
+    s = str(search).strip()
+    if not s:
+        return []
+    parts = [p for p in _SEARCH_SPLIT_RE.split(s) if p]
+    if parts:
+        return parts
+    return [s]
+
+
+def _like_escape(s: str) -> str:
+    """ایمن‌سازی متن ورودی برای الگوهای ILIKE (PostgreSQL با escape '\\')."""
+    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _column_contains_all_tokens(column, tokens: List[str]):
+    """هر توکن باید به‌صورت زیررشته‌ای در مقدار ستون باشد (AND بین توکن‌ها)."""
+    if not tokens:
+        return True
+    if len(tokens) == 1:
+        return column.ilike(f"%{tokens[0]}%")
+    return and_(*[column.ilike(f"%{t}%") for t in tokens])
+
 
 class ProductRepository(BaseRepository[Product]):
     def __init__(self, db: Session) -> None:
@@ -23,10 +52,10 @@ class ProductRepository(BaseRepository[Product]):
 
     def search(self, *, business_id: int, take: int = 20, skip: int = 0, sort_by: str | None = None, sort_desc: bool = True, sort: list[Any] | None = None, search: str | None = None, search_fields: List[str] | None = None, filters: dict[str, Any] | None = None, category_ids: List[int] | None = None, include_inventory: bool = False, inventory_as_of_date: str | None = None) -> dict[str, Any]:
         stmt = select(Product).where(Product.business_id == business_id)
+        search_s = (search or "").strip() if search else ""
+        tokens = _search_query_tokens(search_s) if search_s else []
 
-        if search:
-            s = search.strip()
-            like = f"%{s}%"
+        if tokens:
             ors: List[Any] = []
             raw_fields = search_fields or []
             field_set = {str(x).strip().lower() for x in raw_fields if str(x).strip()}
@@ -41,40 +70,79 @@ class ProductRepository(BaseRepository[Product]):
                 field_set.add("unique_instance_codes")
 
             if "name" in field_set:
-                ors.append(Product.name.ilike(like))
+                ors.append(_column_contains_all_tokens(Product.name, tokens))
             if "code" in field_set:
-                ors.append(Product.code.ilike(like))
+                ors.append(_column_contains_all_tokens(Product.code, tokens))
             if "description" in field_set:
-                ors.append(Product.description.ilike(like))
+                ors.append(_column_contains_all_tokens(Product.description, tokens))
 
             if "general_barcodes" in field_set:
-                term_lower = s.lower()
-                alias_match = exists(
-                    select(1).select_from(ProductGeneralBarcodeAlias).where(
-                        ProductGeneralBarcodeAlias.product_id == Product.id,
-                        ProductGeneralBarcodeAlias.business_id == business_id,
-                        ProductGeneralBarcodeAlias.token_normalized == term_lower,
+                if len(tokens) == 1:
+                    t = tokens[0]
+                    term_lower = t.lower()
+                    alias_match = exists(
+                        select(1).select_from(ProductGeneralBarcodeAlias).where(
+                            ProductGeneralBarcodeAlias.product_id == Product.id,
+                            ProductGeneralBarcodeAlias.business_id == business_id,
+                            ProductGeneralBarcodeAlias.token_normalized == term_lower,
+                        )
                     )
-                )
-                partial_col = and_(
-                    Product.general_barcodes.isnot(None),
-                    Product.general_barcodes != "",
-                    Product.general_barcodes.ilike(like),
-                )
-                ors.append(or_(alias_match, partial_col))
+                    partial_col = and_(
+                        Product.general_barcodes.isnot(None),
+                        Product.general_barcodes != "",
+                        Product.general_barcodes.ilike(f"%{t}%"),
+                    )
+                    ors.append(or_(alias_match, partial_col))
+                else:
+                    partial_col = and_(
+                        Product.general_barcodes.isnot(None),
+                        Product.general_barcodes != "",
+                        _column_contains_all_tokens(Product.general_barcodes, tokens),
+                    )
+                    alias_clauses = [
+                        exists(
+                            select(1).select_from(ProductGeneralBarcodeAlias).where(
+                                ProductGeneralBarcodeAlias.product_id == Product.id,
+                                ProductGeneralBarcodeAlias.business_id == business_id,
+                                ProductGeneralBarcodeAlias.token_normalized == t.lower(),
+                            )
+                        )
+                        for t in tokens
+                    ]
+                    alias_match_multi = and_(*alias_clauses)
+                    ors.append(or_(alias_match_multi, partial_col))
 
             if "unique_instance_codes" in field_set:
-                instance_match = exists(
-                    select(1).select_from(ProductInstance).where(
-                        ProductInstance.business_id == business_id,
-                        ProductInstance.product_id == Product.id,
-                        or_(
-                            ProductInstance.barcode.ilike(like),
-                            ProductInstance.serial_number.ilike(like),
-                        ),
+                if len(tokens) == 1:
+                    like_1 = f"%{tokens[0]}%"
+                    instance_match = exists(
+                        select(1).select_from(ProductInstance).where(
+                            ProductInstance.business_id == business_id,
+                            ProductInstance.product_id == Product.id,
+                            or_(
+                                ProductInstance.barcode.ilike(like_1),
+                                ProductInstance.serial_number.ilike(like_1),
+                            ),
+                        )
                     )
-                )
-                ors.append(instance_match)
+                    ors.append(instance_match)
+                else:
+                    per_row = []
+                    for t in tokens:
+                        tk = f"%{t}%"
+                        per_row.append(
+                            exists(
+                                select(1).select_from(ProductInstance).where(
+                                    ProductInstance.business_id == business_id,
+                                    ProductInstance.product_id == Product.id,
+                                    or_(
+                                        ProductInstance.barcode.ilike(tk),
+                                        ProductInstance.serial_number.ilike(tk),
+                                    ),
+                                )
+                            )
+                        )
+                    ors.append(and_(*per_row))
 
             if ors:
                 stmt = stmt.where(or_(*ors))
@@ -106,7 +174,9 @@ class ProductRepository(BaseRepository[Product]):
                 # Name contains
                 if field == "name":
                     if operator in {"contains", "ilike"} and isinstance(value, str):
-                        stmt = stmt.where(Product.name.ilike(f"%{value}%"))
+                        nt = _search_query_tokens(value)
+                        if nt:
+                            stmt = stmt.where(_column_contains_all_tokens(Product.name, nt))
                     elif operator == "=":
                         stmt = stmt.where(Product.name == value)
                     continue
@@ -167,6 +237,23 @@ class ProductRepository(BaseRepository[Product]):
                     order_parts.append(col.desc() if desc else col.asc())
                 order_parts.append(Product.id.asc())
                 stmt = stmt.order_by(*order_parts)
+            elif search_s:
+                # بدون مرتب‌سازی صریح از کلاینت: نتایج مرتبط‌تر بالاتر (نام دقیق، شروع با عبارت، کد، ...)
+                esc_q = _like_escape(search_s)
+                esc_first = _like_escape(tokens[0]) if tokens else esc_q
+                q_lower = search_s.lower()
+                name_lower = func.lower(func.coalesce(Product.name, ""))
+                code_lower = func.lower(func.coalesce(Product.code, ""))
+                rel_order = [
+                    case((name_lower == literal(q_lower), 0), else_=1).asc(),
+                    case((Product.name.ilike(esc_q + "%", escape="\\"), 0), else_=1).asc(),
+                    case((Product.name.ilike(esc_first + "%", escape="\\"), 0), else_=1).asc(),
+                    case((code_lower == literal(q_lower), 0), else_=1).asc(),
+                    case((Product.code.ilike(esc_q + "%", escape="\\"), 0), else_=1).asc(),
+                    func.length(func.coalesce(Product.name, "")).asc(),
+                    Product.id.desc(),
+                ]
+                stmt = stmt.order_by(*rel_order)
             else:
                 stmt = stmt.order_by(Product.id.desc() if sort_desc else Product.id.asc())
 

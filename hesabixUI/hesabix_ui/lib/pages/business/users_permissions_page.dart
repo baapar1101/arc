@@ -1000,6 +1000,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'edit': '${t.edit} ${t.pettyCash}',
         'delete': '${t.delete} ${t.pettyCash}',
       },
+      'loan_facilities': {
+        'add': '${t.add} ${t.loanFacilities}',
+        'view': '${t.view} ${t.loanFacilities}',
+        'edit': '${t.edit} ${t.loanFacilities}',
+        'delete': '${t.delete} ${t.loanFacilities}',
+      },
       'checks': {
         'add': '${t.add} ${t.checks}',
         'view': '${t.view} ${t.checks}',
@@ -1007,7 +1013,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'delete': '${t.delete} ${t.checks}',
         'collect': '${t.collect} ${t.checks}',
         'transfer': '${t.transfer} ${t.checks}',
-        'return': 'برگشت ${t.checks}',
+        'return': t.returnChecks,
       },
       'wallet': {
         'view': '${t.view} ${t.wallet}',
@@ -1029,17 +1035,17 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'export': '${t.export} ${t.invoices}',
       },
       'invoice_types': {
-        'sales': 'فاکتور فروش',
-        'sales_return': 'برگشت از فروش',
-        'purchase': 'فاکتور خرید',
-        'purchase_return': 'برگشت از خرید',
-        'waste': 'ضایعات',
-        'direct_consumption': 'مصرف مستقیم',
-        'production': 'تولید',
+        'sales': t.invoiceTypeSales,
+        'sales_return': t.invoiceTypeSalesReturn,
+        'purchase': t.invoiceTypePurchase,
+        'purchase_return': t.invoiceTypePurchaseReturn,
+        'waste': t.invoiceTypeWaste,
+        'direct_consumption': t.invoiceTypeDirectConsumption,
+        'production': t.invoiceTypeProduction,
       },
       'pricing': {
-        'sales_price_view': 'مشاهده قیمت فروش',
-        'purchase_price_view': 'مشاهده قیمت خرید',
+        'sales_price_view': '${t.view} ${t.salesPrice}',
+        'purchase_price_view': '${t.view} ${t.purchasePrice}',
       },
       'expenses_income': {
         'add': '${t.add} ${t.expensesIncome}',
@@ -1105,20 +1111,20 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'invoices': t.viewInvoices,
       },
       'reports': {
-        'view': '${t.view} ${t.reports ?? 'گزارش‌ها'}',
-        'export': '${t.export} ${t.reports ?? 'گزارش‌ها'}',
+        'view': '${t.view} ${t.reports}',
+        'export': '${t.export} ${t.reports}',
       },
       'fiscal_years': {
-        'view': '${t.view} ${t.fiscalYears ?? 'سال‌های مالی'}',
-        'edit': 'ویرایش سال مالی جاری',
-        'close': 'بستن سال مالی',
-        'rollback': 'برگشت از سال مالی جاری (عملیات خطرناک)',
+        'view': '${t.view} ${t.fiscalYears}',
+        'edit': t.permissionFiscalYearEditCurrent,
+        'close': t.permissionFiscalYearClose,
+        'rollback': t.permissionFiscalYearRollbackDangerous,
       },
       'warranty': {
-        'read': '${t.view ?? 'مشاهده'} ${t.warranty ?? 'گارانتی'}',
-        'write': '${t.add ?? 'افزودن'} ${t.warranty ?? 'گارانتی'}',
-        'delete': '${t.delete ?? 'حذف'} ${t.warranty ?? 'گارانتی'}',
-        'manage': '${t.manage ?? 'مدیریت'} ${t.warranty ?? 'گارانتی'}',
+        'read': '${t.view} ${t.warranty}',
+        'write': '${t.edit} ${t.warranty}',
+        'delete': '${t.delete} ${t.warranty}',
+        'manage': '${t.manage} ${t.warranty}',
       },
       'customer_club': {
         'view': '${t.view} ${t.customerClubTitle}',
@@ -1127,17 +1133,17 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'redeem': t.customerClubPermissionRedeemInvoice(t.customerClubTitle),
       },
       'crm': {
-        'view': '${t.view ?? 'مشاهده'} CRM',
-        'write': '${t.edit ?? 'ویرایش'} / ${t.add ?? 'افزودن'} CRM',
-        'reports': '${t.view ?? 'مشاهده'} گزارشات CRM',
-        'reports_team': 'گزارش عملکرد کارمندان (همه تیم)',
+        'view': '${t.view} ${t.workflowCategoryCrm}',
+        'write': t.permissionCrmEditAndAdd,
+        'reports': t.permissionCrmViewReports,
+        'reports_team': t.permissionCrmTeamPerformanceReports,
       },
       'crm_web_chat': {
-        'view': 'مشاهده چت وب',
-        'reply': 'پاسخ و ارسال در چت وب',
-        'manage_widgets': 'ساخت و ویرایش ویجت چت',
-        'edit_conversations': 'ویرایش مکالمه (وضعیت، ارجاع، لید)',
-        'delete_messages': 'حذف پیام در چت وب',
+        'view': t.permissionCrmWebChatView,
+        'reply': t.permissionCrmWebChatReply,
+        'manage_widgets': t.permissionCrmWebChatManageWidgets,
+        'edit_conversations': t.permissionCrmWebChatEditConversations,
+        'delete_messages': t.permissionCrmWebChatDeleteMessages,
       },
       'distribution': {
         'view': '${t.view} ${t.distributionMenu}',
@@ -1263,9 +1269,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       }
     } catch (e) {
       if (mounted) {
+        final t = AppLocalizations.of(context);
         _showErrorSnackBar(
-        'خطا در به‌روزرسانی دسترسی‌ها: ${ErrorExtractor.forContext(e, context)}',
-      );
+          t.permissionsUpdateError(ErrorExtractor.forContext(e, context)),
+        );
       }
     } finally {
       if (mounted) {
@@ -1402,17 +1409,17 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['products', 'price_lists', 'categories', 'product_attributes'],
       },
       {
-        'title': 'بانکداری',
+        'title': t.banking,
         'icon': Icons.account_balance,
-        'sections': ['bank_accounts', 'cash', 'petty_cash', 'checks', 'wallet', 'transfers'],
+        'sections': ['bank_accounts', 'cash', 'petty_cash', 'loan_facilities', 'checks', 'wallet', 'transfers'],
       },
       {
-        'title': 'فاکتورها و هزینه‌ها',
+        'title': t.permissionsCategoryInvoicesAndExpenses,
         'icon': Icons.receipt,
         'sections': ['invoices', 'invoice_types', 'pricing', 'expenses_income'],
       },
       {
-        'title': 'حسابداری',
+        'title': t.accounting,
         'icon': Icons.calculate,
         'sections': ['accounting_documents', 'chart_of_accounts', 'opening_balance', 'currency_revaluation'],
       },
@@ -1423,27 +1430,27 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'permissionHintKey': 'warehouse_inventory_bridge',
       },
       {
-        'title': 'گزارش‌ها',
+        'title': t.reports,
         'icon': Icons.assessment,
         'sections': ['reports'],
       },
       {
-        'title': 'CRM',
+        'title': t.workflowCategoryCrm,
         'icon': Icons.handshake_outlined,
         'sections': ['crm', 'crm_web_chat'],
       },
       {
-        'title': 'تنظیمات',
+        'title': t.settings,
         'icon': Icons.settings,
         'sections': ['settings', 'storage', 'sms', 'marketplace', 'fiscal_years'],
       },
       {
-        'title': 'گارانتی',
+        'title': t.warranty,
         'icon': Icons.verified_user,
         'sections': ['warranty'],
       },
       {
-        'title': 'باشگاه مشتریان',
+        'title': t.customerClubMenu,
         'icon': Icons.card_giftcard,
         'sections': ['customer_club'],
       },
@@ -1468,7 +1475,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           for (final action in sectionPermissions.keys) {
             permissionItems.add(
               _buildPermissionItem(
-                _localizeAction(action),
+                sectionKey,
+                action,
+                _localizeAction(t, sectionKey, action),
                 sectionPermissions[action]!,
                 _getPermission(_currentPermissions, sectionKey, action),
                 (value) {
@@ -1488,7 +1497,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           };
           sectionWidgets.add(
             _buildPermissionGroup(
-              _getSectionTitle(sectionKey),
+              _getSectionTitle(t, sectionKey),
               permissionItems,
               theme,
               colorScheme,
@@ -1523,113 +1532,123 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     return sections;
   }
 
-  // سعی می‌کند کلید بخش فعلی را برای آیتم تعیین کند (تقریبی)
-  String _inferCurrentSectionKey(String title, String description) {
-    // جستجو بر اساس کلمات کلیدی ساده
-    final pairs = <String, List<String>>{
-      'people': [(AppLocalizations.of(context).people)],
-      'people_transactions': [
-        (AppLocalizations.of(context).receiptsAndPayments),
-        (AppLocalizations.of(context).receipts),
-        (AppLocalizations.of(context).payments),
-      ],
-      'products': [(AppLocalizations.of(context).products)],
-      'price_lists': [(AppLocalizations.of(context).priceLists)],
-      'categories': [(AppLocalizations.of(context).categories)],
-      'product_attributes': [(AppLocalizations.of(context).productAttributes)],
-      'bank_accounts': [(AppLocalizations.of(context).bankAccounts)],
-      'cash': [(AppLocalizations.of(context).cash)],
-      'petty_cash': [(AppLocalizations.of(context).pettyCash)],
-      'checks': [(AppLocalizations.of(context).checks)],
-      'wallet': [(AppLocalizations.of(context).wallet)],
-      'transfers': [(AppLocalizations.of(context).transfers)],
-      'invoices': [(AppLocalizations.of(context).invoices)],
-      'invoice_types': ['نوع فاکتور', 'invoice type'],
-      'pricing': ['قیمت', 'pricing'],
-      'expenses_income': [(AppLocalizations.of(context).expensesIncome)],
-      'accounting_documents': [(AppLocalizations.of(context).accountingDocuments)],
-      'chart_of_accounts': [(AppLocalizations.of(context).chartOfAccounts)],
-      'opening_balance': [(AppLocalizations.of(context).openingBalance)],
-      'warehouses': [(AppLocalizations.of(context).warehouses)],
-      'warehouse_transfers': [(AppLocalizations.of(context).warehouseTransfers)],
-      'settings': [(AppLocalizations.of(context).businessSettings)],
-      'storage': [(AppLocalizations.of(context).storageSpace)],
-      'sms': [(AppLocalizations.of(context).smsPanel)],
-      'marketplace': [(AppLocalizations.of(context).marketplace)],
-      'reports': ['گزارش', 'گزارش‌ها', 'reports'],
-      'fiscal_years': ['سال مالی', 'سال‌های مالی', 'fiscal year', 'fiscal years'],
-      'crm': ['crm', 'CRM'],
-      'crm_web_chat': ['چت وب', 'web chat', 'crm_web_chat'],
-    };
-
-    final hay = ('$title $description').toLowerCase();
-    for (final entry in pairs.entries) {
-      for (final token in entry.value) {
-        if (hay.contains(token.toLowerCase())) {
-          return entry.key;
-        }
-      }
-    }
-    return 'people';
-  }
-
   /// دریافت عنوان بخش بر اساس کلید
-  String _getSectionTitle(String sectionKey) {
-    final t = AppLocalizations.of(context);
-    final titles = {
-      'people': 'اشخاص',
-      'people_receipts': 'دریافت از اشخاص',
-      'people_payments': 'پرداخت‌های اشخاص',
-      'people_transactions': '${AppLocalizations.of(context).receiptsAndPayments} ${AppLocalizations.of(context).people}',
-      'products': 'کالا و خدمات',
-      'price_lists': 'لیست‌های قیمت',
-      'categories': 'دسته‌بندی‌ها',
-      'product_attributes': 'ویژگی‌های کالا و خدمات',
-      'bank_accounts': 'حساب‌های بانکی',
-      'cash': 'صندوق',
-      'petty_cash': 'تنخواه گردان',
-      'checks': 'چک',
-      'wallet': 'کیف پول',
-      'transfers': 'انتقال',
-      'invoices': 'فاکتورها',
-      'invoice_types': 'نوع‌های مجاز فاکتور',
-      'pricing': 'سطح دسترسی قیمت',
-      'expenses_income': 'هزینه و درآمد',
-      'accounting_documents': 'اسناد حسابداری',
-      'chart_of_accounts': 'جدول حساب‌ها',
-      'currency_revaluation': t.currencyRevaluation,
-      'opening_balance': 'تراز افتتاحیه',
-      'warehouses': 'مدیریت انبارها',
-      'warehouse_transfers': 'صدور حواله',
-      'settings': 'تنظیمات',
-      'storage': 'فضای ذخیره‌سازی',
-      'sms': 'پنل پیامک',
-      'marketplace': 'بازار افزونه‌ها',
-      'reports': 'گزارش‌ها',
-      'fiscal_years': 'سال‌های مالی',
-      'warranty': 'گارانتی',
-      'customer_club': t.customerClubMenu,
-      'distribution': t.distributionMenu,
-      'crm': 'CRM',
-      'crm_web_chat': 'چت وب (ویجت)',
-    };
-    
-    return titles[sectionKey] ?? sectionKey;
+  String _getSectionTitle(AppLocalizations t, String sectionKey) {
+    switch (sectionKey) {
+      case 'people':
+        return t.people;
+      case 'people_receipts':
+        return t.receipts;
+      case 'people_payments':
+        return t.payments;
+      case 'people_transactions':
+        return '${t.receiptsAndPayments} ${t.people}';
+      case 'products':
+        return t.products;
+      case 'price_lists':
+        return t.priceLists;
+      case 'categories':
+        return t.categories;
+      case 'product_attributes':
+        return t.productAttributes;
+      case 'bank_accounts':
+        return t.bankAccounts;
+      case 'cash':
+        return t.cash;
+      case 'petty_cash':
+        return t.pettyCash;
+      case 'loan_facilities':
+        return t.loanFacilities;
+      case 'checks':
+        return t.checks;
+      case 'wallet':
+        return t.wallet;
+      case 'transfers':
+        return t.transfers;
+      case 'invoices':
+        return t.invoices;
+      case 'invoice_types':
+        return t.permissionSectionInvoiceTypes;
+      case 'pricing':
+        return t.permissionSectionPricing;
+      case 'expenses_income':
+        return t.expensesIncome;
+      case 'accounting_documents':
+        return t.accountingDocuments;
+      case 'chart_of_accounts':
+        return t.chartOfAccounts;
+      case 'currency_revaluation':
+        return t.currencyRevaluation;
+      case 'opening_balance':
+        return t.openingBalance;
+      case 'warehouses':
+        return t.warehouses;
+      case 'warehouse_transfers':
+        return t.warehouseTransfers;
+      case 'settings':
+        return t.settings;
+      case 'storage':
+        return t.storageSpace;
+      case 'sms':
+        return t.smsPanel;
+      case 'marketplace':
+        return t.marketplace;
+      case 'reports':
+        return t.reports;
+      case 'fiscal_years':
+        return t.fiscalYears;
+      case 'warranty':
+        return t.warranty;
+      case 'customer_club':
+        return t.customerClubMenu;
+      case 'distribution':
+        return t.distributionMenu;
+      case 'crm':
+        return t.workflowCategoryCrm;
+      case 'crm_web_chat':
+        return t.permissionSectionCrmWebChat;
+      default:
+        return sectionKey;
+    }
   }
 
-  String _localizeAction(String action) {
-    final t = AppLocalizations.of(context);
+  String _localizeAction(AppLocalizations t, String sectionKey, String action) {
     switch (action) {
+      case 'sales':
+        return t.invoiceTypeSales;
+      case 'sales_return':
+        return t.invoiceTypeSalesReturn;
+      case 'purchase':
+        return t.invoiceTypePurchase;
+      case 'purchase_return':
+        return t.invoiceTypePurchaseReturn;
+      case 'waste':
+        return t.invoiceTypeWaste;
+      case 'direct_consumption':
+        return t.invoiceTypeDirectConsumption;
+      case 'production':
+        return t.invoiceTypeProduction;
+      case 'sales_price_view':
+        return '${t.view} ${t.salesPrice}';
+      case 'purchase_price_view':
+        return '${t.view} ${t.purchasePrice}';
       case 'add':
         return t.add;
       case 'view':
         return t.view;
       case 'edit':
-        return t.edit;
+        return sectionKey == 'fiscal_years' ? t.permissionFiscalYearEditCurrent : t.edit;
       case 'delete':
         return t.delete;
       case 'draft':
         return t.draft;
+      case 'read':
+        return t.view;
+      case 'write':
+        if (sectionKey == 'crm') {
+          return t.permissionCrmEditAndAdd;
+        }
+        return t.edit;
       case 'buy':
         return t.buy;
       case 'invoices':
@@ -1644,6 +1663,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.users;
       case 'business':
         return t.business;
+      case 'manage_ftp':
+        return t.settingsPermissionManageFtp;
       case 'collect':
         return t.collect;
       case 'transfer':
@@ -1651,19 +1672,36 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'charge':
         return t.charge;
       case 'return':
-        return 'برگشت';
+        return t.returnChecks;
+      case 'close':
+        return sectionKey == 'fiscal_years' ? t.permissionFiscalYearClose : action;
+      case 'rollback':
+        return sectionKey == 'fiscal_years' ? t.permissionFiscalYearRollbackDangerous : action;
       case 'export':
-        return t.export ?? 'خروجی';
+        return t.export;
       case 'manage':
-        return t.manage ?? 'مدیریت';
+        return t.manage;
       case 'adjust':
         return t.customerClubActionAdjust;
       case 'redeem':
         return t.customerClubActionRedeem;
+      case 'reply':
+        return t.permissionCrmWebChatReply;
+      case 'manage_widgets':
+        return t.permissionCrmWebChatManageWidgets;
+      case 'edit_conversations':
+        return t.permissionCrmWebChatEditConversations;
+      case 'delete_messages':
+        return t.permissionCrmWebChatDeleteMessages;
       case 'operate':
         return t.distributionPermissionOperate;
       case 'reports_team':
+        if (sectionKey == 'crm') {
+          return t.permissionCrmTeamPerformanceReports;
+        }
         return t.distributionPermissionReportsTeam;
+      case 'reports':
+        return sectionKey == 'crm' ? t.permissionCrmViewReports : t.reports;
       default:
         return action;
     }
@@ -1817,6 +1855,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
   }
 
   Widget _buildPermissionItem(
+    String sectionKey,
+    String actionKey,
     String title,
     String description,
     bool value,
@@ -1824,8 +1864,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     ThemeData theme,
     ColorScheme colorScheme,
   ) {
-    final isViewItem = title == 'view' || description.contains('مشاهده') || description.toLowerCase().contains('view');
-    final sectionKey = _inferCurrentSectionKey(title, description);
+    final isViewItem = actionKey == 'view';
     final mustKeepViewEnabled = isViewItem && _hasAnyNonViewEnabled(sectionKey);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),

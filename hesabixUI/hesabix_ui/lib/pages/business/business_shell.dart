@@ -1261,6 +1261,15 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: true,
           ),
+          _MenuItem(
+            key: 'loan-facilities',
+            label: t.loanFacilities,
+            icon: Icons.real_estate_agent_outlined,
+            selectedIcon: Icons.real_estate_agent,
+            path: _bu('loan-facilities'),
+            type: _MenuItemType.simple,
+            hasAddButton: true,
+          ),
         ],
       ),
       _MenuItem(
@@ -3089,8 +3098,10 @@ class _BusinessShellState extends State<BusinessShell> {
       return widget.authStore.canViewCrmWebChat();
     }
     
-    // داشبورد همیشه قابل مشاهده است
-    if (item.path != null && item.path!.endsWith('/dashboard')) {
+    // داشبورد اصلی کسب‌وکار همیشه قابل مشاهده است (داشبورد CRM تابع canReadSection('crm') است)
+    if (item.path != null &&
+        item.path!.endsWith('/dashboard') &&
+        !item.path!.contains('/crm/')) {
       return true;
     }
     
@@ -3180,7 +3191,18 @@ class _BusinessShellState extends State<BusinessShell> {
   // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی
   String? _sectionForLabel(String label, AppLocalizations t) {
     if (label == t.people) return 'people';
-    if (label == 'CRM' || label == 'داشبورد' || label == 'فرایندها و زون ارجاعات' || label == 'سرنخ‌ها' || label == 'فرصت‌های فروش' || label == 'فعالیت‌ها' || label == 'گزارشات' || label == t.crmMenuNotesCalendar || label == 'چت وب') return 'crm';
+    if (label == 'CRM' ||
+        label == 'داشبورد' ||
+        label == 'فرایندها و زون ارجاعات' ||
+        label == 'فرایندها و مراحل قیف' ||
+        label == 'سرنخ‌ها' ||
+        label == 'فرصت‌های فروش' ||
+        label == 'فعالیت‌ها' ||
+        label == 'گزارشات' ||
+        label == t.crmMenuNotesCalendar ||
+        label == 'چت وب') {
+      return 'crm';
+    }
     if (label == t.products) return 'products';
     if (label == t.categories) return 'categories';
     if (label == t.productAttributes) return 'product_attributes';
@@ -3188,6 +3210,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.pettyCash) return 'petty_cash';
     if (label == t.cashBox) return 'cash';
     if (label == t.wallet) return 'wallet';
+    if (label == t.loanFacilities) return 'loan_facilities';
     if (label == t.checks) return 'checks';
     if (label == 'فروش سریع') return 'invoices'; // فروش سریع نیازمند دسترسی invoices.add است
     if (label == t.invoice) return 'invoices';

@@ -240,7 +240,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
                       businessId,
                     );
                     if (!mounted) return;
-                    context.go('/mobile-launcher/$businessId');
+                    context.go(MobileLauncherPrefs.launcherHomePath(businessId));
                   },
                 ),
               ],

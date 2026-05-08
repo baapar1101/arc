@@ -179,7 +179,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
                       businessId,
                     );
                     if (!mounted) return;
-                    context.go('/mobile-launcher/$businessId');
+                    context.go(MobileLauncherPrefs.launcherHomePath(businessId));
                   },
                 ),
               ],

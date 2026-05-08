@@ -488,7 +488,7 @@ class Hesabix_V2_Mapper
 
 		$lines = array();
 		$db_service = new Hesabix_V2_DB_Service();
-		$warehouse_id = get_option('hesabix_v2_default_warehouse_id', null);
+		$warehouse_id = Hesabix_V2_Invoice_Warehouse_Service::resolve_warehouse_id_for_order($order);
 
 		// Add order items (فرمت API حسابیکس: lines[].product_id, quantity, extra_info)
 		foreach ($order->get_items() as $item) {

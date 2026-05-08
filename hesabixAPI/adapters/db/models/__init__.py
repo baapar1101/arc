@@ -66,6 +66,11 @@ from .tax_setting import TaxSetting  # noqa: F401
 from .bank_account import BankAccount  # noqa: F401
 from .cash_register import CashRegister  # noqa: F401
 from .petty_cash import PettyCash  # noqa: F401
+from .received_loan_facility import (  # noqa: F401
+	ReceivedLoanFacility,
+	ReceivedLoanInstallment,
+	ReceivedLoanInstallmentPayment,
+)
 from .check import Check  # noqa: F401
 from .warehouse import Warehouse  # noqa: F401
 from .warehouse_location import WarehouseLocation  # noqa: F401

@@ -657,6 +657,85 @@ class Hesabix_V2_Admin
 			$v = sanitize_text_field(wp_unslash($_POST['hesabix_v2_default_warehouse_id']));
 			update_option('hesabix_v2_default_warehouse_id', $v === '' ? '' : absint($v));
 		}
+
+		$scope = isset($_POST['stock_pull_warehouse_scope'])
+			? sanitize_key(wp_unslash($_POST['stock_pull_warehouse_scope']))
+			: 'default';
+		if (!in_array($scope, array('default', 'selected', 'all'), true)) {
+			$scope = 'default';
+		}
+		$sp_wh_ids = array();
+		if (!empty($_POST['stock_pull_warehouse_ids']) && is_array($_POST['stock_pull_warehouse_ids'])) {
+			foreach ($_POST['stock_pull_warehouse_ids'] as $wid_raw) {
+				$wid = absint(wp_unslash($wid_raw));
+				if ($wid > 0) {
+					$sp_wh_ids[] = $wid;
+				}
+			}
+		}
+		$sp_wh_ids = array_values(array_unique($sp_wh_ids));
+		$cron_min = isset($_POST['stock_pull_cron_minutes'])
+			? absint(wp_unslash($_POST['stock_pull_cron_minutes']))
+			: 15;
+		$cron_min = max(5, min(180, $cron_min));
+
+		update_option(
+			'hesabix_v2_stock_pull',
+			array(
+				'enabled' => isset($_POST['stock_pull_enabled']),
+				'warehouse_scope' => $scope,
+				'warehouse_ids' => $sp_wh_ids,
+				'cron_minutes' => $cron_min,
+				'force_manage_stock' => isset($_POST['stock_pull_force_manage_stock']),
+				'disable_wc_stock_reduction' => isset($_POST['stock_pull_disable_wc_reduce']),
+			)
+		);
+		Hesabix_V2_Stock_Pull_Service::reschedule_cron();
+
+		$inv_resolution = isset($_POST['invoice_wh_resolution'])
+			? sanitize_key(wp_unslash($_POST['invoice_wh_resolution']))
+			: 'default';
+		if (!in_array($inv_resolution, array('default', 'rules'), true)) {
+			$inv_resolution = 'default';
+		}
+		$inv_types = isset($_POST['inv_wh_r_type']) && is_array($_POST['inv_wh_r_type'])
+			? wp_unslash($_POST['inv_wh_r_type'])
+			: array();
+		$inv_keys = isset($_POST['inv_wh_r_key']) && is_array($_POST['inv_wh_r_key'])
+			? wp_unslash($_POST['inv_wh_r_key'])
+			: array();
+		$inv_wids = isset($_POST['inv_wh_r_wid']) && is_array($_POST['inv_wh_r_wid'])
+			? wp_unslash($_POST['inv_wh_r_wid'])
+			: array();
+		$inv_rule_count = max(count($inv_types), count($inv_keys), count($inv_wids));
+		$inv_rule_count = min(40, $inv_rule_count);
+		$inv_rules = array();
+		for ($ri = 0; $ri < $inv_rule_count; $ri++) {
+			$t = isset($inv_types[ $ri ]) ? sanitize_key((string) $inv_types[ $ri ]) : '';
+			if ($t !== 'shipping_method' && $t !== 'shipping_zone') {
+				continue;
+			}
+			$k = isset($inv_keys[ $ri ]) ? trim((string) $inv_keys[ $ri ]) : '';
+			$w = isset($inv_wids[ $ri ]) ? absint($inv_wids[ $ri ]) : 0;
+			if ($k === '' || $w < 1) {
+				continue;
+			}
+			if ($t === 'shipping_zone') {
+				$k = (string) absint($k);
+			}
+			$inv_rules[] = array(
+				'type' => $t,
+				'key' => $k,
+				'warehouse_id' => $w,
+			);
+		}
+		update_option(
+			Hesabix_V2_Invoice_Warehouse_Service::OPTION_KEY,
+			array(
+				'resolution' => $inv_resolution,
+				'rules' => $inv_rules,
+			)
+		);
 		if (isset($_POST['hesabix_v2_default_bank_id'])) {
 			update_option('hesabix_v2_default_bank_id', sanitize_text_field(wp_unslash($_POST['hesabix_v2_default_bank_id'])));
 		}
@@ -1674,6 +1753,28 @@ class Hesabix_V2_Admin
 			'cash_registers' => $cash_registers,
 			'currencies' => $currencies,
 		));
+	}
+
+	/**
+	 * AJAX: کشش موجودی حسابیکس → ووکامرس (هم‌اکنون)
+	 *
+	 * @since 3.3.2
+	 */
+	public function ajax_pull_stock_now()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json(array(
+				'success' => false,
+				'message' => __('ابتدا اتصال به حسابیکس را تکمیل کنید.', 'hesabix-v2'),
+			));
+		}
+
+		$result = Hesabix_V2_Stock_Pull_Service::execute_pull(array('source' => 'ajax'));
+
+		wp_send_json($result);
 	}
 
 	// ==================== Setup Wizard AJAX ====================

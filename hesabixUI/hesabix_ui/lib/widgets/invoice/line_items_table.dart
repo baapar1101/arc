@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -39,6 +41,8 @@ class InvoiceLineItemsTable extends StatefulWidget {
   final List<InvoiceLineItem>? initialRows; // برای مقداردهی اولیه (ویرایش فاکتور)
   final AuthStore? authStore;
   final CalendarController? calendarController; // برای فرمت تاریخ در دیالوگ انتخاب instance
+  /// وقتی کاربر واقعاً در تب «کالاها» فاکتور است true کنید (مثلاً `tabController.index == 1`).
+  final bool lineAddRowShortcutsLayerActive;
 
   const InvoiceLineItemsTable({
     super.key,
@@ -52,6 +56,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
     this.initialRows,
     this.authStore,
     this.calendarController,
+    this.lineAddRowShortcutsLayerActive = false,
   });
 
   @override
@@ -59,6 +64,9 @@ class InvoiceLineItemsTable extends StatefulWidget {
 }
 
 class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
+  static const Duration _lineAddQiWindow = Duration(seconds: 2);
+  DateTime? _lineAddQiPendingSince;
+
   final List<InvoiceLineItem> _rows = <InvoiceLineItem>[];
   final PriceListService _priceListService = PriceListService(apiClient: ApiClient());
   final ProductService _productService = ProductService();
@@ -73,6 +81,80 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   final Map<String, Map<String, FocusNode>> _focusNodesByLineKey = {};
 
   void _notify() => widget.onChanged?.call(List<InvoiceLineItem>.from(_rows));
+
+  bool _subtreeHasEditableText(Element root) {
+    bool found = false;
+    void walk(Element e) {
+      if (found) return;
+      if (e.widget is EditableText) {
+        found = true;
+        return;
+      }
+      e.visitChildren(walk);
+    }
+    walk(root);
+    return found;
+  }
+
+  bool _lineAddShortcutTypingContext() {
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    if (ctx is! Element) return false;
+    return _subtreeHasEditableText(ctx);
+  }
+
+  /// [HardwareKeyboard.addHandler]: true = رویداد را مصرف کن.
+  bool _onLineAddQiHardwareKey(KeyEvent event) {
+    if (!mounted ||
+        !widget.lineAddRowShortcutsLayerActive ||
+        ResponsiveHelper.isMobile(context)) {
+      return false;
+    }
+    final KeyDownEvent? down = switch (event) {
+      KeyDownEvent d => d,
+      _ => null,
+    };
+    if (down == null) {
+      return false;
+    }
+
+    final hw = HardwareKeyboard.instance;
+    if (hw.isControlPressed || hw.isMetaPressed || hw.isAltPressed) {
+      _lineAddQiPendingSince = null;
+      return false;
+    }
+
+    if (_lineAddShortcutTypingContext()) {
+      _lineAddQiPendingSince = null;
+      return false;
+    }
+
+    final lk = event.logicalKey;
+    final isQ = lk.keyId == LogicalKeyboardKey.keyQ.keyId;
+    final isI = lk.keyId == LogicalKeyboardKey.keyI.keyId;
+
+    if (!isQ && !isI) {
+      _lineAddQiPendingSince = null;
+      return false;
+    }
+
+    if (isQ) {
+      _lineAddQiPendingSince = DateTime.now();
+      return false;
+    }
+
+    assert(isI);
+    final pending = _lineAddQiPendingSince;
+    if (pending == null) {
+      return false;
+    }
+    if (DateTime.now().difference(pending) > _lineAddQiWindow) {
+      _lineAddQiPendingSince = null;
+      return false;
+    }
+    _lineAddQiPendingSince = null;
+    unawaited(_addRows(1));
+    return true;
+  }
   
   /// دریافت ارتفاع فیلد بر اساس اندازه صفحه
   double _getFieldHeight(BuildContext context) {
@@ -449,34 +531,43 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
           )
         : null;
 
-    return ElevatedButton.icon(
-      onPressed: _addRowsByPreferredCount,
-      icon: const Icon(Icons.add),
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(addLabel),
-          PopupMenuButton<int>(
-            tooltip: 'انتخاب تعداد ردیف',
-            icon: const Icon(Icons.arrow_drop_down),
-            onSelected: (value) {
-              setState(() {
-                _preferredAddRowCount = value;
-              });
-              _addRows(value);
-            },
-            itemBuilder: (menuContext) => options
-                .map(
-                  (value) => PopupMenuItem<int>(
-                    value: value,
-                    child: Text('افزودن $value ردیف'),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
+    final showShortcutHint =
+        !ResponsiveHelper.isMobile(context) && widget.lineAddRowShortcutsLayerActive;
+    final tooltipMessage = showShortcutHint
+        ? '${t.add}\n${t.invoiceLineItemsAddRowKeyboardHint}'
+        : t.add;
+
+    return Tooltip(
+      message: tooltipMessage,
+      child: ElevatedButton.icon(
+        onPressed: _addRowsByPreferredCount,
+        icon: const Icon(Icons.add),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(addLabel),
+            PopupMenuButton<int>(
+              tooltip: 'انتخاب تعداد ردیف',
+              icon: const Icon(Icons.arrow_drop_down),
+              onSelected: (value) {
+                setState(() {
+                  _preferredAddRowCount = value;
+                });
+                _addRows(value);
+              },
+              itemBuilder: (menuContext) => options
+                  .map(
+                    (value) => PopupMenuItem<int>(
+                      value: value,
+                      child: Text('افزودن $value ردیف'),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+        style: baseStyle,
       ),
-      style: baseStyle,
     );
   }
 
@@ -504,6 +595,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_onLineAddQiHardwareKey);
     if ((widget.initialRows ?? const <InvoiceLineItem>[]).isNotEmpty) {
       _invoiceLineAttrsLog('initState: initialRows count=${widget.initialRows!.length}');
       _rows.clear();
@@ -520,6 +612,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onLineAddQiHardwareKey);
     _disposeAllFocusNodes();
     super.dispose();
   }
@@ -538,6 +631,9 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   @override
   void didUpdateWidget(covariant InvoiceLineItemsTable oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!widget.lineAddRowShortcutsLayerActive) {
+      _lineAddQiPendingSince = null;
+    }
     if (oldWidget.selectedCurrencyId != widget.selectedCurrencyId) {
       // ارز تغییر کرده: لازم است قیمت‌های بر اساس لیست قیمت مجدد ارزیابی شوند
       _recalculateAllUnitPrices();
@@ -832,6 +928,20 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            if (!isMobile && widget.lineAddRowShortcutsLayerActive)
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    t.invoiceLineItemsAddRowKeyboardHint,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+              ),
             Container(
               decoration: BoxDecoration(
                 border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),

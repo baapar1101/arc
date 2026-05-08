@@ -1180,21 +1180,27 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              InvoiceLineItemsTable(
-                businessId: widget.businessId,
-                authStore: widget.authStore,
-                selectedCurrencyId: _selectedCurrencyId,
-                currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
-                currencyUnitLabel: _invoiceCurrencyUnitLabel,
-                invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
-                postInventory: _invoiceWarehouseReleaseMode != 'none',
-                initialRows: _lineItems,
-                calendarController: widget.calendarController,
-                onChanged: (rows) {
-                  setState(() {
-                    _lineItems = rows;
-                    _recalculateTotals();
-                  });
+              AnimatedBuilder(
+                animation: _tabController,
+                builder: (context, _) {
+                  return InvoiceLineItemsTable(
+                    businessId: widget.businessId,
+                    authStore: widget.authStore,
+                    selectedCurrencyId: _selectedCurrencyId,
+                    currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
+                    currencyUnitLabel: _invoiceCurrencyUnitLabel,
+                    invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
+                    postInventory: _invoiceWarehouseReleaseMode != 'none',
+                    initialRows: _lineItems,
+                    calendarController: widget.calendarController,
+                    lineAddRowShortcutsLayerActive: _tabController.index == 1,
+                    onChanged: (rows) {
+                      setState(() {
+                        _lineItems = rows;
+                        _recalculateTotals();
+                      });
+                    },
+                  );
                 },
               ),
               if (showGlobalDisc) ...[

@@ -78,6 +78,16 @@ class MobileLauncherPrefs {
     await _clearLegacy(prefs);
   }
 
+  /// مسیر ثابت خانهٔ لانچر (شبکهٔ کاشی‌ها).
+  static String launcherHomePath(int businessId) =>
+      '/mobile-launcher/$businessId/home';
+
+  static String launcherAppearancePath(int businessId) =>
+      '/mobile-launcher/$businessId/appearance';
+
+  static String launcherQuickSalesPath(int businessId) =>
+      '/mobile-launcher/$businessId/quick-sales';
+
   static Future<String?> resumeHomeLocation(int? userId) async {
     await migrateLegacyIfNeeded(userId);
     final prefs = await SharedPreferences.getInstance();
@@ -85,12 +95,12 @@ class MobileLauncherPrefs {
       if (prefs.getBool(_resumeKey(userId)) != true) return null;
       final id = prefs.getInt(_bizKey(userId));
       if (id == null || id <= 0) return null;
-      return '/mobile-launcher/$id';
+      return launcherHomePath(id);
     }
     if (prefs.getBool(_legacyResume) != true) return null;
     final id = prefs.getInt(_legacyBiz);
     if (id == null || id <= 0) return null;
-    return '/mobile-launcher/$id';
+    return launcherHomePath(id);
   }
 
   static Future<String> postAuthHomeLocation(int? userId) async {

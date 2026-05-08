@@ -685,7 +685,7 @@ def update_permissions(
     return success_response(
         data={},
         request=request,
-        message="دسترسی‌ها با موفقیت به‌روزرسانی شد"
+        message="BUSINESS_USER_PERMISSIONS_UPDATED",
     )
 
 

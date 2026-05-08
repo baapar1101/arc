@@ -11,9 +11,9 @@ import '../../services/business_dashboard_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 
-/// صفحهٔ لانچر سبک (خارج از پنل کسب‌وکار) برای موبایل و POS.
-class MobileLauncherPage extends StatefulWidget {
-  const MobileLauncherPage({
+/// خانهٔ لانچر موبایل (شبکهٔ کاشی‌ها؛ زیرشاخهٔ `/mobile-launcher/:id/home`).
+class MobileLauncherHomePage extends StatefulWidget {
+  const MobileLauncherHomePage({
     super.key,
     required this.businessId,
     required this.authStore,
@@ -23,10 +23,10 @@ class MobileLauncherPage extends StatefulWidget {
   final AuthStore authStore;
 
   @override
-  State<MobileLauncherPage> createState() => _MobileLauncherPageState();
+  State<MobileLauncherHomePage> createState() => _MobileLauncherHomePageState();
 }
 
-class _MobileLauncherPageState extends State<MobileLauncherPage> {
+class _MobileLauncherHomePageState extends State<MobileLauncherHomePage> {
   late Future<int> _bgArgb = MobileLauncherPrefs.backgroundColorArgb(
     widget.authStore.currentUserId,
   );
@@ -91,30 +91,10 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
     );
   }
 
-  Future<void> _validateBusinessAccess() async {
-    final api = ApiClient();
-    final ok =
-        await BusinessDashboardService(api).hasBusinessAccess(widget.businessId);
-    if (!mounted) return;
-    if (ok) return;
-    await MobileLauncherPrefs.clearResumeLauncher(widget.authStore.currentUserId);
-    SnackBarHelper.showError(
-      context,
-      message: AppLocalizations.of(context).mobileLauncherBusinessNoAccess,
-    );
-    context.go('/user/profile/businesses');
-  }
-
   Future<void> _disableLauncherHome(AppLocalizations t) async {
     await MobileLauncherPrefs.clearResumeLauncher(widget.authStore.currentUserId);
     if (!mounted) return;
     SnackBarHelper.show(context, message: t.mobileLauncherDisableHomeLauncherDone);
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _validateBusinessAccess());
   }
 
   @override
@@ -310,7 +290,9 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
                           fg: onBg,
                           onTap: () async {
                             await context.push<void>(
-                              '/mobile-launcher/${widget.businessId}/appearance',
+                              MobileLauncherPrefs.launcherAppearancePath(
+                                widget.businessId,
+                              ),
                             );
                             _reloadBackground();
                             _reloadGridLayout();
@@ -336,7 +318,9 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
                         enabled: canOpenQuickSales,
                         onTap: canOpenQuickSales
                             ? () => context.go(
-                                  '/business/${widget.businessId}/quick-sales',
+                                  MobileLauncherPrefs.launcherQuickSalesPath(
+                                    widget.businessId,
+                                  ),
                                 )
                             : () => SnackBarHelper.showError(
                                   context,

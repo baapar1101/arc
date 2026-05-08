@@ -27,6 +27,8 @@ class Hesabix_V2_Deactivator
 			wp_unschedule_event($timestamp, 'hesabix_v2_clean_old_logs');
 		}
 
+		wp_clear_scheduled_hook('hesabix_v2_pull_stock_cron');
+
 		// Note: We don't delete data on deactivation
 		// Data will only be deleted if user chooses to uninstall
 		

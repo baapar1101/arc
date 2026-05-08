@@ -861,3 +861,6 @@ msgstr "File not found in this conversation"
 
 msgid "CRM_CHAT_CONVERSATION_STATUS_INVALID"
 msgstr "Invalid status"
+
+msgid "BUSINESS_USER_PERMISSIONS_UPDATED"
+msgstr "Permissions updated successfully"

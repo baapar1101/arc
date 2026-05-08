@@ -21,7 +21,15 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
   Map<String, dynamic>? _deleteInfo;
   bool _loading = true;
   bool _confirming = false;
-  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _deleteConfirmController = TextEditingController();
+
+  /// Accepts English `delete` (case-insensitive) or Persian `حذف`.
+  static bool _isDeleteConfirmationPhrase(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return false;
+    if (s.toLowerCase() == 'delete') return true;
+    return s == 'حذف';
+  }
   
   @override
   void initState() {
@@ -31,7 +39,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
   
   @override
   void dispose() {
-    _nameController.dispose();
+    _deleteConfirmController.dispose();
     super.dispose();
   }
   
@@ -66,16 +74,9 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
     }
     
     final businessName = _deleteInfo!['business']['name'] as String;
-    _nameController.clear();
-    
-    // لاگ برای دیباگ
-    print('=== DELETE BUSINESS DEBUG ===');
-    print('Business Name: "$businessName"');
-    print('Business Name Length: ${businessName.length}');
-    print('Business Name Code Units: ${businessName.codeUnits}');
-    print('Business Name Trimmed: "${businessName.trim()}"');
-    print('Business Name Trimmed Length: ${businessName.trim().length}');
-    
+    final t = AppLocalizations.of(context);
+    _deleteConfirmController.clear();
+
     // تایید اول: نمایش دیالوگ هشدار
     final confirm1 = await showDialog<bool>(
       context: context,
@@ -155,16 +156,16 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'لطفاً نام کسب و کار را برای تایید نهایی وارد کنید:',
-                    style: TextStyle(fontWeight: FontWeight.w500),
+                  Text(
+                    t.deleteBusinessConfirmTypeInstruction,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: _nameController,
+                    controller: _deleteConfirmController,
                     decoration: InputDecoration(
-                      hintText: 'نام کسب و کار',
-                      prefixIcon: const Icon(Icons.business),
+                      hintText: t.deleteBusinessConfirmTypeHint,
+                      prefixIcon: const Icon(Icons.keyboard),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -173,20 +174,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                         borderSide: BorderSide(color: Colors.red.shade300, width: 2),
                       ),
                     ),
-                    onChanged: (value) {
-                      print('--- TextField onChanged ---');
-                      print('Entered Value: "$value"');
-                      print('Entered Value Length: ${value.length}');
-                      print('Entered Value Code Units: ${value.codeUnits}');
-                      print('Entered Value Trimmed: "${value.trim()}"');
-                      print('Entered Value Trimmed Length: ${value.trim().length}');
-                      print('Business Name: "$businessName"');
-                      print('Business Name Trimmed: "${businessName.trim()}"');
-                      print('Are Equal: ${value.trim() == businessName.trim()}');
-                      print('Are Equal (no trim): ${value == businessName}');
-                      print('--- End onChanged ---');
-                      setDialogState(() {});
-                    },
+                    onChanged: (_) => setDialogState(() {}),
                   ),
                   const SizedBox(height: 24),
                   // دکمه‌ها
@@ -200,26 +188,13 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                       const SizedBox(width: 8),
                       Builder(
                         builder: (btnContext) {
-                          final enteredText = _nameController.text.trim();
-                          final isMatch = enteredText == businessName.trim();
-                          
-                          // لاگ برای بررسی وضعیت دکمه
-                          print('--- Button State Check ---');
-                          print('Entered Text: "$enteredText"');
-                          print('Entered Text Length: ${enteredText.length}');
-                          print('Business Name: "$businessName"');
-                          print('Business Name Trimmed: "${businessName.trim()}"');
-                          print('Business Name Trimmed Length: ${businessName.trim().length}');
-                          print('Is Match: $isMatch');
-                          print('Button Enabled: $isMatch');
-                          print('--- End Button State Check ---');
-                          
+                          final isMatch = _isDeleteConfirmationPhrase(
+                            _deleteConfirmController.text,
+                          );
+
                           return FilledButton.icon(
                             onPressed: isMatch
-                                ? () {
-                                    print('Button Pressed - Proceeding with deletion');
-                                    Navigator.of(ctx).pop(true);
-                                  }
+                                ? () => Navigator.of(ctx).pop(true)
                                 : null,
                             icon: const Icon(Icons.delete_forever),
                             label: const Text('ادامه'),
