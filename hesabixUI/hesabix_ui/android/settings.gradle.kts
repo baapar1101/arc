@@ -25,6 +25,8 @@ pluginManagement {
         maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
         // Fallback if mirror misses an artifact (init script mirrors composite builds too)
         gradlePluginPortal()
+        google()
+        mavenCentral()
     }
 }
 
