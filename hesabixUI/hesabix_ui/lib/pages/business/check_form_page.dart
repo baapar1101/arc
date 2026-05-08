@@ -246,11 +246,40 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       widget.onSuccess?.call();
     } catch (e) {
       if (mounted) {
-        _showError('خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}');
+        final t = AppLocalizations.of(context);
+        _showError(_buildSaveErrorMessage(error: e, t: t));
       }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String _buildSaveErrorMessage({
+    required Object error,
+    required AppLocalizations t,
+  }) {
+    final extractedMessage = ErrorExtractor.userMessage(error, t);
+    if (_isDuplicateSayadCodeError(error, extractedMessage)) {
+      return t.checkFormDuplicateSayadCode;
+    }
+    return extractedMessage;
+  }
+
+  bool _isDuplicateSayadCodeError(Object error, String extractedMessage) {
+    final rawError = error.toString().toLowerCase();
+    final extracted = extractedMessage.toLowerCase();
+
+    final looksLikeDuplicate = rawError.contains('duplicate') ||
+        rawError.contains('unique constraint') ||
+        rawError.contains('duplicate key') ||
+        extracted.contains('duplicate') ||
+        extracted.contains('unique constraint');
+    final mentionsSayad = rawError.contains('sayad') ||
+        rawError.contains('sayad_code') ||
+        extracted.contains('sayad') ||
+        extracted.contains('شناسه صیاد');
+
+    return looksLikeDuplicate && mentionsSayad;
   }
 
   void _showError(String message) {

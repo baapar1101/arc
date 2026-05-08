@@ -2323,6 +2323,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'You do not have permission to post accounting documents. Saving a check records a journal entry; ask an admin to grant add, edit, or draft under Accounting documents.';
 
   @override
+  String get checkFormDuplicateSayadCode =>
+      'This Sayad code is already registered for another check in this business.';
+
+  @override
   String get addBankAccount => 'Add Bank Account';
 
   @override

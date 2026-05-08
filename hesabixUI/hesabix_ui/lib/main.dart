@@ -370,7 +370,10 @@ class _MyAppState extends State<MyApp> {
       WalletPaymentResultPage(authStore: authStore);
       
       // Preload صفحات Profile
-      ProfileDashboardPage(calendarController: calendarController);
+      ProfileDashboardPage(
+        calendarController: calendarController,
+        authStore: authStore,
+      );
       const AnnouncementsPage();
       NewBusinessPage(calendarController: calendarController);
       const BusinessesPage();
@@ -1059,8 +1062,16 @@ class _MyAppState extends State<MyApp> {
               name: 'profile_dashboard',
               builder: (context, state) {
                 // ثبت صفحه برای preload خودکار
-                registerRoutePage(() => ProfileDashboardPage(calendarController: _calendarController!));
-                return ProfileDashboardPage(calendarController: _calendarController!);
+                registerRoutePage(
+                  () => ProfileDashboardPage(
+                    calendarController: _calendarController!,
+                    authStore: _authStore!,
+                  ),
+                );
+                return ProfileDashboardPage(
+                  calendarController: _calendarController!,
+                  authStore: _authStore!,
+                );
               },
             ),
             GoRoute(

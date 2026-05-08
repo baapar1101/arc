@@ -4535,6 +4535,12 @@ abstract class AppLocalizations {
   /// **'You do not have permission to post accounting documents. Saving a check records a journal entry; ask an admin to grant add, edit, or draft under Accounting documents.'**
   String get checkFormNeedsAccountingDocumentsPermission;
 
+  /// Check form save error when Sayad code already exists in the business.
+  ///
+  /// In en, this message translates to:
+  /// **'This Sayad code is already registered for another check in this business.'**
+  String get checkFormDuplicateSayadCode;
+
   /// No description provided for @addBankAccount.
   ///
   /// In en, this message translates to:

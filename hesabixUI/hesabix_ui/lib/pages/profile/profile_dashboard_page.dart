@@ -7,13 +7,20 @@ import '../../services/announcements_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../core/auth_store.dart';
+import '../../core/mobile_launcher_prefs.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class ProfileDashboardPage extends StatefulWidget {
   final CalendarController calendarController;
-  const ProfileDashboardPage({super.key, required this.calendarController});
+  final AuthStore authStore;
+  const ProfileDashboardPage({
+    super.key,
+    required this.calendarController,
+    required this.authStore,
+  });
 
   @override
   State<ProfileDashboardPage> createState() => _ProfileDashboardPageState();
@@ -122,6 +129,65 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
   bool _isMobile(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     return _currentBreakpoint(width) == 'xs';
+  }
+
+  Future<void> _openBusinessFromDashboard(int businessId) async {
+    final t = AppLocalizations.of(context);
+    if (!_isMobile(context)) {
+      await MobileLauncherPrefs.clearResumeLauncher(widget.authStore.currentUserId);
+      if (!mounted) return;
+      context.go('/business/$businessId/dashboard');
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                  child: Text(
+                    t.mobileLauncherChooseModeTitle,
+                    style: Theme.of(sheetCtx).textTheme.titleMedium,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.dashboard_outlined),
+                  title: Text(t.mobileLauncherModeStandard),
+                  onTap: () async {
+                    Navigator.of(sheetCtx).pop();
+                    await MobileLauncherPrefs.clearResumeLauncher(
+                      widget.authStore.currentUserId,
+                    );
+                    if (!mounted) return;
+                    context.go('/business/$businessId/dashboard');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.apps_outlined),
+                  title: Text(t.mobileLauncherModeLauncher),
+                  onTap: () async {
+                    Navigator.of(sheetCtx).pop();
+                    await MobileLauncherPrefs.setResumeLauncher(
+                      widget.authStore.currentUserId,
+                      businessId,
+                    );
+                    if (!mounted) return;
+                    context.go('/mobile-launcher/$businessId');
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _loadAll() async {
@@ -514,13 +580,15 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
           title: Text(name),
           subtitle: Text(isOwner ? 'مالک' : (role.isNotEmpty ? role : 'عضو')),
           trailing: TextButton.icon(
-            onPressed: () {
+            onPressed: () async {
               final id = it['id'];
               if (id is int) {
-                context.go('/business/$id/dashboard');
+                await _openBusinessFromDashboard(id);
               } else {
                 final p = int.tryParse('$id');
-                if (p != null) context.go('/business/$p/dashboard');
+                if (p != null) {
+                  await _openBusinessFromDashboard(p);
+                }
               }
             },
             icon: const Icon(Icons.arrow_forward),

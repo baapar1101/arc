@@ -849,6 +849,10 @@
     "description": "Check form dialog when user lacks accounting document posting permissions."
   },
   "checkFormNeedsAccountingDocumentsPermission": "You do not have permission to post accounting documents. Saving a check records a journal entry; ask an admin to grant add, edit, or draft under Accounting documents.",
+  "@checkFormDuplicateSayadCode": {
+    "description": "Check form save error when Sayad code already exists in the business."
+  },
+  "checkFormDuplicateSayadCode": "This Sayad code is already registered for another check in this business.",
   "productAttributes": "Product Attributes",
   "addAttribute": "Add Attribute",
   "viewAttributes": "View Attributes",

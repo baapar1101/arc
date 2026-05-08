@@ -2313,6 +2313,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'شما مجوز ثبت سند حسابداری ندارید. ذخیرهٔ چک یک سند حسابداری ایجاد می‌کند؛ از مدیر بخواهید حداقل یکی از گزینه‌های افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را برای شما فعال کند.';
 
   @override
+  String get checkFormDuplicateSayadCode =>
+      'این شناسه صیاد قبلاً برای چک دیگری در این کسب‌وکار ثبت شده است.';
+
+  @override
   String get addBankAccount => 'افزودن حساب بانکی';
 
   @override
