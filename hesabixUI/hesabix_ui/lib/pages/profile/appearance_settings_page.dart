@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -33,6 +35,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   List<BusinessWithPermission> _businesses = const [];
   int? _selectedBusinessId;
   bool _menuPrefsLoading = false;
+  String _baselineSignature = '';
 
   /// ترتیب ریشه بدون داشبورد و بدون جداکننده‌ها (فقط برای بخش‌های چهارگانه).
   List<String> _orderPractical = [];
@@ -183,6 +186,66 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       _legacyChildKeyMigrate[key] ?? _migrateKey(key);
 
   String _migrateAnyMenuKey(String key) => _migrateChildKey(key);
+
+  String _buildStateSignature() {
+    final hidden = _hiddenKeys.toList()..sort();
+    final childrenKeys = _childrenOrder.keys.toList()..sort();
+    final normalizedChildren = <String, List<String>>{};
+    for (final k in childrenKeys) {
+      normalizedChildren[k] = List<String>.from(_childrenOrder[k] ?? const <String>[]);
+    }
+    return jsonEncode(<String, dynamic>{
+      'mode': _draft.name,
+      'sidebarTabBehavior': _draftSidebarTabBehavior.name,
+      'businessId': _selectedBusinessId,
+      'orderPractical': _orderPractical,
+      'orderAccounting': _orderAccounting,
+      'orderPrograms': _orderPrograms,
+      'orderOther': _orderOther,
+      'hiddenKeys': hidden,
+      'childrenOrder': normalizedChildren,
+    });
+  }
+
+  bool get _hasUnsavedChanges => _baselineSignature != _buildStateSignature();
+
+  void _captureBaseline() {
+    _baselineSignature = _buildStateSignature();
+  }
+
+  void _discardChanges() {
+    _load();
+  }
+
+  void _resetAllMenuToDefaults() {
+    setState(() {
+      _orderPractical = [..._defaultOrderPractical];
+      _orderAccounting = [..._defaultOrderAccounting];
+      _orderPrograms = [..._defaultOrderPrograms];
+      _orderOther = [..._defaultOrderOther];
+      _hiddenKeys = <String>{};
+      _childrenOrder = _mergedChildrenOrder(null);
+    });
+  }
+
+  void _resetSectionToDefault(String section) {
+    setState(() {
+      switch (section) {
+        case 'practical':
+          _orderPractical = [..._defaultOrderPractical];
+          break;
+        case 'accounting':
+          _orderAccounting = [..._defaultOrderAccounting];
+          break;
+        case 'programs':
+          _orderPrograms = [..._defaultOrderPrograms];
+          break;
+        case 'other':
+          _orderOther = [..._defaultOrderOther];
+          break;
+      }
+    });
+  }
 
   List<String> _mergeOrder(List<String> saved, List<String> defaults) {
     final seen = <String>{};
@@ -340,6 +403,41 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(_error!, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
               ),
+            if (_hasUnsavedChanges)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.65),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.edit_note_outlined,
+                        size: 18,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'تغییرات ذخیره نشده دارید.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSecondaryContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _saving ? null : _discardChanges,
+                        child: const Text('لغو تغییرات'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -456,16 +554,16 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                       _dashboardRow(theme),
                       const SizedBox(height: 16),
                       _menuSection(theme, title: 'ابزارهای کاربردی', order: _orderPractical,
-                          setOrder: (v) => setState(() => _orderPractical = v)),
+                          setOrder: (v) => setState(() => _orderPractical = v), onResetSection: () => _resetSectionToDefault('practical')),
                       const Divider(height: 24),
                       _menuSection(theme, title: 'حسابداری', order: _orderAccounting,
-                          setOrder: (v) => setState(() => _orderAccounting = v)),
+                          setOrder: (v) => setState(() => _orderAccounting = v), onResetSection: () => _resetSectionToDefault('accounting')),
                       const Divider(height: 24),
                       _menuSection(theme, title: 'برنامه‌های جانبی', order: _orderPrograms,
-                          setOrder: (v) => setState(() => _orderPrograms = v)),
+                          setOrder: (v) => setState(() => _orderPrograms = v), onResetSection: () => _resetSectionToDefault('programs')),
                       const Divider(height: 24),
                       _menuSection(theme, title: 'سایر', order: _orderOther,
-                          setOrder: (v) => setState(() => _orderOther = v)),
+                          setOrder: (v) => setState(() => _orderOther = v), onResetSection: () => _resetSectionToDefault('other')),
                     ],
                     const SizedBox(height: 8),
                     Text(
@@ -479,16 +577,74 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
               ),
             ),
             const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _saving ? null : _save,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.save_outlined),
-              label: Text(t.appearanceSaveButton),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('پیش‌نمایش و وضعیت', style: theme.textTheme.titleSmall),
+                    const SizedBox(height: 8),
+                    Text(
+                      'مجموع آیتم‌های مخفی: ${_hiddenKeys.length}',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'ترتیب نهایی ریشه: ${_canonicalFlatRoot().join('  |  ')}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _saving
+                      ? null
+                      : () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Text('بازگشت به چیدمان پیش‌فرض'),
+                              content: const Text('همه بخش‌های منو به حالت پیش‌فرض برگردند؟'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text('انصراف'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  child: const Text('تایید'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (confirm == true) _resetAllMenuToDefaults();
+                        },
+                  icon: const Icon(Icons.restore_outlined),
+                  label: const Text('بازگشت به پیش‌فرض'),
+                ),
+                FilledButton.icon(
+                  onPressed: _saving || !_hasUnsavedChanges ? null : _save,
+                  icon: _saving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.save_outlined),
+                  label: Text(t.appearanceSaveButton),
+                ),
+              ],
             ),
           ],
         ),
@@ -531,11 +687,23 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     required String title,
     required List<String> order,
     required void Function(List<String>) setOrder,
+    required VoidCallback onResetSection,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+        Row(
+          children: [
+            Expanded(
+              child: Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            ),
+            TextButton.icon(
+              onPressed: _saving ? null : onResetSection,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('ریست بخش'),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         ReorderableListView.builder(
             buildDefaultDragHandles: false,
@@ -714,12 +882,14 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
         _draft = store.mode;
         _draftSidebarTabBehavior = store.sidebarTabBehavior;
         _loading = false;
+        _captureBaseline();
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;
+        _captureBaseline();
       });
     }
   }
@@ -732,6 +902,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       final prefs = await _menuPreferencesService.getPreferences(bid);
       if (!mounted) return;
       setState(() => _deserializeFromPrefs(prefs));
+      _captureBaseline();
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -742,6 +913,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
         _hiddenKeys = <String>{};
         _childrenOrder = _mergedChildrenOrder(null);
       });
+      _captureBaseline();
     } finally {
       if (mounted) setState(() => _menuPrefsLoading = false);
     }
@@ -766,6 +938,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
         );
       }
       if (!mounted) return;
+      _captureBaseline();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).appearanceSaved)),
       );

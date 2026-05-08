@@ -4677,7 +4677,13 @@
   "mobileLauncherDisableHomeLauncherMenu": "ورود به اپ از پروفایل",
   "mobileLauncherDisableHomeLauncherDone": "از این به بعد با باز کردن اپ به پروفایل می‌روید؛ برای لانچر دوباره از لیست کسب‌وکار انتخاب کنید.",
   "mobileLauncherBusinessNoAccess": "به این کسب‌وکار دسترسی ندارید یا حذف شده است.",
-  "mobileLauncherExitAppHint": "برای خروج دوباره بازگشت را بزنید"
+  "mobileLauncherExitAppHint": "برای خروج دوباره بازگشت را بزنید",
+  "mobileLauncherBrandName": "حسابیکس",
+  "mobileLauncherBusinessFallback": "کسب‌وکار",
+  "mobileLauncherGridLayoutSection": "چیدمان آیکون‌ها",
+  "mobileLauncherGridColumns": "تعداد ستون",
+  "mobileLauncherGridRows": "تعداد ردیف",
+  "mobileLauncherGridPreview": "پیش‌نمایش"
 }
 
 

@@ -1365,15 +1365,17 @@ async def export_products_excel(
                         continue
                     it[col_key] = _format_price_list_value(grouped.get((pid, price_list_id), []))
 
+    columns_profile = str(body.get("columns_profile") or "").strip().lower()
+    force_price_report_columns = columns_profile in {"price_report", "product_price_report"}
+
     export_columns = body.get("export_columns")
-    if export_columns and isinstance(export_columns, list):
+    if export_columns and isinstance(export_columns, list) and not force_price_report_columns:
         headers = [col.get("label") or col.get("key") for col in export_columns]
         keys = [col.get("key") for col in export_columns]
     else:
         default_cols = [
             ("code", "کد"),
             ("name", "نام"),
-            ("item_type", "نوع"),
             ("category_name", "دسته"),
         ]
         if report_mode in {"base_only", "base_plus_price_lists"}:
@@ -1383,12 +1385,13 @@ async def export_products_excel(
             ])
         if dynamic_price_columns:
             default_cols.extend(dynamic_price_columns)
-        default_cols.extend([
-            ("main_unit", "واحد اصلی"),
-            ("secondary_unit", "واحد فرعی"),
-            ("track_inventory", "کنترل موجودی"),
-            ("created_at_formatted", "ایجاد"),
-        ])
+        if not force_price_report_columns:
+            default_cols.extend([
+                ("main_unit", "واحد اصلی"),
+                ("secondary_unit", "واحد فرعی"),
+                ("track_inventory", "کنترل موجودی"),
+                ("created_at_formatted", "ایجاد"),
+            ])
         keys = [k for k, _ in default_cols]
         headers = [v for _, v in default_cols]
 
@@ -1471,6 +1474,31 @@ async def export_products_excel(
             "Content-Length": str(len(data)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
+    )
+
+
+@router.post(
+    "/business/{business_id}/price-report/export/excel",
+    summary="خروجی Excel گزارش قیمت کالا (ستون‌های محدود)",
+)
+@require_business_access("business_id")
+async def export_product_price_report_excel(
+    request: Request,
+    business_id: int,
+    body: dict,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "export")),
+):
+    scoped_body = dict(body or {})
+    scoped_body["columns_profile"] = "price_report"
+    return await export_products_excel(
+        request=request,
+        business_id=business_id,
+        body=scoped_body,
+        ctx=ctx,
+        db=db,
+        _=None,
     )
 
 
@@ -2696,15 +2724,17 @@ async def export_products_pdf(
                         continue
                     it[col_key] = _format_price_list_value(grouped.get((pid, price_list_id), []))
 
+    columns_profile = str(body.get("columns_profile") or "").strip().lower()
+    force_price_report_columns = columns_profile in {"price_report", "product_price_report"}
+
     export_columns = body.get("export_columns")
-    if export_columns and isinstance(export_columns, list):
+    if export_columns and isinstance(export_columns, list) and not force_price_report_columns:
         headers = [col.get("label") or col.get("key") for col in export_columns]
         keys = [col.get("key") for col in export_columns]
     else:
         default_cols = [
             ("code", "کد"),
             ("name", "نام"),
-            ("item_type", "نوع"),
             ("category_name", "دسته"),
         ]
         if report_mode in {"base_only", "base_plus_price_lists"}:
@@ -2714,12 +2744,13 @@ async def export_products_pdf(
             ])
         if dynamic_price_columns:
             default_cols.extend(dynamic_price_columns)
-        default_cols.extend([
-            ("main_unit", "واحد اصلی"),
-            ("secondary_unit", "واحد فرعی"),
-            ("track_inventory", "کنترل موجودی"),
-            ("created_at_formatted", "ایجاد"),
-        ])
+        if not force_price_report_columns:
+            default_cols.extend([
+                ("main_unit", "واحد اصلی"),
+                ("secondary_unit", "واحد فرعی"),
+                ("track_inventory", "کنترل موجودی"),
+                ("created_at_formatted", "ایجاد"),
+            ])
         keys = [k for k, _ in default_cols]
         headers = [v for _, v in default_cols]
 
@@ -2950,6 +2981,31 @@ async def export_products_pdf(
             "Content-Length": str(len(pdf_bytes)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
+    )
+
+
+@router.post(
+    "/business/{business_id}/price-report/export/pdf",
+    summary="خروجی PDF گزارش قیمت کالا (ستون‌های محدود)",
+)
+@require_business_access("business_id")
+async def export_product_price_report_pdf(
+    request: Request,
+    business_id: int,
+    body: dict,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "export")),
+):
+    scoped_body = dict(body or {})
+    scoped_body["columns_profile"] = "price_report"
+    return await export_products_pdf(
+        request=request,
+        business_id=business_id,
+        body=scoped_body,
+        ctx=ctx,
+        db=db,
+        _=None,
     )
 
 

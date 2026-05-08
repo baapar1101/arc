@@ -9,6 +9,7 @@ import '../../core/auth_store.dart';
 import '../../core/mobile_launcher_prefs.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 /// صفحهٔ لانچر سبک (خارج از پنل کسب‌وکار) برای موبایل و POS.
 class MobileLauncherPage extends StatefulWidget {
@@ -29,14 +30,47 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
   late Future<int> _bgArgb = MobileLauncherPrefs.backgroundColorArgb(
     widget.authStore.currentUserId,
   );
+  late Future<int> _gridColumns =
+      MobileLauncherPrefs.gridColumns(widget.authStore.currentUserId);
+  late Future<int> _gridRows =
+      MobileLauncherPrefs.gridRows(widget.authStore.currentUserId);
+  late Future<String?> _businessName = _loadBusinessName();
 
   DateTime? _lastBackPressAt;
+  bool _desktopRedirectScheduled = false;
+
+  Future<String?> _loadBusinessName() async {
+    try {
+      final api = ApiClient();
+      final service = BusinessDashboardService(api);
+      final businesses = await service.getUserBusinesses();
+      for (final b in businesses) {
+        if (b.id == widget.businessId) return b.name;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   void _reloadBackground() {
     setState(() {
       _bgArgb = MobileLauncherPrefs.backgroundColorArgb(
         widget.authStore.currentUserId,
       );
+    });
+  }
+
+  void _reloadGridLayout() {
+    setState(() {
+      _gridColumns = MobileLauncherPrefs.gridColumns(widget.authStore.currentUserId);
+      _gridRows = MobileLauncherPrefs.gridRows(widget.authStore.currentUserId);
+    });
+  }
+
+  void _reloadBusinessName() {
+    setState(() {
+      _businessName = _loadBusinessName();
     });
   }
 
@@ -114,6 +148,16 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    if (!ResponsiveHelper.isMobile(context)) {
+      if (!_desktopRedirectScheduled) {
+        _desktopRedirectScheduled = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          context.go('/business/${widget.businessId}/dashboard');
+        });
+      }
+      return const SizedBox.shrink();
+    }
 
     return PopScope(
       canPop: kIsWeb,
@@ -121,15 +165,40 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
         if (didPop || kIsWeb) return;
         await _onLauncherWillPop(t);
       },
-      child: FutureBuilder<int>(
-        future: _bgArgb,
+      child: FutureBuilder<(int, int, int, String?)>(
+        future: Future.wait<dynamic>([_bgArgb, _gridColumns, _gridRows, _businessName]).then(
+          (v) => (v[0] as int, v[1] as int, v[2] as int, v[3] as String?),
+        ),
         builder: (context, snap) {
-          final argb = snap.data ?? MobileLauncherPrefs.defaultBackgroundArgb;
+          final argb = snap.data?.$1 ?? MobileLauncherPrefs.defaultBackgroundArgb;
+          final preferredColumns = snap.data?.$2 ?? MobileLauncherPrefs.defaultGridColumns;
+          final preferredRows = snap.data?.$3 ?? MobileLauncherPrefs.defaultGridRows;
+          final businessName = snap.data?.$4;
           final bg = Color(argb);
           final onBg = _isLight(bg) ? Colors.black87 : Colors.white;
           final cardBg = _isLight(bg)
               ? Colors.white.withValues(alpha: 0.92)
               : Colors.black.withValues(alpha: 0.25);
+          final cardBorder = _isLight(bg)
+              ? Colors.black.withValues(alpha: 0.08)
+              : Colors.white.withValues(alpha: 0.18);
+          final width = MediaQuery.of(context).size.width;
+          final maxColumnsByWidth = width < 360
+              ? 2
+              : width < 460
+                  ? 3
+                  : 4;
+          final crossAxisCount = preferredColumns.clamp(2, maxColumnsByWidth);
+          final visibleRows = preferredRows.clamp(2, 6);
+          const spacing = 16.0;
+          const horizontalPadding = 32.0;
+          const tileAspectRatio = 0.9;
+          final tileWidth =
+              (width - horizontalPadding - ((crossAxisCount - 1) * spacing)) /
+                  crossAxisCount;
+          final tileHeight = tileWidth / tileAspectRatio;
+          final gridViewportHeight =
+              (tileHeight * visibleRows) + (spacing * (visibleRows - 1));
 
           if (snap.connectionState == ConnectionState.done) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -139,12 +208,58 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
 
           return Scaffold(
             appBar: AppBar(
-              backgroundColor: Colors.transparent,
+              backgroundColor: _isLight(bg)
+                  ? Colors.white.withValues(alpha: 0.32)
+                  : Colors.black.withValues(alpha: 0.22),
               foregroundColor: onBg,
               elevation: 0,
-              title: Text(
-                t.mobileLauncherTitle,
-                overflow: TextOverflow.ellipsis,
+              titleSpacing: 12,
+              title: Row(
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: Image.asset(
+                      'assets/images/logo32.png',
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        Icons.account_balance_wallet_outlined,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          t.mobileLauncherBrandName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                color: onBg,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        Text(
+                          businessName ?? '${t.mobileLauncherBusinessFallback} #${widget.businessId}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: onBg.withValues(alpha: 0.88),
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               actions: [
                 IconButton(
@@ -176,34 +291,42 @@ class _MobileLauncherPageState extends State<MobileLauncherPage> {
                 child: Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: GridView.count(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 16,
-                    crossAxisSpacing: 16,
-                    childAspectRatio: 0.85,
-                    children: [
-                      _LauncherTile(
-                        icon: Icons.palette_outlined,
-                        label: t.mobileLauncherAppearanceTile,
-                        bg: cardBg,
-                        fg: onBg,
-                        onTap: () async {
-                          await context.push<void>(
-                            '/mobile-launcher/${widget.businessId}/appearance',
-                          );
-                          _reloadBackground();
-                        },
-                      ),
-                      _LauncherTile(
-                        icon: Icons.dashboard_customize_outlined,
-                        label: t.mobileLauncherOpenFullPanel,
-                        bg: cardBg,
-                        fg: onBg,
-                        onTap: () => context.go(
-                          '/business/${widget.businessId}/dashboard',
+                  child: SizedBox(
+                    height: gridViewportHeight,
+                    child: GridView.count(
+                      crossAxisCount: crossAxisCount,
+                      mainAxisSpacing: spacing,
+                      crossAxisSpacing: spacing,
+                      childAspectRatio: tileAspectRatio,
+                      padding: EdgeInsets.zero,
+                      children: [
+                        _LauncherTile(
+                          icon: Icons.palette_outlined,
+                          label: t.mobileLauncherAppearanceTile,
+                          bg: cardBg,
+                          borderColor: cardBorder,
+                          fg: onBg,
+                          onTap: () async {
+                            await context.push<void>(
+                              '/mobile-launcher/${widget.businessId}/appearance',
+                            );
+                            _reloadBackground();
+                            _reloadGridLayout();
+                            _reloadBusinessName();
+                          },
                         ),
-                      ),
-                    ],
+                        _LauncherTile(
+                          icon: Icons.dashboard_customize_outlined,
+                          label: t.mobileLauncherOpenFullPanel,
+                          bg: cardBg,
+                          borderColor: cardBorder,
+                          fg: onBg,
+                          onTap: () => context.go(
+                            '/business/${widget.businessId}/dashboard',
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -220,6 +343,7 @@ class _LauncherTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.bg,
+    required this.borderColor,
     required this.fg,
     required this.onTap,
   });
@@ -227,6 +351,7 @@ class _LauncherTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color bg;
+  final Color borderColor;
   final Color fg;
   final VoidCallback onTap;
 
@@ -237,10 +362,19 @@ class _LauncherTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
+        splashColor: fg.withValues(alpha: 0.12),
         child: Ink(
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
           child: Padding(
             padding: const EdgeInsets.all(8),

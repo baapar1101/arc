@@ -4635,5 +4635,11 @@
   "mobileLauncherDisableHomeLauncherMenu": "Open app to profile home",
   "mobileLauncherDisableHomeLauncherDone": "The app will open to your profile until you choose launcher again.",
   "mobileLauncherBusinessNoAccess": "You no longer have access to this business.",
-  "mobileLauncherExitAppHint": "Press back again to exit"
+  "mobileLauncherExitAppHint": "Press back again to exit",
+  "mobileLauncherBrandName": "Hesabix",
+  "mobileLauncherBusinessFallback": "Business",
+  "mobileLauncherGridLayoutSection": "Grid layout",
+  "mobileLauncherGridColumns": "Columns",
+  "mobileLauncherGridRows": "Rows",
+  "mobileLauncherGridPreview": "Preview"
 }

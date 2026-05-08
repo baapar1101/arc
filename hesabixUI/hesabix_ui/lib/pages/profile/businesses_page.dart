@@ -179,7 +179,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
     }
   }
 
-  void _navigateToBusiness(int businessId) {
+  Future<void> _navigateToBusiness(int businessId) async {
     // بررسی اینکه کسب و کار حذف نشده باشد
     final business = _businesses.firstWhere(
       (b) => b.id == businessId,
@@ -196,6 +196,12 @@ class _BusinessesPageState extends State<BusinessesPage> {
     }
 
     final t = AppLocalizations.of(context);
+    if (!ResponsiveHelper.isMobile(context)) {
+      await MobileLauncherPrefs.clearResumeLauncher(_authStore.currentUserId);
+      if (!mounted) return;
+      context.go('/business/$businessId/dashboard');
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,

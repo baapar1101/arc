@@ -164,6 +164,7 @@ import 'core/route_registry.dart';
 import 'widgets/simple_splash_screen.dart';
 import 'widgets/url_tracker.dart';
 import 'widgets/user_activity_heartbeat.dart';
+import 'utils/responsive_helper.dart';
 import 'utils/route_prefetcher.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/year_end_closing_page.dart';
@@ -991,6 +992,14 @@ class _MyAppState extends State<MyApp> {
         GoRoute(
           path: '/mobile-launcher/:businessId',
           name: 'mobile_launcher',
+          redirect: (context, state) {
+            final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
+            if (businessId == null || businessId <= 0) return null;
+            if (!ResponsiveHelper.isMobile(context)) {
+              return '/business/$businessId/dashboard';
+            }
+            return null;
+          },
           builder: (context, state) {
             final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
             if (businessId == null || businessId <= 0) {
@@ -1011,6 +1020,14 @@ class _MyAppState extends State<MyApp> {
         GoRoute(
           path: '/mobile-launcher/:businessId/appearance',
           name: 'mobile_launcher_appearance',
+          redirect: (context, state) {
+            final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
+            if (businessId == null || businessId <= 0) return null;
+            if (!ResponsiveHelper.isMobile(context)) {
+              return '/business/$businessId/dashboard';
+            }
+            return null;
+          },
           builder: (context, state) {
             final businessId = int.tryParse(state.pathParameters['businessId'] ?? '');
             if (businessId == null || businessId <= 0) {

@@ -1407,8 +1407,8 @@ class _ProductsPageState extends State<ProductsPage> {
               config: DataTableConfig<Map<String, dynamic>>(
                 endpoint: '/api/v1/products/business/${widget.businessId}/search',
           title: t.products,
-          excelEndpoint: '/api/v1/products/business/${widget.businessId}/export/excel',
-          pdfEndpoint: '/api/v1/products/business/${widget.businessId}/export/pdf',
+          excelEndpoint: '/api/v1/products/business/${widget.businessId}/price-report/export/excel',
+          pdfEndpoint: '/api/v1/products/business/${widget.businessId}/price-report/export/pdf',
           showExportButtons: false,
           businessId: widget.businessId,
           reportModuleKey: 'products',

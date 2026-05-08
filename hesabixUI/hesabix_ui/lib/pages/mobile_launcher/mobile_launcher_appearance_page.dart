@@ -39,6 +39,14 @@ class MobileLauncherAppearancePage extends StatefulWidget {
 class _MobileLauncherAppearancePageState extends State<MobileLauncherAppearancePage> {
   late Future<int> _initialArgb;
   int _selectedArgb = MobileLauncherPrefs.defaultBackgroundArgb;
+  int _selectedColumns = MobileLauncherPrefs.defaultGridColumns;
+  int _selectedRows = MobileLauncherPrefs.defaultGridRows;
+  static const List<(int, int)> _quickLayouts = [
+    (2, 3),
+    (3, 4),
+    (4, 3),
+    (4, 4),
+  ];
 
   @override
   void initState() {
@@ -49,12 +57,23 @@ class _MobileLauncherAppearancePageState extends State<MobileLauncherAppearanceP
     _initialArgb.then((v) {
       if (mounted) setState(() => _selectedArgb = v);
     });
+    MobileLauncherPrefs.gridColumns(widget.authStore.currentUserId).then((v) {
+      if (mounted) setState(() => _selectedColumns = v);
+    });
+    MobileLauncherPrefs.gridRows(widget.authStore.currentUserId).then((v) {
+      if (mounted) setState(() => _selectedRows = v);
+    });
   }
 
   Future<void> _save() async {
     await MobileLauncherPrefs.setBackgroundColorArgb(
       widget.authStore.currentUserId,
       _selectedArgb,
+    );
+    await MobileLauncherPrefs.setGridLayout(
+      widget.authStore.currentUserId,
+      columns: _selectedColumns,
+      rows: _selectedRows,
     );
     if (!mounted) return;
     SnackBarHelper.show(context, message: AppLocalizations.of(context).mobileLauncherColorsSaved);
@@ -98,6 +117,50 @@ class _MobileLauncherAppearancePageState extends State<MobileLauncherAppearanceP
                     ),
                 ],
               ),
+              const SizedBox(height: 24),
+              Text(
+                t.mobileLauncherGridLayoutSection,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final layout in _quickLayouts)
+                    ChoiceChip(
+                      label: Text('${layout.$1}×${layout.$2}'),
+                      selected: _selectedColumns == layout.$1 && _selectedRows == layout.$2,
+                      onSelected: (_) {
+                        setState(() {
+                          _selectedColumns = layout.$1;
+                          _selectedRows = layout.$2;
+                        });
+                      },
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _CountPicker(
+                title: t.mobileLauncherGridColumns,
+                value: _selectedColumns,
+                min: 2,
+                max: 6,
+                onChanged: (v) => setState(() => _selectedColumns = v),
+              ),
+              const SizedBox(height: 8),
+              _CountPicker(
+                title: t.mobileLauncherGridRows,
+                value: _selectedRows,
+                min: 2,
+                max: 6,
+                onChanged: (v) => setState(() => _selectedRows = v),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${t.mobileLauncherGridPreview}: $_selectedColumns × $_selectedRows',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
               const SizedBox(height: 28),
               FilledButton.icon(
                 onPressed: _save,
@@ -125,6 +188,48 @@ class _MobileLauncherAppearancePageState extends State<MobileLauncherAppearanceP
           );
         },
       ),
+    );
+  }
+}
+
+class _CountPicker extends StatelessWidget {
+  const _CountPicker({
+    required this.title,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.onChanged,
+  });
+
+  final String title;
+  final int value;
+  final int min;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+        ),
+        IconButton(
+          onPressed: value > min ? () => onChanged(value - 1) : null,
+          icon: const Icon(Icons.remove_circle_outline),
+        ),
+        Text(
+          '$value',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        IconButton(
+          onPressed: value < max ? () => onChanged(value + 1) : null,
+          icon: const Icon(Icons.add_circle_outline),
+        ),
+      ],
     );
   }
 }
