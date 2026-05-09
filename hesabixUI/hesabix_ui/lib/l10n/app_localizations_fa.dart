@@ -348,6 +348,18 @@ class AppLocalizationsFa extends AppLocalizations {
   String get deleteBusiness => 'حذف کسب و کار';
 
   @override
+  String get loanFacilities => 'تسهیلات دریافتی';
+
+  @override
+  String get deleteBusinessConfirmTypeInstruction => 'برای تأیید، دقیقاً کلمهٔ DELETE (انگلیسی) یا «حذف» را تایپ کنید.';
+
+  @override
+  String get deleteBusinessConfirmTypeHint => 'DELETE یا حذف';
+
+  @override
+  String get invoiceLineItemsAddRowKeyboardHint => 'راهنما: پشت‌سرهم و خارج از فیلدهای متنی، کلیدهای Q سپس I را بزنید تا ردیف اضافه شود.';
+
+  @override
   String get support => 'پشتیبانی';
 
   @override

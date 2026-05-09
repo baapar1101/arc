@@ -749,6 +749,30 @@ abstract class AppLocalizations {
   /// **'Delete Business'**
   String get deleteBusiness;
 
+  /// No description provided for @loanFacilities.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan facilities'**
+  String get loanFacilities;
+
+  /// No description provided for @deleteBusinessConfirmTypeInstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'To confirm, type DELETE in English or «حذف» in Persian, exactly as shown.'**
+  String get deleteBusinessConfirmTypeInstruction;
+
+  /// No description provided for @deleteBusinessConfirmTypeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'DELETE or حذف'**
+  String get deleteBusinessConfirmTypeHint;
+
+  /// No description provided for @invoiceLineItemsAddRowKeyboardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tip: Press Q then I in quick succession to add rows (outside text fields).'**
+  String get invoiceLineItemsAddRowKeyboardHint;
+
   /// No description provided for @support.
   ///
   /// In en, this message translates to:

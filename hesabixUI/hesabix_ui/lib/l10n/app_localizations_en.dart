@@ -348,6 +348,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteBusiness => 'Delete Business';
 
   @override
+  String get loanFacilities => 'Loan facilities';
+
+  @override
+  String get deleteBusinessConfirmTypeInstruction => 'To confirm, type DELETE in English or «حذف» in Persian, exactly as shown.';
+
+  @override
+  String get deleteBusinessConfirmTypeHint => 'DELETE or حذف';
+
+  @override
+  String get invoiceLineItemsAddRowKeyboardHint => 'Tip: Press Q then I in quick succession to add rows (outside text fields).';
+
+  @override
   String get support => 'Support';
 
   @override

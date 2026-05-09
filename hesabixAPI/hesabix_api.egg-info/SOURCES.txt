@@ -56,6 +56,7 @@ adapters/api/v1/public_share_links.py
 adapters/api/v1/public_storage_file_shares.py
 adapters/api/v1/quick_sales.py
 adapters/api/v1/receipts_payments.py
+adapters/api/v1/received_loan_facilities.py
 adapters/api/v1/repair_shop.py
 adapters/api/v1/report_templates.py
 adapters/api/v1/schemas.py
@@ -225,6 +226,7 @@ adapters/db/models/product_instance.py
 adapters/db/models/product_tax_code.py
 adapters/db/models/project.py
 adapters/db/models/quick_sales_settings.py
+adapters/db/models/received_loan_facility.py
 adapters/db/models/repair_shop.py
 adapters/db/models/report_template.py
 adapters/db/models/report_template_status_event.py
@@ -325,6 +327,7 @@ app/core/permissions.py
 app/core/query_timeout.py
 app/core/queue.py
 app/core/rate_limiter.py
+app/core/received_loan_facility_accounts.py
 app/core/repair_shop_plugin_dependency.py
 app/core/response_cache.py
 app/core/responses.py
@@ -446,6 +449,8 @@ app/services/query_service.py
 app/services/quick_sales_service.py
 app/services/realtime.py
 app/services/receipt_payment_service.py
+app/services/received_loan_facility_accounting.py
+app/services/received_loan_facility_service.py
 app/services/repair_shop_accounting.py
 app/services/repair_shop_notification.py
 app/services/repair_shop_operations.py
@@ -649,6 +654,8 @@ migrations/versions/20260611_000002_merge_heads_business_user_menu_preferences_a
 migrations/versions/20260611_000002_report_template_status_events.py
 migrations/versions/20260612_000001_business_print_settings_invoice_pdf_sections.py
 migrations/versions/20260612_000002_merge_heads_report_template_status_events_and_business_print_settings_invoice_pdf_sections.py
+migrations/versions/20260613_000001_seed_received_loan_facility_chart_accounts.py
+migrations/versions/20260613_000002_received_loan_facility_tables.py
 tests/__init__.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py

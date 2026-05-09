@@ -122,6 +122,10 @@
   "newBusiness": "New business",
   "businesses": "Businesses",
   "deleteBusiness": "Delete Business",
+  "loanFacilities": "Loan facilities",
+  "deleteBusinessConfirmTypeInstruction": "To confirm, type DELETE in English or «حذف» in Persian, exactly as shown.",
+  "deleteBusinessConfirmTypeHint": "DELETE or حذف",
+  "invoiceLineItemsAddRowKeyboardHint": "Tip: Press Q then I in quick succession to add rows (outside text fields).",
   "support": "Support",
   "changePassword": "Change password",
   "marketing": "Marketing"
