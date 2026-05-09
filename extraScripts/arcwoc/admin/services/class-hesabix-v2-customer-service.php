@@ -9,6 +9,49 @@
 
 class Hesabix_V2_Customer_Service
 {
+
+	/**
+	 * نقش‌های کاربری مشمول همگام‌سازی دسته‌ای و صفحهٔ «مشتریان» حسابیکس.
+	 *
+	 * @since      3.3.5
+	 * @return array<int,string>
+	 */
+	public static function get_customer_list_roles()
+	{
+		$r = apply_filters(
+			'hesabix_v2_customers_list_roles',
+			array('customer', 'subscriber')
+		);
+		if (!is_array($r)) {
+			$r = array('customer', 'subscriber');
+		}
+		$r = array_map('sanitize_key', array_map('strval', $r));
+		return array_values(array_unique(array_filter($r)));
+	}
+
+	/**
+	 * آیا کاربر یکی از نقش‌های مجاز برای همگام‌سازی شخص است؟
+	 *
+	 * @since      3.3.5
+	 * @param int $user_id
+	 */
+	public static function user_has_customer_list_role($user_id)
+	{
+		$user_id = (int) $user_id;
+		if ($user_id < 1) {
+			return false;
+		}
+		$u = get_userdata($user_id);
+		if (!($u instanceof WP_User)) {
+			return false;
+		}
+		$roles = self::get_customer_list_roles();
+		if ($roles === array()) {
+			return false;
+		}
+		return array_intersect($roles, (array) $u->roles) !== array();
+	}
+
 	/**
 	 * Get all WooCommerce customers
 	 *
@@ -37,9 +80,14 @@ class Hesabix_V2_Customer_Service
 	 */
 	public static function count_sync_customers()
 	{
+		$roles_in = self::get_customer_list_roles();
+		if ($roles_in === array()) {
+			return 0;
+		}
+
 		$q = new WP_User_Query(
 			array(
-				'role__in' => array('customer', 'subscriber'),
+				'role__in' => $roles_in,
 				'number' => 1,
 				'count_total' => true,
 				'fields' => 'ID',
@@ -62,9 +110,14 @@ class Hesabix_V2_Customer_Service
 		$limit = max(1, (int) $limit);
 		$offset = max(0, (int) $offset);
 
+		$roles_in = self::get_customer_list_roles();
+		if ($roles_in === array()) {
+			return array();
+		}
+
 		$ids = get_users(
 			array(
-				'role__in' => array('customer', 'subscriber'),
+				'role__in' => $roles_in,
 				'fields' => 'ID',
 				'number' => $limit,
 				'offset' => $offset,

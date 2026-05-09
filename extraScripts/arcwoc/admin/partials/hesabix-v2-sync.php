@@ -36,6 +36,13 @@ $bulk_opts = Hesabix_V2_Sync_Service::get_bulk_sync_options();
 				</td>
 			</tr>
 			<tr>
+				<th scope="row"><label for="wc_categories_per_ajax"><?php esc_html_e('تعداد دستهٔ ووکامرس به‌ازای هر درخواست (همگام درخت دسته‌ها)', 'hesabix-v2'); ?></label></th>
+				<td>
+					<input type="number" min="10" max="300" step="1" name="wc_categories_per_ajax" id="wc_categories_per_ajax" value="<?php echo esc_attr((string) ($bulk_opts['wc_categories_per_ajax'] ?? 60)); ?>" class="small-text">
+					<p class="description"><?php esc_html_e('همهٔ ترم‌های product_cat (حتی بدون محصول) به ترتیب والد→فرزند نگاشت می‌شوند؛ مقدار بزرگ‌تر مراحل را کمتر می‌کند ولی هر مرحله سنگین‌تر است.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr>
 				<th scope="row"><label for="wc_customers_per_ajax"><?php esc_html_e('تعداد مشتری به‌ازای هر درخواست (وکامرس → حسابیکس)', 'hesabix-v2'); ?></label></th>
 				<td>
 					<input type="number" min="5" max="500" step="1" name="wc_customers_per_ajax" id="wc_customers_per_ajax" value="<?php echo esc_attr((string) $bulk_opts['wc_customers_per_ajax']); ?>" class="small-text">
@@ -75,8 +82,30 @@ $bulk_opts = Hesabix_V2_Sync_Service::get_bulk_sync_options();
 	</div>
 
 	<div class="hesabix-v2-card">
+		<h2><?php esc_html_e('همگام‌سازی دسته‌های محصول ووکامرس', 'hesabix-v2'); ?></h2>
+		<p><?php esc_html_e('همهٔ ترم‌های دستهٔ محصول (product_cat)، از جمله دسته‌های بدون کالا، به حسابیکس نگاشت یا به‌روز می‌شوند؛ به‌صورت چند مرحله.', 'hesabix-v2'); ?></p>
+		<p class="description"><?php esc_html_e('اگر در تنظیمات «تطبیق دسته با نام موجود در حسابیکس» را فعال کرده باشید، قبل از ایجاد دستهٔ جدید، درخت حسابیکس برای همان نام و والد بررسی می‌شود.', 'hesabix-v2'); ?></p>
+		<button id="sync-wc-categories" type="button" class="button button-primary"><?php esc_html_e('همگام‌سازی همهٔ دسته‌ها', 'hesabix-v2'); ?></button>
+		<button id="abort-sync-wc-categories" type="button" class="button" style="display:none;" aria-live="polite"><?php esc_html_e('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2'); ?></button>
+		<div id="wc-categories-progress" class="hesabix-v2-sync-progress" aria-live="polite"></div>
+		<div id="wc-categories-result"></div>
+	</div>
+
+	<div class="hesabix-v2-card">
 		<h2><?php esc_html_e('همگام‌سازی مشتریان', 'hesabix-v2'); ?></h2>
 		<p><?php esc_html_e('کاربران با نقش مشتری یا مشترک به حسابیکس؛ مرحله‌ای.', 'hesabix-v2'); ?></p>
+		<p class="description">
+			<?php
+			echo wp_kses_post(
+				sprintf(
+					/* translators: 1: opening <a>, 2: closing </a> — link wraps «صفحهٔ مشتریان و حسابیکس». */
+					__('برای انتخاب مشتریان مشخص، مشاهدهٔ وضعیت هر کاربر و همگام‌سازی تکی یا گروهی، به %1$sصفحهٔ مشتریان و حسابیکس%2$s بروید.', 'hesabix-v2'),
+					'<a href="' . esc_url(admin_url('admin.php?page=hesabix-v2-customers')) . '">',
+					'</a>'
+				)
+			);
+			?>
+		</p>
 		<button id="sync-customers" type="button" class="button button-primary"><?php esc_html_e('همگام‌سازی همهٔ مشتریان', 'hesabix-v2'); ?></button>
 		<button id="abort-sync-customers" type="button" class="button" style="display:none;"><?php esc_html_e('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2'); ?></button>
 		<div id="customers-progress" class="hesabix-v2-sync-progress" aria-live="polite"></div>
@@ -230,6 +259,11 @@ jQuery(function($) {
 		return esc(label) + ': ' + esc(e.message || '');
 	}
 
+	function fmtCategoryErr(e) {
+		if (!e) return '';
+		return esc('<?php echo esc_js(__('دستهٔ ووکامرس', 'hesabix-v2')); ?> #' + (e.wc_category_id || '')) + ': ' + esc(e.message || '');
+	}
+
 	function renderFinalNoticeCls(aggFailed) {
 		return aggFailed > 0 ? 'notice-warning' : 'notice-success';
 	}
@@ -334,6 +368,99 @@ jQuery(function($) {
 			}
 		}
 
+		$prog.empty();
+		$result.html('<div class="notice ' + cls + '"><p>' + note + '</p></div>');
+		$btn.prop('disabled', false);
+		$abort.hide().prop('disabled', false).text('<?php echo esc_js(__('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2')); ?>');
+	});
+
+	// --- دسته‌های محصول ووکامرس ---
+	var abortWcCategories = false;
+	$('#abort-sync-wc-categories').on('click', function() {
+		abortWcCategories = true;
+		$(this).prop('disabled', true).text('<?php echo esc_js(__('در انتظار پایان مرحلهٔ جاری…', 'hesabix-v2')); ?>');
+	});
+
+	$('#sync-wc-categories').on('click', async function() {
+		if (!ajaxUrl || !nonce) return;
+		if (!confirm('<?php echo esc_js(__('همهٔ دسته‌های محصول ووکامرس (حتی بدون کالا) با حسابیکس همگام شوند. ادامه می‌دهید؟', 'hesabix-v2')); ?>')) return;
+
+		var $btn = $('#sync-wc-categories');
+		var $abort = $('#abort-sync-wc-categories');
+		var $prog = $('#wc-categories-progress');
+		var $result = $('#wc-categories-result');
+		abortWcCategories = false;
+		$btn.prop('disabled', true);
+		$abort.prop('disabled', false).show().text('<?php echo esc_js(__('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2')); ?>');
+
+		var agg = { success: 0, failed: 0, total: 0, errors: [], batches: 0, haltedMsg: '' };
+		var offset = 0;
+		var batch = parseInt(String(bulk.wc_categories_per_ajax || <?php echo (int) ($bulk_defs['wc_categories_per_ajax'] ?? 60); ?>), 10) || 60;
+		var estTotal = null;
+
+		for (;;) {
+			if (abortWcCategories) {
+				agg.haltedMsg = '<?php echo esc_js(__('توسط کاربر متوقف شد (پس از آخرین مرحلهٔ کامل).', 'hesabix-v2')); ?>';
+				break;
+			}
+			$prog.html(
+				'<strong><?php echo esc_js(__('در حال اجرا…', 'hesabix-v2')); ?></strong>'
+				+ '<div class="hesabix-v2-sync-bar"><span></span></div>'
+				+ '<p class="hesabix-sync-progress-text"></p>'
+			);
+			var pct = estTotal ? Math.min(99, Math.round((offset / estTotal) * 100)) : 0;
+			$prog.find('.hesabix-v2-sync-bar > span').css('width', pct + '%');
+			$prog.find('.hesabix-sync-progress-text').text(
+				'<?php echo esc_js(__('مرحلهٔ', 'hesabix-v2')); ?> ' + (agg.batches + 1)
+				+ ' — <?php echo esc_js(__('offset', 'hesabix-v2')); ?> ' + offset
+				+ (estTotal !== null ? ' / ~' + estTotal : '')
+			);
+
+			var res = await ajaxChunk('hesabix_v2_sync_wc_categories', { offset: offset, batch_size: batch });
+			if (!res || res.success !== true || !res.chunk_results) {
+				agg.haltedMsg = (res && res.message) ? res.message : '<?php echo esc_js(__('پاسخ نامعتبر یا خطای سرور', 'hesabix-v2')); ?>';
+				break;
+			}
+			var ch = res.chunk_results;
+			agg.success += (ch.success || 0);
+			agg.failed += (ch.failed || 0);
+			agg.total += (ch.total || 0);
+			attachErrors(agg, ch);
+			agg.batches++;
+
+			if (agg.batches > 5000) {
+				agg.haltedMsg += (agg.haltedMsg ? ' ' : '') +
+					'<?php echo esc_js(__('حداکثر تعداد مراحل ایمن رسید؛ در صورت نیاز دوباره اجرا کنید.', 'hesabix-v2')); ?>';
+				break;
+			}
+
+			if (res.estimated_catalog_total_wc_categories !== undefined && res.estimated_catalog_total_wc_categories !== null) {
+				estTotal = parseInt(res.estimated_catalog_total_wc_categories, 10) || estTotal;
+			}
+			offset = parseInt(res.next_offset, 10) || 0;
+			if (res.done) break;
+			var advance = parseInt(res.processed_wc_categories_in_chunk, 10);
+			if (!advance || advance < 1) break;
+		}
+
+		var cls = renderFinalNoticeCls(agg.failed);
+		var note = '';
+		note += '<strong><?php echo esc_js(__('گزارش نهایی همگام‌سازی دسته‌های ووکامرس', 'hesabix-v2')); ?></strong><br>';
+		note += '<?php echo esc_js(__('موفق:', 'hesabix-v2')); ?> ' + agg.success + '<br>';
+		note += '<?php echo esc_js(__('ناموفق:', 'hesabix-v2')); ?> ' + agg.failed + '<br>';
+		note += '<?php echo esc_js(__('جمع عملیات در این اجرا:', 'hesabix-v2')); ?> ' + agg.total + '<br>';
+		note += '<?php echo esc_js(__('تعداد مرحله:', 'hesabix-v2')); ?> ' + agg.batches + '<br>';
+		if (agg.haltedMsg) {
+			note += '<strong><?php echo esc_js(__('وضعیت:', 'hesabix-v2')); ?></strong> ' + esc(agg.haltedMsg) + '<br>';
+		}
+		if (agg.errors.length) {
+			note += '<br><strong><?php echo esc_js(__('نمونهٔ خطاها:', 'hesabix-v2')); ?></strong><ul>';
+			var sh = agg.errors.slice(0, 20);
+			for (var ci = 0; ci < sh.length; ci++) {
+				note += '<li>' + fmtCategoryErr(sh[ci]) + '</li>';
+			}
+			note += '</ul>';
+		}
 		$prog.empty();
 		$result.html('<div class="notice ' + cls + '"><p>' + note + '</p></div>');
 		$btn.prop('disabled', false);

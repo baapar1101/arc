@@ -10,6 +10,20 @@
 class Hesabix_V2_Mapper
 {
 	/**
+	 * کش مسطح درخت دسته‌های حسابیکس برای تطبیق نام (هر درخواست PHP).
+	 *
+	 * @var array<int, array{id:int,parent_id:?int,label:string}>|null
+	 */
+	private static $hx_category_flat_cache = null;
+
+	/**
+	 * کش شناسه‌های ترم product_cat مرتب‌شده بر اساس عمق (هر درخواست PHP).
+	 *
+	 * @var int[]|null
+	 */
+	private static $wc_product_cat_ids_sorted_cache = null;
+
+	/**
 	 * Convert WooCommerce product to Hesabix API format
 	 *
 	 * @since    2.0.0
@@ -32,9 +46,9 @@ class Hesabix_V2_Mapper
 		// Get category
 		$category_id = null;
 		if ($cats_on) {
-			$categories = $product->get_category_ids();
-			if (!empty($categories)) {
-				$category_id = self::get_or_create_category_mapping($categories[0]);
+			$wc_cat = self::pick_wc_product_category_term_id($product);
+			if ($wc_cat !== null) {
+				$category_id = self::get_or_create_category_mapping($wc_cat);
 			}
 		}
 
@@ -93,9 +107,9 @@ class Hesabix_V2_Mapper
 
 		$category_id = null;
 		if ($cats_on) {
-			$categories = $parent_product->get_category_ids();
-			if (!empty($categories)) {
-				$category_id = self::get_or_create_category_mapping($categories[0]);
+			$wc_cat = self::pick_wc_product_category_term_id($parent_product);
+			if ($wc_cat !== null) {
+				$category_id = self::get_or_create_category_mapping($wc_cat);
 			}
 		}
 
@@ -917,6 +931,200 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
+	 * انتخاب یک ترم product_cat برای همگام با حسابیکس (چند دسته: اصلی SEO یا عمیق‌ترین شاخه).
+	 *
+	 * @since 2.0.8
+	 * @param WC_Product $product
+	 * @return int|null term_id
+	 */
+	private static function pick_wc_product_category_term_id($product)
+	{
+		$ids = array_values(array_unique(array_filter(array_map('intval', (array) $product->get_category_ids()))));
+		if (empty($ids)) {
+			return null;
+		}
+
+		$picked = apply_filters('hesabix_v2_primary_product_cat_term_id', null, $product, $ids);
+		if (is_int($picked) && $picked > 0 && in_array($picked, $ids, true)) {
+			return (int) apply_filters('hesabix_v2_picked_product_cat_term_id', $picked, $product, $ids);
+		}
+
+		$yoast = (int) get_post_meta($product->get_id(), '_yoast_wpseo_primary_product_cat', true);
+		if ($yoast > 0 && in_array($yoast, $ids, true)) {
+			return (int) apply_filters('hesabix_v2_picked_product_cat_term_id', $yoast, $product, $ids);
+		}
+
+		$rank_math = (int) get_post_meta($product->get_id(), 'rank_math_primary_product_cat', true);
+		if ($rank_math < 1) {
+			$rank_math = (int) get_post_meta($product->get_id(), '_rank_math_primary_product_cat', true);
+		}
+		if ($rank_math > 0 && in_array($rank_math, $ids, true)) {
+			return (int) apply_filters('hesabix_v2_picked_product_cat_term_id', $rank_math, $product, $ids);
+		}
+
+		$best_id = null;
+		$best_depth = -1;
+		foreach ($ids as $tid) {
+			$d = self::wc_product_cat_hierarchy_depth($tid);
+			if ($d > $best_depth) {
+				$best_depth = $d;
+				$best_id = $tid;
+			} elseif ($d === $best_depth && $best_id !== null && $tid < $best_id) {
+				$best_id = $tid;
+			}
+		}
+
+		return apply_filters('hesabix_v2_picked_product_cat_term_id', $best_id, $product, $ids);
+	}
+
+	/**
+	 * عمق سلسلهٔ والدها برای ترم product_cat (خود ترم شمرده می‌شود).
+	 *
+	 * @since 2.0.8
+	 * @param int $term_id
+	 * @return int
+	 */
+	private static function wc_product_cat_hierarchy_depth($term_id)
+	{
+		$depth = 0;
+		$tid = (int) $term_id;
+		$guard = 0;
+		while ($tid > 0 && $guard++ < 64) {
+			$t = get_term($tid, 'product_cat');
+			if (!$t || is_wp_error($t)) {
+				break;
+			}
+			$depth++;
+			$tid = (int) $t->parent;
+		}
+		return $depth;
+	}
+
+	/**
+	 * ذخیرهٔ اسنپ‌شات ووکامرس/حسابیکس برای تشخیص تغییر بعدی نام یا والد.
+	 *
+	 * @since 2.0.8
+	 * @param Hesabix_V2_DB_Service $db
+	 * @param int                   $wc_category_id
+	 * @param int                   $hesabix_category_id
+	 * @param \WP_Term              $term
+	 * @param int|null              $hesabix_parent_id
+	 * @param array<string,mixed>   $extra_meta
+	 * @return void
+	 */
+	private static function persist_category_sync_snapshot($db, $wc_category_id, $hesabix_category_id, $term, $hesabix_parent_id, $extra_meta = array())
+	{
+		$meta = array(
+			'wc_snapshot_v' => 1,
+			'wc_label' => $term->name,
+			'wc_parent_term_id' => (int) $term->parent,
+			'hesabix_parent_id' => $hesabix_parent_id,
+		);
+		if (is_array($extra_meta) && !empty($extra_meta)) {
+			$meta = array_merge($meta, $extra_meta);
+		}
+		$db->save_mapping(
+			'category',
+			$wc_category_id,
+			null,
+			$hesabix_category_id,
+			null,
+			$meta
+		);
+	}
+
+	/**
+	 * اگر نام یا والد ترم در ووکامرس عوض شده، دستهٔ متناظر در حسابیکس را به‌روز یا جابه‌جا کن.
+	 *
+	 * @since 2.0.8
+	 * @param int                   $wc_category_id
+	 * @param int                   $hesabix_category_id
+	 * @param array<string,mixed>   $mapping_row
+	 * @return void
+	 */
+	private static function refresh_mapped_wc_category_if_stale($wc_category_id, $hesabix_category_id, array $mapping_row)
+	{
+		$term = get_term($wc_category_id, 'product_cat');
+		if (!$term || is_wp_error($term)) {
+			return;
+		}
+
+		$db = new Hesabix_V2_DB_Service();
+		$meta = array();
+		if (!empty($mapping_row['meta_data'])) {
+			$decoded = json_decode((string) $mapping_row['meta_data'], true);
+			if (is_array($decoded)) {
+				$meta = $decoded;
+			}
+		}
+
+		$desired_parent_hx = null;
+		if (!empty($term->parent) && (int) $term->parent > 0) {
+			$desired_parent_hx = self::get_or_create_category_mapping((int) $term->parent);
+		}
+
+		if (empty($meta['wc_snapshot_v'])) {
+			self::persist_category_sync_snapshot($db, $wc_category_id, $hesabix_category_id, $term, $desired_parent_hx);
+			return;
+		}
+
+		$old_label = isset($meta['wc_label']) ? (string) $meta['wc_label'] : '';
+		$old_wc_parent = array_key_exists('wc_parent_term_id', $meta) ? (int) $meta['wc_parent_term_id'] : null;
+		$old_hx_parent = array_key_exists('hesabix_parent_id', $meta) ? $meta['hesabix_parent_id'] : '__unset__';
+		if ($old_hx_parent !== null && $old_hx_parent !== '__unset__') {
+			$old_hx_parent = (int) $old_hx_parent;
+		}
+
+		$label_stale = ($old_label !== (string) $term->name);
+		$wc_parent_stale = ($old_wc_parent !== (int) $term->parent);
+		$hx_parent_norm = ($old_hx_parent === '__unset__' ? null : $old_hx_parent);
+		$parent_stale = $wc_parent_stale || ($hx_parent_norm !== $desired_parent_hx);
+
+		if (!$label_stale && !$parent_stale) {
+			return;
+		}
+
+		$api = new Hesabix_V2_Api();
+		$ok = true;
+
+		if ($parent_stale) {
+			$mv = $api->move_category(array(
+				'category_id' => $hesabix_category_id,
+				'new_parent_id' => $desired_parent_hx,
+			));
+			if (empty($mv['success'])) {
+				$ok = false;
+				Hesabix_V2_Log_Service::warning('Hesabix category move failed (WC category sync)', array(
+					'wc_category_id' => $wc_category_id,
+					'hesabix_category_id' => $hesabix_category_id,
+					'new_parent_id' => $desired_parent_hx,
+					'response' => $mv,
+				));
+			}
+		}
+
+		if ($ok && $label_stale) {
+			$up = $api->update_category(array(
+				'category_id' => $hesabix_category_id,
+				'label' => $term->name,
+			));
+			if (empty($up['success'])) {
+				$ok = false;
+				Hesabix_V2_Log_Service::warning('Hesabix category label update failed (WC category sync)', array(
+					'wc_category_id' => $wc_category_id,
+					'hesabix_category_id' => $hesabix_category_id,
+					'response' => $up,
+				));
+			}
+		}
+
+		if ($ok) {
+			self::persist_category_sync_snapshot($db, $wc_category_id, $hesabix_category_id, $term, $desired_parent_hx);
+			self::invalidate_hesabix_category_flat_cache();
+		}
+	}
+
+	/**
 	 * Get or create category mapping
 	 *
 	 * @since    2.0.0
@@ -926,11 +1134,12 @@ class Hesabix_V2_Mapper
 	private static function get_or_create_category_mapping($wc_category_id)
 	{
 		$db_service = new Hesabix_V2_DB_Service();
-		
-		// Check if category already mapped
-		$hesabix_id = $db_service->get_hesabix_id('category', $wc_category_id);
-		if ($hesabix_id) {
-			return $hesabix_id;
+
+		$mapping_row = $db_service->get_mapping('category', $wc_category_id, null);
+		if ($mapping_row && !empty($mapping_row['hesabix_id'])) {
+			$hid = (int) $mapping_row['hesabix_id'];
+			self::refresh_mapped_wc_category_if_stale((int) $wc_category_id, $hid, $mapping_row);
+			return $hid;
 		}
 
 		// Get WooCommerce category
@@ -943,6 +1152,25 @@ class Hesabix_V2_Mapper
 		$parent_hesabix_id = null;
 		if (!empty($term->parent) && (int) $term->parent > 0) {
 			$parent_hesabix_id = self::get_or_create_category_mapping((int) $term->parent);
+		}
+
+		$sync_settings = get_option('hesabix_v2_sync_settings', array());
+		if (!empty($sync_settings['sync_category_link_by_name_in_hesabix'])) {
+			$try_link = apply_filters('hesabix_v2_should_link_category_by_name', true, $term, $parent_hesabix_id);
+			if ($try_link) {
+				$linked_id = self::find_hesabix_category_id_by_wc_term($term->name, $parent_hesabix_id);
+				if ($linked_id) {
+					self::persist_category_sync_snapshot(
+						$db_service,
+						(int) $wc_category_id,
+						$linked_id,
+						$term,
+						$parent_hesabix_id,
+						array('linked_existing_by_name' => true)
+					);
+					return $linked_id;
+				}
+			}
 		}
 
 		// Create category in Hesabix (API از فیلد label برای title_translations استفاده می‌کند)
@@ -967,17 +1195,262 @@ class Hesabix_V2_Mapper
 				return null;
 			}
 
-			$db_service->save_mapping(
-				'category',
-				$wc_category_id,
-				null,
-				$hesabix_category_id
+			self::invalidate_hesabix_category_flat_cache();
+
+			self::persist_category_sync_snapshot(
+				$db_service,
+				(int) $wc_category_id,
+				$hesabix_category_id,
+				$term,
+				$parent_hesabix_id
 			);
 
 			return $hesabix_category_id;
 		}
 
 		return null;
+	}
+
+	/**
+	 * یک مرحلهٔ همگام‌سازی همهٔ ترم‌های product_cat (حتی بدون محصول).
+	 *
+	 * @since 2.0.8
+	 * @param int $offset
+	 * @param int $batch_size
+	 * @return array<string,mixed>
+	 */
+	public static function bulk_sync_wc_product_categories_chunk($offset, $batch_size)
+	{
+		$offset = max(0, (int) $offset);
+		$batch_size = max(1, min(500, (int) $batch_size));
+
+		$ids = self::get_sorted_wc_product_cat_term_ids();
+		$total = count($ids);
+		$slice = array_slice($ids, $offset, $batch_size);
+
+		$ok = 0;
+		$fail = 0;
+		$errors = array();
+
+		foreach ($slice as $tid) {
+			$hid = self::get_or_create_category_mapping((int) $tid);
+			if ($hid) {
+				$ok++;
+			} else {
+				$fail++;
+				if (count($errors) < 40) {
+					$errors[] = array(
+						'wc_category_id' => (int) $tid,
+						'message' => __('ایجاد/تطبیق دسته در حسابیکس ناموفق بود', 'hesabix-v2'),
+					);
+				}
+			}
+		}
+
+		$next = $offset + count($slice);
+
+		return array(
+			'success' => true,
+			'done' => ($next >= $total || empty($slice)),
+			'next_offset' => $next,
+			'estimated_catalog_total_wc_categories' => $total,
+			'processed_wc_categories_in_chunk' => count($slice),
+			'chunk_results' => array(
+				'success' => $ok,
+				'failed' => $fail,
+				'total' => count($slice),
+				'errors_preview' => $errors,
+				'errors_total' => $fail,
+			),
+			'message' => sprintf(
+				/* translators: 1: processed count, 2: total WC categories */
+				__('مرحله انجام شد (%1$d از %2$d دسته در این بسته).', 'hesabix-v2'),
+				count($slice),
+				$total
+			),
+		);
+	}
+
+	/**
+	 * @since 2.0.8
+	 * @return int[]
+	 */
+	private static function get_sorted_wc_product_cat_term_ids()
+	{
+		if (self::$wc_product_cat_ids_sorted_cache !== null) {
+			return self::$wc_product_cat_ids_sorted_cache;
+		}
+
+		$terms = get_terms(array(
+			'taxonomy' => 'product_cat',
+			'hide_empty' => false,
+			'number' => 0,
+			'orderby' => 'term_id',
+			'order' => 'ASC',
+		));
+
+		if (is_wp_error($terms) || !is_array($terms)) {
+			self::$wc_product_cat_ids_sorted_cache = array();
+			return self::$wc_product_cat_ids_sorted_cache;
+		}
+
+		$ids = array();
+		foreach ($terms as $t) {
+			if (isset($t->term_id)) {
+				$ids[] = (int) $t->term_id;
+			}
+		}
+		$ids = array_values(array_unique(array_filter($ids)));
+
+		usort(
+			$ids,
+			function ($a, $b) {
+				$da = self::wc_product_cat_hierarchy_depth($a);
+				$db = self::wc_product_cat_hierarchy_depth($b);
+				if ($da !== $db) {
+					return $da - $db;
+				}
+				return $a - $b;
+			}
+		);
+
+		self::$wc_product_cat_ids_sorted_cache = $ids;
+		return self::$wc_product_cat_ids_sorted_cache;
+	}
+
+	/**
+	 * @since 2.0.8
+	 * @return void
+	 */
+	private static function invalidate_hesabix_category_flat_cache()
+	{
+		self::$hx_category_flat_cache = null;
+	}
+
+	/**
+	 * نرمال‌سازی برچسب برای مقایسهٔ تطبیق نام.
+	 *
+	 * @since 2.0.8
+	 * @param string $label
+	 * @return string
+	 */
+	private static function normalize_category_label_for_match($label)
+	{
+		$s = wp_strip_all_tags((string) $label);
+		$s = preg_replace('/\s+/u', ' ', trim($s));
+		if (function_exists('mb_strtolower')) {
+			return mb_strtolower($s, 'UTF-8');
+		}
+		return strtolower($s);
+	}
+
+	/**
+	 * @since 2.0.8
+	 * @param int|null $a
+	 * @param int|null $b
+	 * @return bool
+	 */
+	private static function hesabix_parent_ids_equal($a, $b)
+	{
+		$ai = ($a === null || $a === '' || $a === false) ? null : (int) $a;
+		$bi = ($b === null || $b === '' || $b === false) ? null : (int) $b;
+		return $ai === $bi;
+	}
+
+	/**
+	 * فهرست مسطح دسته‌های حسابیکس از درخت API.
+	 *
+	 * @since 2.0.8
+	 * @return array<int, array{id:int,parent_id:?int,label:string}>
+	 */
+	private static function load_hesabix_categories_flat_index()
+	{
+		if (self::$hx_category_flat_cache !== null) {
+			return self::$hx_category_flat_cache;
+		}
+
+		$api = new Hesabix_V2_Api();
+		$res = $api->get_categories_tree();
+		$flat = array();
+
+		if (empty($res['success'])) {
+			self::$hx_category_flat_cache = $flat;
+			return self::$hx_category_flat_cache;
+		}
+
+		$items = array();
+		if (isset($res['data']['items']) && is_array($res['data']['items'])) {
+			$items = $res['data']['items'];
+		}
+
+		$walk = function ($nodes) use (&$walk, &$flat) {
+			foreach ((array) $nodes as $n) {
+				if (!is_array($n)) {
+					continue;
+				}
+				$pid = null;
+				if (array_key_exists('parent_id', $n)) {
+					$pv = $n['parent_id'];
+					$pid = ($pv === null || $pv === '' || $pv === false) ? null : (int) $pv;
+				}
+				$flat[] = array(
+					'id' => isset($n['id']) ? (int) $n['id'] : 0,
+					'parent_id' => $pid,
+					'label' => isset($n['label']) ? (string) $n['label'] : '',
+				);
+				if (!empty($n['children']) && is_array($n['children'])) {
+					$walk($n['children']);
+				}
+			}
+		};
+		$walk($items);
+
+		self::$hx_category_flat_cache = $flat;
+		return self::$hx_category_flat_cache;
+	}
+
+	/**
+	 * پیدا کردن شناسهٔ دسته در حسابیکس با نام و والد (بدون ساخت رکورد جدید).
+	 *
+	 * @since 2.0.8
+	 * @param string   $wc_term_name
+	 * @param int|null $expected_parent_hesabix_id
+	 * @return int|null
+	 */
+	private static function find_hesabix_category_id_by_wc_term($wc_term_name, $expected_parent_hesabix_id)
+	{
+		$want = self::normalize_category_label_for_match($wc_term_name);
+		if ($want === '') {
+			return null;
+		}
+
+		$rows = self::load_hesabix_categories_flat_index();
+		if (empty($rows)) {
+			return null;
+		}
+
+		$candidates = array();
+		foreach ($rows as $row) {
+			if (empty($row['id'])) {
+				continue;
+			}
+			if (self::normalize_category_label_for_match($row['label']) !== $want) {
+				continue;
+			}
+			if (!self::hesabix_parent_ids_equal($row['parent_id'], $expected_parent_hesabix_id)) {
+				continue;
+			}
+			$candidates[] = (int) $row['id'];
+		}
+
+		if (empty($candidates)) {
+			return null;
+		}
+
+		sort($candidates, SORT_NUMERIC);
+		$chosen = (int) $candidates[0];
+
+		return (int) apply_filters('hesabix_v2_linked_hesabix_category_id', $chosen, $wc_term_name, $expected_parent_hesabix_id, $candidates);
 	}
 
 	/**

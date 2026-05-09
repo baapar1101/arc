@@ -4544,16 +4544,22 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     Widget editButton() => OutlinedButton.icon(
           onPressed: () {
             final doc = _document!;
+            final bid = doc.businessId;
+            final invoiceId = doc.id;
             Navigator.of(context).pop();
-            BusinessNamedRoutes.pushNamed(
-              context,
-              businessId: doc.businessId,
-              routeName: 'business_edit_invoice',
-              pathParameters: {
-                'business_id': doc.businessId.toString(),
-                'invoice_id': doc.id.toString(),
-              },
-            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              final ctx = navigatorKey.currentContext;
+              if (ctx == null || !ctx.mounted) return;
+              BusinessNamedRoutes.pushNamed(
+                ctx,
+                businessId: bid,
+                routeName: 'business_edit_invoice',
+                pathParameters: {
+                  'business_id': bid.toString(),
+                  'invoice_id': invoiceId.toString(),
+                },
+              );
+            });
           },
           icon: const Icon(Icons.edit_outlined),
           label: Text('${t.edit} ${t.invoice}'),

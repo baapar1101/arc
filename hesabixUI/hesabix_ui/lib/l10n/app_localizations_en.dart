@@ -348,12 +348,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteBusiness => 'Delete Business';
 
   @override
-  String get deleteBusinessConfirmTypeInstruction => 'To continue, type the word \"delete\" (English) or \"حذف\" (Persian).';
-
-  @override
-  String get deleteBusinessConfirmTypeHint => 'delete or حذف';
-
-  @override
   String get support => 'Support';
 
   @override
@@ -2233,9 +2227,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cash => 'Cash';
 
   @override
-  String get loanFacilities => 'Facilities';
-
-  @override
   String get invoices => 'Invoices';
 
   @override
@@ -2671,6 +2662,33 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorRestoreFailed => 'Restore failed';
+
+  @override
+  String get apiErrorBusinessUsersBusinessNotFound => 'Business not found.';
+
+  @override
+  String get apiErrorBusinessUsersUserNotFound => 'User not found.';
+
+  @override
+  String get apiErrorBusinessUsersInviteAccountMissing => 'No user found with this email or phone number. They must register first.';
+
+  @override
+  String get apiErrorBusinessUsersAlreadyMember => 'This user is already a member of this business.';
+
+  @override
+  String get apiErrorBusinessUsersCannotRemoveOwner => 'You cannot remove the business owner.';
+
+  @override
+  String get apiErrorBusinessUsersRemoveMemberNotFound => 'This user is not a member of this business.';
+
+  @override
+  String get apiErrorBusinessUsersOwnerCannotLeave => 'The business owner cannot leave the business here. Delete the business from settings if needed.';
+
+  @override
+  String get apiErrorBusinessUsersNotAMemberLeave => 'You are not a member of this business.';
+
+  @override
+  String get apiErrorBusinessUsersLeaveFailed => 'Could not leave the business. Please try again.';
 
   @override
   String get byteUnitB => 'B';
@@ -4411,9 +4429,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noRowsAdded => 'No rows added';
-
-  @override
-  String get invoiceLineItemsAddRowKeyboardHint => 'Shortcut: Press Q then I (when focus is not in a text field) to add one line.';
 
   @override
   String get quantityUnit => 'Quantity/Unit';

@@ -272,6 +272,31 @@ class Hesabix_V2_Admin
 				);
 			}
 
+			if (isset($_GET['page']) && sanitize_text_field(wp_unslash((string) $_GET['page'])) === 'hesabix-v2-customers') {
+				wp_enqueue_script(
+					'hesabix-v2-customers',
+					HESABIX_V2_PLUGIN_URL . 'assets/js/hesabix-v2-customers.js',
+					array('jquery'),
+					$this->version,
+					true
+				);
+				wp_localize_script(
+					'hesabix-v2-customers',
+					'hesabix_v2_customers',
+					array(
+						'ajax_url' => admin_url('admin-ajax.php'),
+						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
+						'chunk_size' => 8,
+						'strings' => array(
+							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
+							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
+							'confirmSync' => __('این مشتری با حسابیکس همگام شود؟ در صورت وجود نگاشت، اطلاعات به‌روز می‌شود.', 'hesabix-v2'),
+							'confirmBulkSync' => __('برای تمام مشتریان انتخاب‌شده همگام‌سازی با حسابیکس انجام شود؟', 'hesabix-v2'),
+						),
+					)
+				);
+			}
+
 			$on_settings_page = ($hook_suffix === 'hesabix-v2_page_hesabix-v2-settings')
 				|| (isset($_GET['page']) && sanitize_text_field(wp_unslash((string) $_GET['page'])) === 'hesabix-v2-settings');
 
@@ -421,6 +446,15 @@ class Hesabix_V2_Admin
 			array($this, 'display_orders')
 		);
 
+		add_submenu_page(
+			'hesabix-v2',
+			__('مشتریان و حسابیکس', 'hesabix-v2'),
+			__('مشتریان', 'hesabix-v2'),
+			'manage_woocommerce',
+			'hesabix-v2-customers',
+			array($this, 'display_customers')
+		);
+
 		// Hide setup wizard from menu
 		add_submenu_page(
 			null,
@@ -504,6 +538,9 @@ class Hesabix_V2_Admin
 			'wc_product_parents_per_ajax' => isset($_POST['wc_product_parents_per_ajax'])
 				? absint(wp_unslash($_POST['wc_product_parents_per_ajax']))
 				: $d['wc_product_parents_per_ajax'],
+			'wc_categories_per_ajax' => isset($_POST['wc_categories_per_ajax'])
+				? absint(wp_unslash($_POST['wc_categories_per_ajax']))
+				: $d['wc_categories_per_ajax'],
 			'wc_customers_per_ajax' => isset($_POST['wc_customers_per_ajax'])
 				? absint(wp_unslash($_POST['wc_customers_per_ajax']))
 				: $d['wc_customers_per_ajax'],
@@ -554,6 +591,24 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * فهرست مشتریان و همگام‌سازی شخص با حسابیکس.
+	 *
+	 * @since      3.3.5
+	 * @return void
+	 */
+	public function display_customers()
+	{
+		if (!current_user_can('manage_woocommerce')) {
+			wp_die(esc_html__('شما اجازهٔ دسترسی ندارید.', 'hesabix-v2'));
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/class-wp-list-table.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/class-hesabix-v2-customers-list-table.php';
+		$list_table = new Hesabix_V2_Customers_List_Table();
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/partials/hesabix-v2-customers.php';
+	}
+
+	/**
 	 * Display setup wizard
 	 *
 	 * @since    2.0.0
@@ -598,6 +653,7 @@ class Hesabix_V2_Admin
 			'auto_sync_orders' => isset($_POST['auto_sync_orders']),
 			'sync_on_product_update' => isset($_POST['sync_on_product_update']),
 			'sync_product_categories' => isset($_POST['sync_product_categories']),
+			'sync_category_link_by_name_in_hesabix' => isset($_POST['sync_category_link_by_name_in_hesabix']),
 			'sync_product_price' => isset($_POST['sync_product_price']),
 			'sync_product_stock' => isset($_POST['sync_product_stock']),
 			'create_customer_on_order' => isset($_POST['create_customer_on_order']),
@@ -1071,6 +1127,54 @@ class Hesabix_V2_Admin
 			$r = $sync_service->sync_order($oid);
 			$results[] = array(
 				'order_id' => $oid,
+				'success' => !empty($r['success']),
+				'message' => isset($r['message']) ? (string) $r['message'] : '',
+			);
+		}
+
+		wp_send_json_success(array('results' => $results));
+	}
+
+	/**
+	 * AJAX: همگام‌سازی مشتری (شخص حسابیکس)، حداکثر ۸ در هر درخواست.
+	 *
+	 * @since      3.3.5
+	 * @return void
+	 */
+	public function ajax_customers_sync_batch()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$raw = isset($_POST['customer_ids']) ? wp_unslash($_POST['customer_ids']) : array();
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, 8);
+		if (empty($ids)) {
+			wp_send_json_error(array('message' => __('مشتری انتخاب نشده است.', 'hesabix-v2')));
+		}
+
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$results = array();
+		foreach ($ids as $uid) {
+			if (! Hesabix_V2_Customer_Service::user_has_customer_list_role((int) $uid)) {
+				$results[] = array(
+					'customer_id' => $uid,
+					'success' => false,
+					/* translators: %d: user ID */
+					'message' => sprintf(__('شناسه %d جزو نقش‌های مجاز مشتری نیست؛ رد شد.', 'hesabix-v2'), (int) $uid),
+				);
+				continue;
+			}
+
+			$r = $sync_service->sync_customer((int) $uid);
+			$results[] = array(
+				'customer_id' => (int) $uid,
 				'success' => !empty($r['success']),
 				'message' => isset($r['message']) ? (string) $r['message'] : '',
 			);
@@ -1569,6 +1673,65 @@ class Hesabix_V2_Admin
 				),
 			)
 		);
+	}
+
+	/**
+	 * AJAX: همگام‌سازی دسته‌های product_cat ووکامرس (شامل خالی)، مرحله‌ای.
+	 *
+	 * @since 2.0.8
+	 */
+	public function ajax_sync_wc_categories()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json(array(
+				'success' => false,
+				'message' => __('ابتدا اتصال را از تنظیمات یا ویزارد کامل کنید.', 'hesabix-v2'),
+			));
+		}
+
+		$o = Hesabix_V2_Sync_Service::get_bulk_sync_options();
+		$offset = isset($_POST['offset']) ? absint($_POST['offset']) : 0;
+		$batch = isset($_POST['batch_size']) ? absint($_POST['batch_size']) : 0;
+		if ($batch < 10 || $batch > 300) {
+			$batch = (int) $o['wc_categories_per_ajax'];
+		}
+
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$r = $sync_service->bulk_sync_wc_categories_chunk($offset, $batch);
+
+		if (empty($r['success'])) {
+			wp_send_json($r);
+		}
+
+		$all_err = isset($r['chunk_results']['errors_preview']) && is_array($r['chunk_results']['errors_preview'])
+			? $r['chunk_results']['errors_preview']
+			: array();
+		$cap = (int) $o['errors_preview_cap'];
+
+		wp_send_json(array(
+			'success' => true,
+			'done' => !empty($r['done']),
+			'next_offset' => isset($r['next_offset']) ? (int) $r['next_offset'] : $offset,
+			'estimated_catalog_total_wc_categories' => isset($r['estimated_catalog_total_wc_categories'])
+				? (int) $r['estimated_catalog_total_wc_categories']
+				: 0,
+			'processed_wc_categories_in_chunk' => isset($r['processed_wc_categories_in_chunk'])
+				? (int) $r['processed_wc_categories_in_chunk']
+				: 0,
+			'chunk_results' => array(
+				'success' => isset($r['chunk_results']['success']) ? (int) $r['chunk_results']['success'] : 0,
+				'failed' => isset($r['chunk_results']['failed']) ? (int) $r['chunk_results']['failed'] : 0,
+				'total' => isset($r['chunk_results']['total']) ? (int) $r['chunk_results']['total'] : 0,
+				'errors_preview' => array_slice($all_err, 0, $cap),
+				'errors_total' => isset($r['chunk_results']['errors_total'])
+					? (int) $r['chunk_results']['errors_total']
+					: count($all_err),
+			),
+			'message' => isset($r['message']) ? (string) $r['message'] : '',
+		));
 	}
 
 	/**

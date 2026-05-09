@@ -887,3 +887,54 @@ msgstr "وضعیت نامعتبر است"
 
 msgid "BUSINESS_USER_PERMISSIONS_UPDATED"
 msgstr "دسترسی‌ها با موفقیت به‌روزرسانی شد"
+
+msgid "BUSINESS_USERS_TELEGRAM_CONNECTED_LIST_FETCHED"
+msgstr "لیست کاربران متصل به تلگرام دریافت شد"
+
+msgid "BUSINESS_USERS_BALE_CONNECTED_LIST_FETCHED"
+msgstr "لیست کاربران متصل به بله دریافت شد"
+
+msgid "BUSINESS_USERS_DETAILS_FETCHED"
+msgstr "جزئیات کاربر دریافت شد"
+
+msgid "BUSINESS_USERS_LIST_FETCHED"
+msgstr "لیست کاربران دریافت شد"
+
+msgid "BUSINESS_USERS_ADD_SUCCESS"
+msgstr "کاربر با موفقیت اضافه شد"
+
+msgid "BUSINESS_USERS_REMOVE_SUCCESS"
+msgstr "کاربر با موفقیت حذف شد"
+
+msgid "BUSINESS_USERS_LEAVE_SUCCESS"
+msgstr "شما با موفقیت از کسب و کار خارج شدید"
+
+msgid "BUSINESS_USERS_DISPLAY_FALLBACK_NAME"
+msgstr "کاربر"
+
+msgid "BUSINESS_USERS_BUSINESS_NOT_FOUND"
+msgstr "کسب و کار یافت نشد."
+
+msgid "BUSINESS_USERS_USER_NOT_FOUND"
+msgstr "کاربر یافت نشد."
+
+msgid "BUSINESS_USERS_INVITE_ACCOUNT_MISSING"
+msgstr "کاربر یافت نشد. لطفاً ابتدا کاربر را در سیستم ثبت‌نام کنید."
+
+msgid "BUSINESS_USERS_ALREADY_MEMBER"
+msgstr "کاربر قبلاً به این کسب و کار اضافه شده است."
+
+msgid "BUSINESS_USERS_CANNOT_REMOVE_OWNER"
+msgstr "نمی‌توان مالک کسب و کار را حذف کرد."
+
+msgid "BUSINESS_USERS_REMOVE_MEMBER_NOT_FOUND"
+msgstr "این کاربر عضو این کسب و کار نیست."
+
+msgid "BUSINESS_USERS_OWNER_CANNOT_LEAVE"
+msgstr "مالک کسب و کار نمی‌تواند از کسب و کار خارج شود. برای حذف کسب و کار از بخش تنظیمات استفاده کنید."
+
+msgid "BUSINESS_USERS_NOT_A_MEMBER_LEAVE"
+msgstr "شما عضو این کسب و کار نیستید."
+
+msgid "BUSINESS_USERS_LEAVE_FAILED"
+msgstr "خطا در خروج از کسب و کار."

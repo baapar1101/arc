@@ -864,3 +864,54 @@ msgstr "Invalid status"
 
 msgid "BUSINESS_USER_PERMISSIONS_UPDATED"
 msgstr "Permissions updated successfully"
+
+msgid "BUSINESS_USERS_TELEGRAM_CONNECTED_LIST_FETCHED"
+msgstr "Telegram-connected users list retrieved successfully"
+
+msgid "BUSINESS_USERS_BALE_CONNECTED_LIST_FETCHED"
+msgstr "Bale-connected users list retrieved successfully"
+
+msgid "BUSINESS_USERS_DETAILS_FETCHED"
+msgstr "User details retrieved successfully"
+
+msgid "BUSINESS_USERS_LIST_FETCHED"
+msgstr "Business users list retrieved successfully"
+
+msgid "BUSINESS_USERS_ADD_SUCCESS"
+msgstr "User added successfully"
+
+msgid "BUSINESS_USERS_REMOVE_SUCCESS"
+msgstr "User removed successfully"
+
+msgid "BUSINESS_USERS_LEAVE_SUCCESS"
+msgstr "You have left the business successfully"
+
+msgid "BUSINESS_USERS_DISPLAY_FALLBACK_NAME"
+msgstr "User"
+
+msgid "BUSINESS_USERS_BUSINESS_NOT_FOUND"
+msgstr "Business not found."
+
+msgid "BUSINESS_USERS_USER_NOT_FOUND"
+msgstr "User not found."
+
+msgid "BUSINESS_USERS_INVITE_ACCOUNT_MISSING"
+msgstr "No user found with this email or phone number. They must register first."
+
+msgid "BUSINESS_USERS_ALREADY_MEMBER"
+msgstr "This user is already a member of this business."
+
+msgid "BUSINESS_USERS_CANNOT_REMOVE_OWNER"
+msgstr "You cannot remove the business owner."
+
+msgid "BUSINESS_USERS_REMOVE_MEMBER_NOT_FOUND"
+msgstr "This user is not a member of this business."
+
+msgid "BUSINESS_USERS_OWNER_CANNOT_LEAVE"
+msgstr "The business owner cannot leave the business here. Delete the business from settings if needed."
+
+msgid "BUSINESS_USERS_NOT_A_MEMBER_LEAVE"
+msgstr "You are not a member of this business."
+
+msgid "BUSINESS_USERS_LEAVE_FAILED"
+msgstr "Could not leave the business. Please try again."

@@ -290,6 +290,17 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			</tr>
 
 			<tr>
+				<th scope="row"><?php _e('تطبیق دسته با نام موجود در حسابیکس', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="sync_category_link_by_name_in_hesabix" value="1" <?php checked(!empty($sync_settings['sync_category_link_by_name_in_hesabix'])); ?>>
+						<?php _e('فعال', 'hesabix-v2'); ?>
+					</label>
+					<p class="description"><?php _e('اگر دستهٔ ووکامرس هنوز در افزونه نگاشت نشده باشد، قبل از ساخت رکورد جدید، درخت دسته‌های حسابیکس برای همان نام و همان والد جستجو می‌شود و در صورت انطباق، همان شناسه پیوند می‌خورد (برای جلوگیری از تکرار نام).', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
 				<th scope="row"><?php _e('همگام‌سازی قیمت محصول', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
@@ -317,6 +328,18 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
 					<p class="description"><?php _e('ثبت‌نام کاربر با نقش مشتری، ویرایش پروفایل وردپرس، و ذخیرهٔ مشتری از حساب کاربری من ووکامرس (هوک woocommerce_update_customer).', 'hesabix-v2'); ?></p>
+					<p class="description">
+						<?php
+						echo wp_kses_post(
+							sprintf(
+								/* translators: 1: opening <a>, 2: closing </a> — link wraps «صفحهٔ مشتریان و حسابیکس». */
+								__('برای مشاهدهٔ وضعیت هر مشتری و همگام‌سازی تکی یا گروهی با حسابیکس، به %1$sصفحهٔ مشتریان و حسابیکس%2$s بروید.', 'hesabix-v2'),
+								'<a href="' . esc_url(admin_url('admin.php?page=hesabix-v2-customers')) . '">',
+								'</a>'
+							)
+						);
+						?>
+					</p>
 				</td>
 			</tr>
 

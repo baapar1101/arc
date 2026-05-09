@@ -255,6 +255,20 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 	}
 
 	/**
+	 * Default wc_get_orders() uses statuses from wc_get_order_statuses() or equivalent; checkout-draft is excluded from that set (e.g. HPOS OrdersTableQuery::sanitize_status). Include it explicitly for CPT + HPOS.
+	 *
+	 * @return array<int,string>
+	 */
+	private static function order_statuses_for_list_query()
+	{
+		$statuses = array_keys( wc_get_order_statuses() );
+		if (!in_array('wc-checkout-draft', $statuses, true)) {
+			$statuses[] = 'wc-checkout-draft';
+		}
+		return $statuses;
+	}
+
+	/**
 	 * @return void
 	 */
 	public function prepare_items()
@@ -316,6 +330,7 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 				'paginate' => true,
 				'orderby' => 'date',
 				'order' => 'DESC',
+				'status' => self::order_statuses_for_list_query(),
 			);
 			if (!empty($mapped)) {
 				$args['exclude'] = $mapped;
@@ -336,6 +351,7 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 					'paginate' => true,
 					'orderby' => 'date',
 					'order' => 'DESC',
+					'status' => self::order_statuses_for_list_query(),
 				)
 			);
 			$this->items = $query->orders;

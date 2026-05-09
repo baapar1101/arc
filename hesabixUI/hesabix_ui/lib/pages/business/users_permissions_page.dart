@@ -1000,12 +1000,6 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'edit': '${t.edit} ${t.pettyCash}',
         'delete': '${t.delete} ${t.pettyCash}',
       },
-      'loan_facilities': {
-        'add': '${t.add} ${t.loanFacilities}',
-        'view': '${t.view} ${t.loanFacilities}',
-        'edit': '${t.edit} ${t.loanFacilities}',
-        'delete': '${t.delete} ${t.loanFacilities}',
-      },
       'checks': {
         'add': '${t.add} ${t.checks}',
         'view': '${t.view} ${t.checks}',
@@ -1411,7 +1405,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': t.banking,
         'icon': Icons.account_balance,
-        'sections': ['bank_accounts', 'cash', 'petty_cash', 'loan_facilities', 'checks', 'wallet', 'transfers'],
+        'sections': ['bank_accounts', 'cash', 'petty_cash', 'checks', 'wallet', 'transfers'],
       },
       {
         'title': t.permissionsCategoryInvoicesAndExpenses,
@@ -1557,8 +1551,6 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.cash;
       case 'petty_cash':
         return t.pettyCash;
-      case 'loan_facilities':
-        return t.loanFacilities;
       case 'checks':
         return t.checks;
       case 'wallet':

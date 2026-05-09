@@ -37,6 +37,7 @@ class Hesabix_V2_Sync_Service
 	{
 		return array(
 			'wc_product_parents_per_ajax' => 35,
+			'wc_categories_per_ajax' => 60,
 			'wc_customers_per_ajax' => 45,
 			'hesabix_person_take' => 80,
 			'hesabix_import_pages_per_ajax' => 3,
@@ -60,6 +61,7 @@ class Hesabix_V2_Sync_Service
 		$o = wp_parse_args($raw, $d);
 
 		$o['wc_product_parents_per_ajax'] = max(5, min(500, absint($o['wc_product_parents_per_ajax'])));
+		$o['wc_categories_per_ajax'] = max(10, min(300, absint($o['wc_categories_per_ajax'])));
 		$o['wc_customers_per_ajax'] = max(5, min(500, absint($o['wc_customers_per_ajax'])));
 
 		$o['hesabix_person_take'] = max(10, min(200, absint($o['hesabix_person_take'])));
@@ -786,6 +788,26 @@ class Hesabix_V2_Sync_Service
 		}
 
 		return $results;
+	}
+
+	/**
+	 * یک مرحلهٔ همگام‌سازی دسته‌های product_cat ووکامرس (شامل دسته‌های بدون محصول).
+	 *
+	 * @since 2.0.8
+	 * @param int $offset
+	 * @param int $batch_size
+	 * @return array<string,mixed>
+	 */
+	public function bulk_sync_wc_categories_chunk($offset, $batch_size)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return array(
+				'success' => false,
+				'message' => __('ابتدا اتصال را از تنظیمات یا ویزارد کامل کنید.', 'hesabix-v2'),
+			);
+		}
+
+		return Hesabix_V2_Mapper::bulk_sync_wc_product_categories_chunk($offset, $batch_size);
 	}
 
 	/**

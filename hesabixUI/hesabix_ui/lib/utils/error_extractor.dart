@@ -34,6 +34,33 @@ class ErrorExtractor {
     return userMessage(e, t);
   }
 
+  /// پیام خطا برای کدهای API شناخته‌شده (اولویت با ترجمهٔ کلاینت).
+  static String? _messageForKnownApiErrorCode(String? code, AppLocalizations t) {
+    if (code == null || code.isEmpty) return null;
+    switch (code) {
+      case 'BUSINESS_USERS_BUSINESS_NOT_FOUND':
+        return t.apiErrorBusinessUsersBusinessNotFound;
+      case 'BUSINESS_USERS_USER_NOT_FOUND':
+        return t.apiErrorBusinessUsersUserNotFound;
+      case 'BUSINESS_USERS_INVITE_ACCOUNT_MISSING':
+        return t.apiErrorBusinessUsersInviteAccountMissing;
+      case 'BUSINESS_USERS_ALREADY_MEMBER':
+        return t.apiErrorBusinessUsersAlreadyMember;
+      case 'BUSINESS_USERS_CANNOT_REMOVE_OWNER':
+        return t.apiErrorBusinessUsersCannotRemoveOwner;
+      case 'BUSINESS_USERS_REMOVE_MEMBER_NOT_FOUND':
+        return t.apiErrorBusinessUsersRemoveMemberNotFound;
+      case 'BUSINESS_USERS_OWNER_CANNOT_LEAVE':
+        return t.apiErrorBusinessUsersOwnerCannotLeave;
+      case 'BUSINESS_USERS_NOT_A_MEMBER_LEAVE':
+        return t.apiErrorBusinessUsersNotAMemberLeave;
+      case 'BUSINESS_USERS_LEAVE_FAILED':
+        return t.apiErrorBusinessUsersLeaveFailed;
+      default:
+        return null;
+    }
+  }
+
   static String? _extractFromResponseData(dynamic data, AppLocalizations t) {
     Map<String, dynamic>? dataMap;
     if (data is Map) {
@@ -48,6 +75,12 @@ class ErrorExtractor {
     }
     if (dataMap == null) return null;
     final error = dataMap['error'];
+    if (error is Map) {
+      final code = error['code'];
+      final codeStr = code is String ? code : null;
+      final fromCode = _messageForKnownApiErrorCode(codeStr, t);
+      if (fromCode != null) return fromCode;
+    }
     if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
       return error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند';
     }
@@ -119,6 +152,8 @@ class ErrorExtractor {
   static String _dioExceptionMessage(dio.DioException e, AppLocalizations t) {
     final inner = e.error;
     if (inner is ApiErrorDetails) {
+      final fromCode = _messageForKnownApiErrorCode(inner.code, t);
+      if (fromCode != null) return fromCode;
       final m = inner.message;
       if (m != null && m.isNotEmpty) return m;
     }

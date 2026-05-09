@@ -1013,6 +1013,25 @@ class Hesabix_V2_Api
 	}
 
 	/**
+	 * درخت دسته‌های کسب‌وکار (برای تطبیق نام و والد).
+	 *
+	 * @since 2.0.8
+	 * @param array<string,mixed> $body
+	 * @return array
+	 */
+	public function get_categories_tree($body = null)
+	{
+		if (!is_array($body)) {
+			$body = new \stdClass();
+		}
+		return $this->request(
+			'POST',
+			"/categories/business/{$this->business_id}/tree",
+			$body
+		);
+	}
+
+	/**
 	 * Create category
 	 *
 	 * @since    2.0.0
@@ -1024,6 +1043,38 @@ class Hesabix_V2_Api
 		return $this->request(
 			'POST',
 			"/categories/business/{$this->business_id}",
+			$data
+		);
+	}
+
+	/**
+	 * به‌روزرسانی دسته (برچسب و سایر فیلدهای اختیاری)
+	 *
+	 * @since 2.0.8
+	 * @param array<string,mixed> $data category_id، label، ...
+	 * @return array
+	 */
+	public function update_category($data)
+	{
+		return $this->request(
+			'POST',
+			"/categories/business/{$this->business_id}/update",
+			$data
+		);
+	}
+
+	/**
+	 * جابه‌جایی دسته در درخت (مثلاً ریشه با new_parent_id برابر null)
+	 *
+	 * @since 2.0.8
+	 * @param array<string,mixed> $data category_id، new_parent_id
+	 * @return array
+	 */
+	public function move_category($data)
+	{
+		return $this->request(
+			'POST',
+			"/categories/business/{$this->business_id}/move",
 			$data
 		);
 	}

@@ -139,6 +139,7 @@ class Hesabix_V2_Activator
 			'sync_product_price' => true,
 			'sync_product_stock' => true,
 			'sync_product_categories' => true,
+			'sync_category_link_by_name_in_hesabix' => false,
 			'create_customer_on_order' => true,
 			'sync_order_on_checkout' => true,
 			'sync_order_on_payment_complete' => false,

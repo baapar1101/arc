@@ -348,12 +348,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get deleteBusiness => 'حذف کسب و کار';
 
   @override
-  String get deleteBusinessConfirmTypeInstruction => 'برای ادامه، کلمه «delete» به انگلیسی یا «حذف» به فارسی را وارد کنید.';
-
-  @override
-  String get deleteBusinessConfirmTypeHint => 'delete یا حذف';
-
-  @override
   String get support => 'پشتیبانی';
 
   @override
@@ -2233,9 +2227,6 @@ class AppLocalizationsFa extends AppLocalizations {
   String get cash => 'صندوق';
 
   @override
-  String get loanFacilities => 'تسهیلات';
-
-  @override
   String get invoices => 'فاکتورها';
 
   @override
@@ -2671,6 +2662,33 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get errorRestoreFailed => 'خطا در بازیابی اطلاعات';
+
+  @override
+  String get apiErrorBusinessUsersBusinessNotFound => 'کسب و کار یافت نشد.';
+
+  @override
+  String get apiErrorBusinessUsersUserNotFound => 'کاربر یافت نشد.';
+
+  @override
+  String get apiErrorBusinessUsersInviteAccountMissing => 'کاربر یافت نشد. لطفاً ابتدا کاربر را در سیستم ثبت‌نام کنید.';
+
+  @override
+  String get apiErrorBusinessUsersAlreadyMember => 'کاربر قبلاً به این کسب و کار اضافه شده است.';
+
+  @override
+  String get apiErrorBusinessUsersCannotRemoveOwner => 'نمی‌توان مالک کسب و کار را حذف کرد.';
+
+  @override
+  String get apiErrorBusinessUsersRemoveMemberNotFound => 'این کاربر عضو این کسب و کار نیست.';
+
+  @override
+  String get apiErrorBusinessUsersOwnerCannotLeave => 'مالک کسب و کار نمی‌تواند از کسب و کار خارج شود. برای حذف کسب و کار از بخش تنظیمات استفاده کنید.';
+
+  @override
+  String get apiErrorBusinessUsersNotAMemberLeave => 'شما عضو این کسب و کار نیستید.';
+
+  @override
+  String get apiErrorBusinessUsersLeaveFailed => 'خطا در خروج از کسب و کار.';
 
   @override
   String get byteUnitB => 'بایت';
@@ -4411,9 +4429,6 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get noRowsAdded => 'ردیفی افزوده نشده است';
-
-  @override
-  String get invoiceLineItemsAddRowKeyboardHint => 'میانبر: کلید Q و سپس بلافاصله I (وقتی فوکوس در فیلد متنی نیست) یک ردیف اضافه می‌کند.';
 
   @override
   String get quantityUnit => 'تعداد/واحد';

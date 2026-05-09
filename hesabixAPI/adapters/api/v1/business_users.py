@@ -1,6 +1,6 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
-from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 import re
 
@@ -11,6 +11,7 @@ from adapters.api.v1.schemas import (
     LeaveBusinessResponse
 )
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.i18n import get_request_translator
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.cache import get_cache
@@ -20,6 +21,10 @@ from adapters.db.models.business import Business
 from sqlalchemy import select, and_, or_
 
 router = APIRouter(prefix="/business", tags=["business-users"])
+
+
+def _localize(request: Request, key: str, default_en: str) -> str:
+    return get_request_translator(request).t(key, default=default_en)
 
 
 def _normalize_phone_for_search(phone: str) -> str | None:
@@ -89,18 +94,18 @@ def get_telegram_connected_users(
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
+        raise ApiError("BUSINESS_USERS_BUSINESS_NOT_FOUND", "Business not found.", http_status=404)
+
     # دریافت لیست کاربران عضو کسب و کار
     permission_repo = BusinessPermissionRepository(db)
     business_permissions = permission_repo.get_business_users(business_id)
-    
+
     # جمع‌آوری user_id های عضو کسب و کار (شامل owner)
     user_ids = {business.owner_id}
     for perm in business_permissions:
         if perm.user_id:
             user_ids.add(perm.user_id)
-    
+
     # دریافت کاربرانی که telegram_chat_id دارند
     stmt = select(User).where(
         and_(
@@ -118,14 +123,16 @@ def get_telegram_connected_users(
         
         user_data = {
             "user_id": user.id,
-            "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر",
+            "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or _localize(
+                request, "BUSINESS_USERS_DISPLAY_FALLBACK_NAME", "User"
+            ),
             "email": user.email or "",
             "mobile": user.mobile or "",
             "telegram_chat_id": user.telegram_chat_id,
             "role": role,
         }
         formatted_users.append(user_data)
-    
+
     logger.info(f"Found {len(formatted_users)} telegram-connected users for business {business_id}")
     
     return success_response(
@@ -134,7 +141,7 @@ def get_telegram_connected_users(
             "total": len(formatted_users)
         },
         request=request,
-        message="لیست کاربران متصل به تلگرام دریافت شد"
+        message="BUSINESS_USERS_TELEGRAM_CONNECTED_LIST_FETCHED",
     )
 
 
@@ -163,7 +170,7 @@ def get_bale_connected_users(
 
     business = db.get(Business, business_id)
     if not business:
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+        raise ApiError("BUSINESS_USERS_BUSINESS_NOT_FOUND", "Business not found.", http_status=404)
 
     permission_repo = BusinessPermissionRepository(db)
     business_permissions = permission_repo.get_business_users(business_id)
@@ -178,7 +185,7 @@ def get_bale_connected_users(
         return success_response(
             data={"users": [], "total": 0},
             request=request,
-            message="لیست کاربران متصل به بله دریافت شد"
+            message="BUSINESS_USERS_BALE_CONNECTED_LIST_FETCHED",
         )
 
     stmt = select(User).where(
@@ -194,7 +201,9 @@ def get_bale_connected_users(
         role = "owner" if user.id == business.owner_id else "member"
         user_data = {
             "user_id": user.id,
-            "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر",
+            "name": f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or _localize(
+                request, "BUSINESS_USERS_DISPLAY_FALLBACK_NAME", "User"
+            ),
             "email": user.email or "",
             "mobile": user.mobile or "",
             "bale_chat_id": getattr(user, "bale_chat_id", None),
@@ -210,7 +219,7 @@ def get_bale_connected_users(
             "total": len(formatted_users)
         },
         request=request,
-        message="لیست کاربران متصل به بله دریافت شد"
+        message="BUSINESS_USERS_BALE_CONNECTED_LIST_FETCHED",
     )
 
 
@@ -280,13 +289,13 @@ def get_user_details(
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
+        raise ApiError("BUSINESS_USERS_BUSINESS_NOT_FOUND", "Business not found.", http_status=404)
+
     # Get user details
     user = db.get(User, user_id)
     if not user:
         logger.warning(f"User {user_id} not found")
-        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        raise ApiError("BUSINESS_USERS_USER_NOT_FOUND", "User not found.", http_status=404)
     
     # Get user permissions for this business
     permission_repo = BusinessPermissionRepository(db)
@@ -323,7 +332,7 @@ def get_user_details(
     return success_response(
         data={"user": formatted_user_data},
         request=request,
-        message="جزئیات کاربر دریافت شد"
+        message="BUSINESS_USERS_DETAILS_FETCHED",
     )
 
 
@@ -396,8 +405,8 @@ def get_users(
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
+        raise ApiError("BUSINESS_USERS_BUSINESS_NOT_FOUND", "Business not found.", http_status=404)
+
     # Get business permissions for this business
     permission_repo = BusinessPermissionRepository(db)
     business_permissions = permission_repo.get_business_users(business_id)
@@ -465,7 +474,7 @@ def get_users(
             "total_count": len(formatted_users)
         },
         request=request,
-        message="لیست کاربران دریافت شد"
+        message="BUSINESS_USERS_LIST_FETCHED",
     )
 
 
@@ -533,7 +542,7 @@ def add_user(
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
-        raise ApiError("BUSINESS_NOT_FOUND", "کسب و کار یافت نشد", http_status=404)
+        raise ApiError("BUSINESS_USERS_BUSINESS_NOT_FOUND", "Business not found.", http_status=404)
     
     # Find user by email or phone
     logger.info(f"Searching for user with email/phone: {add_request.email_or_phone}")
@@ -562,7 +571,11 @@ def add_user(
     
     if not user:
         logger.warning(f"User not found with email/phone: {add_request.email_or_phone}")
-        raise ApiError("USER_NOT_FOUND", "کاربر یافت نشد. لطفاً ابتدا کاربر را در سیستم ثبت‌نام کنید.", http_status=404)
+        raise ApiError(
+            "BUSINESS_USERS_INVITE_ACCOUNT_MISSING",
+            "No user found with this email or phone number. They must register first.",
+            http_status=404,
+        )
     
     logger.info(f"Found user: {user.id} - {user.email}")
     
@@ -572,7 +585,11 @@ def add_user(
     
     if existing_permission:
         logger.warning(f"User {user.id} already exists in business {business_id}")
-        raise ApiError("USER_ALREADY_ADDED", "کاربر قبلاً به این کسب و کار اضافه شده است", http_status=400)
+        raise ApiError(
+            "BUSINESS_USERS_ALREADY_MEMBER",
+            "This user is already a member of this business.",
+            http_status=400,
+        )
     
     # Add user to business with default permissions
     logger.info(f"Adding user {user.id} to business {business_id}")
@@ -617,7 +634,7 @@ def add_user(
     return success_response(
         data={"user": formatted_user_data},
         request=request,
-        message="کاربر با موفقیت اضافه شد"
+        message="BUSINESS_USERS_ADD_SUCCESS",
     )
 
 
@@ -667,12 +684,12 @@ def update_permissions(
     # بررسی وجود کسب‌وکار
     business = db.get(Business, business_id)
     if not business:
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
+        raise ApiError("BUSINESS_USERS_BUSINESS_NOT_FOUND", "Business not found.", http_status=404)
+
     # Check if target user exists
     target_user = db.get(User, user_id)
     if not target_user:
-        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        raise ApiError("BUSINESS_USERS_USER_NOT_FOUND", "User not found.", http_status=404)
     
     # Update permissions
     permission_repo = BusinessPermissionRepository(db)
@@ -731,18 +748,26 @@ def remove_user(
     # بررسی وجود کسب‌وکار
     business = db.get(Business, business_id)
     if not business:
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
+        raise ApiError("BUSINESS_USERS_BUSINESS_NOT_FOUND", "Business not found.", http_status=404)
+
     # Check if target user is business owner
     if business and business.owner_id == user_id:
-        raise HTTPException(status_code=400, detail="نمی‌توان مالک کسب و کار را حذف کرد")
+        raise ApiError(
+            "BUSINESS_USERS_CANNOT_REMOVE_OWNER",
+            "You cannot remove the business owner.",
+            http_status=400,
+        )
     
     # Remove user permissions
     permission_repo = BusinessPermissionRepository(db)
     success = permission_repo.delete_by_user_and_business(user_id, business_id)
     
     if not success:
-        raise HTTPException(status_code=404, detail="کاربر یافت نشد")
+        raise ApiError(
+            "BUSINESS_USERS_REMOVE_MEMBER_NOT_FOUND",
+            "This user is not a member of this business.",
+            http_status=404,
+        )
     
     # Invalidate cache for removed user's businesses list
     cache = get_cache()
@@ -761,7 +786,7 @@ def remove_user(
     return success_response(
         data={},
         request=request,
-        message="کاربر با موفقیت حذف شد"
+        message="BUSINESS_USERS_REMOVE_SUCCESS",
     )
 
 
@@ -813,14 +838,15 @@ def leave_business(
     business = db.get(Business, business_id)
     if not business:
         logger.error(f"Business {business_id} not found")
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
+        raise ApiError("BUSINESS_USERS_BUSINESS_NOT_FOUND", "Business not found.", http_status=404)
+
     # بررسی اینکه کاربر مالک کسب و کار نباشد
     if business.owner_id == current_user_id:
         logger.warning(f"User {current_user_id} is business owner, cannot leave")
-        raise HTTPException(
-            status_code=400, 
-            detail="مالک کسب و کار نمی‌تواند از کسب و کار خارج شود. برای حذف کسب و کار از بخش تنظیمات استفاده کنید."
+        raise ApiError(
+            "BUSINESS_USERS_OWNER_CANNOT_LEAVE",
+            "The business owner cannot leave the business here. Delete the business from settings if needed.",
+            http_status=400,
         )
     
     # بررسی اینکه کاربر عضو کسب و کار باشد
@@ -829,9 +855,10 @@ def leave_business(
     
     if not permission_obj:
         logger.warning(f"User {current_user_id} is not a member of business {business_id}")
-        raise HTTPException(
-            status_code=400, 
-            detail="شما عضو این کسب و کار نیستید"
+        raise ApiError(
+            "BUSINESS_USERS_NOT_A_MEMBER_LEAVE",
+            "You are not a member of this business.",
+            http_status=400,
         )
     
     # حذف دسترسی‌های کاربر
@@ -840,9 +867,10 @@ def leave_business(
     
     if not success:
         logger.error(f"Failed to remove user {current_user_id} from business {business_id}")
-        raise HTTPException(
-            status_code=500, 
-            detail="خطا در خروج از کسب و کار"
+        raise ApiError(
+            "BUSINESS_USERS_LEAVE_FAILED",
+            "Could not leave the business. Please try again.",
+            http_status=500,
         )
     
     # Invalidate cache for user businesses list
@@ -859,5 +887,5 @@ def leave_business(
     return success_response(
         data={},
         request=request,
-        message="شما با موفقیت از کسب و کار خارج شدید"
+        message="BUSINESS_USERS_LEAVE_SUCCESS",
     )

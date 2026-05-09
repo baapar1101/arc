@@ -749,18 +749,6 @@ abstract class AppLocalizations {
   /// **'Delete Business'**
   String get deleteBusiness;
 
-  /// No description provided for @deleteBusinessConfirmTypeInstruction.
-  ///
-  /// In en, this message translates to:
-  /// **'To continue, type the word \"delete\" (English) or \"حذف\" (Persian).'**
-  String get deleteBusinessConfirmTypeInstruction;
-
-  /// No description provided for @deleteBusinessConfirmTypeHint.
-  ///
-  /// In en, this message translates to:
-  /// **'delete or حذف'**
-  String get deleteBusinessConfirmTypeHint;
-
   /// No description provided for @support.
   ///
   /// In en, this message translates to:
@@ -4475,12 +4463,6 @@ abstract class AppLocalizations {
   /// **'Cash'**
   String get cash;
 
-  /// No description provided for @loanFacilities.
-  ///
-  /// In en, this message translates to:
-  /// **'Facilities'**
-  String get loanFacilities;
-
   /// No description provided for @invoices.
   ///
   /// In en, this message translates to:
@@ -5350,6 +5332,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Restore failed'**
   String get errorRestoreFailed;
+
+  /// No description provided for @apiErrorBusinessUsersBusinessNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Business not found.'**
+  String get apiErrorBusinessUsersBusinessNotFound;
+
+  /// No description provided for @apiErrorBusinessUsersUserNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'User not found.'**
+  String get apiErrorBusinessUsersUserNotFound;
+
+  /// No description provided for @apiErrorBusinessUsersInviteAccountMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No user found with this email or phone number. They must register first.'**
+  String get apiErrorBusinessUsersInviteAccountMissing;
+
+  /// No description provided for @apiErrorBusinessUsersAlreadyMember.
+  ///
+  /// In en, this message translates to:
+  /// **'This user is already a member of this business.'**
+  String get apiErrorBusinessUsersAlreadyMember;
+
+  /// No description provided for @apiErrorBusinessUsersCannotRemoveOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'You cannot remove the business owner.'**
+  String get apiErrorBusinessUsersCannotRemoveOwner;
+
+  /// No description provided for @apiErrorBusinessUsersRemoveMemberNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This user is not a member of this business.'**
+  String get apiErrorBusinessUsersRemoveMemberNotFound;
+
+  /// No description provided for @apiErrorBusinessUsersOwnerCannotLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'The business owner cannot leave the business here. Delete the business from settings if needed.'**
+  String get apiErrorBusinessUsersOwnerCannotLeave;
+
+  /// No description provided for @apiErrorBusinessUsersNotAMemberLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'You are not a member of this business.'**
+  String get apiErrorBusinessUsersNotAMemberLeave;
+
+  /// No description provided for @apiErrorBusinessUsersLeaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not leave the business. Please try again.'**
+  String get apiErrorBusinessUsersLeaveFailed;
 
   /// No description provided for @byteUnitB.
   ///
@@ -8770,12 +8806,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No rows added'**
   String get noRowsAdded;
-
-  /// No description provided for @invoiceLineItemsAddRowKeyboardHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Shortcut: Press Q then I (when focus is not in a text field) to add one line.'**
-  String get invoiceLineItemsAddRowKeyboardHint;
 
   /// No description provided for @quantityUnit.
   ///

@@ -66,6 +66,11 @@ $stats = $db->get_sync_stats();
 						<br>
 						<?php _e('خطا:', 'hesabix-v2'); ?> <?php echo $stats['customer']['error'] ?? 0; ?>
 					</p>
+					<p class="stat-detail" style="margin-top:10px;">
+						<a href="<?php echo esc_url(admin_url('admin.php?page=hesabix-v2-customers')); ?>">
+							<?php esc_html_e('فهرست مشتریان و همگام‌سازی دستی', 'hesabix-v2'); ?>
+						</a>
+					</p>
 				</div>
 
 				<div class="stat-box">
@@ -85,6 +90,9 @@ $stats = $db->get_sync_stats();
 				<p>
 					<a href="<?php echo admin_url('admin.php?page=hesabix-v2-sync'); ?>" class="button button-primary">
 						<?php _e('همگام‌سازی', 'hesabix-v2'); ?>
+					</a>
+					<a href="<?php echo esc_url(admin_url('admin.php?page=hesabix-v2-customers')); ?>" class="button">
+						<?php esc_html_e('مشتریان', 'hesabix-v2'); ?>
 					</a>
 					<a href="<?php echo admin_url('admin.php?page=hesabix-v2-settings'); ?>" class="button">
 						<?php _e('تنظیمات', 'hesabix-v2'); ?>

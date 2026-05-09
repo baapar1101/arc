@@ -45,6 +45,9 @@ class Hesabix_V2_Invoice_Helper
 		if (!isset($sync['invoice_extra_tag_ids'])) {
 			$sync['invoice_extra_tag_ids'] = '';
 		}
+		if (!array_key_exists('sync_category_link_by_name_in_hesabix', $sync)) {
+			$sync['sync_category_link_by_name_in_hesabix'] = false;
+		}
 
 		return $sync;
 	}
