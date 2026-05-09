@@ -78,7 +78,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get welcomeTitle => 'حسابداری ابری حسابیکس';
 
   @override
-  String get welcomeSubtitle => 'حسابداری هوشمند، امن و همیشه در دسترس برای کسب‌وکار شما.';
+  String get welcomeSubtitle =>
+      'حسابداری هوشمند، امن و همیشه در دسترس برای کسب‌وکار شما.';
 
   @override
   String get brandTagline => 'مدیریت مالی هرجا و هر زمان با اطمینان.';
@@ -108,7 +109,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get and => 'و';
 
   @override
-  String get acceptTermsRequired => 'برای عضویت باید با سیاست حفظ حریم خصوصی و قوانین ارائه خدمات موافق باشید.';
+  String get acceptTermsRequired =>
+      'برای عضویت باید با سیاست حفظ حریم خصوصی و قوانین ارائه خدمات موافق باشید.';
 
   @override
   String get sendReset => 'ارسال کد بازیابی';
@@ -117,7 +119,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get registerFailed => 'عضویت ناموفق بود. لطفاً دوباره تلاش کنید.';
 
   @override
-  String get resetFailed => 'ارسال کد بازیابی ناموفق بود. لطفاً دوباره تلاش کنید.';
+  String get resetFailed =>
+      'ارسال کد بازیابی ناموفق بود. لطفاً دوباره تلاش کنید.';
 
   @override
   String get fixFormErrors => 'لطفاً خطاهای فرم را برطرف کنید.';
@@ -156,7 +159,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get emailSettings => 'تنظیمات ایمیل';
 
   @override
-  String get emailSettingsDescription => 'پیکربندی تنظیمات SMTP برای ارسال ایمیل';
+  String get emailSettingsDescription =>
+      'پیکربندی تنظیمات SMTP برای ارسال ایمیل';
 
   @override
   String get emailConfigurations => 'پیکربندی‌های ایمیل';
@@ -213,7 +217,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get deleteConfiguration => 'حذف پیکربندی';
 
   @override
-  String get deleteConfigurationConfirm => 'آیا مطمئن هستید که می‌خواهید این پیکربندی را حذف کنید؟';
+  String get deleteConfigurationConfirm =>
+      'آیا مطمئن هستید که می‌خواهید این پیکربندی را حذف کنید؟';
 
   @override
   String get delete => 'حذف';
@@ -234,7 +239,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get columnSettings => 'تنظیمات ستون‌ها';
 
   @override
-  String get columnSettingsDescription => 'مدیریت نمایش و ترتیب ستون‌های این جدول';
+  String get columnSettingsDescription =>
+      'مدیریت نمایش و ترتیب ستون‌های این جدول';
 
   @override
   String get columnName => 'نام ستون';
@@ -279,16 +285,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get bulkDefaultWarehouseScopeAll => 'همه موارد انتخاب‌شده';
 
   @override
-  String get bulkDefaultWarehouseScopeTrackInventoryTrue => 'فقط کالاهای انبارداری';
+  String get bulkDefaultWarehouseScopeTrackInventoryTrue =>
+      'فقط کالاهای انبارداری';
 
   @override
-  String get bulkDefaultWarehouseScopeTrackInventoryFalse => 'فقط کالاهای غیرانبارداری';
+  String get bulkDefaultWarehouseScopeTrackInventoryFalse =>
+      'فقط کالاهای غیرانبارداری';
 
   @override
   String get bulkDefaultWarehouseConfirmTitle => 'اعمال تغییر';
 
   @override
-  String get bulkDefaultWarehouseConfirmMessage => 'آیا از اعمال تغییر انبار پیش‌فرض برای کالاهای انتخاب‌شده مطمئن هستید؟';
+  String get bulkDefaultWarehouseConfirmMessage =>
+      'آیا از اعمال تغییر انبار پیش‌فرض برای کالاهای انتخاب‌شده مطمئن هستید؟';
 
   @override
   String bulkDefaultWarehouseApplySuccess(String count) {
@@ -301,7 +310,11 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String bulkDefaultWarehousePreviewSummary(String total, String found, String willUpdate) {
+  String bulkDefaultWarehousePreviewSummary(
+    String total,
+    String found,
+    String willUpdate,
+  ) {
     return 'تعداد انتخاب: $total | پیدا شده: $found | قابل تغییر: $willUpdate';
   }
 
@@ -319,21 +332,29 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String bulkDefaultWarehouseApplySummary(String total, String found, String updated, String skipped) {
+  String bulkDefaultWarehouseApplySummary(
+    String total,
+    String found,
+    String updated,
+    String skipped,
+  ) {
     return 'تعداد انتخاب: $total | پیدا شده: $found | تغییر کرده: $updated | نادیده: $skipped';
   }
 
   @override
-  String get bulkDefaultWarehouseReasonAlreadySet => 'از قبل همین‌طور تنظیم شده';
+  String get bulkDefaultWarehouseReasonAlreadySet =>
+      'از قبل همین‌طور تنظیم شده';
 
   @override
-  String get bulkDefaultWarehouseReasonScopeMismatch => 'با دامنه انتخابی شما هم‌خوانی ندارد';
+  String get bulkDefaultWarehouseReasonScopeMismatch =>
+      'با دامنه انتخابی شما هم‌خوانی ندارد';
 
   @override
   String get bulkDefaultWarehouseReasonNotFound => 'پیدا نشد';
 
   @override
-  String get bulkDefaultWarehouseReasonServiceAlreadyNull => 'خدمت است و انبار پیش‌فرض ندارد';
+  String get bulkDefaultWarehouseReasonServiceAlreadyNull =>
+      'خدمت است و انبار پیش‌فرض ندارد';
 
   @override
   String get bulkDefaultWarehouseReasonUnknown => 'نامشخص';
@@ -357,7 +378,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loanFacilitySearchTitlesLabel => 'جست‌وجو در عنوان';
 
   @override
-  String get loanFacilityEmptyState => 'قراردادی یافت نشد. با «افزودن» قرارداد جدید بسازید.';
+  String get loanFacilityEmptyState =>
+      'قراردادی یافت نشد. با «افزودن» قرارداد جدید بسازید.';
 
   @override
   String get loanFacilityLoadMore => 'بیشتر';
@@ -369,7 +391,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loanFacilityValidationSelectCurrency => 'ارز را انتخاب کنید';
 
   @override
-  String get loanFacilityValidationPrincipalInvalid => 'مبلغ اصل معتبر وارد کنید';
+  String get loanFacilityValidationPrincipalInvalid =>
+      'مبلغ اصل معتبر وارد کنید';
 
   @override
   String get loanFacilityDialogNewTitle => 'قرارداد جدید';
@@ -399,7 +422,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loanFacilityFieldAnnualRate => 'نرخ سود سالانه (٪)';
 
   @override
-  String get loanFacilityFieldInstallmentCountOptional => 'تعداد اقساط (اختیاری)';
+  String get loanFacilityFieldInstallmentCountOptional =>
+      'تعداد اقساط (اختیاری)';
 
   @override
   String get loanFacilityFieldFirstInstallment => 'اولین سررسید قسط';
@@ -422,7 +446,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loanFacilityConfirmDeleteDraftTitle => 'حذف پیش‌نویس؟';
 
   @override
-  String get loanFacilityConfirmDeleteDraftBody => 'این قرارداد و اقساطش حذف می‌شود.';
+  String get loanFacilityConfirmDeleteDraftBody =>
+      'این قرارداد و اقساطش حذف می‌شود.';
 
   @override
   String get loanFacilityDeleted => 'حذف شد';
@@ -434,7 +459,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loanFacilityDeletePaymentTitle => 'حذف پرداخت؟';
 
   @override
-  String get loanFacilityDeletePaymentBody => 'سند حسابداری مرتبط حذف و ماندهٔ قسط اصلاح می‌شود.';
+  String get loanFacilityDeletePaymentBody =>
+      'سند حسابداری مرتبط حذف و ماندهٔ قسط اصلاح می‌شود.';
 
   @override
   String get loanFacilityPaymentDeleted => 'پرداخت حذف شد';
@@ -514,7 +540,10 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String loanFacilityRemainingPrincipalInterest(String principal, String interest) {
+  String loanFacilityRemainingPrincipalInterest(
+    String principal,
+    String interest,
+  ) {
     return 'مانده اصل / بهره: $principal / $interest';
   }
 
@@ -533,16 +562,20 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loanFacilityDeletePayment => 'حذف پرداخت';
 
   @override
-  String get loanFacilityPaymentPostingHint => 'در صورت فعال بودن ثبت سند، سندهای استاندارد سیستم ثبت می‌شود.';
+  String get loanFacilityPaymentPostingHint =>
+      'در صورت فعال بودن ثبت سند، سندهای استاندارد سیستم ثبت می‌شود.';
 
   @override
-  String get loanFacilityRegenerateValidationCount => 'تعداد اقساط معتبر وارد کنید';
+  String get loanFacilityRegenerateValidationCount =>
+      'تعداد اقساط معتبر وارد کنید';
 
   @override
-  String get loanFacilityRegenerateValidationFirstDue => 'تاریخ اولین قسط لازم است';
+  String get loanFacilityRegenerateValidationFirstDue =>
+      'تاریخ اولین قسط لازم است';
 
   @override
-  String get loanFacilityRegenerateValidationDisburseBank => 'برای ثبت سند، حساب بانکی تنخواه را انتخاب کنید';
+  String get loanFacilityRegenerateValidationDisburseBank =>
+      'برای ثبت سند، حساب بانکی تنخواه را انتخاب کنید';
 
   @override
   String get loanFacilityRegenerateDialogTitle => 'جدول اقساط';
@@ -563,7 +596,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loanFacilityRegenerateFirstDueRequired => 'اولین سررسید *';
 
   @override
-  String get loanFacilityRegenerateDisburseBank => 'حساب بانکی (تنخواه / واریز)';
+  String get loanFacilityRegenerateDisburseBank =>
+      'حساب بانکی (تنخواه / واریز)';
 
   @override
   String get loanFacilityRegeneratePostAccounting => 'ثبت سند حسابداری تنخواه';
@@ -572,13 +606,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loanFacilityRegenerateApply => 'اعمال';
 
   @override
-  String get apiErrorLoanFacilityFinancialLocked => 'پس از صدور یا فعال‌سازی جدول اقساط، امکان تغییر اطلاعات مالی نیست.';
+  String get apiErrorLoanFacilityFinancialLocked =>
+      'پس از صدور یا فعال‌سازی جدول اقساط، امکان تغییر اطلاعات مالی نیست.';
 
   @override
-  String get apiErrorLoanFacilityNotDraft => 'فقط قراردادهای پیش‌نویس را می‌توان حذف کرد.';
+  String get apiErrorLoanFacilityNotDraft =>
+      'فقط قراردادهای پیش‌نویس را می‌توان حذف کرد.';
 
   @override
-  String get apiErrorLoanFacilityHasPayments => 'به‌دلیل وجود پرداخت، این عمل مجاز نیست.';
+  String get apiErrorLoanFacilityHasPayments =>
+      'به‌دلیل وجود پرداخت، این عمل مجاز نیست.';
 
   @override
   String get apiErrorLoanInvalidCurrency => 'ارز الزامی است یا نامعتبر است.';
@@ -587,28 +624,36 @@ class AppLocalizationsFa extends AppLocalizations {
   String get apiErrorLoanInvalidPrincipal => 'مبلغ اصل باید مثبت باشد.';
 
   @override
-  String get apiErrorLoanContractDateRequired => 'تاریخ قرارداد الزامی است یا نامعتبر است.';
+  String get apiErrorLoanContractDateRequired =>
+      'تاریخ قرارداد الزامی است یا نامعتبر است.';
 
   @override
-  String get apiErrorLoanInvalidScheduleMethod => 'شیوهٔ اقساط باید آنویتی یا اصل مساوی باشد.';
+  String get apiErrorLoanInvalidScheduleMethod =>
+      'شیوهٔ اقساط باید آنویتی یا اصل مساوی باشد.';
 
   @override
-  String get apiErrorLoanInvalidInstallmentCount => 'تعداد اقساط الزامی است و باید حداقل ۱ باشد.';
+  String get apiErrorLoanInvalidInstallmentCount =>
+      'تعداد اقساط الزامی است و باید حداقل ۱ باشد.';
 
   @override
-  String get apiErrorLoanFirstDueRequired => 'تاریخ سررسید اولین قسط الزامی است.';
+  String get apiErrorLoanFirstDueRequired =>
+      'تاریخ سررسید اولین قسط الزامی است.';
 
   @override
-  String get apiErrorLoanBadSchedulePayload => 'تعداد اقساط یا تاریخ سررسید نامعتبر است.';
+  String get apiErrorLoanBadSchedulePayload =>
+      'تعداد اقساط یا تاریخ سررسید نامعتبر است.';
 
   @override
-  String get apiErrorLoanBankRequiredAccounting => 'برای ثبت سند حسابداری، حساب بانکی لازم است.';
+  String get apiErrorLoanBankRequiredAccounting =>
+      'برای ثبت سند حسابداری، حساب بانکی لازم است.';
 
   @override
-  String get apiErrorLoanBankCurrencyMismatch => 'ارز حساب بانکی باید با ارز قرارداد یکسان باشد.';
+  String get apiErrorLoanBankCurrencyMismatch =>
+      'ارز حساب بانکی باید با ارز قرارداد یکسان باشد.';
 
   @override
-  String get apiErrorLoanFacilityDraft => 'قبل از ثبت پرداخت، ابتدا جدول اقساط را تولید کنید.';
+  String get apiErrorLoanFacilityDraft =>
+      'قبل از ثبت پرداخت، ابتدا جدول اقساط را تولید کنید.';
 
   @override
   String get apiErrorLoanInvalidAmount => 'مبلغ الزامی است و باید مثبت باشد.';
@@ -617,22 +662,27 @@ class AppLocalizationsFa extends AppLocalizations {
   String get apiErrorLoanInvalidPaymentDate => 'تاریخ پرداخت نامعتبر است.';
 
   @override
-  String get apiErrorLoanScheduleError => 'امکان محاسبهٔ جدول اقساط وجود ندارد.';
+  String get apiErrorLoanScheduleError =>
+      'امکان محاسبهٔ جدول اقساط وجود ندارد.';
 
   @override
-  String get apiErrorLoanInvalidBankAccount => 'حساب بانکی موجود نیست یا نامعتبر است.';
+  String get apiErrorLoanInvalidBankAccount =>
+      'حساب بانکی موجود نیست یا نامعتبر است.';
 
   @override
   String get apiErrorLoanInvalidRate => 'نرخ سود سالانه نامعتبر است.';
 
   @override
-  String get apiErrorLoanInvalidFirstInstallmentDate => 'تاریخ اولین قسط نامعتبر است.';
+  String get apiErrorLoanInvalidFirstInstallmentDate =>
+      'تاریخ اولین قسط نامعتبر است.';
 
   @override
-  String get apiErrorLoanPaymentExceedsBalance => 'مبلغ پرداخت بیش از ماندهٔ این قسط است.';
+  String get apiErrorLoanPaymentExceedsBalance =>
+      'مبلغ پرداخت بیش از ماندهٔ این قسط است.';
 
   @override
-  String get apiErrorLoanAllocationError => 'پرداخت به‌درستی تسویه نشد؛ مبلغ را کم کنید یا با پشتیبانی تماس بگیرید.';
+  String get apiErrorLoanAllocationError =>
+      'پرداخت به‌درستی تسویه نشد؛ مبلغ را کم کنید یا با پشتیبانی تماس بگیرید.';
 
   @override
   String get apiErrorLoanFacilityNotFound => 'این قرارداد تسهیلات یافت نشد.';
@@ -644,28 +694,35 @@ class AppLocalizationsFa extends AppLocalizations {
   String get apiErrorLoanPaymentNotFound => 'این رکورد پرداخت یافت نشد.';
 
   @override
-  String get apiErrorLoanFacilityMissingAfterCommit => 'در ذخیرهٔ جدول اقساط مشکل پیش آمد. صفحه را بارگذاری مجدد کنید و دوباره تلاش کنید.';
+  String get apiErrorLoanFacilityMissingAfterCommit =>
+      'در ذخیرهٔ جدول اقساط مشکل پیش آمد. صفحه را بارگذاری مجدد کنید و دوباره تلاش کنید.';
 
   @override
-  String get apiErrorLoanPaymentAccountingFailed => 'ثبت سند حسابداری برای این پرداخت انجام نشد.';
+  String get apiErrorLoanPaymentAccountingFailed =>
+      'ثبت سند حسابداری برای این پرداخت انجام نشد.';
 
   @override
-  String get apiErrorLoanChartAccountNotFound => 'حساب‌های کل استاندارد تسهیلات در سیستم نیست؛ با پشتیبانی تماس بگیرید.';
+  String get apiErrorLoanChartAccountNotFound =>
+      'حساب‌های کل استاندارد تسهیلات در سیستم نیست؛ با پشتیبانی تماس بگیرید.';
 
   @override
-  String get apiErrorLoanAccountingLinesUnbalanced => 'جمع بدهکار و بستانکار اسند نامتعادل است؛ با پشتیبانی تماس بگیرید.';
+  String get apiErrorLoanAccountingLinesUnbalanced =>
+      'جمع بدهکار و بستانکار اسند نامتعادل است؛ با پشتیبانی تماس بگیرید.';
 
   @override
-  String get apiErrorLoanBankRequiredForPaymentDocument => 'برای ثبت سند حسابداری، حساب بانکی الزامی است.';
+  String get apiErrorLoanBankRequiredForPaymentDocument =>
+      'برای ثبت سند حسابداری، حساب بانکی الزامی است.';
 
   @override
-  String get deleteBusinessConfirmTypeInstruction => 'برای تأیید، دقیقاً کلمهٔ DELETE (انگلیسی) یا «حذف» را تایپ کنید.';
+  String get deleteBusinessConfirmTypeInstruction =>
+      'برای تأیید، دقیقاً کلمهٔ DELETE (انگلیسی) یا «حذف» را تایپ کنید.';
 
   @override
   String get deleteBusinessConfirmTypeHint => 'DELETE یا حذف';
 
   @override
-  String get invoiceLineItemsAddRowKeyboardHint => 'راهنما: پشت‌سرهم و خارج از فیلدهای متنی، کلیدهای Q سپس I را بزنید تا ردیف اضافه شود.';
+  String get invoiceLineItemsAddRowKeyboardHint =>
+      'راهنما: پشت‌سرهم و خارج از فیلدهای متنی، کلیدهای Q سپس I را بزنید تا ردیف اضافه شود.';
 
   @override
   String get support => 'پشتیبانی';
@@ -719,13 +776,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get changePasswordSuccess => 'کلمه عبور با موفقیت تغییر کرد';
 
   @override
-  String get changePasswordFailed => 'تغییر کلمه عبور ناموفق بود. لطفاً دوباره تلاش کنید.';
+  String get changePasswordFailed =>
+      'تغییر کلمه عبور ناموفق بود. لطفاً دوباره تلاش کنید.';
 
   @override
   String get passwordsDoNotMatch => 'کلمه عبور جدید و تکرار آن مطابقت ندارند';
 
   @override
-  String get samePassword => 'کلمه عبور جدید باید با کلمه عبور فعلی متفاوت باشد';
+  String get samePassword =>
+      'کلمه عبور جدید باید با کلمه عبور فعلی متفاوت باشد';
 
   @override
   String get invalidCurrentPassword => 'کلمه عبور فعلی اشتباه است';
@@ -734,7 +793,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get passwordChanged => 'کلمه عبور با موفقیت تغییر کرد';
 
   @override
-  String get changePasswordDescription => 'کلمه عبور فعلی خود را وارد کرده و کلمه عبور جدید امنی انتخاب کنید';
+  String get changePasswordDescription =>
+      'کلمه عبور فعلی خود را وارد کرده و کلمه عبور جدید امنی انتخاب کنید';
 
   @override
   String get changePasswordButton => 'تغییر کلمه عبور';
@@ -743,7 +803,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get passwordMinLength => 'کلمه عبور باید حداقل 8 کاراکتر باشد';
 
   @override
-  String get passwordMaxLength => 'رمز عبور نباید از حد مجاز (۷۲ کاراکتر) بیشتر باشد';
+  String get passwordMaxLength =>
+      'رمز عبور نباید از حد مجاز (۷۲ کاراکتر) بیشتر باشد';
 
   @override
   String get calendar => 'تقویم';
@@ -854,13 +915,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get installmentsExportError => 'خطا در خروجی گرفتن';
 
   @override
-  String get installmentsExportWebOnly => 'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود';
+  String get installmentsExportWebOnly =>
+      'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود';
 
   @override
   String get installmentsInvoicePickerTitle => 'انتخاب فاکتور اقساطی';
 
   @override
-  String get installmentsInvoicePickerSearchLabel => 'جستجو بر اساس کد، شرح و...';
+  String get installmentsInvoicePickerSearchLabel =>
+      'جستجو بر اساس کد، شرح و...';
 
   @override
   String get installmentInvoicesLoadMore => 'مشاهدهٔ بیشتر';
@@ -964,7 +1027,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get installmentsNoPaymentsYet => 'هنوز تخصیص دریافتی ثبت نشده';
 
   @override
-  String get installmentsPaymentsDetailMissing => 'مبلغ پرداخت برای این قسط ثبت شده اما فهرست اسناد دریافت قابل نمایش نیست. در صورت ثبت دریافت با تخصیص قسط، یک‌بار دیگر این پنجره را باز کنید.';
+  String get installmentsPaymentsDetailMissing =>
+      'مبلغ پرداخت برای این قسط ثبت شده اما فهرست اسناد دریافت قابل نمایش نیست. در صورت ثبت دریافت با تخصیص قسط، یک‌بار دیگر این پنجره را باز کنید.';
 
   @override
   String get test => 'تست';
@@ -1129,10 +1193,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get includeSampleDataLabel => 'افزودن دادهٔ نمونه برای شروع سریع';
 
   @override
-  String get includeSampleDataSubtitle => 'مشتری، کالا، انبار و حساب‌های نمونه ایجاد می‌شود (با بازیابی فایل .hbx اعمال نمی‌شود).';
+  String get includeSampleDataSubtitle =>
+      'مشتری، کالا، انبار و حساب‌های نمونه ایجاد می‌شود (با بازیابی فایل .hbx اعمال نمی‌شود).';
 
   @override
-  String get sampleDataSeedWarning => 'کسب‌وکار ایجاد شد اما دادهٔ نمونه کامل نشد';
+  String get sampleDataSeedWarning =>
+      'کسب‌وکار ایجاد شد اما دادهٔ نمونه کامل نشد';
 
   @override
   String get businessContactInfo => 'اطلاعات تماس';
@@ -1438,7 +1504,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get ticketCreatedSuccessfully => 'تیکت با موفقیت ایجاد شد';
 
   @override
-  String get pleaseSelectCategoryAndPriority => 'لطفاً دسته‌بندی و اولویت را انتخاب کنید';
+  String get pleaseSelectCategoryAndPriority =>
+      'لطفاً دسته‌بندی و اولویت را انتخاب کنید';
 
   @override
   String get changeStatus => 'تغییر وضعیت';
@@ -1625,7 +1692,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get defaultConfiguration => 'پیکربندی پیشفرض';
 
   @override
-  String get setDefaultConfirm => 'آیا مطمئن هستید که می‌خواهید این پیکربندی را به عنوان پیشفرض تنظیم کنید؟';
+  String get setDefaultConfirm =>
+      'آیا مطمئن هستید که می‌خواهید این پیکربندی را به عنوان پیشفرض تنظیم کنید؟';
 
   @override
   String get defaultSetSuccessfully => 'پیکربندی پیشفرض با موفقیت تنظیم شد';
@@ -1637,7 +1705,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get cannotDeleteDefault => 'نمی‌توان پیکربندی پیشفرض را حذف کرد';
 
   @override
-  String get defaultConfigurationNote => 'پیکربندی پیشفرض برای ارسال ایمیل‌ها استفاده می‌شود و قابل حذف نیست';
+  String get defaultConfigurationNote =>
+      'پیکربندی پیشفرض برای ارسال ایمیل‌ها استفاده می‌شود و قابل حذف نیست';
 
   @override
   String get setAsDefaultEmail => 'تنظیم به عنوان ایمیل پیشفرض';
@@ -1673,7 +1742,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get emailConfigSavedSuccessfully => 'تنظیمات ایمیل با موفقیت ذخیره شد';
 
   @override
-  String get emailConfigUpdatedSuccessfully => 'تنظیمات ایمیل با موفقیت به‌روزرسانی شد';
+  String get emailConfigUpdatedSuccessfully =>
+      'تنظیمات ایمیل با موفقیت به‌روزرسانی شد';
 
   @override
   String get editEmailConfiguration => 'ویرایش تنظیمات ایمیل';
@@ -1857,7 +1927,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get storageManagement => 'مدیریت ذخیره‌سازی';
 
   @override
-  String get storageManagementDescription => 'پیکربندی سیستم‌های ذخیره‌سازی فایل، آدرس اپ برای لینک‌های عمومی (اشتراک فایل) و مدیریت فایل‌ها';
+  String get storageManagementDescription =>
+      'پیکربندی سیستم‌های ذخیره‌سازی فایل، آدرس اپ برای لینک‌های عمومی (اشتراک فایل) و مدیریت فایل‌ها';
 
   @override
   String get systemConfiguration => 'پیکربندی سیستم';
@@ -1899,19 +1970,23 @@ class AppLocalizationsFa extends AppLocalizations {
   String get maintenanceSettings => 'تنظیمات نگهداری';
 
   @override
-  String get smsDestinationRateSettings => 'محدودیت ارسال پیامک (به‌ازای شماره مقصد)';
+  String get smsDestinationRateSettings =>
+      'محدودیت ارسال پیامک (به‌ازای شماره مقصد)';
 
   @override
-  String get smsDestinationRateEnabled => 'اعمال سقف ارسال به هر شماره در بازه زمانی';
+  String get smsDestinationRateEnabled =>
+      'اعمال سقف ارسال به هر شماره در بازه زمانی';
 
   @override
-  String get smsDestinationRateMaxSends => 'حداکثر ارسال در پنجره (برای هر شماره)';
+  String get smsDestinationRateMaxSends =>
+      'حداکثر ارسال در پنجره (برای هر شماره)';
 
   @override
   String get smsDestinationRateWindowMinutes => 'طول پنجره (دقیقه)';
 
   @override
-  String get smsDestinationRateMaxSendsHelper => 'صفر یعنی بدون سقف (این محدودیت تعداد غیرفعال است)';
+  String get smsDestinationRateMaxSendsHelper =>
+      'صفر یعنی بدون سقف (این محدودیت تعداد غیرفعال است)';
 
   @override
   String get initializing => 'در حال راه‌اندازی...';
@@ -2142,7 +2217,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get userRemoveFailed => 'خطا در حذف کاربر';
 
   @override
-  String get permissionsUpdatedSuccessfully => 'دسترسی‌ها با موفقیت به‌روزرسانی شد';
+  String get permissionsUpdatedSuccessfully =>
+      'دسترسی‌ها با موفقیت به‌روزرسانی شد';
 
   @override
   String get permissionsUpdateFailed => 'خطا در به‌روزرسانی دسترسی‌ها';
@@ -2160,7 +2236,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get removeUser => 'حذف کاربر';
 
   @override
-  String get removeUserConfirm => 'آیا مطمئن هستید که می‌خواهید این کاربر را حذف کنید؟';
+  String get removeUserConfirm =>
+      'آیا مطمئن هستید که می‌خواهید این کاربر را حذف کنید؟';
 
   @override
   String get userPermissions => 'دسترسی‌های کاربر';
@@ -2274,13 +2351,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get permissionPrint => 'دسترسی به چاپ اسناد';
 
   @override
-  String get ownerWarning => 'هشدار: کاربر مالک کسب و کار نیازی به افزودن ندارد و همیشه دسترسی کامل به همه بخش‌ها دارد';
+  String get ownerWarning =>
+      'هشدار: کاربر مالک کسب و کار نیازی به افزودن ندارد و همیشه دسترسی کامل به همه بخش‌ها دارد';
 
   @override
   String get ownerWarningTitle => 'کاربر مالک';
 
   @override
-  String get alreadyAddedWarning => 'این کاربر قبلاً به کسب و کار اضافه شده است';
+  String get alreadyAddedWarning =>
+      'این کاربر قبلاً به کسب و کار اضافه شده است';
 
   @override
   String get alreadyAddedWarningTitle => 'کاربر موجود';
@@ -2433,7 +2512,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get storageConfigDeleted => 'تنظیمات ذخیره‌سازی حذف شد';
 
   @override
-  String get storageConfigHasFiles => 'این تنظیمات ذخیره‌سازی دارای فایل است و قابل حذف نیست';
+  String get storageConfigHasFiles =>
+      'این تنظیمات ذخیره‌سازی دارای فایل است و قابل حذف نیست';
 
   @override
   String get storageConfigNotFound => 'تنظیمات ذخیره‌سازی یافت نشد';
@@ -2445,13 +2525,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get storageConfigSetDefaultFailed => 'خطا در تنظیم به عنوان پیش‌فرض';
 
   @override
-  String get adminStorageFtpPurposeSubtitle => 'به‌عنوان پس‌زمینهٔ پیش‌فرض ذخیرهٔ فایل‌های سیستم استفاده می‌شود (جدا از FTP بکاپ هر کسب‌وکار).';
+  String get adminStorageFtpPurposeSubtitle =>
+      'به‌عنوان پس‌زمینهٔ پیش‌فرض ذخیرهٔ فایل‌های سیستم استفاده می‌شود (جدا از FTP بکاپ هر کسب‌وکار).';
 
   @override
-  String get adminStorageFtpInsecureWarning => 'بدون TLS، رمز و داده روی شبکه قابل شنود است. در صورت پشتیبانی سرور، TLS را فعال کنید.';
+  String get adminStorageFtpInsecureWarning =>
+      'بدون TLS، رمز و داده روی شبکه قابل شنود است. در صورت پشتیبانی سرور، TLS را فعال کنید.';
 
   @override
-  String get adminStorageFtpPasswordOptionalHint => 'برای حفظ رمز فعلی خالی بگذارید';
+  String get adminStorageFtpPasswordOptionalHint =>
+      'برای حفظ رمز فعلی خالی بگذارید';
 
   @override
   String get adminStorageFtpPassive => 'حالت غیرفعال (PASV)';
@@ -2484,7 +2567,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get adminStorageFtpDirectoryLabel => 'پوشه روی سرور';
 
   @override
-  String get adminStorageFtpDirectoryHint => 'پوشهٔ روی سرور برای فایل‌ها (مثلاً /hesabix_files)';
+  String get adminStorageFtpDirectoryHint =>
+      'پوشهٔ روی سرور برای فایل‌ها (مثلاً /hesabix_files)';
 
   @override
   String get adminStorageLocalBasePath => 'مسیر پایه';
@@ -2493,19 +2577,22 @@ class AppLocalizationsFa extends AppLocalizations {
   String get adminStorageFtpUseTlsTitle => 'استفاده از TLS';
 
   @override
-  String get adminStorageFtpUseTlsSubtitle => 'FTP روی TLS (FTPS) در صورت پشتیبانی سرور';
+  String get adminStorageFtpUseTlsSubtitle =>
+      'FTP روی TLS (FTPS) در صورت پشتیبانی سرور';
 
   @override
   String get adminStorageDefaultTitle => 'تنظیم به عنوان پیش‌فرض';
 
   @override
-  String get adminStorageDefaultSubtitle => 'این پیکربندی به‌عنوان ذخیره‌سازی پیش‌فرض استفاده شود';
+  String get adminStorageDefaultSubtitle =>
+      'این پیکربندی به‌عنوان ذخیره‌سازی پیش‌فرض استفاده شود';
 
   @override
   String get adminStorageActiveTitle => 'فعال';
 
   @override
-  String get adminStorageActiveSubtitle => 'پیکربندی‌های غیرفعال برای آپلود جدید استفاده نمی‌شوند';
+  String get adminStorageActiveSubtitle =>
+      'پیکربندی‌های غیرفعال برای آپلود جدید استفاده نمی‌شوند';
 
   @override
   String get adminStorageCreateTitle => 'ایجاد پیکربندی ذخیره‌سازی';
@@ -2562,13 +2649,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get warehouseTransfers => 'صدور حواله';
 
   @override
-  String get permissionsWarehouseInventoryHint => 'مدیریت انبارها و حواله‌های انبار مجوزهای جدا دارند. «مدیریت انبارها» برای تعریف و ویرایش انبارهاست. برای دسترسی به لیست حواله، ثبت و قطعی حواله، حواله از فاکتور، انبارگردانی و سایر عملیات موجودی مرتبط، گزینه‌های بخش «صدور حواله» را هم فعال کنید.';
+  String get permissionsWarehouseInventoryHint =>
+      'مدیریت انبارها و حواله‌های انبار مجوزهای جدا دارند. «مدیریت انبارها» برای تعریف و ویرایش انبارهاست. برای دسترسی به لیست حواله، ثبت و قطعی حواله، حواله از فاکتور، انبارگردانی و سایر عملیات موجودی مرتبط، گزینه‌های بخش «صدور حواله» را هم فعال کنید.';
 
   @override
-  String get permissionsGroupHintChecks => 'ثبت چک جدید همیشه یک سند حسابداری هم ایجاد می‌کند؛ علاوه بر مجوزهای چک، حداقل یکی از افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را فعال کنید. بعضی فرایندهای چک (مانند وصول، واگذاری، پرداخت و …) نیز ممکن است سند ثبت کنند.';
+  String get permissionsGroupHintChecks =>
+      'ثبت چک جدید همیشه یک سند حسابداری هم ایجاد می‌کند؛ علاوه بر مجوزهای چک، حداقل یکی از افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را فعال کنید. بعضی فرایندهای چک (مانند وصول، واگذاری، پرداخت و …) نیز ممکن است سند ثبت کنند.';
 
   @override
-  String get permissionsGroupHintAccountingDocuments => 'این مجوزها برای ثبت اسناد دستی و همچنین اسناد خودکاری که سیستم با عملیات‌هایی مانند چک، دریافت و پرداخت اشخاص یا فاکتور (در صورت کاربرد) ایجاد می‌کند، اعمال می‌شود.';
+  String get permissionsGroupHintAccountingDocuments =>
+      'این مجوزها برای ثبت اسناد دستی و همچنین اسناد خودکاری که سیستم با عملیات‌هایی مانند چک، دریافت و پرداخت اشخاص یا فاکتور (در صورت کاربرد) ایجاد می‌کند، اعمال می‌شود.';
 
   @override
   String get permissionsCategoryInvoicesAndExpenses => 'فاکتورها و هزینه‌ها';
@@ -2589,7 +2679,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get permissionCrmViewReports => 'مشاهده گزارش‌های CRM';
 
   @override
-  String get permissionCrmTeamPerformanceReports => 'گزارش عملکرد کارمندان (کل تیم)';
+  String get permissionCrmTeamPerformanceReports =>
+      'گزارش عملکرد کارمندان (کل تیم)';
 
   @override
   String get permissionCrmWebChatView => 'مشاهده چت وب';
@@ -2601,7 +2692,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get permissionCrmWebChatManageWidgets => 'ایجاد و ویرایش ویجت چت';
 
   @override
-  String get permissionCrmWebChatEditConversations => 'ویرایش مکالمه (وضعیت، ارجاع، سرنخ)';
+  String get permissionCrmWebChatEditConversations =>
+      'ویرایش مکالمه (وضعیت، ارجاع، سرنخ)';
 
   @override
   String get permissionCrmWebChatDeleteMessages => 'حذف پیام در چت وب';
@@ -2613,7 +2705,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get permissionFiscalYearClose => 'بستن سال مالی';
 
   @override
-  String get permissionFiscalYearRollbackDangerous => 'برگشت از سال مالی جاری (عملیات خطرناک)';
+  String get permissionFiscalYearRollbackDangerous =>
+      'برگشت از سال مالی جاری (عملیات خطرناک)';
 
   @override
   String permissionsUpdateError(String error) {
@@ -2621,13 +2714,16 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get checkFormNeedsChecksWritePermission => 'شما مجوز افزودن یا ویرایش چک را ندارید.';
+  String get checkFormNeedsChecksWritePermission =>
+      'شما مجوز افزودن یا ویرایش چک را ندارید.';
 
   @override
-  String get checkFormNeedsAccountingDocumentsPermission => 'شما مجوز ثبت سند حسابداری ندارید. ذخیرهٔ چک یک سند حسابداری ایجاد می‌کند؛ از مدیر بخواهید حداقل یکی از گزینه‌های افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را برای شما فعال کند.';
+  String get checkFormNeedsAccountingDocumentsPermission =>
+      'شما مجوز ثبت سند حسابداری ندارید. ذخیرهٔ چک یک سند حسابداری ایجاد می‌کند؛ از مدیر بخواهید حداقل یکی از گزینه‌های افزودن، ویرایش یا پیش‌نویس «اسناد حسابداری» را برای شما فعال کند.';
 
   @override
-  String get checkFormDuplicateSayadCode => 'این شناسه صیاد قبلاً برای چک دیگری در این کسب‌وکار ثبت شده است.';
+  String get checkFormDuplicateSayadCode =>
+      'این شناسه صیاد قبلاً برای چک دیگری در این کسب‌وکار ثبت شده است.';
 
   @override
   String get addBankAccount => 'افزودن حساب بانکی';
@@ -2714,7 +2810,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get invoiceCopyOpenNew => 'کپی به فاکتور جدید';
 
   @override
-  String get invoiceCopyLoading => 'در حال آماده‌سازی فرم فاکتور جدید از روی سند انتخاب‌شده…';
+  String get invoiceCopyLoading =>
+      'در حال آماده‌سازی فرم فاکتور جدید از روی سند انتخاب‌شده…';
 
   @override
   String get viewInvoices => 'صورت حساب‌ها';
@@ -2840,10 +2937,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get advancedSettings => 'تنظیمات پیشرفته';
 
   @override
-  String get businessSettingsDescription => 'مدیریت اطلاعات کسب و کار و تنظیمات اصلی';
+  String get businessSettingsDescription =>
+      'مدیریت اطلاعات کسب و کار و تنظیمات اصلی';
 
   @override
-  String get usersAndPermissionsDescription => 'مدیریت کاربران و تعیین سطح دسترسی';
+  String get usersAndPermissionsDescription =>
+      'مدیریت کاربران و تعیین سطح دسترسی';
 
   @override
   String get printDocumentsDescription => 'تنظیمات چاپ و قالب‌بندی اسناد';
@@ -2879,37 +2978,45 @@ class AppLocalizationsFa extends AppLocalizations {
   String get restoreWarningTitle => 'هشدار امنیتی';
 
   @override
-  String get restoreWarningReplace => '⚠️ بازیابی با حالت «جایگزینی کامل» تمام اطلاعات فعلی کسب‌وکار شما را حذف می‌کند و آن‌ها را با داده‌های فایل پشتیبان جایگزین می‌کند. این عمل غیرقابل بازگشت است!';
+  String get restoreWarningReplace =>
+      '⚠️ بازیابی با حالت «جایگزینی کامل» تمام اطلاعات فعلی کسب‌وکار شما را حذف می‌کند و آن‌ها را با داده‌های فایل پشتیبان جایگزین می‌کند. این عمل غیرقابل بازگشت است!';
 
   @override
-  String get restoreWarningNewBusiness => 'ℹ️ بازیابی با حالت «ایجاد کسب‌وکار جدید» یک کسب‌وکار جدید با داده‌های فایل پشتیبان ایجاد می‌کند و اطلاعات فعلی شما را تغییر نمی‌دهد.';
+  String get restoreWarningNewBusiness =>
+      'ℹ️ بازیابی با حالت «ایجاد کسب‌وکار جدید» یک کسب‌وکار جدید با داده‌های فایل پشتیبان ایجاد می‌کند و اطلاعات فعلی شما را تغییر نمی‌دهد.';
 
   @override
   String get restoreSecurityNote => 'نکات امنیتی:';
 
   @override
-  String get restoreSecurityNote1 => '• قبل از بازیابی، از اطلاعات فعلی خود یک نسخه پشتیبان تهیه کنید';
+  String get restoreSecurityNote1 =>
+      '• قبل از بازیابی، از اطلاعات فعلی خود یک نسخه پشتیبان تهیه کنید';
 
   @override
-  String get restoreSecurityNote2 => '• مطمئن شوید که فایل پشتیبان معتبر و مربوط به کسب‌وکار شماست';
+  String get restoreSecurityNote2 =>
+      '• مطمئن شوید که فایل پشتیبان معتبر و مربوط به کسب‌وکار شماست';
 
   @override
-  String get restoreSecurityNote3 => '• بازیابی ممکن است چند دقیقه طول بکشد، لطفاً صبر کنید';
+  String get restoreSecurityNote3 =>
+      '• بازیابی ممکن است چند دقیقه طول بکشد، لطفاً صبر کنید';
 
   @override
-  String get restoreSecurityNote4 => '• در صورت بروز خطا، با پشتیبانی تماس بگیرید';
+  String get restoreSecurityNote4 =>
+      '• در صورت بروز خطا، با پشتیبانی تماس بگیرید';
 
   @override
   String get restoreConfirmReplace => 'تایید جایگزینی کامل';
 
   @override
-  String get restoreConfirmReplaceMessage => 'آیا مطمئن هستید که می‌خواهید تمام اطلاعات فعلی را حذف و با داده‌های فایل پشتیبان جایگزین کنید؟\n\nاین عمل غیرقابل بازگشت است!';
+  String get restoreConfirmReplaceMessage =>
+      'آیا مطمئن هستید که می‌خواهید تمام اطلاعات فعلی را حذف و با داده‌های فایل پشتیبان جایگزین کنید؟\n\nاین عمل غیرقابل بازگشت است!';
 
   @override
   String get restoreConfirmNewBusiness => 'تایید ایجاد کسب‌وکار جدید';
 
   @override
-  String get restoreConfirmNewBusinessMessage => 'آیا مطمئن هستید که می‌خواهید یک کسب‌وکار جدید با داده‌های فایل پشتیبان ایجاد کنید؟';
+  String get restoreConfirmNewBusinessMessage =>
+      'آیا مطمئن هستید که می‌خواهید یک کسب‌وکار جدید با داده‌های فایل پشتیبان ایجاد کنید؟';
 
   @override
   String get restoreSourceTitle => 'منبع بازیابی';
@@ -2927,19 +3034,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errorUnknown => 'خطای نامشخص';
 
   @override
-  String get errorConnectionTimeout => 'زمان اتصال به سرور به پایان رسید. لطفاً اتصال اینترنت خود را بررسی کنید.';
+  String get errorConnectionTimeout =>
+      'زمان اتصال به سرور به پایان رسید. لطفاً اتصال اینترنت خود را بررسی کنید.';
 
   @override
-  String get errorReceiveTimeout => 'زمان دریافت پاسخ از سرور به پایان رسید. لطفاً دوباره تلاش کنید.';
+  String get errorReceiveTimeout =>
+      'زمان دریافت پاسخ از سرور به پایان رسید. لطفاً دوباره تلاش کنید.';
 
   @override
-  String get errorConnectionError => 'خطا در اتصال به سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
+  String get errorConnectionError =>
+      'خطا در اتصال به سرور. لطفاً اتصال اینترنت خود را بررسی کنید.';
 
   @override
-  String get errorFileUploadFailed => 'خطا در آپلود فایل. لطفاً دوباره تلاش کنید.';
+  String get errorFileUploadFailed =>
+      'خطا در آپلود فایل. لطفاً دوباره تلاش کنید.';
 
   @override
-  String get errorDataSaveFailed => 'ذخیره اطلاعات انجام نشد. لطفاً دوباره تلاش کنید.';
+  String get errorDataSaveFailed =>
+      'ذخیره اطلاعات انجام نشد. لطفاً دوباره تلاش کنید.';
 
   @override
   String get errorSendTimeout => 'زمان ارسال درخواست به سرور به پایان رسید.';
@@ -2948,7 +3060,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errorUnknownServer => 'خطای نامشخص در ارتباط با سرور';
 
   @override
-  String get errorRequestTimeout => 'زمان درخواست به پایان رسید. لطفاً دوباره تلاش کنید.';
+  String get errorRequestTimeout =>
+      'زمان درخواست به پایان رسید. لطفاً دوباره تلاش کنید.';
 
   @override
   String get errorExtractorSaveData => 'خطا در ذخیره اطلاعات';
@@ -2957,10 +3070,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errorExtractorFileUpload => 'خطا در آپلود فایل';
 
   @override
-  String get errorInternetUnavailablePleaseRetry => 'ارتباط با اینترنت برقرار نیست. لطفاً دوباره تلاش کنید.';
+  String get errorInternetUnavailablePleaseRetry =>
+      'ارتباط با اینترنت برقرار نیست. لطفاً دوباره تلاش کنید.';
 
   @override
-  String get errorInvalidInput => 'داده‌های ارسالی نامعتبر است. لطفاً اطلاعات را بررسی کنید.';
+  String get errorInvalidInput =>
+      'داده‌های ارسالی نامعتبر است. لطفاً اطلاعات را بررسی کنید.';
 
   @override
   String get errorBackupNotFound => 'بکاپ مورد نظر یافت نشد.';
@@ -2972,13 +3087,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get errorNotSupported => 'این عملیات در حال حاضر پشتیبانی نمی‌شود.';
 
   @override
-  String get errorRateLimit => 'تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.';
+  String get errorRateLimit =>
+      'تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً کمی صبر کنید.';
 
   @override
   String get errorInvalidBackup => 'فایل بکاپ نامعتبر است یا آسیب دیده است.';
 
   @override
-  String get errorBusinessCreationFailed => 'خطا در ایجاد کسب‌وکار جدید. لطفاً دوباره تلاش کنید.';
+  String get errorBusinessCreationFailed =>
+      'خطا در ایجاد کسب‌وکار جدید. لطفاً دوباره تلاش کنید.';
 
   @override
   String get errorRestoreFailed => 'خطا در بازیابی اطلاعات';
@@ -2990,34 +3107,43 @@ class AppLocalizationsFa extends AppLocalizations {
   String get apiErrorBusinessUsersUserNotFound => 'کاربر یافت نشد.';
 
   @override
-  String get apiErrorBusinessUsersInviteAccountMissing => 'کاربر یافت نشد. لطفاً ابتدا کاربر را در سیستم ثبت‌نام کنید.';
+  String get apiErrorBusinessUsersInviteAccountMissing =>
+      'کاربر یافت نشد. لطفاً ابتدا کاربر را در سیستم ثبت‌نام کنید.';
 
   @override
-  String get apiErrorBusinessUsersAlreadyMember => 'کاربر قبلاً به این کسب و کار اضافه شده است.';
+  String get apiErrorBusinessUsersAlreadyMember =>
+      'کاربر قبلاً به این کسب و کار اضافه شده است.';
 
   @override
-  String get apiErrorBusinessUsersCannotRemoveOwner => 'نمی‌توان مالک کسب و کار را حذف کرد.';
+  String get apiErrorBusinessUsersCannotRemoveOwner =>
+      'نمی‌توان مالک کسب و کار را حذف کرد.';
 
   @override
-  String get apiErrorBusinessUsersRemoveMemberNotFound => 'این کاربر عضو این کسب و کار نیست.';
+  String get apiErrorBusinessUsersRemoveMemberNotFound =>
+      'این کاربر عضو این کسب و کار نیست.';
 
   @override
-  String get apiErrorBusinessUsersOwnerCannotLeave => 'مالک کسب و کار نمی‌تواند از کسب و کار خارج شود. برای حذف کسب و کار از بخش تنظیمات استفاده کنید.';
+  String get apiErrorBusinessUsersOwnerCannotLeave =>
+      'مالک کسب و کار نمی‌تواند از کسب و کار خارج شود. برای حذف کسب و کار از بخش تنظیمات استفاده کنید.';
 
   @override
-  String get apiErrorBusinessUsersNotAMemberLeave => 'شما عضو این کسب و کار نیستید.';
+  String get apiErrorBusinessUsersNotAMemberLeave =>
+      'شما عضو این کسب و کار نیستید.';
 
   @override
   String get apiErrorBusinessUsersLeaveFailed => 'خطا در خروج از کسب و کار.';
 
   @override
-  String get apiErrorNoFiscalYearForDate => 'سال مالی‌ای برای این تاریخ تعریف نشده است.';
+  String get apiErrorNoFiscalYearForDate =>
+      'سال مالی‌ای برای این تاریخ تعریف نشده است.';
 
   @override
-  String get apiErrorFiscalYearLockedForPosting => 'سال مالی بسته است و امکان ثبت سند وجود ندارد.';
+  String get apiErrorFiscalYearLockedForPosting =>
+      'سال مالی بسته است و امکان ثبت سند وجود ندارد.';
 
   @override
-  String get apiErrorDocumentCodeRace => 'تداخل در شماره سند. لطفاً دوباره تلاش کنید.';
+  String get apiErrorDocumentCodeRace =>
+      'تداخل در شماره سند. لطفاً دوباره تلاش کنید.';
 
   @override
   String get byteUnitB => 'بایت';
@@ -3110,22 +3236,28 @@ class AppLocalizationsFa extends AppLocalizations {
   String get restore => 'بازیابی';
 
   @override
-  String get businessSettingsDialogContent => 'در این بخش می‌توانید اطلاعات کسب و کار، آدرس، شماره تماس و سایر جزئیات را مدیریت کنید.';
+  String get businessSettingsDialogContent =>
+      'در این بخش می‌توانید اطلاعات کسب و کار، آدرس، شماره تماس و سایر جزئیات را مدیریت کنید.';
 
   @override
-  String get usersAndPermissionsDialogContent => 'در این بخش می‌توانید کاربران جدید اضافه کنید، دسترسی‌ها را تعیین کنید و نقش‌ها را مدیریت کنید.';
+  String get usersAndPermissionsDialogContent =>
+      'در این بخش می‌توانید کاربران جدید اضافه کنید، دسترسی‌ها را تعیین کنید و نقش‌ها را مدیریت کنید.';
 
   @override
-  String get printDocumentsDialogContent => 'در این بخش می‌توانید قالب‌های چاپ، سربرگ‌ها و تنظیمات چاپگر را پیکربندی کنید.';
+  String get printDocumentsDialogContent =>
+      'در این بخش می‌توانید قالب‌های چاپ، سربرگ‌ها و تنظیمات چاپگر را پیکربندی کنید.';
 
   @override
-  String get dataBackupDialogContent => 'در این بخش می‌توانید از تمام اطلاعات کسب و کار نسخه پشتیبان تهیه کنید.';
+  String get dataBackupDialogContent =>
+      'در این بخش می‌توانید از تمام اطلاعات کسب و کار نسخه پشتیبان تهیه کنید.';
 
   @override
-  String get dataRestoreDialogContent => 'در این بخش می‌توانید اطلاعات را از نسخه پشتیبان قبلی بازیابی کنید.';
+  String get dataRestoreDialogContent =>
+      'در این بخش می‌توانید اطلاعات را از نسخه پشتیبان قبلی بازیابی کنید.';
 
   @override
-  String get systemLogsDialogContent => 'در این بخش می‌توانید گزارش‌های سیستم، خطاها و فعالیت‌های کاربران را مشاهده کنید.';
+  String get systemLogsDialogContent =>
+      'در این بخش می‌توانید گزارش‌های سیستم، خطاها و فعالیت‌های کاربران را مشاهده کنید.';
 
   @override
   String get accountManagement => 'مدیریت حساب کاربری';
@@ -3308,7 +3440,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personAliasNameRequired => 'نام مستعار الزامی است';
 
   @override
-  String get personAliasPickFromNamesHint => 'پر کردن نام مستعار از نام / نام خانوادگی…';
+  String get personAliasPickFromNamesHint =>
+      'پر کردن نام مستعار از نام / نام خانوادگی…';
 
   @override
   String get personTypeRequired => 'نوع شخص الزامی است';
@@ -3506,7 +3639,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get row => 'ردیف';
 
   @override
-  String get onlyForMarketerSeller => 'این بخش فقط برای بازاریاب/فروشنده نمایش داده می‌شود';
+  String get onlyForMarketerSeller =>
+      'این بخش فقط برای بازاریاب/فروشنده نمایش داده می‌شود';
 
   @override
   String get percentFromSales => 'درصد از فروش';
@@ -3548,7 +3682,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get integerNoDecimal => 'عدد صحیح بدون اعشار';
 
   @override
-  String get shareholderShareCountRequired => 'برای سهامدار، تعداد سهام الزامی است';
+  String get shareholderShareCountRequired =>
+      'برای سهامدار، تعداد سهام الزامی است';
 
   @override
   String get noBankAccountsAdded => 'هیچ حساب بانکی اضافه نشده است';
@@ -3557,10 +3692,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get commissionExcludeDiscounts => 'عدم محاسبه تخفیف';
 
   @override
-  String get commissionExcludeAdditionsDeductions => 'عدم محاسبه اضافات و کسورات فاکتور';
+  String get commissionExcludeAdditionsDeductions =>
+      'عدم محاسبه اضافات و کسورات فاکتور';
 
   @override
-  String get commissionPostInInvoiceDocument => 'ثبت پورسانت در سند حسابداری فاکتور';
+  String get commissionPostInInvoiceDocument =>
+      'ثبت پورسانت در سند حسابداری فاکتور';
 
   @override
   String get manageCategories => 'مدیریت دسته‌بندی‌ها';
@@ -3641,25 +3778,31 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productCommercialPricing => 'بازرگانی و قیمت';
 
   @override
-  String get productCommercialPricingNoAccessHint => 'برای مشاهده این تب، دسترسی مشاهده فاکتورها لازم است. لطفاً از مدیر سیستم مجوز invoices.view را درخواست کنید.';
+  String get productCommercialPricingNoAccessHint =>
+      'برای مشاهده این تب، دسترسی مشاهده فاکتورها لازم است. لطفاً از مدیر سیستم مجوز invoices.view را درخواست کنید.';
 
   @override
-  String get productCommercialInsightsNotEligibleTitle => 'گزارش برای این کالا فعال نیست';
+  String get productCommercialInsightsNotEligibleTitle =>
+      'گزارش برای این کالا فعال نیست';
 
   @override
-  String get productCommercialInsightsNotEligibleBody => 'این خلاصه برای این محصول یا پیکربندی کسب‌وکار در دسترس نیست.';
+  String get productCommercialInsightsNotEligibleBody =>
+      'این خلاصه برای این محصول یا پیکربندی کسب‌وکار در دسترس نیست.';
 
   @override
   String get productCommercialInsightsChecklistTitle => 'پیشنهادهای بررسی:';
 
   @override
-  String get productCommercialInsightsChecklistInventoryTracked => 'کنترل موجودی کالا روشن باشد.';
+  String get productCommercialInsightsChecklistInventoryTracked =>
+      'کنترل موجودی کالا روشن باشد.';
 
   @override
-  String get productCommercialInsightsChecklistConfirmedInvoice => 'حداقل یک فاکتور خرید/فروش تأییدشده برای این کالا ثبت شده باشد.';
+  String get productCommercialInsightsChecklistConfirmedInvoice =>
+      'حداقل یک فاکتور خرید/فروش تأییدشده برای این کالا ثبت شده باشد.';
 
   @override
-  String get productCommercialInsightsChecklistPostedWarehouseDoc => 'برای فاکتورهای مرتبط، حوالهٔ انبار posted با مبدأ invoice وجود داشته باشد.';
+  String get productCommercialInsightsChecklistPostedWarehouseDoc =>
+      'برای فاکتورهای مرتبط، حوالهٔ انبار posted با مبدأ invoice وجود داشته باشد.';
 
   @override
   String get productCommercialInsightsReload => 'بارگذاری مجدد';
@@ -3689,10 +3832,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productCommercialInsightsFxRateToBase => 'نرخ سند به پایه';
 
   @override
-  String get productCommercialInsightsChartDataMissing => 'دادهٔ نمودار موجود نیست.';
+  String get productCommercialInsightsChartDataMissing =>
+      'دادهٔ نمودار موجود نیست.';
 
   @override
-  String get productCommercialInsightsChartNoPoints => 'برای بازهٔ انتخاب‌شده نقطهٔ نموداری نیست.';
+  String get productCommercialInsightsChartNoPoints =>
+      'برای بازهٔ انتخاب‌شده نقطهٔ نموداری نیست.';
 
   @override
   String get productCommercialInsightsLanePurchase => 'خرید';
@@ -3701,13 +3846,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productCommercialInsightsLaneSale => 'فروش';
 
   @override
-  String get productCommercialInsightsLegendPurchaseAvg => 'میانگین موزون خرید (پایه)';
+  String get productCommercialInsightsLegendPurchaseAvg =>
+      'میانگین موزون خرید (پایه)';
 
   @override
-  String get productCommercialInsightsLegendSaleAvg => 'میانگین موزون فروش (پایه)';
+  String get productCommercialInsightsLegendSaleAvg =>
+      'میانگین موزون فروش (پایه)';
 
   @override
-  String get productCommercialInsightsAvgUnitBaseLabel => 'میانگین واحد به پایه';
+  String get productCommercialInsightsAvgUnitBaseLabel =>
+      'میانگین واحد به پایه';
 
   @override
   String get productCommercialInsightsTotalQuantityLabel => 'مجموع مقدار';
@@ -3764,16 +3912,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productCommercialInsightsSaleLinesCount => 'تعداد خطوط فروش';
 
   @override
-  String get productCommercialInsightsTrendTitle => 'روند میانگین موزون قیمت واحد (ارز پایه)';
+  String get productCommercialInsightsTrendTitle =>
+      'روند میانگین موزون قیمت واحد (ارز پایه)';
 
   @override
-  String get productCommercialInsightsTopSuppliers => 'تأمین‌کنندگان پرحجم در بازه';
+  String get productCommercialInsightsTopSuppliers =>
+      'تأمین‌کنندگان پرحجم در بازه';
 
   @override
   String get productCommercialInsightsTopBuyers => 'خریداران پرحجم در بازه';
 
   @override
-  String get productCommercialInsightsRecentEventsTitle => 'رویدادهای اخیر (خطوط فاکتور)';
+  String get productCommercialInsightsRecentEventsTitle =>
+      'رویدادهای اخیر (خطوط فاکتور)';
 
   @override
   String get productCommercialInsightsUnitShortLabel => 'واحد';
@@ -3809,13 +3960,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get inventoryControl => 'کنترل موجودی';
 
   @override
-  String get inventoryControlHelpSubtitle => 'روشن: رهگیری موجودی و درج این کالا در حواله‌های مرتبط با فاکتور. خاموش: این قلم در حوالهٔ خودکار فاکتور نمی‌آید.';
+  String get inventoryControlHelpSubtitle =>
+      'روشن: رهگیری موجودی و درج این کالا در حواله‌های مرتبط با فاکتور. خاموش: این قلم در حوالهٔ خودکار فاکتور نمی‌آید.';
 
   @override
-  String get inventoryControlHelpDetail => 'خاموش کردن این گزینه به‌معنای «اجازهٔ قطعی حواله با کمبود موجودی» نیست. اگر باید گاهی با موجودی کمتر از صفر حواله قطعی شود، در تنظیمات کسب‌وکار بخش «کنترل کسری / موجودی منفی» را بررسی کنید.';
+  String get inventoryControlHelpDetail =>
+      'خاموش کردن این گزینه به‌معنای «اجازهٔ قطعی حواله با کمبود موجودی» نیست. اگر باید گاهی با موجودی کمتر از صفر حواله قطعی شود، در تنظیمات کسب‌وکار بخش «کنترل کسری / موجودی منفی» را بررسی کنید.';
 
   @override
-  String get inventoryUniqueModeRequiresTrack => 'برای استفاده از حالت یونیک، باید «کنترل موجودی» را فعال کنید';
+  String get inventoryUniqueModeRequiresTrack =>
+      'برای استفاده از حالت یونیک، باید «کنترل موجودی» را فعال کنید';
 
   @override
   String get reorderPoint => 'نقطه سفارش';
@@ -3842,7 +3996,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productGeneralBarcodes => 'بارکدهای عمومی';
 
   @override
-  String get productGeneralBarcodesHint => 'چند بارکد را با ویرگول (انگلیسی یا فارسی) جدا کنید. برای جستجوی سریع در فاکتور و چاپ برچسب PDF استفاده می‌شود.';
+  String get productGeneralBarcodesHint =>
+      'چند بارکد را با ویرگول (انگلیسی یا فارسی) جدا کنید. برای جستجوی سریع در فاکتور و چاپ برچسب PDF استفاده می‌شود.';
 
   @override
   String get printGeneralBarcodeLabels => 'چاپ برچسب بارکدهای عمومی (PDF)';
@@ -3851,7 +4006,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get generalBarcodeLabelsTitle => 'چاپ بارکدهای عمومی';
 
   @override
-  String get generalBarcodeLabelsNoneSelected => 'در کالاهای انتخاب‌شده بارکد عمومی ثبت نشده است.';
+  String get generalBarcodeLabelsNoneSelected =>
+      'در کالاهای انتخاب‌شده بارکد عمومی ثبت نشده است.';
 
   @override
   String get labelPdfDialogTitle => 'چاپ برچسب';
@@ -3917,7 +4073,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get labelPdfPreviewHintDesktop => 'زوم و پیمایش از نوار پیش‌نمایش';
 
   @override
-  String get labelPdfPreviewHintWeb => 'در وب: پیش‌نمایش با نمایشگر PDF مرورگر (زوم از منوی راست‌کلیک یا Ctrl±)';
+  String get labelPdfPreviewHintWeb =>
+      'در وب: پیش‌نمایش با نمایشگر PDF مرورگر (زوم از منوی راست‌کلیک یا Ctrl±)';
 
   @override
   String get labelPdfOrientationLandscape => 'افقی';
@@ -3959,10 +4116,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get noPriceListsTitle => 'لیست قیمت موجود نیست';
 
   @override
-  String get noPriceListsMessage => 'برای افزودن قیمت، ابتدا باید یک لیست قیمت ایجاد کنید.';
+  String get noPriceListsMessage =>
+      'برای افزودن قیمت، ابتدا باید یک لیست قیمت ایجاد کنید.';
 
   @override
-  String get noPriceListsHint => 'برای ایجاد لیست قیمت، از دکمه \"مدیریت لیست‌های قیمت\" در صفحه محصولات استفاده کنید.';
+  String get noPriceListsHint =>
+      'برای ایجاد لیست قیمت، از دکمه \"مدیریت لیست‌های قیمت\" در صفحه محصولات استفاده کنید.';
 
   @override
   String get gotIt => 'متوجه شدم';
@@ -4036,7 +4195,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get bulkPriceUpdateTitle => 'تغییر قیمت‌های گروهی';
 
   @override
-  String get bulkPriceUpdateSubtitle => 'اعمال افزایش یا کاهش قیمت با فیلترهای پیشرفته';
+  String get bulkPriceUpdateSubtitle =>
+      'اعمال افزایش یا کاهش قیمت با فیلترهای پیشرفته';
 
   @override
   String get bulkPriceUpdateApplyScopeTitle => 'محدوده اعمال';
@@ -4054,10 +4214,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get bulkPriceUpdateStatsTitle => 'خلاصه آمار';
 
   @override
-  String get bulkPriceUpdateListOnlyTargetHint => 'در این حالت فقط قیمت فروش داخل لیست‌های قیمت تغییر می‌کند.';
+  String get bulkPriceUpdateListOnlyTargetHint =>
+      'در این حالت فقط قیمت فروش داخل لیست‌های قیمت تغییر می‌کند.';
 
   @override
-  String get bulkPriceUpdatePriceListsHint => 'بدون انتخاب، همهٔ لیست‌های قیمت (مطابق فیلتر ارز) اعمال می‌شود.';
+  String get bulkPriceUpdatePriceListsHint =>
+      'بدون انتخاب، همهٔ لیست‌های قیمت (مطابق فیلتر ارز) اعمال می‌شود.';
 
   @override
   String get bulkPriceUpdatePreviewListChanges => 'لیست قیمت';
@@ -4077,7 +4239,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get bulkProductPricesSheetTitle => 'ویرایش گسترده قیمت‌ها';
 
   @override
-  String get bulkProductPricesSheetSubtitle => 'قیمت پایه را در جدول ویرایش کنید؛ هر صفحه جدا ذخیره می‌شود.';
+  String get bulkProductPricesSheetSubtitle =>
+      'قیمت پایه را در جدول ویرایش کنید؛ هر صفحه جدا ذخیره می‌شود.';
 
   @override
   String get bulkProductPricesSheetSave => 'ذخیره این صفحه';
@@ -4107,7 +4270,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get bulkProductPricesSheetPriceListsForColumns => 'ستون‌های لیست قیمت';
 
   @override
-  String get bulkProductPricesSheetSelectListsHint => 'برای نمایش و ویرایش قیمت داخل لیست‌ها، یک یا چند لیست را انتخاب کنید و صفحه را بارگذاری کنید.';
+  String get bulkProductPricesSheetSelectListsHint =>
+      'برای نمایش و ویرایش قیمت داخل لیست‌ها، یک یا چند لیست را انتخاب کنید و صفحه را بارگذاری کنید.';
 
   @override
   String get bulkProductPricesSheetExportExcel => 'دانلود اکسل';
@@ -4116,7 +4280,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get bulkProductPricesSheetImportExcel => 'بارگذاری اکسل';
 
   @override
-  String get bulkProductPricesSheetExcelHint => 'تمام کالاهای همین جستجو در اکسل ذخیره می‌شود. پس از ویرایش قیمت‌ها، فایل را بارگذاری کنید. نام برگه «BulkPrices» را حذف نکنید؛ ستون‌های pi_ شناسهٔ ردیف لیست قیمت در پایگاه است.';
+  String get bulkProductPricesSheetExcelHint =>
+      'تمام کالاهای همین جستجو در اکسل ذخیره می‌شود. پس از ویرایش قیمت‌ها، فایل را بارگذاری کنید. نام برگه «BulkPrices» را حذف نکنید؛ ستون‌های pi_ شناسهٔ ردیف لیست قیمت در پایگاه است.';
 
   @override
   String get bulkProductPricesSheetGuideTitle => 'راهنما و خروجی اکسل';
@@ -4134,7 +4299,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get bulkProductPricesSheetNoRows => 'کالایی برای این صفحه نیست';
 
   @override
-  String get bulkProductPricesSheetNoRowsHint => 'فیلتر جستجو را عوض کنید یا صفحهٔ دیگری را انتخاب کنید.';
+  String get bulkProductPricesSheetNoRowsHint =>
+      'فیلتر جستجو را عوض کنید یا صفحهٔ دیگری را انتخاب کنید.';
 
   @override
   String get bulkProductPricesSheetPageLabel => 'صفحه';
@@ -4203,13 +4369,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productsWithInventoryOnly => 'فقط کالاهای با موجودی';
 
   @override
-  String get productsWithInventoryOnlySubtitle => 'فقط کالاهایی که موجودی آن‌ها کنترل می‌شود';
+  String get productsWithInventoryOnlySubtitle =>
+      'فقط کالاهایی که موجودی آن‌ها کنترل می‌شود';
 
   @override
   String get productsWithBasePriceOnly => 'فقط کالاهای با قیمت پایه';
 
   @override
-  String get productsWithBasePriceOnlySubtitle => 'فقط کالاهایی که قیمت پایه دارند';
+  String get productsWithBasePriceOnlySubtitle =>
+      'فقط کالاهایی که قیمت پایه دارند';
 
   @override
   String get confirmChangesTitle => 'تأیید تغییرات';
@@ -4271,7 +4439,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get productDeletedSuccessfully => 'کالا/خدمت با موفقیت حذف شد';
 
   @override
-  String get productsDeletedSuccessfully => 'آیتم‌های انتخاب‌شده با موفقیت حذف شدند';
+  String get productsDeletedSuccessfully =>
+      'آیتم‌های انتخاب‌شده با موفقیت حذف شدند';
 
   @override
   String get noRowsSelectedError => 'هیچ سطری انتخاب نشده است';
@@ -4433,7 +4602,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportTemplatePickExport => 'قالب را برای خروجی انتخاب کنید';
 
   @override
-  String get reportTemplateImportDoneOpenHtml => 'فرم پر شد. با «قالب جدید — HTML» بررسی و ذخیره کنید.';
+  String get reportTemplateImportDoneOpenHtml =>
+      'فرم پر شد. با «قالب جدید — HTML» بررسی و ذخیره کنید.';
 
   @override
   String reportTemplatesLoadError(String error) {
@@ -4517,13 +4687,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportTemplateDeleteConfirmTitle => 'حذف قالب';
 
   @override
-  String get reportTemplateDeleteConfirmMessage => 'آیا از حذف این قالب مطمئن هستید؟ این عمل برگشت‌ناپذیر است.';
+  String get reportTemplateDeleteConfirmMessage =>
+      'آیا از حذف این قالب مطمئن هستید؟ این عمل برگشت‌ناپذیر است.';
 
   @override
   String get reportTemplateSetDefaultTitle => 'تایید';
 
   @override
-  String get reportTemplateSetDefaultMessage => 'این قالب به‌عنوان پیش‌فرض برای همین حوزه تنظیم شود؟';
+  String get reportTemplateSetDefaultMessage =>
+      'این قالب به‌عنوان پیش‌فرض برای همین حوزه تنظیم شود؟';
 
   @override
   String reportTemplateEditSaveError(String error) {
@@ -4558,7 +4730,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportTemplateOpenInNewTab => 'تب جدید';
 
   @override
-  String get reportTemplatePdfInlineFailedHint => 'نمایش PDF در همین صفحه ناموفق بود؛ از تب HTML استفاده کنید.';
+  String get reportTemplatePdfInlineFailedHint =>
+      'نمایش PDF در همین صفحه ناموفق بود؛ از تب HTML استفاده کنید.';
 
   @override
   String get reportTemplateBuilderDesignEmpty => 'طرح سازندهٔ بصری خالی است.';
@@ -4567,7 +4740,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportTemplatePaperCustomLabel => 'سایز سفارشی کاغذ (اختیاری)';
 
   @override
-  String get reportTemplatePaperCustomHelper => 'اگر پر باشد، به‌جای سایز انتخاب‌شده در لیست ذخیره می‌شود (حداکثر ۳۲ نویسه).';
+  String get reportTemplatePaperCustomHelper =>
+      'اگر پر باشد، به‌جای سایز انتخاب‌شده در لیست ذخیره می‌شود (حداکثر ۳۲ نویسه).';
 
   @override
   String get reportTemplateEditorTabCss => 'CSS';
@@ -4594,10 +4768,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportTemplateSubtypeLabel => 'subtype';
 
   @override
-  String get reportTemplateModuleKeyTooltip => 'شناسهٔ ماژول گزارش ارسالی به API.';
+  String get reportTemplateModuleKeyTooltip =>
+      'شناسهٔ ماژول گزارش ارسالی به API.';
 
   @override
-  String get reportTemplateSubtypeTooltip => 'زیرنوع گزارش در API (مثلاً list یا detail).';
+  String get reportTemplateSubtypeTooltip =>
+      'زیرنوع گزارش در API (مثلاً list یا detail).';
 
   @override
   String get reportTemplateHintHtmlBody => 'HTML محتوا (متغیرهای Jinja2 مجاز)';
@@ -4720,10 +4896,12 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get deleteInvoiceTaxWorkspaceError => 'این فاکتور در کارپوشه سامانه مودیان قرار دارد و قابل حذف نمی‌باشد';
+  String get deleteInvoiceTaxWorkspaceError =>
+      'این فاکتور در کارپوشه سامانه مودیان قرار دارد و قابل حذف نمی‌باشد';
 
   @override
-  String get deleteInvoiceReceiptPaymentsWarning => 'اسناد دریافت/پرداخت مرتبط:';
+  String get deleteInvoiceReceiptPaymentsWarning =>
+      'اسناد دریافت/پرداخت مرتبط:';
 
   @override
   String get deleteInvoiceWarehouseWarning => 'حواله‌های انبار قطعی شده مرتبط:';
@@ -4769,10 +4947,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get installmentsTitle => 'فروش اقساطی';
 
   @override
-  String get installmentsSubtitle => 'در صورت فعال‌سازی، طرح اقساط همراه فاکتور ذخیره می‌شود';
+  String get installmentsSubtitle =>
+      'در صورت فعال‌سازی، طرح اقساط همراه فاکتور ذخیره می‌شود';
 
   @override
-  String get installmentsSettingsSubtitle => 'مدیریت پلن‌های اقساط و شرایط فروش';
+  String get installmentsSettingsSubtitle =>
+      'مدیریت پلن‌های اقساط و شرایط فروش';
 
   @override
   String get installmentsCount => 'تعداد اقساط';
@@ -5018,7 +5198,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsProfitLossSection => 'سود و زیان';
 
   @override
-  String get reportsKardexSubtitle => 'نمایش ریز تراکنش‌ها بر اساس شخص/کالا/بانک/حساب/چک با فیلتر تاریخ';
+  String get reportsKardexSubtitle =>
+      'نمایش ریز تراکنش‌ها بر اساس شخص/کالا/بانک/حساب/چک با فیلتر تاریخ';
 
   @override
   String get reportsDebtorsTitle => 'لیست بدهکاران';
@@ -5036,37 +5217,43 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsPeopleTransactionsTitle => 'گزارش تراکنش‌های اشخاص';
 
   @override
-  String get reportsPeopleTransactionsSubtitle => 'ریز دریافت‌ها و پرداخت‌ها به تفکیک شخص';
+  String get reportsPeopleTransactionsSubtitle =>
+      'ریز دریافت‌ها و پرداخت‌ها به تفکیک شخص';
 
   @override
   String get reportsItemMovementsTitle => 'گردش کالا';
 
   @override
-  String get reportsItemMovementsSubtitle => 'ورود، خروج و مانده کالا به تفکیک بازه';
+  String get reportsItemMovementsSubtitle =>
+      'ورود، خروج و مانده کالا به تفکیک بازه';
 
   @override
   String get reportsInventoryKardexTitle => 'کارتکس انبار';
 
   @override
-  String get reportsInventoryKardexSubtitle => 'ریز گردش هر کالا (FIFO/LIFO/میانگین)';
+  String get reportsInventoryKardexSubtitle =>
+      'ریز گردش هر کالا (FIFO/LIFO/میانگین)';
 
   @override
   String get reportsInventoryStockTitle => 'گزارش موجودی انبار';
 
   @override
-  String get reportsInventoryStockSubtitle => 'موجودی محصولات به تفکیک انبار و تاریخ';
+  String get reportsInventoryStockSubtitle =>
+      'موجودی محصولات به تفکیک انبار و تاریخ';
 
   @override
   String get reportsSalesByProductTitle => 'فروش به تفکیک کالا';
 
   @override
-  String get reportsSalesByProductSubtitle => 'عملکرد فروش هر کالا در بازه زمانی';
+  String get reportsSalesByProductSubtitle =>
+      'عملکرد فروش هر کالا در بازه زمانی';
 
   @override
   String get reportsBankAccountsTurnoverTitle => 'گردش حساب‌های بانکی';
 
   @override
-  String get reportsBankAccountsTurnoverSubtitle => 'برداشت و واریز به تفکیک حساب';
+  String get reportsBankAccountsTurnoverSubtitle =>
+      'برداشت و واریز به تفکیک حساب';
 
   @override
   String get reportsCashPettyTurnoverTitle => 'گردش صندوق و تنخواه';
@@ -5108,13 +5295,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsTopSuppliersTitle => 'تامین‌کنندگان برتر';
 
   @override
-  String get reportsTopSuppliersSubtitle => 'رتبه‌بندی تامین‌کنندگان بر اساس خرید';
+  String get reportsTopSuppliersSubtitle =>
+      'رتبه‌بندی تامین‌کنندگان بر اساس خرید';
 
   @override
   String get reportsMaterialsConsumptionTitle => 'گزارش مصرف مواد';
 
   @override
-  String get reportsMaterialsConsumptionSubtitle => 'مصرف مواد اولیه به ازای محصول';
+  String get reportsMaterialsConsumptionSubtitle =>
+      'مصرف مواد اولیه به ازای محصول';
 
   @override
   String get reportsProductionTitle => 'گزارش تولیدات';
@@ -5138,7 +5327,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsJournalLedgerTitle => 'دفتر روزنامه';
 
   @override
-  String get reportsJournalLedgerSubtitle => 'تمام تراکنش‌های مالی به ترتیب تاریخ';
+  String get reportsJournalLedgerSubtitle =>
+      'تمام تراکنش‌های مالی به ترتیب تاریخ';
 
   @override
   String get debitAccount => 'حساب بدهکار';
@@ -5159,13 +5349,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsAccountsReviewTitle => 'گزارش مرور حساب‌ها';
 
   @override
-  String get reportsAccountsReviewSubtitle => 'ساختار درختی حساب‌ها با مانده‌ها و جزئیات تراکنش‌ها';
+  String get reportsAccountsReviewSubtitle =>
+      'ساختار درختی حساب‌ها با مانده‌ها و جزئیات تراکنش‌ها';
 
   @override
   String get reportsPnlCumulativeSubtitle => 'مقایسه دوره‌ای و تجمیعی';
 
   @override
-  String get reportsComingSoonMessage => 'این گزارش به‌زودی در دسترس خواهد بود.';
+  String get reportsComingSoonMessage =>
+      'این گزارش به‌زودی در دسترس خواهد بود.';
 
   @override
   String get reportsSearchHint => 'جستجو در گزارش‌ها…';
@@ -5182,13 +5374,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsFavoritesTitle => 'علاقه‌مندی‌ها';
 
   @override
-  String get reportsFavoritesEmptyMessage => 'برای دسترسی سریع، روی ستاره کنار هر گزارش بزنید.';
+  String get reportsFavoritesEmptyMessage =>
+      'برای دسترسی سریع، روی ستاره کنار هر گزارش بزنید.';
 
   @override
   String get reportsRecentTitle => 'اخیراً استفاده‌شده';
 
   @override
-  String get reportsRecentEmptyMessage => 'گزارش‌هایی که باز می‌کنید اینجا نمایش داده می‌شوند.';
+  String get reportsRecentEmptyMessage =>
+      'گزارش‌هایی که باز می‌کنید اینجا نمایش داده می‌شوند.';
 
   @override
   String get reportsWarehouseSection => 'گزارشات انبار';
@@ -5200,7 +5394,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsActivityLogsTitle => 'گزارش فعالیت‌های کاربران';
 
   @override
-  String get reportsActivityLogsSubtitle => 'مشاهده تاریخچه فعالیت‌های کاربران در سیستم';
+  String get reportsActivityLogsSubtitle =>
+      'مشاهده تاریخچه فعالیت‌های کاربران در سیستم';
 
   @override
   String reportsSectionCount(Object count) {
@@ -5220,37 +5415,45 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsStockCountTitle => 'گزارش انبارگردانی';
 
   @override
-  String get reportsStockCountSubtitle => 'تاریخچه انبارگردانی‌ها و حواله‌های تعدیل';
+  String get reportsStockCountSubtitle =>
+      'تاریخچه انبارگردانی‌ها و حواله‌های تعدیل';
 
   @override
-  String get reportsWarehouseDocumentsSummaryTitle => 'گزارش خلاصه حواله‌های انبار';
+  String get reportsWarehouseDocumentsSummaryTitle =>
+      'گزارش خلاصه حواله‌های انبار';
 
   @override
-  String get reportsWarehouseDocumentsSummarySubtitle => 'خلاصه حواله‌ها به تفکیک نوع با آمار ورود و خروج';
+  String get reportsWarehouseDocumentsSummarySubtitle =>
+      'خلاصه حواله‌ها به تفکیک نوع با آمار ورود و خروج';
 
   @override
   String get reportsSlowMovingItemsTitle => 'گزارش کالاهای کم‌گردش';
 
   @override
-  String get reportsSlowMovingItemsSubtitle => 'کالاهایی که در بازه زمانی مشخص‌شده هیچ حرکتی نداشته‌اند';
+  String get reportsSlowMovingItemsSubtitle =>
+      'کالاهایی که در بازه زمانی مشخص‌شده هیچ حرکتی نداشته‌اند';
 
   @override
   String get reportsCriticalStockTitle => 'گزارش کالاهای با موجودی بحرانی';
 
   @override
-  String get reportsCriticalStockSubtitle => 'کالاهایی که موجودی آن‌ها کمتر از حد تعیین‌شده است';
+  String get reportsCriticalStockSubtitle =>
+      'کالاهایی که موجودی آن‌ها کمتر از حد تعیین‌شده است';
 
   @override
-  String get reportsInterWarehouseTransfersTitle => 'گزارش انتقالات بین انبارها';
+  String get reportsInterWarehouseTransfersTitle =>
+      'گزارش انتقالات بین انبارها';
 
   @override
-  String get reportsInterWarehouseTransfersSubtitle => 'جزئیات انتقالات بین انبارها';
+  String get reportsInterWarehouseTransfersSubtitle =>
+      'جزئیات انتقالات بین انبارها';
 
   @override
   String get reportsAdjustmentDocumentsTitle => 'گزارش حواله‌های تعدیل';
 
   @override
-  String get reportsAdjustmentDocumentsSubtitle => 'تحلیل حواله‌های تعدیل و تفاوت‌های موجودی';
+  String get reportsAdjustmentDocumentsSubtitle =>
+      'تحلیل حواله‌های تعدیل و تفاوت‌های موجودی';
 
   @override
   String get reportsWarehousePerformanceTitle => 'گزارش عملکرد انبارها';
@@ -5259,10 +5462,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsWarehousePerformanceSubtitle => 'مقایسه عملکرد انبارها';
 
   @override
-  String get reportsProductMovementHistoryTitle => 'گزارش تاریخچه حرکات یک کالا';
+  String get reportsProductMovementHistoryTitle =>
+      'گزارش تاریخچه حرکات یک کالا';
 
   @override
-  String get reportsProductMovementHistorySubtitle => 'تاریخچه کامل حرکات یک کالا در تمام انبارها';
+  String get reportsProductMovementHistorySubtitle =>
+      'تاریخچه کامل حرکات یک کالا در تمام انبارها';
 
   @override
   String get reportsInventoryValuationTitle => 'گزارش ارزش موجودی انبار';
@@ -5274,7 +5479,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsPendingDocumentsTitle => 'گزارش حواله‌های در انتظار تأیید';
 
   @override
-  String get reportsPendingDocumentsSubtitle => 'حواله‌های پیش‌نویس یا در انتظار تأیید';
+  String get reportsPendingDocumentsSubtitle =>
+      'حواله‌های پیش‌نویس یا در انتظار تأیید';
 
   @override
   String get reportsInventoryTurnoverTitle => 'گزارش گردش موجودی';
@@ -5298,37 +5504,43 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsSettingsTitle => 'تنظیمات اعلان و نوتیفیکیشن';
 
   @override
-  String get notificationsSettingsSubtitle => 'کانال‌های ارسال را فعال کنید، پیام تست بفرستید و اطلاعات اتصال سرویس‌ها را مدیریت کنید.';
+  String get notificationsSettingsSubtitle =>
+      'کانال‌های ارسال را فعال کنید، پیام تست بفرستید و اطلاعات اتصال سرویس‌ها را مدیریت کنید.';
 
   @override
   String get notificationsChannelsSectionTitle => 'کانال‌های ارسال';
 
   @override
-  String get notificationsChannelsSectionSubtitle => 'هر کانالی که فعال باشد برای اعلان‌های سیستمی و هشدارهای عملیاتی استفاده می‌شود.';
+  String get notificationsChannelsSectionSubtitle =>
+      'هر کانالی که فعال باشد برای اعلان‌های سیستمی و هشدارهای عملیاتی استفاده می‌شود.';
 
   @override
   String get notificationsChannelTelegram => 'تلگرام';
 
   @override
-  String get notificationsChannelTelegramDescription => 'ارسال پیام از طریق ربات تلگرام متصل برای اپراتورها.';
+  String get notificationsChannelTelegramDescription =>
+      'ارسال پیام از طریق ربات تلگرام متصل برای اپراتورها.';
 
   @override
   String get notificationsChannelBale => 'بله';
 
   @override
-  String get notificationsChannelBaleDescription => 'ارسال پیام از طریق پیام‌رسان بله (متصل به ربات).';
+  String get notificationsChannelBaleDescription =>
+      'ارسال پیام از طریق پیام‌رسان بله (متصل به ربات).';
 
   @override
   String get notificationsBaleAdvancedTitle => 'تنظیمات پیشرفته بله';
 
   @override
-  String get notificationsBaleAdvancedSubtitle => 'پیکربندی ربات بله برای نوتیفیکیشن';
+  String get notificationsBaleAdvancedSubtitle =>
+      'پیکربندی ربات بله برای نوتیفیکیشن';
 
   @override
   String get notificationsFieldBaleToken => 'توکن ربات بله';
 
   @override
-  String get notificationsFieldBaleTokenHint => 'توکن ربات از @BotFather در بله';
+  String get notificationsFieldBaleTokenHint =>
+      'توکن ربات از @BotFather در بله';
 
   @override
   String get notificationsFieldBaleUsername => 'نام کاربری ربات بله';
@@ -5352,7 +5564,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsBaleConnecting => 'در حال اتصال...';
 
   @override
-  String get notificationsBaleConnectionWarning => 'برای فعال شدن ناتیفیکیشن‌های بله، ابتدا اتصال را برقرار کنید.';
+  String get notificationsBaleConnectionWarning =>
+      'برای فعال شدن ناتیفیکیشن‌های بله، ابتدا اتصال را برقرار کنید.';
 
   @override
   String notificationsBaleLinkInstructions(String token) {
@@ -5360,7 +5573,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get notificationsBaleLinkExpired => 'لینک اتصال منقضی شد. لطفاً لینک جدید ایجاد کنید.';
+  String get notificationsBaleLinkExpired =>
+      'لینک اتصال منقضی شد. لطفاً لینک جدید ایجاد کنید.';
 
   @override
   String notificationsBaleConnectedSince(String date) {
@@ -5368,7 +5582,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get notificationsBaleConnectionSuccess => 'اتصال بله با موفقیت برقرار شد.';
+  String get notificationsBaleConnectionSuccess =>
+      'اتصال بله با موفقیت برقرار شد.';
 
   @override
   String get notificationsBaleConnectionError => 'خطا در اتصال بله.';
@@ -5383,19 +5598,22 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsChannelEmail => 'ایمیل';
 
   @override
-  String get notificationsChannelEmailDescription => 'ارسال رایانامه با استفاده از سرور ایمیلی که در تنظیمات سیستم تعریف شده است.';
+  String get notificationsChannelEmailDescription =>
+      'ارسال رایانامه با استفاده از سرور ایمیلی که در تنظیمات سیستم تعریف شده است.';
 
   @override
   String get notificationsChannelSms => 'پیامک';
 
   @override
-  String get notificationsChannelSmsDescription => 'ارسال پیامک از طریق سرویس‌دهندهٔ پیکربندی‌شده برای رویدادهای حساس.';
+  String get notificationsChannelSmsDescription =>
+      'ارسال پیامک از طریق سرویس‌دهندهٔ پیکربندی‌شده برای رویدادهای حساس.';
 
   @override
   String get notificationsChannelInApp => 'داخل برنامه';
 
   @override
-  String get notificationsChannelInAppDescription => 'نمایش اعلان داخل وب و موبایل حسابیکس در لحظه.';
+  String get notificationsChannelInAppDescription =>
+      'نمایش اعلان داخل وب و موبایل حسابیکس در لحظه.';
 
   @override
   String get notificationsSaveSuccess => 'تنظیمات اعلان ذخیره شد.';
@@ -5407,7 +5625,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsTestSectionTitle => 'ارسال پیام تست';
 
   @override
-  String get notificationsTestSectionSubtitle => 'بعد از هر تغییر می‌توانید از طریق کانال انتخابی پیام آزمایشی بفرستید.';
+  String get notificationsTestSectionSubtitle =>
+      'بعد از هر تغییر می‌توانید از طریق کانال انتخابی پیام آزمایشی بفرستید.';
 
   @override
   String notificationsTestButton(String channel) {
@@ -5425,7 +5644,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get notificationsWebsocketInfoTitle => 'اعلان‌های درون‌برنامه‌ای لحظه‌ای';
+  String get notificationsWebsocketInfoTitle =>
+      'اعلان‌های درون‌برنامه‌ای لحظه‌ای';
 
   @override
   String notificationsWebsocketInfoDescription(String endpoint) {
@@ -5436,7 +5656,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsAdvancedSectionTitle => 'پیکربندی پیشرفته (ادمین)';
 
   @override
-  String get notificationsAdvancedSectionSubtitle => 'اعتبارسنجی کانال‌های تلگرام و پیامک را اینجا مدیریت کنید. دسترسی system_settings لازم است.';
+  String get notificationsAdvancedSectionSubtitle =>
+      'اعتبارسنجی کانال‌های تلگرام و پیامک را اینجا مدیریت کنید. دسترسی system_settings لازم است.';
 
   @override
   String get notificationsAdvancedTelegramHeader => 'راه‌اندازی ربات تلگرام';
@@ -5454,10 +5675,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsFieldTelegramSecretHeader => 'نام هدر محرمانه';
 
   @override
-  String get notificationsFieldTelegramTokenHint => 'از BotFather دریافت می‌شود (فرمت: 123456789:ABC...).';
+  String get notificationsFieldTelegramTokenHint =>
+      'از BotFather دریافت می‌شود (فرمت: 123456789:ABC...).';
 
   @override
-  String get notificationsFieldTelegramWebhookSecretHint => 'اختیاری؛ برای تطبیق درخواست‌های ورودی استفاده می‌شود.';
+  String get notificationsFieldTelegramWebhookSecretHint =>
+      'اختیاری؛ برای تطبیق درخواست‌های ورودی استفاده می‌شود.';
 
   @override
   String get notificationsAdvancedSmsHeader => 'درگاه پیامک';
@@ -5469,19 +5692,22 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsFieldSmsApiKey => 'کلید API';
 
   @override
-  String get notificationsFieldSmsApiKeyHint => 'از سرویس‌دهنده دریافت می‌شود؛ بهتر است دوره‌ای تعویض شود.';
+  String get notificationsFieldSmsApiKeyHint =>
+      'از سرویس‌دهنده دریافت می‌شود؛ بهتر است دوره‌ای تعویض شود.';
 
   @override
   String get notificationsFieldSmsSender => 'فرستنده/شماره';
 
   @override
-  String get notificationsFieldSmsSenderHint => 'دقیقاً همان مقداری که در پنل سرویس‌دهنده ثبت شده است.';
+  String get notificationsFieldSmsSenderHint =>
+      'دقیقاً همان مقداری که در پنل سرویس‌دهنده ثبت شده است.';
 
   @override
   String get notificationsProxySectionTitle => 'پروکسی تلگرام';
 
   @override
-  String get notificationsProxySectionSubtitle => 'در صورت قرار داشتن سرورها در ایران، با فعال کردن پروکسی درخواست‌های تلگرام از مسیر امن بیرونی عبور می‌کند.';
+  String get notificationsProxySectionSubtitle =>
+      'در صورت قرار داشتن سرورها در ایران، با فعال کردن پروکسی درخواست‌های تلگرام از مسیر امن بیرونی عبور می‌کند.';
 
   @override
   String get notificationsProxyEnableLabel => 'فعال‌سازی پروکسی تلگرام';
@@ -5493,16 +5719,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsFieldTelegramProxyApiKey => 'کلید دسترسی پروکسی';
 
   @override
-  String get notificationsAdvancedRestartHint => 'پس از تغییر، در صورت نیاز سرویس ارسال اعلان را در زمان کم‌ترافیک ریستارت کنید.';
+  String get notificationsAdvancedRestartHint =>
+      'پس از تغییر، در صورت نیاز سرویس ارسال اعلان را در زمان کم‌ترافیک ریستارت کنید.';
 
   @override
   String get notificationsAdvancedSave => 'ذخیرهٔ تنظیمات پیشرفته';
 
   @override
-  String get notificationsAdvancedSaveSuccess => 'تنظیمات پیشرفتهٔ اعلان ذخیره شد.';
+  String get notificationsAdvancedSaveSuccess =>
+      'تنظیمات پیشرفتهٔ اعلان ذخیره شد.';
 
   @override
-  String get notificationsAdvancedSaveError => 'ذخیرهٔ تنظیمات پیشرفتهٔ اعلان انجام نشد.';
+  String get notificationsAdvancedSaveError =>
+      'ذخیرهٔ تنظیمات پیشرفتهٔ اعلان انجام نشد.';
 
   @override
   String get notificationsTelegramConnectionStatus => 'وضعیت اتصال';
@@ -5523,10 +5752,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsTelegramConnecting => 'در حال اتصال...';
 
   @override
-  String get notificationsTelegramConnectionWarning => 'برای فعال شدن ناتیفیکیشن‌های تلگرام، ابتدا اتصال را برقرار کنید.';
+  String get notificationsTelegramConnectionWarning =>
+      'برای فعال شدن ناتیفیکیشن‌های تلگرام، ابتدا اتصال را برقرار کنید.';
 
   @override
-  String get notificationsTelegramConnectionSuccess => 'اتصال تلگرام با موفقیت برقرار شد.';
+  String get notificationsTelegramConnectionSuccess =>
+      'اتصال تلگرام با موفقیت برقرار شد.';
 
   @override
   String get notificationsTelegramConnectionError => 'خطا در اتصال تلگرام.';
@@ -5538,7 +5769,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationsTelegramDisconnectError => 'خطا در قطع اتصال تلگرام.';
 
   @override
-  String get notificationsTelegramLinkExpired => 'لینک اتصال منقضی شد. لطفاً لینک جدید ایجاد کنید.';
+  String get notificationsTelegramLinkExpired =>
+      'لینک اتصال منقضی شد. لطفاً لینک جدید ایجاد کنید.';
 
   @override
   String notificationsTelegramLinkInstructions(String token) {
@@ -5547,7 +5779,8 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String notificationsTelegramLinkExpiresIn(int minutes) {
-    final intl.NumberFormat minutesNumberFormat = intl.NumberFormat.decimalPattern(localeName);
+    final intl.NumberFormat minutesNumberFormat =
+        intl.NumberFormat.decimalPattern(localeName);
     final String minutesString = minutesNumberFormat.format(minutes);
 
     return 'این لینک تا $minutesString دقیقه دیگر معتبر است.';
@@ -5797,16 +6030,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsWalletPayoutsAdmin => 'مدیریت تسویه کیف‌پول';
 
   @override
-  String get settingsWalletPayoutsAdminDescription => 'مشاهده، پیگیری و ثبت تسویه‌های کیف‌پول کسب‌وکارها';
+  String get settingsWalletPayoutsAdminDescription =>
+      'مشاهده، پیگیری و ثبت تسویه‌های کیف‌پول کسب‌وکارها';
 
   @override
   String get walletPayoutsAdminTitle => 'درخواست‌های تسویه کیف‌پول';
 
   @override
-  String get walletPayoutsAdminSubtitle => 'در این بخش می‌توانید درخواست‌های تسویه کیف‌پول را مشاهده و وضعیت واریز بانکی آن‌ها را ثبت کنید.';
+  String get walletPayoutsAdminSubtitle =>
+      'در این بخش می‌توانید درخواست‌های تسویه کیف‌پول را مشاهده و وضعیت واریز بانکی آن‌ها را ثبت کنید.';
 
   @override
-  String get walletPayoutsAdminEmpty => 'در حال حاضر درخواستی برای نمایش وجود ندارد.';
+  String get walletPayoutsAdminEmpty =>
+      'در حال حاضر درخواستی برای نمایش وجود ندارد.';
 
   @override
   String get walletPayoutsAdminSettleDialogTitle => 'ثبت اطلاعات واریز بانکی';
@@ -5824,7 +6060,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get walletPayoutsAdminSettlementDate => 'تاریخ واریز';
 
   @override
-  String get walletPayoutsAdminFeeHint => 'در صورت وجود کارمزد انتقال، آن را وارد کنید';
+  String get walletPayoutsAdminFeeHint =>
+      'در صورت وجود کارمزد انتقال، آن را وارد کنید';
 
   @override
   String get bankTrackingCode => 'کد پیگیری بانک';
@@ -5833,19 +6070,23 @@ class AppLocalizationsFa extends AppLocalizations {
   String get walletTopUpTitle => 'افزایش اعتبار';
 
   @override
-  String get walletTopUpInitializing => 'در حال ثبت درخواست و آماده‌سازی درگاه...';
+  String get walletTopUpInitializing =>
+      'در حال ثبت درخواست و آماده‌سازی درگاه...';
 
   @override
   String get walletRedirectingToGateway => 'در حال انتقال به درگاه پرداخت...';
 
   @override
-  String get walletTopUpNoPaymentLink => 'درخواست افزایش اعتبار ثبت شد، اما لینک پرداخت دریافت نشد. لطفاً بعداً دوباره تلاش کنید یا تنظیمات درگاه را بررسی کنید.';
+  String get walletTopUpNoPaymentLink =>
+      'درخواست افزایش اعتبار ثبت شد، اما لینک پرداخت دریافت نشد. لطفاً بعداً دوباره تلاش کنید یا تنظیمات درگاه را بررسی کنید.';
 
   @override
-  String get walletGatewayInitFailed => 'خطا در اتصال به درگاه. لطفاً تنظیمات درگاه را بررسی کنید یا بعداً تلاش کنید.';
+  String get walletGatewayInitFailed =>
+      'خطا در اتصال به درگاه. لطفاً تنظیمات درگاه را بررسی کنید یا بعداً تلاش کنید.';
 
   @override
-  String get walletInvalidGatewayConfig => 'پیکربندی درگاه ناقص است. لطفاً مرچنت آی‌دی و آدرس بازگشت را بررسی کنید.';
+  String get walletInvalidGatewayConfig =>
+      'پیکربندی درگاه ناقص است. لطفاً مرچنت آی‌دی و آدرس بازگشت را بررسی کنید.';
 
   @override
   String get walletGatewayDisabled => 'این درگاه غیرفعال است.';
@@ -5854,13 +6095,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get walletGatewayNotFound => 'درگاه پرداخت یافت نشد.';
 
   @override
-  String get walletGatewayServerError => 'خطای سرور هنگام اتصال به درگاه. لطفاً بعداً تلاش کنید.';
+  String get walletGatewayServerError =>
+      'خطای سرور هنگام اتصال به درگاه. لطفاً بعداً تلاش کنید.';
 
   @override
   String get walletOpenGatewayDialogTitle => 'انتقال به درگاه پرداخت';
 
   @override
-  String get walletOpenGatewayDialogInstructions => 'برای ادامه پرداخت، لینک زیر را باز کنید:';
+  String get walletOpenGatewayDialogInstructions =>
+      'برای ادامه پرداخت، لینک زیر را باز کنید:';
 
   @override
   String get walletPaymentResultTitle => 'نتیجه پرداخت کیف‌پول';
@@ -6018,7 +6261,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get creditLimitHint => 'خالی: استفاده از سقف پیش‌فرض کسب‌وکار';
 
   @override
-  String get creditTipText => 'با خالی گذاشتن سقف اعتبار یا انتخاب حالت ارث‌بری، تنظیمات پیش‌فرض کسب‌وکار اعمال می‌شود.';
+  String get creditTipText =>
+      'با خالی گذاشتن سقف اعتبار یا انتخاب حالت ارث‌بری، تنظیمات پیش‌فرض کسب‌وکار اعمال می‌شود.';
 
   @override
   String get selectInstallmentPlan => 'انتخاب پلن اقساط';
@@ -6033,13 +6277,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxWorkspaceTitle => 'کارپوشه مودیان';
 
   @override
-  String get taxWorkspaceSubtitle => 'فاکتورها را قبل از ارسال به سامانه مودیان بررسی و مدیریت کنید.';
+  String get taxWorkspaceSubtitle =>
+      'فاکتورها را قبل از ارسال به سامانه مودیان بررسی و مدیریت کنید.';
 
   @override
   String get taxIntegrationTitle => 'سامانه مودیان مالیاتی';
 
   @override
-  String get taxIntegrationSubtitle => 'اطلاعات اتصال و کلیدهای ارتباط با سامانه مودیان را مدیریت کنید.';
+  String get taxIntegrationSubtitle =>
+      'اطلاعات اتصال و کلیدهای ارتباط با سامانه مودیان را مدیریت کنید.';
 
   @override
   String get taxSettingsTabConnection => 'اتصال و اطلاعات پایه';
@@ -6057,136 +6303,171 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxGuideIntroTitle => 'چگونه تنظیمات سامانه مودیان را تکمیل کنیم؟';
 
   @override
-  String get taxGuideIntroDescription => 'این راهنما تمام مراحل اتصال کسب‌وکار به سامانه مودیان در نسخه جدید حسابیکس را مرور می‌کند؛ از تولید کلیدها تا کنترل کیفیت داده و ارسال صورتحساب.';
+  String get taxGuideIntroDescription =>
+      'این راهنما تمام مراحل اتصال کسب‌وکار به سامانه مودیان در نسخه جدید حسابیکس را مرور می‌کند؛ از تولید کلیدها تا کنترل کیفیت داده و ارسال صورتحساب.';
 
   @override
   String get taxGuidePrereqTitle => 'پیش‌نیازهای قبل از شروع';
 
   @override
-  String get taxGuidePrereqItem1 => 'دسترسی کاربر اصلی کسب‌وکار به منوی «سامانه مودیان» در حسابیکس';
+  String get taxGuidePrereqItem1 =>
+      'دسترسی کاربر اصلی کسب‌وکار به منوی «سامانه مودیان» در حسابیکس';
 
   @override
-  String get taxGuidePrereqItem2 => 'اطلاعات ثبتی صحیح (شناسه ملی، کد اقتصادی و ایمیل سازمانی معتبر)';
+  String get taxGuidePrereqItem2 =>
+      'اطلاعات ثبتی صحیح (شناسه ملی، کد اقتصادی و ایمیل سازمانی معتبر)';
 
   @override
-  String get taxGuidePrereqItem3 => 'دسترسی به کارپوشه مالیاتی در سامانه my.tax.gov.ir';
+  String get taxGuidePrereqItem3 =>
+      'دسترسی به کارپوشه مالیاتی در سامانه my.tax.gov.ir';
 
   @override
   String get taxGuideStep1Title => '۱) ساخت کلیدها در حسابیکس';
 
   @override
-  String get taxGuideStep1Description => 'از کارت «تولید کلید جدید» استفاده کنید تا کلید خصوصی، عمومی و در صورت نیاز CSR را ایجاد کنید.';
+  String get taxGuideStep1Description =>
+      'از کارت «تولید کلید جدید» استفاده کنید تا کلید خصوصی، عمومی و در صورت نیاز CSR را ایجاد کنید.';
 
   @override
-  String get taxGuideStep1Bullet1 => 'از برگه «کلیدها و گواهی‌ها» روی دکمه تولید کلید بزنید.';
+  String get taxGuideStep1Bullet1 =>
+      'از برگه «کلیدها و گواهی‌ها» روی دکمه تولید کلید بزنید.';
 
   @override
-  String get taxGuideStep1Bullet2 => 'نوع شخص (حقیقی/حقوقی) و شناسه ملی را دقیق وارد کنید.';
+  String get taxGuideStep1Bullet2 =>
+      'نوع شخص (حقیقی/حقوقی) و شناسه ملی را دقیق وارد کنید.';
 
   @override
-  String get taxGuideStep1Bullet3 => 'نام فارسی، نام انگلیسی و ایمیل باید با پرونده مالیاتی یکسان باشند.';
+  String get taxGuideStep1Bullet3 =>
+      'نام فارسی، نام انگلیسی و ایمیل باید با پرونده مالیاتی یکسان باشند.';
 
   @override
   String get taxGuideStep2Title => '۲) دانلود و نگهداری امن';
 
   @override
-  String get taxGuideStep2Description => 'پس از تولید، کلیدها فقط یک‌بار نمایش داده می‌شوند؛ آن‌ها را در جای امن نگهداری کنید.';
+  String get taxGuideStep2Description =>
+      'پس از تولید، کلیدها فقط یک‌بار نمایش داده می‌شوند؛ آن‌ها را در جای امن نگهداری کنید.';
 
   @override
-  String get taxGuideStep2Bullet1 => 'فایل‌های کلید را دانلود و در فضای آفلاین (USB یا رمزدار) نگهداری کنید.';
+  String get taxGuideStep2Bullet1 =>
+      'فایل‌های کلید را دانلود و در فضای آفلاین (USB یا رمزدار) نگهداری کنید.';
 
   @override
-  String get taxGuideStep2Bullet2 => 'از اشتراک‌گذاری کلید خصوصی با افراد غیرمسئول خودداری کنید.';
+  String get taxGuideStep2Bullet2 =>
+      'از اشتراک‌گذاری کلید خصوصی با افراد غیرمسئول خودداری کنید.';
 
   @override
-  String get taxGuideStep2Bullet3 => 'در صورت مفقودی کلید خصوصی باید فرآیند تولید کلید را از ابتدا طی کنید.';
+  String get taxGuideStep2Bullet3 =>
+      'در صورت مفقودی کلید خصوصی باید فرآیند تولید کلید را از ابتدا طی کنید.';
 
   @override
   String get taxGuideStep3Title => '۳) ثبت کلید عمومی در سامانه مودیان';
 
   @override
-  String get taxGuideStep3Description => 'برای دریافت شناسه یکتای حافظه باید Public Key را در کارپوشه مالیاتی ثبت کنید.';
+  String get taxGuideStep3Description =>
+      'برای دریافت شناسه یکتای حافظه باید Public Key را در کارپوشه مالیاتی ثبت کنید.';
 
   @override
-  String get taxGuideStep3Bullet1 => 'به my.tax.gov.ir وارد شوید و مسیر «ورود به پرونده > عضویت > شناسه یکتا حافظه مالیاتی» را دنبال کنید.';
+  String get taxGuideStep3Bullet1 =>
+      'به my.tax.gov.ir وارد شوید و مسیر «ورود به پرونده > عضویت > شناسه یکتا حافظه مالیاتی» را دنبال کنید.';
 
   @override
-  String get taxGuideStep3Bullet2 => 'گزینه «توسط مودی» را انتخاب و فایل Public Key را بارگذاری کنید.';
+  String get taxGuideStep3Bullet2 =>
+      'گزینه «توسط مودی» را انتخاب و فایل Public Key را بارگذاری کنید.';
 
   @override
-  String get taxGuideStep3Bullet3 => 'شناسه یکتای نمایش داده شده را ذخیره و در حسابیکس وارد کنید.';
+  String get taxGuideStep3Bullet3 =>
+      'شناسه یکتای نمایش داده شده را ذخیره و در حسابیکس وارد کنید.';
 
   @override
   String get taxGuideStep4Title => '۴) تکمیل فرم اتصال در حسابیکس';
 
   @override
-  String get taxGuideStep4Description => 'شناسه حافظه، کد اقتصادی و کلید خصوصی باید در تب «اتصال و اطلاعات پایه» ثبت شوند.';
+  String get taxGuideStep4Description =>
+      'شناسه حافظه، کد اقتصادی و کلید خصوصی باید در تب «اتصال و اطلاعات پایه» ثبت شوند.';
 
   @override
-  String get taxGuideStep4Bullet1 => 'شناسه یکتا و کد اقتصادی را بدون فاصله اضافی وارد کنید.';
+  String get taxGuideStep4Bullet1 =>
+      'شناسه یکتا و کد اقتصادی را بدون فاصله اضافی وارد کنید.';
 
   @override
-  String get taxGuideStep4Bullet2 => 'کلید خصوصی (PEM) را در فیلد مربوطه جای‌گذاری و در صورت نیاز Public Key و CSR را نیز ذخیره کنید.';
+  String get taxGuideStep4Bullet2 =>
+      'کلید خصوصی (PEM) را در فیلد مربوطه جای‌گذاری و در صورت نیاز Public Key و CSR را نیز ذخیره کنید.';
 
   @override
-  String get taxGuideStep4Bullet3 => 'در صورت استفاده از محیط تست، گزینه حالت سندباکس را فعال کنید.';
+  String get taxGuideStep4Bullet3 =>
+      'در صورت استفاده از محیط تست، گزینه حالت سندباکس را فعال کنید.';
 
   @override
   String get taxGuideStep5Title => '۵) دریافت گواهی میانی با CSR';
 
   @override
-  String get taxGuideStep5Description => 'برای اشخاص حقوقی لازم است CSR تولید شده را در مرکز صدور گواهی میانی ثبت کنید.';
+  String get taxGuideStep5Description =>
+      'برای اشخاص حقوقی لازم است CSR تولید شده را در مرکز صدور گواهی میانی ثبت کنید.';
 
   @override
-  String get taxGuideStep5Bullet1 => 'به سایت gica.ir مراجعه و گزینه «درخواست گواهی از طریق CSR» را انتخاب کنید.';
+  String get taxGuideStep5Bullet1 =>
+      'به سایت gica.ir مراجعه و گزینه «درخواست گواهی از طریق CSR» را انتخاب کنید.';
 
   @override
-  String get taxGuideStep5Bullet2 => 'فرم‌ها را با اطلاعات شرکت تکمیل و هزینه صدور را پرداخت کنید.';
+  String get taxGuideStep5Bullet2 =>
+      'فرم‌ها را با اطلاعات شرکت تکمیل و هزینه صدور را پرداخت کنید.';
 
   @override
-  String get taxGuideStep5Bullet3 => 'پس از مراجعه حضوری، فایل گواهی صادره را در حسابیکس بارگذاری کنید.';
+  String get taxGuideStep5Bullet3 =>
+      'پس از مراجعه حضوری، فایل گواهی صادره را در حسابیکس بارگذاری کنید.';
 
   @override
   String get taxGuideStep6Title => '۶) ثبت کد کالا و خدمت';
 
   @override
-  String get taxGuideStep6Description => 'بدون درج کد و واحد مالیاتی برای کالا/خدمت ارسال صورتحساب رد می‌شود.';
+  String get taxGuideStep6Description =>
+      'بدون درج کد و واحد مالیاتی برای کالا/خدمت ارسال صورتحساب رد می‌شود.';
 
   @override
-  String get taxGuideStep6Bullet1 => 'از مسیر «کالا و خدمات > ویرایش» کد ۱۳ رقمی را در بخش مالیات ثبت کنید.';
+  String get taxGuideStep6Bullet1 =>
+      'از مسیر «کالا و خدمات > ویرایش» کد ۱۳ رقمی را در بخش مالیات ثبت کنید.';
 
   @override
-  String get taxGuideStep6Bullet2 => 'در صورت نیاز از فایل کدهای عمومی stuffid.tax.gov.ir استفاده کنید یا کد اختصاصی بسازید.';
+  String get taxGuideStep6Bullet2 =>
+      'در صورت نیاز از فایل کدهای عمومی stuffid.tax.gov.ir استفاده کنید یا کد اختصاصی بسازید.';
 
   @override
-  String get taxGuideStep6Bullet3 => 'برای خدمات خاص، کد مربوطه را از portal.gs1-ir.org دریافت کنید.';
+  String get taxGuideStep6Bullet3 =>
+      'برای خدمات خاص، کد مربوطه را از portal.gs1-ir.org دریافت کنید.';
 
   @override
   String get taxGuideStep7Title => '۷) کنترل کیفیت داده و ارسال امن';
 
   @override
-  String get taxGuideStep7Description => 'پس از تکمیل تنظیمات، گزارش کیفیت داده و کارپوشه مودیان را بررسی کنید.';
+  String get taxGuideStep7Description =>
+      'پس از تکمیل تنظیمات، گزارش کیفیت داده و کارپوشه مودیان را بررسی کنید.';
 
   @override
-  String get taxGuideStep7Bullet1 => 'در تب «کیفیت داده» موارد ناقص برای کالا، مشتری و فاکتور نشان داده می‌شود.';
+  String get taxGuideStep7Bullet1 =>
+      'در تب «کیفیت داده» موارد ناقص برای کالا، مشتری و فاکتور نشان داده می‌شود.';
 
   @override
-  String get taxGuideStep7Bullet2 => 'فاکتورها را ابتدا به کارپوشه مودیان اضافه و وضعیت خطاها را در همان صفحه پیگیری کنید.';
+  String get taxGuideStep7Bullet2 =>
+      'فاکتورها را ابتدا به کارپوشه مودیان اضافه و وضعیت خطاها را در همان صفحه پیگیری کنید.';
 
   @override
-  String get taxGuideStep7Bullet3 => 'ارسال تکی یا گروهی را فقط بعد از رفع خطاهای اعتبارسنجی انجام دهید.';
+  String get taxGuideStep7Bullet3 =>
+      'ارسال تکی یا گروهی را فقط بعد از رفع خطاهای اعتبارسنجی انجام دهید.';
 
   @override
   String get taxGuideResourcesTitle => 'یادآوری مسیرها و منابع';
 
   @override
-  String get taxGuideResourcesWorkspace => 'کارپوشه مودیان: از منوی فروش > کارپوشه مالیاتی قابل دسترسی است.';
+  String get taxGuideResourcesWorkspace =>
+      'کارپوشه مودیان: از منوی فروش > کارپوشه مالیاتی قابل دسترسی است.';
 
   @override
-  String get taxGuideResourcesProducts => 'کالا و خدمات: در همین منو می‌توانید کد مالیاتی و واحد را ویرایش یا از اکسل وارد کنید.';
+  String get taxGuideResourcesProducts =>
+      'کالا و خدمات: در همین منو می‌توانید کد مالیاتی و واحد را ویرایش یا از اکسل وارد کنید.';
 
   @override
-  String get taxGuideResourcesSupport => 'در صورت بروز خطای اتصال، لاگ کامل در ماژول «تنظیمات سامانه مودیان» و بخش تیکتینگ در دسترس است.';
+  String get taxGuideResourcesSupport =>
+      'در صورت بروز خطای اتصال، لاگ کامل در ماژول «تنظیمات سامانه مودیان» و بخش تیکتینگ در دسترس است.';
 
   @override
   String get taxMemoryIdLabel => 'شناسه حافظه مالیاتی';
@@ -6198,7 +6479,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxSandboxModeLabel => 'حالت سندباکس';
 
   @override
-  String get taxSandboxModeSubtitle => 'با فعال بودن این گزینه، درخواست‌ها به محیط آزمایشی سامانه ارسال می‌شوند.';
+  String get taxSandboxModeSubtitle =>
+      'با فعال بودن این گزینه، درخواست‌ها به محیط آزمایشی سامانه ارسال می‌شوند.';
 
   @override
   String get taxPrivateKeyLabel => 'کلید خصوصی (PEM)';
@@ -6260,7 +6542,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxDataQualityTitle => 'کنترل کیفیت داده';
 
   @override
-  String get taxDataQualitySubtitle => 'اقلام فاقد اطلاعات مالیاتی را پیش از ارسال بررسی کنید.';
+  String get taxDataQualitySubtitle =>
+      'اقلام فاقد اطلاعات مالیاتی را پیش از ارسال بررسی کنید.';
 
   @override
   String get taxDataQualityReload => 'به‌روزرسانی گزارش';
@@ -6290,7 +6573,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxDataQualityNoSamples => 'نمونه‌ای یافت نشد.';
 
   @override
-  String get taxDataQualityNoIssues => 'همه چیز آماده است! موردی برای تکمیل وجود ندارد.';
+  String get taxDataQualityNoIssues =>
+      'همه چیز آماده است! موردی برای تکمیل وجود ندارد.';
 
   @override
   String get taxDataQualityNoData => 'گزارشی برای نمایش وجود ندارد.';
@@ -6316,7 +6600,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxValidationIssuesTitle => 'مشکلات اعتبارسنجی مالیاتی';
 
   @override
-  String get taxValidationIssuesDescription => 'برای ارسال موفق به سامانه مودیان، ابتدا موارد زیر را برطرف کنید.';
+  String get taxValidationIssuesDescription =>
+      'برای ارسال موفق به سامانه مودیان، ابتدا موارد زیر را برطرف کنید.';
 
   @override
   String get taxValidationIssuesEmpty => 'جزئیاتی برای نمایش وجود ندارد.';
@@ -6370,7 +6655,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get documentDetailsInstallmentsTab => 'اقساط';
 
   @override
-  String get documentDetailsInstallmentsEmptySchedule => 'ردیفی برای طرح اقساط این فاکتور ثبت نشده است.';
+  String get documentDetailsInstallmentsEmptySchedule =>
+      'ردیفی برای طرح اقساط این فاکتور ثبت نشده است.';
 
   @override
   String documentDetailsInstallmentsAmountsNote(String currency) {
@@ -6381,7 +6667,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get documentDetailsInstallmentReceive => 'ثبت دریافت';
 
   @override
-  String get documentDetailsInstallmentReceiptTypeOnly => 'تخصیص قسط برای این نوع فاکتور فقط همراه سند دریافت امکان‌پذیر است.';
+  String get documentDetailsInstallmentReceiptTypeOnly =>
+      'تخصیص قسط برای این نوع فاکتور فقط همراه سند دریافت امکان‌پذیر است.';
 
   @override
   String get documentDetailsInstallmentDocCodeColumn => 'سند';
@@ -6393,7 +6680,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxStatusNotSent => 'ارسال نشده';
 
   @override
-  String get taxAddToWorkspaceNotAllowed => 'این فاکتور قابل افزودن به کارپوشه مالیاتی نیست.';
+  String get taxAddToWorkspaceNotAllowed =>
+      'این فاکتور قابل افزودن به کارپوشه مالیاتی نیست.';
 
   @override
   String get taxAddToWorkspaceDialogTitle => 'افزودن به کارپوشه مالیاتی';
@@ -6425,7 +6713,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get taxRemoveFromWorkspaceSuccess => 'فاکتور از کارپوشه مالیاتی حذف شد.';
+  String get taxRemoveFromWorkspaceSuccess =>
+      'فاکتور از کارپوشه مالیاتی حذف شد.';
 
   @override
   String get taxRemoveFromWorkspaceError => 'خطا در حذف از کارپوشه مالیاتی.';
@@ -6470,7 +6759,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get taxSendSelectedTooltip => 'ارسال فاکتورهای انتخاب‌شده به سامانه مودیان';
+  String get taxSendSelectedTooltip =>
+      'ارسال فاکتورهای انتخاب‌شده به سامانه مودیان';
 
   @override
   String taxSendSelectedButton(int count) {
@@ -6478,7 +6768,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get taxRemoveSelectedTooltip => 'حذف فاکتورهای انتخاب‌شده از کارپوشه مالیاتی';
+  String get taxRemoveSelectedTooltip =>
+      'حذف فاکتورهای انتخاب‌شده از کارپوشه مالیاتی';
 
   @override
   String taxRemoveSelectedButton(int count) {
@@ -6486,7 +6777,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get taxSendSelectedDialogTitle => 'ارسال انتخاب‌شده‌ها به سامانه مودیان';
+  String get taxSendSelectedDialogTitle =>
+      'ارسال انتخاب‌شده‌ها به سامانه مودیان';
 
   @override
   String taxSendSelectedDialogMessage(int count) {
@@ -6494,10 +6786,12 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get taxSendSelectedSuccess => 'فاکتورهای انتخاب‌شده به سامانه مودیان ارسال شدند.';
+  String get taxSendSelectedSuccess =>
+      'فاکتورهای انتخاب‌شده به سامانه مودیان ارسال شدند.';
 
   @override
-  String get taxSendSelectedAllAlreadySent => 'تمام فاکتورهای انتخاب‌شده قبلاً ارسال شده‌اند.';
+  String get taxSendSelectedAllAlreadySent =>
+      'تمام فاکتورهای انتخاب‌شده قبلاً ارسال شده‌اند.';
 
   @override
   String taxSendSelectedSomeAlreadySent(int skipped, int count) {
@@ -6528,7 +6822,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get taxInquireSelectedDialogTitle => 'استعلام وضعیت فاکتورهای انتخاب‌شده';
+  String get taxInquireSelectedDialogTitle =>
+      'استعلام وضعیت فاکتورهای انتخاب‌شده';
 
   @override
   String taxInquireSelectedDialogMessage(int count) {
@@ -6558,10 +6853,12 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get taxRemoveSelectedSuccess => 'فاکتورهای انتخاب‌شده از کارپوشه مالیاتی حذف شدند.';
+  String get taxRemoveSelectedSuccess =>
+      'فاکتورهای انتخاب‌شده از کارپوشه مالیاتی حذف شدند.';
 
   @override
-  String get taxRemoveSelectedAllAlreadySent => 'تمام فاکتورهای انتخاب‌شده قبلاً ارسال شده‌اند و نمی‌توانند از کارپوشه حذف شوند.';
+  String get taxRemoveSelectedAllAlreadySent =>
+      'تمام فاکتورهای انتخاب‌شده قبلاً ارسال شده‌اند و نمی‌توانند از کارپوشه حذف شوند.';
 
   @override
   String taxRemoveSelectedSomeAlreadySent(int skipped, int count) {
@@ -6610,25 +6907,31 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxHelpSectionQuickActions => 'عملیات سریع';
 
   @override
-  String get taxHelpQuickActionSendPending => 'ارسال همه در انتظار: ارسال تمام فاکتورهای در انتظار';
+  String get taxHelpQuickActionSendPending =>
+      'ارسال همه در انتظار: ارسال تمام فاکتورهای در انتظار';
 
   @override
-  String get taxHelpQuickActionInquireSent => 'استعلام همه ارسال شده: بررسی وضعیت فاکتورهای ارسال شده';
+  String get taxHelpQuickActionInquireSent =>
+      'استعلام همه ارسال شده: بررسی وضعیت فاکتورهای ارسال شده';
 
   @override
-  String get taxHelpQuickActionRetryFailed => 'تلاش مجدد همه ناموفق: تلاش مجدد برای فاکتورهای ناموفق';
+  String get taxHelpQuickActionRetryFailed =>
+      'تلاش مجدد همه ناموفق: تلاش مجدد برای فاکتورهای ناموفق';
 
   @override
   String get taxHelpSectionImportantNotes => 'نکات مهم';
 
   @override
-  String get taxHelpNoteValidateBeforeSend => 'قبل از ارسال، فاکتورها را اعتبارسنجی کنید';
+  String get taxHelpNoteValidateBeforeSend =>
+      'قبل از ارسال، فاکتورها را اعتبارسنجی کنید';
 
   @override
-  String get taxHelpNoteFailedInDLQ => 'فاکتورهای ناموفق در صف خطا ذخیره می‌شوند';
+  String get taxHelpNoteFailedInDLQ =>
+      'فاکتورهای ناموفق در صف خطا ذخیره می‌شوند';
 
   @override
-  String get taxHelpNoteTimeline => 'می‌توانید تاریخچه تغییرات هر فاکتور را مشاهده کنید';
+  String get taxHelpNoteTimeline =>
+      'می‌توانید تاریخچه تغییرات هر فاکتور را مشاهده کنید';
 
   @override
   String get taxHelpNoteExport => 'گزارش‌های ارسال را می‌توانید خروجی بگیرید';
@@ -6698,16 +7001,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get documentMonetizationTitle => 'پکیج‌ها و تعرفه‌ها';
 
   @override
-  String get documentMonetizationSubtitle => 'پکیج‌ها، هزینه ثبت هر سند و تسویه حجمی';
+  String get documentMonetizationSubtitle =>
+      'پکیج‌ها، هزینه ثبت هر سند و تسویه حجمی';
 
   @override
   String get subscriptionPackages => 'پکیج‌های اشتراک';
 
   @override
-  String get noActivePackage => 'هیچ پکیج فعالی برای این کسب‌وکار ثبت نشده است.';
+  String get noActivePackage =>
+      'هیچ پکیج فعالی برای این کسب‌وکار ثبت نشده است.';
 
   @override
-  String get noPackageAvailable => 'در حال حاضر هیچ پکیجی برای خرید فعال نشده است.';
+  String get noPackageAvailable =>
+      'در حال حاضر هیچ پکیجی برای خرید فعال نشده است.';
 
   @override
   String get activePackage => 'پکیج فعال';
@@ -6939,7 +7245,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get warehousePostalLabelLandscape => 'افقی';
 
   @override
-  String get warehousePostalLabelCustomPaperHint => 'سایز سفارشی (حداکثر ۳۲ کاراکتر، مثلاً ۱۲۰mm ۸۰mm)';
+  String get warehousePostalLabelCustomPaperHint =>
+      'سایز سفارشی (حداکثر ۳۲ کاراکتر، مثلاً ۱۲۰mm ۸۰mm)';
 
   @override
   String get warehousePostalLabelTemplate => 'قالب چاپ';
@@ -7014,19 +7321,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get supportTicketsUserSectionTitle => 'تیکت پشتیبانی کاربران';
 
   @override
-  String get supportTicketsAllowUsersLabel => 'امکان ثبت و مشاهده تیکت برای کاربران عادی';
+  String get supportTicketsAllowUsersLabel =>
+      'امکان ثبت و مشاهده تیکت برای کاربران عادی';
 
   @override
-  String get supportTicketsAllowUsersDescription => 'در صورت غیرفعال، متن پیام زیر به کاربران نشان داده می‌شود. اپراتورهای پشتیبانی به پنل اپراتور دسترسی دارند.';
+  String get supportTicketsAllowUsersDescription =>
+      'در صورت غیرفعال، متن پیام زیر به کاربران نشان داده می‌شود. اپراتورهای پشتیبانی به پنل اپراتور دسترسی دارند.';
 
   @override
-  String get supportTicketsDisabledNoticeLabel => 'متن پیام برای کاربر (وقتی خاموش است)';
+  String get supportTicketsDisabledNoticeLabel =>
+      'متن پیام برای کاربر (وقتی خاموش است)';
 
   @override
-  String get supportTicketsDisabledNoticeHint => 'خالی بگذارید تا پیام پیش‌فرض سیستم استفاده شود.';
+  String get supportTicketsDisabledNoticeHint =>
+      'خالی بگذارید تا پیام پیش‌فرض سیستم استفاده شود.';
 
   @override
-  String get supportTicketsUnavailableBody => 'بخش تیکت‌های پشتیبانی موقتاً غیرفعال است.';
+  String get supportTicketsUnavailableBody =>
+      'بخش تیکت‌های پشتیبانی موقتاً غیرفعال است.';
 
   @override
   String get unlimited => 'نامحدود';
@@ -7056,7 +7368,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get otpLoginTitle => 'ورود با کد یکبار مصرف';
 
   @override
-  String get otpLoginSubtitle => 'کد ورود به ایمیل، شماره موبایل یا تلگرام شما ارسال می‌شود';
+  String get otpLoginSubtitle =>
+      'کد ورود به ایمیل، شماره موبایل یا تلگرام شما ارسال می‌شود';
 
   @override
   String get otpLoginIdentifierHint => 'ایمیل یا شماره موبایل خود را وارد کنید';
@@ -7166,13 +7479,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowNoAccess => 'دسترسی به اتوماسیون‌ها برای شما فراهم نیست';
 
   @override
-  String get workflowNoAccessEditor => 'دسترسی به ویرایش اتوماسیون برای شما فراهم نیست';
+  String get workflowNoAccessEditor =>
+      'دسترسی به ویرایش اتوماسیون برای شما فراهم نیست';
 
   @override
   String get workflowNoWorkflows => 'هنوز workflow‌ای ایجاد نشده است.';
 
   @override
-  String get workflowCreateFirst => 'با دکمه پایین صفحه نخستین اتوماسیون را بسازید.';
+  String get workflowCreateFirst =>
+      'با دکمه پایین صفحه نخستین اتوماسیون را بسازید.';
 
   @override
   String get workflowCreate => 'افزودن Workflow';
@@ -7187,7 +7502,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowTestRun => 'اجرای آزمایشی (وضعیت زنده)';
 
   @override
-  String get workflowFixValidationBeforeTestRun => 'قبل از اجرای آزمایشی، خطاهای اعتبارسنجی روی بوم را برطرف کنید.';
+  String get workflowFixValidationBeforeTestRun =>
+      'قبل از اجرای آزمایشی، خطاهای اعتبارسنجی روی بوم را برطرف کنید.';
 
   @override
   String get workflowExecutionHistory => 'تاریخچه اجرا';
@@ -7259,7 +7575,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowConfigSelectFromNodes => 'انتخاب از نودهای قبلی';
 
   @override
-  String get workflowConfigValueUsesNode => 'این مقدار از یک نود قبلی استفاده می‌کند';
+  String get workflowConfigValueUsesNode =>
+      'این مقدار از یک نود قبلی استفاده می‌کند';
 
   @override
   String get workflowConfigSelectDate => 'انتخاب تاریخ';
@@ -7274,10 +7591,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowConfigNoNodesToSelect => 'هیچ نودی برای انتخاب وجود ندارد';
 
   @override
-  String get workflowConfigNoTelegramUsers => 'هیچ کاربری به ربات تلگرام متصل نیست. لطفاً ابتدا کاربران را به ربات متصل کنید.';
+  String get workflowConfigNoTelegramUsers =>
+      'هیچ کاربری به ربات تلگرام متصل نیست. لطفاً ابتدا کاربران را به ربات متصل کنید.';
 
   @override
-  String get workflowConfigNoBaleUsers => 'هیچ کاربری به ربات بله متصل نیست. لطفاً ابتدا کاربران را به ربات متصل کنید.';
+  String get workflowConfigNoBaleUsers =>
+      'هیچ کاربری به ربات بله متصل نیست. لطفاً ابتدا کاربران را به ربات متصل کنید.';
 
   @override
   String get workflowConfigOwner => 'مالک';
@@ -7289,7 +7608,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowConfigPersonIdLabel => 'شناسه طرف حساب';
 
   @override
-  String get workflowConfigPersonIdHelper => 'می‌توانید شناسه را وارد کنید یا از نود قبلی استفاده کنید: \$node_id.person_id';
+  String get workflowConfigPersonIdHelper =>
+      'می‌توانید شناسه را وارد کنید یا از نود قبلی استفاده کنید: \$node_id.person_id';
 
   @override
   String get workflowConfigSearchSelectProduct => 'جست‌وجو و انتخاب کالا/خدمت';
@@ -7354,7 +7674,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowConfigAddPayment => 'افزودن پرداخت';
 
   @override
-  String get workflowConfigNoPaymentsYet => 'هنوز پرداختی اضافه نشده است. برای افزودن، از دکمهٔ زیر استفاده کنید.';
+  String get workflowConfigNoPaymentsYet =>
+      'هنوز پرداختی اضافه نشده است. برای افزودن، از دکمهٔ زیر استفاده کنید.';
 
   @override
   String workflowConfigPaymentN(int n) {
@@ -7392,10 +7713,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowConfigCard => 'کارت';
 
   @override
-  String get workflowConfigSelectTelegramUser => 'انتخاب کاربر عضو کسب و کار که به ربات تلگرام متصل است';
+  String get workflowConfigSelectTelegramUser =>
+      'انتخاب کاربر عضو کسب و کار که به ربات تلگرام متصل است';
 
   @override
-  String get workflowConfigSelectBaleUser => 'انتخاب کاربر عضو کسب و کار که به ربات بله متصل است';
+  String get workflowConfigSelectBaleUser =>
+      'انتخاب کاربر عضو کسب و کار که به ربات بله متصل است';
 
   @override
   String get workflowConfigSelectAtLeastOne => 'حداقل یک مورد را انتخاب کنید';
@@ -7404,7 +7727,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowConfigReferenceTitle => 'انتخاب از نودهای قبلی';
 
   @override
-  String get workflowConfigNoNodesAvailable => 'هیچ نودی برای انتخاب وجود ندارد';
+  String get workflowConfigNoNodesAvailable =>
+      'هیچ نودی برای انتخاب وجود ندارد';
 
   @override
   String get workflowConfigStep1Node => 'مرحله 1: انتخاب نود';
@@ -7478,7 +7802,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowNodeUnknown => 'نود ناشناس';
 
   @override
-  String get workflowConfigEnumRequiredForMultiSelect => 'خطا: enum values برای multi-select تعریف نشده است';
+  String get workflowConfigEnumRequiredForMultiSelect =>
+      'خطا: enum values برای multi-select تعریف نشده است';
 
   @override
   String get workflowConfigFieldEnabled => 'فعال';
@@ -7661,28 +7986,34 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowConnectionHelpMethod1 => 'روش 1: Drag & Drop (پیشنهادی)';
 
   @override
-  String get workflowConnectionHelpMethod1Step1 => '1. روی نقطه خروجی (Output) یک نود کلیک کنید و نگه دارید';
+  String get workflowConnectionHelpMethod1Step1 =>
+      '1. روی نقطه خروجی (Output) یک نود کلیک کنید و نگه دارید';
 
   @override
-  String get workflowConnectionHelpMethod1Step2 => '2. ماوس را بکشید - یک خط موقت نمایش داده می‌شود';
+  String get workflowConnectionHelpMethod1Step2 =>
+      '2. ماوس را بکشید - یک خط موقت نمایش داده می‌شود';
 
   @override
-  String get workflowConnectionHelpMethod1Step3 => '3. ماوس را روی نقطه ورودی (Input) نود دیگر رها کنید';
+  String get workflowConnectionHelpMethod1Step3 =>
+      '3. ماوس را روی نقطه ورودی (Input) نود دیگر رها کنید';
 
   @override
   String get workflowConnectionHelpMethod2 => 'روش 2: Click & Click';
 
   @override
-  String get workflowConnectionHelpMethod2Step1 => '1. روی نقطه خروجی (Output) یک نود کلیک کنید';
+  String get workflowConnectionHelpMethod2Step1 =>
+      '1. روی نقطه خروجی (Output) یک نود کلیک کنید';
 
   @override
-  String get workflowConnectionHelpMethod2Step2 => '2. روی نقطه ورودی (Input) نود دیگر کلیک کنید';
+  String get workflowConnectionHelpMethod2Step2 =>
+      '2. روی نقطه ورودی (Input) نود دیگر کلیک کنید';
 
   @override
   String get workflowConnectionHelpTips => 'نکات مهم';
 
   @override
-  String get workflowConnectionHelpTipsText => '• نودهای Trigger فقط نقطه خروجی دارند\n• نودهای Action هم ورودی و هم خروجی دارند\n• برای حذف اتصال: روی آن کلیک کرده و Delete بزنید';
+  String get workflowConnectionHelpTipsText =>
+      '• نودهای Trigger فقط نقطه خروجی دارند\n• نودهای Action هم ورودی و هم خروجی دارند\n• برای حذف اتصال: روی آن کلیک کرده و Delete بزنید';
 
   @override
   String get workflowConnectionHelpGotIt => 'متوجه شدم';
@@ -7709,7 +8040,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowEnterName => 'لطفاً نام ورکفلو را وارد کنید';
 
   @override
-  String get workflowInfoUpdated => 'اطلاعات به‌روزرسانی شد. برای ذخیره دائمی، دکمه ذخیره را بزنید.';
+  String get workflowInfoUpdated =>
+      'اطلاعات به‌روزرسانی شد. برای ذخیره دائمی، دکمه ذخیره را بزنید.';
 
   @override
   String get workflowNoteComment => 'یادداشت / توضیح';
@@ -7920,10 +8252,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowErrorUpdatingStatus => 'خطا در تغییر وضعیت';
 
   @override
-  String get workflowHierarchicalLayoutApplied => 'چیدمان Hierarchical اعمال شد';
+  String get workflowHierarchicalLayoutApplied =>
+      'چیدمان Hierarchical اعمال شد';
 
   @override
-  String get workflowForceDirectedLayoutApplied => 'چیدمان Force-directed اعمال شد';
+  String get workflowForceDirectedLayoutApplied =>
+      'چیدمان Force-directed اعمال شد';
 
   @override
   String get workflowValidationSuccess => 'اعتبارسنجی موفق';
@@ -8024,7 +8358,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowToolbarConnections => 'اتصالات';
 
   @override
-  String get workflowNoSuggestedFields => 'فیلدهای پیشنهادی برای این نود موجود نیست';
+  String get workflowNoSuggestedFields =>
+      'فیلدهای پیشنهادی برای این نود موجود نیست';
 
   @override
   String workflowTypeFieldManually(String nodeId) {
@@ -8335,7 +8670,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowFieldPersonTypesList => 'انواع شخص';
 
   @override
-  String get workflowFieldDescPersonTypesList => 'لیست انواع تخصیص‌یافته به شخص (هنگام ایجاد)';
+  String get workflowFieldDescPersonTypesList =>
+      'لیست انواع تخصیص‌یافته به شخص (هنگام ایجاد)';
 
   @override
   String get workflowFieldSuccess => 'موفقیت';
@@ -8353,7 +8689,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowFieldSentMessage => 'متن ارسال‌شده';
 
   @override
-  String get workflowFieldDescSentMessage => 'متن پیام پس از ارسال (مثلاً تلگرام/بله)';
+  String get workflowFieldDescSentMessage =>
+      'متن پیام پس از ارسال (مثلاً تلگرام/بله)';
 
   @override
   String get workflowFieldTelegramChatId => 'شناسه چت تلگرام';
@@ -8371,37 +8708,43 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowFieldFileStorageId => 'شناسه فایل (فایل‌سرور)';
 
   @override
-  String get workflowFieldDescFileStorageId => 'UUID فایل در فایل‌سرور؛ در بله در attachment_file_id به صورت \$شناسه_نود.file_id';
+  String get workflowFieldDescFileStorageId =>
+      'UUID فایل در فایل‌سرور؛ در بله در attachment_file_id به صورت \$شناسه_نود.file_id';
 
   @override
   String get workflowFieldAttachmentFileId => 'شناسه فایل پیوست';
 
   @override
-  String get workflowFieldDescAttachmentFileId => 'پس از پشتیبان همان file_id است؛ برای ارجاع در بله';
+  String get workflowFieldDescAttachmentFileId =>
+      'پس از پشتیبان همان file_id است؛ برای ارجاع در بله';
 
   @override
   String get workflowFieldStoredFilename => 'نام فایل ذخیره‌شده';
 
   @override
-  String get workflowFieldDescStoredFilename => 'نام فایل پشتیبان یا پیوست روی فایل‌سرور';
+  String get workflowFieldDescStoredFilename =>
+      'نام فایل پشتیبان یا پیوست روی فایل‌سرور';
 
   @override
   String get workflowFieldSendFileAttachment => 'ارسال فایل پیوست';
 
   @override
-  String get workflowFieldDescSendFileAttachment => 'آیا اکشن بله سند را از فایل‌سرور ارسال کرده است';
+  String get workflowFieldDescSendFileAttachment =>
+      'آیا اکشن بله سند را از فایل‌سرور ارسال کرده است';
 
   @override
   String get workflowFieldCrmChatConversationId => 'شناسه مکالمه چت';
 
   @override
-  String get workflowFieldDescCrmChatConversationId => 'شناسه رکورد مکالمه چت وب CRM در trigger_data';
+  String get workflowFieldDescCrmChatConversationId =>
+      'شناسه رکورد مکالمه چت وب CRM در trigger_data';
 
   @override
   String get workflowFieldCrmChatWidgetId => 'شناسه ویجت چت';
 
   @override
-  String get workflowFieldDescCrmChatWidgetId => 'شناسه ویجت چت وب متصل به این مکالمه';
+  String get workflowFieldDescCrmChatWidgetId =>
+      'شناسه ویجت چت وب متصل به این مکالمه';
 
   @override
   String get workflowFieldCrmChatMessageId => 'شناسه پیام چت';
@@ -8413,73 +8756,85 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowFieldCrmChatBody => 'متن پیام';
 
   @override
-  String get workflowFieldDescCrmChatBody => 'متن پیام بازدیدکننده یا عامل در چت وب';
+  String get workflowFieldDescCrmChatBody =>
+      'متن پیام بازدیدکننده یا عامل در چت وب';
 
   @override
   String get workflowFieldCrmChatSenderRole => 'نقش فرستنده';
 
   @override
-  String get workflowFieldDescCrmChatSenderRole => 'visitor یا agent مطابق پیام';
+  String get workflowFieldDescCrmChatSenderRole =>
+      'visitor یا agent مطابق پیام';
 
   @override
   String get workflowFieldCrmChatVisitorFirstName => 'نام بازدیدکننده';
 
   @override
-  String get workflowFieldDescCrmChatVisitorFirstName => 'نام ثبت‌شده در فرم چت';
+  String get workflowFieldDescCrmChatVisitorFirstName =>
+      'نام ثبت‌شده در فرم چت';
 
   @override
   String get workflowFieldCrmChatVisitorLastName => 'نام خانوادگی بازدیدکننده';
 
   @override
-  String get workflowFieldDescCrmChatVisitorLastName => 'نام خانوادگی ثبت‌شده در فرم چت';
+  String get workflowFieldDescCrmChatVisitorLastName =>
+      'نام خانوادگی ثبت‌شده در فرم چت';
 
   @override
   String get workflowFieldCrmChatPageUrl => 'آدرس صفحه';
 
   @override
-  String get workflowFieldDescCrmChatPageUrl => 'نشانی صفحهٔ سایت هنگام رویداد (در صورت وجود)';
+  String get workflowFieldDescCrmChatPageUrl =>
+      'نشانی صفحهٔ سایت هنگام رویداد (در صورت وجود)';
 
   @override
   String get workflowFieldCrmChatConversationStatus => 'وضعیت مکالمه';
 
   @override
-  String get workflowFieldDescCrmChatConversationStatus => 'مثلاً open یا resolved';
+  String get workflowFieldDescCrmChatConversationStatus =>
+      'مثلاً open یا resolved';
 
   @override
   String get workflowFieldCrmChatAssignedToUserId => 'شناسه مسئول مکالمه';
 
   @override
-  String get workflowFieldDescCrmChatAssignedToUserId => 'کاربر عامل موثر بر مکالمه در صورت تخصیص';
+  String get workflowFieldDescCrmChatAssignedToUserId =>
+      'کاربر عامل موثر بر مکالمه در صورت تخصیص';
 
   @override
   String get workflowFieldCrmChatAgentUserId => 'شناسه کاربر عامل پیام';
 
   @override
-  String get workflowFieldDescCrmChatAgentUserId => 'فرستندهٔ پیام نقش agent در تریگر پاسخ عامل';
+  String get workflowFieldDescCrmChatAgentUserId =>
+      'فرستندهٔ پیام نقش agent در تریگر پاسخ عامل';
 
   @override
   String get workflowFieldAutomationSource => 'منبع اتوماسیون';
 
   @override
-  String get workflowFieldDescAutomationSource => 'مثلاً workflow وقتی پیام از ورک‌فلو است';
+  String get workflowFieldDescAutomationSource =>
+      'مثلاً workflow وقتی پیام از ورک‌فلو است';
 
   @override
   String get workflowFieldOperatorRelay => 'پل اپراتور';
 
   @override
-  String get workflowFieldDescOperatorRelay => 'در صورت ارسال از کانال اپراتور (تلگرام/بله)';
+  String get workflowFieldDescOperatorRelay =>
+      'در صورت ارسال از کانال اپراتور (تلگرام/بله)';
 
   @override
   String get workflowFieldCrmChatOldAssignedUserId => 'شناسه مسئول قبلی';
 
   @override
-  String get workflowFieldDescCrmChatOldAssignedUserId => 'قبل از تغییر تخصیص مکالمه';
+  String get workflowFieldDescCrmChatOldAssignedUserId =>
+      'قبل از تغییر تخصیص مکالمه';
 
   @override
   String get workflowFieldCrmChatNewAssignedUserId => 'شناسه مسئول جدید';
 
   @override
-  String get workflowFieldDescCrmChatNewAssignedUserId => 'پس از تغییر تخصیص مکالمه';
+  String get workflowFieldDescCrmChatNewAssignedUserId =>
+      'پس از تغییر تخصیص مکالمه';
 
   @override
   String get workflowFieldCrmChatOldStatus => 'وضعیت قبلی مکالمه';
@@ -8593,7 +8948,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowTemplateInvoiceSalesName => 'اطلاع‌رسانی فاکتور فروش';
 
   @override
-  String get workflowTemplateInvoiceSalesDesc => 'بعد از ایجاد فاکتور فروش، ایمیل و تلگرام ارسال می‌شود';
+  String get workflowTemplateInvoiceSalesDesc =>
+      'بعد از ایجاد فاکتور فروش، ایمیل و تلگرام ارسال می‌شود';
 
   @override
   String get workflowCategoryInvoice => 'فاکتور';
@@ -8602,7 +8958,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowTemplateInventoryLowName => 'هشدار موجودی کم';
 
   @override
-  String get workflowTemplateInventoryLowDesc => 'زمانی که موجودی محصول کم شود، notification ارسال می‌شود';
+  String get workflowTemplateInventoryLowDesc =>
+      'زمانی که موجودی محصول کم شود، notification ارسال می‌شود';
 
   @override
   String get workflowCategoryInventory => 'موجودی';
@@ -8611,7 +8968,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowTemplateReceiptPaymentName => 'ثبت لاگ دریافت/پرداخت';
 
   @override
-  String get workflowTemplateReceiptPaymentDesc => 'بعد از ثبت دریافت/پرداخت، لاگ ثبت می‌شود';
+  String get workflowTemplateReceiptPaymentDesc =>
+      'بعد از ثبت دریافت/پرداخت، لاگ ثبت می‌شود';
 
   @override
   String get workflowCategoryFinancial => 'مالی';
@@ -8620,7 +8978,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowTemplatePersonWelcomeName => 'خوش‌آمدگویی شخص جدید';
 
   @override
-  String get workflowTemplatePersonWelcomeDesc => 'بعد از ایجاد شخص جدید، پیام خوش‌آمدگویی ارسال می‌شود';
+  String get workflowTemplatePersonWelcomeDesc =>
+      'بعد از ایجاد شخص جدید، پیام خوش‌آمدگویی ارسال می‌شود';
 
   @override
   String get workflowCategoryPersons => 'اشخاص';
@@ -8632,28 +8991,35 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowTemplateCrmNewLeadNotifyName => 'اعلان سرنخ جدید';
 
   @override
-  String get workflowTemplateCrmNewLeadNotifyDesc => 'با ایجاد سرنخ، یک اعلان درون‌برنامه ثبت می‌شود';
+  String get workflowTemplateCrmNewLeadNotifyDesc =>
+      'با ایجاد سرنخ، یک اعلان درون‌برنامه ثبت می‌شود';
 
   @override
   String get workflowTemplateCrmDealWonLogName => 'ثبت لاگ بستن معامله موفق';
 
   @override
-  String get workflowTemplateCrmDealWonLogDesc => 'فقط معاملات برنده؛ یک رکورد لاگ اطلاعات ثبت می‌شود';
+  String get workflowTemplateCrmDealWonLogDesc =>
+      'فقط معاملات برنده؛ یک رکورد لاگ اطلاعات ثبت می‌شود';
 
   @override
-  String get workflowTemplateReceiptUpdatedNotifyName => 'اعلان ویرایش دریافت/پرداخت';
+  String get workflowTemplateReceiptUpdatedNotifyName =>
+      'اعلان ویرایش دریافت/پرداخت';
 
   @override
-  String get workflowTemplateReceiptUpdatedNotifyDesc => 'بعد از ویرایش سند دریافت یا پرداخت، یک اعلان درون‌برنامه ثبت می‌شود';
+  String get workflowTemplateReceiptUpdatedNotifyDesc =>
+      'بعد از ویرایش سند دریافت یا پرداخت، یک اعلان درون‌برنامه ثبت می‌شود';
 
   @override
-  String get workflowTemplateInvoiceAmountBranchName => 'فاکتور فروش: مبلغ بالا یا پایین';
+  String get workflowTemplateInvoiceAmountBranchName =>
+      'فاکتور فروش: مبلغ بالا یا پایین';
 
   @override
-  String get workflowTemplateInvoiceAmountBranchDesc => 'اگر مبلغ فاکتور از ۱۰ میلیون تومان بیشتر باشد اعلان با اولویت بالا؛ وگرنه فقط ثبت لاگ (مثال شرط ساده)';
+  String get workflowTemplateInvoiceAmountBranchDesc =>
+      'اگر مبلغ فاکتور از ۱۰ میلیون تومان بیشتر باشد اعلان با اولویت بالا؛ وگرنه فقط ثبت لاگ (مثال شرط ساده)';
 
   @override
-  String get workflowTestRunCompletedDry => 'اجرای آزمایشی موفق بود (بدون ارسال/ثبت واقعی).';
+  String get workflowTestRunCompletedDry =>
+      'اجرای آزمایشی موفق بود (بدون ارسال/ثبت واقعی).';
 
   @override
   String get settingsCategoriesCount => 'دسته‌بندی';
@@ -8682,7 +9048,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get categoryTreeNoProductsInCategory => 'کالایی در این دسته‌بندی یافت نشد';
+  String get categoryTreeNoProductsInCategory =>
+      'کالایی در این دسته‌بندی یافت نشد';
 
   @override
   String get categoryDescriptionHint => 'توضیحات اختیاری دسته‌بندی';
@@ -8740,31 +9107,36 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsCategoryCoreConfiguration => 'پایه و پیکربندی';
 
   @override
-  String get settingsCategoryCoreConfigurationDescription => 'تنظیمات پایه و پیکربندی سیستم';
+  String get settingsCategoryCoreConfigurationDescription =>
+      'تنظیمات پایه و پیکربندی سیستم';
 
   @override
   String get settingsCategoryStorageFiles => 'ذخیره‌سازی و فایل‌ها';
 
   @override
-  String get settingsCategoryStorageFilesDescription => 'مدیریت ذخیره‌سازی و پلن‌های ذخیره‌سازی';
+  String get settingsCategoryStorageFilesDescription =>
+      'مدیریت ذخیره‌سازی و پلن‌های ذخیره‌سازی';
 
   @override
   String get settingsCategoryFinancialPayment => 'مالی و پرداخت';
 
   @override
-  String get settingsCategoryFinancialPaymentDescription => 'تنظیمات کیف‌پول و درگاه‌های پرداخت';
+  String get settingsCategoryFinancialPaymentDescription =>
+      'تنظیمات کیف‌پول و درگاه‌های پرداخت';
 
   @override
   String get settingsCategoryUsersBusinesses => 'کاربران و کسب و کارها';
 
   @override
-  String get settingsCategoryUsersBusinessesDescription => 'مدیریت کاربران و کسب و کارها';
+  String get settingsCategoryUsersBusinessesDescription =>
+      'مدیریت کاربران و کسب و کارها';
 
   @override
   String get settingsCategoryCommunications => 'ارتباطات';
 
   @override
-  String get settingsCategoryCommunicationsDescription => 'ایمیل، اعلان‌ها و اعلان‌های سیستمی';
+  String get settingsCategoryCommunicationsDescription =>
+      'ایمیل، اعلان‌ها و اعلان‌های سیستمی';
 
   @override
   String get settingsCategoryAI => 'هوش مصنوعی';
@@ -8776,19 +9148,22 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsCategoryExternalServices => 'سرویس‌های خارجی';
 
   @override
-  String get settingsCategoryExternalServicesDescription => 'ادغام‌های سرویس‌های خارجی';
+  String get settingsCategoryExternalServicesDescription =>
+      'ادغام‌های سرویس‌های خارجی';
 
   @override
   String get settingsCategoryMonitoringLogs => 'مانیتورینگ و لاگ‌ها';
 
   @override
-  String get settingsCategoryMonitoringLogsDescription => 'مانیتورینگ سیستم و ثبت لاگ';
+  String get settingsCategoryMonitoringLogsDescription =>
+      'مانیتورینگ سیستم و ثبت لاگ';
 
   @override
   String get settingsShareLinks => 'لینک‌های اشتراک';
 
   @override
-  String get settingsShareLinksDescription => 'تعیین آدرس مقصد نمایش کارت حساب در لینک‌های عمومی';
+  String get settingsShareLinksDescription =>
+      'تعیین آدرس مقصد نمایش کارت حساب در لینک‌های عمومی';
 
   @override
   String get personShareLinkActive => 'لینک فعال';
@@ -8806,7 +9181,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personShareRefreshStatus => 'بروزرسانی وضعیت';
 
   @override
-  String get personShareLinkHint => 'این لینک کوتاه برای ارسال در پیامک و شبکه‌های اجتماعی آماده است.';
+  String get personShareLinkHint =>
+      'این لینک کوتاه برای ارسال در پیامک و شبکه‌های اجتماعی آماده است.';
 
   @override
   String get personShareStatus => 'وضعیت';
@@ -8824,7 +9200,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personShareCreateNew => 'ساخت لینک جدید';
 
   @override
-  String get personShareCreateWarning => 'با ایجاد لینک جدید، لینک قبلی (در صورت وجود) غیرفعال می‌شود.';
+  String get personShareCreateWarning =>
+      'با ایجاد لینک جدید، لینک قبلی (در صورت وجود) غیرفعال می‌شود.';
 
   @override
   String get personShareExpiryLabel => 'زمان اعتبار لینک';
@@ -8845,7 +9222,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personShareMaxViewsLabel => 'حداکثر تعداد بازدید مجاز';
 
   @override
-  String get personShareMaxViewsHint => '۱ تا ۱۰۰۰ یا خالی (بدون محدودیت). مثلاً ۵';
+  String get personShareMaxViewsHint =>
+      '۱ تا ۱۰۰۰ یا خالی (بدون محدودیت). مثلاً ۵';
 
   @override
   String get personShareDocumentsLimit => 'تعداد ردیف کارت حساب';
@@ -8860,7 +9238,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personShareIncludeInvoices => 'نمایش لیست فاکتورها';
 
   @override
-  String get personShareIncludeInvoicesSubtitle => 'آخرین فاکتورهای مرتبط با این شخص';
+  String get personShareIncludeInvoicesSubtitle =>
+      'آخرین فاکتورهای مرتبط با این شخص';
 
   @override
   String get personShareCreateButton => 'ایجاد لینک';
@@ -8875,16 +9254,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personShareRefresh => 'تازه‌سازی اطلاعات';
 
   @override
-  String get personShareValidationAtLeastOne => 'حداقل یکی از «نمایش کارت حساب» یا «نمایش لیست فاکتورها» باید فعال باشد.';
+  String get personShareValidationAtLeastOne =>
+      'حداقل یکی از «نمایش کارت حساب» یا «نمایش لیست فاکتورها» باید فعال باشد.';
 
   @override
-  String get personSharePermissionHint => 'برای ایجاد یا لغو لینک به دسترسی ویرایش اشخاص نیاز است.';
+  String get personSharePermissionHint =>
+      'برای ایجاد یا لغو لینک به دسترسی ویرایش اشخاص نیاز است.';
 
   @override
   String get personShareLinkCopied => 'لینک در کلیپ‌بورد کپی شد';
 
   @override
-  String get personShareLinkCopiedAndShare => 'لینک کپی شد؛ می‌توانید در پیامک یا شبکه‌های اجتماعی ارسال کنید.';
+  String get personShareLinkCopiedAndShare =>
+      'لینک کپی شد؛ می‌توانید در پیامک یا شبکه‌های اجتماعی ارسال کنید.';
 
   @override
   String get personShareRetry => 'تلاش مجدد';
@@ -8914,10 +9296,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personShareSendingSms => 'در حال ارسال...';
 
   @override
-  String get personShareNoMobileHint => 'شماره موبایل در پرونده مشتری ثبت نشده است.';
+  String get personShareNoMobileHint =>
+      'شماره موبایل در پرونده مشتری ثبت نشده است.';
 
   @override
-  String get personShareNoTemplateHint => 'قالب تایید‌شده برای ارسال لینک کارت حساب یافت نشد. از بخش قالب‌های نوتیفیکیشن یک قالب برای رویداد «ارسال لینک کارت حساب» تعریف و تایید کنید.';
+  String get personShareNoTemplateHint =>
+      'قالب تایید‌شده برای ارسال لینک کارت حساب یافت نشد. از بخش قالب‌های نوتیفیکیشن یک قالب برای رویداد «ارسال لینک کارت حساب» تعریف و تایید کنید.';
 
   @override
   String get personShareSmsSent => 'پیامک با موفقیت ارسال شد.';
@@ -8929,19 +9313,22 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personShareSendToNumberLabel => 'ارسال به شماره دیگر (اختیاری)';
 
   @override
-  String get personShareSendToNumberHint => 'خالی = ارسال به شماره ثبت‌شده در پرونده مشتری';
+  String get personShareSendToNumberHint =>
+      'خالی = ارسال به شماره ثبت‌شده در پرونده مشتری';
 
   @override
   String get settingsRedisCache => 'تنظیمات Redis Cache';
 
   @override
-  String get settingsRedisCacheDescription => 'پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس';
+  String get settingsRedisCacheDescription =>
+      'پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس';
 
   @override
   String get settingsFirewall => 'فایروال نرم‌افزار';
 
   @override
-  String get settingsFirewallDescription => 'قوانین اجازه/رد IP، سقف نرخ مسیر (دیتابیس)، بن موقت، لاگ و گزارش';
+  String get settingsFirewallDescription =>
+      'قوانین اجازه/رد IP، سقف نرخ مسیر (دیتابیس)، بن موقت، لاگ و گزارش';
 
   @override
   String get firewallTabRules => 'قوانین';
@@ -8965,7 +9352,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get firewallEditRatePolicy => 'ویرایش سیاست نرخ';
 
   @override
-  String get firewallRatePolicyPathRequired => 'پیشوند مسیر (مثال /api/v1/public/crm-chat)';
+  String get firewallRatePolicyPathRequired =>
+      'پیشوند مسیر (مثال /api/v1/public/crm-chat)';
 
   @override
   String get firewallRateMaxRequests => 'حداکثر درخواست در پنجره';
@@ -8974,13 +9362,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get firewallRateWindowSeconds => 'طول پنجره (ثانیه)';
 
   @override
-  String get firewallNoRatePolicies => 'سیاست نرخی ثبت نشده. برای چت وب و مسیرهای عمومی از اینجا سقف IP تعیین کنید.';
+  String get firewallNoRatePolicies =>
+      'سیاست نرخی ثبت نشده. برای چت وب و مسیرهای عمومی از اینجا سقف IP تعیین کنید.';
 
   @override
   String get firewallDeleteRatePolicyTitle => 'حذف سیاست نرخ؟';
 
   @override
-  String get firewallDeleteRatePolicyBody => 'محدودیت نرخ برای این مسیر حذف می‌شود.';
+  String get firewallDeleteRatePolicyBody =>
+      'محدودیت نرخ برای این مسیر حذف می‌شود.';
 
   @override
   String get firewallEnabled => 'فعال';
@@ -9007,7 +9397,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get firewallPathPrefixOptional => 'پیشوند مسیر (اختیاری)';
 
   @override
-  String get firewallHttpMethodsOptional => 'متدهای HTTP مثل GET,POST (اختیاری)';
+  String get firewallHttpMethodsOptional =>
+      'متدهای HTTP مثل GET,POST (اختیاری)';
 
   @override
   String get firewallPriority => 'اولویت (کمتر = زودتر ارزیابی)';
@@ -9022,7 +9413,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get firewallBanIp => 'مسدودسازی IP';
 
   @override
-  String get firewallDurationMinutesHint => 'مدت به دقیقه (خالی = دائم تا حذف دستی)';
+  String get firewallDurationMinutesHint =>
+      'مدت به دقیقه (خالی = دائم تا حذف دستی)';
 
   @override
   String get firewallBanDone => 'مسدودسازی اعمال شد';
@@ -9070,19 +9462,22 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsStoragePlans => 'پلن‌های ذخیره‌سازی';
 
   @override
-  String get settingsStoragePlansDescription => 'مدیریت پلن‌های ذخیره‌سازی و تعیین قیمت‌ها';
+  String get settingsStoragePlansDescription =>
+      'مدیریت پلن‌های ذخیره‌سازی و تعیین قیمت‌ها';
 
   @override
   String get settingsDocumentMonetization => 'تنظیمات پکیج‌ها';
 
   @override
-  String get settingsDocumentMonetizationDescription => 'مدیریت سناریوی درآمدزایی اسناد و پکیج‌ها';
+  String get settingsDocumentMonetizationDescription =>
+      'مدیریت سناریوی درآمدزایی اسناد و پکیج‌ها';
 
   @override
   String get settingsMarketplacePlugins => 'مدیریت افزونه‌های بازار';
 
   @override
-  String get settingsMarketplacePluginsDescription => 'مدیریت افزونه‌ها و پلن‌های بازار افزونه‌ها';
+  String get settingsMarketplacePluginsDescription =>
+      'مدیریت افزونه‌ها و پلن‌های بازار افزونه‌ها';
 
   @override
   String get settingsWalletSettings => 'تنظیمات کیف‌پول';
@@ -9094,7 +9489,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsCurrenciesAdmin => 'مدیریت ارزها';
 
   @override
-  String get settingsCurrenciesAdminDescription => 'اعشار، گرد کردن مبالغ و افزودن یا حذف ارز';
+  String get settingsCurrenciesAdminDescription =>
+      'اعشار، گرد کردن مبالغ و افزودن یا حذف ارز';
 
   @override
   String get settingsPaymentGateways => 'درگاه‌های پرداخت';
@@ -9106,49 +9502,57 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsBusinessesManagement => 'مدیریت کسب و کارها';
 
   @override
-  String get settingsBusinessesManagementDescription => 'مشاهده و مدیریت لیست همه کسب و کارهای سیستم';
+  String get settingsBusinessesManagementDescription =>
+      'مشاهده و مدیریت لیست همه کسب و کارهای سیستم';
 
   @override
   String get settingsAnnouncements => 'مدیریت اعلان‌ها';
 
   @override
-  String get settingsAnnouncementsDescription => 'ایجاد/ویرایش/انتشار اعلان‌های سیستمی';
+  String get settingsAnnouncementsDescription =>
+      'ایجاد/ویرایش/انتشار اعلان‌های سیستمی';
 
   @override
   String get settingsNotifications => 'تنظیمات نوتیفیکیشن';
 
   @override
-  String get settingsNotificationsDescription => 'فعال/غیرفعال‌سازی کانال‌ها و ارسال تست';
+  String get settingsNotificationsDescription =>
+      'فعال/غیرفعال‌سازی کانال‌ها و ارسال تست';
 
   @override
   String get settingsNotificationTemplates => 'قالب‌های نوتیفیکیشن';
 
   @override
-  String get settingsNotificationTemplatesDescription => 'مدیریت قالب‌ها برای کانال‌ها و زبان‌ها';
+  String get settingsNotificationTemplatesDescription =>
+      'مدیریت قالب‌ها برای کانال‌ها و زبان‌ها';
 
   @override
   String get settingsSupportOperators => 'اپراتورهای پشتیبانی';
 
   @override
-  String get settingsSupportOperatorsDescription => 'اعطا یا لغو دسترسی اپراتور پشتیبانی برای کاربران';
+  String get settingsSupportOperatorsDescription =>
+      'اعطا یا لغو دسترسی اپراتور پشتیبانی برای کاربران';
 
   @override
   String get settingsNotificationModeration => 'بررسی قالب‌های نوتیفیکیشن';
 
   @override
-  String get settingsNotificationModerationDescription => 'تایید یا رد قالب‌های ارسال‌شده توسط کسب‌وکارها';
+  String get settingsNotificationModerationDescription =>
+      'تایید یا رد قالب‌های ارسال‌شده توسط کسب‌وکارها';
 
   @override
   String get settingsNotificationSmsPricing => 'قیمت‌گذاری پیامک نوتیفیکیشن';
 
   @override
-  String get settingsNotificationSmsPricingDescription => 'تنظیم قیمت هر پیامک برای نوتیفیکیشن‌های کسب‌وکارها';
+  String get settingsNotificationSmsPricingDescription =>
+      'تنظیم قیمت هر پیامک برای نوتیفیکیشن‌های کسب‌وکارها';
 
   @override
   String get settingsSystemScripts => 'اسکریپت‌های سیستمی';
 
   @override
-  String get settingsSystemScriptsDescription => 'اجرای عملیات اصلاحی سراسری برای همه کسب‌وکارها';
+  String get settingsSystemScriptsDescription =>
+      'اجرای عملیات اصلاحی سراسری برای همه کسب‌وکارها';
 
   @override
   String get supportOperatorsPageTitle => 'اپراتورهای پشتیبانی';
@@ -9162,13 +9566,15 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get supportOperatorsAccessRevokedSuccess => 'دسترسی اپراتور با موفقیت لغو شد';
+  String get supportOperatorsAccessRevokedSuccess =>
+      'دسترسی اپراتور با موفقیت لغو شد';
 
   @override
   String get supportOperatorsEmpty => 'هیچ اپراتور پشتیبانی یافت نشد';
 
   @override
-  String get supportOperatorsEmptyHint => 'برای افزودن اپراتور، از صفحه مدیریت کاربران استفاده کنید.';
+  String get supportOperatorsEmptyHint =>
+      'برای افزودن اپراتور، از صفحه مدیریت کاربران استفاده کنید.';
 
   @override
   String get supportOperatorsTelegramConnected => 'متصل به تلگرام';
@@ -9183,55 +9589,64 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsAISettings => 'تنظیمات AI';
 
   @override
-  String get settingsAISettingsDescription => 'پیکربندی Provider، مدل و API Key';
+  String get settingsAISettingsDescription =>
+      'پیکربندی Provider، مدل و API Key';
 
   @override
   String get settingsAIPlans => 'پلن‌های AI';
 
   @override
-  String get settingsAIPlansDescription => 'مدیریت پلن‌های استفاده از AI و تعیین قیمت‌ها';
+  String get settingsAIPlansDescription =>
+      'مدیریت پلن‌های استفاده از AI و تعیین قیمت‌ها';
 
   @override
   String get settingsAIPrompts => 'Prompt های AI';
 
   @override
-  String get settingsAIPromptsDescription => 'مدیریت Prompt های پیش‌فرض برای نقش‌های مختلف';
+  String get settingsAIPromptsDescription =>
+      'مدیریت Prompt های پیش‌فرض برای نقش‌های مختلف';
 
   @override
   String get settingsZohalServices => 'سرویس‌های زحل';
 
   @override
-  String get settingsZohalServicesDescription => 'مدیریت سرویس‌های استعلامات زحل و تنظیمات API';
+  String get settingsZohalServicesDescription =>
+      'مدیریت سرویس‌های استعلامات زحل و تنظیمات API';
 
   @override
   String get settingsZohalSettings => 'تنظیمات زحل';
 
   @override
-  String get settingsZohalSettingsDescription => 'تنظیم API Key و پیکربندی سرویس زحل';
+  String get settingsZohalSettingsDescription =>
+      'تنظیم API Key و پیکربندی سرویس زحل';
 
   @override
   String get settingsTaxProductCodes => 'کدهای مالیاتی کالا';
 
   @override
-  String get settingsTaxProductCodesDescription => 'جستجو و ایمپورت لیست جدید از فایل XML';
+  String get settingsTaxProductCodesDescription =>
+      'جستجو و ایمپورت لیست جدید از فایل XML';
 
   @override
   String get settingsSystemMonitoring => 'مانیتورینگ سیستم';
 
   @override
-  String get settingsSystemMonitoringDescription => 'بررسی وضعیت سیستم، منابع سخت‌افزاری و سرویس‌ها';
+  String get settingsSystemMonitoringDescription =>
+      'بررسی وضعیت سیستم، منابع سخت‌افزاری و سرویس‌ها';
 
   @override
   String get settingsServiceLogs => 'لاگ‌های سرویس‌ها';
 
   @override
-  String get settingsServiceLogsDescription => 'مشاهده لاگ سرویس‌های hesabix-api، hesabix-rq-worker و hesabix-notification-moderation و مدیریت سرویس‌ها';
+  String get settingsServiceLogsDescription =>
+      'مشاهده لاگ سرویس‌های hesabix-api، hesabix-rq-worker و hesabix-notification-moderation و مدیریت سرویس‌ها';
 
   @override
   String get settingsBusinessActivityLogs => 'لاگ کسب و کارها';
 
   @override
-  String get settingsBusinessActivityLogsDescription => 'مشاهده فعالیت کاربران در همه کسب و کارها با فیلترهای تاریخ، کسب و کار، کاربر و نوع عمل';
+  String get settingsBusinessActivityLogsDescription =>
+      'مشاهده فعالیت کاربران در همه کسب و کارها با فیلترهای تاریخ، کسب و کار، کاربر و نوع عمل';
 
   @override
   String get serviceLogsPauseAutoRefreshTooltip => 'توقف بروزرسانی خودکار';
@@ -9243,7 +9658,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get serviceLogsRefreshTooltip => 'بروزرسانی';
 
   @override
-  String get serviceLogsFollowTailOnTooltip => 'چسبیدن به آخرین خط روشن است؛ برای خواندن لاگ‌های قدیمی خاموش کنید';
+  String get serviceLogsFollowTailOnTooltip =>
+      'چسبیدن به آخرین خط روشن است؛ برای خواندن لاگ‌های قدیمی خاموش کنید';
 
   @override
   String get serviceLogsFollowTailOffTooltip => 'چسبیدن به آخرین خط خاموش است';
@@ -9334,16 +9750,19 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get serviceLogsRestartSuccessDefault => 'سرویس با موفقیت راه‌اندازی مجدد شد';
+  String get serviceLogsRestartSuccessDefault =>
+      'سرویس با موفقیت راه‌اندازی مجدد شد';
 
   @override
   String get serviceLogsFollowTailChip => 'آخر خط';
 
   @override
-  String get serviceLogsEmptyAllowedList => 'سرور فهرست خالی از سرویس‌های مجاز برگرداند.';
+  String get serviceLogsEmptyAllowedList =>
+      'سرور فهرست خالی از سرویس‌های مجاز برگرداند.';
 
   @override
-  String get serviceLogsNoFilterMatches => 'هیچ خطی با فیلتر یا جستجوی فعلی هم‌خوان نیست';
+  String get serviceLogsNoFilterMatches =>
+      'هیچ خطی با فیلتر یا جستجوی فعلی هم‌خوان نیست';
 
   @override
   String serviceLogsAllowedServicesFetchFailed(String error) {
@@ -9359,7 +9778,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsDatabaseBackup => 'بکاپ دیتابیس';
 
   @override
-  String get settingsDatabaseBackupDescription => 'تهیه بکاپ از کل دیتابیس و ارسال به ایمیل، FTP یا دانلود مستقیم';
+  String get settingsDatabaseBackupDescription =>
+      'تهیه بکاپ از کل دیتابیس و ارسال به ایمیل، FTP یا دانلود مستقیم';
 
   @override
   String get warranty => 'گارانتی';
@@ -9476,7 +9896,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get warrantyRequireSerialVerification => 'نیاز به تأیید سریال کالا';
 
   @override
-  String get warrantyRequireProductInstanceMatch => 'نیاز به تطابق با instance کالا';
+  String get warrantyRequireProductInstanceMatch =>
+      'نیاز به تطابق با instance کالا';
 
   @override
   String get warrantyMaxActivationAttempts => 'حداکثر تلاش برای فعال‌سازی';
@@ -9533,7 +9954,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get warrantyLinkInactive => 'لینک رهگیری غیرفعال است';
 
   @override
-  String get warrantyPluginNotActive => 'پلاگین گارانتی برای این کسب و کار فعال نیست';
+  String get warrantyPluginNotActive =>
+      'پلاگین گارانتی برای این کسب و کار فعال نیست';
 
   @override
   String get warrantyGenerateCodes => 'تولید کدهای گارانتی';
@@ -9635,7 +10057,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubPercentHint => 'مثلاً ۱ به معنای یک درصد از مبلغ مبنا';
 
   @override
-  String get customerClubStepAmount => 'بازهٔ مبلغ (در حالت امتیاز به ازای بازه)';
+  String get customerClubStepAmount =>
+      'بازهٔ مبلغ (در حالت امتیاز به ازای بازه)';
 
   @override
   String get customerClubPointsPerStep => 'امتیاز به ازای هر بازه';
@@ -9653,19 +10076,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubRedemptionSection => 'مصرف امتیاز و انقضا';
 
   @override
-  String get customerClubCurrencyValuePerPoint => 'مبلغ تخفیف به ازای هر امتیاز (ارز فاکتور)';
+  String get customerClubCurrencyValuePerPoint =>
+      'مبلغ تخفیف به ازای هر امتیاز (ارز فاکتور)';
 
   @override
-  String get customerClubCurrencyValuePerPointHint => 'هر امتیاز معادل چند واحد پول از تخفیف در فاکتور فروش؛ مثلاً ۵۰۰۰ به معنای ۵۰۰۰ واحد ارز فاکتور به ازای هر امتیاز.';
+  String get customerClubCurrencyValuePerPointHint =>
+      'هر امتیاز معادل چند واحد پول از تخفیف در فاکتور فروش؛ مثلاً ۵۰۰۰ به معنای ۵۰۰۰ واحد ارز فاکتور به ازای هر امتیاز.';
 
   @override
-  String get customerClubMaxRedeemPerInvoice => 'حداکثر امتیاز قابل مصرف در هر فاکتور فروش (اختیاری)';
+  String get customerClubMaxRedeemPerInvoice =>
+      'حداکثر امتیاز قابل مصرف در هر فاکتور فروش (اختیاری)';
 
   @override
-  String get customerClubPointsExpireAfterDays => 'اعتبار امتیاز از تاریخ اعطا (روز)';
+  String get customerClubPointsExpireAfterDays =>
+      'اعتبار امتیاز از تاریخ اعطا (روز)';
 
   @override
-  String get customerClubPointsExpireAfterDaysHint => 'خالی بگذارید تا امتیازها منقضی نشوند.';
+  String get customerClubPointsExpireAfterDaysHint =>
+      'خالی بگذارید تا امتیازها منقضی نشوند.';
 
   @override
   String get customerClubRequireCustomerType => 'فقط اشخاص با نقش مشتری';
@@ -9686,10 +10114,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubAdjustmentSaved => 'اصلاح امتیاز ثبت شد.';
 
   @override
-  String get customerClubNoAdjustPermission => 'مجوز اصلاح دستی امتیاز را ندارید.';
+  String get customerClubNoAdjustPermission =>
+      'مجوز اصلاح دستی امتیاز را ندارید.';
 
   @override
-  String get customerClubAdjustIntro => 'برای افزایش یا کسر امتیاز دستی از فرم زیر استفاده کنید. عدد دلتا می‌تواند منفی باشد.';
+  String get customerClubAdjustIntro =>
+      'برای افزایش یا کسر امتیاز دستی از فرم زیر استفاده کنید. عدد دلتا می‌تواند منفی باشد.';
 
   @override
   String get customerClubPersonId => 'شناسهٔ شخص (person_id)';
@@ -9701,7 +10131,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubSubmitAdjustment => 'ثبت اصلاحی';
 
   @override
-  String get customerClubSettingsSubtitle => 'قوانین امتیاز، تراکنش‌ها و اصلاح ماندهٔ مشتریان';
+  String get customerClubSettingsSubtitle =>
+      'قوانین امتیاز، تراکنش‌ها و اصلاح ماندهٔ مشتریان';
 
   @override
   String get customerClubRoundingFloor => 'گرد کردن به پایین (floor)';
@@ -9731,10 +10162,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubTxnInvoiceSync => 'همگام‌سازی با فاکتور';
 
   @override
-  String get customerClubTxnInvoiceDeleteReversal => 'حذف فاکتور — برگشت امتیاز';
+  String get customerClubTxnInvoiceDeleteReversal =>
+      'حذف فاکتور — برگشت امتیاز';
 
   @override
-  String get customerClubTxnInvoiceDeleteReversalRedeem => 'حذف فاکتور — برگشت مصرف';
+  String get customerClubTxnInvoiceDeleteReversalRedeem =>
+      'حذف فاکتور — برگشت مصرف';
 
   @override
   String customerClubPermissionManageSettings(String title) {
@@ -9778,7 +10211,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubSettingsSummaryTitle => 'خلاصهٔ تنظیمات ذخیره‌شده';
 
   @override
-  String get customerClubLedgerFilterPerson => 'فیلتر لیست تراکنش‌ها بر اساس شخص';
+  String get customerClubLedgerFilterPerson =>
+      'فیلتر لیست تراکنش‌ها بر اساس شخص';
 
   @override
   String get customerClubCurrentPointsBalance => 'ماندهٔ فعلی امتیاز این شخص';
@@ -9795,7 +10229,8 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get customerClubSummaryInactive => 'باشگاه در این کسب‌وکار غیرفعال است.';
+  String get customerClubSummaryInactive =>
+      'باشگاه در این کسب‌وکار غیرفعال است.';
 
   @override
   String get customerClubTabAnalytics => 'تحلیل RFM / CLV';
@@ -9810,10 +10245,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubAnalyticsRecalculating => 'در حال محاسبه…';
 
   @override
-  String get customerClubAnalyticsNoData => 'داده‌ای برای نمایش نیست. اگر تحلیل RFM یا CLV را در تنظیمات فعال کرده‌اید، بازمحاسبه را بزنید.';
+  String get customerClubAnalyticsNoData =>
+      'داده‌ای برای نمایش نیست. اگر تحلیل RFM یا CLV را در تنظیمات فعال کرده‌اید، بازمحاسبه را بزنید.';
 
   @override
-  String get customerClubAnalyticsDisabled => 'برای استفاده، «تحلیل RFM» و/یا «ارزش طول عمر (CLV)» را در تنظیمات باشگاه فعال کنید.';
+  String get customerClubAnalyticsDisabled =>
+      'برای استفاده، «تحلیل RFM» و/یا «ارزش طول عمر (CLV)» را در تنظیمات باشگاه فعال کنید.';
 
   @override
   String customerClubAnalyticsWindow(String start, String end, int months) {
@@ -9896,16 +10333,20 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubAnalyticsSortComposite => 'ترکیبی';
 
   @override
-  String get customerClubAnalyticsRecalculateDone => 'محاسبه با موفقیت انجام شد.';
+  String get customerClubAnalyticsRecalculateDone =>
+      'محاسبه با موفقیت انجام شد.';
 
   @override
-  String get customerClubSettingsSectionAnalytics => 'تحلیل RFM و ارزش طول عمر (CLV)';
+  String get customerClubSettingsSectionAnalytics =>
+      'تحلیل RFM و ارزش طول عمر (CLV)';
 
   @override
-  String get customerClubRfmEnabled => 'فعال‌سازی تحلیل RFM (تازگی، تکرار، مبلغ)';
+  String get customerClubRfmEnabled =>
+      'فعال‌سازی تحلیل RFM (تازگی، تکرار، مبلغ)';
 
   @override
-  String get customerClubClvEnabled => 'فعال‌سازی تخمین ارزش طول عمر مشتری (CLV)';
+  String get customerClubClvEnabled =>
+      'فعال‌سازی تخمین ارزش طول عمر مشتری (CLV)';
 
   @override
   String get customerClubRfmWindowMonths => 'طول پنجره زمانی تحلیل (ماه)';
@@ -9938,28 +10379,35 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubClvFormulaHistorical => 'مجموع خرید در پنجره';
 
   @override
-  String get customerClubClvFormulaProjection => 'میانگین سفارش × فرکانس سالانه × عمر تخمینی';
+  String get customerClubClvFormulaProjection =>
+      'میانگین سفارش × فرکانس سالانه × عمر تخمینی';
 
   @override
-  String get customerClubClvLifespanYears => 'عمر مشتری تخمینی (سال) — برای فرمول پیش‌بینی';
+  String get customerClubClvLifespanYears =>
+      'عمر مشتری تخمینی (سال) — برای فرمول پیش‌بینی';
 
   @override
-  String get customerClubAnalyticsHint => 'پس از تغییر تنظیمات، یک‌بار بازمحاسبه را از تب تحلیل بزنید.';
+  String get customerClubAnalyticsHint =>
+      'پس از تغییر تنظیمات، یک‌بار بازمحاسبه را از تب تحلیل بزنید.';
 
   @override
-  String get customerClubSettingsSectionLoyaltyRfm => 'ارتباط امتیاز وفاداری با RFM';
+  String get customerClubSettingsSectionLoyaltyRfm =>
+      'ارتباط امتیاز وفاداری با RFM';
 
   @override
   String get customerClubLoyaltyRfmMode => 'حالت یکپارچگی';
 
   @override
-  String get customerClubLoyaltyRfmDecoupled => 'جدا: امتیاز از فاکتور؛ سطح از مانده امتیاز';
+  String get customerClubLoyaltyRfmDecoupled =>
+      'جدا: امتیاز از فاکتور؛ سطح از مانده امتیاز';
 
   @override
-  String get customerClubLoyaltyRfmTiers => 'سطح/ضریب از نمره RFM (نیاز به تحلیل RFM فعال)';
+  String get customerClubLoyaltyRfmTiers =>
+      'سطح/ضریب از نمره RFM (نیاز به تحلیل RFM فعال)';
 
   @override
-  String get customerClubLoyaltyRfmHint => 'در حالت دوم، آستانه هر سطح را با فیلد «حداقل نمره RFM (۰–۱)» در API سطوح یا به‌صورت نسبی از حداقل امتیاز÷۱۰۰۰۰ تنظیم کنید. امتیاز مصرف در فاکتور همچنان از مانده فاکتور است.';
+  String get customerClubLoyaltyRfmHint =>
+      'در حالت دوم، آستانه هر سطح را با فیلد «حداقل نمره RFM (۰–۱)» در API سطوح یا به‌صورت نسبی از حداقل امتیاز÷۱۰۰۰۰ تنظیم کنید. امتیاز مصرف در فاکتور همچنان از مانده فاکتور است.';
 
   @override
   String get customerClubAnalyticsSegmentsTitle => 'گروه‌ها';
@@ -9971,7 +10419,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubAnalyticsCampaignTitle => 'لیست مخاطبان برای کمپین';
 
   @override
-  String get customerClubAnalyticsCampaignBody => 'شناسه اشخاص مطابق فیلتر فعلی (سگمنت و جستجو). می‌توانید در ابزار پیامک/ایمیل خود وارد کنید.';
+  String get customerClubAnalyticsCampaignBody =>
+      'شناسه اشخاص مطابق فیلتر فعلی (سگمنت و جستجو). می‌توانید در ابزار پیامک/ایمیل خود وارد کنید.';
 
   @override
   String get customerClubAnalyticsCampaignCopyIds => 'کپی شناسه‌ها';
@@ -9994,7 +10443,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get identityInquiryTitle => 'استعلام اطلاعات هویتی';
 
   @override
-  String get identityInquirySubtitle => 'لطفاً کد ملی و تاریخ تولد را وارد کنید';
+  String get identityInquirySubtitle =>
+      'لطفاً کد ملی و تاریخ تولد را وارد کنید';
 
   @override
   String get nationalIdHint => 'کد ملی 10 رقمی';
@@ -10042,7 +10492,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get noMatch => 'عدم تطابق';
 
   @override
-  String get noMatchDescription => 'کد ملی و تاریخ تولد با یکدیگر مطابقت ندارند';
+  String get noMatchDescription =>
+      'کد ملی و تاریخ تولد با یکدیگر مطابقت ندارند';
 
   @override
   String get personalInformation => 'اطلاعات شخصی';
@@ -10060,7 +10511,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get newInquiry => 'استعلام جدید';
 
   @override
-  String get identityInquiryDescription => 'با وارد کردن کد ملی و تاریخ تولد می‌توانید اطلاعات هویتی فرد را استعلام کنید';
+  String get identityInquiryDescription =>
+      'با وارد کردن کد ملی و تاریخ تولد می‌توانید اطلاعات هویتی فرد را استعلام کنید';
 
   @override
   String get noResultAvailable => 'خطا: نتیجه‌ای وجود ندارد';
@@ -10069,49 +10521,58 @@ class AppLocalizationsFa extends AppLocalizations {
   String get accountSettingsTitle => 'تنظیمات حساب کاربری';
 
   @override
-  String get accountSettingsSubtitle => 'مدیریت و تنظیم تمام بخش‌های حساب کاربری شما';
+  String get accountSettingsSubtitle =>
+      'مدیریت و تنظیم تمام بخش‌های حساب کاربری شما';
 
   @override
-  String get accountSettingsMarketingDescription => 'مدیریت لینک معرفی و گزارش‌های بازاریابی';
+  String get accountSettingsMarketingDescription =>
+      'مدیریت لینک معرفی و گزارش‌های بازاریابی';
 
   @override
   String get accountSettingsNotificationsTitle => 'اعلان‌ها و نوتیفیکیشن';
 
   @override
-  String get accountSettingsNotificationsDescription => 'تنظیمات کانال‌های اعلان‌رسانی و نوتیفیکیشن';
+  String get accountSettingsNotificationsDescription =>
+      'تنظیمات کانال‌های اعلان‌رسانی و نوتیفیکیشن';
 
   @override
   String get accountSettingsSignatureTitle => 'امضا و تصویر کاربر';
 
   @override
-  String get accountSettingsSignatureDescription => 'بارگذاری و مدیریت امضای شخصی و تصویر پروفایل';
+  String get accountSettingsSignatureDescription =>
+      'بارگذاری و مدیریت امضای شخصی و تصویر پروفایل';
 
   @override
   String get accountSettingsApiKeysTitle => 'کلیدهای API';
 
   @override
-  String get accountSettingsApiKeysDescription => 'مدیریت کلیدهای API برای دسترسی به سیستم';
+  String get accountSettingsApiKeysDescription =>
+      'مدیریت کلیدهای API برای دسترسی به سیستم';
 
   @override
   String get accountSettingsLoginSessionsTitle => 'سشن‌های ورود';
 
   @override
-  String get accountSettingsLoginSessionsDescription => 'مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری';
+  String get accountSettingsLoginSessionsDescription =>
+      'مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری';
 
   @override
-  String get accountSettingsChangePasswordDescription => 'تغییر کلمه عبور حساب کاربری';
+  String get accountSettingsChangePasswordDescription =>
+      'تغییر کلمه عبور حساب کاربری';
 
   @override
   String get accountSettingsVerificationTitle => 'تایید شماره موبایل و ایمیل';
 
   @override
-  String get accountSettingsVerificationDescription => 'تایید شماره موبایل و ایمیل برای امنیت بیشتر';
+  String get accountSettingsVerificationDescription =>
+      'تایید شماره موبایل و ایمیل برای امنیت بیشتر';
 
   @override
   String get accountSettingsNotificationHistoryTitle => 'تاریخچه ناتیفیکیشن‌ها';
 
   @override
-  String get accountSettingsNotificationHistoryDescription => 'مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)';
+  String get accountSettingsNotificationHistoryDescription =>
+      'مشاهده تمام ناتیفیکیشن‌های ارسال شده (OTP، فراموشی رمز، تیکت و ...)';
 
   @override
   String get notificationCenterLevelInfo => 'اطلاعات';
@@ -10128,13 +10589,15 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get notificationCenterClearAllTooltip => 'پاک کردن اعلان‌های ذخیره‌شده در برنامه';
+  String get notificationCenterClearAllTooltip =>
+      'پاک کردن اعلان‌های ذخیره‌شده در برنامه';
 
   @override
   String get notificationCenterClearAllTitle => 'پاک کردن اعلان‌ها؟';
 
   @override
-  String get notificationCenterClearAllMessage => 'همه اعلان‌های قابل مشاهده برای شما پنهان می‌شوند. پیام‌های فقط بلادرنگ (بدون ذخیره در سرور) هم از این لیست پاک می‌شوند.';
+  String get notificationCenterClearAllMessage =>
+      'همه اعلان‌های قابل مشاهده برای شما پنهان می‌شوند. پیام‌های فقط بلادرنگ (بدون ذخیره در سرور) هم از این لیست پاک می‌شوند.';
 
   @override
   String get notificationCenterClearAllConfirm => 'پاک کردن';
@@ -10146,13 +10609,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get notificationCenterCleared => 'اعلان‌ها پاک شد';
 
   @override
-  String get notificationsInappRetentionTitle => 'نگهداری اعلان‌های درون‌برنامه';
+  String get notificationsInappRetentionTitle =>
+      'نگهداری اعلان‌های درون‌برنامه';
 
   @override
-  String get notificationsInappRetentionSubtitle => 'اعلان سیستمی که خوانده شده‌اند بعد از تعداد روز تعیین‌شده به‌طور خودکار حذف یا پنهان می‌شوند.';
+  String get notificationsInappRetentionSubtitle =>
+      'اعلان سیستمی که خوانده شده‌اند بعد از تعداد روز تعیین‌شده به‌طور خودکار حذف یا پنهان می‌شوند.';
 
   @override
-  String get notificationsInappRetentionEnabled => 'فعال‌سازی حذف خودکار خوانده‌شده‌ها';
+  String get notificationsInappRetentionEnabled =>
+      'فعال‌سازی حذف خودکار خوانده‌شده‌ها';
 
   @override
   String get notificationsInappRetentionDays => 'تعداد روز بعد از خوانده شدن';
@@ -10170,7 +10636,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get apiKeyCreatedSuccessfully => 'کلید API ایجاد شد';
 
   @override
-  String get apiKeySaveWarning => 'لطفاً این کلید را ذخیره کنید. این تنها باری است که نمایش داده می‌شود.';
+  String get apiKeySaveWarning =>
+      'لطفاً این کلید را ذخیره کنید. این تنها باری است که نمایش داده می‌شود.';
 
   @override
   String get apiKeyClose => 'بستن';
@@ -10223,13 +10690,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get apiKeyCreateNewButton => 'ایجاد کلید جدید';
 
   @override
-  String get apiKeyCreateHint => 'برای ایجاد یک کلید جدید، روی دکمه ایجاد کلیک کنید';
+  String get apiKeyCreateHint =>
+      'برای ایجاد یک کلید جدید، روی دکمه ایجاد کلیک کنید';
 
   @override
   String get apiKeyNoRevokedHint => 'هیچ کلید لغو شده‌ای برای نمایش وجود ندارد';
 
   @override
-  String get apiKeyUsageHint => 'برای استفاده از API در برنامه‌های دیگر، یک کلید ایجاد کنید';
+  String get apiKeyUsageHint =>
+      'برای استفاده از API در برنامه‌های دیگر، یک کلید ایجاد کنید';
 
   @override
   String get apiKeyEdit => 'ویرایش';
@@ -10265,7 +10734,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get apiKeyScopeLabel => 'محدوده دسترسی (JSON)';
 
   @override
-  String get apiKeyScopeHint => 'اختیاری - مثال: {\"read\": true, \"write\": false}';
+  String get apiKeyScopeHint =>
+      'اختیاری - مثال: {\"read\": true, \"write\": false}';
 
   @override
   String get apiKeyIPsLabel => 'لیست IP های مجاز';
@@ -10292,7 +10762,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get datePickerSelectDate => 'انتخاب تاریخ';
 
   @override
-  String get dateInputInvalidFormat => 'تاریخ معتبر به صورت YYYY/MM/DD وارد کنید';
+  String get dateInputInvalidFormat =>
+      'تاریخ معتبر به صورت YYYY/MM/DD وارد کنید';
 
   @override
   String get dateInputOutOfRange => 'تاریخ در بازه مجاز نیست';
@@ -10322,7 +10793,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get sessionsErrorLoading => 'خطا در بارگذاری سشن‌ها';
 
   @override
-  String get sessionsCannotDeleteCurrent => 'نمی‌توانید session فعلی را حذف کنید';
+  String get sessionsCannotDeleteCurrent =>
+      'نمی‌توانید session فعلی را حذف کنید';
 
   @override
   String get sessionsDeleteTitle => 'حذف سشن';
@@ -10403,22 +10875,27 @@ class AppLocalizationsFa extends AppLocalizations {
   String get invoiceWarehouseReleaseSectionTitle => 'حواله انبار پس از ثبت';
 
   @override
-  String get invoiceWarehouseReleaseSectionSubtitle => 'بر اساس پیش‌فرض کسب‌وکار؛ در صورت تغییر، برای همین نوع فاکتور در این مرورگر ذخیره می‌شود.';
+  String get invoiceWarehouseReleaseSectionSubtitle =>
+      'بر اساس پیش‌فرض کسب‌وکار؛ در صورت تغییر، برای همین نوع فاکتور در این مرورگر ذخیره می‌شود.';
 
   @override
-  String get invoiceWarehouseReleaseBusinessTitle => 'حواله انبار پس از ثبت فاکتور';
+  String get invoiceWarehouseReleaseBusinessTitle =>
+      'حواله انبار پس از ثبت فاکتور';
 
   @override
-  String get invoiceWarehouseReleaseBusinessSubtitle => 'اگر در API یا ایمپорт، فیلدهای ثبت انبار ارسال نشود، این حالت اعمال می‌شود.';
+  String get invoiceWarehouseReleaseBusinessSubtitle =>
+      'اگر در API یا ایمپорт، فیلدهای ثبت انبار ارسال نشود، این حالت اعمال می‌شود.';
 
   @override
-  String get invoiceWarehouseReleaseStockHint => 'در حالت «قطعی فوری»، حواله با ثبت فاکتور قطعی می‌شود و همان قوانین کسری و موجودی منفیِ همین صفحه (بخش پایین) اعمال می‌شود؛ پیش‌نویس فقط روی کاغذ مانده تا خودتان بعداً قطعی کنید.';
+  String get invoiceWarehouseReleaseStockHint =>
+      'در حالت «قطعی فوری»، حواله با ثبت فاکتور قطعی می‌شود و همان قوانین کسری و موجودی منفیِ همین صفحه (بخش پایین) اعمال می‌شود؛ پیش‌نویس فقط روی کاغذ مانده تا خودتان بعداً قطعی کنید.';
 
   @override
   String get ftpBackupSettingsTitle => 'مقصد FTP بکاپ';
 
   @override
-  String get ftpBackupSettingsDescription => 'اتصال به سرور FTP برای ارسال خودکار یا دستی فایل‌های پشتیبان.';
+  String get ftpBackupSettingsDescription =>
+      'اتصال به سرور FTP برای ارسال خودکار یا دستی فایل‌های پشتیبان.';
 
   @override
   String get ftpPasswordLeaveEmptyHint => 'برای حفظ رمز فعلی خالی بگذارید';
@@ -10466,13 +10943,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get ftpUseSftp => 'استفاده از SFTP (SSH)';
 
   @override
-  String get ftpInsecureWarning => 'بدون FTPS یا SFTP، رمز و داده روی شبکه قابل شنود هستند. در صورت امکان FTPS یا SFTP را فعال کنید.';
+  String get ftpInsecureWarning =>
+      'بدون FTPS یا SFTP، رمز و داده روی شبکه قابل شنود هستند. در صورت امکان FTPS یا SFTP را فعال کنید.';
 
   @override
   String get ftpDeleteSettingsConfirmTitle => 'حذف مقصد بکاپ';
 
   @override
-  String get ftpDeleteSettingsConfirmMessage => 'تنظیمات FTP/SFTP این کسب‌وکار حذف شود؟ ارسال خودکار پس از بکاپ قطع می‌شود.';
+  String get ftpDeleteSettingsConfirmMessage =>
+      'تنظیمات FTP/SFTP این کسب‌وکار حذف شود؟ ارسال خودکار پس از بکاپ قطع می‌شود.';
 
   @override
   String ftpTestResultSampleCount(int count) {
@@ -10489,13 +10968,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get backupOpenFtpSettings => 'تنظیمات FTP';
 
   @override
-  String get backupFtpNotConfiguredError => 'ابتدا در تنظیمات، مقصد FTP/SFTP را ذخیره کنید.';
+  String get backupFtpNotConfiguredError =>
+      'ابتدا در تنظیمات، مقصد FTP/SFTP را ذخیره کنید.';
 
   @override
   String get ftpSendAfterBackup => 'ارسال به FTP پس از بکاپ';
 
   @override
-  String get ftpSendAfterBackupSubtitle => 'نیاز به ذخیره تنظیمات FTP و دسترسی مدیریت FTP';
+  String get ftpSendAfterBackupSubtitle =>
+      'نیاز به ذخیره تنظیمات FTP و دسترسی مدیریت FTP';
 
   @override
   String get jobUploadingToFtp => 'در حال ارسال به FTP';
@@ -10582,7 +11063,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmNotesNoNotes => 'یادداشتی نیست';
 
   @override
-  String get crmNotesEmptyDayHint => 'هنوز یادداشتی برای این روز ثبت نشده است. با افزودن یادداشت، پیگیری‌ها را منظم نگه دارید.';
+  String get crmNotesEmptyDayHint =>
+      'هنوز یادداشتی برای این روز ثبت نشده است. با افزودن یادداشت، پیگیری‌ها را منظم نگه دارید.';
 
   @override
   String get crmNotesRetry => 'تلاش مجدد';
@@ -10690,10 +11172,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmNotesNoteTypeMeeting => 'جلسه (تاریخ و ساعت)';
 
   @override
-  String get crmNotesNoteTypeAllowComments => 'اجازهٔ کامنت (برای یادداشت عمومی)';
+  String get crmNotesNoteTypeAllowComments =>
+      'اجازهٔ کامنت (برای یادداشت عمومی)';
 
   @override
-  String get crmNotesNoteTypeAllowCommentsHint => 'فقط برای یادداشت‌هایی که برای کسب‌وکار قابل مشاهده‌اند (عمومی) اعمال می‌شود.';
+  String get crmNotesNoteTypeAllowCommentsHint =>
+      'فقط برای یادداشت‌هایی که برای کسب‌وکار قابل مشاهده‌اند (عمومی) اعمال می‌شود.';
 
   @override
   String get crmNotesNoteTypeCreated => 'نوع یادداشت ایجاد شد';
@@ -10702,7 +11186,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmNotesPickDateTime => 'انتخاب تاریخ و ساعت';
 
   @override
-  String get crmNotesDeleteConfirmMessage => 'این یادداشت حذف می‌شود. ادامه می‌دهید؟';
+  String get crmNotesDeleteConfirmMessage =>
+      'این یادداشت حذف می‌شود. ادامه می‌دهید؟';
 
   @override
   String get crmNotesDeleteConfirmTitle => 'حذف یادداشت';
@@ -10729,16 +11214,20 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmNotesVisibilityShortShared => 'انتخابی';
 
   @override
-  String get crmNotesVisibilityHintPrivate => 'فقط خودتان این یادداشت را می‌بینید.';
+  String get crmNotesVisibilityHintPrivate =>
+      'فقط خودتان این یادداشت را می‌بینید.';
 
   @override
-  String get crmNotesVisibilityHintBusiness => 'همه اعضایی که به CRM دسترسی دارند (در این کسب‌وکار).';
+  String get crmNotesVisibilityHintBusiness =>
+      'همه اعضایی که به CRM دسترسی دارند (در این کسب‌وکار).';
 
   @override
-  String get crmNotesVisibilityHintShared => 'فقط شما و افرادی که انتخاب می‌کنید.';
+  String get crmNotesVisibilityHintShared =>
+      'فقط شما و افرادی که انتخاب می‌کنید.';
 
   @override
-  String get crmNotesSharedPickHint => 'حداقل یک همکار را انتخاب کنید (خودتان همیشه شامل می‌شوید).';
+  String get crmNotesSharedPickHint =>
+      'حداقل یک همکار را انتخاب کنید (خودتان همیشه شامل می‌شوید).';
 
   @override
   String get crmNotesEventDateButton => 'انتخاب تاریخ';
@@ -10750,10 +11239,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmNotesLeadSearchInDialogHint => 'نام، کد، موبایل یا ایمیل…';
 
   @override
-  String get crmNotesCommentsDisabledTab => 'برای این نوع یا سطح دسترسی، کامنت غیرفعال است.';
+  String get crmNotesCommentsDisabledTab =>
+      'برای این نوع یا سطح دسترسی، کامنت غیرفعال است.';
 
   @override
-  String get crmNotesNoteTypeCodeHelper => 'فقط حروف لاتین، عدد و زیرخط؛ برای استفاده داخلی و گزارش‌ها.';
+  String get crmNotesNoteTypeCodeHelper =>
+      'فقط حروف لاتین، عدد و زیرخط؛ برای استفاده داخلی و گزارش‌ها.';
 
   @override
   String get crmNotesNoteTypePreview => 'پیش‌نمایش با زبان فعلی رابط';
@@ -10849,10 +11340,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmLeadFormSubtitle => 'اطلاعات تماس، فانل و پیگیری را مشخص کنید.';
 
   @override
-  String get crmActivityFormSubtitle => 'فعالیت را به مشتری یا سرنخ وصل کنید و نتیجه را بنویسید.';
+  String get crmActivityFormSubtitle =>
+      'فعالیت را به مشتری یا سرنخ وصل کنید و نتیجه را بنویسید.';
 
   @override
-  String get crmDealFormSubtitle => 'مشتری، مرحلهٔ پایپلاین و مبالغ را ثبت کنید.';
+  String get crmDealFormSubtitle =>
+      'مشتری، مرحلهٔ پایپلاین و مبالغ را ثبت کنید.';
 
   @override
   String get crmConvertLeadTitle => 'تبدیل به مشتری';
@@ -10861,7 +11354,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmConvertLeadSubtitle => 'یک شخص جدید در بخش اشخاص ایجاد می‌شود.';
 
   @override
-  String get crmConvertLeadIntro => 'سرنخ تبدیل می‌شود و رکورد شخص جدید در اشخاص ثبت می‌شود.';
+  String get crmConvertLeadIntro =>
+      'سرنخ تبدیل می‌شود و رکورد شخص جدید در اشخاص ثبت می‌شود.';
 
   @override
   String get crmConvertWithDealLabel => 'همزمان فرصت فروش ایجاد شود';
@@ -10933,7 +11427,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmActivityTypeNote => 'یادداشت';
 
   @override
-  String get crmProcessFormSubtitle => 'کد، نام نمایشی و گزینه‌های پیش‌فرض این فرایند را مشخص کنید.';
+  String get crmProcessFormSubtitle =>
+      'کد، نام نمایشی و گزینه‌های پیش‌فرض این فرایند را مشخص کنید.';
 
   @override
   String get crmProcessSectionMain => 'تعریف فرایند';
@@ -10942,34 +11437,43 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmProcessSectionStages => 'مراحل اولیه (فقط هنگام ایجاد)';
 
   @override
-  String get inventoryNegativePolicySectionTitle => 'کنترل کسری هنگام قطعی حواله انبار';
+  String get inventoryNegativePolicySectionTitle =>
+      'کنترل کسری هنگام قطعی حواله انبار';
 
   @override
-  String get inventoryNegativePolicyIntro => 'این بخش با «کنترل موجودی» در فرم کالا متفاوت است؛ آنجا تعیین می‌کنید اصلاً برای آن کالا رهگیری انبار بشود یا نه، اینجا تصمیم می‌گیرید هنگام قطعی حوالهٔ خروج، در صورت کمبود، آیا اجازهٔ موجودی منفی بدهید. پیش‌فرض قطعی بدون موجودی کافی ممکن نیست؛ با دو سوئیچ زیر برای فله و یونیک می‌توانید استثنا قائل شوید. حوالهٔ انتقال را می‌توان جداگانه همیشه سخت‌گیرانه نگه دارید.';
+  String get inventoryNegativePolicyIntro =>
+      'این بخش با «کنترل موجودی» در فرم کالا متفاوت است؛ آنجا تعیین می‌کنید اصلاً برای آن کالا رهگیری انبار بشود یا نه، اینجا تصمیم می‌گیرید هنگام قطعی حوالهٔ خروج، در صورت کمبود، آیا اجازهٔ موجودی منفی بدهید. پیش‌فرض قطعی بدون موجودی کافی ممکن نیست؛ با دو سوئیچ زیر برای فله و یونیک می‌توانید استثنا قائل شوید. حوالهٔ انتقال را می‌توان جداگانه همیشه سخت‌گیرانه نگه دارید.';
 
   @override
-  String get inventoryNegativePolicyBulkTitle => 'اجازه خروج با موجودی منفی برای کالای فله‌ای';
+  String get inventoryNegativePolicyBulkTitle =>
+      'اجازه خروج با موجودی منفی برای کالای فله‌ای';
 
   @override
-  String get inventoryNegativePolicyBulkSubtitle => 'کالاهایی که حالت موجودی «فله‌ای» دارند و کنترل موجودی فعال است.';
+  String get inventoryNegativePolicyBulkSubtitle =>
+      'کالاهایی که حالت موجودی «فله‌ای» دارند و کنترل موجودی فعال است.';
 
   @override
-  String get inventoryNegativePolicyUniqueTitle => 'اجازه خروج با موجودی منفی برای کالای یونیک';
+  String get inventoryNegativePolicyUniqueTitle =>
+      'اجازه خروج با موجودی منفی برای کالای یونیک';
 
   @override
-  String get inventoryNegativePolicyUniqueSubtitle => 'کالاهایی که با سریال/نسخهٔ یونیک ردیابی می‌شوند؛ ریسک ثبت ناسازگار با فیزیک بالاتر است.';
+  String get inventoryNegativePolicyUniqueSubtitle =>
+      'کالاهایی که با سریال/نسخهٔ یونیک ردیابی می‌شوند؛ ریسک ثبت ناسازگار با فیزیک بالاتر است.';
 
   @override
-  String get inventoryNegativePolicyTransferTitle => 'انتقال بین انبار همیشه نیاز به موجودی کافی';
+  String get inventoryNegativePolicyTransferTitle =>
+      'انتقال بین انبار همیشه نیاز به موجودی کافی';
 
   @override
-  String get inventoryNegativePolicyTransferSubtitle => 'اگر روشن باشد، حوالهٔ انتقال صرف‌نظر از دو گزینهٔ بالا کنترل کسری کامل دارد.';
+  String get inventoryNegativePolicyTransferSubtitle =>
+      'اگر روشن باشد، حوالهٔ انتقال صرف‌نظر از دو گزینهٔ بالا کنترل کسری کامل دارد.';
 
   @override
   String get workflowMarketplaceTitle => 'مخزن ورک‌فلوها';
 
   @override
-  String get workflowMarketplaceSubtitle => 'ورک‌فلوهای منتشرشده توسط کاربران را ببینید و به کسب‌وکار خود اضافه کنید.';
+  String get workflowMarketplaceSubtitle =>
+      'ورک‌فلوهای منتشرشده توسط کاربران را ببینید و به کسب‌وکار خود اضافه کنید.';
 
   @override
   String get workflowMarketplaceSearchHint => 'جستجو در عنوان و توضیح کوتاه…';
@@ -11038,10 +11542,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowMarketplacePublishSaved => 'ورک‌فلو در مخزن منتشر شد.';
 
   @override
-  String get workflowMarketplaceInstalled => 'ورک‌فلو به‌صورت پیش‌نویس اضافه شد.';
+  String get workflowMarketplaceInstalled =>
+      'ورک‌فلو به‌صورت پیش‌نویس اضافه شد.';
 
   @override
-  String get workflowMarketplaceNameAfterInstall => 'نام ورک‌فلو پس از افزودن (اختیاری)';
+  String get workflowMarketplaceNameAfterInstall =>
+      'نام ورک‌فلو پس از افزودن (اختیاری)';
 
   @override
   String get workflowMarketplaceError => 'خطا در مخزن ورک‌فلو';
@@ -11059,10 +11565,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get workflowMarketplaceUnpublish => 'حذف از مخزن';
 
   @override
-  String get workflowMarketplaceUnpublishConfirmTitle => 'از فهرست عمومی حذف شود؟';
+  String get workflowMarketplaceUnpublishConfirmTitle =>
+      'از فهرست عمومی حذف شود؟';
 
   @override
-  String get workflowMarketplaceUnpublishConfirmBody => 'دیگران این ورک‌فلو را نمی‌بینند؛ در فهرست «انتشارات من» باقی می‌ماند و می‌توانید بعداً دوباره منتشر کنید.';
+  String get workflowMarketplaceUnpublishConfirmBody =>
+      'دیگران این ورک‌فلو را نمی‌بینند؛ در فهرست «انتشارات من» باقی می‌ماند و می‌توانید بعداً دوباره منتشر کنید.';
 
   @override
   String get workflowMarketplaceRepublish => 'انتشار مجدد در مخزن';
@@ -11092,13 +11600,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get distributionTabReturns => 'مرجوعی';
 
   @override
-  String get distributionPermissionOperate => 'عملیات میدانی (شروع/پایان ویزیت، مرجوعی)';
+  String get distributionPermissionOperate =>
+      'عملیات میدانی (شروع/پایان ویزیت، مرجوعی)';
 
   @override
-  String get distributionPermissionManage => 'تعریف مسیر، توقف، تخصیص و تأیید مرجوعی';
+  String get distributionPermissionManage =>
+      'تعریف مسیر، توقف، تخصیص و تأیید مرجوعی';
 
   @override
-  String get distributionPermissionReportsTeam => 'گزارش و برنامهٔ کاربران دیگر';
+  String get distributionPermissionReportsTeam =>
+      'گزارش و برنامهٔ کاربران دیگر';
 
   @override
   String get distributionSelectDate => 'انتخاب تاریخ';
@@ -11134,7 +11645,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get distributionOutcomeCancelled => 'لغو ویزیت';
 
   @override
-  String get distributionDocumentIdHint => 'شناسه سند (پیش‌فاکتور/فاکتور) اختیاری';
+  String get distributionDocumentIdHint =>
+      'شناسه سند (پیش‌فاکتور/فاکتور) اختیاری';
 
   @override
   String get distributionDealIdHint => 'شناسه فرصت فروش CRM اختیاری';
@@ -11152,22 +11664,28 @@ class AppLocalizationsFa extends AppLocalizations {
   String get distributionRefresh => 'به‌روزرسانی';
 
   @override
-  String get distributionPluginInactive => 'افزونه پخش مویرگی فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
+  String get distributionPluginInactive =>
+      'افزونه پخش مویرگی فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
 
   @override
-  String get distributionSettingsSubtitle => 'مسیرها، برنامه روز، ویزیت میدانی و مرجوعی';
+  String get distributionSettingsSubtitle =>
+      'مسیرها، برنامه روز، ویزیت میدانی و مرجوعی';
 
   @override
-  String get distributionSharedRoutingCatalog => 'کاتالوگ مشترک مسیرها برای همهٔ ویزیتورها';
+  String get distributionSharedRoutingCatalog =>
+      'کاتالوگ مشترک مسیرها برای همهٔ ویزیتورها';
 
   @override
-  String get distributionSharedRoutingCatalogHint => 'اگر خاموش باشد هر ویزیتور فقط مسیرهای تخصیص‌داده‌شده به خود را می‌بیند.';
+  String get distributionSharedRoutingCatalogHint =>
+      'اگر خاموش باشد هر ویزیتور فقط مسیرهای تخصیص‌داده‌شده به خود را می‌بیند.';
 
   @override
-  String get distributionRequireVisitInDailyPlan => 'شروع ویزیت فقط از برنامهٔ روز';
+  String get distributionRequireVisitInDailyPlan =>
+      'شروع ویزیت فقط از برنامهٔ روز';
 
   @override
-  String get distributionRequireVisitInDailyPlanHint => 'شخص باید در برنامهٔ همان روز ویزیتور باشد.';
+  String get distributionRequireVisitInDailyPlanHint =>
+      'شخص باید در برنامهٔ همان روز ویزیتور باشد.';
 
   @override
   String get distributionSettingsSaved => 'تنظیمات ذخیره شد.';
@@ -11182,7 +11700,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsDistributionDashboardTitle => 'خلاصه عملکرد ویزیت و مرجوعی';
 
   @override
-  String get reportsDistributionDashboardSubtitle => 'آمار ویزیت‌ها و مرجوعی در بازهٔ زمانی';
+  String get reportsDistributionDashboardSubtitle =>
+      'آمار ویزیت‌ها و مرجوعی در بازهٔ زمانی';
 
   @override
   String get invoiceGlobalDiscountSection => 'تخفیف کلی فاکتور';
@@ -11219,34 +11738,44 @@ class AppLocalizationsFa extends AppLocalizations {
   String get invoiceSummaryTotal => 'جمع کل';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountTitle => 'تخفیف کلی فاکتور (محاسبه)';
+  String get businessSettingsInvoiceGlobalDiscountTitle =>
+      'تخفیف کلی فاکتور (محاسبه)';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountBasisLabel => 'مبنای درصد تخفیف کلی';
+  String get businessSettingsInvoiceGlobalDiscountBasisLabel =>
+      'مبنای درصد تخفیف کلی';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines => 'جمع خالص پس از تخفیف ردیف (پیش از مالیات)';
+  String get businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines =>
+      'جمع خالص پس از تخفیف ردیف (پیش از مالیات)';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountBasisGrossBeforeLines => 'جمع ناخالص (قبل از تخفیف ردیف)';
+  String get businessSettingsInvoiceGlobalDiscountBasisGrossBeforeLines =>
+      'جمع ناخالص (قبل از تخفیف ردیف)';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountBasisTotalWithTax => 'جمع ردیف‌ها شامل مالیات';
+  String get businessSettingsInvoiceGlobalDiscountBasisTotalWithTax =>
+      'جمع ردیف‌ها شامل مالیات';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountTaxModeLabel => 'اثر بر مالیات';
+  String get businessSettingsInvoiceGlobalDiscountTaxModeLabel =>
+      'اثر بر مالیات';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountTaxModeRecalculate => 'بازمحاسبه مالیات به‌صورت متناسب';
+  String get businessSettingsInvoiceGlobalDiscountTaxModeRecalculate =>
+      'بازمحاسبه مالیات به‌صورت متناسب';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountTaxModeKeep => 'ثابت نگه‌داشتن مالیات ردیف‌ها';
+  String get businessSettingsInvoiceGlobalDiscountTaxModeKeep =>
+      'ثابت نگه‌داشتن مالیات ردیف‌ها';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountMaxPercent => 'سقف درصد (اختیاری)';
+  String get businessSettingsInvoiceGlobalDiscountMaxPercent =>
+      'سقف درصد (اختیاری)';
 
   @override
-  String get businessSettingsInvoiceGlobalDiscountMaxAmount => 'سقف مبلغ (اختیاری)';
+  String get businessSettingsInvoiceGlobalDiscountMaxAmount =>
+      'سقف مبلغ (اختیاری)';
 
   @override
   String get editInvoiceTitle => 'ویرایش فاکتور';
@@ -11267,10 +11796,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get invoiceSettingsTab => 'تنظیمات';
 
   @override
-  String get invoiceGlobalDiscountPercentInvalid => 'درصد تخفیف کلی باید بین ۰ تا ۱۰۰ باشد';
+  String get invoiceGlobalDiscountPercentInvalid =>
+      'درصد تخفیف کلی باید بین ۰ تا ۱۰۰ باشد';
 
   @override
-  String get invoiceGlobalDiscountAmountInvalid => 'مبلغ تخفیف کلی نمی‌تواند منفی باشد';
+  String get invoiceGlobalDiscountAmountInvalid =>
+      'مبلغ تخفیف کلی نمی‌تواند منفی باشد';
 
   @override
   String get invoiceGlobalDiscountValueInvalid => 'مقدار تخفیف کلی نامعتبر است';
@@ -11282,16 +11813,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fiscalYearRollbackRetry => 'تلاش مجدد';
 
   @override
-  String get fiscalYearRollbackTokenMissing => 'کد تأیید موقت تولید نشده یا منقضی شده. دکمهٔ «به‌روزرسانی پیش‌نمایش» را بزنید و دوباره تلاش کنید.';
+  String get fiscalYearRollbackTokenMissing =>
+      'کد تأیید موقت تولید نشده یا منقضی شده. دکمهٔ «به‌روزرسانی پیش‌نمایش» را بزنید و دوباره تلاش کنید.';
 
   @override
   String get fiscalYearRollbackConfirmTitle => 'تأیید نهایی';
 
   @override
-  String get fiscalYearRollbackConfirmWithBackupBody => 'ابتدا پشتیبان کامل کسب‌وکار در سیستم ذخیره می‌شود، سپس سال مالی جاری و تمام اسناد آن حذف می‌شود. سند اختتامیهٔ سال قبل (در صورت وجود) نیز حذف می‌شود. این عمل قابل بازگشت در نرم‌افزار نیست.';
+  String get fiscalYearRollbackConfirmWithBackupBody =>
+      'ابتدا پشتیبان کامل کسب‌وکار در سیستم ذخیره می‌شود، سپس سال مالی جاری و تمام اسناد آن حذف می‌شود. سند اختتامیهٔ سال قبل (در صورت وجود) نیز حذف می‌شود. این عمل قابل بازگشت در نرم‌افزار نیست.';
 
   @override
-  String get fiscalYearRollbackConfirmWithoutBackupBody => 'سال مالی جاری و تمام اسناد آن حذف می‌شود. سند اختتامیهٔ سال قبل (در صورت وجود) نیز حذف می‌شود. این عمل قابل بازگشت در نرم‌افزار نیست.';
+  String get fiscalYearRollbackConfirmWithoutBackupBody =>
+      'سال مالی جاری و تمام اسناد آن حذف می‌شود. سند اختتامیهٔ سال قبل (در صورت وجود) نیز حذف می‌شود. این عمل قابل بازگشت در نرم‌افزار نیست.';
 
   @override
   String get fiscalYearRollbackCancel => 'انصراف';
@@ -11300,22 +11834,28 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fiscalYearRollbackConfirmDelete => 'حذف سال جاری';
 
   @override
-  String get fiscalYearRollbackPhaseBackupStarting => 'در حال ایجاد پشتیبان کامل در سیستم…';
+  String get fiscalYearRollbackPhaseBackupStarting =>
+      'در حال ایجاد پشتیبان کامل در سیستم…';
 
   @override
-  String get fiscalYearRollbackBackupStartFailed => 'شروع پشتیبان‌گیری ناموفق بود.';
+  String get fiscalYearRollbackBackupStartFailed =>
+      'شروع پشتیبان‌گیری ناموفق بود.';
 
   @override
-  String get fiscalYearRollbackBackupJobIdMissing => 'شناسهٔ کار پشتیبان از سرور دریافت نشد.';
+  String get fiscalYearRollbackBackupJobIdMissing =>
+      'شناسهٔ کار پشتیبان از سرور دریافت نشد.';
 
   @override
-  String get fiscalYearRollbackPhasePreviewRefresh => 'به‌روزرسانی پیش‌نمایش (کد تأیید جدید)…';
+  String get fiscalYearRollbackPhasePreviewRefresh =>
+      'به‌روزرسانی پیش‌نمایش (کد تأیید جدید)…';
 
   @override
-  String get fiscalYearRollbackAfterBackupBlocked => 'پس از پشتیبان‌گیری، برگشت از سال مالی دیگر مجاز نیست. احتمالاً وضعیت کسب‌وکار تغییر کرده. پیش‌نمایش را بررسی و دوباره تلاش کنید.';
+  String get fiscalYearRollbackAfterBackupBlocked =>
+      'پس از پشتیبان‌گیری، برگشت از سال مالی دیگر مجاز نیست. احتمالاً وضعیت کسب‌وکار تغییر کرده. پیش‌نمایش را بررسی و دوباره تلاش کنید.';
 
   @override
-  String get fiscalYearRollbackTokenAfterBackupMissing => 'کد تأیید پس از پشتیبان دریافت نشد. «به‌روزرسانی پیش‌نمایش» را بزنید.';
+  String get fiscalYearRollbackTokenAfterBackupMissing =>
+      'کد تأیید پس از پشتیبان دریافت نشد. «به‌روزرسانی پیش‌نمایش» را بزنید.';
 
   @override
   String get fiscalYearRollbackTokenMissingGeneric => 'کد تأیید در دسترس نیست.';
@@ -11327,7 +11867,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fiscalYearRollbackSuccessFallback => 'با موفقیت انجام شد';
 
   @override
-  String get fiscalYearRollbackWarningCard => 'این عملیات تمام اسناد سال مالی جاری را حذف می‌کند و سال قبل را دوباره «جاری» می‌کند.';
+  String get fiscalYearRollbackWarningCard =>
+      'این عملیات تمام اسناد سال مالی جاری را حذف می‌کند و سال قبل را دوباره «جاری» می‌کند.';
 
   @override
   String get fiscalYearRollbackCurrentYearLabel => 'سال جاری (حذف می‌شود)';
@@ -11351,10 +11892,12 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get fiscalYearRollbackBackupCheckboxTitle => 'قبل از حذف سال، پشتیبان کامل بگیرم';
+  String get fiscalYearRollbackBackupCheckboxTitle =>
+      'قبل از حذف سال، پشتیبان کامل بگیرم';
 
   @override
-  String get fiscalYearRollbackBackupCheckboxSubtitle => 'همان پشتیبان سیستمی (.hbx) از بخش تنظیمات؛ برای بازیابی در صورت نیاز.';
+  String get fiscalYearRollbackBackupCheckboxSubtitle =>
+      'همان پشتیبان سیستمی (.hbx) از بخش تنظیمات؛ برای بازیابی در صورت نیاز.';
 
   @override
   String get fiscalYearRollbackOpenBackupPage => 'باز کردن صفحهٔ پشتیبان‌گیری';
@@ -11363,10 +11906,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fiscalYearRollbackExecuteButton => 'اجرای حذف سال مالی جاری';
 
   @override
-  String get fiscalYearRollbackBlockedTitle => 'این عملیات الان مجاز نیست — دلایل:';
+  String get fiscalYearRollbackBlockedTitle =>
+      'این عملیات الان مجاز نیست — دلایل:';
 
   @override
-  String get fiscalYearRollbackBlockedHint => 'پس از رفع موارد زیر، دکمهٔ «به‌روزرسانی پیش‌نمایش» را بزنید.';
+  String get fiscalYearRollbackBlockedHint =>
+      'پس از رفع موارد زیر، دکمهٔ «به‌روزرسانی پیش‌نمایش» را بزنید.';
 
   @override
   String get fiscalYearRollbackRefreshPreview => 'به‌روزرسانی پیش‌نمایش';
@@ -11377,46 +11922,56 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get fiscalYearRollbackPreviewFailed => 'پیش‌نمایش برگشت از سال مالی ناموفق بود.';
+  String get fiscalYearRollbackPreviewFailed =>
+      'پیش‌نمایش برگشت از سال مالی ناموفق بود.';
 
   @override
-  String get fiscalYearRollbackNetworkUnreachable => 'ارتباط با سرور برقرار نشد. اینترنت و وضعیت ورود را بررسی کنید.';
+  String get fiscalYearRollbackNetworkUnreachable =>
+      'ارتباط با سرور برقرار نشد. اینترنت و وضعیت ورود را بررسی کنید.';
 
   @override
-  String get fiscalYearRollbackExecuteFailed => 'اجرای برگشت از سال مالی ناموفق بود.';
+  String get fiscalYearRollbackExecuteFailed =>
+      'اجرای برگشت از سال مالی ناموفق بود.';
 
   @override
-  String get fiscalYearRollbackExecuteFailedSupport => 'اجرای عملیات با خطا مواجه شد. در صورت تکرار با پشتیبانی تماس بگیرید.';
+  String get fiscalYearRollbackExecuteFailedSupport =>
+      'اجرای عملیات با خطا مواجه شد. در صورت تکرار با پشتیبانی تماس بگیرید.';
 
   @override
-  String get backupJobWaitTimeout => 'پشتیبان‌گیری در زمان انتظار به پایان نرسید. از بخش «تنظیمات → پشتیبان‌گیری» وضعیت را بررسی کنید.';
+  String get backupJobWaitTimeout =>
+      'پشتیبان‌گیری در زمان انتظار به پایان نرسید. از بخش «تنظیمات → پشتیبان‌گیری» وضعیت را بررسی کنید.';
 
   @override
-  String get backupJobStorageLimitFallback => 'پشتیبان به‌خاطر محدودیت ذخیره‌سازی ذخیره نشد. پکیج را فعال یا حجم را آزاد کنید.';
+  String get backupJobStorageLimitFallback =>
+      'پشتیبان به‌خاطر محدودیت ذخیره‌سازی ذخیره نشد. پکیج را فعال یا حجم را آزاد کنید.';
 
   @override
   String get settingsSideCurrenciesTitle => 'مدیریت ارزهای جانبی';
 
   @override
-  String get settingsSideCurrenciesSubtitle => 'اضافه و حذف ارزهای قابل استفاده در کسب‌وکار';
+  String get settingsSideCurrenciesSubtitle =>
+      'اضافه و حذف ارزهای قابل استفاده در کسب‌وکار';
 
   @override
   String get settingsInvoiceFxPolicyTitle => 'سیاست تسعیر فاکتور';
 
   @override
-  String get settingsInvoiceFxPolicySubtitle => 'لحظه مرجع نرخ و رفتار در نبود نرخ (ارز اصلی/فرعی)';
+  String get settingsInvoiceFxPolicySubtitle =>
+      'لحظه مرجع نرخ و رفتار در نبود نرخ (ارز اصلی/فرعی)';
 
   @override
   String get fxRevaluationSettingsTitle => 'تسعیر فاکتور (سیاست)';
 
   @override
-  String get fxRevaluationSettingsIntro => 'این گزینه‌ها تعیین می‌کنند «لحظه مرجع» نرخ تسعیر (نسبت به ارز اصلی) برای فاکتورهای ارزی چگونه محاسبه شود و اگر نرخی نبود چه رفتاری انجام شود.';
+  String get fxRevaluationSettingsIntro =>
+      'این گزینه‌ها تعیین می‌کنند «لحظه مرجع» نرخ تسعیر (نسبت به ارز اصلی) برای فاکتورهای ارزی چگونه محاسبه شود و اگر نرخی نبود چه رفتاری انجام شود.';
 
   @override
   String get fxRevaluationAsOfSourceLabel => 'لحظه مرجع نرخ (as_of)';
 
   @override
-  String get fxRevaluationAsOfSourceDocumentDate => 'تاریخ سند (با ساعت طبق گزینه زیر)';
+  String get fxRevaluationAsOfSourceDocumentDate =>
+      'تاریخ سند (با ساعت طبق گزینه زیر)';
 
   @override
   String get fxRevaluationAsOfSourceRegisteredAt => 'زمان ثبت سند در سیستم';
@@ -11431,19 +11986,23 @@ class AppLocalizationsFa extends AppLocalizations {
   String get fxRevaluationTimeNoon => 'میانه روز ۱۲:۰۰';
 
   @override
-  String get fxRevaluationTimeEndOfDay => 'پایان روز ۲۳:۵۹:۵۹ (چند نرخ در یک روز)';
+  String get fxRevaluationTimeEndOfDay =>
+      'پایان روز ۲۳:۵۹:۵۹ (چند نرخ در یک روز)';
 
   @override
-  String get fxRevaluationWhenNoRateLabel => 'اگر نرخ تسعیر برای لحظه مرجع نبود';
+  String get fxRevaluationWhenNoRateLabel =>
+      'اگر نرخ تسعیر برای لحظه مرجع نبود';
 
   @override
   String get fxRevaluationWhenNoRateBlock => 'جلوگیری از ثبت فاکتور';
 
   @override
-  String get fxRevaluationWhenNoRateAllow => 'اجازه ثبت بدون نرخ (ثبت سند fx به‌صورت ناقص)';
+  String get fxRevaluationWhenNoRateAllow =>
+      'اجازه ثبت بدون نرخ (ثبت سند fx به‌صورت ناقص)';
 
   @override
-  String get fxRevaluationSettingsFooterNote => 'کاربران بدون مجوز «تسعیر و نرخ ارز» نمی‌توانند ردیف نرخ خاصی انتخاب کنند؛ سیستم نزدیک‌ترین نرخ (آخرین نرخ مؤثر تا لحظه مرجع) را اعمال می‌کند.';
+  String get fxRevaluationSettingsFooterNote =>
+      'کاربران بدون مجوز «تسعیر و نرخ ارز» نمی‌توانند ردیف نرخ خاصی انتخاب کنند؛ سیستم نزدیک‌ترین نرخ (آخرین نرخ مؤثر تا لحظه مرجع) را اعمال می‌کند.';
 
   @override
   String fxRevaluationSettingsLoadError(String error) {
@@ -11462,7 +12021,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get invoiceFxRateAuto => 'خودکار (سیاست تنظیمات کسب‌وکار)';
 
   @override
-  String get invoiceFxRateHelper => 'برای ارز غیر اصلی؛ «خودکار» آخرین نرخ معتبر تا لحظهٔ مرجع سند است.';
+  String get invoiceFxRateHelper =>
+      'برای ارز غیر اصلی؛ «خودکار» آخرین نرخ معتبر تا لحظهٔ مرجع سند است.';
 
   @override
   String get invoiceFxRateStoredOnDocument => 'نرخ ذخیره‌شده سند';
@@ -11500,10 +12060,12 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get crmWebChatFileUploadDisabledCrm => 'ارسال فایل در تنظیمات CRM غیرفعال است';
+  String get crmWebChatFileUploadDisabledCrm =>
+      'ارسال فایل در تنظیمات CRM غیرفعال است';
 
   @override
-  String get crmWebChatFileReadFailed => 'خواندن فایل ممکن نیست (حجم زیاد یا محدودیت مرورگر). فایل کوچک‌تر انتخاب کنید.';
+  String get crmWebChatFileReadFailed =>
+      'خواندن فایل ممکن نیست (حجم زیاد یا محدودیت مرورگر). فایل کوچک‌تر انتخاب کنید.';
 
   @override
   String get crmWebChatFileIdMissing => 'شناسه فایل از سرور نیامد';
@@ -11553,13 +12115,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatDefaultWidgetName => 'ویجت';
 
   @override
-  String get crmWebChatAccessDenied => 'شما دسترسی لازم برای مشاهده CRM را ندارید';
+  String get crmWebChatAccessDenied =>
+      'شما دسترسی لازم برای مشاهده CRM را ندارید';
 
   @override
   String get crmWebChatPageTitle => 'چت وب';
 
   @override
-  String get crmWebChatSearchConversationsHint => 'جستجوی مکالمه، شناسه، ایمیل…';
+  String get crmWebChatSearchConversationsHint =>
+      'جستجوی مکالمه، شناسه، ایمیل…';
 
   @override
   String get crmWebChatMessageDeleted => 'این پیام حذف شده است';
@@ -11571,13 +12135,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatDeleteMessage => 'حذف پیام';
 
   @override
-  String get crmWebChatDeleteMessageConfirm => 'حذف این پیام غیرقابل بازگردانی است. ادامه می‌دهید؟';
+  String get crmWebChatDeleteMessageConfirm =>
+      'حذف این پیام غیرقابل بازگردانی است. ادامه می‌دهید؟';
 
   @override
   String get crmWebChatDeleteConversation => 'حذف مکالمه';
 
   @override
-  String get crmWebChatDeleteConversationConfirm => 'این مکالمه و تمام پیام‌هایش برای همیشه حذف می‌شوند. ادامه می‌دهید؟';
+  String get crmWebChatDeleteConversationConfirm =>
+      'این مکالمه و تمام پیام‌هایش برای همیشه حذف می‌شوند. ادامه می‌دهید؟';
 
   @override
   String get crmWebChatConversationDeleted => 'مکالمه حذف شد';
@@ -11604,13 +12170,16 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatFilterAll => 'همه';
 
   @override
-  String get crmWebChatFilterLongPressHint => 'برای حذف دسته‌جمعی مکالمات، عنوان «فیلتر وضعیت» را چند ثانیه نگه دارید.';
+  String get crmWebChatFilterLongPressHint =>
+      'برای حذف دسته‌جمعی مکالمات، عنوان «فیلتر وضعیت» را چند ثانیه نگه دارید.';
 
   @override
-  String get crmWebChatCrmSettingsWidgetsIntro => 'کلید عمومی، دامنه‌های مجاز و ارسال فایل بازدیدکننده را برای هر ویجت مدیریت کنید.';
+  String get crmWebChatCrmSettingsWidgetsIntro =>
+      'کلید عمومی، دامنه‌های مجاز و ارسال فایل بازدیدکننده را برای هر ویجت مدیریت کنید.';
 
   @override
-  String get crmWebChatCrmSettingsNoWidgets => 'هنوز ویجی ندارید. با دکمهٔ زیر یک ویجت بسازید.';
+  String get crmWebChatCrmSettingsNoWidgets =>
+      'هنوز ویجی ندارید. با دکمهٔ زیر یک ویجت بسازید.';
 
   @override
   String get crmWebChatAddWidgetButton => 'ویجت جدید';
@@ -11619,7 +12188,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatBulkDeleteTitle => 'حذف دسته‌جمعی مکالمات';
 
   @override
-  String get crmWebChatBulkDeleteConfirmAll => 'همهٔ مکالمات این کسب‌وکار و تمام پیام‌ها برای همیشه حذف می‌شوند. این کار برگشت‌ناپذیر است. ادامه می‌دهید؟';
+  String get crmWebChatBulkDeleteConfirmAll =>
+      'همهٔ مکالمات این کسب‌وکار و تمام پیام‌ها برای همیشه حذف می‌شوند. این کار برگشت‌ناپذیر است. ادامه می‌دهید؟';
 
   @override
   String crmWebChatBulkDeleteConfirmStatus(String statusLabel) {
@@ -11635,22 +12205,28 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatWidgetsSectionTitle => 'ویجت‌های چت';
 
   @override
-  String get crmWebChatWidgetsSectionHint => 'برای Public Key و غیرفعال‌کردن فایل فقط روی همان سایت، ویرایش را بزنید.';
+  String get crmWebChatWidgetsSectionHint =>
+      'برای Public Key و غیرفعال‌کردن فایل فقط روی همان سایت، ویرایش را بزنید.';
 
   @override
-  String get crmWebChatVisitorAttachmentCrmOff => 'پیوست بازدیدکننده: بسته (ابتدا در تنظیمات CRM روشن شود)';
+  String get crmWebChatVisitorAttachmentCrmOff =>
+      'پیوست بازدیدکننده: بسته (ابتدا در تنظیمات CRM روشن شود)';
 
   @override
-  String get crmWebChatVisitorAttachmentAllowed => 'پیوست بازدیدکننده: مجاز — فضای ذخیره کسب‌وکار';
+  String get crmWebChatVisitorAttachmentAllowed =>
+      'پیوست بازدیدکننده: مجاز — فضای ذخیره کسب‌وکار';
 
   @override
-  String get crmWebChatVisitorAttachmentWidgetOff => 'پیوست بازدیدکننده: برای این ویجت بسته است';
+  String get crmWebChatVisitorAttachmentWidgetOff =>
+      'پیوست بازدیدکننده: برای این ویجت بسته است';
 
   @override
-  String get crmWebChatWidgetStateActive => 'وضعیت: فعال — در سایت جاسازی می‌شود';
+  String get crmWebChatWidgetStateActive =>
+      'وضعیت: فعال — در سایت جاسازی می‌شود';
 
   @override
-  String get crmWebChatWidgetStateInactive => 'وضعیت: غیرفعال — مکالمه جدید با این کلید بسته است';
+  String get crmWebChatWidgetStateInactive =>
+      'وضعیت: غیرفعال — مکالمه جدید با این کلید بسته است';
 
   @override
   String get crmWebChatPublicKeyCopied => 'کلید عمومی کپی شد';
@@ -11668,10 +12244,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatMenuEdit => 'ویرایش…';
 
   @override
-  String get crmWebChatNoWidgetsYet => 'هنوز ویجی نساخته‌اید — از + استفاده کنید.';
+  String get crmWebChatNoWidgetsYet =>
+      'هنوز ویجی نساخته‌اید — از + استفاده کنید.';
 
   @override
-  String get crmWebChatNoConversations => 'مکالمه‌ای نیست — یا فیلتر را تغییر دهید';
+  String get crmWebChatNoConversations =>
+      'مکالمه‌ای نیست — یا فیلتر را تغییر دهید';
 
   @override
   String crmWebChatConversationNumber(int id) {
@@ -11682,7 +12260,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatSelectConversation => 'یک مکالمه را انتخاب کنید';
 
   @override
-  String get crmWebChatConversationNotFoundRefresh => 'مکالمه یافت نشد — به‌روزرسانی را بزنید';
+  String get crmWebChatConversationNotFoundRefresh =>
+      'مکالمه یافت نشد — به‌روزرسانی را بزنید';
 
   @override
   String get crmWebChatVisitorStartPageLabel => 'صفحهٔ شروع چت (بازدیدکننده)';
@@ -11733,7 +12312,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatFileLabel => 'فایل';
 
   @override
-  String get crmWebChatAttachFileTooltip => 'پیوست فایل (فضای ذخیره‌سازی کسب‌وکار، بستر crm_web_chat)';
+  String get crmWebChatAttachFileTooltip =>
+      'پیوست فایل (فضای ذخیره‌سازی کسب‌وکار، بستر crm_web_chat)';
 
   @override
   String get crmWebChatReplyHint => 'پاسخ… (Ctrl+Enter ارسال)';
@@ -11748,7 +12328,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatWidgetDialogTitleNew => 'ویجت چت جدید';
 
   @override
-  String get crmWebChatWidgetDialogIntro => 'پس از ایجاد، «کلید عمومی» و راهنمای اتصال API از منوی … ویجت قابل کپی است. دامنهٔ مجاز فقط امنیت مرورگر (CORS) است.';
+  String get crmWebChatWidgetDialogIntro =>
+      'پس از ایجاد، «کلید عمومی» و راهنمای اتصال API از منوی … ویجت قابل کپی است. دامنهٔ مجاز فقط امنیت مرورگر (CORS) است.';
 
   @override
   String get crmWebChatWidgetNameLabel => 'نام ویجت (داخلی)';
@@ -11757,7 +12338,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatWidgetNameHint => 'مثال: فروشگاه اینترنتی';
 
   @override
-  String get crmWebChatWidgetNameHelper => 'فقط در پنل شما دیده می‌شود تا بین چند ویجت تمایز بگذارید.';
+  String get crmWebChatWidgetNameHelper =>
+      'فقط در پنل شما دیده می‌شود تا بین چند ویجت تمایز بگذارید.';
 
   @override
   String get crmWebChatWidgetOriginsLabel => 'دامنه‌های مجاز درخواست';
@@ -11766,25 +12348,31 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatWidgetOriginsHint => 'shop.ir، blog.shop.ir';
 
   @override
-  String get crmWebChatWidgetOriginsHelper => 'اختیاری. فقط نام میزبان (بدون https://)؛ جدا با ویرگول لاتین یا فارسی. اگر خالی بگذارید، محدودیت دامنه با منطق سرور طبق مستند API اعمال می‌شود. برای جاسازی روی دامنهٔ مشخص، حتماً همان دامنه را اضافه کنید.';
+  String get crmWebChatWidgetOriginsHelper =>
+      'اختیاری. فقط نام میزبان (بدون https://)؛ جدا با ویرگول لاتین یا فارسی. اگر خالی بگذارید، محدودیت دامنه با منطق سرور طبق مستند API اعمال می‌شود. برای جاسازی روی دامنهٔ مشخص، حتماً همان دامنه را اضافه کنید.';
 
   @override
-  String get crmWebChatVisitorFileSwitchTitle => 'ارسال فایل توسط بازدیدکنندهٔ سایت';
+  String get crmWebChatVisitorFileSwitchTitle =>
+      'ارسال فایل توسط بازدیدکنندهٔ سایت';
 
   @override
-  String get crmWebChatVisitorFileSwitchOn => 'وابسته به پلن فضای ذخیره‌سازی. می‌توانید فقط برای این ویجت ببندید؛ اگر روشن بماند، مثل سایر ویجت‌هاست.';
+  String get crmWebChatVisitorFileSwitchOn =>
+      'وابسته به پلن فضای ذخیره‌سازی. می‌توانید فقط برای این ویجت ببندید؛ اگر روشن بماند، مثل سایر ویجت‌هاست.';
 
   @override
-  String get crmWebChatVisitorFileSwitchOff => 'الان در سطح کسب‌وکار غیرفعال است. از مسیر «مدیریت ارتباطات → تنظیمات CRM» (یا منوی مربوط) گزینهٔ ارسال فایل در چت وب را روشن کنید، بعد برگردید و این سوییچ را تنظیم کنید.';
+  String get crmWebChatVisitorFileSwitchOff =>
+      'الان در سطح کسب‌وکار غیرفعال است. از مسیر «مدیریت ارتباطات → تنظیمات CRM» (یا منوی مربوط) گزینهٔ ارسال فایل در چت وب را روشن کنید، بعد برگردید و این سوییچ را تنظیم کنید.';
 
   @override
   String get crmWebChatWidgetActiveTitle => 'ویجت فعال';
 
   @override
-  String get crmWebChatWidgetActiveSubtitle => 'اگر غیرفعال شود، با همین «کلید عمومی» مکالمهٔ جدید شروع نمی‌شود (ویجت‌های قدیم در پنل باقی می‌مانند).';
+  String get crmWebChatWidgetActiveSubtitle =>
+      'اگر غیرفعال شود، با همین «کلید عمومی» مکالمهٔ جدید شروع نمی‌شود (ویجت‌های قدیم در پنل باقی می‌مانند).';
 
   @override
-  String get crmWebChatNameRequired => 'لطفاً «نام ویجت» را وارد کنید (مثلاً نام سایت یا بخش).';
+  String get crmWebChatNameRequired =>
+      'لطفاً «نام ویجت» را وارد کنید (مثلاً نام سایت یا بخش).';
 
   @override
   String get crmWebChatCreate => 'ایجاد';
@@ -11814,19 +12402,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmSettingsWebChatVoiceTitle => 'پیام صوتی در چت وب';
 
   @override
-  String get crmSettingsWebChatVoiceSubtitle => 'پیام‌های صوتی کوتاه (بازدیدکننده یا اپراتور) مانند هر فایل در فضای ذخیره‌سازی کسب‌وکار حساب می‌شوند.';
+  String get crmSettingsWebChatVoiceSubtitle =>
+      'پیام‌های صوتی کوتاه (بازدیدکننده یا اپراتور) مانند هر فایل در فضای ذخیره‌سازی کسب‌وکار حساب می‌شوند.';
 
   @override
-  String get crmWebChatVisitorVoiceSwitchTitle => 'پیام صوتی توسط بازدیدکنندهٔ سایت';
+  String get crmWebChatVisitorVoiceSwitchTitle =>
+      'پیام صوتی توسط بازدیدکنندهٔ سایت';
 
   @override
-  String get crmWebChatVisitorVoiceSwitchOn => 'طبق تنظیمات کسب‌وکار و پلن فضا. می‌توانید فقط روی همین ویجت غیرفعال کنید.';
+  String get crmWebChatVisitorVoiceSwitchOn =>
+      'طبق تنظیمات کسب‌وکار و پلن فضا. می‌توانید فقط روی همین ویجت غیرفعال کنید.';
 
   @override
-  String get crmWebChatVisitorVoiceSwitchOff => 'پیام صوتی در تنظیمات CRM کسب‌وکار خاموش است یا در این ویجت محدود شده است.';
+  String get crmWebChatVisitorVoiceSwitchOff =>
+      'پیام صوتی در تنظیمات CRM کسب‌وکار خاموش است یا در این ویجت محدود شده است.';
 
   @override
-  String get crmWebChatVoiceDisabledCrm => 'پیام صوتی برای این کسب‌وکار در تنظیمات CRM غیرفعال است';
+  String get crmWebChatVoiceDisabledCrm =>
+      'پیام صوتی برای این کسب‌وکار در تنظیمات CRM غیرفعال است';
 
   @override
   String get crmWebChatComposerDropTarget => 'رها کنید تا ارسال شود';
@@ -11838,7 +12431,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get crmWebChatMicStopSend => 'توقف و ارسال';
 
   @override
-  String get crmWebChatMicUnavailableWeb => 'ضبط صدا در مرورگر این نسخه در دست نیست؛ از اپ یا دکمهٔ پیوست استفاده کنید';
+  String get crmWebChatMicUnavailableWeb =>
+      'ضبط صدا در مرورگر این نسخه در دست نیست؛ از اپ یا دکمهٔ پیوست استفاده کنید';
 
   @override
   String get crmWebChatVisitorVoiceOffWidget => 'ویس مهمان خاموش';
@@ -11847,7 +12441,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get accountSettingsAppearanceTitle => 'ظاهر برنامه';
 
   @override
-  String get accountSettingsAppearanceDescription => 'نحوهٔ نمایش پنل کسب‌وکار در دسکتاپ (صفحهٔ واحد یا چند تب)';
+  String get accountSettingsAppearanceDescription =>
+      'نحوهٔ نمایش پنل کسب‌وکار در دسکتاپ (صفحهٔ واحد یا چند تب)';
 
   @override
   String get appearanceSettingsPageTitle => 'تنظیمات ظاهری';
@@ -11859,16 +12454,19 @@ class AppLocalizationsFa extends AppLocalizations {
   String get appearanceNavigationSingleLabel => 'صفحهٔ واحد';
 
   @override
-  String get appearanceNavigationSingleSubtitle => 'در هر زمان فقط یک صفحه باز است (ناوبری کلاسیک)';
+  String get appearanceNavigationSingleSubtitle =>
+      'در هر زمان فقط یک صفحه باز است (ناوبری کلاسیک)';
 
   @override
   String get appearanceNavigationTabsLabel => 'تب در نوار بالا';
 
   @override
-  String get appearanceNavigationTabsSubtitle => 'چند صفحه باز بماند و با تب‌های نوار تیره بالای پنل جابه‌جا شوید (فقط دسکتاپ). تب‌های پس‌زمینه در حافظه می‌مانند؛ کلید پایدار مسیر برای بازگشت بهتر به همان تب هم‌سو با روتر است.';
+  String get appearanceNavigationTabsSubtitle =>
+      'چند صفحه باز بماند و با تب‌های نوار تیره بالای پنل جابه‌جا شوید (فقط دسکتاپ). تب‌های پس‌زمینه در حافظه می‌مانند؛ کلید پایدار مسیر برای بازگشت بهتر به همان تب هم‌سو با روتر است.';
 
   @override
-  String get appearanceDesktopOnlyNote => 'حالت تب فقط در عرض زیاد اعمال می‌شود؛ در موبایل همیشه حالت تک‌صفحه است.';
+  String get appearanceDesktopOnlyNote =>
+      'حالت تب فقط در عرض زیاد اعمال می‌شود؛ در موبایل همیشه حالت تک‌صفحه است.';
 
   @override
   String get appearanceSaved => 'ذخیره شد';
@@ -11910,19 +12508,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get businessPanelTabRouteRepairShopSettings => 'تنظیمات تعمیرگاه';
 
   @override
-  String get appearanceSidebarTabBehaviorSection => 'باز کردن از منوی کناری (وقتی تب فعال است)';
+  String get appearanceSidebarTabBehaviorSection =>
+      'باز کردن از منوی کناری (وقتی تب فعال است)';
 
   @override
-  String get appearanceSidebarTabBehaviorReuseTitle => 'رفتن به تب موجود یا باز کردن تب جدید';
+  String get appearanceSidebarTabBehaviorReuseTitle =>
+      'رفتن به تب موجود یا باز کردن تب جدید';
 
   @override
-  String get appearanceSidebarTabBehaviorReuseSubtitle => 'اگر همان صفحه در یکی از تب‌ها باز است به همان می‌رود؛ وگرنه تب جدید اضافه می‌شود (همان پیش‌فرض قبلی).';
+  String get appearanceSidebarTabBehaviorReuseSubtitle =>
+      'اگر همان صفحه در یکی از تب‌ها باز است به همان می‌رود؛ وگرنه تب جدید اضافه می‌شود (همان پیش‌فرض قبلی).';
 
   @override
-  String get appearanceSidebarTabBehaviorLongPressTitle => 'جایگزینی تب فعال؛ لانگ‌پرس مثل پیش‌فرض';
+  String get appearanceSidebarTabBehaviorLongPressTitle =>
+      'جایگزینی تب فعال؛ لانگ‌پرس مثل پیش‌فرض';
 
   @override
-  String get appearanceSidebarTabBehaviorLongPressSubtitle => 'کلیک معمولی فقط محتوای تب فعلی را عوض می‌کند. لانگ‌پرس روی آیتم منو همان رفتار گزینهٔ بالا را دارد (تب موجود یا تب جدید).';
+  String get appearanceSidebarTabBehaviorLongPressSubtitle =>
+      'کلیک معمولی فقط محتوای تب فعلی را عوض می‌کند. لانگ‌پرس روی آیتم منو همان رفتار گزینهٔ بالا را دارد (تب موجود یا تب جدید).';
 
   @override
   String get mobileLauncherTitle => 'لانچر موبایل';
@@ -11964,10 +12567,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get mobileLauncherDisableHomeLauncherMenu => 'ورود به اپ از پروفایل';
 
   @override
-  String get mobileLauncherDisableHomeLauncherDone => 'از این به بعد با باز کردن اپ به پروفایل می‌روید؛ برای لانچر دوباره از لیست کسب‌وکار انتخاب کنید.';
+  String get mobileLauncherDisableHomeLauncherDone =>
+      'از این به بعد با باز کردن اپ به پروفایل می‌روید؛ برای لانچر دوباره از لیست کسب‌وکار انتخاب کنید.';
 
   @override
-  String get mobileLauncherBusinessNoAccess => 'به این کسب‌وکار دسترسی ندارید یا حذف شده است.';
+  String get mobileLauncherBusinessNoAccess =>
+      'به این کسب‌وکار دسترسی ندارید یا حذف شده است.';
 
   @override
   String get mobileLauncherExitAppHint => 'برای خروج دوباره بازگشت را بزنید';
