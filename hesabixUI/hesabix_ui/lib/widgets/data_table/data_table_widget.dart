@@ -1515,7 +1515,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (_items.isEmpty) {
       return 320 + bottomFudge;
     }
-    final heading = widget.config.headingRowHeight ?? (_dense ? 40.0 : 44.0);
+    final heading = widget.config.showColumnHeaders
+        ? (widget.config.headingRowHeight ?? (_dense ? 40.0 : 44.0))
+        : 0.0;
     final dataH = widget.config.dataRowHeight ?? (_dense ? 38.0 : 48.0);
     final n = _items.length;
     return heading + n * dataH + bottomFudge;
@@ -3120,7 +3122,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           // در غیر این صورت از config استفاده می‌کنیم
           minWidth: _calculateMinTableWidth(columns, availableWidth),
           horizontalScrollController: _horizontalScrollController,
-          headingRowHeight: widget.config.headingRowHeight ?? (_dense ? 40 : 44),
+          headingRowHeight: widget.config.showColumnHeaders
+              ? (widget.config.headingRowHeight ?? (_dense ? 40 : 44))
+              : 0,
           dataRowHeight: widget.config.dataRowHeight ?? (_dense ? 38 : 48),
           columns: columns,
       rows: _items.asMap().entries.map((entry) {

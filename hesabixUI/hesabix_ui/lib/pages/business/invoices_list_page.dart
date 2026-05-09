@@ -936,6 +936,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         reportSubtype: 'list',
         enableColumnSettings: false,
         showColumnSettingsButton: false,
+        showColumnHeaders: false,
         defaultSortBy: 'document_date',
         defaultSortDesc: true,
         dataRowHeight: _mobileInvoiceRowHeight,

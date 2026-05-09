@@ -142,6 +142,7 @@ adapters/api/v1/schema_models/warehouse_location.py
 adapters/api/v1/support/__init__.py
 adapters/api/v1/support/ai_tickets.py
 adapters/api/v1/support/categories.py
+adapters/api/v1/support/dependencies.py
 adapters/api/v1/support/operator.py
 adapters/api/v1/support/priorities.py
 adapters/api/v1/support/schemas.py
