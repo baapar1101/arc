@@ -46,6 +46,8 @@ class InvoiceLineItem {
   final Map<String, dynamic>? extraInfo;
 
   static final _uuid = Uuid();
+  /// مقدار پیش‌فرض copyWith برای [basePurchasePriceMainUnit] یعنی «فیلد را عوض نکن».
+  static const Object _basePurchaseUnset = Object();
 
   InvoiceLineItem({
     String? lineKey,
@@ -89,7 +91,7 @@ class InvoiceLineItem {
     num? taxRate,
     String? description,
     num? baseSalesPriceMainUnit,
-    num? basePurchasePriceMainUnit,
+    Object? basePurchasePriceMainUnit = _basePurchaseUnset,
     int? minOrderQty,
     bool? trackInventory,
     int? warehouseId,
@@ -113,7 +115,9 @@ class InvoiceLineItem {
       taxRate: taxRate ?? this.taxRate,
       description: description ?? this.description,
       baseSalesPriceMainUnit: baseSalesPriceMainUnit ?? this.baseSalesPriceMainUnit,
-      basePurchasePriceMainUnit: basePurchasePriceMainUnit ?? this.basePurchasePriceMainUnit,
+      basePurchasePriceMainUnit: identical(basePurchasePriceMainUnit, _basePurchaseUnset)
+          ? this.basePurchasePriceMainUnit
+          : basePurchasePriceMainUnit as num?,
       minOrderQty: minOrderQty ?? this.minOrderQty,
       trackInventory: trackInventory ?? this.trackInventory,
       warehouseId: warehouseId ?? this.warehouseId,

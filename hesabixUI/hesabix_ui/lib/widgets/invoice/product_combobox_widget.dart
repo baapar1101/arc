@@ -9,6 +9,7 @@ import '../../core/auth_store.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/category_tree_widget.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/general_barcode_utils.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 
 /// متن خلاصه‌ی نمایشی کالا (کد - نام یا فقط نام)
@@ -34,12 +35,18 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
     required this.onTap,
     this.dense = false,
     this.highlighted = false,
+    this.showPurchaseInMetrics = true,
+    this.showGeneralBarcodeLine = false,
   });
 
   final Map<String, dynamic> item;
   final VoidCallback onTap;
   final bool dense;
   final bool highlighted;
+  /// اگر false باشد، بخش «خرید …» در خط خلاصه نمایش داده نمی‌شود (بدون دسترسی به قیمت خرید).
+  final bool showPurchaseInMetrics;
+  /// در موبایل false تا بارکد عمومی در نتایج نشان داده نشود.
+  final bool showGeneralBarcodeLine;
 
   @override
   Widget build(BuildContext context) {
@@ -55,8 +62,9 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
         : _pickerFormatMoney(item['base_sales_price']);
     final trackInventory = item['track_inventory'] == true;
     final String metricsLine;
+    final purchaseSeg = showPurchaseInMetrics ? 'خرید $purchaseStr · ' : '';
     if (!trackInventory) {
-      metricsLine = 'خرید $purchaseStr · فروش $salesStr · بدون موجودی انباردیاری';
+      metricsLine = '${purchaseSeg}فروش $salesStr · بدون موجودی انباردیاری';
     } else {
       final wh = item['inventory_stock_warehouse'];
       final acc = item['inventory_stock_accounting'];
@@ -64,8 +72,10 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
       final stockPart = !hasLoaded
           ? 'موجودی: —'
           : 'موجودی انبار ${_pickerFormatQty(wh ?? acc ?? 0)} · حساب ${_pickerFormatQty(acc ?? wh ?? 0)}';
-      metricsLine = 'خرید $purchaseStr · فروش $salesStr · $stockPart';
+      metricsLine = '${purchaseSeg}فروش $salesStr · $stockPart';
     }
+    final barcodeLine =
+        showGeneralBarcodeLine ? productPrimaryBarcodeForSearchDisplay(item) : null;
 
     final padH = dense ? 10.0 : 14.0;
     final padV = dense ? 8.0 : 10.0;
@@ -111,6 +121,16 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
                       textAlign: TextAlign.right,
                     ),
                   ],
+                  if (barcodeLine != null && barcodeLine.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'بارکد: $barcodeLine',
+                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.2),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Text(
                     metricsLine,
@@ -140,6 +160,8 @@ Widget _buildProductSuggestionsScrollArea({
   required void Function(Map<String, dynamic> product) onProductSelected,
   int highlightedIndex = -1,
   bool dense = false,
+  bool showPurchaseInMetrics = true,
+  bool showGeneralBarcodeLine = false,
 }) {
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
@@ -207,6 +229,8 @@ Widget _buildProductSuggestionsScrollArea({
               item: it,
               dense: dense,
               highlighted: index == highlightedIndex,
+              showPurchaseInMetrics: showPurchaseInMetrics,
+              showGeneralBarcodeLine: showGeneralBarcodeLine,
               onTap: () => onProductSelected(it),
             );
           },
@@ -553,6 +577,8 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                     },
                     highlightedIndex: _highlightedIndex,
                     dense: true,
+                    showPurchaseInMetrics: widget.authStore?.canViewPurchasePrice() ?? false,
+                    showGeneralBarcodeLine: true,
                   ),
                 ),
               );
@@ -990,6 +1016,8 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
               Navigator.pop(ctx);
             },
             isMobile: isMobile,
+            showPurchaseInMetrics: widget.authStore?.canViewPurchasePrice() ?? false,
+            showGeneralBarcodeLine: false,
           );
         },
       );
@@ -1021,6 +1049,8 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
               _select(product);
               Navigator.pop(ctx);
             },
+            showPurchaseInMetrics: widget.authStore?.canViewPurchasePrice() ?? false,
+            showGeneralBarcodeLine: true,
           );
         },
       );
@@ -1211,6 +1241,8 @@ class _ProductPickerBottomSheet extends StatefulWidget {
   final void Function(int? categoryId) onCategorySelected;
   final void Function(Map<String, dynamic> product) onProductSelected;
   final bool isMobile;
+  final bool showPurchaseInMetrics;
+  final bool showGeneralBarcodeLine;
 
   const _ProductPickerBottomSheet({
     required this.label,
@@ -1228,6 +1260,8 @@ class _ProductPickerBottomSheet extends StatefulWidget {
     required this.onCategorySelected,
     required this.onProductSelected,
     this.isMobile = true,
+    this.showPurchaseInMetrics = true,
+    this.showGeneralBarcodeLine = false,
   });
 
   @override
@@ -1404,6 +1438,8 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
                     onProductSelected: widget.onProductSelected,
                     highlightedIndex: -1,
                     dense: false,
+                    showPurchaseInMetrics: widget.showPurchaseInMetrics,
+                    showGeneralBarcodeLine: widget.showGeneralBarcodeLine,
                   );
                 },
               ),
@@ -1431,6 +1467,8 @@ class _ProductPickerDialog extends StatelessWidget {
   final void Function(String query) onQueryChanged;
   final void Function(int? categoryId) onCategorySelected;
   final void Function(Map<String, dynamic> product) onProductSelected;
+  final bool showPurchaseInMetrics;
+  final bool showGeneralBarcodeLine;
 
   const _ProductPickerDialog({
     required this.label,
@@ -1447,6 +1485,8 @@ class _ProductPickerDialog extends StatelessWidget {
     required this.onQueryChanged,
     required this.onCategorySelected,
     required this.onProductSelected,
+    this.showPurchaseInMetrics = true,
+    this.showGeneralBarcodeLine = true,
   });
 
   @override
@@ -1565,6 +1605,8 @@ class _ProductPickerDialog extends StatelessWidget {
                           onProductSelected: onProductSelected,
                           highlightedIndex: -1,
                           dense: false,
+                          showPurchaseInMetrics: showPurchaseInMetrics,
+                          showGeneralBarcodeLine: showGeneralBarcodeLine,
                         );
                       },
                     ),

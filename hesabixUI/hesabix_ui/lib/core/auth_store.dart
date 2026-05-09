@@ -548,8 +548,7 @@ class AuthStore with ChangeNotifier {
 
   bool canViewPurchasePrice() {
     if (_currentBusiness?.isOwner == true) return true;
-    return hasBusinessPermission('pricing', 'purchase_price_view') ||
-        hasBusinessPermission('products', 'view');
+    return hasBusinessPermission('pricing', 'purchase_price_view');
   }
 
   /// ثبت یا ویرایش سند حسابداری (شامل اسناد خودکار از چک، دریافت‌وپرداخت و …).

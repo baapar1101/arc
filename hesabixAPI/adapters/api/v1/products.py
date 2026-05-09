@@ -1,6 +1,6 @@
 # Removed __future__ annotations to fix OpenAPI schema generation
 
-from typing import Annotated, Dict, Any, Optional
+from typing import Annotated, Dict, Any, Optional, List
 from datetime import date as date_type
 from fastapi import APIRouter, Depends, Request, Body, Query
 from sqlalchemy.orm import Session
@@ -35,6 +35,7 @@ from adapters.api.v1.schema_models.common import SuccessResponse, ErrorResponse
 from app.services.product_service import (
     create_product,
     list_products,
+    list_recent_sales_invoice_products,
     get_product,
     update_product,
     delete_product,
@@ -80,9 +81,8 @@ def _apply_pricing_visibility_for_user(
         has_business_permission_for_business(auth_context, db, business_id, "pricing", "sales_price_view")
         or has_business_permission_for_business(auth_context, db, business_id, "products", "view")
     )
-    can_view_purchase = (
-        has_business_permission_for_business(auth_context, db, business_id, "pricing", "purchase_price_view")
-        or has_business_permission_for_business(auth_context, db, business_id, "products", "view")
+    can_view_purchase = has_business_permission_for_business(
+        auth_context, db, business_id, "pricing", "purchase_price_view"
     )
     masked = dict(item or {})
     if not can_view_sales:
@@ -554,6 +554,52 @@ def search_products_endpoint(
 			"خطای داخلی سرور رخ داد. لطفاً با پشتیبانی تماس بگیرید.",
 			http_status=500
 		)
+
+
+@router.get(
+    "/business/{business_id}/recent-from-sales-invoices",
+    summary="کالاهای اخیر در فاکتورهای فروش",
+    description="""
+    فهرست کالاهایی که اخیراً در اسناد فروش (غیر پیش‌فاکتور) استفاده شده‌اند،
+    مرتب‌شده از جدیدترین فاکتور؛ برای پیشنهاد اولیه در جستجو (مثلاً فروش سریع).
+    """,
+    response_model=SuccessResponse[ProductListResponse],
+)
+@require_business_access("business_id")
+def list_recent_from_sales_invoices_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    take: int = Query(10, ge=1, le=50, description="حداکثر تعداد کالا"),
+    category_ids: Optional[str] = Query(
+        None,
+        description="شناسه دسته‌ها با ویرگول (مثلاً 1,2,3)؛ در صورت ارسال فقط کالاهای این دسته‌ها",
+    ),
+    _: None = Depends(require_business_permission_dep("products", "view")),
+) -> Dict[str, Any]:
+    parsed_cats: Optional[List[int]] = None
+    if category_ids and str(category_ids).strip():
+        parsed_cats = []
+        for part in str(category_ids).split(","):
+            p = part.strip()
+            if not p:
+                continue
+            try:
+                parsed_cats.append(int(p))
+            except ValueError:
+                continue
+        if not parsed_cats:
+            parsed_cats = None
+    result = list_recent_sales_invoice_products(
+        db, business_id, take=int(take), category_ids=parsed_cats
+    )
+    result["items"] = [
+        _apply_pricing_visibility_for_user(ctx, db, business_id, item)
+        for item in (result.get("items") or [])
+    ]
+    formatted = format_datetime_fields(result, request)
+    return success_response(data=formatted, request=request)
 
 
 @router.get(

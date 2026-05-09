@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, date, timedelta
 from sqlalchemy.orm import Session, load_only
-from sqlalchemy import select, and_, or_, func, case
+from sqlalchemy import select, and_, or_, func, case, desc
 from sqlalchemy.types import Numeric
 from decimal import Decimal
 import logging
@@ -539,6 +539,82 @@ def list_products(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[
         include_inventory=include_inventory,
         inventory_as_of_date=inventory_as_of_date,
     )
+
+
+def list_recent_sales_invoice_products(
+    db: Session,
+    business_id: int,
+    take: int = 10,
+    category_ids: Optional[List[int]] = None,
+) -> Dict[str, Any]:
+    """
+    کالاهایی که اخیراً در فاکتور فروش (غیر پیش‌فاکتور) در ردیف‌های فاکتور آمده‌اند،
+    به ترتیب جدیدترین فاکتور (بر اساس created_at سند).
+    """
+    from adapters.db.models.invoice_item_line import InvoiceItemLine
+    from adapters.db.models.document import Document
+    from app.services.invoice_service import INVOICE_SALES
+
+    take = max(1, min(50, int(take)))
+    last_at = func.max(Document.created_at).label("last_at")
+    stmt = (
+        select(InvoiceItemLine.product_id, last_at)
+        .join(Document, Document.id == InvoiceItemLine.document_id)
+        .where(
+            Document.business_id == int(business_id),
+            Document.document_type == INVOICE_SALES,
+            Document.is_proforma.is_(False),
+        )
+    )
+    if category_ids:
+        stmt = stmt.join(Product, Product.id == InvoiceItemLine.product_id).where(
+            Product.business_id == int(business_id),
+            Product.category_id.in_(list(category_ids)),
+        )
+    stmt = (
+        stmt.group_by(InvoiceItemLine.product_id)
+        .order_by(desc(last_at))
+        .limit(take * 3)
+    )
+    rows = list(db.execute(stmt).all())
+    ordered_ids: List[int] = []
+    for r in rows:
+        pid = r[0]
+        if pid is None:
+            continue
+        try:
+            ordered_ids.append(int(pid))
+        except (TypeError, ValueError):
+            continue
+
+    items: List[Dict[str, Any]] = []
+    seen: set[int] = set()
+    for pid in ordered_ids:
+        if pid in seen:
+            continue
+        seen.add(pid)
+        row = get_product(db, pid, business_id)
+        if row is None:
+            continue
+        if row.get("is_active") is False:
+            continue
+        items.append(row)
+        if len(items) >= take:
+            break
+
+    return {
+        "items": items,
+        "total_count": len(items),
+        "has_more": False,
+        "pagination": {
+            "total": len(items),
+            "page": 1,
+            "per_page": take,
+            "total_pages": 1,
+            "has_next": False,
+            "has_prev": False,
+        },
+    }
 
 
 def get_product(db: Session, product_id: int, business_id: int) -> Optional[Dict[str, Any]]:

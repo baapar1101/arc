@@ -202,6 +202,28 @@ class ProductService {
     return const <String, dynamic>{};
   }
 
+  /// کالاهایی که اخیراً در فاکتورهای فروش (غیر پیش‌فاکتور) در ردیف‌ها آمده‌اند.
+  Future<List<Map<String, dynamic>>> fetchRecentFromSalesInvoices({
+    required int businessId,
+    int take = 10,
+    List<int>? categoryIds,
+  }) async {
+    final query = <String, dynamic>{
+      'take': take,
+      if (categoryIds != null && categoryIds.isNotEmpty) 'category_ids': categoryIds.join(','),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/products/business/$businessId/recent-from-sales-invoices',
+      query: query,
+    );
+    final data = res.data?['data'];
+    final items = (data is Map<String, dynamic>) ? data['items'] : null;
+    if (items is List) {
+      return items.map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return const <Map<String, dynamic>>[];
+  }
+
   /// اعمال دسته‌ای قیمت پایه از نمای ویرایش گسترده.
   Future<Map<String, dynamic>> applyBulkProductPriceSheet({
     required int businessId,

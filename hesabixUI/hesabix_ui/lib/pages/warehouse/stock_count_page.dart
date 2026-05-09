@@ -368,7 +368,10 @@ class _StockCountPageState extends State<StockCountPage> {
       title: 'اقلام انبارگردانی',
       showSearch: true,
       showFilters: false,
-      showPagination: true,
+      // همهٔ اقلام در یک اسکرول صفحه؛ بدون صفحه‌بندی محلی
+      showPagination: false,
+      persistPageSize: false,
+      defaultPageSize: 100000,
       showColumnSearch: false,
       showExportButtons: false,
       enableSorting: false,
@@ -931,19 +934,14 @@ class _StockCountPageState extends State<StockCountPage> {
               },
             ),
           if (_rows.isNotEmpty && !isMobile)
-            SliverFillRemaining(
-              hasScrollBody: true,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: Card(
-                  child: SingleChildScrollView(
-                    child: DataTableWidget<Map<String, dynamic>>(
-                      config: _buildDesktopTableConfig(),
-                      fromJson: (json) => json,
-                      localRawItems: _rows.map((r) => r.raw).toList(),
-                      localSummary: null,
-                    ),
-                  ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              sliver: SliverToBoxAdapter(
+                child: DataTableWidget<Map<String, dynamic>>(
+                  config: _buildDesktopTableConfig(),
+                  fromJson: (json) => json,
+                  localRawItems: _rows.map((r) => r.raw).toList(),
+                  localSummary: null,
                 ),
               ),
             ),

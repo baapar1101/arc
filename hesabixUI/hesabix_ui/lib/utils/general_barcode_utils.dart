@@ -17,3 +17,20 @@ List<String> parseGeneralBarcodeTokens(String? raw) {
   }
   return out;
 }
+
+/// نمایش یک بارکد عمومی (اولین توکن) یا بارکد legacy برای لیست نتایج جستجو.
+String? productPrimaryBarcodeForSearchDisplay(
+  Map<String, dynamic> product, {
+  int maxLen = 56,
+}) {
+  final tokens = parseGeneralBarcodeTokens(product['general_barcodes']?.toString());
+  if (tokens.isNotEmpty) {
+    final t = tokens.first;
+    if (t.length <= maxLen) return t;
+    return '${t.substring(0, maxLen - 1)}…';
+  }
+  final legacy = product['barcode']?.toString().trim();
+  if (legacy == null || legacy.isEmpty) return null;
+  if (legacy.length <= maxLen) return legacy;
+  return '${legacy.substring(0, maxLen - 1)}…';
+}

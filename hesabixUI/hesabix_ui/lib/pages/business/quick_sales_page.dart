@@ -35,6 +35,8 @@ import '../../models/customer_model.dart';
 import 'package:go_router/go_router.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/barcode/mobile_barcode_scan_screen.dart';
+import '../../utils/general_barcode_utils.dart';
+import '../../utils/responsive_helper.dart';
 
 class QuickSalesPage extends StatefulWidget {
   final int businessId;
@@ -127,6 +129,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   int _barcodeSuggestionsSkip = 0;
   String _barcodeSuggestionsQuery = '';
   int _barcodeHighlightedIndex = -1;
+  /// جلوگیری از دوبار اجرا شدن انتخاب با دابل‌کلیک روی همان ردیف اورلی پیشنهادها.
+  DateTime? _lastOverlaySuggestionTapAt;
+  int? _lastOverlaySuggestionTapProductId;
+
   late final TabController _mobileTabController;
   int _mobileTabIndex = 0;
   Timer? _searchDebounce;
@@ -825,7 +831,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       taxRate: _toNum(product['sales_tax_rate'] ?? product['tax_rate']),
       trackInventory: trackInventory,
       warehouseId: instanceWarehouseId ?? _defaultWarehouseId,
-      basePurchasePriceMainUnit: _toNum(product['base_purchase_price']),
+      basePurchasePriceMainUnit: product['base_purchase_price'] != null
+          ? _toNum(product['base_purchase_price'])
+          : null,
       extraInfo: instanceId != null
           ? {
               'instance_id': instanceId,
@@ -1533,14 +1541,28 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               final selected = index == _barcodeHighlightedIndex;
               final name = product['name']?.toString() ?? 'نامشخص';
               final code = product['code']?.toString() ?? '';
+              final gb = productPrimaryBarcodeForSearchDisplay(product);
+              final subStyle = TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withOpacity(0.72),
+              );
               return Material(
                 color: selected ? cs.primary.withOpacity(0.10) : Colors.transparent,
                 child: ListTile(
                   dense: true,
                   leading: const Icon(Icons.inventory_2_outlined),
                   title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: code.isNotEmpty ? Text('کد: $code') : null,
-                  onTap: () => _selectBarcodeSuggestion(product),
+                  subtitle: (code.isNotEmpty || gb != null)
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (code.isNotEmpty) Text('کد: $code', style: subStyle),
+                            if (gb != null) Text('بارکد: $gb', style: subStyle),
+                          ],
+                        )
+                      : null,
+                  onTap: () => _onBarcodeOverlayRowTapped(product),
                 ),
               );
             },
@@ -1562,15 +1584,69 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (!mounted || !_isDesktopLike) return;
     if (query.isEmpty) {
       setState(() {
-        _barcodeSuggestions = const <Map<String, dynamic>>[];
-        _barcodeSuggestionsLoading = false;
+        _barcodeSuggestionsLoading = true;
         _barcodeSuggestionsLoadingMore = false;
         _barcodeSuggestionsHasMore = false;
         _barcodeSuggestionsSkip = 0;
         _barcodeSuggestionsQuery = '';
-        _barcodeHighlightedIndex = -1;
       });
       _barcodeOverlayEntry?.markNeedsBuild();
+      try {
+        final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
+        var items = await _productService.fetchRecentFromSalesInvoices(
+          businessId: widget.businessId,
+          take: 10,
+          categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
+        );
+        if (items.length < 5) {
+          final more = await _productService.searchProducts(
+            businessId: widget.businessId,
+            searchQuery: null,
+            limit: 15,
+            skip: 0,
+            searchFields: const ['code', 'name', 'barcode'],
+            categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
+          );
+          final merged = List<Map<String, dynamic>>.from(items);
+          final seen = <int>{};
+          for (final m in merged) {
+            final id = (m['id'] as num?)?.toInt();
+            if (id != null) seen.add(id);
+          }
+          for (final m in more) {
+            final id = (m['id'] as num?)?.toInt();
+            if (id == null || seen.contains(id)) continue;
+            seen.add(id);
+            merged.add(m);
+            if (merged.length >= 10) break;
+          }
+          items = merged;
+        }
+        if (!mounted) return;
+        setState(() {
+          _barcodeSuggestions = items;
+          _barcodeSuggestionsLoadingMore = false;
+          _barcodeSuggestionsHasMore = false;
+          _barcodeSuggestionsSkip = items.length;
+          _barcodeSuggestionsQuery = '';
+          _barcodeHighlightedIndex = items.isEmpty ? -1 : 0;
+        });
+        _ensureHighlightedSuggestionVisible();
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _barcodeSuggestions = const <Map<String, dynamic>>[];
+          _barcodeSuggestionsLoadingMore = false;
+          _barcodeSuggestionsHasMore = false;
+          _barcodeSuggestionsSkip = 0;
+          _barcodeHighlightedIndex = -1;
+        });
+      } finally {
+        if (mounted) {
+          setState(() => _barcodeSuggestionsLoading = false);
+          _barcodeOverlayEntry?.markNeedsBuild();
+        }
+      }
       return;
     }
     setState(() => _barcodeSuggestionsLoading = true);
@@ -1690,6 +1766,20 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     await _selectBarcodeSuggestion(_barcodeSuggestions[idx]);
   }
 
+  void _onBarcodeOverlayRowTapped(Map<String, dynamic> product) {
+    final id = (product['id'] as num?)?.toInt();
+    final now = DateTime.now();
+    if (id != null &&
+        _lastOverlaySuggestionTapProductId == id &&
+        _lastOverlaySuggestionTapAt != null &&
+        now.difference(_lastOverlaySuggestionTapAt!) < const Duration(milliseconds: 400)) {
+      return;
+    }
+    _lastOverlaySuggestionTapProductId = id;
+    _lastOverlaySuggestionTapAt = now;
+    unawaited(_selectBarcodeSuggestion(product));
+  }
+
   Future<void> _selectBarcodeSuggestion(Map<String, dynamic> product) async {
     await _addToCart(product);
     await _saveRecentProduct(product);
@@ -1723,13 +1813,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           _moveSuggestionHighlight(-1);
           return true;
         }
-        if (event.logicalKey == LogicalKeyboardKey.enter ||
-            event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-          if (_barcodeSuggestions.isNotEmpty) {
-            unawaited(_selectHighlightedBarcodeSuggestion());
-            return true;
-          }
-        }
+        // Enter روی پیشنهادها فقط در onSubmitted فیلد جستجو پردازش می‌شود؛
+        // تکرار اینجا باعث دو بار _addToCart می‌شد (KeyboardListener همیشه ignored برمی‌گرداند).
         if (event.logicalKey == LogicalKeyboardKey.escape) {
           if (_barcodeController.text.isNotEmpty || _barcodeSuggestions.isNotEmpty) {
             _removeBarcodeOverlay();
@@ -4213,7 +4298,9 @@ class _ProductSelectionDialog extends StatelessWidget {
                   final product = products[index];
                   final productName = product['name']?.toString() ?? 'نامشخص';
                   final productCode = product['code']?.toString();
-                  final barcode = product['barcode']?.toString();
+                  final showBarcodeLine = !ResponsiveHelper.isMobile(context);
+                  final barcodeLine =
+                      showBarcodeLine ? productPrimaryBarcodeForSearchDisplay(product) : null;
                   final salesPrice = product['base_sales_price'] ?? product['sales_price'];
                   
                   return ListTile(
@@ -4224,8 +4311,8 @@ class _ProductSelectionDialog extends StatelessWidget {
                       children: [
                         if (productCode != null && productCode.isNotEmpty)
                           Text('کد: $productCode'),
-                        if (barcode != null && barcode.isNotEmpty)
-                          Text('بارکد: $barcode'),
+                        if (barcodeLine != null && barcodeLine.isNotEmpty)
+                          Text('بارکد: $barcodeLine'),
                         if (salesPrice != null)
                           Text(
                             'قیمت: ${_formatNumber(_toNum(salesPrice))} ریال',

@@ -1823,7 +1823,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       unitConversionFactor: _toNum(p['unit_conversion_factor'], fallback: 1),
       selectedUnit: mainUnit,
       baseSalesPriceMainUnit: _toNum(p['base_sales_price']),
-      basePurchasePriceMainUnit: _toNum(p['base_purchase_price']),
+      basePurchasePriceMainUnit:
+          p['base_purchase_price'] != null ? _toNum(p['base_purchase_price']) : null,
       taxRate: taxRate,
       minOrderQty: _toInt(p['min_order_qty']),
       trackInventory: p['track_inventory'] == true,
