@@ -86,7 +86,7 @@ def get_facility_endpoint(
 ):
 	row = get_facility_by_id(db, facility_id, with_installments=True)
 	if not row:
-		raise ApiError("NOT_FOUND", "Facility not found", http_status=404)
+		raise ApiError("LOAN_FACILITY_NOT_FOUND", "Facility not found", http_status=404)
 	return success_response(data=format_datetime_fields(row, request), request=request, message="LOAN_FACILITY_FETCHED")
 
 
@@ -104,7 +104,7 @@ def update_facility_endpoint(
 ):
 	updated = update_facility(db, facility_id, dict(body or {}))
 	if updated is None:
-		raise ApiError("NOT_FOUND", "Facility not found", http_status=404)
+		raise ApiError("LOAN_FACILITY_NOT_FOUND", "Facility not found", http_status=404)
 	return success_response(data=format_datetime_fields(updated, request), request=request, message="LOAN_FACILITY_UPDATED")
 
 
@@ -121,11 +121,11 @@ def delete_facility_endpoint(
 ):
 	obj = db.get(ReceivedLoanFacility, facility_id)
 	if obj is None:
-		raise ApiError("NOT_FOUND", "Facility not found", http_status=404)
+		raise ApiError("LOAN_FACILITY_NOT_FOUND", "Facility not found", http_status=404)
 	business_id = obj.business_id
 	ok = delete_facility(db, facility_id, business_id)
 	if not ok:
-		raise ApiError("NOT_FOUND", "Facility not found", http_status=404)
+		raise ApiError("LOAN_FACILITY_NOT_FOUND", "Facility not found", http_status=404)
 	return success_response(data={"deleted": True}, request=request, message="LOAN_FACILITY_DELETED")
 
 
@@ -166,7 +166,7 @@ def pay_installment_endpoint(
 ):
 	f = db.get(ReceivedLoanFacility, facility_id)
 	if not f or f.business_id != business_id:
-		raise ApiError("NOT_FOUND", "Facility not found", http_status=404)
+		raise ApiError("LOAN_FACILITY_NOT_FOUND", "Facility not found", http_status=404)
 	user_id = ctx.get_user_id()
 	if not user_id:
 		raise ApiError("UNAUTHORIZED", "User required", http_status=401)
@@ -191,7 +191,7 @@ def delete_installment_payment_endpoint(
 ):
 	f = db.get(ReceivedLoanFacility, facility_id)
 	if not f or f.business_id != business_id:
-		raise ApiError("NOT_FOUND", "Facility not found", http_status=404)
+		raise ApiError("LOAN_FACILITY_NOT_FOUND", "Facility not found", http_status=404)
 	res = delete_loan_payment(db, business_id, facility_id, installment_id, payment_id)
 	return success_response(data=format_datetime_fields(res, request), request=request, message="LOAN_PAYMENT_DELETED")
 

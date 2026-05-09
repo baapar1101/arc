@@ -70,8 +70,8 @@ def _get_fixed_chart_account(db: Session, account_code: str) -> Account:
 	).first()
 	if not row:
 		raise ApiError(
-			"ACCOUNT_NOT_FOUND",
-			f"Chart account code {account_code} not found",
+			"LOAN_CHART_ACCOUNT_NOT_FOUND",
+			f"Chart account code {account_code} not found for loan posting",
 			http_status=500,
 		)
 	return row
@@ -127,7 +127,11 @@ def _create_balanced_manual_document(
 	td = sum(Decimal(str(x.get("debit", 0) or 0)) for x in lines_payload).quantize(Decimal("0.01"))
 	tc = sum(Decimal(str(x.get("credit", 0) or 0)) for x in lines_payload).quantize(Decimal("0.01"))
 	if td != tc or td <= 0:
-		raise ApiError("INVALID_DOCUMENT", "Loan accounting lines not balanced", http_status=400)
+		raise ApiError(
+			"LOAN_ACCOUNTING_LINES_UNBALANCED",
+			"Loan accounting lines not balanced",
+			http_status=400,
+		)
 	ensure_document_policy_allows_creation(
 		db,
 		business_id,
@@ -250,7 +254,11 @@ def post_installment_payment_document(
 	if total <= 0:
 		return None
 	if bank_account_id is None:
-		raise ApiError("BANK_REQUIRED", "Bank account required for installment payment accounting", http_status=400)
+		raise ApiError(
+			"LOAN_BANK_REQUIRED_FOR_PAYMENT_DOCUMENT",
+			"Bank account required for installment payment accounting",
+			http_status=400,
+		)
 
 	bank_ledger = _get_fixed_chart_account(db, BANK_LEDGER_ACCOUNT_CODE)
 	principal_acc = _get_fixed_chart_account(db, RECEIVED_LOAN_PRINCIPAL_PAYABLE_CODE)

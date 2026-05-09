@@ -259,6 +259,140 @@
   "businesses": "کسب‌وکارها",
   "deleteBusiness": "حذف کسب و کار",
   "loanFacilities": "تسهیلات دریافتی",
+  "loanFacilityReloadTooltip": "بارگذاری مجدد",
+  "loanFacilitySearchTitlesLabel": "جست‌وجو در عنوان",
+  "loanFacilityEmptyState": "قراردادی یافت نشد. با «افزودن» قرارداد جدید بسازید.",
+  "loanFacilityLoadMore": "بیشتر",
+  "loanFacilityValidationTitleRequired": "عنوان لازم است",
+  "loanFacilityValidationSelectCurrency": "ارز را انتخاب کنید",
+  "loanFacilityValidationPrincipalInvalid": "مبلغ اصل معتبر وارد کنید",
+  "loanFacilityDialogNewTitle": "قرارداد جدید",
+  "loanFacilityDialogEditTitle": "ویرایش قرارداد",
+  "loanFacilityFieldTitle": "عنوان *",
+  "loanFacilityFieldCurrency": "ارز *",
+  "loanFacilityFieldCurrencyHint": "انتخاب ارز",
+  "loanFacilityFieldPrincipal": "اصل وام *",
+  "loanFacilityFieldContractDate": "تاریخ قرارداد *",
+  "loanFacilityFieldContractDateHint": "انتخاب",
+  "loanFacilityFieldAnnualRate": "نرخ سود سالانه (٪)",
+  "loanFacilityFieldInstallmentCountOptional": "تعداد اقساط (اختیاری)",
+  "loanFacilityFieldFirstInstallment": "اولین سررسید قسط",
+  "loanFacilityFieldFirstInstallmentHint": "اختیاری",
+  "loanFacilityFieldLenderBank": "حساب بانکی وام‌دهنده",
+  "loanFacilityFieldNotes": "یادداشت",
+  "loanFacilityCurrencyId": "ارز #{id}",
+  "@loanFacilityCurrencyId": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "loanFacilityConfirmDeleteDraftTitle": "حذف پیش‌نویس؟",
+  "loanFacilityConfirmDeleteDraftBody": "این قرارداد و اقساطش حذف می‌شود.",
+  "loanFacilityDeleted": "حذف شد",
+  "loanFacilityScheduleUpdated": "جدول اقساط به‌روز شد",
+  "loanFacilityDeletePaymentTitle": "حذف پرداخت؟",
+  "loanFacilityDeletePaymentBody": "سند حسابداری مرتبط حذف و ماندهٔ قسط اصلاح می‌شود.",
+  "loanFacilityPaymentDeleted": "پرداخت حذف شد",
+  "loanFacilityRecordPaymentTitle": "ثبت پرداخت قسط",
+  "loanFacilityAmount": "مبلغ",
+  "loanFacilityBankAccount": "حساب بانکی",
+  "loanFacilityValidationAmountInvalid": "مبلغ معتبر وارد کنید",
+  "loanFacilityValidationPickBank": "حساب بانکی را انتخاب کنید",
+  "loanFacilityPaymentRecorded": "پرداخت ثبت شد",
+  "loanFacilityRetry": "تلاش مجدد",
+  "loanFacilityTooltipEdit": "ویرایش",
+  "loanFacilityTooltipDeleteDraft": "حذف پیش‌نویس",
+  "loanFacilityContractSummary": "خلاصهٔ قرارداد",
+  "loanFacilitySummaryStatus": "وضعیت",
+  "loanFacilitySummaryCurrency": "ارز",
+  "loanFacilitySummaryPrincipal": "اصل وام",
+  "loanFacilitySummaryAnnualRate": "نرخ سالانه",
+  "loanFacilitySummaryContractDate": "تاریخ قرارداد",
+  "loanFacilitySummaryFirstInstallment": "اولین قسط",
+  "loanFacilitySummaryInstallmentCount": "تعداد اقساط",
+  "loanFacilitySummaryScheduleMethod": "شیوهٔ اقساط",
+  "loanFacilitySummaryLenderBankId": "حساب وام‌دهنده",
+  "loanFacilitySummaryNotes": "یادداشت",
+  "loanFacilityDisbursementDocument": "سند دریافت وام / تنخواص",
+  "loanFacilityScheduleSection": "اقساط",
+  "loanFacilityRegenerateSchedule": "تولید / بازسازی جدول اقساط",
+  "loanFacilityInstallmentLine": "قسط {seq} · {due}",
+  "@loanFacilityInstallmentLine": {
+    "placeholders": {
+      "seq": {
+        "type": "String"
+      },
+      "due": {
+        "type": "String"
+      }
+    }
+  },
+  "loanFacilityRemainingPrincipalInterest": "مانده اصل / بهره: {principal} / {interest}",
+  "@loanFacilityRemainingPrincipalInterest": {
+    "placeholders": {
+      "principal": {
+        "type": "String"
+      },
+      "interest": {
+        "type": "String"
+      }
+    }
+  },
+  "loanFacilityRecordPayment": "ثبت پرداخت",
+  "loanFacilityDocumentNumber": "سند #{id}",
+  "@loanFacilityDocumentNumber": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "loanFacilityViewVoucher": "مشاهده سند",
+  "loanFacilityDeletePayment": "حذف پرداخت",
+  "loanFacilityPaymentPostingHint": "در صورت فعال بودن ثبت سند، سندهای استاندارد سیستم ثبت می‌شود.",
+  "loanFacilityRegenerateValidationCount": "تعداد اقساط معتبر وارد کنید",
+  "loanFacilityRegenerateValidationFirstDue": "تاریخ اولین قسط لازم است",
+  "loanFacilityRegenerateValidationDisburseBank": "برای ثبت سند، حساب بانکی تنخواه را انتخاب کنید",
+  "loanFacilityRegenerateDialogTitle": "جدول اقساط",
+  "loanFacilityRegenerateMethod": "شیوهٔ محاسبه",
+  "loanFacilityScheduleMethodAnnuity": "قساط ثابت (آنویتی)",
+  "loanFacilityScheduleMethodEqualPrincipal": "اصل مساوی",
+  "loanFacilityRegenerateCountRequired": "تعداد اقساط *",
+  "loanFacilityRegenerateFirstDueRequired": "اولین سررسید *",
+  "loanFacilityRegenerateDisburseBank": "حساب بانکی (تنخواه / واریز)",
+  "loanFacilityRegeneratePostAccounting": "ثبت سند حسابداری تنخواه",
+  "loanFacilityRegenerateApply": "اعمال",
+  "apiErrorLoanFacilityFinancialLocked": "پس از صدور یا فعال‌سازی جدول اقساط، امکان تغییر اطلاعات مالی نیست.",
+  "apiErrorLoanFacilityNotDraft": "فقط قراردادهای پیش‌نویس را می‌توان حذف کرد.",
+  "apiErrorLoanFacilityHasPayments": "به‌دلیل وجود پرداخت، این عمل مجاز نیست.",
+  "apiErrorLoanInvalidCurrency": "ارز الزامی است یا نامعتبر است.",
+  "apiErrorLoanInvalidPrincipal": "مبلغ اصل باید مثبت باشد.",
+  "apiErrorLoanContractDateRequired": "تاریخ قرارداد الزامی است یا نامعتبر است.",
+  "apiErrorLoanInvalidScheduleMethod": "شیوهٔ اقساط باید آنویتی یا اصل مساوی باشد.",
+  "apiErrorLoanInvalidInstallmentCount": "تعداد اقساط الزامی است و باید حداقل ۱ باشد.",
+  "apiErrorLoanFirstDueRequired": "تاریخ سررسید اولین قسط الزامی است.",
+  "apiErrorLoanBadSchedulePayload": "تعداد اقساط یا تاریخ سررسید نامعتبر است.",
+  "apiErrorLoanBankRequiredAccounting": "برای ثبت سند حسابداری، حساب بانکی لازم است.",
+  "apiErrorLoanBankCurrencyMismatch": "ارز حساب بانکی باید با ارز قرارداد یکسان باشد.",
+  "apiErrorLoanFacilityDraft": "قبل از ثبت پرداخت، ابتدا جدول اقساط را تولید کنید.",
+  "apiErrorLoanInvalidAmount": "مبلغ الزامی است و باید مثبت باشد.",
+  "apiErrorLoanInvalidPaymentDate": "تاریخ پرداخت نامعتبر است.",
+  "apiErrorLoanScheduleError": "امکان محاسبهٔ جدول اقساط وجود ندارد.",
+  "apiErrorLoanInvalidBankAccount": "حساب بانکی موجود نیست یا نامعتبر است.",
+  "apiErrorLoanInvalidRate": "نرخ سود سالانه نامعتبر است.",
+  "apiErrorLoanInvalidFirstInstallmentDate": "تاریخ اولین قسط نامعتبر است.",
+  "apiErrorLoanPaymentExceedsBalance": "مبلغ پرداخت بیش از ماندهٔ این قسط است.",
+  "apiErrorLoanAllocationError": "پرداخت به‌درستی تسویه نشد؛ مبلغ را کم کنید یا با پشتیبانی تماس بگیرید.",
+  "apiErrorLoanFacilityNotFound": "این قرارداد تسهیلات یافت نشد.",
+  "apiErrorLoanInstallmentNotFound": "این قسط یافت نشد.",
+  "apiErrorLoanPaymentNotFound": "این رکورد پرداخت یافت نشد.",
+  "apiErrorLoanFacilityMissingAfterCommit": "در ذخیرهٔ جدول اقساط مشکل پیش آمد. صفحه را بارگذاری مجدد کنید و دوباره تلاش کنید.",
+  "apiErrorLoanPaymentAccountingFailed": "ثبت سند حسابداری برای این پرداخت انجام نشد.",
+  "apiErrorLoanChartAccountNotFound": "حساب‌های کل استاندارد تسهیلات در سیستم نیست؛ با پشتیبانی تماس بگیرید.",
+  "apiErrorLoanAccountingLinesUnbalanced": "جمع بدهکار و بستانکار اسند نامتعادل است؛ با پشتیبانی تماس بگیرید.",
+  "apiErrorLoanBankRequiredForPaymentDocument": "برای ثبت سند حسابداری، حساب بانکی الزامی است.",
   "deleteBusinessConfirmTypeInstruction": "برای تأیید، دقیقاً کلمهٔ DELETE (انگلیسی) یا «حذف» را تایپ کنید.",
   "deleteBusinessConfirmTypeHint": "DELETE یا حذف",
   "invoiceLineItemsAddRowKeyboardHint": "راهنما: پشت‌سرهم و خارج از فیلدهای متنی، کلیدهای Q سپس I را بزنید تا ردیف اضافه شود.",

@@ -530,7 +530,7 @@ def regenerate_schedule(db: Session, facility_id: int, data: Dict[str, Any], act
 
 	obj = db.query(ReceivedLoanFacility).filter(ReceivedLoanFacility.id == facility_id).first()
 	if not obj:
-		raise ApiError("NOT_FOUND", "Facility not found", http_status=404)
+		raise ApiError("LOAN_FACILITY_NOT_FOUND", "Facility not found", http_status=404)
 
 	if _facility_has_payments(db, facility_id):
 		raise ApiError("HAS_PAYMENTS", "Cannot regenerate schedule after payments exist", http_status=409)
@@ -626,7 +626,11 @@ def regenerate_schedule(db: Session, facility_id: int, data: Dict[str, Any], act
 		.one_or_none()
 	)
 	if obj is None:
-		raise ApiError("NOT_FOUND", "Facility not found after schedule", http_status=500)
+		raise ApiError(
+			"LOAN_FACILITY_MISSING_AFTER_COMMIT",
+			"Facility not found after schedule",
+			http_status=500,
+		)
 	return facility_to_dict(obj, include_installments=True)
 
 
@@ -654,7 +658,7 @@ def record_payment(
 		.first()
 	)
 	if not inst:
-		raise ApiError("NOT_FOUND", "Installment not found", http_status=404)
+		raise ApiError("LOAN_INSTALLMENT_NOT_FOUND", "Installment not found", http_status=404)
 
 	if inst.facility.status == LoanFacilityStatuses.draft:
 		raise ApiError("FACILITY_DRAFT", "Activate schedule before recording payments", http_status=409)
@@ -789,7 +793,7 @@ def delete_loan_payment(
 		or pay_row.installment.facility_id != facility_id
 		or pay_row.installment.facility.business_id != business_id
 	):
-		raise ApiError("NOT_FOUND", "Payment not found", http_status=404)
+		raise ApiError("LOAN_PAYMENT_NOT_FOUND", "Payment not found", http_status=404)
 
 	inst = pay_row.installment
 	fac = inst.facility

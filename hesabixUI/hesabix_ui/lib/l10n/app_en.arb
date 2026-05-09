@@ -123,6 +123,140 @@
   "businesses": "Businesses",
   "deleteBusiness": "Delete Business",
   "loanFacilities": "Loan facilities",
+  "loanFacilityReloadTooltip": "Reload",
+  "loanFacilitySearchTitlesLabel": "Search titles",
+  "loanFacilityEmptyState": "No contracts yet. Tap add to create one.",
+  "loanFacilityLoadMore": "Load more",
+  "loanFacilityValidationTitleRequired": "Title is required",
+  "loanFacilityValidationSelectCurrency": "Select a currency",
+  "loanFacilityValidationPrincipalInvalid": "Enter a valid principal amount",
+  "loanFacilityDialogNewTitle": "New contract",
+  "loanFacilityDialogEditTitle": "Edit contract",
+  "loanFacilityFieldTitle": "Title *",
+  "loanFacilityFieldCurrency": "Currency *",
+  "loanFacilityFieldCurrencyHint": "Choose currency",
+  "loanFacilityFieldPrincipal": "Principal *",
+  "loanFacilityFieldContractDate": "Contract date *",
+  "loanFacilityFieldContractDateHint": "Pick",
+  "loanFacilityFieldAnnualRate": "Annual rate (%)",
+  "loanFacilityFieldInstallmentCountOptional": "Installment count (optional)",
+  "loanFacilityFieldFirstInstallment": "First installment date",
+  "loanFacilityFieldFirstInstallmentHint": "Optional",
+  "loanFacilityFieldLenderBank": "Lender bank account",
+  "loanFacilityFieldNotes": "Notes",
+  "loanFacilityCurrencyId": "Currency #{id}",
+  "@loanFacilityCurrencyId": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "loanFacilityConfirmDeleteDraftTitle": "Delete draft?",
+  "loanFacilityConfirmDeleteDraftBody": "This contract and its installments will be removed.",
+  "loanFacilityDeleted": "Deleted",
+  "loanFacilityScheduleUpdated": "Schedule updated",
+  "loanFacilityDeletePaymentTitle": "Delete payment?",
+  "loanFacilityDeletePaymentBody": "Linked accounting voucher will be removed and installment balances will be rolled back.",
+  "loanFacilityPaymentDeleted": "Payment deleted",
+  "loanFacilityRecordPaymentTitle": "Record installment payment",
+  "loanFacilityAmount": "Amount",
+  "loanFacilityBankAccount": "Bank account",
+  "loanFacilityValidationAmountInvalid": "Enter a valid amount",
+  "loanFacilityValidationPickBank": "Pick a bank account",
+  "loanFacilityPaymentRecorded": "Payment recorded",
+  "loanFacilityRetry": "Retry",
+  "loanFacilityTooltipEdit": "Edit",
+  "loanFacilityTooltipDeleteDraft": "Delete draft",
+  "loanFacilityContractSummary": "Contract summary",
+  "loanFacilitySummaryStatus": "Status",
+  "loanFacilitySummaryCurrency": "Currency",
+  "loanFacilitySummaryPrincipal": "Principal",
+  "loanFacilitySummaryAnnualRate": "Annual rate",
+  "loanFacilitySummaryContractDate": "Contract date",
+  "loanFacilitySummaryFirstInstallment": "First installment",
+  "loanFacilitySummaryInstallmentCount": "Installments",
+  "loanFacilitySummaryScheduleMethod": "Schedule method",
+  "loanFacilitySummaryLenderBankId": "Lender bank id",
+  "loanFacilitySummaryNotes": "Notes",
+  "loanFacilityDisbursementDocument": "Disbursement document",
+  "loanFacilityScheduleSection": "Schedule",
+  "loanFacilityRegenerateSchedule": "Generate / rebuild schedule",
+  "loanFacilityInstallmentLine": "Installment {seq} · {due}",
+  "@loanFacilityInstallmentLine": {
+    "placeholders": {
+      "seq": {
+        "type": "String"
+      },
+      "due": {
+        "type": "String"
+      }
+    }
+  },
+  "loanFacilityRemainingPrincipalInterest": "Rem. pr./int.: {principal} / {interest}",
+  "@loanFacilityRemainingPrincipalInterest": {
+    "placeholders": {
+      "principal": {
+        "type": "String"
+      },
+      "interest": {
+        "type": "String"
+      }
+    }
+  },
+  "loanFacilityRecordPayment": "Record payment",
+  "loanFacilityDocumentNumber": "Doc #{id}",
+  "@loanFacilityDocumentNumber": {
+    "placeholders": {
+      "id": {
+        "type": "String"
+      }
+    }
+  },
+  "loanFacilityViewVoucher": "View voucher",
+  "loanFacilityDeletePayment": "Delete payment",
+  "loanFacilityPaymentPostingHint": "If posting is enabled, standard system vouchers are created.",
+  "loanFacilityRegenerateValidationCount": "Enter a valid installment count",
+  "loanFacilityRegenerateValidationFirstDue": "First due date is required",
+  "loanFacilityRegenerateValidationDisburseBank": "Pick a bank account for disbursement posting",
+  "loanFacilityRegenerateDialogTitle": "Installment schedule",
+  "loanFacilityRegenerateMethod": "Method",
+  "loanFacilityScheduleMethodAnnuity": "Annuity",
+  "loanFacilityScheduleMethodEqualPrincipal": "Equal principal",
+  "loanFacilityRegenerateCountRequired": "Installment count *",
+  "loanFacilityRegenerateFirstDueRequired": "First due *",
+  "loanFacilityRegenerateDisburseBank": "Bank account (disbursement)",
+  "loanFacilityRegeneratePostAccounting": "Post disbursement voucher",
+  "loanFacilityRegenerateApply": "Apply",
+  "apiErrorLoanFacilityFinancialLocked": "Financial details cannot be changed after scheduling or activating the contract.",
+  "apiErrorLoanFacilityNotDraft": "Only draft contracts can be deleted.",
+  "apiErrorLoanFacilityHasPayments": "This action is not allowed because payments already exist.",
+  "apiErrorLoanInvalidCurrency": "Currency is required or invalid.",
+  "apiErrorLoanInvalidPrincipal": "Principal must be a positive amount.",
+  "apiErrorLoanContractDateRequired": "Contract date is required or invalid.",
+  "apiErrorLoanInvalidScheduleMethod": "Schedule method must be annuity or equal principal.",
+  "apiErrorLoanInvalidInstallmentCount": "Installment count is required and must be at least 1.",
+  "apiErrorLoanFirstDueRequired": "First installment due date is required.",
+  "apiErrorLoanBadSchedulePayload": "Invalid installment count or due date.",
+  "apiErrorLoanBankRequiredAccounting": "A bank account is required to post the accounting voucher.",
+  "apiErrorLoanBankCurrencyMismatch": "The bank account currency must match the contract currency.",
+  "apiErrorLoanFacilityDraft": "Generate the installment schedule before recording payments.",
+  "apiErrorLoanInvalidAmount": "Amount is required and must be positive.",
+  "apiErrorLoanInvalidPaymentDate": "Payment date is invalid.",
+  "apiErrorLoanScheduleError": "Could not calculate the installment schedule.",
+  "apiErrorLoanInvalidBankAccount": "Bank account is missing or invalid.",
+  "apiErrorLoanInvalidRate": "Annual interest rate is invalid.",
+  "apiErrorLoanInvalidFirstInstallmentDate": "First installment date is invalid.",
+  "apiErrorLoanPaymentExceedsBalance": "Payment amount exceeds the remaining balance for this installment.",
+  "apiErrorLoanAllocationError": "The payment could not be applied correctly. Try a smaller amount or contact support.",
+  "apiErrorLoanFacilityNotFound": "This loan contract was not found.",
+  "apiErrorLoanInstallmentNotFound": "This installment was not found.",
+  "apiErrorLoanPaymentNotFound": "This payment record was not found.",
+  "apiErrorLoanFacilityMissingAfterCommit": "Something went wrong while saving the schedule. Refresh the page and try again.",
+  "apiErrorLoanPaymentAccountingFailed": "The accounting voucher for this payment could not be created.",
+  "apiErrorLoanChartAccountNotFound": "Required chart accounts for loan posting are missing. Contact support.",
+  "apiErrorLoanAccountingLinesUnbalanced": "Loan accounting totals do not balance. Contact support.",
+  "apiErrorLoanBankRequiredForPaymentDocument": "A bank account is required to register the accounting voucher.",
   "deleteBusinessConfirmTypeInstruction": "To confirm, type DELETE in English or «حذف» in Persian, exactly as shown.",
   "deleteBusinessConfirmTypeHint": "DELETE or حذف",
   "invoiceLineItemsAddRowKeyboardHint": "Tip: Press Q then I in quick succession to add rows (outside text fields).",

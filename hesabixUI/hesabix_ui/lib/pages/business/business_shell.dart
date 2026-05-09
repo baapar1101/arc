@@ -49,6 +49,7 @@ import 'receipts_payments_list_page.dart';
 import 'expense_income_list_page.dart';
 import 'transfers_page.dart';
 import 'documents_page.dart';
+import 'loan_facilities_page.dart';
 import 'business_shell_side_nav_scope.dart';
 
 class BusinessShell extends StatefulWidget {
@@ -1925,6 +1926,36 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    void _refreshLoanFacilitiesPageIfOpen() {
+      try {
+        final currentPath = GoRouterState.of(context).uri.path;
+        final lfPath = _bu('loan-facilities');
+        if (currentPath == lfPath) {
+          final pageState = LoanFacilitiesPage.getPageState(widget.businessId);
+          if (pageState != null && pageState.mounted) {
+            pageState.refresh();
+            return;
+          }
+        }
+      } catch (_) {
+        _refreshCurrentPage();
+      }
+    }
+
+    Future<void> showLoanFacilityCreateDialog() async {
+      if (!context.mounted) return;
+      final ctx = context;
+      final calendarController = widget.calendarController ?? await CalendarController.load();
+      if (!ctx.mounted) return;
+      await LoanFacilitiesPage.showUpsertFacilityDialog(
+        context: ctx,
+        businessId: widget.businessId,
+        calendarController: calendarController,
+        authStore: widget.authStore,
+        onSuccess: _refreshLoanFacilitiesPageIfOpen,
+      );
+    }
+
     Future<void> showAddWarehouseDialog() async {
       final result = await WarehouseFormDialog.show(
         context,
@@ -2422,6 +2453,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                             context.go('${_bu('crm/deals')}?openAdd=1');
                                           } else if (child.label == 'فعالیت‌ها') {
                                             context.go('${_bu('crm/activities')}?openAdd=1');
+                                          } else if (child.label == t.loanFacilities) {
+                                            showLoanFacilityCreateDialog();
                                           }
                                         },
                                         child: Container(
@@ -2840,6 +2873,8 @@ class _BusinessShellState extends State<BusinessShell> {
                               context.go('${_bu('crm/deals')}?openAdd=1');
                             } else if (child.label == 'فعالیت‌ها') {
                               context.go('${_bu('crm/activities')}?openAdd=1');
+                            } else if (child.label == t.loanFacilities) {
+                              showLoanFacilityCreateDialog();
                             }
                           },
                           child: Container(

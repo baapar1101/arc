@@ -53,6 +53,24 @@ class LoanFacilitiesService {
     return unwrapDataEnvelope(res.data);
   }
 
+  Future<Map<String, dynamic>> updateFacility({
+    required int facilityId,
+    required Map<String, dynamic> body,
+  }) async {
+    final res = await _api.patch(
+      '/loan-facilities/$facilityId',
+      data: body,
+    );
+    return unwrapDataEnvelope(res.data);
+  }
+
+  Future<Map<String, dynamic>> deleteFacility({
+    required int facilityId,
+  }) async {
+    final res = await _api.delete('/loan-facilities/$facilityId');
+    return unwrapDataEnvelope(res.data);
+  }
+
   Future<Map<String, dynamic>> getDetail({
     required int facilityId,
   }) async {

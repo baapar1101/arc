@@ -62,8 +62,7 @@ import 'app_localizations_fa.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -71,8 +70,7 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate =
-      _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -84,18 +82,17 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-      <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('fa'),
+    Locale('fa')
   ];
 
   /// No description provided for @appTitle.
@@ -678,11 +675,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Requested: {total} | Found: {found} | Will update: {willUpdate}'**
-  String bulkDefaultWarehousePreviewSummary(
-    String total,
-    String found,
-    String willUpdate,
-  );
+  String bulkDefaultWarehousePreviewSummary(String total, String found, String willUpdate);
 
   /// No description provided for @bulkDefaultWarehouseSkippedCount.
   ///
@@ -706,12 +699,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Requested: {total} | Found: {found} | Updated: {updated} | Skipped: {skipped}'**
-  String bulkDefaultWarehouseApplySummary(
-    String total,
-    String found,
-    String updated,
-    String skipped,
-  );
+  String bulkDefaultWarehouseApplySummary(String total, String found, String updated, String skipped);
 
   /// No description provided for @bulkDefaultWarehouseReasonAlreadySet.
   ///
@@ -766,6 +754,606 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loan facilities'**
   String get loanFacilities;
+
+  /// No description provided for @loanFacilityReloadTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get loanFacilityReloadTooltip;
+
+  /// No description provided for @loanFacilitySearchTitlesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search titles'**
+  String get loanFacilitySearchTitlesLabel;
+
+  /// No description provided for @loanFacilityEmptyState.
+  ///
+  /// In en, this message translates to:
+  /// **'No contracts yet. Tap add to create one.'**
+  String get loanFacilityEmptyState;
+
+  /// No description provided for @loanFacilityLoadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get loanFacilityLoadMore;
+
+  /// No description provided for @loanFacilityValidationTitleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Title is required'**
+  String get loanFacilityValidationTitleRequired;
+
+  /// No description provided for @loanFacilityValidationSelectCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a currency'**
+  String get loanFacilityValidationSelectCurrency;
+
+  /// No description provided for @loanFacilityValidationPrincipalInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid principal amount'**
+  String get loanFacilityValidationPrincipalInvalid;
+
+  /// No description provided for @loanFacilityDialogNewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New contract'**
+  String get loanFacilityDialogNewTitle;
+
+  /// No description provided for @loanFacilityDialogEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit contract'**
+  String get loanFacilityDialogEditTitle;
+
+  /// No description provided for @loanFacilityFieldTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title *'**
+  String get loanFacilityFieldTitle;
+
+  /// No description provided for @loanFacilityFieldCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency *'**
+  String get loanFacilityFieldCurrency;
+
+  /// No description provided for @loanFacilityFieldCurrencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose currency'**
+  String get loanFacilityFieldCurrencyHint;
+
+  /// No description provided for @loanFacilityFieldPrincipal.
+  ///
+  /// In en, this message translates to:
+  /// **'Principal *'**
+  String get loanFacilityFieldPrincipal;
+
+  /// No description provided for @loanFacilityFieldContractDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract date *'**
+  String get loanFacilityFieldContractDate;
+
+  /// No description provided for @loanFacilityFieldContractDateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick'**
+  String get loanFacilityFieldContractDateHint;
+
+  /// No description provided for @loanFacilityFieldAnnualRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual rate (%)'**
+  String get loanFacilityFieldAnnualRate;
+
+  /// No description provided for @loanFacilityFieldInstallmentCountOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment count (optional)'**
+  String get loanFacilityFieldInstallmentCountOptional;
+
+  /// No description provided for @loanFacilityFieldFirstInstallment.
+  ///
+  /// In en, this message translates to:
+  /// **'First installment date'**
+  String get loanFacilityFieldFirstInstallment;
+
+  /// No description provided for @loanFacilityFieldFirstInstallmentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional'**
+  String get loanFacilityFieldFirstInstallmentHint;
+
+  /// No description provided for @loanFacilityFieldLenderBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Lender bank account'**
+  String get loanFacilityFieldLenderBank;
+
+  /// No description provided for @loanFacilityFieldNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get loanFacilityFieldNotes;
+
+  /// No description provided for @loanFacilityCurrencyId.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency #{id}'**
+  String loanFacilityCurrencyId(String id);
+
+  /// No description provided for @loanFacilityConfirmDeleteDraftTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete draft?'**
+  String get loanFacilityConfirmDeleteDraftTitle;
+
+  /// No description provided for @loanFacilityConfirmDeleteDraftBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This contract and its installments will be removed.'**
+  String get loanFacilityConfirmDeleteDraftBody;
+
+  /// No description provided for @loanFacilityDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get loanFacilityDeleted;
+
+  /// No description provided for @loanFacilityScheduleUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule updated'**
+  String get loanFacilityScheduleUpdated;
+
+  /// No description provided for @loanFacilityDeletePaymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete payment?'**
+  String get loanFacilityDeletePaymentTitle;
+
+  /// No description provided for @loanFacilityDeletePaymentBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked accounting voucher will be removed and installment balances will be rolled back.'**
+  String get loanFacilityDeletePaymentBody;
+
+  /// No description provided for @loanFacilityPaymentDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment deleted'**
+  String get loanFacilityPaymentDeleted;
+
+  /// No description provided for @loanFacilityRecordPaymentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record installment payment'**
+  String get loanFacilityRecordPaymentTitle;
+
+  /// No description provided for @loanFacilityAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get loanFacilityAmount;
+
+  /// No description provided for @loanFacilityBankAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account'**
+  String get loanFacilityBankAccount;
+
+  /// No description provided for @loanFacilityValidationAmountInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid amount'**
+  String get loanFacilityValidationAmountInvalid;
+
+  /// No description provided for @loanFacilityValidationPickBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a bank account'**
+  String get loanFacilityValidationPickBank;
+
+  /// No description provided for @loanFacilityPaymentRecorded.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment recorded'**
+  String get loanFacilityPaymentRecorded;
+
+  /// No description provided for @loanFacilityRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get loanFacilityRetry;
+
+  /// No description provided for @loanFacilityTooltipEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get loanFacilityTooltipEdit;
+
+  /// No description provided for @loanFacilityTooltipDeleteDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete draft'**
+  String get loanFacilityTooltipDeleteDraft;
+
+  /// No description provided for @loanFacilityContractSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract summary'**
+  String get loanFacilityContractSummary;
+
+  /// No description provided for @loanFacilitySummaryStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get loanFacilitySummaryStatus;
+
+  /// No description provided for @loanFacilitySummaryCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency'**
+  String get loanFacilitySummaryCurrency;
+
+  /// No description provided for @loanFacilitySummaryPrincipal.
+  ///
+  /// In en, this message translates to:
+  /// **'Principal'**
+  String get loanFacilitySummaryPrincipal;
+
+  /// No description provided for @loanFacilitySummaryAnnualRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual rate'**
+  String get loanFacilitySummaryAnnualRate;
+
+  /// No description provided for @loanFacilitySummaryContractDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract date'**
+  String get loanFacilitySummaryContractDate;
+
+  /// No description provided for @loanFacilitySummaryFirstInstallment.
+  ///
+  /// In en, this message translates to:
+  /// **'First installment'**
+  String get loanFacilitySummaryFirstInstallment;
+
+  /// No description provided for @loanFacilitySummaryInstallmentCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Installments'**
+  String get loanFacilitySummaryInstallmentCount;
+
+  /// No description provided for @loanFacilitySummaryScheduleMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule method'**
+  String get loanFacilitySummaryScheduleMethod;
+
+  /// No description provided for @loanFacilitySummaryLenderBankId.
+  ///
+  /// In en, this message translates to:
+  /// **'Lender bank id'**
+  String get loanFacilitySummaryLenderBankId;
+
+  /// No description provided for @loanFacilitySummaryNotes.
+  ///
+  /// In en, this message translates to:
+  /// **'Notes'**
+  String get loanFacilitySummaryNotes;
+
+  /// No description provided for @loanFacilityDisbursementDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Disbursement document'**
+  String get loanFacilityDisbursementDocument;
+
+  /// No description provided for @loanFacilityScheduleSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get loanFacilityScheduleSection;
+
+  /// No description provided for @loanFacilityRegenerateSchedule.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate / rebuild schedule'**
+  String get loanFacilityRegenerateSchedule;
+
+  /// No description provided for @loanFacilityInstallmentLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment {seq} · {due}'**
+  String loanFacilityInstallmentLine(String seq, String due);
+
+  /// No description provided for @loanFacilityRemainingPrincipalInterest.
+  ///
+  /// In en, this message translates to:
+  /// **'Rem. pr./int.: {principal} / {interest}'**
+  String loanFacilityRemainingPrincipalInterest(String principal, String interest);
+
+  /// No description provided for @loanFacilityRecordPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Record payment'**
+  String get loanFacilityRecordPayment;
+
+  /// No description provided for @loanFacilityDocumentNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Doc #{id}'**
+  String loanFacilityDocumentNumber(String id);
+
+  /// No description provided for @loanFacilityViewVoucher.
+  ///
+  /// In en, this message translates to:
+  /// **'View voucher'**
+  String get loanFacilityViewVoucher;
+
+  /// No description provided for @loanFacilityDeletePayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete payment'**
+  String get loanFacilityDeletePayment;
+
+  /// No description provided for @loanFacilityPaymentPostingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If posting is enabled, standard system vouchers are created.'**
+  String get loanFacilityPaymentPostingHint;
+
+  /// No description provided for @loanFacilityRegenerateValidationCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid installment count'**
+  String get loanFacilityRegenerateValidationCount;
+
+  /// No description provided for @loanFacilityRegenerateValidationFirstDue.
+  ///
+  /// In en, this message translates to:
+  /// **'First due date is required'**
+  String get loanFacilityRegenerateValidationFirstDue;
+
+  /// No description provided for @loanFacilityRegenerateValidationDisburseBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a bank account for disbursement posting'**
+  String get loanFacilityRegenerateValidationDisburseBank;
+
+  /// No description provided for @loanFacilityRegenerateDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment schedule'**
+  String get loanFacilityRegenerateDialogTitle;
+
+  /// No description provided for @loanFacilityRegenerateMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Method'**
+  String get loanFacilityRegenerateMethod;
+
+  /// No description provided for @loanFacilityScheduleMethodAnnuity.
+  ///
+  /// In en, this message translates to:
+  /// **'Annuity'**
+  String get loanFacilityScheduleMethodAnnuity;
+
+  /// No description provided for @loanFacilityScheduleMethodEqualPrincipal.
+  ///
+  /// In en, this message translates to:
+  /// **'Equal principal'**
+  String get loanFacilityScheduleMethodEqualPrincipal;
+
+  /// No description provided for @loanFacilityRegenerateCountRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment count *'**
+  String get loanFacilityRegenerateCountRequired;
+
+  /// No description provided for @loanFacilityRegenerateFirstDueRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'First due *'**
+  String get loanFacilityRegenerateFirstDueRequired;
+
+  /// No description provided for @loanFacilityRegenerateDisburseBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account (disbursement)'**
+  String get loanFacilityRegenerateDisburseBank;
+
+  /// No description provided for @loanFacilityRegeneratePostAccounting.
+  ///
+  /// In en, this message translates to:
+  /// **'Post disbursement voucher'**
+  String get loanFacilityRegeneratePostAccounting;
+
+  /// No description provided for @loanFacilityRegenerateApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get loanFacilityRegenerateApply;
+
+  /// No description provided for @apiErrorLoanFacilityFinancialLocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial details cannot be changed after scheduling or activating the contract.'**
+  String get apiErrorLoanFacilityFinancialLocked;
+
+  /// No description provided for @apiErrorLoanFacilityNotDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Only draft contracts can be deleted.'**
+  String get apiErrorLoanFacilityNotDraft;
+
+  /// No description provided for @apiErrorLoanFacilityHasPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'This action is not allowed because payments already exist.'**
+  String get apiErrorLoanFacilityHasPayments;
+
+  /// No description provided for @apiErrorLoanInvalidCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency is required or invalid.'**
+  String get apiErrorLoanInvalidCurrency;
+
+  /// No description provided for @apiErrorLoanInvalidPrincipal.
+  ///
+  /// In en, this message translates to:
+  /// **'Principal must be a positive amount.'**
+  String get apiErrorLoanInvalidPrincipal;
+
+  /// No description provided for @apiErrorLoanContractDateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract date is required or invalid.'**
+  String get apiErrorLoanContractDateRequired;
+
+  /// No description provided for @apiErrorLoanInvalidScheduleMethod.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule method must be annuity or equal principal.'**
+  String get apiErrorLoanInvalidScheduleMethod;
+
+  /// No description provided for @apiErrorLoanInvalidInstallmentCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment count is required and must be at least 1.'**
+  String get apiErrorLoanInvalidInstallmentCount;
+
+  /// No description provided for @apiErrorLoanFirstDueRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'First installment due date is required.'**
+  String get apiErrorLoanFirstDueRequired;
+
+  /// No description provided for @apiErrorLoanBadSchedulePayload.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid installment count or due date.'**
+  String get apiErrorLoanBadSchedulePayload;
+
+  /// No description provided for @apiErrorLoanBankRequiredAccounting.
+  ///
+  /// In en, this message translates to:
+  /// **'A bank account is required to post the accounting voucher.'**
+  String get apiErrorLoanBankRequiredAccounting;
+
+  /// No description provided for @apiErrorLoanBankCurrencyMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'The bank account currency must match the contract currency.'**
+  String get apiErrorLoanBankCurrencyMismatch;
+
+  /// No description provided for @apiErrorLoanFacilityDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate the installment schedule before recording payments.'**
+  String get apiErrorLoanFacilityDraft;
+
+  /// No description provided for @apiErrorLoanInvalidAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount is required and must be positive.'**
+  String get apiErrorLoanInvalidAmount;
+
+  /// No description provided for @apiErrorLoanInvalidPaymentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment date is invalid.'**
+  String get apiErrorLoanInvalidPaymentDate;
+
+  /// No description provided for @apiErrorLoanScheduleError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not calculate the installment schedule.'**
+  String get apiErrorLoanScheduleError;
+
+  /// No description provided for @apiErrorLoanInvalidBankAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account is missing or invalid.'**
+  String get apiErrorLoanInvalidBankAccount;
+
+  /// No description provided for @apiErrorLoanInvalidRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Annual interest rate is invalid.'**
+  String get apiErrorLoanInvalidRate;
+
+  /// No description provided for @apiErrorLoanInvalidFirstInstallmentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'First installment date is invalid.'**
+  String get apiErrorLoanInvalidFirstInstallmentDate;
+
+  /// No description provided for @apiErrorLoanPaymentExceedsBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment amount exceeds the remaining balance for this installment.'**
+  String get apiErrorLoanPaymentExceedsBalance;
+
+  /// No description provided for @apiErrorLoanAllocationError.
+  ///
+  /// In en, this message translates to:
+  /// **'The payment could not be applied correctly. Try a smaller amount or contact support.'**
+  String get apiErrorLoanAllocationError;
+
+  /// No description provided for @apiErrorLoanFacilityNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This loan contract was not found.'**
+  String get apiErrorLoanFacilityNotFound;
+
+  /// No description provided for @apiErrorLoanInstallmentNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This installment was not found.'**
+  String get apiErrorLoanInstallmentNotFound;
+
+  /// No description provided for @apiErrorLoanPaymentNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This payment record was not found.'**
+  String get apiErrorLoanPaymentNotFound;
+
+  /// No description provided for @apiErrorLoanFacilityMissingAfterCommit.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong while saving the schedule. Refresh the page and try again.'**
+  String get apiErrorLoanFacilityMissingAfterCommit;
+
+  /// No description provided for @apiErrorLoanPaymentAccountingFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The accounting voucher for this payment could not be created.'**
+  String get apiErrorLoanPaymentAccountingFailed;
+
+  /// No description provided for @apiErrorLoanChartAccountNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'Required chart accounts for loan posting are missing. Contact support.'**
+  String get apiErrorLoanChartAccountNotFound;
+
+  /// No description provided for @apiErrorLoanAccountingLinesUnbalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Loan accounting totals do not balance. Contact support.'**
+  String get apiErrorLoanAccountingLinesUnbalanced;
+
+  /// No description provided for @apiErrorLoanBankRequiredForPaymentDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'A bank account is required to register the accounting voucher.'**
+  String get apiErrorLoanBankRequiredForPaymentDocument;
 
   /// No description provided for @deleteBusinessConfirmTypeInstruction.
   ///
@@ -22854,8 +23442,7 @@ abstract class AppLocalizations {
   String get mobileLauncherQuickSalesTile;
 }
 
-class _AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -22864,26 +23451,25 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      <String>['en', 'fa'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['en', 'fa'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'en':
-      return AppLocalizationsEn();
-    case 'fa':
-      return AppLocalizationsFa();
+    case 'en': return AppLocalizationsEn();
+    case 'fa': return AppLocalizationsFa();
   }
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
     'an issue with the localizations generation tool. Please file an issue '
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
+    'that was used.'
   );
 }

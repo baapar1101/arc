@@ -56,6 +56,83 @@ class ErrorExtractor {
         return t.apiErrorBusinessUsersNotAMemberLeave;
       case 'BUSINESS_USERS_LEAVE_FAILED':
         return t.apiErrorBusinessUsersLeaveFailed;
+
+      case 'NO_FISCAL_YEAR':
+        return t.apiErrorNoFiscalYearForDate;
+      case 'FISCAL_YEAR_LOCKED':
+        return t.apiErrorFiscalYearLockedForPosting;
+      case 'DOCUMENT_CODE_RACE':
+        return t.apiErrorDocumentCodeRace;
+
+      case 'LOAN_FACILITY_NOT_FOUND':
+        return t.apiErrorLoanFacilityNotFound;
+      case 'LOAN_INSTALLMENT_NOT_FOUND':
+        return t.apiErrorLoanInstallmentNotFound;
+      case 'LOAN_PAYMENT_NOT_FOUND':
+        return t.apiErrorLoanPaymentNotFound;
+      case 'LOAN_FACILITY_MISSING_AFTER_COMMIT':
+        return t.apiErrorLoanFacilityMissingAfterCommit;
+      case 'PAYMENT_ACCOUNTING_FAILED':
+        return t.apiErrorLoanPaymentAccountingFailed;
+      case 'LOAN_CHART_ACCOUNT_NOT_FOUND':
+        return t.apiErrorLoanChartAccountNotFound;
+      case 'LOAN_ACCOUNTING_LINES_UNBALANCED':
+        return t.apiErrorLoanAccountingLinesUnbalanced;
+      case 'LOAN_BANK_REQUIRED_FOR_PAYMENT_DOCUMENT':
+        return t.apiErrorLoanBankRequiredForPaymentDocument;
+
+      case 'FACILITY_FINANCIAL_LOCKED':
+        return t.apiErrorLoanFacilityFinancialLocked;
+      case 'FACILITY_NOT_DRAFT':
+        return t.apiErrorLoanFacilityNotDraft;
+      case 'HAS_PAYMENTS':
+        return t.apiErrorLoanFacilityHasPayments;
+
+      case 'INVALID_CURRENCY':
+        return t.apiErrorLoanInvalidCurrency;
+      case 'INVALID_PRINCIPAL':
+        return t.apiErrorLoanInvalidPrincipal;
+      case 'CONTRACT_DATE_REQUIRED':
+      case 'INVALID_CONTRACT_DATE':
+        return t.apiErrorLoanContractDateRequired;
+
+      case 'INVALID_RATE':
+        return t.apiErrorLoanInvalidRate;
+      case 'INVALID_FIRST_INSTALLMENT_DATE':
+        return t.apiErrorLoanInvalidFirstInstallmentDate;
+
+      case 'INVALID_SCHEDULE_METHOD':
+        return t.apiErrorLoanInvalidScheduleMethod;
+      case 'INVALID_INSTALLMENT_COUNT':
+        return t.apiErrorLoanInvalidInstallmentCount;
+      case 'FIRST_DUE_REQUIRED':
+        return t.apiErrorLoanFirstDueRequired;
+      case 'BAD_SCHEDULE_PAYLOAD':
+        return t.apiErrorLoanBadSchedulePayload;
+
+      case 'BANK_REQUIRED_FOR_ACCOUNTING':
+        return t.apiErrorLoanBankRequiredAccounting;
+      case 'BANK_CURRENCY_MISMATCH':
+        return t.apiErrorLoanBankCurrencyMismatch;
+      case 'FACILITY_DRAFT':
+        return t.apiErrorLoanFacilityDraft;
+
+      case 'INVALID_AMOUNT':
+        return t.apiErrorLoanInvalidAmount;
+      case 'PAYMENT_EXCEEDS_BALANCE':
+        return t.apiErrorLoanPaymentExceedsBalance;
+      case 'ALLOCATION_ERROR':
+        return t.apiErrorLoanAllocationError;
+      case 'INVALID_PAYMENT_DATE':
+        return t.apiErrorLoanInvalidPaymentDate;
+      case 'SCHEDULE_ERROR':
+        return t.apiErrorLoanScheduleError;
+      case 'INVALID_BANK_ACCOUNT':
+        return t.apiErrorLoanInvalidBankAccount;
+
+      case 'TITLE_REQUIRED':
+        return t.loanFacilityValidationTitleRequired;
+
       default:
         return null;
     }
