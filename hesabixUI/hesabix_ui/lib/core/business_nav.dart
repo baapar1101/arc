@@ -32,9 +32,21 @@ String? redirectLegacyBusinessPath(BuildContext context, GoRouterState state) {
   return base.replace(queryParameters: state.uri.queryParameters).toString();
 }
 
+/// مسیر URI فعلی برای ناوبری کسب‌وکار؛ از [GoRouter] در صورت موجود بودن استفاده می‌کند
+/// تا زمانی که [GoRouterState] در دسترس نباشد (مثل context پس از بستن دیالوگ).
+String _currentGoRouterPath(BuildContext context) {
+  final router = GoRouter.maybeOf(context);
+  if (router != null) {
+    return router.state.uri.path;
+  }
+  return GoRouterState.of(context).uri.path;
+}
+
 extension BusinessNavContext on BuildContext {
   int businessTabSlot(int businessId) {
-    final path = GoRouterState.of(this).uri.path;
+    // GoRouterState فقط زیر RouteBase.builder است؛ context ریشهٔ Navigator
+    // (مثلاً بعد از بستن دیالوگ با navigatorKey) معمولاً GoRouterState ندارد.
+    final path = _currentGoRouterPath(this);
     final fromUrl = BusinessRoutePaths.parseTabSlotFromPath(path);
     if (fromUrl != null) return fromUrl;
     final session = BusinessPanelUiStore.instance.tabsForBusiness(businessId);
