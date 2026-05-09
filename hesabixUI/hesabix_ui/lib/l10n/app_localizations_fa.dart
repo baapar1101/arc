@@ -6694,6 +6694,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get maintenanceMode => 'حالت تعمیرات';
 
   @override
+  String get supportTicketsUserSectionTitle => 'تیکت پشتیبانی کاربران';
+
+  @override
+  String get supportTicketsAllowUsersLabel => 'امکان ثبت و مشاهده تیکت برای کاربران عادی';
+
+  @override
+  String get supportTicketsAllowUsersDescription => 'در صورت غیرفعال، متن پیام زیر به کاربران نشان داده می‌شود. اپراتورهای پشتیبانی به پنل اپراتور دسترسی دارند.';
+
+  @override
+  String get supportTicketsDisabledNoticeLabel => 'متن پیام برای کاربر (وقتی خاموش است)';
+
+  @override
+  String get supportTicketsDisabledNoticeHint => 'خالی بگذارید تا پیام پیش‌فرض سیستم استفاده شود.';
+
+  @override
+  String get supportTicketsUnavailableBody => 'بخش تیکت‌های پشتیبانی موقتاً غیرفعال است.';
+
+  @override
   String get unlimited => 'نامحدود';
 
   @override

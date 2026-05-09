@@ -2056,6 +2056,8 @@ def get_inventory_stock_report(
     search: Optional[str] = None,
     skip: int = 0,
     take: int = 50,
+    *,
+    for_export: bool = False,
 ) -> Dict[str, Any]:
     """
     گزارش موجودی انبار (موجودی کالا)
@@ -2077,6 +2079,7 @@ def get_inventory_stock_report(
         search: جستجو در کد یا نام کالا (اختیاری)
         skip: تعداد رکوردهای رد شده برای pagination
         take: تعداد رکوردهای برگشتی
+        for_export: برای خروجی اکسل/PDF سقف take تا ۱۰۰۰۰ مجاز می‌شود
     
     Returns:
         dict: {
@@ -2129,10 +2132,12 @@ def get_inventory_stock_report(
     # دریافت لیست محصولات
     products = query.all()
     
+    _max_take = 10000 if for_export else 500
+    
     if not products:
         # اعتبارسنجی take و skip
-        if take > 500:
-            take = 500
+        if take > _max_take:
+            take = _max_take
         if take < 1:
             take = 50
         if skip < 0:
@@ -2293,8 +2298,8 @@ def get_inventory_stock_report(
     
     # Pagination
     total = len(items)
-    if take > 500:
-        take = 500
+    if take > _max_take:
+        take = _max_take
     if take < 1:
         take = 50
     if skip < 0:

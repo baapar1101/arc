@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/api_client.dart';
+import '../../services/support_tickets_public_config.dart';
 import '../../core/auth_store.dart';
 import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
@@ -23,22 +27,52 @@ class ProfileShell extends StatefulWidget {
   State<ProfileShell> createState() => _ProfileShellState();
 }
 
-class _ProfileShellState extends State<ProfileShell> {
+class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver {
   /// هم‌تراز با [BusinessShell] — نوار بالای پنل کاربر.
   static const double _kProfileAppBarToolbarHeight = 44;
   static const Color _kTopMenuBlueLight = Color(0xFF0D47A1);
   static const Color _kTopMenuBlueDark = Color(0xFF1565C0);
 
   int _hoverIndex = -1;
+  bool _supportTicketsEnabledForUsers = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.authStore.addListener(() {
       if (mounted) {
         setState(() {});
       }
+      unawaited(_refreshSupportTicketsAvailability());
     });
+    unawaited(_refreshSupportTicketsAvailability());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshSupportTicketsAvailability());
+    }
+    super.didChangeAppLifecycleState(state);
+  }
+
+  Future<void> _refreshSupportTicketsAvailability() async {
+    try {
+      final cfg = await SupportTicketsPublicConfig.fetch(ApiClient());
+      if (!mounted) return;
+      setState(() => _supportTicketsEnabledForUsers = cfg.enabledForUsers);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _supportTicketsEnabledForUsers = true);
+      }
+    }
   }
 
   @override
@@ -63,7 +97,8 @@ class _ProfileShellState extends State<ProfileShell> {
       _Dest(t.dashboard, Icons.dashboard_outlined, Icons.dashboard, '/user/profile/dashboard'),
       _Dest(t.newBusiness, Icons.add_business, Icons.add_business, '/user/profile/new-business'),
       _Dest(t.businesses, Icons.business, Icons.business, '/user/profile/businesses'),
-      _Dest(t.support, Icons.support_agent, Icons.support_agent, '/user/profile/support'),
+      if (_supportTicketsEnabledForUsers)
+        _Dest(t.support, Icons.support_agent, Icons.support_agent, '/user/profile/support'),
       _Dest(t.accountSettingsTitle, Icons.settings_outlined, Icons.settings, '/user/profile/account-settings'),
     ];
 

@@ -13127,6 +13127,42 @@ abstract class AppLocalizations {
   /// **'Maintenance Mode'**
   String get maintenanceMode;
 
+  /// No description provided for @supportTicketsUserSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'User support tickets'**
+  String get supportTicketsUserSectionTitle;
+
+  /// No description provided for @supportTicketsAllowUsersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow normal users to create and view tickets'**
+  String get supportTicketsAllowUsersLabel;
+
+  /// No description provided for @supportTicketsAllowUsersDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When disabled, the message below is shown to users. Support operators still have access.'**
+  String get supportTicketsAllowUsersDescription;
+
+  /// No description provided for @supportTicketsDisabledNoticeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Notice text for users (when disabled)'**
+  String get supportTicketsDisabledNoticeLabel;
+
+  /// No description provided for @supportTicketsDisabledNoticeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank to use the built-in default message.'**
+  String get supportTicketsDisabledNoticeHint;
+
+  /// No description provided for @supportTicketsUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Support tickets are temporarily unavailable.'**
+  String get supportTicketsUnavailableBody;
+
   /// No description provided for @unlimited.
   ///
   /// In en, this message translates to:

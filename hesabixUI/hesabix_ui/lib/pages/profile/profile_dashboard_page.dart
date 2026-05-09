@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../utils/date_formatters.dart';
 import '../../services/profile_dashboard_service.dart';
+import '../../services/support_tickets_public_config.dart';
 import '../../services/announcements_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -28,7 +31,7 @@ class ProfileDashboardPage extends StatefulWidget {
 
 typedef ProfileWidgetBuilder = Widget Function(BuildContext, dynamic, DashboardLayoutItem, {VoidCallback? onRefresh});
 
-class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
+class _ProfileDashboardPageState extends State<ProfileDashboardPage> with WidgetsBindingObserver {
   late final ProfileDashboardService _service;
   DashboardLayoutProfile? _layout;
   Map<String, dynamic> _data = <String, dynamic>{};
@@ -38,12 +41,56 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
   // Announcements state
   final Set<int> _annBusyIds = <int>{};
   bool _annOnlyUnread = false;
+  SupportTicketsPublicConfig _supportPublic = const SupportTicketsPublicConfig();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _service = ProfileDashboardService(ApiClient());
     _loadAll();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refreshAfterAppResume());
+    }
+    super.didChangeAppLifecycleState(state);
+  }
+
+  /// بازخوانی وضعیت تیکت و دادهٔ ویجت‌ها پس از برگشت اپ به پیش‌زمینه (بدون اسکلتون بارگذاری اولیه).
+  Future<void> _refreshAfterAppResume() async {
+    if (!mounted || _loading) return;
+    if (_error != null) {
+      await _loadAll();
+      return;
+    }
+    final layout = _layout;
+    try {
+      final supportCfg = await SupportTicketsPublicConfig.fetch(ApiClient());
+      if (!mounted) return;
+      Map<String, dynamic> nextData = _data;
+      if (layout != null) {
+        final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
+        var data = await _service.getWidgetsBatchData(widgetKeys: keys);
+        data = await _service.hydrateSpecialWidgets(data, keys);
+        if (!mounted) return;
+        nextData = data;
+      }
+      setState(() {
+        _supportPublic = supportCfg;
+        if (layout != null) {
+          _data = nextData;
+        }
+      });
+    } catch (_) {}
   }
 
   String _currentBreakpoint(double width) {
@@ -196,6 +243,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
         _loading = true;
         _error = null;
       });
+      final supportCfg = await SupportTicketsPublicConfig.fetch(ApiClient());
       final defs = await _service.getWidgetDefinitions();
       if (!context.mounted) return;
       final ctx = context;
@@ -225,6 +273,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
         _layout = layout;
         _data = data;
         _loading = false;
+        _supportPublic = supportCfg;
       });
     } catch (e) {
       if (!mounted) return;
@@ -737,6 +786,20 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> {
   Widget _supportTicketsWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
     final theme = Theme.of(context);
     final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
+    final t = AppLocalizations.of(context);
+    if (!_supportPublic.enabledForUsers) {
+      final msg = _supportPublic.disabledMessage.trim().isEmpty
+          ? t.supportTicketsUnavailableBody
+          : _supportPublic.disabledMessage;
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SelectableText(
+          msg,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.35),
+        ),
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [

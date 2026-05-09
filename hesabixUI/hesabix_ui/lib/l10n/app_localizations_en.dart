@@ -6694,6 +6694,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get maintenanceMode => 'Maintenance Mode';
 
   @override
+  String get supportTicketsUserSectionTitle => 'User support tickets';
+
+  @override
+  String get supportTicketsAllowUsersLabel => 'Allow normal users to create and view tickets';
+
+  @override
+  String get supportTicketsAllowUsersDescription => 'When disabled, the message below is shown to users. Support operators still have access.';
+
+  @override
+  String get supportTicketsDisabledNoticeLabel => 'Notice text for users (when disabled)';
+
+  @override
+  String get supportTicketsDisabledNoticeHint => 'Leave blank to use the built-in default message.';
+
+  @override
+  String get supportTicketsUnavailableBody => 'Support tickets are temporarily unavailable.';
+
+  @override
   String get unlimited => 'Unlimited';
 
   @override

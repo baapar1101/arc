@@ -58,6 +58,8 @@ SYSTEM_CONFIG_DEFAULT_THEME = "system_config_default_theme"
 SYSTEM_CONFIG_ENABLE_REGISTRATION = "system_config_enable_registration"
 SYSTEM_CONFIG_ENABLE_EMAIL_VERIFICATION = "system_config_enable_email_verification"
 SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE = "system_config_enable_maintenance_mode"
+SYSTEM_CONFIG_SUPPORT_TICKETS_ENABLED = "system_config_support_tickets_enabled"
+SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE = "system_config_support_tickets_disabled_message"
 SYSTEM_CONFIG_SESSION_TIMEOUT = "system_config_session_timeout"
 SYSTEM_CONFIG_MAX_FILE_SIZE = "system_config_max_file_size"
 SYSTEM_CONFIG_MAX_USERS = "system_config_max_users"
@@ -96,6 +98,42 @@ REDIS_CONFIG_HOST = "redis_config_host"
 REDIS_CONFIG_PORT = "redis_config_port"
 REDIS_CONFIG_DB = "redis_config_db"
 REDIS_CONFIG_PASSWORD = "redis_config_password"
+
+_SUPPORT_TICKETS_DISABLED_FALLBACK_MESSAGE_FA = "سیستم تیکت‌های پشتیبانی موقتاً غیرفعال است."
+MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN = 8192
+
+
+def is_support_tickets_enabled_for_users(db: Session) -> bool:
+	raw = _get_setting_bool(db, SYSTEM_CONFIG_SUPPORT_TICKETS_ENABLED)
+	return True if raw is None else raw
+
+
+def get_support_tickets_disabled_user_message(db: Session) -> str:
+	obj = _get_setting(db, SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE)
+	if obj and obj.value_string and obj.value_string.strip():
+		text = obj.value_string.strip()
+		return text[:MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN]
+	return _SUPPORT_TICKETS_DISABLED_FALLBACK_MESSAGE_FA
+
+
+def assert_end_user_support_tickets_allowed(db: Session) -> None:
+	if is_support_tickets_enabled_for_users(db):
+		return
+	msg = get_support_tickets_disabled_user_message(db)
+	raise ApiError(
+		"SUPPORT_TICKETS_DISABLED",
+		msg,
+		http_status=403,
+		details={"user_message": msg},
+	)
+
+
+def support_tickets_public_config_dict(db: Session) -> Dict[str, Any]:
+	enabled = is_support_tickets_enabled_for_users(db)
+	return {
+		"support_tickets_enabled": enabled,
+		"support_tickets_disabled_message": "" if enabled else get_support_tickets_disabled_user_message(db),
+	}
 
 
 def _default_share_link_base_url() -> str:
@@ -742,6 +780,12 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 	business_creation_requirement = get_business_creation_verification_requirement(db)
 	sms_r = get_sms_destination_rate_effective(db)
 	sec = get_captcha_auth_security_effective(db)
+	support_disabled_msg_setting = _get_setting(db, SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE)
+	support_disabled_msg_storage = ""
+	if support_disabled_msg_setting and support_disabled_msg_setting.value_string:
+		support_disabled_msg_storage = support_disabled_msg_setting.value_string.strip()[
+			:MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN
+		]
 
 	return {
 		"app_name": (app_name.value_string if app_name and app_name.value_string else env.app_name),
@@ -783,6 +827,8 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"login_backoff_seconds": sec["login_backoff_seconds"],
 		"firewall_auto_ban_on_login_fail": sec["firewall_auto_ban_on_login_fail"],
 		"firewall_auto_ban_duration_sec": sec["firewall_auto_ban_duration_sec"],
+		"support_tickets_enabled": is_support_tickets_enabled_for_users(db),
+		"support_tickets_disabled_message": support_disabled_msg_storage,
 	}
 
 
@@ -796,6 +842,8 @@ def set_system_configuration(
 	enable_registration: bool | None = None,
 	enable_email_verification: bool | None = None,
 	enable_maintenance_mode: bool | None = None,
+	support_tickets_enabled: bool | None = None,
+	support_tickets_disabled_message: str | None = None,
 	session_timeout: int | None = None,
 	max_file_size: int | None = None,
 	max_users: int | None = None,
@@ -869,6 +917,19 @@ def set_system_configuration(
 	if enable_maintenance_mode is not None:
 		_upsert_setting_bool(db, SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE, enable_maintenance_mode)
 		cache.delete("system:maintenance_mode")  # Invalidate cache
+
+	if support_tickets_enabled is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_SUPPORT_TICKETS_ENABLED, support_tickets_enabled)
+
+	if support_tickets_disabled_message is not None:
+		text = str(support_tickets_disabled_message).strip()
+		if len(text) > MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN:
+			raise ApiError(
+				"SUPPORT_MESSAGE_TOO_LONG",
+				f"پیام غیرفعال‌سازی تیکت‌ها حداکثر {MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN} کاراکتر است",
+				http_status=400,
+			)
+		_upsert_setting_string(db, SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE, text)
 	
 	if session_timeout is not None:
 		# 0 به معنی نامحدود است

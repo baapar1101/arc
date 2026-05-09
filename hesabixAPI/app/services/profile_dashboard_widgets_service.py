@@ -9,6 +9,7 @@ from app.services.business_service import get_user_businesses
 from app.services.announcement_service import user_list as list_announcements
 from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.api.v1.schemas import QueryInfo
+from app.services.system_settings_service import is_support_tickets_enabled_for_users
 
 # ----------------------------
 # Responsive columns per breakpoint
@@ -271,6 +272,9 @@ def _resolve_profile_support_tickets(
     """
     Returns user's support tickets.
     """
+    if not is_support_tickets_enabled_for_users(db):
+        return {"items": []}
+
     limit_raw = filters.get("limit", 5)
     try:
         limit = max(1, min(50, int(limit_raw)))

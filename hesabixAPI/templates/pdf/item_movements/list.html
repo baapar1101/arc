@@ -1,0 +1,93 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <style>
+    .report-item-movements .filters-line {
+      margin-bottom: 10px;
+      padding: 6px 8px;
+      border: 1px solid #9aa0a6;
+      border-radius: 6px;
+      background: #fff;
+      color: #111;
+      font-size: 10.5px;
+      line-height: 1.45;
+      page-break-inside: avoid;
+    }
+    .report-item-movements .filters-line .label {
+      font-weight: 700;
+      margin-inline-end: 6px;
+      color: #111;
+      white-space: nowrap;
+    }
+    .report-item-movements td.num, .report-item-movements th.num {
+      text-align: {{ 'left' if is_fa else 'right' }};
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .report-item-movements th.idx, .report-item-movements td.idx {
+      width: 36px;
+    }
+  </style>
+
+  <div class="report-item-movements">
+    <div class="header">
+      <div>
+        <div class="title">{{ title_text or ('گزارش گردش کالا' if is_fa else 'Item movements') }}</div>
+        <div class="meta">{{ business_name or '' }}</div>
+      </div>
+      <div class="meta">{{ generated_at or '' }}</div>
+    </div>
+
+    {% if filters_summary and filters_summary|length > 0 %}
+      {% set max_filters = 8 %}
+      {% set shown = filters_summary[:max_filters] %}
+      {% set remaining = (filters_summary|length) - (shown|length) %}
+      <div class="filters-line">
+        <span class="label">{{ 'فیلترها' if is_fa else 'Filters' }}:</span>
+        <span class="text">
+          {% for f in shown %}
+            {% if not loop.first %} | {% endif %}
+            {{ (f.label | default('', true)) }}: {{ (f.value | default('', true)) }}
+          {% endfor %}
+        </span>
+        {% if remaining > 0 %}
+          <span class="more"> | +{{ remaining }}</span>
+        {% endif %}
+      </div>
+    {% endif %}
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th class="idx num">#</th>
+            <th>{{ 'کد کالا' if is_fa else 'Code' }}</th>
+            <th>{{ 'نام کالا' if is_fa else 'Product' }}</th>
+            <th>{{ 'واحد' if is_fa else 'Unit' }}</th>
+            <th>{{ 'دسته' if is_fa else 'Category' }}</th>
+            <th class="num">{{ 'مانده ابتدا' if is_fa else 'Opening' }}</th>
+            <th class="num">{{ 'ورود' if is_fa else 'In' }}</th>
+            <th class="num">{{ 'خروج' if is_fa else 'Out' }}</th>
+            <th class="num">{{ 'مانده انتها' if is_fa else 'Closing' }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items or [] %}
+            <tr>
+              <td class="idx num">{{ loop.index }}</td>
+              <td>{{ it.product_code | default('', true) }}</td>
+              <td>{{ it.product_name | default('', true) }}</td>
+              <td>{{ it.unit | default('', true) }}</td>
+              <td>{{ it.category_name | default('', true) }}</td>
+              <td class="num">{{ it.opening_balance | smart_number(2) | ltr | safe }}</td>
+              <td class="num">{{ it.total_in | smart_number(2) | ltr | safe }}</td>
+              <td class="num">{{ it.total_out | smart_number(2) | ltr | safe }}</td>
+              <td class="num">{{ it.closing_balance | smart_number(2) | ltr | safe }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer"></div>
+  </div>
+{% endblock %}

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/support_service.dart';
+import 'package:hesabix_ui/services/support_tickets_public_config.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
@@ -30,6 +31,8 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   bool _isLoading = false;
   bool _isSubmitting = false;
   String? _error;
+  bool _supportBlocked = false;
+  String _supportBlockedMessage = '';
 
   @override
   void initState() {
@@ -108,6 +111,16 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     });
 
     try {
+      final cfg = await SupportTicketsPublicConfig.fetch(ApiClient());
+      if (!mounted) return;
+      if (!cfg.enabledForUsers) {
+        setState(() {
+          _supportBlocked = true;
+          _supportBlockedMessage = cfg.disabledMessage.trim();
+          _isLoading = false;
+        });
+        return;
+      }
       final categories = await _supportService.getCategories();
       final priorities = await _supportService.getPriorities();
       
@@ -275,6 +288,24 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               ),
             ),
           ],
+        ),
+      );
+    }
+
+    if (_supportBlocked) {
+      final msg =
+          _supportBlockedMessage.isEmpty ? t.supportTicketsUnavailableBody : _supportBlockedMessage;
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: SelectableText(
+            msg,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
         ),
       );
     }

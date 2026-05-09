@@ -2,7 +2,6 @@ import 'dart:math' show min;
 import 'dart:ui' as ui;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -22,7 +21,6 @@ import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/services/person_service.dart';
 import '../../main.dart' show navigatorKey;
 import 'package:hesabix_ui/widgets/attached_files/attached_files_widget.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/warehouse/warehouse_document_details_dialog.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -44,6 +42,7 @@ import 'package:flutter/services.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_print_options_bottom_sheet.dart';
+import 'package:hesabix_ui/widgets/invoice/invoice_pdf_print_flow.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/invoice_transaction_preferences.dart';
 import 'package:hesabix_ui/models/invoice_transaction.dart' show TransactionType;
@@ -521,35 +520,22 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
     setState(() => _isGeneratingPdf = true);
     try {
-      final api = ApiClient();
-      String path;
-      // اگر فاکتور است، از endpoint اختصاصی فاکتور استفاده کنیم تا قالب invoices/detail اعمال شود
       if (isInvoice) {
-        path = '/invoices/business/${doc.businessId}/${doc.id}/pdf';
+        await InvoicePdfPrintFlow.downloadWithPrintOptions(
+          context: context,
+          businessId: doc.businessId,
+          invoiceId: doc.id,
+          invoiceCode: doc.code,
+          invoicePrint: invoicePrint!,
+        );
       } else {
-        // سایر اسناد: endpoint عمومی با قالب documents/detail
-        path = '/documents/${doc.id}/pdf';
+        final api = ApiClient();
+        final path = '/documents/${doc.id}/pdf';
+        final bytes = await api.downloadPdf(path, query: null);
+        await InvoicePdfPrintFlow.savePdfBytesWeb(bytes, doc.code);
+        if (!mounted) return;
+        SnackBarHelper.showSuccess(context, message: 'فایل PDF با موفقیت ذخیره شد');
       }
-      final query = <String, dynamic>{};
-      if (isInvoice) {
-        final p = invoicePrint!;
-        final ps = p.paperSize;
-        if (ps != null && ps.isNotEmpty) {
-          query['paper_size'] = ps;
-        }
-        if (p.orientation.isNotEmpty) {
-          query['orientation'] = p.orientation;
-        }
-        query['show_stamp'] = p.showStamp ? 'true' : 'false';
-        query['show_share_qr'] = p.showShareQr ? 'true' : 'false';
-        if (p.templateId != null) {
-          query['template_id'] = p.templateId;
-        }
-      }
-      final bytes = await api.downloadPdf(path, query: query.isNotEmpty ? query : null);
-      await _savePdfFile(bytes, doc.code);
-      if (!mounted) return;
-      SnackBarHelper.showSuccess(context, message: 'فایل PDF با موفقیت ذخیره شد');
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
@@ -558,19 +544,6 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       );
     } finally {
       if (mounted) setState(() => _isGeneratingPdf = false);
-    }
-  }
-
-  Future<void> _savePdfFile(List<int> bytes, String filename) async {
-    if (kIsWeb) {
-      final name = filename.endsWith('.pdf') ? filename : '$filename.pdf';
-      await web_utils.saveBytesAsFileWeb(
-        bytes,
-        name,
-        mimeType: 'application/pdf',
-      );
-    } else {
-      throw UnsupportedError('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
     }
   }
 

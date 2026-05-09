@@ -380,12 +380,15 @@
             {{ 'مشخصات فروشنده' if is_fa else 'Seller details' }}
           </div>
           <div class="meta" style="line-height: 1.4;">
-            <div><strong>{{ 'نام' if is_fa else 'Name' }}:</strong> {{ seller.name or '-' }}</div>
-            {% if seller.get('name_prefix') %}
-              <div><strong>{{ 'پیشوند' if is_fa else 'Prefix' }}:</strong> {{ seller.name_prefix }}</div>
-            {% endif %}
+            <div><strong>{{ 'نام' if is_fa else 'Name' }}:</strong>
+              {% if seller.get('name_prefix') %}
+                {{ ((seller.name_prefix ~ ' ' ~ (seller.name or '')) | trim) or '-' }}
+              {% else %}
+                {{ seller.name or '-' }}
+              {% endif %}
+            </div>
             {% if seller.get('legal_entity_type') %}
-              <div><strong>{{ 'نوع حقوقی' if is_fa else 'Entity type' }}:</strong> {{ seller.legal_entity_type_label or seller.legal_entity_type }}</div>
+              <div><strong>{{ 'نوع' if is_fa else 'Type' }}:</strong> {{ seller.legal_entity_type_label or seller.legal_entity_type }}</div>
             {% endif %}
             {% if seller.national_id or seller.national_code %}
               <div><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ seller.national_id or seller.national_code }}</div>
@@ -412,12 +415,15 @@
             {{ 'مشخصات خریدار' if is_fa else 'Buyer details' }}
           </div>
           <div class="meta" style="line-height: 1.4;">
-            <div><strong>{{ 'نام' if is_fa else 'Name' }}:</strong> {{ buyer.name or '-' }}</div>
-            {% if buyer.get('name_prefix') %}
-              <div><strong>{{ 'پیشوند' if is_fa else 'Prefix' }}:</strong> {{ buyer.name_prefix }}</div>
-            {% endif %}
+            <div><strong>{{ 'نام' if is_fa else 'Name' }}:</strong>
+              {% if buyer.get('name_prefix') %}
+                {{ ((buyer.name_prefix ~ ' ' ~ (buyer.name or '')) | trim) or '-' }}
+              {% else %}
+                {{ buyer.name or '-' }}
+              {% endif %}
+            </div>
             {% if buyer.get('legal_entity_type') %}
-              <div><strong>{{ 'نوع حقوقی' if is_fa else 'Entity type' }}:</strong> {{ buyer.legal_entity_type_label or buyer.legal_entity_type }}</div>
+              <div><strong>{{ 'نوع' if is_fa else 'Type' }}:</strong> {{ buyer.legal_entity_type_label or buyer.legal_entity_type }}</div>
             {% endif %}
             {% if buyer.economic_id or buyer.economic_code %}
               <div><strong>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</strong> {{ buyer.economic_id or buyer.economic_code }}</div>

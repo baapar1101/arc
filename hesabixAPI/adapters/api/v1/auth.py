@@ -87,13 +87,15 @@ async def generate_captcha(request: Request, db: Session = Depends(get_db)) -> d
 	response_model=SuccessResponse,
 )
 async def get_public_auth_config(db: Session = Depends(get_db)) -> dict:
-	from app.services.system_settings_service import is_registration_enabled
+	from app.services.system_settings_service import is_registration_enabled, support_tickets_public_config_dict
 	repo = UserRepository(db)
 	is_first_user_bootstrap = repo.count_all() == 0
-	return success_response({
+	data = {
 		# برای استقرار اولیه، حتی اگر تنظیم ثبت‌نام بسته باشد تب عضویت باید نمایش داده شود
 		"enable_registration": True if is_first_user_bootstrap else is_registration_enabled(db),
-	})
+	}
+	data.update(support_tickets_public_config_dict(db))
+	return success_response(data)
 
 
 @router.get("/me", 

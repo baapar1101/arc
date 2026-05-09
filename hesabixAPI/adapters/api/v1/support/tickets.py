@@ -2,6 +2,7 @@
 
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from adapters.api.v1.support.dependencies import require_end_user_support_open
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -27,6 +28,7 @@ router = APIRouter()
 async def search_user_tickets(
     request: Request,
     query_info: QueryInfo,
+    _require_support: None = Depends(require_end_user_support_open),
     current_user: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -127,6 +129,7 @@ async def search_user_tickets(
 async def create_ticket(
     request: Request,
     ticket_request: CreateTicketRequest,
+    _require_support: None = Depends(require_end_user_support_open),
     current_user: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -203,6 +206,7 @@ async def create_ticket(
 async def get_ticket(
     request: Request,
     ticket_id: int,
+    _require_support: None = Depends(require_end_user_support_open),
     current_user: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -228,6 +232,7 @@ async def send_message(
     request: Request,
     ticket_id: int,
     message_request: CreateMessageRequest,
+    _require_support: None = Depends(require_end_user_support_open),
     current_user: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -304,6 +309,7 @@ async def search_ticket_messages(
     request: Request,
     ticket_id: int,
     query_info: QueryInfo,
+    _require_support: None = Depends(require_end_user_support_open),
     current_user: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

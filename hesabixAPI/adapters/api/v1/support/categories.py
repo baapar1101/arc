@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List
 from fastapi import APIRouter, Depends, Request
+from adapters.api.v1.support.dependencies import require_end_user_support_open
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -16,6 +17,7 @@ router = APIRouter()
 @router.get("", response_model=SuccessResponse)
 async def get_categories(
     request: Request,
+    _require_support: None = Depends(require_end_user_support_open),
     db: Session = Depends(get_db)
 ):
     """دریافت لیست دسته‌بندی‌های فعال"""

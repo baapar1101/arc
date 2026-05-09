@@ -29,6 +29,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   bool _enableRegistration = true;
   bool _enableEmailVerification = true;
   bool _enableMaintenanceMode = false;
+  bool _supportTicketsEnabled = true;
+  final TextEditingController _supportTicketsDisabledMessageCtrl = TextEditingController();
   int _sessionTimeout = 30;
   int _maxFileSize = 10;
   int _maxUsers = 0;
@@ -122,6 +124,12 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
     }
   }
 
+  @override
+  void dispose() {
+    _supportTicketsDisabledMessageCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadConfiguration() async {
     setState(() {
       _isLoadingData = true;
@@ -139,6 +147,9 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _enableRegistration = data['enable_registration'] as bool? ?? true;
           _enableEmailVerification = data['enable_email_verification'] as bool? ?? true;
           _enableMaintenanceMode = data['enable_maintenance_mode'] as bool? ?? false;
+          _supportTicketsEnabled = data['support_tickets_enabled'] as bool? ?? true;
+          _supportTicketsDisabledMessageCtrl.text =
+              data['support_tickets_disabled_message']?.toString() ?? '';
           _sessionTimeout = data['session_timeout'] as int? ?? 30;
           _maxFileSize = data['max_file_size'] as int? ?? 10;
           _maxUsers = data['max_users'] as int? ?? 0;
@@ -470,6 +481,40 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       max: 10000,
                       allowUnlimited: true,
                       unlimitedLabel: t.unlimited,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildSectionCard(
+                  theme,
+                  t.supportTicketsUserSectionTitle,
+                  Icons.support_agent_outlined,
+                  [
+                    _buildSwitchField(
+                      label: t.supportTicketsAllowUsersLabel,
+                      value: _supportTicketsEnabled,
+                      onChanged: (value) => setState(() => _supportTicketsEnabled = value),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        t.supportTicketsAllowUsersDescription,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    TextFormField(
+                      controller: _supportTicketsDisabledMessageCtrl,
+                      minLines: 3,
+                      maxLines: 8,
+                      maxLength: 8192,
+                      decoration: InputDecoration(
+                        labelText: t.supportTicketsDisabledNoticeLabel,
+                        hintText: t.supportTicketsDisabledNoticeHint,
+                        border: const OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
                     ),
                   ],
                 ),
@@ -998,6 +1043,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'enable_registration': _enableRegistration,
         'enable_email_verification': _enableEmailVerification,
         'enable_maintenance_mode': _enableMaintenanceMode,
+        'support_tickets_enabled': _supportTicketsEnabled,
+        'support_tickets_disabled_message': _supportTicketsDisabledMessageCtrl.text.trim(),
         'session_timeout': _sessionTimeout,
         'max_file_size': _maxFileSize,
         'max_users': _maxUsers,

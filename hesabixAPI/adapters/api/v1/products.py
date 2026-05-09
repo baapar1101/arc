@@ -3803,6 +3803,245 @@ async def export_item_movements_report_excel(
 
 
 @router.post(
+    "/businesses/{business_id}/reports/item-movements/export/pdf",
+    summary="خروجی PDF گزارش گردش کالا",
+    responses={
+        200: {
+            "description": "فایل PDF",
+            "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
+        }
+    },
+)
+@require_business_access("business_id")
+async def export_item_movements_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی PDF گزارش گردش کالا"""
+    import datetime
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.calendar import CalendarConverter
+    from app.services.pdf.template_renderer import render_template, load_farsi_font_data_uris
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+    if not fiscal_year_id:
+        from adapters.db.models.fiscal_year import FiscalYear
+
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(FiscalYear.business_id == business_id, FiscalYear.is_last == True)
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+
+    date_from = body.get("date_from")
+    date_to = body.get("date_to")
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+    product_ids = body.get("product_ids")
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    warehouse_ids = body.get("warehouse_ids")
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    category_ids = body.get("category_ids")
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    include_zero_balance = bool(body.get("include_zero_balance", False))
+    search = body.get("search")
+    selected_only = bool(body.get("selected_only", False))
+    selected_indices = body.get("selected_indices")
+
+    max_export_records = 10000
+    result = get_item_movements_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        product_ids=product_ids,
+        warehouse_ids=warehouse_ids,
+        category_ids=category_ids,
+        include_zero_balance=include_zero_balance,
+        search=search,
+        skip=0,
+        take=max_export_records,
+    )
+    items = result.get("items", [])
+    items = [format_datetime_fields(item, request) for item in items]
+
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                import json as _json
+
+                indices = _json.loads(selected_indices)
+            except Exception:
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+
+    calendar_type = getattr(request.state, "calendar_type", "jalali")
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    try:
+        _now = datetime.datetime.now()
+        _gen = CalendarConverter.format_datetime(_now, calendar_type).get("formatted") or ""
+        generated_at = " ".join(_gen.split(" ")[:2])
+        if generated_at.count(":") >= 2:
+            generated_at = generated_at.rsplit(":", 1)[0]
+    except Exception:
+        generated_at = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+
+    filters_summary = []
+    if date_from:
+        filters_summary.append({"label": "از" if is_fa else "From", "value": str(date_from)})
+    if date_to:
+        filters_summary.append({"label": "تا" if is_fa else "To", "value": str(date_to)})
+    if search:
+        filters_summary.append({"label": "جستجو" if is_fa else "Search", "value": str(search)})
+
+    try:
+        from app.services.print_footer_settings import build_report_title_and_time_footer
+
+        footer_text = build_report_title_and_time_footer(
+            db,
+            business_id,
+            title="گزارش گردش کالا" if is_fa else "Item movements",
+            time_part=generated_at,
+            preparer_name=ctx.get_user_name() or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"{'گزارش گردش کالا' if is_fa else 'Item movements'} • {generated_at}"
+
+    business_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+    except Exception:
+        business_name = ""
+
+    try:
+        qp = request.query_params
+        paper_size = qp.get("paper_size")
+        orientation = qp.get("orientation") or "landscape"
+        disposition = qp.get("disposition") or "attachment"
+    except Exception:
+        paper_size = None
+        orientation = "landscape"
+        disposition = "attachment"
+
+    fa_font_url_regular = ""
+    fa_font_url_bold = ""
+    try:
+        if is_fa:
+            fa_reg, fa_bold = load_farsi_font_data_uris()
+            fa_font_url_regular = fa_reg or ""
+            fa_font_url_bold = fa_bold or ""
+    except Exception:
+        pass
+
+    explicit_template_id = None
+    try:
+        if body.get("template_id") is not None:
+            explicit_template_id = int(body.get("template_id"))
+    except Exception:
+        explicit_template_id = None
+
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+
+        tmpl_ctx = {
+            "title_text": "گزارش گردش کالا" if is_fa else "Item movements",
+            "business_name": business_name,
+            "generated_at": generated_at,
+            "is_fa": is_fa,
+            "locale": locale,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "fa_font_url_regular": fa_font_url_regular,
+            "fa_font_url_bold": fa_font_url_bold,
+            "footer_text": footer_text,
+            "filters_summary": filters_summary,
+            "items": items,
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="item_movements",
+            subtype="list",
+            context=tmpl_ctx,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    if not resolved_html:
+        final_html = render_template(
+            "pdf/item_movements/list.html",
+            {
+                "title_text": "گزارش گردش کالا" if is_fa else "Item movements",
+                "business_name": business_name,
+                "generated_at": generated_at,
+                "is_fa": is_fa,
+                "locale": locale,
+                "paper_size": paper_size or "A4",
+                "orientation": orientation or "landscape",
+                "fa_font_url_regular": fa_font_url_regular,
+                "fa_font_url_bold": fa_font_url_bold,
+                "footer_text": footer_text,
+                "filters_summary": filters_summary,
+                "items": items,
+            },
+        )
+    else:
+        final_html = resolved_html
+
+    page_css = f"@page {{ size: {(paper_size or 'A4')} {(orientation or 'landscape')}; margin: 1cm; }}"
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=final_html).write_pdf(
+        stylesheets=[CSS(string=page_css)],
+        font_config=font_config,
+    )
+    fn = f"item_movements_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"{disposition}; filename={fn}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post(
     "/businesses/{business_id}/reports/sales-by-product",
     summary="گزارش فروش به تفکیک کالا",
     description="""
@@ -4287,6 +4526,533 @@ async def inventory_stock_report_endpoint(
         data=result,
         message="Inventory stock report retrieved successfully" if locale != 'fa' else "گزارش موجودی انبار با موفقیت دریافت شد",
         request=request
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/inventory-stock/export/excel",
+    summary="خروجی Excel گزارش موجودی انبار",
+    responses={
+        200: {
+            "description": "فایل Excel",
+            "content": {
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                    "schema": {"type": "string", "format": "binary"}
+                }
+            },
+        }
+    },
+)
+@require_business_access("business_id")
+async def export_inventory_stock_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی Excel گزارش موجودی انبار"""
+    from fastapi.responses import Response
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    import io
+    import datetime
+    import re
+
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    product_ids = body.get("product_ids")
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    warehouse_ids = body.get("warehouse_ids")
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    category_ids = body.get("category_ids")
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    as_of_date = body.get("as_of_date")
+    track_inventory = body.get("track_inventory")
+    if track_inventory is not None:
+        try:
+            track_inventory = bool(track_inventory)
+        except (ValueError, TypeError):
+            track_inventory = None
+    only_negative_stock = bool(body.get("only_negative_stock", False))
+    only_without_movements = bool(body.get("only_without_movements", False))
+    include_zero = bool(body.get("include_zero", False))
+    search = body.get("search")
+    selected_only = bool(body.get("selected_only", False))
+    selected_indices = body.get("selected_indices")
+    selected_row_keys = body.get("selected_row_keys")
+
+    max_export_records = 10000
+    result = get_inventory_stock_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        product_ids=product_ids,
+        warehouse_ids=warehouse_ids,
+        category_ids=category_ids,
+        as_of_date=as_of_date,
+        track_inventory=track_inventory,
+        only_negative_stock=only_negative_stock,
+        only_without_movements=only_without_movements,
+        include_zero=include_zero,
+        search=search,
+        skip=0,
+        take=max_export_records,
+        for_export=True,
+    )
+    items = result.get("items", [])
+    items = [format_datetime_fields(item, request) for item in items]
+
+    if selected_only and selected_row_keys is not None and isinstance(selected_row_keys, list):
+        try:
+            wanted = [k for k in selected_row_keys if isinstance(k, dict)]
+            if wanted:
+
+                def _match_key(it: dict, key: dict) -> bool:
+                    for fld in ("product_id", "warehouse_id"):
+                        if key.get(fld) is not None and it.get(fld) is not None:
+                            try:
+                                if int(it.get(fld)) != int(key.get(fld)):
+                                    return False
+                            except Exception:
+                                return False
+                    return True
+
+                filt = []
+                for it in items:
+                    for k in wanted:
+                        if _match_key(it, k):
+                            filt.append(it)
+                            break
+                items = filt
+        except Exception:
+            pass
+
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                import json as _json
+
+                indices = _json.loads(selected_indices)
+            except Exception:
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+
+    export_columns = body.get("export_columns")
+    if export_columns and isinstance(export_columns, list):
+        headers = [col.get("label") or col.get("key") for col in export_columns]
+        keys = [col.get("key") for col in export_columns]
+    else:
+        locale = negotiate_locale(request.headers.get("Accept-Language"))
+        is_fa = locale == "fa"
+        default_columns = [
+            ("product_code", "کد محصول" if is_fa else "Product Code"),
+            ("product_name", "نام محصول" if is_fa else "Product Name"),
+            ("category_name", "دسته‌بندی" if is_fa else "Category"),
+            ("warehouse_code", "کد انبار" if is_fa else "Warehouse Code"),
+            ("warehouse_name", "نام انبار" if is_fa else "Warehouse Name"),
+            ("quantity", "موجودی" if is_fa else "Quantity"),
+            ("unit", "واحد" if is_fa else "Unit"),
+            ("track_inventory", "کنترل موجودی" if is_fa else "Track inventory"),
+        ]
+        keys = [k for k, _ in default_columns]
+        headers = [h for _, h in default_columns]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Inventory Stock"
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    if locale == "fa":
+        try:
+            ws.sheet_view.rightToLeft = True
+        except Exception:
+            pass
+    header_font = Font(bold=True)
+    header_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
+    thin_border = Border(
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
+    )
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = Alignment(horizontal="center")
+        cell.border = thin_border
+
+    def _cell_val(raw_key: str, it: Dict[str, Any]):
+        val = it.get(raw_key)
+        if raw_key == "track_inventory":
+            if negotiate_locale(request.headers.get("Accept-Language")) == "fa":
+                return "بله" if val else "خیر"
+            return "Yes" if val else "No"
+        return val
+
+    for it in items:
+        row = []
+        for k in keys:
+            value = _cell_val(k, it)
+            if value is None:
+                row.append("")
+            elif isinstance(value, (int, float)):
+                row.append(float(value))
+            else:
+                row.append(str(value))
+        ws.append(row)
+        for cell in ws[ws.max_row]:
+            cell.border = thin_border
+            if locale == "fa":
+                cell.alignment = Alignment(horizontal="right")
+
+    try:
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if cell.value is not None and len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except Exception:
+                    pass
+            ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
+    except Exception:
+        pass
+
+    output = io.BytesIO()
+    wb.save(output)
+    data = output.getvalue()
+    biz_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            biz_name = b.name or ""
+    except Exception:
+        biz_name = ""
+
+    def slugify(text: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
+
+    base = "inventory_stock"
+    if biz_name:
+        base += f"_{slugify(biz_name)}"
+    if selected_only:
+        base += "_selected"
+    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename={filename}",
+            "Content-Length": str(len(data)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/inventory-stock/export/pdf",
+    summary="خروجی PDF گزارش موجودی انبار",
+    responses={
+        200: {
+            "description": "فایل PDF",
+            "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
+        }
+    },
+)
+@require_business_access("business_id")
+async def export_inventory_stock_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی PDF گزارش موجودی انبار"""
+    import datetime
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+    from app.core.calendar import CalendarConverter
+    from app.services.pdf.template_renderer import render_template, load_farsi_font_data_uris
+
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    product_ids = body.get("product_ids")
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    warehouse_ids = body.get("warehouse_ids")
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+    category_ids = body.get("category_ids")
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    as_of_date = body.get("as_of_date")
+    track_inventory = body.get("track_inventory")
+    if track_inventory is not None:
+        try:
+            track_inventory = bool(track_inventory)
+        except (ValueError, TypeError):
+            track_inventory = None
+    only_negative_stock = bool(body.get("only_negative_stock", False))
+    only_without_movements = bool(body.get("only_without_movements", False))
+    include_zero = bool(body.get("include_zero", False))
+    search = body.get("search")
+    selected_only = bool(body.get("selected_only", False))
+    selected_indices = body.get("selected_indices")
+    selected_row_keys = body.get("selected_row_keys")
+
+    max_export_records = 10000
+    result = get_inventory_stock_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        product_ids=product_ids,
+        warehouse_ids=warehouse_ids,
+        category_ids=category_ids,
+        as_of_date=as_of_date,
+        track_inventory=track_inventory,
+        only_negative_stock=only_negative_stock,
+        only_without_movements=only_without_movements,
+        include_zero=include_zero,
+        search=search,
+        skip=0,
+        take=max_export_records,
+        for_export=True,
+    )
+    items = result.get("items", [])
+    items = [format_datetime_fields(item, request) for item in items]
+
+    if selected_only and selected_row_keys is not None and isinstance(selected_row_keys, list):
+        try:
+            wanted = [k for k in selected_row_keys if isinstance(k, dict)]
+            if wanted:
+
+                def _match_key(it: dict, key: dict) -> bool:
+                    for fld in ("product_id", "warehouse_id"):
+                        if key.get(fld) is not None and it.get(fld) is not None:
+                            try:
+                                if int(it.get(fld)) != int(key.get(fld)):
+                                    return False
+                            except Exception:
+                                return False
+                    return True
+
+                filt = []
+                for it in items:
+                    for k in wanted:
+                        if _match_key(it, k):
+                            filt.append(it)
+                            break
+                items = filt
+        except Exception:
+            pass
+
+    if selected_only and selected_indices is not None:
+        indices = None
+        if isinstance(selected_indices, str):
+            try:
+                import json as _json
+
+                indices = _json.loads(selected_indices)
+            except Exception:
+                indices = None
+        elif isinstance(selected_indices, list):
+            indices = selected_indices
+        if isinstance(indices, list):
+            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+
+    calendar_type = getattr(request.state, "calendar_type", "jalali")
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    is_fa = locale == "fa"
+    try:
+        _now = datetime.datetime.now()
+        _gen = CalendarConverter.format_datetime(_now, calendar_type).get("formatted") or ""
+        generated_at = " ".join(_gen.split(" ")[:2])
+        if generated_at.count(":") >= 2:
+            generated_at = generated_at.rsplit(":", 1)[0]
+    except Exception:
+        generated_at = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+
+    filters_summary = []
+    if as_of_date:
+        filters_summary.append(
+            {"label": "تاریخ گزارش" if is_fa else "As of date", "value": str(as_of_date)}
+        )
+    if search:
+        filters_summary.append({"label": "جستجو" if is_fa else "Search", "value": str(search)})
+    if track_inventory is True:
+        filters_summary.append({"label": "کنترل موجودی" if is_fa else "Tracking", "value": "فعال" if is_fa else "On"})
+    elif track_inventory is False:
+        filters_summary.append({"label": "کنترل موجودی" if is_fa else "Tracking", "value": "غیرفعال" if is_fa else "Off"})
+    if only_negative_stock:
+        filters_summary.append(
+            {"label": "فیلتر" if is_fa else "Filter", "value": "فقط منفی" if is_fa else "Negative only"}
+        )
+    if only_without_movements:
+        filters_summary.append(
+            {
+                "label": "فیلتر" if is_fa else "Filter",
+                "value": "بدون حرکت" if is_fa else "No movements",
+            }
+        )
+    if include_zero:
+        filters_summary.append(
+            {"label": "شامل صفر" if is_fa else "Include zero", "value": "بله" if is_fa else "Yes"}
+        )
+
+    try:
+        from app.services.print_footer_settings import build_report_title_and_time_footer
+
+        _t = "گزارش موجودی انبار" if is_fa else "Inventory Stock Report"
+        footer_text = build_report_title_and_time_footer(
+            db,
+            business_id,
+            title=_t,
+            time_part=generated_at,
+            preparer_name=ctx.get_user_name() or None,
+            is_fa=is_fa,
+        )
+    except Exception:
+        footer_text = f"{'گزارش موجودی انبار' if is_fa else 'Inventory Stock Report'} • {generated_at}"
+
+    business_name = ""
+    try:
+        b = db.query(Business).filter(Business.id == business_id).first()
+        if b is not None:
+            business_name = b.name or ""
+    except Exception:
+        business_name = ""
+
+    try:
+        qp = request.query_params
+        paper_size = qp.get("paper_size")
+        orientation = qp.get("orientation") or "landscape"
+        disposition = qp.get("disposition") or "attachment"
+    except Exception:
+        paper_size = None
+        orientation = "landscape"
+        disposition = "attachment"
+
+    fa_font_url_regular = ""
+    fa_font_url_bold = ""
+    try:
+        if is_fa:
+            fa_reg, fa_bold = load_farsi_font_data_uris()
+            fa_font_url_regular = fa_reg or ""
+            fa_font_url_bold = fa_bold or ""
+    except Exception:
+        pass
+
+    explicit_template_id = None
+    try:
+        if body.get("template_id") is not None:
+            explicit_template_id = int(body.get("template_id"))
+    except Exception:
+        explicit_template_id = None
+
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+
+        template_context = {
+            "title_text": "گزارش موجودی انبار" if is_fa else "Inventory Stock Report",
+            "business_name": business_name,
+            "generated_at": generated_at,
+            "is_fa": is_fa,
+            "locale": locale,
+            "paper_size": paper_size,
+            "orientation": orientation,
+            "fa_font_url_regular": fa_font_url_regular,
+            "fa_font_url_bold": fa_font_url_bold,
+            "footer_text": footer_text,
+            "filters_summary": filters_summary,
+            "items": items,
+        }
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="inventory_stock",
+            subtype="list",
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+        )
+    except Exception:
+        resolved_html = None
+
+    if not resolved_html:
+        final_html = render_template(
+            "pdf/inventory_stock/list.html",
+            {
+                "title_text": "گزارش موجودی انبار" if is_fa else "Inventory Stock Report",
+                "business_name": business_name,
+                "generated_at": generated_at,
+                "is_fa": is_fa,
+                "locale": locale,
+                "paper_size": paper_size or "A4",
+                "orientation": orientation or "landscape",
+                "fa_font_url_regular": fa_font_url_regular,
+                "fa_font_url_bold": fa_font_url_bold,
+                "footer_text": footer_text,
+                "filters_summary": filters_summary,
+                "items": items,
+            },
+        )
+    else:
+        final_html = resolved_html
+
+    page_css = f"@page {{ size: {(paper_size or 'A4')} {(orientation or 'landscape')}; margin: 1cm; }}"
+    font_config = FontConfiguration()
+    pdf_bytes = HTML(string=final_html).write_pdf(
+        stylesheets=[CSS(string=page_css)],
+        font_config=font_config,
+    )
+    fn = f"inventory_stock_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"{disposition}; filename={fn}",
+            "Content-Length": str(len(pdf_bytes)),
+            "Access-Control-Expose-Headers": "Content-Disposition",
+        },
     )
 
 

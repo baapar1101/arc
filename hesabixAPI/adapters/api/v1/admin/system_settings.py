@@ -345,6 +345,15 @@ class SystemConfigurationPayload(BaseModel):
 	enable_registration: bool | None = None
 	enable_email_verification: bool | None = None
 	enable_maintenance_mode: bool | None = None
+	support_tickets_enabled: bool | None = Field(
+		default=None,
+		description="اگر False باشد ثبت/view تیکت برای کاربران عادی قطع می‌شود؛ اپراتور همچنان دسترسی دارد",
+	)
+	support_tickets_disabled_message: str | None = Field(
+		default=None,
+		description="متن دلخواه مدیر؛ در صورت خالی نمایش پیش‌فرض در خطا و عمومی برای کاربر",
+		max_length=8192,
+	)
 	session_timeout: int | None = None
 	max_file_size: int | None = None
 	max_users: int | None = None
@@ -420,6 +429,8 @@ def set_system_configuration_endpoint(
 		enable_registration=payload.enable_registration,
 		enable_email_verification=payload.enable_email_verification,
 		enable_maintenance_mode=payload.enable_maintenance_mode,
+		support_tickets_enabled=payload.support_tickets_enabled,
+		support_tickets_disabled_message=payload.support_tickets_disabled_message,
 		session_timeout=payload.session_timeout,
 		max_file_size=payload.max_file_size,
 		max_users=payload.max_users,

@@ -7,7 +7,7 @@ import logging
 import re
 from collections import defaultdict, deque
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import and_, or_, func, cast
 from sqlalchemy.dialects.postgresql import JSONB
@@ -1086,6 +1086,26 @@ def _compute_available_stock(
         wh_movements_query = wh_movements_query.filter(
             WarehouseDocumentLine.warehouse_id == warehouse_id
         )
+
+    # حواله‌های ناشی از فاکتور قبلاً در invoice_item_lines (بخش _iter_product_movements) لحاظ شده‌اند؛
+    # شمردن دوبارهٔ خطوط این حواله‌ها موجودی را دو برابر نشان می‌دهد.
+    _wh_src_doc = aliased(Document)
+    wh_movements_query = wh_movements_query.outerjoin(
+        _wh_src_doc,
+        and_(
+            WarehouseDocument.source_document_id == _wh_src_doc.id,
+            _wh_src_doc.business_id == business_id,
+        ),
+    ).filter(
+        ~or_(
+            func.lower(func.coalesce(WarehouseDocument.source_type, "")) == "invoice",
+            and_(
+                WarehouseDocument.source_document_id.isnot(None),
+                _wh_src_doc.id.isnot(None),
+                _wh_src_doc.document_type.in_(SUPPORTED_INVOICE_TYPES),
+            ),
+        )
+    )
 
     if exclude_warehouse_document_ids:
         _xwh = sorted({int(x) for x in exclude_warehouse_document_ids if x is not None})

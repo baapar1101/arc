@@ -13,6 +13,7 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
+import 'package:hesabix_ui/widgets/invoice/invoice_pdf_print_flow.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/invoice_warehouse_bulk_service.dart';
@@ -1026,6 +1027,15 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                 );
               },
             ),
+            DataTableAction(
+              icon: Icons.picture_as_pdf,
+              label: t.printPdf,
+              onTap: (item) async {
+                final invoice = item as InvoiceListItem;
+                if (!mounted) return;
+                await _printInvoicePdfFromList(invoice);
+              },
+            ),
             if (widget.authStore.canWriteSection('invoices'))
               DataTableAction(
                 icon: Icons.edit,
@@ -1415,6 +1425,11 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           label: t.view,
           onTap: () => _onView(invoice),
         ),
+        _InvoiceActionItem(
+          icon: Icons.picture_as_pdf,
+          label: t.printPdf,
+          onTap: () => _printInvoicePdfFromList(invoice),
+        ),
       ];
       if (widget.authStore.canWriteSection('invoices')) {
         actions.addAll([
@@ -1651,6 +1666,17 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         documentId: item.id,
         calendarController: widget.calendarController,
       ),
+    );
+  }
+
+  Future<void> _printInvoicePdfFromList(InvoiceListItem invoice) async {
+    if (!mounted) return;
+    await InvoicePdfPrintFlow.showPrintOptionsSheetAndDownload(
+      context: context,
+      businessId: widget.businessId,
+      invoiceId: invoice.id,
+      invoiceCode: invoice.code,
+      documentType: invoice.documentType,
     );
   }
 

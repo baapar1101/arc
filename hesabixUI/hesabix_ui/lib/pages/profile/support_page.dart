@@ -1,9 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/support_service.dart';
+import 'package:hesabix_ui/services/support_tickets_public_config.dart';
 import 'package:hesabix_ui/services/saved_filters_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/models/saved_filter.dart';
@@ -39,11 +41,13 @@ class SupportPage extends StatefulWidget {
   State<SupportPage> createState() => _SupportPageState();
 }
 
-class _SupportPageState extends State<SupportPage> {
+class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   Set<int> _selectedRows = <int>{};
   
   // Support data for filters
   final SupportService _supportService = SupportService(ApiClient());
+  bool _supportGateResolved = false;
+  SupportTicketsPublicConfig _supportPublic = const SupportTicketsPublicConfig();
   List<SupportStatus> _statuses = [];
   List<SupportPriority> _priorities = [];
   List<SupportCategory> _categories = [];
@@ -89,8 +93,41 @@ class _SupportPageState extends State<SupportPage> {
   @override
   void initState() {
     super.initState();
-    _loadMetadata();
-    _loadSavedFilters();
+    WidgetsBinding.instance.addObserver(this);
+    _resolveSupportAvailability();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_resolveSupportAvailability());
+    }
+    super.didChangeAppLifecycleState(state);
+  }
+
+  Future<void> _resolveSupportAvailability() async {
+    final cfg = await SupportTicketsPublicConfig.fetch(ApiClient());
+    if (!mounted) return;
+    setState(() {
+      _supportPublic = cfg;
+      _supportGateResolved = true;
+    });
+    if (cfg.enabledForUsers) {
+      _loadMetadata();
+      _loadSavedFilters();
+    } else if (mounted) {
+      setState(() {
+        _metadataLoading = false;
+      });
+    }
   }
 
   Future<void> _loadMetadata() async {
@@ -1444,18 +1481,50 @@ class _SupportPageState extends State<SupportPage> {
   }
 
   @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final width = MediaQuery.of(context).size.width;
     final bool isMobile = width < 768;
+
+    if (!_supportGateResolved) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (!_supportPublic.enabledForUsers) {
+      final bodyText = _supportPublic.disabledMessage.trim().isEmpty
+          ? t.supportTicketsUnavailableBody
+          : _supportPublic.disabledMessage;
+      return Scaffold(
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Icon(Icons.support_agent_outlined, size: 56, color: theme.colorScheme.primary),
+                  const SizedBox(height: 20),
+                  Text(
+                    t.support,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    bodyText,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     if (isMobile && !_ticketsEverLoaded && !_ticketsLoading) {
       _ticketsEverLoaded = true;
