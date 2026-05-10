@@ -28,7 +28,7 @@ if (!defined('WPINC')) {
 /**
  * Currently plugin version.
  */
-define('HESABIX_V2_VERSION', '3.3.4');
+define('HESABIX_V2_VERSION', '3.3.5');
 define('HESABIX_V2_PLUGIN_FILE', __FILE__);
 define('HESABIX_V2_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HESABIX_V2_PLUGIN_DIR', plugin_dir_path(__FILE__));
