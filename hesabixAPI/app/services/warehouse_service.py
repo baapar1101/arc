@@ -82,6 +82,43 @@ def _is_duplicate_warehouse_document_code_error(exc: IntegrityError) -> bool:
 	return False
 
 
+# هم‌تراز با ستون warehouse_document_lines.quantity (Numeric(18, 6) در PostgreSQL)
+_MAX_WAREHOUSE_LINE_QUANTITY = Decimal("999999999999.999999")
+
+
+def _parse_stock_count_adjustment_quantity(raw: Any, product_label: str) -> Optional[Decimal]:
+	"""Parse و اعتبارسنجی تعداد خط حواله قبل از INSERT تا از numeric overflow در DB جلوگیری شود."""
+	try:
+		q = Decimal(str(raw))
+	except Exception:
+		raise ApiError(
+			"INVALID_QUANTITY",
+			f"مقدار تعداد برای کالا ({product_label}) نامعتبر است.",
+			http_status=400,
+		)
+	if q <= 0:
+		return None
+	if not q.is_finite():
+		raise ApiError(
+			"INVALID_QUANTITY",
+			f"مقدار تعداد برای کالا ({product_label}) نامعتبر است.",
+			http_status=400,
+		)
+	q = q.quantize(Decimal("0.000001"))
+	if q <= 0:
+		return None
+	if q > _MAX_WAREHOUSE_LINE_QUANTITY:
+		raise ApiError(
+			"QUANTITY_OUT_OF_RANGE",
+			(
+				"مقدار تعداد تعدیل از حد مجاز سیستم بیشتر است. "
+				f"حداکثر مجاز {_MAX_WAREHOUSE_LINE_QUANTITY} است؛ لطفاً مقادیر شمارش یا تفاوت را بررسی کنید."
+			),
+			http_status=400,
+		)
+	return q
+
+
 def _generate_auto_warehouse_code(db: Session, business_id: int) -> str:
 	"""تولید کد خودکار برای انبار: WH-00001, WH-00002, ..."""
 	from sqlalchemy import func, select
@@ -3015,9 +3052,10 @@ def create_stock_count_adjustment(
 		product_id = item.get("product_id")
 		warehouse_id = item.get("warehouse_id")
 		movement = item.get("movement")
-		quantity = Decimal(str(item.get("quantity", 0)))
-		
-		if not product_id or not movement or quantity <= 0:
+		if not product_id or not movement:
+			continue
+		quantity = _parse_stock_count_adjustment_quantity(item.get("quantity", 0), str(product_id))
+		if quantity is None:
 			continue
 		
 		# بررسی محصول
