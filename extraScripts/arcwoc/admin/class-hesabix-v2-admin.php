@@ -629,6 +629,34 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * کمبوی چندگانهٔ برچسب اضافی: آرایه → رشتهٔ ویرگول‌دار (هم‌خوان با parse_extra_tag_ids).
+	 *
+	 * @return string
+	 */
+	private static function sanitize_invoice_extra_tag_ids_from_post()
+	{
+		$raw = isset($_POST['invoice_extra_tag_ids'])
+			? wp_unslash($_POST['invoice_extra_tag_ids'])
+			: '';
+		if (is_string($raw)) {
+			$raw = $raw !== '' ? array($raw) : array();
+		}
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+		$ids = array();
+		foreach ($raw as $part) {
+			$id = absint($part);
+			if ($id > 0) {
+				$ids[] = $id;
+			}
+		}
+		$ids = array_values(array_unique($ids));
+
+		return implode(',', $ids);
+	}
+
+	/**
 	 * Save settings
 	 *
 	 * @since    2.0.0
@@ -668,12 +696,13 @@ class Hesabix_V2_Admin
 			'invoice_tag_website_name' => isset($_POST['invoice_tag_website_name'])
 				? sanitize_text_field(wp_unslash($_POST['invoice_tag_website_name']))
 				: 'فروش سایت',
-			'invoice_extra_tag_ids' => isset($_POST['invoice_extra_tag_ids'])
-				? sanitize_text_field(wp_unslash($_POST['invoice_extra_tag_ids']))
-				: '',
+			'invoice_extra_tag_ids' => self::sanitize_invoice_extra_tag_ids_from_post(),
 			'order_fiscal_year_date_policy' => isset($_POST['order_fiscal_year_date_policy'])
 				? sanitize_key(wp_unslash($_POST['order_fiscal_year_date_policy']))
 				: 'keep',
+			'queue_items_per_cron_run' => isset($_POST['queue_items_per_cron_run'])
+				? max(1, min(500, absint(wp_unslash($_POST['queue_items_per_cron_run']))))
+				: 15,
 		);
 
 		$fiscal_policy_allowed = array('keep', 'clamp', 'skip');
@@ -923,6 +952,34 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * همگام‌سازی سفارش در پس‌زمینه (صف Cron) تا درخواست ادمین/چک‌اوت به‌خاطر کندی API حسابیکس 504 ندهد.
+	 *
+	 * @param int $order_id
+	 * @return void
+	 */
+	private function defer_auto_order_sync_to_queue($order_id)
+	{
+		$order_id = (int) $order_id;
+		if ($order_id < 1) {
+			return;
+		}
+
+		Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
+
+		// بدون spawn_cron: آن درخواست loopback اغلب همان بدنهٔ ذخیرهٔ سفارش را منتظر یا PHP-FPM را اشغال می‌کند.
+		$scheduled = false;
+		if (function_exists('as_enqueue_async_action')) {
+			$id = as_enqueue_async_action('hesabix_v2_async_process_queue', array(), 'hesabix-v2-queue', true);
+			$scheduled = is_int($id) && $id > 0;
+		}
+
+		if (!$scheduled && !get_transient('hesabix_v2_queue_wp_cron_sched')) {
+			set_transient('hesabix_v2_queue_wp_cron_sched', '1', 90);
+			wp_schedule_single_event(time() + 2, 'hesabix_v2_process_queue');
+		}
+	}
+
+	/**
 	 * فقط کاربران با نقش customer (مشتری فروشگاه) همگام شوند، نه هر کاربر وردپرس.
 	 *
 	 * @param int $user_id
@@ -960,8 +1017,7 @@ class Hesabix_V2_Admin
 		if ($this->should_skip_auto_order_sync($order_id)) {
 			return;
 		}
-		$sync_service = new Hesabix_V2_Sync_Service();
-		$sync_service->sync_order($order_id);
+		$this->defer_auto_order_sync_to_queue($order_id);
 	}
 
 	/**
@@ -981,8 +1037,7 @@ class Hesabix_V2_Admin
 		if ($this->should_skip_auto_order_sync($order_id)) {
 			return;
 		}
-		$sync_service = new Hesabix_V2_Sync_Service();
-		$sync_service->sync_order($order_id);
+		$this->defer_auto_order_sync_to_queue($order_id);
 	}
 
 	/**
@@ -1008,8 +1063,7 @@ class Hesabix_V2_Admin
 		if ($this->should_skip_auto_order_sync($order_id)) {
 			return;
 		}
-		$sync_service = new Hesabix_V2_Sync_Service();
-		$sync_service->sync_order($order_id);
+		$this->defer_auto_order_sync_to_queue($order_id);
 	}
 
 	/**

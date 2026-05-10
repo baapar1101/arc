@@ -273,6 +273,10 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 	 */
 	public function prepare_items()
 	{
+		$this->items = array();
+		$columns = $this->get_columns();
+		$this->_column_headers = array($columns, array(), $this->get_sortable_columns());
+
 		$per_page = 20;
 		$current_page = max(1, (int) $this->get_pagenum());
 		$filter = isset($_GET['hesabix_filter']) ? sanitize_key(wp_unslash((string) $_GET['hesabix_filter'])) : 'all';

@@ -715,6 +715,10 @@ class Hesabix_V2_Mapper
 				);
 			}
 
+			if ($warehouse_id !== null && $warehouse_id !== '') {
+				$line_extra['warehouse_id'] = (int) $warehouse_id;
+			}
+
 			$lines[] = array(
 				'product_id' => $fee_product_id,
 				'quantity' => 1,

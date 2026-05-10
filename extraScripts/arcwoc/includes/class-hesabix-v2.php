@@ -209,6 +209,8 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_complete', $plugin_admin, 'ajax_setup_complete');
 
 		$this->loader->add_action('hesabix_v2_process_queue', 'Hesabix_V2_Queue_Service', 'process_due');
+		// پردازش صف بدون باز کردن wp-cron.php در همان لحظهٔ ذخیرهٔ سفارش (کاهش ۵۰۴ روی سرورهای با PHP-FPM محدود)
+		$this->loader->add_action('hesabix_v2_async_process_queue', 'Hesabix_V2_Queue_Service', 'process_due');
 		$this->loader->add_action('hesabix_v2_clean_old_logs', 'Hesabix_V2_Log_Service', 'cron_clean_old_logs');
 	}
 

@@ -28,6 +28,11 @@ class Hesabix_V2_Sync_Service
 	private $db;
 
 	/**
+	 * پیش از فراخوانی API؛ انبار خطوط حل نشده باشد تا زمان اصلاح تنظیمات نباید دوباره به صف رود.
+	 */
+	const ERR_INVOICE_WAREHOUSE_PREFLIGHT = 94001;
+
+	/**
 	 * پیش‌فرض‌های اندازهٔ دسته برای عملیات سنگین همگام‌سازی و واردات (کاهش تایم‌اوت AJAX).
 	 *
 	 * @since 2.0.7
@@ -556,9 +561,12 @@ class Hesabix_V2_Sync_Service
 					),
 				)
 			);
-			$order->add_order_note(
-				sprintf(__('همگام‌سازی حسابیکس متوقف شد (ارز): %s', 'hesabix-v2'), $gate['message'])
-			);
+			if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+				Hesabix_V2_Order_Sync_Meta::set_or_update_order_system_note(
+					$order,
+					sprintf(__('همگام‌سازی حسابیکس متوقف شد (ارز): %s', 'hesabix-v2'), $gate['message'])
+				);
+			}
 
 			return array(
 				'success' => false,
@@ -585,7 +593,10 @@ class Hesabix_V2_Sync_Service
 						'detail' => $skip_msg,
 					)
 				);
-				$order->add_order_note($skip_msg);
+				if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+					Hesabix_V2_Order_Sync_Meta::set_or_update_order_system_note($order, $skip_msg);
+				}
+
 				return array(
 					'success' => false,
 					'message' => $skip_msg,
@@ -664,6 +675,8 @@ class Hesabix_V2_Sync_Service
 
 			$wc_payload_for_log = $invoice_data;
 
+			self::assert_invoice_lines_have_warehouse_when_required($order, $invoice_data);
+
 			// Check if already synced
 			$existing_mapping = $this->db->get_mapping('order', $order_id);
 			$is_new_invoice = !$existing_mapping;
@@ -678,6 +691,10 @@ class Hesabix_V2_Sync_Service
 
 			if (isset($api_last_result['success']) && $api_last_result['success']) {
 				$hesabix_id = $api_last_result['data']['id'];
+
+				if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+					Hesabix_V2_Order_Sync_Meta::remove_order_system_note($order);
+				}
 
 				// Save mapping
 				$this->db->save_mapping(
@@ -739,14 +756,23 @@ class Hesabix_V2_Sync_Service
 					'decoded' => $api_last_result,
 				);
 			}
-			Hesabix_V2_Log_Service::error('Order sync failed', $elog);
+			if ((int) $e->getCode() !== self::ERR_INVOICE_WAREHOUSE_PREFLIGHT) {
+				$hint_msg = (string) $e->getMessage();
+				if (
+					stripos($hint_msg, 'warehouse') !== false
+					|| preg_match('/انبار/u', $hint_msg) === 1
+				) {
+					$elog['resolution_hint_fa'] = __(
+						'این پاسخ از API معمولاً یعنی حسابیکس برای خط انبارداری به warehouse_id نیاز داشته اما مقدار را نپذیرفته است. در تنظیمات افزونه، تب فاکتور، «انبار پیش‌فرض» و «انبار در خطوط فاکتور فروش» را بررسی کنید و payload ارسالی (json_body) را در همین رکورد لاگ ببینید.',
+						'hesabix-v2'
+					);
+				}
+				Hesabix_V2_Log_Service::error('Order sync failed', $elog);
+			}
 
-			// Add error note to order (order may not be set if exception was early)
 			$order_for_note = isset($order) ? $order : wc_get_order($order_id);
-			if ($order_for_note) {
-				$order_for_note->add_order_note(
-					sprintf(__('خطا در ایجاد فاکتور حسابیکس: %s', 'hesabix-v2'), $e->getMessage())
-				);
+			if ($order_for_note && class_exists('Hesabix_V2_Order_Sync_Meta')) {
+				Hesabix_V2_Order_Sync_Meta::set_or_update_invoice_sync_error_note($order_for_note, $e->getMessage());
 			}
 
 			$should_queue = $order_id > 0 && strpos($e->getMessage(), __('سفارش یافت نشد', 'hesabix-v2')) === false;
@@ -759,6 +785,9 @@ class Hesabix_V2_Sync_Service
 			if ($should_queue && strpos($e->getMessage(), __('ارز فروشگاه ووکامرس مشخص نیست', 'hesabix-v2')) !== false) {
 				$should_queue = false;
 			}
+			if ($should_queue && (int) $e->getCode() === self::ERR_INVOICE_WAREHOUSE_PREFLIGHT) {
+				$should_queue = false;
+			}
 
 			if ($should_queue) {
 				Hesabix_V2_Queue_Service::enqueue('order', $order_id, 'sync_order');
@@ -769,6 +798,121 @@ class Hesabix_V2_Sync_Service
 				'message' => $e->getMessage(),
 			);
 		}
+	}
+
+	/**
+	 * وقتی post_inventory فعال است، هر خط با movement برابر out باید warehouse_id در extra_info داشته باشد.
+	 *
+	 * @param WC_Order $order
+	 * @param array    $invoice_data
+	 * @return void
+	 * @throws Exception با کد {@see self::ERR_INVOICE_WAREHOUSE_PREFLIGHT}
+	 */
+	private static function assert_invoice_lines_have_warehouse_when_required($order, array $invoice_data)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return;
+		}
+
+		$extra = isset($invoice_data['extra_info']) && is_array($invoice_data['extra_info']) ? $invoice_data['extra_info'] : array();
+		if (empty($extra['post_inventory'])) {
+			return;
+		}
+
+		$lines = isset($invoice_data['lines']) && is_array($invoice_data['lines']) ? $invoice_data['lines'] : array();
+		$missing = array();
+
+		foreach ($lines as $i => $line) {
+			if (!is_array($line)) {
+				continue;
+			}
+			$ei = isset($line['extra_info']) && is_array($line['extra_info']) ? $line['extra_info'] : array();
+			if (($ei['movement'] ?? '') !== 'out') {
+				continue;
+			}
+			$wid = isset($ei['warehouse_id']) ? (int) $ei['warehouse_id'] : 0;
+			if ($wid < 1) {
+				$missing[] = array(
+					'line_index' => (int) $i,
+					'hesabix_product_id' => isset($line['product_id']) ? (int) $line['product_id'] : 0,
+					'description' => isset($line['description']) && is_string($line['description'])
+						? mb_substr($line['description'], 0, 200)
+						: '',
+				);
+			}
+		}
+
+		if ($missing === array()) {
+			return;
+		}
+
+		$resolved = Hesabix_V2_Invoice_Warehouse_Service::resolve_warehouse_id_for_order($order);
+		$resolved_log = ($resolved !== null && $resolved !== '') ? (int) $resolved : null;
+		$cfg = Hesabix_V2_Invoice_Warehouse_Service::get_config();
+		$default_opt = get_option('hesabix_v2_default_warehouse_id', '');
+		$default_log = ($default_opt !== '' && $default_opt !== null) ? absint($default_opt) : null;
+
+		Hesabix_V2_Log_Service::warning(
+			__('فاکتور ارسال نشد — خطوط خروج از انبار بدون شناسهٔ انبار (warehouse_id)', 'hesabix-v2'),
+			array(
+				'entity_type' => 'order',
+				'entity_id' => $order->get_id(),
+				'wc_order_number' => $order->get_order_number(),
+				'detail_title_fa' => __(
+					'حسابیکس برای فاکتورهای با ثبت موجودی، برای هر خط خروج از انبار به warehouse_id نیاز دارد.',
+					'hesabix-v2'
+				),
+				'resolution' => 'invoice_warehouse_preflight',
+				'post_inventory' => true,
+				'invoice_warehouse_mode' => isset($cfg['resolution']) ? (string) $cfg['resolution'] : '',
+				'default_warehouse_id_option' => $default_log,
+				'resolved_warehouse_for_order' => $resolved_log,
+				'shipping_methods' => self::summarize_order_shipping_method_keys_for_log($order),
+				'hint_configure_fa' => __(
+					'مسیر پیشنهادی: حسابیکس ووکامرس ← تنظیمات ← تب فاکتور — «انبار پیش‌فرض» را انتخاب کنید، یا در بخش «انبار در خطوط فاکتور فروش» قانون منطبق با روش حمل یا منطقهٔ ارسال همین سفارش تعریف کنید.',
+					'hesabix-v2'
+				),
+				'lines_missing_warehouse_id' => $missing,
+				'direction' => 'woocommerce_payload',
+				'request_preview' => array(
+					'lines_count' => count($lines),
+				),
+			)
+		);
+
+		$msg = __(
+			'ثبت موجودی برای فاکتور فعال است اما حسابیکس برای یک یا چند خط خروج از انبار warehouse_id دریافت نکرده است. در تنظیمات افزونه، تب فاکتور، انبار پیش‌فرض یا قوانین انبار را تکمیل کنید.',
+			'hesabix-v2'
+		);
+
+		throw new Exception($msg, self::ERR_INVOICE_WAREHOUSE_PREFLIGHT);
+	}
+
+	/**
+	 * خلاصهٔ روش‌های حمل برای توضیح در لاگ.
+	 *
+	 * @param WC_Order $order
+	 * @return array<int, string>
+	 */
+	private static function summarize_order_shipping_method_keys_for_log($order)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return array();
+		}
+
+		$keys = array();
+		foreach ($order->get_items('shipping') as $ship_item) {
+			if (!$ship_item instanceof WC_Order_Item_Shipping) {
+				continue;
+			}
+			$mid = sanitize_title((string) $ship_item->get_method_id());
+			$iid = preg_replace('/[^0-9]/', '', (string) $ship_item->get_instance_id());
+			if ($mid !== '') {
+				$keys[] = $mid . ':' . $iid;
+			}
+		}
+
+		return array_values(array_unique($keys));
 	}
 
 	/**

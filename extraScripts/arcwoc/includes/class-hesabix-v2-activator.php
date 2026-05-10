@@ -150,6 +150,7 @@ class Hesabix_V2_Activator
 			'invoice_tag_website_name' => 'فروش سایت',
 			'invoice_extra_tag_ids' => '',
 			'order_fiscal_year_date_policy' => 'keep',
+			'queue_items_per_cron_run' => 15,
 		);
 
 		if (!get_option('hesabix_v2_sync_settings')) {
@@ -204,7 +205,4 @@ class Hesabix_V2_Activator
 		return $schedules;
 	}
 }
-
-// Add custom cron schedule
-add_filter('cron_schedules', array('Hesabix_V2_Activator', 'add_cron_schedules'));
 

@@ -16,6 +16,14 @@ class Hesabix_V2_Order_Sync_Meta
 	const META_PAUSE_AUTO = '_hesabix_v2_pause_auto_sync';
 
 	/**
+	 * متا برای شناسهٔ نظر واحد «وضعیت همگام‌سازی حسابیکس»: ارز، سال مالی، خطای فاکتور؛ با هر رویداد همان نظر به‌روز می‌شود.
+	 */
+	const META_ORDER_SYSTEM_NOTE = '_hesabix_v2_order_system_note_id';
+
+	/** @var string نسخهٔ قدیمی متای خطای فاکتور؛ فقط خوانده می‌شود و هنگام ثبت نظر جدید حذف می‌گردد */
+	const LEGACY_META_INVOICE_SYNC_ERROR_NOTE = '_hesabix_v2_invoice_sync_error_note_id';
+
+	/**
 	 * آیا همگام‌سازی خودکار (هوک‌ها و صف) برای این سفارش رد شود؟
 	 *
 	 * @param int $order_id
@@ -32,6 +40,7 @@ class Hesabix_V2_Order_Sync_Meta
 			return false;
 		}
 		$v = $order->get_meta(self::META_PAUSE_AUTO, true);
+
 		return $v === '1' || $v === 1 || $v === true;
 	}
 
@@ -54,7 +63,17 @@ class Hesabix_V2_Order_Sync_Meta
 		} else {
 			$order->delete_meta_data(self::META_PAUSE_AUTO);
 		}
+
+		// هوک woocommerce_update_order در حین ذخیرهٔ اصلی سفارش: save() تمام شیء خطر حلقه با افزونه‌هایی
+		// (مثلاً Yoast کش نقشه سایت بعد از پاک‌کردن کش پست هنگام همگام‌سازی CPT/HPOS) دارد؛ فقط متادیتا را بنویسیم.
+		if (doing_action('woocommerce_update_order')) {
+			$order->save_meta_data();
+
+			return true;
+		}
+
 		$order->save();
+
 		return true;
 	}
 
@@ -67,5 +86,143 @@ class Hesabix_V2_Order_Sync_Meta
 	public static function clear_on_unsync($order_id)
 	{
 		self::set_pause_auto_sync((int) $order_id, false);
+
+		$order = wc_get_order((int) $order_id);
+		if ($order) {
+			self::remove_order_system_note($order);
+		}
+	}
+
+	/**
+	 * @param WC_Order $order
+	 * @return int
+	 */
+	private static function get_stored_system_note_id($order)
+	{
+		$nid = absint((string) $order->get_meta(self::META_ORDER_SYSTEM_NOTE, true));
+		if ($nid > 0) {
+			return $nid;
+		}
+
+		return absint((string) $order->get_meta(self::LEGACY_META_INVOICE_SYNC_ERROR_NOTE, true));
+	}
+
+	/**
+	 * @param WC_Order $order
+	 * @return void
+	 */
+	private static function persist_order_meta_after_note_change($order)
+	{
+		if (doing_action('woocommerce_update_order')) {
+			$order->save_meta_data();
+		} else {
+			$order->save();
+		}
+	}
+
+	/**
+	 * یک یادداشت واحد از طرف افزونه: متن کامل قبلاً ترجمه/قالب شده باشد؛ در صورت وجود نظر قبلی متن آن به‌روز می‌شود.
+	 *
+	 * @param WC_Order $order
+	 * @param string   $content متن یادداشت کامل برای نمایش در سفارش
+	 */
+	public static function set_or_update_order_system_note($order, $content)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return;
+		}
+
+		$content = wp_strip_all_tags((string) $content);
+		if (mb_strlen($content) > 2500) {
+			$content = mb_substr($content, 0, 2497) . '…';
+		}
+
+		$note_id = self::get_stored_system_note_id($order);
+		if ($note_id > 0) {
+			$c = get_comment($note_id);
+			if (
+				is_object($c)
+				&& (int) $c->comment_post_ID === (int) $order->get_id()
+				&& (($c->comment_type ?? '') === 'order_note' || ($c->comment_type ?? '') === '')
+			) {
+				wp_update_comment(
+					array(
+						'comment_ID' => $note_id,
+						'comment_content' => $content,
+						'comment_date' => current_time('mysql'),
+						'comment_date_gmt' => current_time('mysql', 1),
+					)
+				);
+
+				if ($order->meta_exists(self::LEGACY_META_INVOICE_SYNC_ERROR_NOTE)) {
+					$order->delete_meta_data(self::LEGACY_META_INVOICE_SYNC_ERROR_NOTE);
+					self::persist_order_meta_after_note_change($order);
+				}
+
+				return;
+			}
+		}
+
+		$new_id = (int) $order->add_order_note($content, false);
+		if ($new_id > 0) {
+			$order->update_meta_data(self::META_ORDER_SYSTEM_NOTE, (string) $new_id);
+			$order->delete_meta_data(self::LEGACY_META_INVOICE_SYNC_ERROR_NOTE);
+			self::persist_order_meta_after_note_change($order);
+		}
+	}
+
+	/**
+	 * پیام خطای ایجاد/به‌روزرسانی فاکتور؛ همان یادداشت تجمیعی سفارش را به‌روز می‌کند.
+	 *
+	 * @param WC_Order $order
+	 * @param string   $exception_message پیام خام استثناء (بدون پیشوند افزونه)
+	 */
+	public static function set_or_update_invoice_sync_error_note($order, $exception_message)
+	{
+		$body = sanitize_text_field(wp_strip_all_tags((string) $exception_message));
+		if (mb_strlen($body) > 2000) {
+			$body = mb_substr($body, 0, 1997) . '…';
+		}
+
+		$content = sprintf(
+			__('خطا در ایجاد فاکتور حسابیکس: %s', 'hesabix-v2'),
+			$body
+		);
+
+		self::set_or_update_order_system_note($order, $content);
+	}
+
+	/**
+	 * پس از موفقیت همگام‌سازی فاکتور یا لغو ارسال: حذف یادداشت تجمیعی و متای آن.
+	 *
+	 * @param WC_Order $order
+	 */
+	public static function remove_order_system_note($order)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return;
+		}
+
+		$note_id = self::get_stored_system_note_id($order);
+		if ($note_id > 0) {
+			$c = get_comment($note_id);
+			if (is_object($c) && (int) $c->comment_post_ID === (int) $order->get_id()) {
+				wp_delete_comment($note_id, true);
+			}
+		}
+
+		$order->delete_meta_data(self::META_ORDER_SYSTEM_NOTE);
+		$order->delete_meta_data(self::LEGACY_META_INVOICE_SYNC_ERROR_NOTE);
+
+		self::persist_order_meta_after_note_change($order);
+	}
+
+	/**
+	 * @param WC_Order $order
+	 * @deprecated سازگاری عقب‌رو؛ از {@see remove_order_system_note} استفاده کنید.
+	 */
+	public static function remove_invoice_sync_error_note($order)
+	{
+		self::remove_order_system_note($order);
 	}
 }

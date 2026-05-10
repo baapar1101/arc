@@ -92,6 +92,22 @@ add_action('before_woocommerce_init', function() {
 });
 
 /**
+ * بازهٔ کرون هر ۵ دقیقه باید همیشه در فیلتر cron_schedules ثبت شود.
+ * قبلاً فقط در هنگام پارسِ فایلٔ فعال‌سازی ثبت می‌شد؛ بعد از آن روی اکثر بارگذاری‌ها هرگز اعمال نمی‌شد و رویداد {@see hesabix_v2_process_queue} خطای invalid_schedule می‌گرفت.
+ */
+add_filter('cron_schedules', static function ($schedules) {
+	if (!is_array($schedules)) {
+		$schedules = array();
+	}
+	$schedules['every_5_minutes'] = array(
+		'interval' => 300,
+		'display'  => 'Every 5 minutes (Hesabix)',
+	);
+
+	return $schedules;
+});
+
+/**
  * The code that runs during plugin activation.
  */
 function activate_hesabix_v2()

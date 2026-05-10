@@ -68,6 +68,11 @@ class Hesabix_V2_Invoice_Helper
 			$sync['order_fiscal_year_date_policy'] = 'keep';
 		}
 
+		if (!array_key_exists('queue_items_per_cron_run', $sync)) {
+			$sync['queue_items_per_cron_run'] = 15;
+		}
+		$sync['queue_items_per_cron_run'] = max(1, min(500, absint($sync['queue_items_per_cron_run'])));
+
 		return $sync;
 	}
 
