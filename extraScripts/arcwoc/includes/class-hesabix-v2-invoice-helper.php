@@ -48,6 +48,25 @@ class Hesabix_V2_Invoice_Helper
 		if (!array_key_exists('sync_category_link_by_name_in_hesabix', $sync)) {
 			$sync['sync_category_link_by_name_in_hesabix'] = false;
 		}
+		if (!isset($sync['track_inventory_policy']) || !is_string($sync['track_inventory_policy'])) {
+			$sync['track_inventory_policy'] = 'wc';
+		} else {
+			$sync['track_inventory_policy'] = sanitize_key($sync['track_inventory_policy']);
+		}
+		$allowed_policies = array('wc', 'physical_always', 'always_on', 'always_off');
+		if (!in_array($sync['track_inventory_policy'], $allowed_policies, true)) {
+			$sync['track_inventory_policy'] = 'wc';
+		}
+
+		if (!isset($sync['order_fiscal_year_date_policy']) || !is_string($sync['order_fiscal_year_date_policy'])) {
+			$sync['order_fiscal_year_date_policy'] = 'keep';
+		} else {
+			$sync['order_fiscal_year_date_policy'] = sanitize_key($sync['order_fiscal_year_date_policy']);
+		}
+		$allowed_fiscal = array('keep', 'clamp', 'skip');
+		if (!in_array($sync['order_fiscal_year_date_policy'], $allowed_fiscal, true)) {
+			$sync['order_fiscal_year_date_policy'] = 'keep';
+		}
 
 		return $sync;
 	}

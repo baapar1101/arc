@@ -138,6 +138,7 @@ class Hesabix_V2_Activator
 			'sync_on_product_update' => true,
 			'sync_product_price' => true,
 			'sync_product_stock' => true,
+			'track_inventory_policy' => 'wc',
 			'sync_product_categories' => true,
 			'sync_category_link_by_name_in_hesabix' => false,
 			'create_customer_on_order' => true,
@@ -148,6 +149,7 @@ class Hesabix_V2_Activator
 			'invoice_tag_website_enabled' => true,
 			'invoice_tag_website_name' => 'فروش سایت',
 			'invoice_extra_tag_ids' => '',
+			'order_fiscal_year_date_policy' => 'keep',
 		);
 
 		if (!get_option('hesabix_v2_sync_settings')) {

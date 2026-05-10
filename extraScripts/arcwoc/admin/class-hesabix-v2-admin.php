@@ -656,6 +656,9 @@ class Hesabix_V2_Admin
 			'sync_category_link_by_name_in_hesabix' => isset($_POST['sync_category_link_by_name_in_hesabix']),
 			'sync_product_price' => isset($_POST['sync_product_price']),
 			'sync_product_stock' => isset($_POST['sync_product_stock']),
+			'track_inventory_policy' => isset($_POST['track_inventory_policy'])
+				? sanitize_key(wp_unslash($_POST['track_inventory_policy']))
+				: 'wc',
 			'create_customer_on_order' => isset($_POST['create_customer_on_order']),
 			'sync_order_on_checkout' => isset($_POST['sync_order_on_checkout']),
 			'sync_order_on_payment_complete' => isset($_POST['sync_order_on_payment_complete']),
@@ -668,9 +671,25 @@ class Hesabix_V2_Admin
 			'invoice_extra_tag_ids' => isset($_POST['invoice_extra_tag_ids'])
 				? sanitize_text_field(wp_unslash($_POST['invoice_extra_tag_ids']))
 				: '',
+			'order_fiscal_year_date_policy' => isset($_POST['order_fiscal_year_date_policy'])
+				? sanitize_key(wp_unslash($_POST['order_fiscal_year_date_policy']))
+				: 'keep',
 		);
 
+		$fiscal_policy_allowed = array('keep', 'clamp', 'skip');
+		if (!in_array($sync_settings['order_fiscal_year_date_policy'], $fiscal_policy_allowed, true)) {
+			$sync_settings['order_fiscal_year_date_policy'] = 'keep';
+		}
+
+		$policy_allowed = array('wc', 'physical_always', 'always_on', 'always_off');
+		if (!isset($sync_settings['track_inventory_policy']) || !in_array($sync_settings['track_inventory_policy'], $policy_allowed, true)) {
+			$sync_settings['track_inventory_policy'] = 'wc';
+		}
+
 		update_option('hesabix_v2_sync_settings', $sync_settings);
+		if (class_exists('Hesabix_V2_Order_Fiscal_Service')) {
+			Hesabix_V2_Order_Fiscal_Service::invalidate_bounds_cache();
+		}
 		update_option('hesabix_v2_debug_mode', isset($_POST['debug_mode']));
 		update_option('hesabix_v2_add_checkout_fields', isset($_POST['add_checkout_fields']));
 
@@ -2050,6 +2069,9 @@ class Hesabix_V2_Admin
 		update_option('hesabix_v2_api_key', $api_key);
 		update_option('hesabix_v2_business_id', $business_id);
 		update_option('hesabix_v2_fiscal_year_id', 0);
+		if (class_exists('Hesabix_V2_Order_Fiscal_Service')) {
+			Hesabix_V2_Order_Fiscal_Service::invalidate_bounds_cache();
+		}
 		update_option('hesabix_v2_enabled', true);
 		update_option('hesabix_v2_setup_completed', true);
 		delete_transient('hesabix_v2_show_setup_wizard');

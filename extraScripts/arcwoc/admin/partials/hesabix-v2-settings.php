@@ -321,6 +321,27 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			</tr>
 
 			<tr>
+				<th scope="row"><?php _e('کنترل موجودی حسابیکس نسبت به ووکامرس', 'hesabix-v2'); ?></th>
+				<td>
+					<select name="track_inventory_policy" id="hesabix_v2_track_inventory_policy" class="regular-text">
+						<option value="wc" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'wc'); ?>>
+							<?php _e('مطابق ووکامرس (تیک «مدیریت موجودی»)', 'hesabix-v2'); ?>
+						</option>
+						<option value="physical_always" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'physical_always'); ?>>
+							<?php _e('برای کالاهای فیزیکی همیشه روشن؛ خدمات ردیابی نمی‌شوند', 'hesabix-v2'); ?>
+						</option>
+						<option value="always_on" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'always_on'); ?>>
+							<?php _e('همیشه روشن برای همهٔ اقلام ارسالی (کالا و خدمت)', 'hesabix-v2'); ?>
+						</option>
+						<option value="always_off" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'always_off'); ?>>
+							<?php _e('همیشه خاموش', 'hesabix-v2'); ?>
+						</option>
+					</select>
+					<p class="description"><?php _e('فقط هنگامی که «همگام‌سازی موجودی محصول» فعال است اعمال می‌شود؛ در صورت غیرفعال بودن آن، کنترل موجودی در حسابیکس در همگام‌سازی خاموش می‌ماند.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
 				<th scope="row"><?php _e('همگام‌سازی خودکار مشتریان', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
@@ -405,6 +426,24 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
 					<p class="description"><?php _e('اگر مشتری در حسابیکس وجود نداشت، ایجاد شود', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
+				<th scope="row"><?php _e('سفارش و بازهٔ سال مالی حسابیکس', 'hesabix-v2'); ?></th>
+				<td>
+					<select name="order_fiscal_year_date_policy">
+						<option value="keep" <?php selected(($sync_settings['order_fiscal_year_date_policy'] ?? 'keep'), 'keep'); ?>>
+							<?php _e('بدون تغییر — تاریخ ایجاد سفارش ووکامرس همان تاریخ سند حسابیکس', 'hesabix-v2'); ?>
+						</option>
+						<option value="clamp" <?php selected(($sync_settings['order_fiscal_year_date_policy'] ?? 'keep'), 'clamp'); ?>>
+							<?php _e('اصلاح به بازهٔ سال مالی جاری — اگر سفارش قبل از ابتدای سال باشد، تاریخ سند اولین روز سال؛ اگر بعد از انتهای سال باشد، آخرین روز سال (پرداخت‌های همراه فاکتور در صورت نیاز هم‌سو می‌شوند)', 'hesabix-v2'); ?>
+						</option>
+						<option value="skip" <?php selected(($sync_settings['order_fiscal_year_date_policy'] ?? 'keep'), 'skip'); ?>>
+							<?php _e('عدم همگام‌سازی — اگر تاریخ سفارش خارج از سال مالی جاری باشد، فاکتور ارسال نمی‌شود', 'hesabix-v2'); ?>
+						</option>
+					</select>
+					<p class="description"><?php _e('بازهٔ سال از API سال مالی «جاری» حسابیکس خوانده می‌شود و حداکثر یک ساعت کش می‌شود. اگر دریافت بازه ممکن نباشد، رفتار «بدون تغییر» اعمال می‌شود و یک هشدار در لاگ ثبت می‌گردد.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 		</table>

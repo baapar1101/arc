@@ -1997,6 +1997,141 @@ async def export_single_invoice_pdf(
     except Exception:
         installment_plan = None
 
+    # اضافات و کسورات فاکتور (نمایش ضمیمه در PDF)
+    invoice_adjustments_rows: List[Dict[str, Any]] = []
+    adjustments_net_signed = 0.0
+    adjustments_tax_signed = 0.0
+    adjustments_additions_total = 0.0
+    adjustments_deductions_total = 0.0
+    final_payable_total = payable_total
+    try:
+        raw_adjustments = (
+            extra.get("invoice_adjustments") if isinstance(extra, dict) else None
+        )
+        if isinstance(raw_adjustments, list) and raw_adjustments:
+            acc_ids: List[int] = []
+            for row in raw_adjustments:
+                if isinstance(row, dict) and row.get("account_id") is not None:
+                    try:
+                        acc_ids.append(int(row["account_id"]))
+                    except Exception:
+                        continue
+            acc_name_map: Dict[int, str] = {}
+            acc_code_map: Dict[int, Optional[str]] = {}
+            if acc_ids:
+                try:
+                    for acc in (
+                        db.query(Account)
+                        .filter(Account.id.in_(set(acc_ids)))
+                        .all()
+                    ):
+                        acc_name_map[int(acc.id)] = acc.name or ""
+                        acc_code_map[int(acc.id)] = getattr(acc, "code", None)
+                except Exception:
+                    logger.exception(
+                        "Invoice PDF: failed to load adjustment account names"
+                    )
+
+            for row in raw_adjustments:
+                if not isinstance(row, dict):
+                    continue
+                kind = str(row.get("kind") or "").strip().lower()
+                if kind not in ("addition", "deduction"):
+                    continue
+                try:
+                    amt = float(row.get("amount") or 0)
+                except Exception:
+                    amt = 0.0
+                try:
+                    tr = float(row.get("tax_rate") or 0)
+                except Exception:
+                    tr = 0.0
+                try:
+                    tax_amt = float(row.get("tax_amount") or 0)
+                except Exception:
+                    tax_amt = 0.0
+                try:
+                    total = float(
+                        row.get("total") if row.get("total") is not None else (amt + tax_amt)
+                    )
+                except Exception:
+                    total = amt + tax_amt
+                acc_id_int: Optional[int] = None
+                try:
+                    if row.get("account_id") is not None:
+                        acc_id_int = int(row["account_id"])
+                except Exception:
+                    acc_id_int = None
+                acc_name = acc_name_map.get(acc_id_int) if acc_id_int is not None else None
+                acc_code = acc_code_map.get(acc_id_int) if acc_id_int is not None else None
+                kind_label = (
+                    ("اضافه" if is_fa else "Addition")
+                    if kind == "addition"
+                    else ("کسر" if is_fa else "Deduction")
+                )
+                sign = 1 if kind == "addition" else -1
+                adjustments_net_signed += amt * sign
+                adjustments_tax_signed += tax_amt * sign
+                if kind == "addition":
+                    adjustments_additions_total += total
+                else:
+                    adjustments_deductions_total += total
+                invoice_adjustments_rows.append(
+                    {
+                        "kind": kind,
+                        "kind_label": kind_label,
+                        "amount": amt,
+                        "tax_rate": tr,
+                        "tax_amount": tax_amt,
+                        "total": total,
+                        "signed_amount": amt * sign,
+                        "signed_tax": tax_amt * sign,
+                        "signed_total": total * sign,
+                        "account_id": acc_id_int,
+                        "account_name": acc_name,
+                        "account_code": acc_code,
+                        "description": (row.get("description") or "").strip()
+                        if isinstance(row.get("description"), str)
+                        else (row.get("description") or ""),
+                    }
+                )
+        else:
+            try:
+                adjustments_net_signed = float(
+                    (totals or {}).get("adjustments_net", 0) or 0
+                )
+                adjustments_tax_signed = float(
+                    (totals or {}).get("adjustments_tax", 0) or 0
+                )
+            except Exception:
+                adjustments_net_signed = 0.0
+                adjustments_tax_signed = 0.0
+
+        adjustments_net_signed = round(adjustments_net_signed, 2)
+        adjustments_tax_signed = round(adjustments_tax_signed, 2)
+        adjustments_additions_total = round(adjustments_additions_total, 2)
+        adjustments_deductions_total = round(adjustments_deductions_total, 2)
+        try:
+            final_payable_total = round(
+                float(payable_total or 0)
+                + adjustments_net_signed
+                + adjustments_tax_signed,
+                2,
+            )
+        except Exception:
+            final_payable_total = payable_total
+    except Exception:
+        logger.exception(
+            "Invoice PDF: error building adjustments rows for invoice_id=%s",
+            invoice_id,
+        )
+        invoice_adjustments_rows = []
+        adjustments_net_signed = 0.0
+        adjustments_tax_signed = 0.0
+        adjustments_additions_total = 0.0
+        adjustments_deductions_total = 0.0
+        final_payable_total = payable_total
+
     # غنی‌سازی دیکشنری فاکتور برای استفاده راحت‌تر در قالب و لیست‌ها
     item["title"] = item.get("title") or ("فاکتور" if is_fa else "Invoice")
     item["issue_date"] = invoice_date_display
@@ -2008,6 +2143,12 @@ async def export_single_invoice_pdf(
     item["payable_total"] = payable_total
     item["amount_before_discount_and_tax"] = amount_before_discount_and_tax
     item["amount_without_tax"] = amount_without_tax
+    item["invoice_adjustments"] = invoice_adjustments_rows
+    item["adjustments_net"] = adjustments_net_signed
+    item["adjustments_tax"] = adjustments_tax_signed
+    item["adjustments_additions_total"] = adjustments_additions_total
+    item["adjustments_deductions_total"] = adjustments_deductions_total
+    item["final_payable_total"] = final_payable_total
     # فلگ فروش اقساطی: اگر طرح اقساط روی سند وجود داشته باشد
     try:
         extra_info_for_flag = item.get("extra_info") or {}

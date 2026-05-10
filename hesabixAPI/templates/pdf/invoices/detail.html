@@ -311,6 +311,85 @@
       position: relative;
       z-index: 1;
     }
+
+    /* اضافات و کسورات فاکتور — جدول جمع‌وجور و ضمیمه‌شده در دل فاکتور */
+    .invoice-layout .adjustments-card {
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+
+    .invoice-layout .adjustments-card .adj-table-wrapper {
+      border-radius: 6px;
+      border: 1px solid #000;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    .invoice-layout .adjustments-card table {
+      font-size: 9px;
+      line-height: 1.25;
+    }
+
+    .invoice-layout .adjustments-card thead {
+      background: #f0f0f0;
+      color: #000;
+    }
+
+    .invoice-layout .adjustments-card th,
+    .invoice-layout .adjustments-card td {
+      padding: 3px 4px;
+      vertical-align: middle;
+      border-color: #000;
+      text-align: center;
+    }
+
+    .invoice-layout .adjustments-card thead th {
+      font-size: 8.5px;
+      padding: 4px 3px;
+      letter-spacing: 0;
+      white-space: normal;
+    }
+
+    .invoice-layout tbody tr.adj-add { background: #f4faf4 !important; }
+    .invoice-layout tbody tr.adj-add:nth-child(even) { background: #ebf6ec !important; }
+    .invoice-layout tbody tr.adj-ded { background: #fdf5f3 !important; }
+    .invoice-layout tbody tr.adj-ded:nth-child(even) { background: #fbeae6 !important; }
+
+    .invoice-layout .adj-kind-tag {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 999px;
+      font-size: 8.5px;
+      font-weight: 700;
+      border: 1px solid #999;
+      white-space: nowrap;
+      line-height: 1.4;
+    }
+
+    .invoice-layout .adj-kind-tag.add {
+      color: #186a18;
+      border-color: #2f8a2f;
+      background: #e8f7e6;
+    }
+
+    .invoice-layout .adj-kind-tag.ded {
+      color: #8a2a2a;
+      border-color: #b54141;
+      background: #fbe5e0;
+    }
+
+    .invoice-layout .adj-tot-add { color: #186a18; }
+    .invoice-layout .adj-tot-ded { color: #8a2a2a; }
+
+    .invoice-layout .summary .adj-row {
+      font-size: 11px;
+    }
+
+    .invoice-layout .summary hr.summary-divider {
+      border: none;
+      border-top: 1px dashed #999;
+      margin: 4px 0;
+    }
   </style>
 
   <div class="invoice-layout">
@@ -512,6 +591,60 @@
       </div>
     </div>
 
+    {# اضافات و کسورات فاکتور — به‌صورت ضمیمه و در دل فاکتور (نه صفحه جدا) #}
+    {% set _adj_rows = (invoice.invoice_adjustments | default([], true)) or [] %}
+    {% if _adj_rows|length > 0 %}
+      <div class="section-card adjustments-card">
+        <h3 style="margin-top: 0;">{{ 'اضافات و کسورات فاکتور' if is_fa else 'Invoice adjustments' }}</h3>
+        <div class="adj-table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ 'ردیف' if is_fa else 'No.' }}</th>
+                <th>{{ 'نوع' if is_fa else 'Kind' }}</th>
+                <th>{{ 'حساب' if is_fa else 'Account' }}</th>
+                <th>{{ 'شرح' if is_fa else 'Description' }}</th>
+                <th class="line-numeric-strong">{{ 'مبلغ خالص' if is_fa else 'Net amount' }}</th>
+                <th class="line-numeric-strong">{{ 'نرخ مالیات' if is_fa else 'Tax rate' }}</th>
+                <th class="line-numeric-strong">{{ 'مالیات' if is_fa else 'Tax' }}</th>
+                <th class="line-numeric-strong">{{ 'جمع' if is_fa else 'Total' }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in _adj_rows %}
+                <tr class="{{ 'adj-add' if r.kind == 'addition' else 'adj-ded' }}">
+                  <td>{{ loop.index }}</td>
+                  <td>
+                    <span class="adj-kind-tag {{ 'add' if r.kind == 'addition' else 'ded' }}">
+                      {{ '+' if r.kind == 'addition' else '−' }} {{ r.kind_label }}
+                    </span>
+                  </td>
+                  <td>
+                    {% if r.account_code %}{{ r.account_code }} - {% endif %}{{ r.account_name or '-' }}
+                  </td>
+                  <td style="text-align: start;">{{ r.description or '-' }}</td>
+                  <td class="amount line-numeric-strong">{{ (r.amount or 0) | format_amount(0) | ltr | safe }}</td>
+                  <td class="line-numeric-strong">
+                    {% if (r.tax_rate or 0) > 0 %}
+                      <span class="amount" style="font-weight: 700;">{{ (r.tax_rate or 0) | smart_number | ltr | safe }}%</span>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                  <td class="amount line-numeric-strong">{{ (r.tax_amount or 0) | format_amount(0) | ltr | safe }}</td>
+                  <td class="amount line-numeric-strong">
+                    <span class="{{ 'adj-tot-add' if r.kind == 'addition' else 'adj-tot-ded' }}">
+                      {{ '+' if r.kind == 'addition' else '−' }}{{ (r.total or 0) | format_amount(0) | ltr | safe }}
+                    </span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
     {# متن پاورقی تنظیمات چاپ، پرداخت‌ها و تراز در کادرهای جدا؛ خلاصه مالی کنار آن #}
     <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
       {% set _has_notes_block = invoice_footer_note %}
@@ -629,9 +762,32 @@
                 <span class="amount">{{ (invoice.tax_total or 0) | format_amount(0) | ltr | safe }}</span>
               </div>
             {% endif %}
+
+            {% set _adj_add_total = (invoice.adjustments_additions_total | default(0, true)) or 0 %}
+            {% set _adj_ded_total = (invoice.adjustments_deductions_total | default(0, true)) or 0 %}
+            {% set _adj_net = (invoice.adjustments_net | default(0, true)) or 0 %}
+            {% set _adj_tax = (invoice.adjustments_tax | default(0, true)) or 0 %}
+            {% if _adj_add_total or _adj_ded_total or _adj_net or _adj_tax %}
+              <hr class="summary-divider" />
+              {% if _adj_add_total %}
+                <div class="adj-row" style="display:flex; justify-content: space-between;">
+                  <span class="meta adj-tot-add">{{ 'اضافات (با مالیات)' if is_fa else 'Additions (incl. tax)' }}:</span>
+                  <span class="amount adj-tot-add">+{{ _adj_add_total | format_amount(0) | ltr | safe }}</span>
+                </div>
+              {% endif %}
+              {% if _adj_ded_total %}
+                <div class="adj-row" style="display:flex; justify-content: space-between;">
+                  <span class="meta adj-tot-ded">{{ 'کسورات (با مالیات)' if is_fa else 'Deductions (incl. tax)' }}:</span>
+                  <span class="amount adj-tot-ded">−{{ _adj_ded_total | format_amount(0) | ltr | safe }}</span>
+                </div>
+              {% endif %}
+              <hr class="summary-divider" />
+            {% endif %}
+
+            {% set _final_payable = (invoice.final_payable_total | default(invoice.payable_total, true)) | default(0, true) %}
             <div style="display:flex; justify-content: space-between; font-weight: bold; margin-top: 6px;">
               <span>{{ 'قابل پرداخت' if is_fa else 'Payable' }}:</span>
-              <span class="amount">{{ (invoice.payable_total or 0) | format_amount(0) | ltr | safe }}</span>
+              <span class="amount">{{ _final_payable | format_amount(0) | ltr | safe }}</span>
             </div>
           </div>
         </div>

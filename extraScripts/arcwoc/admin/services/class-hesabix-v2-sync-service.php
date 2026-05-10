@@ -146,12 +146,15 @@ class Hesabix_V2_Sync_Service
 			$wc_payload_for_log = $product_data;
 
 			// اعمال تنظیمات همگام‌سازی قیمت و موجودی (API حسابیکس: base_sales_price، track_inventory)
-			$sync_settings = get_option('hesabix_v2_sync_settings', array());
+			$sync_settings = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
 			if (empty($sync_settings['sync_product_price'])) {
 				unset($product_data['base_sales_price']);
 			}
 			if (empty($sync_settings['sync_product_stock'])) {
 				$product_data['track_inventory'] = false;
+			} else {
+				$policy = isset($sync_settings['track_inventory_policy']) ? (string) $sync_settings['track_inventory_policy'] : 'wc';
+				$product_data['track_inventory'] = Hesabix_V2_Mapper::resolve_track_inventory_by_policy($product, $policy);
 			}
 
 			// Check if already synced
@@ -564,13 +567,45 @@ class Hesabix_V2_Sync_Service
 			);
 		}
 
+		$sync_settings = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (class_exists('Hesabix_V2_Order_Fiscal_Service')) {
+			$fy_policy = isset($sync_settings['order_fiscal_year_date_policy'])
+				? (string) $sync_settings['order_fiscal_year_date_policy']
+				: 'keep';
+			$fiscal = Hesabix_V2_Order_Fiscal_Service::resolve_for_sync($order, $fy_policy, $this->api);
+			if (!empty($fiscal['skip'])) {
+				$skip_msg = isset($fiscal['skip_message'])
+					? (string) $fiscal['skip_message']
+					: __('همگام‌سازی به‌دلیل سال مالی انجام نشد.', 'hesabix-v2');
+				Hesabix_V2_Log_Service::info(
+					'Order sync skipped — outside current fiscal year (plugin setting)',
+					array(
+						'entity_type' => 'order',
+						'entity_id' => $order_id,
+						'detail' => $skip_msg,
+					)
+				);
+				$order->add_order_note($skip_msg);
+				return array(
+					'success' => false,
+					'message' => $skip_msg,
+					'fiscal_year_skipped' => true,
+				);
+			}
+		} else {
+			$fiscal = array(
+				'document_date' => null,
+				'payment_date_ymd' => null,
+				'note' => '',
+			);
+		}
+
 		$wc_payload_for_log = null;
 		$api_last_result = null;
 
 		try {
 
 			// Get or create customer (با توجه به تنظیم create_customer_on_order)
-			$sync_settings = get_option('hesabix_v2_sync_settings', array());
 			$create_customer_on_order = !empty($sync_settings['create_customer_on_order']);
 			$customer_id = $order->get_customer_id();
 			$person_id = null;
@@ -607,9 +642,23 @@ class Hesabix_V2_Sync_Service
 			}
 
 			// Prepare invoice data
+			$fiscal_dates = array();
+			if (!empty($fiscal['document_date'])) {
+				$fiscal_dates['document_date'] = $fiscal['document_date'];
+			}
+			if (!empty($fiscal['payment_date_ymd'])) {
+				$fiscal_dates['payment_date_ymd'] = $fiscal['payment_date_ymd'];
+			}
+
 			$invoice_data = apply_filters(
 				'hesabix_v2_invoice_data',
-				Hesabix_V2_Mapper::wc_order_to_invoice($order, $person_id, $gate['factor'], $gate['currency_id']),
+				Hesabix_V2_Mapper::wc_order_to_invoice(
+					$order,
+					$person_id,
+					$gate['factor'],
+					$gate['currency_id'],
+					$fiscal_dates ? $fiscal_dates : null
+				),
 				$order
 			);
 
@@ -653,6 +702,9 @@ class Hesabix_V2_Sync_Service
 					$order->add_order_note(
 						sprintf(__('فاکتور در حسابیکس ایجاد شد. شناسه: %d', 'hesabix-v2'), $hesabix_id)
 					);
+				}
+				if (!empty($fiscal['note'])) {
+					$order->add_order_note((string) $fiscal['note']);
 				}
 
 				return array(

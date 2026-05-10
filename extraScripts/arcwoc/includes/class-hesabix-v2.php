@@ -101,6 +101,8 @@ class Hesabix_V2
 		 */
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-order-sync-meta.php';
 
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-order-fiscal-service.php';
+
 		/**
 		 * The class responsible for validation.
 		 */

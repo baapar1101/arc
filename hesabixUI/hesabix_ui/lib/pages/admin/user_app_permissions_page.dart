@@ -112,6 +112,35 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
     }
   }
 
+  Future<void> _confirmAndSetAllAppPermissions(bool enable) async {
+    final t = AppLocalizations.of(context);
+    if (!enable) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(t.permissionsConfirmDisableAllTitle),
+          content: Text(t.appLevelPermissionsConfirmDisableBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(t.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(t.confirm),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    setState(() {
+      for (final k in _permissionLabels.keys) {
+        _permissions[k] = enable;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -161,12 +190,30 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
                   const SizedBox(height: 24),
                   
                   // Permissions List
-                  const Text(
-                    'دسترسی‌های سطح اپلیکیشن',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'دسترسی‌های سطح اپلیکیشن',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _isSaving ? null : () => _confirmAndSetAllAppPermissions(true),
+                        child: Text(t.permissionsEnableAll),
+                      ),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Theme.of(context).colorScheme.error,
+                        ),
+                        onPressed: _isSaving ? null : () => _confirmAndSetAllAppPermissions(false),
+                        child: Text(t.permissionsDisableAll),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   

@@ -135,6 +135,61 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
+	 * مقدار track_inventory حسابیکس بر اساس سیاست انتخابی (وقتی همگام‌سازی موجودی روشن باشد).
+	 *
+	 * @param WC_Product $product محصول ساده یا واریانت.
+	 * @param string     $policy  یکی از: wc، physical_always، always_on، always_off
+	 * @return bool
+	 */
+	public static function resolve_track_inventory_by_policy($product, $policy)
+	{
+		if (!$product instanceof WC_Product) {
+			return false;
+		}
+
+		$p = is_string($policy) ? sanitize_key($policy) : 'wc';
+
+		switch ($p) {
+			case 'physical_always':
+				return !$product->is_virtual();
+			case 'always_on':
+				return true;
+			case 'always_off':
+				return false;
+			case 'wc':
+			default:
+				return $product->managing_stock();
+		}
+	}
+
+	/**
+	 * آیا برای موجودی اولیه / نمایش موجودی ووکامرس از این قلم استفاده شود؟
+	 *
+	 * @param WC_Product $product
+	 * @param string     $policy
+	 * @return bool
+	 */
+	public static function wc_product_qualifies_for_opening_stock_qty($product, $policy)
+	{
+		if (!$product instanceof WC_Product || $product->is_virtual()) {
+			return false;
+		}
+
+		$p = is_string($policy) ? sanitize_key($policy) : 'wc';
+
+		switch ($p) {
+			case 'physical_always':
+			case 'always_on':
+				return true;
+			case 'always_off':
+				return $product->managing_stock();
+			case 'wc':
+			default:
+				return $product->managing_stock();
+		}
+	}
+
+	/**
 	 * Convert WooCommerce customer to Hesabix API format
 	 *
 	 * @since    2.0.0
@@ -491,14 +546,23 @@ class Hesabix_V2_Mapper
 	 * @param    int         $person_id
 	 * @param    float|null  $amount_factor   ضریب مبلغ (مثلاً ۱۰ برای تومان→ریال).
 	 * @param    int|null    $invoice_currency_id شناسهٔ ارز در حسابیکس؛ اگر تهی باشد از تنظیمات/پیش‌فرض حل می‌شود.
+	 * @param    array|null  $date_overrides      اختیاری: `document_date` (Y-m-d)، `payment_date_ymd` (Y-m-d برای بخش تاریخ transaction_date پرداخت).
 	 * @return   array
 	 */
-	public static function wc_order_to_invoice($order, $person_id, $amount_factor = 1.0, $invoice_currency_id = null)
+	public static function wc_order_to_invoice($order, $person_id, $amount_factor = 1.0, $invoice_currency_id = null, $date_overrides = null)
 	{
 		$f = (float) $amount_factor;
 		if ($f <= 0 || is_nan($f)) {
 			$f = 1.0;
 		}
+
+		$date_opts = is_array($date_overrides) ? $date_overrides : array();
+		$document_date_override = isset($date_opts['document_date']) && is_string($date_opts['document_date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_opts['document_date'])
+			? $date_opts['document_date']
+			: null;
+		$payment_date_ymd = isset($date_opts['payment_date_ymd']) && is_string($date_opts['payment_date_ymd']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_opts['payment_date_ymd'])
+			? $date_opts['payment_date_ymd']
+			: null;
 
 		$lines = array();
 		$db_service = new Hesabix_V2_DB_Service();
@@ -715,9 +779,14 @@ class Hesabix_V2_Mapper
 			? (int) $invoice_currency_id
 			: Hesabix_V2_Currency_Service::resolve_invoice_currency_id();
 
+		$_created = $order->get_date_created();
+		$document_date = $document_date_override !== null
+			? $document_date_override
+			: ($_created ? $_created->format('Y-m-d') : current_time('Y-m-d'));
+
 		$payload = array(
 			'invoice_type' => 'invoice_sales',
-			'document_date' => $order->get_date_created()->format('Y-m-d'),
+			'document_date' => $document_date,
 			'currency_id' => $currency_id,
 			'is_proforma' => $is_proforma,
 			'extra_info' => array(
@@ -741,7 +810,7 @@ class Hesabix_V2_Mapper
 			$payload['tag_ids'] = $tag_ids;
 		}
 
-		$payload['payments'] = self::build_wc_order_invoice_payments($order, $is_proforma, $f);
+		$payload['payments'] = self::build_wc_order_invoice_payments($order, $is_proforma, $f, $payment_date_ymd);
 
 		return $payload;
 	}
@@ -856,9 +925,10 @@ class Hesabix_V2_Mapper
 	 * @param WC_Order $order
 	 * @param bool     $is_proforma
 	 * @param float    $amount_factor ضریب مبلغ نهایی سفارش برای پرداخت هم‌تراز با خطوط فاکتور.
+	 * @param string|null $payment_date_ymd اگر ست باشد، بخش تاریخ transaction_date هم‌راستا با این مقدار (بخش ساعت از تاریخ پرداخت یا زمان کنونی).
 	 * @return array<int, array<string, mixed>>
 	 */
-	private static function build_wc_order_invoice_payments($order, $is_proforma, $amount_factor = 1.0)
+	private static function build_wc_order_invoice_payments($order, $is_proforma, $amount_factor = 1.0, $payment_date_ymd = null)
 	{
 		$payments = array();
 
@@ -876,9 +946,15 @@ class Hesabix_V2_Mapper
 			return apply_filters('hesabix_v2_invoice_payments', $payments, $order, $amount_factor);
 		}
 
-		$transaction_date = $order->get_date_paid()
-			? $order->get_date_paid()->format('Y-m-d\TH:i:s.v')
-			: current_time('Y-m-d\TH:i:s.v');
+		$date_paid = $order->get_date_paid();
+		if (is_string($payment_date_ymd) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $payment_date_ymd)) {
+			$time_part = $date_paid ? $date_paid->format('H:i:s.v') : current_time('H:i:s.v');
+			$transaction_date = $payment_date_ymd . 'T' . $time_part;
+		} elseif ($date_paid) {
+			$transaction_date = $date_paid->format('Y-m-d\TH:i:s.v');
+		} else {
+			$transaction_date = current_time('Y-m-d\TH:i:s.v');
+		}
 
 		$desc = sprintf(
 			/* translators: %s: WooCommerce order number */

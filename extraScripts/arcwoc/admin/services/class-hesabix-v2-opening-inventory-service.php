@@ -104,6 +104,9 @@ class Hesabix_V2_Opening_Inventory_Service
 			return array();
 		}
 
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		$inv_policy = isset($sync['track_inventory_policy']) ? (string) $sync['track_inventory_policy'] : 'wc';
+
 		$out = array();
 		foreach ($ids as $pid) {
 			$pid = (int) $pid;
@@ -122,7 +125,7 @@ class Hesabix_V2_Opening_Inventory_Service
 						continue;
 					}
 					$v = wc_get_product($vid);
-					if (!$v || $v->is_virtual() || !$v->managing_stock()) {
+					if (!$v || $v->is_virtual() || !Hesabix_V2_Mapper::wc_product_qualifies_for_opening_stock_qty($v, $inv_policy)) {
 						continue;
 					}
 					$q = (float) $v->get_stock_quantity();
@@ -139,7 +142,7 @@ class Hesabix_V2_Opening_Inventory_Service
 			}
 
 			if ($p->is_type('simple')) {
-				if (!$p->managing_stock()) {
+				if (!Hesabix_V2_Mapper::wc_product_qualifies_for_opening_stock_qty($p, $inv_policy)) {
 					continue;
 				}
 				$q = (float) $p->get_stock_quantity();

@@ -173,6 +173,60 @@ def _strip_invoice_for_public(raw: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def _enrich_public_invoice_adjustments(
+    db: Session, public_invoice: Dict[str, Any]
+) -> None:
+    """نام/کد حساب طرف اضافات و کسورات را برای نمایش عمومی روی هر ردیف ست می‌کند.
+    برای جلوگیری از افشای شناسهٔ داخلی، account_id حذف می‌شود.
+    """
+    extra = public_invoice.get("extra_info")
+    if not isinstance(extra, dict):
+        return
+    rows = extra.get("invoice_adjustments")
+    if not isinstance(rows, list) or not rows:
+        return
+
+    from adapters.db.models.account import Account
+
+    acc_ids: List[int] = []
+    for row in rows:
+        if isinstance(row, dict) and row.get("account_id") is not None:
+            try:
+                acc_ids.append(int(row["account_id"]))
+            except Exception:
+                continue
+    name_map: Dict[int, str] = {}
+    code_map: Dict[int, Optional[str]] = {}
+    if acc_ids:
+        try:
+            for acc in (
+                db.query(Account).filter(Account.id.in_(set(acc_ids))).all()
+            ):
+                name_map[int(acc.id)] = acc.name or ""
+                code_map[int(acc.id)] = getattr(acc, "code", None)
+        except Exception:
+            logger.exception(
+                "public payload: failed to load adjustment account names"
+            )
+
+    enriched: List[Dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        r = dict(row)
+        try:
+            aid = int(r.get("account_id")) if r.get("account_id") is not None else None
+        except Exception:
+            aid = None
+        if aid is not None:
+            r["account_name"] = name_map.get(aid)
+            r["account_code"] = code_map.get(aid)
+        r.pop("account_id", None)
+        enriched.append(r)
+    extra["invoice_adjustments"] = enriched
+    public_invoice["extra_info"] = extra
+
+
 def _safe_decimal(v: Any) -> Decimal:
     try:
         return Decimal(str(v or 0))
@@ -319,6 +373,7 @@ def build_public_payload(
 
     inv = invoice_document_to_dict(db, document, persist_link_cleanup=False)
     public_invoice = _strip_invoice_for_public(inv or {})
+    _enrich_public_invoice_adjustments(db, public_invoice)
     installments = _build_public_installments(public_invoice.get("extra_info") or {})
 
     return {
