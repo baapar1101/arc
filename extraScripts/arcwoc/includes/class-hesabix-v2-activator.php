@@ -145,6 +145,8 @@ class Hesabix_V2_Activator
 			'sync_order_on_checkout' => true,
 			'sync_order_on_payment_complete' => false,
 			'sync_order_on_statuses' => array('processing', 'completed'),
+			'finalize_proforma_on_paid' => true,
+			'finalize_proforma_order_statuses' => array('processing', 'completed'),
 			'invoice_is_proforma' => false,
 			'invoice_tag_website_enabled' => true,
 			'invoice_tag_website_name' => 'فروش سایت',

@@ -777,7 +777,11 @@ class Hesabix_V2_Mapper
 		}
 
 		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
-		$is_proforma = !empty($sync['invoice_is_proforma']);
+		if (!empty($sync['invoice_is_proforma'])) {
+			$is_proforma = ! Hesabix_V2_Invoice_Helper::order_invoice_should_be_final($order, $sync);
+		} else {
+			$is_proforma = false;
+		}
 
 		$currency_id = $invoice_currency_id !== null
 			? (int) $invoice_currency_id
@@ -1302,7 +1306,7 @@ class Hesabix_V2_Mapper
 	public static function bulk_sync_wc_product_categories_chunk($offset, $batch_size)
 	{
 		$offset = max(0, (int) $offset);
-		$batch_size = max(1, min(500, (int) $batch_size));
+		$batch_size = max(1, min((int) Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS, (int) $batch_size));
 
 		$ids = self::get_sorted_wc_product_cat_term_ids();
 		$total = count($ids);

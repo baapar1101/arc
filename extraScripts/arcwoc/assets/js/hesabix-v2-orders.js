@@ -55,7 +55,11 @@
 						appendFeedback('<div class="notice notice-error inline"><p>' + msg + '</p></div>');
 					} else if (res.data && res.data.results) {
 						res.data.results.forEach(function (row) {
-							var cls = row.success ? 'notice-success' : 'notice-error';
+							var cls = row.skipped_pause
+								? 'notice-warning'
+								: row.success
+									? 'notice-success'
+									: 'notice-error';
 							var m = row.message || '';
 							appendFeedback(
 								'<div class="notice ' +

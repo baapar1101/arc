@@ -40,6 +40,7 @@ from adapters.db.models.business_print_settings import BusinessPrintSettings
 from adapters.db.models.user import User
 from app.core.responses import ApiError
 from app.services import invoice_service
+from app.services.invoice_bulk_upsert_service import bulk_upsert_invoices_integration
 from app.services.invoice_service import (
     create_invoice,
     update_invoice,
@@ -690,6 +691,34 @@ def bulk_delete_invoices_endpoint(
         request=request,
         message="INVOICE_BULK_DELETED",
     )
+
+
+@router.post(
+    "/business/{business_id}/bulk-upsert",
+    summary="ایجاد/ویرایش گروهی فاکتورها (یکپارچه‌سازی)",
+    description=(
+        "بدنه شامل `items`: آرایه‌ای از `{client_ref?، invoice_id?، payload}`؛ برای ایجاد `invoice_id` خالی؛ "
+        "برای ویرایش عدد همان شناسه سند؛ `payload` همان بدنهٔ تکی ایجاد/ویرایش فاکتور. "
+        "حداکثر ۱۰۰۰ آیتم در هر درخواست؛ نتیجهٔ per-item در `results` با status=created|updated|failed است."
+    ),
+)
+@require_business_access("business_id")
+def bulk_upsert_invoices_integration_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
+    data = bulk_upsert_invoices_integration(
+        db,
+        business_id,
+        ctx,
+        body,
+        user_can_select_fx_rate=can_pick,
+    )
+    return success_response(data=data, request=request, message="BULK_INVOICE_UPSERT_COMPLETED")
 
 
 @router.get(

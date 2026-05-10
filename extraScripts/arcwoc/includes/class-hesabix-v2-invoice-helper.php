@@ -36,6 +36,24 @@ class Hesabix_V2_Invoice_Helper
 		if (!array_key_exists('invoice_is_proforma', $sync)) {
 			$sync['invoice_is_proforma'] = false;
 		}
+		if (!array_key_exists('finalize_proforma_on_paid', $sync)) {
+			$sync['finalize_proforma_on_paid'] = true;
+		}
+		if (!isset($sync['finalize_proforma_order_statuses']) || !is_array($sync['finalize_proforma_order_statuses'])) {
+			$sync['finalize_proforma_order_statuses'] = array('processing', 'completed');
+		}
+		$sync['finalize_proforma_on_paid'] = (bool) $sync['finalize_proforma_on_paid'];
+		$fp_st = array();
+		foreach ($sync['finalize_proforma_order_statuses'] as $st) {
+			if (!is_string($st) && !is_numeric($st)) {
+				continue;
+			}
+			$s = sanitize_key(str_replace('wc-', '', (string) $st));
+			if ($s !== '') {
+				$fp_st[] = $s;
+			}
+		}
+		$sync['finalize_proforma_order_statuses'] = array_values(array_unique($fp_st));
 		if (!array_key_exists('invoice_tag_website_enabled', $sync)) {
 			$sync['invoice_tag_website_enabled'] = true;
 		}
@@ -186,5 +204,53 @@ class Hesabix_V2_Invoice_Helper
 			$out[$slug] = $label;
 		}
 		return $out;
+	}
+
+	/**
+	 * نرمال‌سازی اسلاگ وضعیت سفارش ووکامرس (بدون پیشوند wc-).
+	 *
+	 * @param string $status
+	 * @return string
+	 */
+	public static function normalize_order_status_slug($status)
+	{
+		$s = is_string($status) ? strtolower(trim(str_replace('wc-', '', $status))) : '';
+		if ($s === '') {
+			return '';
+		}
+		return sanitize_key($s);
+	}
+
+	/**
+	 * آیا با توجه به وضعیت/پرداخت سفارش، فاکتور ارسالی به حسابیکس باید قطعی باشد؟
+	 * وقتی invoice_is_proforma خاموش است، همیشه true (یعنی همیشه قطعی).
+	 *
+	 * @param WC_Order $order
+	 * @param array|null $sync نتیجه normalize_sync_settings یا null برای خواندن از option.
+	 * @return bool
+	 */
+	public static function order_invoice_should_be_final($order, $sync = null)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return true;
+		}
+		if ($sync === null) {
+			$sync = self::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		} else {
+			$sync = self::normalize_sync_settings($sync);
+		}
+		if (empty($sync['invoice_is_proforma'])) {
+			return true;
+		}
+		if (!empty($sync['finalize_proforma_on_paid']) && $order->is_paid()) {
+			return true;
+		}
+		$cur = self::normalize_order_status_slug($order->get_status());
+		foreach ($sync['finalize_proforma_order_statuses'] as $allowed) {
+			if ($cur !== '' && $cur === self::normalize_order_status_slug($allowed)) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

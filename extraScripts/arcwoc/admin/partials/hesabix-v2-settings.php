@@ -474,6 +474,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 		</div>
 
 		<div class="hesabix-v2-tab-panel" data-tab="invoice" hidden>
+			<input type="hidden" name="hesabix_v2_invoice_tab_fields" value="1" />
 			<h2 class="screen-reader-text"><?php esc_html_e('تنظیمات فاکتور', 'hesabix-v2'); ?></h2>
 		<table class="form-table">
 			<tr>
@@ -487,6 +488,32 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="radio" name="invoice_doc_mode" value="proforma" <?php checked(!empty($sync_settings['invoice_is_proforma'])); ?>>
 						<?php _e('پیش‌فاکتور / پیش‌نویس (is_proforma)', 'hesabix-v2'); ?>
 					</label>
+					<p class="description"><?php _e('برای قطعی‌شدن فروش و ثبت خودکار خروج انبار همسو با گزارش موجودی، گزینهٔ فاکتور قطعی را انتخاب کنید. برای پیش‌فاکتور، حسابیکس حواله انبار از روی همین فاکتور تا قبل از قطعی ایجاد نمی‌کند؛ با همگام‌سازی دوباره و ارسال is_proforma=false، فاکتور در حسابیکس قطعی و حواله طبق تنظیم کسب‌وکار ساخته می‌شود.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr class="hesabix-v2-proforma-finalize-settings">
+				<th scope="row"><?php _e('ارتقاء پیش‌فاکتور به قطعی در حسابیکس', 'hesabix-v2'); ?></th>
+				<td>
+					<label style="display:block;margin-bottom:8px;">
+						<input type="checkbox" name="finalize_proforma_on_paid" value="1" <?php checked(!empty($sync_settings['finalize_proforma_on_paid'])); ?>>
+						<?php _e('وقتی سفارش در ووکامرس «پرداخت‌شده» شد، در همگام بعدی به‌صورت فاکتور قطعی به‌روزرسانی شود (هوک woocommerce_payment_complete؛ بدون نیاز به تیک «ارسال فاکتور: پس از پرداخت»)', 'hesabix-v2'); ?>
+					</label>
+					<p class="description" style="margin:8px 0 6px;"><?php _e('یا وقتی وضعیت سفارش به یکی از این موارد رسید تا با همگام‌سازی مجدد، فاکتور قطعی به حسابیکس فرستاده شود (حتی اگر آن وضعیت در لیست بالای «ارسال با تغییر وضعیت» انتخاب نشده باشد):', 'hesabix-v2'); ?></p>
+					<fieldset style="max-height:220px;overflow:auto;border:1px solid #ccd0d4;padding:8px;">
+						<?php
+						$fp_sel = isset($sync_settings['finalize_proforma_order_statuses']) && is_array($sync_settings['finalize_proforma_order_statuses'])
+							? $sync_settings['finalize_proforma_order_statuses']
+							: array();
+						foreach ($wc_status_choices as $slug => $label) :
+							?>
+							<label style="display:block;margin:4px 0;">
+								<input type="checkbox" name="finalize_proforma_order_statuses[]" value="<?php echo esc_attr($slug); ?>"
+									<?php checked(in_array($slug, $fp_sel, true)); ?>>
+								<?php echo esc_html($label); ?>
+								<code style="font-size:11px;">(<?php echo esc_html($slug); ?>)</code>
+							</label>
+						<?php endforeach; ?>
+					</fieldset>
 				</td>
 			</tr>
 			<tr>

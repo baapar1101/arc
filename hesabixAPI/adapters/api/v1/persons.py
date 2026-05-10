@@ -44,6 +44,7 @@ from app.services.person_service import (
     get_creditors_report,
     get_people_transactions_report,
 )
+from app.services.person_bulk_upsert_service import bulk_upsert_persons_integration
 from app.services.person_share_link_service import (
     create_share_link as create_person_share_link_service,
     get_active_share_link_for_person,
@@ -163,8 +164,29 @@ async def bulk_delete_persons_endpoint(
     }, request)
 
 
-@router.post("/businesses/{business_id}/persons/create", 
-    summary="ایجاد شخص جدید", 
+@router.post(
+    "/businesses/{business_id}/persons/bulk-upsert",
+    summary="ایجاد/ویرایش گروهی اشخاص (یکپارچه‌سازی)",
+    description=(
+        "بدنه شامل `items`: آرایه‌ای از {client_ref?, person_id?, payload}؛ payload همان فیلدهای ایجاد/ویرایش شخص؛ "
+        "می‌توانید `create_if_update_missing` برای ایجاد پس از نبودن شخص ارسال کنید (پیش‌فرض true). "
+        "حداکثر ۱۰۰۰ آیتم در هر درخواست. خروجی: results[{index, client_ref?, status, person_id?, ...}] و summary."
+    ),
+)
+@require_business_access("business_id")
+async def bulk_upsert_persons_integration_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    data = bulk_upsert_persons_integration(db, business_id, ctx, body)
+    return success_response(data=data, request=request, message="BULK_PERSON_UPSERT_COMPLETED")
+
+
+@router.post("/businesses/{business_id}/persons/create",
+    summary="ایجاد شخص جدید",
     description="ایجاد شخص جدید برای کسب و کار مشخص",
     response_model=SuccessResponse,
     responses={

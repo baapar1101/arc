@@ -84,7 +84,13 @@ def invalidate_persons_cache(business_id: int, fiscal_year_id: Optional[int] = N
 		logger.warning(f"Error invalidating persons cache for business_id {business_id}: {e}")
 
 
-def create_person(db: Session, business_id: int, person_data: PersonCreateRequest) -> Dict[str, Any]:
+def create_person(
+    db: Session,
+    business_id: int,
+    person_data: PersonCreateRequest,
+    *,
+    defer_cache_invalidation: bool = False,
+) -> Dict[str, Any]:
     """ایجاد شخص جدید"""
     person_data = merge_person_create_with_group_defaults(db, business_id, person_data)
     # محاسبه/اعتبارسنجی کد یکتا
@@ -221,10 +227,11 @@ def create_person(db: Session, business_id: int, person_data: PersonCreateReques
         db.rollback()
         raise ApiError("DUPLICATE_PERSON_CODE", "کد شخص تکراری است", http_status=400)
     db.refresh(person)
-    
-    # Invalidate کش لیست اشخاص
-    invalidate_persons_cache(business_id, fiscal_year_id=None)
-    
+
+    # Invalidate کش لیست اشخاص (در bulk با defer از بیرون یک‌بار invalidate می‌شود)
+    if not defer_cache_invalidation:
+        invalidate_persons_cache(business_id, fiscal_year_id=None)
+
     # فراخوانی workflow triggers
     try:
         from app.services.workflow.workflow_trigger_service import trigger_person_created
@@ -623,10 +630,12 @@ def get_persons_by_business(
 
 
 def update_person(
-    db: Session, 
-    person_id: int, 
-    business_id: int, 
-    person_data: PersonUpdateRequest
+    db: Session,
+    person_id: int,
+    business_id: int,
+    person_data: PersonUpdateRequest,
+    *,
+    defer_cache_invalidation: bool = False,
 ) -> Optional[Dict[str, Any]]:
     """ویرایش شخص"""
     person = db.query(Person).filter(
@@ -723,9 +732,9 @@ def update_person(
         .filter(Person.id == person_id)
         .first()
     ) or person
-    
-    # Invalidate کش لیست اشخاص
-    invalidate_persons_cache(business_id, fiscal_year_id=None)
+
+    if not defer_cache_invalidation:
+        invalidate_persons_cache(business_id, fiscal_year_id=None)
 
     # فراخوانی workflow
     try:

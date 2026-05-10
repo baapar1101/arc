@@ -33,6 +33,26 @@ class Hesabix_V2_Sync_Service
 	const ERR_INVOICE_WAREHOUSE_PREFLIGHT = 94001;
 
 	/**
+	 * سقف اندازهٔ دسته AJAX ووکامرس در فرم همگام‌سازی دسته‌ای — با اندپوینت‌های bulk حسابیکس هم‌سو است.
+	 *
+	 * @since 3.5.0
+	 */
+	public const BULK_WC_CHUNK_MAX_ITEMS = 1000;
+
+	/**
+	 * حداکثر آیتم در هر بدنهٔ bulk API حسابیکس (اشخاص / فاکتور / کالا).
+	 *
+	 * @since 3.5.0
+	 */
+	public const BULK_API_ITEMS_MAX_PERSON = 1000;
+
+	/** @since 3.5.0 */
+	public const BULK_API_ITEMS_MAX_INVOICE = 1000;
+
+	/** @since 3.5.0 */
+	public const BULK_API_ITEMS_MAX_PRODUCT = 1000;
+
+	/**
 	 * پیش‌فرض‌های اندازهٔ دسته برای عملیات سنگین همگام‌سازی و واردات (کاهش تایم‌اوت AJAX).
 	 *
 	 * @since 2.0.7
@@ -44,6 +64,10 @@ class Hesabix_V2_Sync_Service
 			'wc_product_parents_per_ajax' => 35,
 			'wc_categories_per_ajax' => 60,
 			'wc_customers_per_ajax' => 45,
+			'wc_orders_ajax_batch' => 40,
+			'api_bulk_persons_per_request' => 35,
+			'api_bulk_invoices_per_request' => 8,
+			'api_bulk_products_per_request' => 20,
 			'hesabix_person_take' => 80,
 			'hesabix_import_pages_per_ajax' => 3,
 			'errors_preview_cap' => 60,
@@ -65,9 +89,15 @@ class Hesabix_V2_Sync_Service
 		}
 		$o = wp_parse_args($raw, $d);
 
-		$o['wc_product_parents_per_ajax'] = max(5, min(500, absint($o['wc_product_parents_per_ajax'])));
-		$o['wc_categories_per_ajax'] = max(10, min(300, absint($o['wc_categories_per_ajax'])));
-		$o['wc_customers_per_ajax'] = max(5, min(500, absint($o['wc_customers_per_ajax'])));
+		$o['wc_product_parents_per_ajax'] = max(5, min(self::BULK_WC_CHUNK_MAX_ITEMS, absint($o['wc_product_parents_per_ajax'])));
+		$o['wc_categories_per_ajax'] = max(10, min(self::BULK_WC_CHUNK_MAX_ITEMS, absint($o['wc_categories_per_ajax'])));
+		$o['wc_customers_per_ajax'] = max(5, min(self::BULK_WC_CHUNK_MAX_ITEMS, absint($o['wc_customers_per_ajax'])));
+
+		$o['wc_orders_ajax_batch'] = max(5, min(self::BULK_WC_CHUNK_MAX_ITEMS, absint($o['wc_orders_ajax_batch'] ?? 40)));
+
+		$o['api_bulk_persons_per_request'] = max(5, min(self::BULK_API_ITEMS_MAX_PERSON, absint($o['api_bulk_persons_per_request'] ?? 35)));
+		$o['api_bulk_invoices_per_request'] = max(1, min(self::BULK_API_ITEMS_MAX_INVOICE, absint($o['api_bulk_invoices_per_request'] ?? 8)));
+		$o['api_bulk_products_per_request'] = max(3, min(self::BULK_API_ITEMS_MAX_PRODUCT, absint($o['api_bulk_products_per_request'] ?? 20)));
 
 		$o['hesabix_person_take'] = max(10, min(200, absint($o['hesabix_person_take'])));
 
@@ -524,6 +554,298 @@ class Hesabix_V2_Sync_Service
 	}
 
 	/**
+	 * بدون تماس شبکهٔ تکی: آمادهٔ payload فاکتور برای bulk-upsert.
+	 *
+	 * @since 3.4.0
+	 * @param int $order_id
+	 * @return array{success?:bool,message?:string,order_id?:int,order?:WC_Order,person_id?:mixed,invoice_data?:array,is_new_invoice?:bool,hesabix_invoice_id?:int|null,fiscal_note?:string}
+	 */
+	private function prepare_order_bulk_invoice_without_api($order_id)
+	{
+		$order = wc_get_order($order_id);
+		if (!$order) {
+			return array(
+				'success' => false,
+				'message' => __('سفارش یافت نشد', 'hesabix-v2'),
+			);
+		}
+
+		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, $order->get_currency());
+		if (!$gate['ok']) {
+			return array(
+				'success' => false,
+				'message' => $gate['message'],
+			);
+		}
+
+		$sync_settings = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (class_exists('Hesabix_V2_Order_Fiscal_Service')) {
+			$fy_policy = isset($sync_settings['order_fiscal_year_date_policy'])
+				? (string) $sync_settings['order_fiscal_year_date_policy']
+				: 'keep';
+			$fiscal = Hesabix_V2_Order_Fiscal_Service::resolve_for_sync($order, $fy_policy, $this->api);
+			if (!empty($fiscal['skip'])) {
+				$skip_msg = isset($fiscal['skip_message'])
+					? (string) $fiscal['skip_message']
+					: __('همگام‌سازی به‌دلیل سال مالی انجام نشد.', 'hesabix-v2');
+
+				return array(
+					'success' => false,
+					'message' => $skip_msg,
+				);
+			}
+		} else {
+			$fiscal = array(
+				'document_date' => null,
+				'payment_date_ymd' => null,
+				'note' => '',
+			);
+		}
+
+		try {
+			$create_customer_on_order = !empty($sync_settings['create_customer_on_order']);
+			$customer_id = $order->get_customer_id();
+			$person_id = null;
+
+			if ($customer_id) {
+				$person_id = $this->db->get_hesabix_id('customer', $customer_id);
+
+				if (!$person_id) {
+					if (!$create_customer_on_order) {
+						throw new Exception(__('مشتری در حسابیکس وجود ندارد. گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
+					}
+					$customer_result = $this->sync_customer($customer_id, $order_id);
+					if ($customer_result['success']) {
+						$person_id = $customer_result['hesabix_id'];
+					} else {
+						$msg = isset($customer_result['message']) ? (string) $customer_result['message'] : __('خطا در همگام‌سازی مشتری', 'hesabix-v2');
+						throw new Exception($msg);
+					}
+				}
+			} else {
+				if (!$create_customer_on_order) {
+					throw new Exception(__('برای ثبت سفارش مهمان، گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
+				}
+				$guest_result = $this->sync_guest_customer($order_id);
+				if ($guest_result['success']) {
+					$person_id = $guest_result['hesabix_id'];
+				} else {
+					$msg = isset($guest_result['message']) ? (string) $guest_result['message'] : __('خطا در ایجاد مشتری مهمان', 'hesabix-v2');
+					throw new Exception($msg);
+				}
+			}
+
+			$fiscal_dates = array();
+			if (!empty($fiscal['document_date'])) {
+				$fiscal_dates['document_date'] = $fiscal['document_date'];
+			}
+			if (!empty($fiscal['payment_date_ymd'])) {
+				$fiscal_dates['payment_date_ymd'] = $fiscal['payment_date_ymd'];
+			}
+
+			$invoice_data = apply_filters(
+				'hesabix_v2_invoice_data',
+				Hesabix_V2_Mapper::wc_order_to_invoice(
+					$order,
+					$person_id,
+					$gate['factor'],
+					$gate['currency_id'],
+					$fiscal_dates ? $fiscal_dates : null
+				),
+				$order
+			);
+
+			self::assert_invoice_lines_have_warehouse_when_required($order, $invoice_data);
+
+			$existing_mapping = $this->db->get_mapping('order', $order_id);
+			$hid = null;
+			if ($existing_mapping && !empty($existing_mapping['hesabix_id'])) {
+				$hid = absint($existing_mapping['hesabix_id']);
+			}
+
+			return array(
+				'success' => true,
+				'order_id' => (int) $order_id,
+				'order' => $order,
+				'person_id' => $person_id,
+				'invoice_data' => $invoice_data,
+				'is_new_invoice' => !$existing_mapping,
+				'hesabix_invoice_id' => $hid && $hid > 0 ? $hid : null,
+				'fiscal_note' => isset($fiscal['note']) ? (string) $fiscal['note'] : '',
+			);
+		} catch (Exception $e) {
+			return array(
+				'success' => false,
+				'message' => $e->getMessage(),
+			);
+		}
+	}
+
+	/**
+	 * همگام‌سازی چند سفارش با چند فاکتور در یک یا چند تماس bulk به API.
+	 *
+	 * @since 3.4.0
+	 * @param array<int> $order_ids
+	 * @return array{success:int,failed:int,total:int,errors:array,per_order:array<int,array>}
+	 */
+	public function bulk_sync_orders(array $order_ids)
+	{
+		$res = array(
+			'success' => 0,
+			'failed' => 0,
+			'total' => count($order_ids),
+			'errors' => array(),
+			'per_order' => array(),
+		);
+
+		$order_ids = array_values(array_unique(array_filter(array_map('absint', (array) $order_ids))));
+		if (empty($order_ids)) {
+			return $res;
+		}
+
+		$o = self::get_bulk_sync_options();
+		$cap = isset($o['api_bulk_invoices_per_request'])
+			? (int) $o['api_bulk_invoices_per_request']
+			: 8;
+		$cap = max(1, min(self::BULK_API_ITEMS_MAX_INVOICE, $cap));
+
+		$queued = array();
+		foreach ($order_ids as $oid) {
+			$p = $this->prepare_order_bulk_invoice_without_api((int) $oid);
+			if (empty($p['success'])) {
+				$res['failed']++;
+				$res['errors'][] = array(
+					'order_id' => (int) $oid,
+					'message' => isset($p['message']) ? (string) $p['message'] : '',
+				);
+				$res['per_order'][ (int) $oid ] = array(
+					'success' => false,
+					'message' => isset($p['message']) ? (string) $p['message'] : '',
+				);
+
+				continue;
+			}
+
+			if (class_exists('Hesabix_V2_Order_Sync_Meta') && Hesabix_V2_Order_Sync_Meta::is_pause_auto_sync((int) $oid)) {
+				$res['per_order'][ (int) $oid ] = array(
+					'success' => false,
+					'skipped_pause' => true,
+					'message' => __('رد شده — همگام‌سازی خودکار برای این سفارش متوقف است.', 'hesabix-v2'),
+				);
+				continue;
+			}
+
+			$queued[] = $p;
+		}
+
+		foreach (array_chunk($queued, $cap) as $chunk) {
+			$items = array();
+			$cref_to_oid = array();
+			$cref_meta = array();
+
+			foreach ($chunk as $prep) {
+				$cref = 'wc_order:' . (int) $prep['order_id'];
+				$items[] = array(
+					'client_ref' => $cref,
+					'invoice_id' => (!empty($prep['hesabix_invoice_id']) && absint($prep['hesabix_invoice_id']) > 0)
+					? absint($prep['hesabix_invoice_id'])
+					: null,
+					'payload' => $prep['invoice_data'],
+				);
+				$cref_to_oid[ $cref ] = (int) $prep['order_id'];
+				$cref_meta[ $cref ] = array(
+					'is_new_invoice' => !empty($prep['is_new_invoice']),
+					'fiscal_note' => isset($prep['fiscal_note']) ? (string) $prep['fiscal_note'] : '',
+				);
+			}
+
+			if (empty($items)) {
+				continue;
+			}
+
+			$t_inv = (int) max(120, min(900, ($cap * 5)));
+
+			$api_out = $this->api->bulk_upsert_invoices(array('items' => $items), $t_inv);
+
+			if (empty($api_out['success'])) {
+				$fatal = isset($api_out['message']) ? (string) $api_out['message'] : __('خطای bulk فاکتور در API حسابیکس', 'hesabix-v2');
+				foreach ($cref_to_oid as $oid_chunk) {
+					$res['failed']++;
+					$res['errors'][] = array('order_id' => (int) $oid_chunk, 'message' => $fatal);
+					$res['per_order'][ (int) $oid_chunk ] = array(
+						'success' => false,
+						'message' => $fatal,
+					);
+
+					$o_fail = wc_get_order((int) $oid_chunk);
+					if ($o_fail && class_exists('Hesabix_V2_Order_Sync_Meta')) {
+						Hesabix_V2_Order_Sync_Meta::set_or_update_invoice_sync_error_note($o_fail, $fatal);
+					}
+				}
+				continue;
+			}
+
+			$bundle = isset($api_out['data']) && is_array($api_out['data']) ? $api_out['data'] : array();
+			$list = isset($bundle['results']) && is_array($bundle['results']) ? $bundle['results'] : array();
+
+			foreach ($list as $row) {
+				$cref = isset($row['client_ref']) ? (string) $row['client_ref'] : '';
+				$oid = isset($cref_to_oid[ $cref ]) ? $cref_to_oid[ $cref ] : 0;
+				if ($oid < 1 && preg_match('/^wc_order:(\d+)$/', $cref, $mx)) {
+					$oid = absint($mx[1]);
+				}
+				$st = isset($row['status']) ? (string) $row['status'] : '';
+				if (($st === 'created' || $st === 'updated') && !empty($row['invoice_id'])) {
+					$hid = absint($row['invoice_id']);
+					$oobj = wc_get_order($oid);
+					if ($oobj && $hid > 0) {
+						$this->db->save_mapping('order', $oid, null, $hid, 'invoice');
+						if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+							Hesabix_V2_Order_Sync_Meta::remove_order_system_note($oobj);
+						}
+
+						$meta_note = isset($cref_meta[ $cref ]) ? $cref_meta[ $cref ] : array();
+						if (!empty($meta_note['is_new_invoice'])) {
+							$oobj->add_order_note(
+								sprintf(__('فاکتور در حسابیکس ایجاد شد. شناسه: %d', 'hesabix-v2'), $hid)
+							);
+						}
+						if (!empty($meta_note['fiscal_note'])) {
+							$oobj->add_order_note((string) $meta_note['fiscal_note']);
+						}
+
+						$res['success']++;
+						$res['per_order'][ $oid ] = array(
+							'success' => true,
+							'message' => __('سفارش با موفقیت همگام‌سازی شد', 'hesabix-v2'),
+							'hesabix_id' => $hid,
+						);
+					}
+				} else {
+					$msg = isset($row['message']) ? (string) $row['message'] : __('ناموفق', 'hesabix-v2');
+					if ($oid > 0) {
+						$res['failed']++;
+						$res['errors'][] = array(
+							'order_id' => $oid,
+							'message' => $msg,
+						);
+						$res['per_order'][ $oid ] = array(
+							'success' => false,
+							'message' => $msg,
+						);
+						$o_fail = wc_get_order($oid);
+						if ($o_fail && class_exists('Hesabix_V2_Order_Sync_Meta')) {
+							Hesabix_V2_Order_Sync_Meta::set_or_update_invoice_sync_error_note($o_fail, $msg);
+						}
+					}
+				}
+			}
+		}
+
+		return $res;
+	}
+
+	/**
 	 * Sync order (create invoice) to Hesabix
 	 *
 	 * @since    2.0.0
@@ -916,11 +1238,194 @@ class Hesabix_V2_Sync_Service
 	}
 
 	/**
-	 * Bulk sync products (محصولات ساده مستقیم؛ محصولات متغیر به‌صورت واریانت‌ها همگام می‌شوند)
+	 * شناسهٔ مرجع یک سطر bulk برای هماهنگ‌کردن پاسخ API با WC (ساده: والد منطقی ۰، موجودیت = شناسهٔ محصول).
+	 *
+	 * @since 3.4.0
+	 * @param int $parent_or_zero برای واریانت شناسهٔ محصول متغیر؛ برای محصول ساده ۰.
+	 * @param int $entity_wc_id  همان wc_id ذخیره‌شده در نگاشت (محصول یا واریانت).
+	 * @return string
+	 */
+	private static function product_bulk_client_ref($parent_or_zero, $entity_wc_id)
+	{
+		return 'wc_pv:' . (int) $parent_or_zero . ':' . (int) $entity_wc_id;
+	}
+
+	/**
+	 * صف‌بندی همگام تکی مانند خطای سنتی sync_product (بدون تکرار برای «محصول یافت نشد»).
+	 *
+	 * @since 3.4.0
+	 * @param int         $wc_id
+	 * @param int|null    $wc_parent_id
+	 * @param string      $error_message
+	 * @return void
+	 */
+	private static function enqueue_product_retry_from_bulk_failure($wc_id, $wc_parent_id, $error_message)
+	{
+		$m = (string) $error_message;
+		if (strpos($m, __('محصول یافت نشد', 'hesabix-v2')) !== false) {
+			return;
+		}
+
+		$qpayload = ((int) $wc_parent_id) > 0
+			? array('parent_id' => (int) $wc_parent_id)
+			: null;
+
+		Hesabix_V2_Queue_Service::enqueue('product', (int) $wc_id, 'sync_product', $qpayload);
+	}
+
+	/**
+	 * فقط شناسه‌های محصول والد ووکامرس را به فهرست سطرهای bulk (محصول یا هر واریانت) گسترده می‌کند.
+	 *
+	 * @since 3.4.0
+	 * @param array<int|string> $parent_product_ids
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function expand_parent_product_ids_for_bulk_sync(array $parent_product_ids)
+	{
+		$list = array();
+
+		foreach (array_unique(array_filter(array_map('absint', (array) $parent_product_ids))) as $product_id) {
+			if ($product_id < 1) {
+				continue;
+			}
+
+			$product = wc_get_product($product_id);
+			if (!$product) {
+				$list[] = array(
+					'kind' => 'missing_parent',
+					'product_id' => $product_id,
+				);
+				continue;
+			}
+
+			if ($product->is_type('variable')) {
+				$variation_ids = $product->get_children();
+				if (empty($variation_ids)) {
+					$list[] = array(
+						'kind' => 'empty_variable',
+						'product_id' => $product_id,
+					);
+					continue;
+				}
+
+				foreach ($variation_ids as $variation_id) {
+					$vid = absint($variation_id);
+					if ($vid > 0) {
+						$list[] = array(
+							'kind' => 'row',
+							'parent_id' => $product_id,
+							'variation_id' => $vid,
+						);
+					}
+				}
+
+				continue;
+			}
+
+			$list[] = array(
+				'kind' => 'row',
+				'parent_id' => $product_id,
+				'variation_id' => null,
+			);
+		}
+
+		return $list;
+	}
+
+	/**
+	 * ساخت یک آیتم bulk-upsert برای API کالا (بدون تماس شبکه)، با توجه به نگاشت فعلی.
+	 *
+	 * @since 3.4.0
+	 * @param int                       $parent_product_id شناسهٔ محصول والد برای واریانت؛ برای محصول ساده همان wc_id محصول است.
+	 * @param int|null                  $variation_id برای محصول ساده null.
+	 * @param array<string, mixed>      $gate خروجی {@see Hesabix_V2_Currency_Service::evaluate_currency_sync()} با ok=true
+	 * @return array{ok:bool,message?:string,item?:array,wc_id?:int,wc_parent_id:?int}
+	 */
+	private function collect_product_bulk_item($parent_product_id, $variation_id, array $gate)
+	{
+		$pid = absint($parent_product_id);
+
+		if ($variation_id !== null && (int) $variation_id !== 0) {
+			$vid = absint($variation_id);
+			$product = wc_get_product($vid);
+			$parent_product = wc_get_product($pid);
+
+			if (!$product || !$parent_product) {
+				return array(
+					'ok' => false,
+					'message' => __('محصول یافت نشد', 'hesabix-v2'),
+					'wc_id' => $vid > 0 ? $vid : $pid,
+					'wc_parent_id' => $pid,
+				);
+			}
+
+			$product_data = Hesabix_V2_Mapper::wc_variation_to_api($parent_product, $product, $pid, $gate['factor']);
+			$wc_id = $vid;
+			$wc_parent_id = $pid;
+			$cref_zone = $pid;
+		} else {
+			$product = wc_get_product($pid);
+
+			if (!$product) {
+				return array(
+					'ok' => false,
+					'message' => __('محصول یافت نشد', 'hesabix-v2'),
+					'wc_id' => $pid,
+					'wc_parent_id' => null,
+				);
+			}
+
+			$product_data = Hesabix_V2_Mapper::wc_product_to_api($product, $pid, $gate['factor']);
+			$wc_id = $pid;
+			$wc_parent_id = null;
+			$cref_zone = 0;
+		}
+
+		$sync_settings = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		if (empty($sync_settings['sync_product_price'])) {
+			unset($product_data['base_sales_price']);
+		}
+
+		if (empty($sync_settings['sync_product_stock'])) {
+			$product_data['track_inventory'] = false;
+		} else {
+			$policy = isset($sync_settings['track_inventory_policy']) ? (string) $sync_settings['track_inventory_policy'] : 'wc';
+			$product_data['track_inventory'] = Hesabix_V2_Mapper::resolve_track_inventory_by_policy($product, $policy);
+		}
+
+		$existing_mapping = $this->db->get_mapping('product', $wc_id, $wc_parent_id);
+
+		$hx_pid = null;
+		if (!empty($existing_mapping['hesabix_id'])) {
+			$h = absint($existing_mapping['hesabix_id']);
+			if ($h > 0) {
+				$hx_pid = $h;
+			}
+		}
+
+		$item = array(
+			'client_ref' => self::product_bulk_client_ref($cref_zone, $wc_id),
+			'payload' => $product_data,
+		);
+
+		if ($hx_pid !== null) {
+			$item['product_id'] = $hx_pid;
+		}
+
+		return array(
+			'ok' => true,
+			'item' => $item,
+			'wc_id' => $wc_id,
+			'wc_parent_id' => $wc_parent_id,
+		);
+	}
+
+	/**
+	 * Bulk sync products via یک یا چند تماس bulk-upsert به API حسابیکس (ساده‌ها و واریانت‌ها).
 	 *
 	 * @since    2.0.0
-	 * @param    array    $product_ids
-	 * @return   array
+	 * @param    array<int|string>    $product_ids شناسهٔ پست‌های والد منتشرشده در ووکامرس
+	 * @return   array{success:int,failed:int,total:int,errors:array}
 	 */
 	public function bulk_sync_products($product_ids)
 	{
@@ -931,55 +1436,298 @@ class Hesabix_V2_Sync_Service
 			'errors' => array(),
 		);
 
-		foreach ($product_ids as $product_id) {
-			$product = wc_get_product($product_id);
-			if (!$product) {
+		$plans = $this->expand_parent_product_ids_for_bulk_sync((array) $product_ids);
+		$results['total'] = count($plans);
+
+		if (empty($plans)) {
+			return $results;
+		}
+
+		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, null);
+
+		if (!$gate['ok']) {
+			$gmsg = isset($gate['message']) ? (string) $gate['message'] : '';
+
+			foreach ($plans as $pl) {
+				if (($pl['kind'] ?? '') === 'missing_parent') {
+					$results['failed']++;
+					$results['errors'][] = array(
+						'product_id' => (int) ($pl['product_id'] ?? 0),
+						'message' => __('محصول یافت نشد', 'hesabix-v2'),
+					);
+					continue;
+				}
+
+				if (($pl['kind'] ?? '') === 'empty_variable') {
+					$results['failed']++;
+					$results['errors'][] = array(
+						'product_id' => (int) ($pl['product_id'] ?? 0),
+						'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
+					);
+					continue;
+				}
+
+				$parent_id = (int) ($pl['parent_id'] ?? 0);
+				$vid = isset($pl['variation_id']) ? (int) $pl['variation_id'] : 0;
+
+				$row_err = array('message' => $gmsg);
+				if ($vid > 0) {
+					$row_err['product_id'] = $parent_id;
+					$row_err['variation_id'] = $vid;
+				} else {
+					$row_err['product_id'] = $parent_id;
+				}
+
 				$results['failed']++;
-				$results['total']++;
+				$results['errors'][] = $row_err;
+			}
+
+			return $results;
+		}
+
+		$rows = array();
+
+		foreach ($plans as $pl) {
+			if (($pl['kind'] ?? '') === 'missing_parent') {
+				$results['failed']++;
 				$results['errors'][] = array(
-					'product_id' => $product_id,
+					'product_id' => (int) ($pl['product_id'] ?? 0),
 					'message' => __('محصول یافت نشد', 'hesabix-v2'),
 				);
 				continue;
 			}
 
-			if ($product->is_type('variable')) {
-				$variation_ids = $product->get_children();
-				if (empty($variation_ids)) {
-					$results['failed']++;
-					$results['total']++;
-					$results['errors'][] = array(
-						'product_id' => $product_id,
-						'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
-					);
-					continue;
-				}
-				foreach ($variation_ids as $variation_id) {
-					$results['total']++;
-					$result = $this->sync_product($product_id, $variation_id);
-					if ($result['success']) {
-						$results['success']++;
-					} else {
-						$results['failed']++;
+			if (($pl['kind'] ?? '') === 'empty_variable') {
+				$results['failed']++;
+				$results['errors'][] = array(
+					'product_id' => (int) ($pl['product_id'] ?? 0),
+					'message' => __('محصول متغیر بدون واریانت', 'hesabix-v2'),
+				);
+				continue;
+			}
+
+			$rows[] = $pl;
+		}
+
+		$o = self::get_bulk_sync_options();
+		$cap = isset($o['api_bulk_products_per_request']) ? (int) $o['api_bulk_products_per_request'] : 20;
+		$cap = max(3, min(self::BULK_API_ITEMS_MAX_PRODUCT, $cap));
+
+		foreach (array_chunk($rows, $cap) as $chunk_plans) {
+			$items = array();
+			$cref_meta = array();
+
+			foreach ($chunk_plans as $rp) {
+				$variation_id = isset($rp['variation_id']) && (int) $rp['variation_id'] > 0
+					? (int) $rp['variation_id']
+					: null;
+
+				$collected = $this->collect_product_bulk_item((int) ($rp['parent_id'] ?? 0), $variation_id, $gate);
+
+				if (empty($collected['ok'])) {
+					$m = isset($collected['message']) ? (string) $collected['message'] : '';
+
+					$wc_id_fail = isset($collected['wc_id']) ? (int) $collected['wc_id'] : 0;
+					$wc_par_fail = isset($collected['wc_parent_id'])
+						? $collected['wc_parent_id']
+						: null;
+
+					if ($variation_id !== null && $variation_id > 0) {
 						$results['errors'][] = array(
-							'product_id' => $product_id,
+							'product_id' => (int) ($rp['parent_id'] ?? 0),
 							'variation_id' => $variation_id,
-							'message' => $result['message'],
+							'message' => $m,
+						);
+					} else {
+						$results['errors'][] = array(
+							'product_id' => (int) ($rp['parent_id'] ?? 0),
+							'message' => $m,
 						);
 					}
-				}
-			} else {
-				$results['total']++;
-				$result = $this->sync_product($product_id);
-				if ($result['success']) {
-					$results['success']++;
-				} else {
+
 					$results['failed']++;
+
+					if ($wc_id_fail > 0) {
+						self::enqueue_product_retry_from_bulk_failure($wc_id_fail, $wc_par_fail, $m);
+					}
+
+					continue;
+				}
+
+				$cref = isset($collected['item']['client_ref']) ? (string) $collected['item']['client_ref'] : '';
+				if ($cref === '') {
+					continue;
+				}
+
+				$cref_meta[ $cref ] = array(
+					'wc_id' => (int) $collected['wc_id'],
+					'wc_parent_id' => isset($collected['wc_parent_id'])
+						? $collected['wc_parent_id']
+						: null,
+				);
+				$items[] = $collected['item'];
+			}
+
+			if ($items === array()) {
+				continue;
+			}
+
+			$items = apply_filters('hesabix_v2_bulk_upsert_products_items_before_api', $items, $chunk_plans, $this->api);
+
+			$t_out = max(90, min(900, ($cap * 5)));
+
+			$api_res = $this->api->bulk_upsert_products(
+				array(
+					'items' => $items,
+					'create_if_update_missing' => true,
+				),
+				$t_out
+			);
+
+			if (empty($api_res['success'])) {
+				$fatal = isset($api_res['message'])
+					? (string) $api_res['message']
+					: __('خطای bulk کالا در API حسابیکس', 'hesabix-v2');
+
+				Hesabix_V2_Log_Service::error(
+					'Product bulk-sync API chunk failed',
+					array(
+						'entity_type' => 'product',
+						'bulk_products' => true,
+						'items_in_chunk' => count($cref_meta),
+						'direction' => 'hesabix_api',
+						'error' => $fatal,
+					)
+				);
+
+				foreach ($cref_meta as $meta) {
+					$wid = isset($meta['wc_id']) ? (int) $meta['wc_id'] : 0;
+					if ($wid < 1) {
+						continue;
+					}
+
+					$wc_parent_ok = isset($meta['wc_parent_id']) ? $meta['wc_parent_id'] : null;
+
+					if ($wc_parent_ok !== null && (int) $wc_parent_ok > 0) {
+						$p = (int) $wc_parent_ok;
+						$results['errors'][] = array(
+							'product_id' => $p,
+							'variation_id' => $wid,
+							'message' => $fatal,
+						);
+					} else {
+						$results['errors'][] = array(
+							'product_id' => $wid,
+							'message' => $fatal,
+						);
+					}
+
+					$results['failed']++;
+					self::enqueue_product_retry_from_bulk_failure($wid, $wc_parent_ok, $fatal);
+				}
+
+				continue;
+			}
+
+			$data_bundle = isset($api_res['data']) && is_array($api_res['data'])
+				? $api_res['data']
+				: array();
+
+			$result_rows = isset($data_bundle['results']) && is_array($data_bundle['results'])
+				? $data_bundle['results']
+				: array();
+
+			foreach ($result_rows as $row) {
+				if (!is_array($row)) {
+					continue;
+				}
+
+				$cref_raw = isset($row['client_ref']) ? trim((string) $row['client_ref']) : '';
+
+				$resolved = null;
+
+				if ($cref_raw !== '' && isset($cref_meta[ $cref_raw ])) {
+					$resolved = $cref_meta[ $cref_raw ];
+				} elseif ($cref_raw !== '' && preg_match('/^wc_pv:(\d+):(\d+)$/', $cref_raw, $xm)) {
+					$p_zone = absint($xm[1]);
+					$e_id = absint($xm[2]);
+					if ($p_zone === 0) {
+						$resolved = array('wc_id' => $e_id, 'wc_parent_id' => null);
+					} else {
+						$resolved = array('wc_id' => $e_id, 'wc_parent_id' => $p_zone);
+					}
+				}
+
+				if ($resolved === null || empty($resolved['wc_id'])) {
+					continue;
+				}
+
+				if ($cref_raw !== '' && isset($cref_meta[ $cref_raw ])) {
+					unset($cref_meta[ $cref_raw ]);
+				}
+
+				$wid2 = absint($resolved['wc_id']);
+				$wp2 = isset($resolved['wc_parent_id']) ? $resolved['wc_parent_id'] : null;
+
+				$status = isset($row['status']) ? (string) $row['status'] : '';
+
+				if (($status === 'created' || $status === 'updated')
+					&& !empty($row['product_id'])
+					&& absint($row['product_id']) > 0
+				) {
+					$h_id = absint($row['product_id']);
+
+					$this->db->save_mapping(
+						'product',
+						$wid2,
+						$wp2,
+						$h_id,
+						'product',
+						array('synced_at' => current_time('mysql'))
+					);
+
+					$results['success']++;
+
+					Hesabix_V2_Log_Service::info(
+						'Product synced successfully (bulk)',
+						array(
+							'entity_type' => 'product',
+							'entity_id' => $wid2,
+							'hesabix_id' => $h_id,
+						)
+					);
+
+					continue;
+				}
+
+				$mf = isset($row['message']) ? (string) $row['message'] : __('ناموفق', 'hesabix-v2');
+
+				if ($wp2 !== null && (int) $wp2 > 0) {
 					$results['errors'][] = array(
-						'product_id' => $product_id,
-						'message' => $result['message'],
+						'product_id' => (int) $wp2,
+						'variation_id' => $wid2,
+						'message' => $mf,
+					);
+				} else {
+					$results['errors'][] = array(
+						'product_id' => $wid2,
+						'message' => $mf,
 					);
 				}
+
+				$results['failed']++;
+				self::enqueue_product_retry_from_bulk_failure($wid2, $wp2, $mf);
+
+				Hesabix_V2_Log_Service::error(
+					'Product bulk-sync row failed',
+					array(
+						'entity_type' => 'product',
+						'entity_id' => $wid2,
+						'error' => $mf,
+						'direction' => 'hesabix_api',
+						'bulk_products' => true,
+					)
+				);
 			}
 		}
 
@@ -1020,23 +1768,198 @@ class Hesabix_V2_Sync_Service
 			'failed' => 0,
 			'total' => count($customer_ids),
 			'errors' => array(),
+			'per_customer' => array(),
 		);
 
-		foreach ($customer_ids as $customer_id) {
-			$result = $this->sync_customer($customer_id);
+		$ids = array_values(array_unique(array_filter(array_map('absint', (array) $customer_ids))));
+		if (empty($ids)) {
+			return $results;
+		}
 
-			if ($result['success']) {
-				$results['success']++;
-			} else {
+		$results['total'] = count($ids);
+
+		foreach ($ids as $cid_init) {
+			$results['per_customer'][ (int) $cid_init ] = array(
+				'success' => false,
+				'message' => '',
+			);
+		}
+
+		$o = self::get_bulk_sync_options();
+		$cap = isset($o['api_bulk_persons_per_request']) ? (int) $o['api_bulk_persons_per_request'] : 35;
+		$cap = max(5, min(self::BULK_API_ITEMS_MAX_PERSON, $cap));
+
+		foreach (array_chunk($ids, $cap) as $chunk) {
+			$cid_by_ref = array();
+			$items = array();
+
+			foreach ($chunk as $customer_id) {
+				$item_data = $this->collect_customer_bulk_item((int) $customer_id, null);
+
+				if (empty($item_data['ok'])) {
+					$results['failed']++;
+					$row_err = array(
+						'customer_id' => (int) $customer_id,
+						'message' => isset($item_data['message']) ? (string) $item_data['message'] : '',
+					);
+					$results['errors'][] = $row_err;
+					$results['per_customer'][ (int) $customer_id ] = array(
+						'success' => false,
+						'message' => $row_err['message'],
+					);
+
+					continue;
+				}
+
+				$cref = isset($item_data['item']['client_ref']) ? (string) $item_data['item']['client_ref'] : '';
+				if ($cref !== '') {
+					$cid_by_ref[ $cref ] = (int) $customer_id;
+				}
+				$items[] = $item_data['item'];
+			}
+
+			if (empty($items)) {
+				continue;
+			}
+
+			$items = apply_filters('hesabix_v2_bulk_upsert_persons_items_before_api', $items, $chunk, $this->api);
+
+			$t_per = (int) max(90, min(900, ($cap * 3)));
+
+			$api_res = $this->api->bulk_upsert_persons(
+				array(
+					'items' => $items,
+					'create_if_update_missing' => true,
+				),
+				$t_per
+			);
+
+			if (empty($api_res['success'])) {
+				$m = isset($api_res['message']) ? (string) $api_res['message'] : __('خطای bulk شخص در API', 'hesabix-v2');
+
+				foreach ($cid_by_ref as $wc_id_mapped) {
+					$wid = absint($wc_id_mapped);
+
+					if (empty($results['per_customer'][ $wid ]) || empty($results['per_customer'][ $wid ]['success'])) {
+						$results['failed']++;
+						$results['errors'][] = array('customer_id' => $wid, 'message' => $m);
+						$results['per_customer'][ $wid ] = array('success' => false, 'message' => $m);
+					}
+				}
+				continue;
+			}
+
+			$bundle = isset($api_res['data']) && is_array($api_res['data']) ? $api_res['data'] : array();
+			$list = isset($bundle['results']) && is_array($bundle['results']) ? $bundle['results'] : array();
+
+			foreach ($list as $row) {
+				$cref3 = isset($row['client_ref']) ? (string) $row['client_ref'] : '';
+				if ($cref3 === '' || empty($cid_by_ref[ $cref3 ])) {
+					continue;
+				}
+
+				$wc_id = (int) $cid_by_ref[ $cref3 ];
+				if ($wc_id < 1) {
+					continue;
+				}
+
+				$status = isset($row['status']) ? (string) $row['status'] : '';
+
+				if ($status === 'created' || $status === 'updated') {
+					if (!empty($row['person_id'])) {
+						$hid = absint($row['person_id']);
+						if ($hid > 0) {
+							$this->db->save_mapping('customer', $wc_id, null, $hid, 'person');
+
+							Hesabix_V2_Log_Service::info('Customer synced (bulk)', array(
+								'entity_type' => 'customer',
+								'entity_id' => $wc_id,
+								'hesabix_id' => $hid,
+							));
+
+							$results['success']++;
+							$results['per_customer'][ $wc_id ] = array(
+								'success' => true,
+								'message' => __('مشتری با موفقیت همگام‌سازی شد', 'hesabix-v2'),
+							);
+
+							continue;
+						}
+					}
+				}
+
+				if (!empty($results['per_customer'][ $wc_id ]['success'])) {
+					continue;
+				}
+
+				$mf = isset($row['message']) ? (string) $row['message'] : __('ناموفق', 'hesabix-v2');
+
 				$results['failed']++;
-				$results['errors'][] = array(
-					'customer_id' => $customer_id,
-					'message' => $result['message'],
+				$results['errors'][] = array('customer_id' => $wc_id, 'message' => $mf);
+				$results['per_customer'][ $wc_id ] = array(
+					'success' => false,
+					'message' => $mf,
 				);
 			}
 		}
 
 		return $results;
+	}
+
+	/**
+	 * ساخت ورودی bulk-upsert برای یک مشتری ووکامرس.
+	 *
+	 * @param int           $customer_id
+	 * @param WC_Order|null $context_order
+	 * @return array{ok:bool, message:string, item?:array<string,mixed>}
+	 */
+	private function collect_customer_bulk_item($customer_id, $context_order = null)
+	{
+		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync($this->api, null);
+		if (!$gate['ok']) {
+			Hesabix_V2_Log_Service::warning('Customer bulk blocked — currency mismatch', array(
+				'entity_type' => 'customer',
+				'entity_id' => $customer_id,
+				'message' => $gate['message'],
+			));
+
+			return array(
+				'ok' => false,
+				'message' => $gate['message'],
+			);
+		}
+
+		$customer = new WC_Customer($customer_id);
+		if (!$customer->get_id()) {
+			return array(
+				'ok' => false,
+				'message' => __('مشتری یافت نشد', 'hesabix-v2'),
+			);
+		}
+
+		$customer_data = apply_filters(
+			'hesabix_v2_customer_data',
+			Hesabix_V2_Mapper::wc_customer_to_api($customer, $context_order),
+			$customer,
+			$context_order
+		);
+
+		$mapping = $this->db->get_mapping('customer', $customer_id);
+		$hid = null;
+
+		if ($mapping && !empty($mapping['hesabix_id'])) {
+			$hid = absint($mapping['hesabix_id']);
+		}
+
+		return array(
+			'ok' => true,
+			'message' => '',
+			'item' => array(
+				'client_ref' => 'wc_customer:' . (int) $customer_id,
+				'person_id' => $hid && $hid > 0 ? $hid : null,
+				'payload' => $customer_data,
+			),
+		);
 	}
 
 	/**

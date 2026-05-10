@@ -251,13 +251,15 @@ class Hesabix_V2_Admin
 					$this->version,
 					true
 				);
+				$bulk_o = Hesabix_V2_Sync_Service::get_bulk_sync_options();
+				$o_chunk = isset($bulk_o['wc_orders_ajax_batch']) ? (int) $bulk_o['wc_orders_ajax_batch'] : 40;
 				wp_localize_script(
 					'hesabix-v2-orders',
 					'hesabix_v2_orders',
 					array(
 						'ajax_url' => admin_url('admin-ajax.php'),
 						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
-						'chunk_size' => 5,
+						'chunk_size' => max(5, min(Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS, $o_chunk)),
 						'strings' => array(
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
@@ -280,13 +282,16 @@ class Hesabix_V2_Admin
 					$this->version,
 					true
 				);
+				$bco = Hesabix_V2_Sync_Service::get_bulk_sync_options();
+				$c_chunk = isset($bco['wc_customers_per_ajax']) ? (int) $bco['wc_customers_per_ajax'] : 45;
+
 				wp_localize_script(
 					'hesabix-v2-customers',
 					'hesabix_v2_customers',
 					array(
 						'ajax_url' => admin_url('admin-ajax.php'),
 						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
-						'chunk_size' => 8,
+						'chunk_size' => max(5, min(Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS, $c_chunk)),
 						'strings' => array(
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
@@ -544,6 +549,18 @@ class Hesabix_V2_Admin
 			'wc_customers_per_ajax' => isset($_POST['wc_customers_per_ajax'])
 				? absint(wp_unslash($_POST['wc_customers_per_ajax']))
 				: $d['wc_customers_per_ajax'],
+			'wc_orders_ajax_batch' => isset($_POST['wc_orders_ajax_batch'])
+				? absint(wp_unslash($_POST['wc_orders_ajax_batch']))
+				: ($d['wc_orders_ajax_batch'] ?? 40),
+			'api_bulk_persons_per_request' => isset($_POST['api_bulk_persons_per_request'])
+				? absint(wp_unslash($_POST['api_bulk_persons_per_request']))
+				: ($d['api_bulk_persons_per_request'] ?? 35),
+			'api_bulk_invoices_per_request' => isset($_POST['api_bulk_invoices_per_request'])
+				? absint(wp_unslash($_POST['api_bulk_invoices_per_request']))
+				: ($d['api_bulk_invoices_per_request'] ?? 8),
+			'api_bulk_products_per_request' => isset($_POST['api_bulk_products_per_request'])
+				? absint(wp_unslash($_POST['api_bulk_products_per_request']))
+				: ($d['api_bulk_products_per_request'] ?? 20),
 			'hesabix_person_take' => isset($_POST['hesabix_person_take'])
 				? absint(wp_unslash($_POST['hesabix_person_take']))
 				: $d['hesabix_person_take'],
@@ -664,6 +681,7 @@ class Hesabix_V2_Admin
 	private function save_settings()
 	{
 		// Sync settings (قالب واحد با Hesabix_V2_Invoice_Helper::normalize_sync_settings)
+		$prev_sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
 		$status_choices = Hesabix_V2_Invoice_Helper::get_wc_order_status_choices();
 		$sync_order_on_statuses = array();
 		if (isset($_POST['sync_order_on_statuses']) && is_array($_POST['sync_order_on_statuses'])) {
@@ -671,6 +689,24 @@ class Hesabix_V2_Admin
 				$st = sanitize_text_field(wp_unslash($st));
 				if ($st !== '' && isset($status_choices[$st])) {
 					$sync_order_on_statuses[] = $st;
+				}
+			}
+		}
+
+		$invoice_tab_in_post = isset($_POST['hesabix_v2_invoice_tab_fields']);
+		$finalize_proforma_on_paid = !empty($prev_sync['finalize_proforma_on_paid']);
+		$finalize_proforma_order_statuses = isset($prev_sync['finalize_proforma_order_statuses']) && is_array($prev_sync['finalize_proforma_order_statuses'])
+			? $prev_sync['finalize_proforma_order_statuses']
+			: array('processing', 'completed');
+		if ($invoice_tab_in_post) {
+			$finalize_proforma_on_paid = isset($_POST['finalize_proforma_on_paid']);
+			$finalize_proforma_order_statuses = array();
+			if (isset($_POST['finalize_proforma_order_statuses']) && is_array($_POST['finalize_proforma_order_statuses'])) {
+				foreach ($_POST['finalize_proforma_order_statuses'] as $st) {
+					$st = sanitize_text_field(wp_unslash($st));
+					if ($st !== '' && isset($status_choices[$st])) {
+						$finalize_proforma_order_statuses[] = $st;
+					}
 				}
 			}
 		}
@@ -692,6 +728,8 @@ class Hesabix_V2_Admin
 			'sync_order_on_payment_complete' => isset($_POST['sync_order_on_payment_complete']),
 			'sync_order_on_statuses' => $sync_order_on_statuses,
 			'invoice_is_proforma' => isset($_POST['invoice_doc_mode']) && sanitize_text_field(wp_unslash($_POST['invoice_doc_mode'])) === 'proforma',
+			'finalize_proforma_on_paid' => $finalize_proforma_on_paid,
+			'finalize_proforma_order_statuses' => $finalize_proforma_order_statuses,
 			'invoice_tag_website_enabled' => isset($_POST['invoice_tag_website_enabled']),
 			'invoice_tag_website_name' => isset($_POST['invoice_tag_website_name'])
 				? sanitize_text_field(wp_unslash($_POST['invoice_tag_website_name']))
@@ -1031,7 +1069,9 @@ class Hesabix_V2_Admin
 			return;
 		}
 		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
-		if (empty($sync['sync_order_on_payment_complete'])) {
+		$sync_on_payment = !empty($sync['sync_order_on_payment_complete']);
+		$proforma_promote = !empty($sync['invoice_is_proforma']) && !empty($sync['finalize_proforma_on_paid']);
+		if (!$sync_on_payment && !$proforma_promote) {
 			return;
 		}
 		if ($this->should_skip_auto_order_sync($order_id)) {
@@ -1057,7 +1097,21 @@ class Hesabix_V2_Admin
 		$allowed = isset($sync['sync_order_on_statuses']) && is_array($sync['sync_order_on_statuses'])
 			? $sync['sync_order_on_statuses']
 			: array();
-		if (empty($allowed) || !in_array($new_status, $allowed, true)) {
+		$new_slug = Hesabix_V2_Invoice_Helper::normalize_order_status_slug($new_status);
+		$promote_statuses = isset($sync['finalize_proforma_order_statuses']) && is_array($sync['finalize_proforma_order_statuses'])
+			? $sync['finalize_proforma_order_statuses']
+			: array();
+		$proforma_promote = false;
+		if (!empty($sync['invoice_is_proforma']) && $new_slug !== '') {
+			foreach ($promote_statuses as $ps) {
+				if ($new_slug === Hesabix_V2_Invoice_Helper::normalize_order_status_slug($ps)) {
+					$proforma_promote = true;
+					break;
+				}
+			}
+		}
+		$in_sync_list = !empty($allowed) && in_array($new_status, $allowed, true);
+		if (!$in_sync_list && !$proforma_promote) {
 			return;
 		}
 		if ($this->should_skip_auto_order_sync($order_id)) {
@@ -1189,27 +1243,55 @@ class Hesabix_V2_Admin
 		if (!is_array($raw)) {
 			$raw = array();
 		}
-		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, 8);
+
+		$bulk_opts = Hesabix_V2_Sync_Service::get_bulk_sync_options();
+		$o_max = isset($bulk_opts['wc_orders_ajax_batch']) ? (int) $bulk_opts['wc_orders_ajax_batch'] : 40;
+		$o_max = max(5, min(Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS, $o_max));
+
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, $o_max);
 		if (empty($ids)) {
 			wp_send_json_error(array('message' => __('سفارشی انتخاب نشده است.', 'hesabix-v2')));
 		}
 
 		$sync_service = new Hesabix_V2_Sync_Service();
+		$bulk = $sync_service->bulk_sync_orders($ids);
+
 		$results = array();
 		foreach ($ids as $oid) {
-			$r = $sync_service->sync_order($oid);
+			if (isset($bulk['per_order'][ $oid ])) {
+				$po = $bulk['per_order'][ $oid ];
+				$paused = !empty($po['skipped_pause']);
+				$results[] = array(
+					'order_id' => (int) $oid,
+					'success' => $paused ? true : (!empty($po['success'])),
+					'skipped_pause' => $paused,
+					'message' => isset($po['message']) ? (string) $po['message'] : '',
+				);
+
+				continue;
+			}
+
 			$results[] = array(
-				'order_id' => $oid,
-				'success' => !empty($r['success']),
-				'message' => isset($r['message']) ? (string) $r['message'] : '',
+				'order_id' => (int) $oid,
+				'success' => false,
+				/* translators: %d: WooCommerce order id */
+				'message' => sprintf(__('خلاصهٔ نتیجه برای سفارش %d موجود نبود.', 'hesabix-v2'), (int) $oid),
 			);
 		}
 
-		wp_send_json_success(array('results' => $results));
+		wp_send_json_success(
+			array(
+				'results' => $results,
+				'summary' => array(
+					'success' => isset($bulk['success']) ? (int) $bulk['success'] : 0,
+					'failed' => isset($bulk['failed']) ? (int) $bulk['failed'] : 0,
+				),
+			)
+		);
 	}
 
 	/**
-	 * AJAX: همگام‌سازی مشتری (شخص حسابیکس)، حداکثر ۸ در هر درخواست.
+	 * AJAX: همگام‌سازی دستهٔ مشتریان (bulk API حسابیکس).
 	 *
 	 * @since      3.3.5
 	 * @return void
@@ -1227,29 +1309,50 @@ class Hesabix_V2_Admin
 		if (!is_array($raw)) {
 			$raw = array();
 		}
-		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, 8);
+		$c_opts = Hesabix_V2_Sync_Service::get_bulk_sync_options();
+		$c_max = isset($c_opts['wc_customers_per_ajax']) ? (int) $c_opts['wc_customers_per_ajax'] : 45;
+		$c_max = max(5, min(500, $c_max));
+
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, $c_max);
 		if (empty($ids)) {
 			wp_send_json_error(array('message' => __('مشتری انتخاب نشده است.', 'hesabix-v2')));
 		}
 
-		$sync_service = new Hesabix_V2_Sync_Service();
-		$results = array();
+		$eligible = array();
+		$precheck = array();
 		foreach ($ids as $uid) {
 			if (! Hesabix_V2_Customer_Service::user_has_customer_list_role((int) $uid)) {
-				$results[] = array(
-					'customer_id' => $uid,
+				$precheck[] = array(
+					'customer_id' => (int) $uid,
 					'success' => false,
 					/* translators: %d: user ID */
 					'message' => sprintf(__('شناسه %d جزو نقش‌های مجاز مشتری نیست؛ رد شد.', 'hesabix-v2'), (int) $uid),
 				);
+
 				continue;
 			}
 
-			$r = $sync_service->sync_customer((int) $uid);
+			$eligible[] = (int) $uid;
+		}
+
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$r = empty($eligible) ? array(
+			'success' => 0,
+			'failed' => count($precheck),
+			'per_customer' => array(),
+		) : $sync_service->bulk_sync_customers($eligible);
+
+		$results = $precheck;
+		foreach ($eligible as $cid) {
+			$slot = isset($r['per_customer'][ $cid ]) ? $r['per_customer'][ $cid ] : array(
+				'success' => false,
+				/* translators: %d customer id */
+				'message' => sprintf(__('نتیجه‌ای برای مشتری %d برنگشت.', 'hesabix-v2'), (int) $cid),
+			);
 			$results[] = array(
-				'customer_id' => (int) $uid,
-				'success' => !empty($r['success']),
-				'message' => isset($r['message']) ? (string) $r['message'] : '',
+				'customer_id' => (int) $cid,
+				'success' => !empty($slot['success']),
+				'message' => isset($slot['message']) ? (string) $slot['message'] : '',
 			);
 		}
 
