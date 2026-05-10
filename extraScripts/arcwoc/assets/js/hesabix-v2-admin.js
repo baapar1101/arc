@@ -398,6 +398,16 @@
 				activateTab(m[1]);
 			}
 		}
+
+		var $finalizeRow = $('.hesabix-v2-proforma-finalize-settings');
+		if ($finalizeRow.length) {
+			function hesabixV2ToggleProformaFinalize() {
+				var proformaSelected = $('input[name="invoice_doc_mode"][value="proforma"]').is(':checked');
+				$finalizeRow.css('display', proformaSelected ? '' : 'none');
+			}
+			$(document).on('change', 'input[name="invoice_doc_mode"]', hesabixV2ToggleProformaFinalize);
+			hesabixV2ToggleProformaFinalize();
+		}
 	});
 
 	window.HesabixV2Admin = HesabixV2Admin;

@@ -32,6 +32,7 @@ from adapters.api.v1.schema_models.product import (
     BulkDefaultWarehouseApplyResponse,
 )
 from adapters.api.v1.schema_models.common import SuccessResponse, ErrorResponse
+from app.services.product_bulk_upsert_service import bulk_upsert_products_integration
 from app.services.product_service import (
     create_product,
     list_products,
@@ -281,6 +282,27 @@ async def create_product_endpoint(
             db.commit()
     
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
+
+
+@router.post(
+    "/business/{business_id}/bulk-upsert",
+    summary="ایجاد/ویرایش گروهی کالا (یکپارچه‌سازی)",
+    description=(
+        "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در حسابیکس,"
+        '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی }}],'
+        '\"create_if_update_missing\":true}`. حداکثر ۱۰۰۰ آیتم. خروجی: results با status در created|updated|failed.'
+    ),
+)
+@require_business_access("business_id")
+async def bulk_upsert_products_integration_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    data = bulk_upsert_products_integration(db, business_id, ctx, body)
+    return success_response(data=data, request=request, message="BULK_PRODUCT_UPSERT_COMPLETED")
 
 
 @router.post(

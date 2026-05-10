@@ -1285,6 +1285,125 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     SnackBarHelper.showSuccess(context, message: message);
   }
 
+  /// ترتیب فعال‌سازی: ابتدا `view` تا قوانین پیش‌نیاز `_setPermission` رعایت شود.
+  List<String> _orderedActionsForEnable(Iterable<String> actions) {
+    final list = actions.toList();
+    final viewFirst = list.where((a) => a == 'view').toList();
+    final rest = list.where((a) => a != 'view').toList()..sort();
+    return [...viewFirst, ...rest];
+  }
+
+  void _applyAllPermissions(bool enable) {
+    final t = AppLocalizations.of(context);
+    final all = _getAllPermissions(t);
+    for (final entry in all.entries) {
+      final section = entry.key;
+      final actionKeys = entry.value.keys.toList();
+      if (enable) {
+        for (final action in _orderedActionsForEnable(actionKeys)) {
+          _setPermission(_currentPermissions, section, action, true);
+        }
+      } else {
+        final nonView = actionKeys.where((a) => a != 'view').toList()..sort();
+        final onlyView = actionKeys.where((a) => a == 'view').toList();
+        for (final action in nonView) {
+          _setPermission(_currentPermissions, section, action, false);
+        }
+        for (final action in onlyView) {
+          _setPermission(_currentPermissions, section, action, false);
+        }
+      }
+    }
+    setState(() {});
+  }
+
+  void _applyCategoryPermissions(List<String> sectionKeys, bool enable) {
+    final t = AppLocalizations.of(context);
+    final all = _getAllPermissions(t);
+    for (final section in sectionKeys) {
+      final def = all[section];
+      if (def == null) continue;
+      final actionKeys = def.keys.toList();
+      if (enable) {
+        for (final action in _orderedActionsForEnable(actionKeys)) {
+          _setPermission(_currentPermissions, section, action, true);
+        }
+      } else {
+        final nonView = actionKeys.where((a) => a != 'view').toList()..sort();
+        final onlyView = actionKeys.where((a) => a == 'view').toList();
+        for (final action in nonView) {
+          _setPermission(_currentPermissions, section, action, false);
+        }
+        for (final action in onlyView) {
+          _setPermission(_currentPermissions, section, action, false);
+        }
+      }
+    }
+    setState(() {});
+  }
+
+  Future<void> _confirmAndApplyAllPermissions(bool enable) async {
+    if (enable) {
+      _applyAllPermissions(true);
+      return;
+    }
+    final t = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.permissionsConfirmDisableAllTitle),
+        content: SingleChildScrollView(
+          child: Text(t.permissionsConfirmDisableAllBody),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(t.confirm),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    _applyAllPermissions(false);
+  }
+
+  Future<void> _confirmAndApplyCategoryPermissions(
+    List<String> sectionKeys,
+    String categoryTitle,
+    bool enable,
+  ) async {
+    if (enable) {
+      _applyCategoryPermissions(sectionKeys, true);
+      return;
+    }
+    final t = AppLocalizations.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.permissionsConfirmDisableCategoryTitle),
+        content: SingleChildScrollView(
+          child: Text(t.permissionsConfirmDisableCategoryBody(categoryTitle)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(t.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(t.confirm),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    _applyCategoryPermissions(sectionKeys, false);
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -1331,6 +1450,31 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
                 ],
               ),
             ),
+
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Wrap(
+                        spacing: 4,
+                        runSpacing: 0,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: _isUpdating ? null : () => _confirmAndApplyAllPermissions(true),
+                            child: Text(t.permissionsEnableAll),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: colorScheme.error,
+                            ),
+                            onPressed: _isUpdating ? null : () => _confirmAndApplyAllPermissions(false),
+                            child: Text(t.permissionsDisableAll),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                   // Content
                   Expanded(
@@ -1514,6 +1658,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           theme,
           colorScheme,
           hintText: hintText,
+          categorySectionKeys: List<String>.from(config['sections'] as List<String>),
+          l10n: t,
         ),
       );
       
@@ -1706,6 +1852,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     ThemeData theme,
     ColorScheme colorScheme, {
     String? hintText,
+    List<String>? categorySectionKeys,
+    AppLocalizations? l10n,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -1729,6 +1877,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
               ),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
                   icon,
@@ -1736,13 +1885,52 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
                   color: colorScheme.primary,
                 ),
                 const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.onSurface,
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                 ),
+                if (categorySectionKeys != null &&
+                    categorySectionKeys.isNotEmpty &&
+                    l10n != null) ...[
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: _isUpdating
+                        ? null
+                        : () => _confirmAndApplyCategoryPermissions(
+                              categorySectionKeys,
+                              title,
+                              true,
+                            ),
+                    child: Text(l10n.permissionsEnableAll),
+                  ),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.error,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: _isUpdating
+                        ? null
+                        : () => _confirmAndApplyCategoryPermissions(
+                              categorySectionKeys,
+                              title,
+                              false,
+                            ),
+                    child: Text(l10n.permissionsDisableAll),
+                  ),
+                ],
               ],
             ),
           ),

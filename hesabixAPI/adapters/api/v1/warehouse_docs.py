@@ -190,6 +190,12 @@ def create_warehouse_doc_from_invoice(
 	inv = db.query(Document).filter(Document.id == invoice_id).first()
 	if not inv or inv.business_id != business_id:
 		raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
+	if bool(getattr(inv, "is_proforma", False)):
+		raise ApiError(
+			"PROFORMA_INVOICE",
+			"برای پیش‌فاکتور ایجاد حواله از فاکتور مجاز نیست؛ ابتدا فاکتور را قطعی کنید تا ثبت موجودی با گزارش‌ها همسو باشد.",
+			http_status=400,
+		)
 
 	lines = payload.get("lines")
 	if not isinstance(lines, list) or not lines:

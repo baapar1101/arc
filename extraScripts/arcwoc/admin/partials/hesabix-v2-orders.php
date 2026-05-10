@@ -41,6 +41,7 @@ if (!defined('WPINC')) {
 
 	<form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>">
 		<input type="hidden" name="page" value="hesabix-v2-orders" />
+		<?php $list_table->prepare_items(); ?>
 		<?php $list_table->display(); ?>
 	</form>
 </div>

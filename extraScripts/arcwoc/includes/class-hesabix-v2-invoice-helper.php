@@ -36,6 +36,24 @@ class Hesabix_V2_Invoice_Helper
 		if (!array_key_exists('invoice_is_proforma', $sync)) {
 			$sync['invoice_is_proforma'] = false;
 		}
+		if (!array_key_exists('finalize_proforma_on_paid', $sync)) {
+			$sync['finalize_proforma_on_paid'] = true;
+		}
+		if (!isset($sync['finalize_proforma_order_statuses']) || !is_array($sync['finalize_proforma_order_statuses'])) {
+			$sync['finalize_proforma_order_statuses'] = array('processing', 'completed');
+		}
+		$sync['finalize_proforma_on_paid'] = (bool) $sync['finalize_proforma_on_paid'];
+		$fp_st = array();
+		foreach ($sync['finalize_proforma_order_statuses'] as $st) {
+			if (!is_string($st) && !is_numeric($st)) {
+				continue;
+			}
+			$s = sanitize_key(str_replace('wc-', '', (string) $st));
+			if ($s !== '') {
+				$fp_st[] = $s;
+			}
+		}
+		$sync['finalize_proforma_order_statuses'] = array_values(array_unique($fp_st));
 		if (!array_key_exists('invoice_tag_website_enabled', $sync)) {
 			$sync['invoice_tag_website_enabled'] = true;
 		}
@@ -48,6 +66,30 @@ class Hesabix_V2_Invoice_Helper
 		if (!array_key_exists('sync_category_link_by_name_in_hesabix', $sync)) {
 			$sync['sync_category_link_by_name_in_hesabix'] = false;
 		}
+		if (!isset($sync['track_inventory_policy']) || !is_string($sync['track_inventory_policy'])) {
+			$sync['track_inventory_policy'] = 'wc';
+		} else {
+			$sync['track_inventory_policy'] = sanitize_key($sync['track_inventory_policy']);
+		}
+		$allowed_policies = array('wc', 'physical_always', 'always_on', 'always_off');
+		if (!in_array($sync['track_inventory_policy'], $allowed_policies, true)) {
+			$sync['track_inventory_policy'] = 'wc';
+		}
+
+		if (!isset($sync['order_fiscal_year_date_policy']) || !is_string($sync['order_fiscal_year_date_policy'])) {
+			$sync['order_fiscal_year_date_policy'] = 'keep';
+		} else {
+			$sync['order_fiscal_year_date_policy'] = sanitize_key($sync['order_fiscal_year_date_policy']);
+		}
+		$allowed_fiscal = array('keep', 'clamp', 'skip');
+		if (!in_array($sync['order_fiscal_year_date_policy'], $allowed_fiscal, true)) {
+			$sync['order_fiscal_year_date_policy'] = 'keep';
+		}
+
+		if (!array_key_exists('queue_items_per_cron_run', $sync)) {
+			$sync['queue_items_per_cron_run'] = 15;
+		}
+		$sync['queue_items_per_cron_run'] = max(1, min(500, absint($sync['queue_items_per_cron_run'])));
 
 		return $sync;
 	}
@@ -162,5 +204,53 @@ class Hesabix_V2_Invoice_Helper
 			$out[$slug] = $label;
 		}
 		return $out;
+	}
+
+	/**
+	 * نرمال‌سازی اسلاگ وضعیت سفارش ووکامرس (بدون پیشوند wc-).
+	 *
+	 * @param string $status
+	 * @return string
+	 */
+	public static function normalize_order_status_slug($status)
+	{
+		$s = is_string($status) ? strtolower(trim(str_replace('wc-', '', $status))) : '';
+		if ($s === '') {
+			return '';
+		}
+		return sanitize_key($s);
+	}
+
+	/**
+	 * آیا با توجه به وضعیت/پرداخت سفارش، فاکتور ارسالی به حسابیکس باید قطعی باشد؟
+	 * وقتی invoice_is_proforma خاموش است، همیشه true (یعنی همیشه قطعی).
+	 *
+	 * @param WC_Order $order
+	 * @param array|null $sync نتیجه normalize_sync_settings یا null برای خواندن از option.
+	 * @return bool
+	 */
+	public static function order_invoice_should_be_final($order, $sync = null)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return true;
+		}
+		if ($sync === null) {
+			$sync = self::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		} else {
+			$sync = self::normalize_sync_settings($sync);
+		}
+		if (empty($sync['invoice_is_proforma'])) {
+			return true;
+		}
+		if (!empty($sync['finalize_proforma_on_paid']) && $order->is_paid()) {
+			return true;
+		}
+		$cur = self::normalize_order_status_slug($order->get_status());
+		foreach ($sync['finalize_proforma_order_statuses'] as $allowed) {
+			if ($cur !== '' && $cur === self::normalize_order_status_slug($allowed)) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

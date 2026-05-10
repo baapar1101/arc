@@ -638,6 +638,26 @@ class Hesabix_V2_Api
 	}
 
 	/**
+	 * ایجاد/ویرایش گروهی کالا در یک درخواست API.
+	 *
+	 * @since 3.4.0
+	 * @param array $body
+	 * @param int   $timeout
+	 * @return array
+	 */
+	public function bulk_upsert_products($body, $timeout = 150)
+	{
+		$t = (int) max(45, min(900, $timeout));
+
+		return $this->request(
+			'POST',
+			'/products/business/' . $this->business_id . '/bulk-upsert',
+			$body,
+			$t
+		);
+	}
+
+	/**
 	 * Get product by ID
 	 *
 	 * @since    2.0.0
@@ -741,6 +761,46 @@ class Hesabix_V2_Api
 			'PUT',
 			"/persons/persons/{$person_id}",
 			$data
+		);
+	}
+
+	/**
+	 * ایجاد/ویرایش گروهی اشخاص (یک درخواست به API حسابیکس).
+	 *
+	 * @since 3.4.0
+	 * @param array $body بدنه شامل items و اختیاری create_if_update_missing.
+	 * @param int   $timeout
+	 * @return array
+	 */
+	public function bulk_upsert_persons($body, $timeout = 120)
+	{
+		$t = (int) max(45, min(900, $timeout));
+
+		return $this->request(
+			'POST',
+			"/persons/businesses/{$this->business_id}/persons/bulk-upsert",
+			$body,
+			$t
+		);
+	}
+
+	/**
+	 * ایجاد/ویرایش گروهی فاکتورها.
+	 *
+	 * @since 3.4.0
+	 * @param array $body
+	 * @param int   $timeout
+	 * @return array
+	 */
+	public function bulk_upsert_invoices($body, $timeout = 180)
+	{
+		$t = (int) max(45, min(900, $timeout));
+
+		return $this->request(
+			'POST',
+			"/invoices/business/{$this->business_id}/bulk-upsert",
+			$body,
+			$t
 		);
 	}
 

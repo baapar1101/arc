@@ -12,6 +12,10 @@ if (!defined('WPINC')) {
 
 $bulk_defs = Hesabix_V2_Sync_Service::get_bulk_sync_defaults();
 $bulk_opts = Hesabix_V2_Sync_Service::get_bulk_sync_options();
+$bulk_wc_max = (int) Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS;
+$bulk_api_max_person = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PERSON;
+$bulk_api_max_invoice = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_INVOICE;
+$bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUCT;
 ?>
 
 <div class="wrap hesabix-v2-wrap hesabix-v2-sync-page">
@@ -31,21 +35,61 @@ $bulk_opts = Hesabix_V2_Sync_Service::get_bulk_sync_options();
 			<tr>
 				<th scope="row"><label for="wc_product_parents_per_ajax"><?php esc_html_e('تعداد محصول والد به‌ازای هر درخواست (وکامرس → حسابیکس)', 'hesabix-v2'); ?></label></th>
 				<td>
-					<input type="number" min="5" max="500" step="1" name="wc_product_parents_per_ajax" id="wc_product_parents_per_ajax" value="<?php echo esc_attr((string) $bulk_opts['wc_product_parents_per_ajax']); ?>" class="small-text">
-					<p class="description"><?php esc_html_e('محصول متغیر به ازای هر واریانت یک عملیات API جدا دارد؛ مقدار کمتر بار شبکهٔ پایدارتر و زمان هر مرحله کوتاه‌تر.', 'hesabix-v2'); ?></p>
+					<input type="number" min="5" max="<?php echo esc_attr((string) $bulk_wc_max); ?>" step="1" name="wc_product_parents_per_ajax" id="wc_product_parents_per_ajax" value="<?php echo esc_attr((string) $bulk_opts['wc_product_parents_per_ajax']); ?>" class="small-text">
+					<p class="description"><?php esc_html_e('هر مرحله این تعداد محصول والد انتخاب می‌شود؛ واریانت‌ها داخل هر مرحله در چند تماس bulk کالا تقسیم می‌شوند؛ مقدار کمتر هر مرحلهٔ AJAX سبک‌تر است.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
 				<th scope="row"><label for="wc_categories_per_ajax"><?php esc_html_e('تعداد دستهٔ ووکامرس به‌ازای هر درخواست (همگام درخت دسته‌ها)', 'hesabix-v2'); ?></label></th>
 				<td>
-					<input type="number" min="10" max="300" step="1" name="wc_categories_per_ajax" id="wc_categories_per_ajax" value="<?php echo esc_attr((string) ($bulk_opts['wc_categories_per_ajax'] ?? 60)); ?>" class="small-text">
+					<input type="number" min="10" max="<?php echo esc_attr((string) $bulk_wc_max); ?>" step="1" name="wc_categories_per_ajax" id="wc_categories_per_ajax" value="<?php echo esc_attr((string) ($bulk_opts['wc_categories_per_ajax'] ?? 60)); ?>" class="small-text">
 					<p class="description"><?php esc_html_e('همهٔ ترم‌های product_cat (حتی بدون محصول) به ترتیب والد→فرزند نگاشت می‌شوند؛ مقدار بزرگ‌تر مراحل را کمتر می‌کند ولی هر مرحله سنگین‌تر است.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="wc_customers_per_ajax"><?php esc_html_e('تعداد مشتری به‌ازای هر درخواست (وکامرس → حسابیکس)', 'hesabix-v2'); ?></label></th>
+				<th scope="row"><label for="wc_customers_per_ajax"><?php esc_html_e('تعداد مشتری به‌ازای هر درخواست AJAX (ادمین ووکامرس)', 'hesabix-v2'); ?></label></th>
 				<td>
-					<input type="number" min="5" max="500" step="1" name="wc_customers_per_ajax" id="wc_customers_per_ajax" value="<?php echo esc_attr((string) $bulk_opts['wc_customers_per_ajax']); ?>" class="small-text">
+					<input type="number" min="5" max="<?php echo esc_attr((string) $bulk_wc_max); ?>" step="1" name="wc_customers_per_ajax" id="wc_customers_per_ajax" value="<?php echo esc_attr((string) $bulk_opts['wc_customers_per_ajax']); ?>" class="small-text">
+					<p class="description"><?php esc_html_e('چند کاربر همزمان از مرورگر برای یک درخواست admin-ajax ارسال شود؛ داخل هر درخواست، شخص‌ها در دستهٔ کوچک‌تر برای API حسابیکس شکسته می‌شوند.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="wc_orders_ajax_batch"><?php esc_html_e('حداکثر سفارش در هر دستهٔ همگام‌سازی AJAX', 'hesabix-v2'); ?></label></th>
+				<td>
+					<input type="number" min="5" max="<?php echo esc_attr((string) $bulk_wc_max); ?>" step="1" name="wc_orders_ajax_batch" id="wc_orders_ajax_batch" value="<?php echo esc_attr((string) ($bulk_opts['wc_orders_ajax_batch'] ?? $bulk_defs['wc_orders_ajax_batch'])); ?>" class="small-text">
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="api_bulk_persons_per_request"><?php esc_html_e('حداکثر مشتری در هر تماس bulk API (حسابیکس)', 'hesabix-v2'); ?></label></th>
+				<td>
+					<input type="number" min="5" max="<?php echo esc_attr((string) $bulk_api_max_person); ?>" step="1" name="api_bulk_persons_per_request" id="api_bulk_persons_per_request" value="<?php echo esc_attr((string) ($bulk_opts['api_bulk_persons_per_request'] ?? $bulk_defs['api_bulk_persons_per_request'])); ?>" class="small-text">
+					<p class="description"><?php echo esc_html(sprintf(
+						/* translators: %d: max items per bulk request (aligned with Hesabix API). */
+						__('یک درخواست HTTP به اندپوینت bulk اشخاص؛ حداکثر %d آیتم در هر بدنه مطابق حسابیکس؛ مقادیر بسیار بالا خطر تایم‌اوت دارند.', 'hesabix-v2'),
+						$bulk_api_max_person
+					)); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="api_bulk_invoices_per_request"><?php esc_html_e('حداکثر فاکتور در هر تماس bulk API (حسابیکس)', 'hesabix-v2'); ?></label></th>
+				<td>
+					<input type="number" min="1" max="<?php echo esc_attr((string) $bulk_api_max_invoice); ?>" step="1" name="api_bulk_invoices_per_request" id="api_bulk_invoices_per_request" value="<?php echo esc_attr((string) ($bulk_opts['api_bulk_invoices_per_request'] ?? $bulk_defs['api_bulk_invoices_per_request'])); ?>" class="small-text">
+					<p class="description"><?php echo esc_html(sprintf(
+						/* translators: %d: max invoices per bulk request. */
+						__('هر بدنهٔ bulk حداکثر %d فاکتور؛ payload سنگین است — مقدار کمتر برای پایداری و تایم‌اوت کمتر توصیه می‌شود.', 'hesabix-v2'),
+						$bulk_api_max_invoice
+					)); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><label for="api_bulk_products_per_request"><?php esc_html_e('حداکثر کالا در هر تماس bulk API (حسابیکس)', 'hesabix-v2'); ?></label></th>
+				<td>
+					<input type="number" min="3" max="<?php echo esc_attr((string) $bulk_api_max_product); ?>" step="1" name="api_bulk_products_per_request" id="api_bulk_products_per_request" value="<?php echo esc_attr((string) ($bulk_opts['api_bulk_products_per_request'] ?? $bulk_defs['api_bulk_products_per_request'])); ?>" class="small-text">
+					<p class="description"><?php echo esc_html(sprintf(
+						/* translators: %d: max product rows per bulk request. */
+						__('هر تماس شامل سطرهای همگام (محصول ساده یا واریانت) است؛ حسابیکس تا %d سطر قبول می‌کند؛ برای تایم‌اوت کمتر مقدار کوچک‌تر بهتر است.', 'hesabix-v2'),
+						$bulk_api_max_product
+					)); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -230,7 +274,7 @@ jQuery(function($) {
 				$.ajax({
 					url: ajaxUrl,
 					type: 'POST',
-					timeout: 300000,
+					timeout: 900000,
 					data: $.extend({ action: action, nonce: nonce }, data)
 				}).done(function(res) {
 					def.resolve(res || {});

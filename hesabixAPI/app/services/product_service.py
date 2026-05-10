@@ -329,7 +329,13 @@ def _upsert_attributes(db: Session, product_id: int, business_id: int, attribute
         db.commit()
 
 
-def create_product(db: Session, business_id: int, payload: ProductCreateRequest) -> Dict[str, Any]:
+def create_product(
+    db: Session,
+    business_id: int,
+    payload: ProductCreateRequest,
+    *,
+    defer_cache_invalidation: bool = False,
+) -> Dict[str, Any]:
     """
     ایجاد کالا/خدمت جدید (با Retry Logic برای مدیریت Race Condition)
     """
@@ -440,12 +446,12 @@ def create_product(db: Session, business_id: int, payload: ProductCreateRequest)
             if getattr(payload, 'secondary_unit_title', None):
                 data["secondary_unit_title"] = str(getattr(payload, 'secondary_unit_title'))
 
-            # Invalidate cache بعد از ایجاد موفق محصول
-            logger.debug(f"[CREATE_PRODUCT] Invalidating cache - business_id={business_id}, category_id={payload.category_id}")
-            invalidate_products_cache(
-                business_id=business_id,
-                category_id=payload.category_id
-            )
+            if not defer_cache_invalidation:
+                logger.debug(f"[CREATE_PRODUCT] Invalidating cache - business_id={business_id}, category_id={payload.category_id}")
+                invalidate_products_cache(
+                    business_id=business_id,
+                    category_id=payload.category_id
+                )
 
             logger.info(f"[CREATE_PRODUCT] ✅ Product created successfully - ID={obj.id}, code='{obj.code}', name='{obj.name}'")
             return {"message": "PRODUCT_CREATED", "data": data}
@@ -624,7 +630,14 @@ def get_product(db: Session, product_id: int, business_id: int) -> Optional[Dict
     return _to_dict(obj, db)
 
 
-def update_product(db: Session, product_id: int, business_id: int, payload: ProductUpdateRequest) -> Optional[Dict[str, Any]]:
+def update_product(
+    db: Session,
+    product_id: int,
+    business_id: int,
+    payload: ProductUpdateRequest,
+    *,
+    defer_cache_invalidation: bool = False,
+) -> Optional[Dict[str, Any]]:
     repo = ProductRepository(db)
     obj = db.get(Product, product_id)
     if not obj or obj.business_id != business_id:
@@ -776,25 +789,22 @@ def update_product(db: Session, product_id: int, business_id: int, payload: Prod
         )
     db.refresh(updated)
     
-    # Invalidate cache بعد از به‌روزرسانی موفق محصول
-    # دریافت category_id قبلی و جدید
-    old_category_id = obj.category_id if obj else None
-    new_category_id = payload.category_id if 'category_id' in fields_set else old_category_id
-    
-    # Invalidate کش‌های مربوط به category قبلی
-    invalidate_products_cache(
-        business_id=business_id,
-        product_id=product_id,
-        category_id=old_category_id
-    )
-    
-    # اگر category تغییر کرده، کش‌های category جدید را هم invalidate کن
-    if new_category_id != old_category_id and new_category_id is not None:
+    if not defer_cache_invalidation:
+        old_category_id = obj.category_id if obj else None
+        new_category_id = payload.category_id if 'category_id' in fields_set else old_category_id
+
         invalidate_products_cache(
             business_id=business_id,
-            category_id=new_category_id
+            product_id=product_id,
+            category_id=old_category_id
         )
-    
+
+        if new_category_id != old_category_id and new_category_id is not None:
+            invalidate_products_cache(
+                business_id=business_id,
+                category_id=new_category_id
+            )
+
     data = _to_dict(updated, db)
     return {"message": "PRODUCT_UPDATED", "data": data}
 

@@ -14,7 +14,22 @@ class Hesabix_V2_Queue_Service
 {
 	const MAX_ATTEMPTS = 5;
 
-	const BATCH_SIZE = 15;
+	/** پیش‌فرض تعداد آیتم در هر اجرای کرون؛ مقدار واقعی از تنظیمات همگام‌سازی خوانده می‌شود. */
+	const DEFAULT_ITEMS_PER_RUN = 15;
+
+	/**
+	 * حداکثر تعداد کارهای صف که در هر فراخوانی process_due پردازش می‌شود (۱ تا ۵۰۰).
+	 *
+	 * @since 3.3.6
+	 * @return int
+	 */
+	public static function get_batch_size()
+	{
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		$n = isset($sync['queue_items_per_cron_run']) ? (int) $sync['queue_items_per_cron_run'] : self::DEFAULT_ITEMS_PER_RUN;
+
+		return (int) apply_filters('hesabix_v2_queue_batch_size', max(1, min(500, $n)));
+	}
 
 	/**
 	 * Cron: پردازش آیتم‌های در انتظار صف.
@@ -27,6 +42,13 @@ class Hesabix_V2_Queue_Service
 			return;
 		}
 
+		if (defined('DOING_CRON') && DOING_CRON) {
+			if (function_exists('wp_raise_memory_limit')) {
+				wp_raise_memory_limit('admin');
+			}
+			@set_time_limit(0);
+		}
+
 		$gate = Hesabix_V2_Currency_Service::evaluate_currency_sync(new Hesabix_V2_Api(), null);
 		if (!$gate['ok']) {
 			return;
@@ -34,12 +56,13 @@ class Hesabix_V2_Queue_Service
 
 		global $wpdb;
 		$table = $wpdb->prefix . 'hesabix_v2_queue';
+		$limit = self::get_batch_size();
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT * FROM {$table} WHERE status = %s ORDER BY priority DESC, id ASC LIMIT %d",
 				'pending',
-				self::BATCH_SIZE
+				$limit
 			),
 			ARRAY_A
 		);

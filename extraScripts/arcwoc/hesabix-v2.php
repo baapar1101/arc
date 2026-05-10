@@ -8,7 +8,7 @@
  * Plugin Name:       Hesabix V2: WooCommerce
  * Plugin URI:        https://hesabix.ir/
  * Description:       اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید
- * Version:           3.3.4
+ * Version:           3.5.0
  * Author:            Hesabix Team
  * Author URI:        https://hesabix.ir
  * License:           GPL-3.0+
@@ -28,7 +28,7 @@ if (!defined('WPINC')) {
 /**
  * Currently plugin version.
  */
-define('HESABIX_V2_VERSION', '3.3.4');
+define('HESABIX_V2_VERSION', '3.5.0');
 define('HESABIX_V2_PLUGIN_FILE', __FILE__);
 define('HESABIX_V2_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('HESABIX_V2_PLUGIN_DIR', plugin_dir_path(__FILE__));
@@ -89,6 +89,22 @@ add_action('before_woocommerce_init', function() {
 	if (class_exists(\Automattic\WooCommerce\Utilities\FeaturesUtil::class)) {
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility('custom_order_tables', __FILE__, true);
 	}
+});
+
+/**
+ * بازهٔ کرون هر ۵ دقیقه باید همیشه در فیلتر cron_schedules ثبت شود.
+ * قبلاً فقط در هنگام پارسِ فایلٔ فعال‌سازی ثبت می‌شد؛ بعد از آن روی اکثر بارگذاری‌ها هرگز اعمال نمی‌شد و رویداد {@see hesabix_v2_process_queue} خطای invalid_schedule می‌گرفت.
+ */
+add_filter('cron_schedules', static function ($schedules) {
+	if (!is_array($schedules)) {
+		$schedules = array();
+	}
+	$schedules['every_5_minutes'] = array(
+		'interval' => 300,
+		'display'  => 'Every 5 minutes (Hesabix)',
+	);
+
+	return $schedules;
 });
 
 /**

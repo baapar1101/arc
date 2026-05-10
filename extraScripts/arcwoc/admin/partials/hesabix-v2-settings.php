@@ -94,6 +94,10 @@ if (defined('WC_VERSION')) {
 $hsx_conn_ok = !empty(get_option('hesabix_v2_api_key'));
 
 $hsx_max_exec = (string) ini_get('max_execution_time');
+$saved_invoice_extra_tag_ids = Hesabix_V2_Invoice_Helper::parse_extra_tag_ids(
+	isset($sync_settings['invoice_extra_tag_ids']) ? (string) $sync_settings['invoice_extra_tag_ids'] : ''
+);
+
 if ($hsx_max_exec === '' || $hsx_max_exec === false) {
 	$hsx_max_exec_disp = '—';
 } elseif ($hsx_max_exec === '0') {
@@ -321,6 +325,27 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			</tr>
 
 			<tr>
+				<th scope="row"><?php _e('کنترل موجودی حسابیکس نسبت به ووکامرس', 'hesabix-v2'); ?></th>
+				<td>
+					<select name="track_inventory_policy" id="hesabix_v2_track_inventory_policy" class="regular-text">
+						<option value="wc" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'wc'); ?>>
+							<?php _e('مطابق ووکامرس (تیک «مدیریت موجودی»)', 'hesabix-v2'); ?>
+						</option>
+						<option value="physical_always" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'physical_always'); ?>>
+							<?php _e('برای کالاهای فیزیکی همیشه روشن؛ خدمات ردیابی نمی‌شوند', 'hesabix-v2'); ?>
+						</option>
+						<option value="always_on" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'always_on'); ?>>
+							<?php _e('همیشه روشن برای همهٔ اقلام ارسالی (کالا و خدمت)', 'hesabix-v2'); ?>
+						</option>
+						<option value="always_off" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'always_off'); ?>>
+							<?php _e('همیشه خاموش', 'hesabix-v2'); ?>
+						</option>
+					</select>
+					<p class="description"><?php _e('فقط هنگامی که «همگام‌سازی موجودی محصول» فعال است اعمال می‌شود؛ در صورت غیرفعال بودن آن، کنترل موجودی در حسابیکس در همگام‌سازی خاموش می‌ماند.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
 				<th scope="row"><?php _e('همگام‌سازی خودکار مشتریان', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
@@ -351,6 +376,26 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
 					<p class="description"><?php _e('وقتی غیرفعال باشد، هیچ‌کدام از گزینه‌های زیر اجرا نمی‌شوند.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
+				<th scope="row"><?php _e('تعداد آیتم صف در هر اجرای کرون', 'hesabix-v2'); ?></th>
+				<td>
+					<label for="hesabix_v2_queue_items_per_cron_run">
+						<input type="number" name="queue_items_per_cron_run" id="hesabix_v2_queue_items_per_cron_run"
+							min="1" max="500" step="1" class="small-text"
+							value="<?php echo esc_attr((string) ($sync_settings['queue_items_per_cron_run'] ?? 15)); ?>">
+					</label>
+					<p class="description">
+						<?php _e('در هر بار فراخوانی خودکار پردازشگر صف (کرون هر ۵ دقیقه یا کرون دستی)، حداکثر این تعداد کار در صف همگام‌سازی یکی‌یکی انجام می‌شود؛ شامل سفارش، مشتری و محصولی که از طریق صف آمده باشند.', 'hesabix-v2'); ?>
+					</p>
+					<p class="description">
+						<?php _e('توجه: API حسابیکس در این افزونه هر فاکتور یا شخص را با یک درخواست جدا می‌فرستد؛ این عدد تنها ظرفیت «خالی‌کردن صف» در هر اجرا را زیاد می‌کند نه ادغام چند فاکتور در یک بدنهٔ HTTP.', 'hesabix-v2'); ?>
+					</p>
+					<p class="description">
+						<?php _e('برای مقادیر زیاد از کرون سیستم واقعی برای wp-cron استفاده کنید و در صورت تایم‌اوت PHP، عدد را کم کنید یا فاصلهٔ اجرای کرون را کمتر کنید.', 'hesabix-v2'); ?>
+					</p>
 				</td>
 			</tr>
 
@@ -407,10 +452,29 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					<p class="description"><?php _e('اگر مشتری در حسابیکس وجود نداشت، ایجاد شود', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
+
+			<tr>
+				<th scope="row"><?php _e('سفارش و بازهٔ سال مالی حسابیکس', 'hesabix-v2'); ?></th>
+				<td>
+					<select name="order_fiscal_year_date_policy">
+						<option value="keep" <?php selected(($sync_settings['order_fiscal_year_date_policy'] ?? 'keep'), 'keep'); ?>>
+							<?php _e('بدون تغییر — تاریخ ایجاد سفارش ووکامرس همان تاریخ سند حسابیکس', 'hesabix-v2'); ?>
+						</option>
+						<option value="clamp" <?php selected(($sync_settings['order_fiscal_year_date_policy'] ?? 'keep'), 'clamp'); ?>>
+							<?php _e('اصلاح به بازهٔ سال مالی جاری — اگر سفارش قبل از ابتدای سال باشد، تاریخ سند اولین روز سال؛ اگر بعد از انتهای سال باشد، آخرین روز سال (پرداخت‌های همراه فاکتور در صورت نیاز هم‌سو می‌شوند)', 'hesabix-v2'); ?>
+						</option>
+						<option value="skip" <?php selected(($sync_settings['order_fiscal_year_date_policy'] ?? 'keep'), 'skip'); ?>>
+							<?php _e('عدم همگام‌سازی — اگر تاریخ سفارش خارج از سال مالی جاری باشد، فاکتور ارسال نمی‌شود', 'hesabix-v2'); ?>
+						</option>
+					</select>
+					<p class="description"><?php _e('بازهٔ سال از API سال مالی «جاری» حسابیکس خوانده می‌شود و حداکثر یک ساعت کش می‌شود. اگر دریافت بازه ممکن نباشد، رفتار «بدون تغییر» اعمال می‌شود و یک هشدار در لاگ ثبت می‌گردد.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
 		</table>
 		</div>
 
 		<div class="hesabix-v2-tab-panel" data-tab="invoice" hidden>
+			<input type="hidden" name="hesabix_v2_invoice_tab_fields" value="1" />
 			<h2 class="screen-reader-text"><?php esc_html_e('تنظیمات فاکتور', 'hesabix-v2'); ?></h2>
 		<table class="form-table">
 			<tr>
@@ -424,6 +488,32 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="radio" name="invoice_doc_mode" value="proforma" <?php checked(!empty($sync_settings['invoice_is_proforma'])); ?>>
 						<?php _e('پیش‌فاکتور / پیش‌نویس (is_proforma)', 'hesabix-v2'); ?>
 					</label>
+					<p class="description"><?php _e('برای قطعی‌شدن فروش و ثبت خودکار خروج انبار همسو با گزارش موجودی، گزینهٔ فاکتور قطعی را انتخاب کنید. برای پیش‌فاکتور، حسابیکس حواله انبار از روی همین فاکتور تا قبل از قطعی ایجاد نمی‌کند؛ با همگام‌سازی دوباره و ارسال is_proforma=false، فاکتور در حسابیکس قطعی و حواله طبق تنظیم کسب‌وکار ساخته می‌شود.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr class="hesabix-v2-proforma-finalize-settings">
+				<th scope="row"><?php _e('ارتقاء پیش‌فاکتور به قطعی در حسابیکس', 'hesabix-v2'); ?></th>
+				<td>
+					<label style="display:block;margin-bottom:8px;">
+						<input type="checkbox" name="finalize_proforma_on_paid" value="1" <?php checked(!empty($sync_settings['finalize_proforma_on_paid'])); ?>>
+						<?php _e('وقتی سفارش در ووکامرس «پرداخت‌شده» شد، در همگام بعدی به‌صورت فاکتور قطعی به‌روزرسانی شود (هوک woocommerce_payment_complete؛ بدون نیاز به تیک «ارسال فاکتور: پس از پرداخت»)', 'hesabix-v2'); ?>
+					</label>
+					<p class="description" style="margin:8px 0 6px;"><?php _e('یا وقتی وضعیت سفارش به یکی از این موارد رسید تا با همگام‌سازی مجدد، فاکتور قطعی به حسابیکس فرستاده شود (حتی اگر آن وضعیت در لیست بالای «ارسال با تغییر وضعیت» انتخاب نشده باشد):', 'hesabix-v2'); ?></p>
+					<fieldset style="max-height:220px;overflow:auto;border:1px solid #ccd0d4;padding:8px;">
+						<?php
+						$fp_sel = isset($sync_settings['finalize_proforma_order_statuses']) && is_array($sync_settings['finalize_proforma_order_statuses'])
+							? $sync_settings['finalize_proforma_order_statuses']
+							: array();
+						foreach ($wc_status_choices as $slug => $label) :
+							?>
+							<label style="display:block;margin:4px 0;">
+								<input type="checkbox" name="finalize_proforma_order_statuses[]" value="<?php echo esc_attr($slug); ?>"
+									<?php checked(in_array($slug, $fp_sel, true)); ?>>
+								<?php echo esc_html($label); ?>
+								<code style="font-size:11px;">(<?php echo esc_html($slug); ?>)</code>
+							</label>
+						<?php endforeach; ?>
+					</fieldset>
 				</td>
 			</tr>
 			<tr>
@@ -442,12 +532,10 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			<tr>
 				<th scope="row"><?php _e('شناسه برچسب‌های اضافی', 'hesabix-v2'); ?></th>
 				<td>
-					<input type="text" name="invoice_extra_tag_ids" class="regular-text" dir="ltr"
-						value="<?php echo esc_attr(isset($sync_settings['invoice_extra_tag_ids']) ? $sync_settings['invoice_extra_tag_ids'] : ''); ?>"
-						placeholder="12, 34">
-					<button type="button" id="hesabix_v2_load_invoice_tags" class="button button-secondary" style="margin-right:8px;"><?php _e('نمایش برچسب‌ها از حسابیکس', 'hesabix-v2'); ?></button>
-					<pre id="hesabix_v2_invoice_tags_preview" style="max-height:160px;overflow:auto;background:#f6f7f7;padding:8px;font-size:12px;"></pre>
-					<p class="description"><?php _e('شناسه‌های عددی را با ویرگول جدا کنید؛ برای دیدن فهرست دکمه بالا را بزنید.', 'hesabix-v2'); ?></p>
+					<select name="invoice_extra_tag_ids[]" id="hesabix_v2_invoice_extra_tag_select" multiple size="8" class="regular-text hesabix-v2-invoice-extra-tags-select" dir="ltr" style="min-width:min(420px,100%);display:block;max-width:100%;"></select>
+					<button type="button" id="hesabix_v2_load_invoice_tags" class="button button-secondary" style="margin-top:8px;"><?php _e('بارگذاری فهرست برچسب‌ها از حسابیکس', 'hesabix-v2'); ?></button>
+					<span id="hesabix_v2_invoice_tags_status" class="description hesabix-v2-invoice-tags-status" style="margin-right:8px;" aria-live="polite"></span>
+					<p class="description"><?php _e('پس از بارگذاری، برچسب‌های حسابیکس در لیست نمایش داده می‌شوند؛ موارد دلخواه را انتخاب کنید (در ویندوز و لینوکس Ctrl، در مک ⌘ برای چند انتخاب). مقادیر ذخیره‌شده با بارگذاری خودکار صفحه اعمال می‌شوند.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -608,6 +696,8 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			var savedCurrency = '<?php echo esc_js((string) $saved_currency_id); ?>';
 			var savedStockPullWhIds = <?php echo wp_json_encode(array_values(array_map('intval', isset($stock_pull_opts['warehouse_ids']) ? $stock_pull_opts['warehouse_ids'] : array()))); ?>;
 			var savedInvoiceWhRuleIds = <?php echo wp_json_encode(array_map('intval', $inv_wh_saved_wids)); ?>;
+			var savedInvoiceExtraTagIds = <?php echo wp_json_encode(array_values(array_map('intval', $saved_invoice_extra_tag_ids))); ?>;
+			var invoiceTagOrphanSuffix = <?php echo wp_json_encode(__('(ذخیره‌شده)', 'hesabix-v2')); ?>;
 
 			function hesabixV2FillInvoiceWarehouseRuleSelects(warehouses) {
 				var warehousesList = warehouses || [];
@@ -749,27 +839,118 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				});
 			});
 
-			$('#hesabix_v2_load_invoice_tags').on('click', function(){
-				var $btn = $(this);
-				var $pre = $('#hesabix_v2_invoice_tags_preview');
-				$btn.prop('disabled', true);
-				$pre.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>');
+			function hesabixV2SeedInvoiceExtraTagSelectPlaceholder() {
+				var $sel = $('#hesabix_v2_invoice_extra_tag_select');
+				if (!$sel.length) {
+					return;
+				}
+				$sel.empty();
+				(savedInvoiceExtraTagIds || []).forEach(function(id){
+					id = parseInt(id, 10);
+					if (!id || id < 1) {
+						return;
+					}
+					var sid = String(id);
+					$sel.append($('<option></option>').val(sid).text(sid + ' — ' + invoiceTagOrphanSuffix).prop('selected', true));
+				});
+			}
+
+			function hesabixV2ApplyInvoiceExtraTagSelection($sel, desiredList) {
+				var want = {};
+				(desiredList || []).forEach(function(v){ want[String(v)] = true; });
+				$sel.find('option').each(function(){
+					var v = $(this).val();
+					$(this).prop('selected', !!(v !== '' && want[v]));
+				});
+			}
+
+			function hesabixV2LoadInvoiceTags(isAuto) {
+				var $btn = $('#hesabix_v2_load_invoice_tags');
+				var $sel = $('#hesabix_v2_invoice_extra_tag_select');
+				var $st = $('#hesabix_v2_invoice_tags_status');
+				if (!$sel.length) {
+					return;
+				}
+				var cv = $sel.val();
+				var prevSel = (cv && $.isArray(cv) && cv.length) ? cv.map(String) : (savedInvoiceExtraTagIds || []).map(String);
+
+				if (!isAuto) {
+					$btn.prop('disabled', true);
+				}
+				if ($st.length && isAuto) {
+					$st.text('');
+				}
+				if (!isAuto) {
+					$st.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>').css('color', '');
+				}
+
 				$.post(hesabix_v2_ajax.ajax_url, {
 					action: 'hesabix_v2_get_invoice_tags',
 					nonce: hesabix_v2_ajax.nonce
 				}).done(function(res){
-					if (res.success && res.tags && res.tags.length) {
-						var lines = res.tags.map(function(t){ return t.id + ' — ' + t.name; });
-						$pre.text(lines.join("\n"));
-					} else {
-						$pre.text(res.message || '<?php echo esc_js(__('برچسبی برنگردید یا خطا در API', 'hesabix-v2')); ?>');
+					var tags = (res.success && res.tags && res.tags.length) ? res.tags : [];
+
+					var byRemote = {};
+					tags.forEach(function(t){ byRemote[String(t.id)] = t; });
+
+					$sel.empty();
+					tags.forEach(function(t){
+						var sid = String(t.id);
+						var label = sid + ' — ' + (t.name || '');
+						$sel.append($('<option></option>').val(sid).text(label));
+					});
+
+					prevSel.forEach(function(s){
+						var id = parseInt(s, 10);
+						if (!id || id < 1 || byRemote[String(id)]) {
+							return;
+						}
+						var sid = String(id);
+						$sel.append($('<option></option>').val(sid).text(sid + ' — ' + invoiceTagOrphanSuffix));
+					});
+
+					if (!$sel.find('option').length) {
+						var msg = '';
+						if (res.success && (!tags || !tags.length)) {
+							msg = '<?php echo esc_js(__('برچسبی در حسابیکس یافت نشد.', 'hesabix-v2')); ?>';
+						} else {
+							msg = (res.message && String(res.message)) ? String(res.message) : '<?php echo esc_js(__('دریافت برچسب‌ها ناموفق بود.', 'hesabix-v2')); ?>';
+						}
+						if ($st.length && !(isAuto && savedInvoiceExtraTagIds && savedInvoiceExtraTagIds.length && !tags.length)) {
+							$st.text(msg).css('color', 'red');
+						}
+					}
+
+					hesabixV2ApplyInvoiceExtraTagSelection($sel, prevSel);
+
+					if ($st.length) {
+						if (tags.length) {
+							$st.css('color', '').text('<?php echo esc_js(__('فهرست به‌روز شد.', 'hesabix-v2')); ?>');
+						} else if (isAuto && savedInvoiceExtraTagIds && savedInvoiceExtraTagIds.length && res.success) {
+							$st.css('color', '').text('<?php echo esc_js(__('شناسه‌های ذخیره‌شده نمایش داده شد؛ نام برچسب پس از دریافت موفق فهرست به‌روز می‌شود.', 'hesabix-v2')); ?>');
+						}
 					}
 				}).fail(function(){
-					$pre.text('<?php echo esc_js(__('خطا در ارتباط', 'hesabix-v2')); ?>');
+					hesabixV2SeedInvoiceExtraTagSelectPlaceholder();
+					hesabixV2ApplyInvoiceExtraTagSelection($sel, prevSel);
+					if (!isAuto && $st.length) {
+						$st.text('<?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?>').css('color', 'red');
+					}
 				}).always(function(){
-					$btn.prop('disabled', false);
+					if (!$btn.length) {
+						return;
+					}
+					if (!isAuto) {
+						$btn.prop('disabled', false);
+					}
 				});
+			}
+
+			hesabixV2SeedInvoiceExtraTagSelectPlaceholder();
+			$(function(){
+				hesabixV2LoadInvoiceTags(true);
 			});
+			$('#hesabix_v2_load_invoice_tags').on('click', function(){ hesabixV2LoadInvoiceTags(false); });
 		})(jQuery);
 		</script>
 		</div>

@@ -373,6 +373,117 @@ async def get_public_invoice_document_pdf(
 	invoice_view["amount_before_discount_and_tax"] = _num(totals.get("gross"))
 	invoice_view["amount_without_tax"] = _num(totals.get("gross")) - _num(totals.get("discount"))
 
+	invoice_adjustments_rows: list = []
+	adjustments_net_signed = 0.0
+	adjustments_tax_signed = 0.0
+	adjustments_additions_total = 0.0
+	adjustments_deductions_total = 0.0
+	final_payable_total = invoice_view["payable_total"]
+	try:
+		raw_adjustments = extra.get("invoice_adjustments") if isinstance(extra, dict) else None
+		if isinstance(raw_adjustments, list) and raw_adjustments:
+			from adapters.db.models.account import Account as _Account
+
+			acc_ids: list = []
+			for row in raw_adjustments:
+				if isinstance(row, dict) and row.get("account_id") is not None:
+					try:
+						acc_ids.append(int(row["account_id"]))
+					except Exception:
+						continue
+			acc_name_map: dict = {}
+			acc_code_map: dict = {}
+			if acc_ids:
+				try:
+					for acc in db.query(_Account).filter(_Account.id.in_(set(acc_ids))).all():
+						acc_name_map[int(acc.id)] = acc.name or ""
+						acc_code_map[int(acc.id)] = getattr(acc, "code", None)
+				except Exception:
+					pass
+
+			for row in raw_adjustments:
+				if not isinstance(row, dict):
+					continue
+				kind = str(row.get("kind") or "").strip().lower()
+				if kind not in ("addition", "deduction"):
+					continue
+				amt = _num(row.get("amount"))
+				tr = _num(row.get("tax_rate"))
+				tax_amt = _num(row.get("tax_amount"))
+				total = _num(row.get("total")) if row.get("total") is not None else (amt + tax_amt)
+				acc_id_int = None
+				try:
+					if row.get("account_id") is not None:
+						acc_id_int = int(row["account_id"])
+				except Exception:
+					acc_id_int = None
+				# اگر payload عمومی already enrich شده باشد، نام/کد حساب همراه ردیف می‌آید.
+				acc_name = (
+					row.get("account_name")
+					or (acc_name_map.get(acc_id_int) if acc_id_int is not None else None)
+				)
+				acc_code = (
+					row.get("account_code")
+					or (acc_code_map.get(acc_id_int) if acc_id_int is not None else None)
+				)
+				kind_label = (
+					("اضافه" if is_fa else "Addition")
+					if kind == "addition"
+					else ("کسر" if is_fa else "Deduction")
+				)
+				sign = 1 if kind == "addition" else -1
+				adjustments_net_signed += amt * sign
+				adjustments_tax_signed += tax_amt * sign
+				if kind == "addition":
+					adjustments_additions_total += total
+				else:
+					adjustments_deductions_total += total
+				desc_val = row.get("description")
+				desc_str = desc_val.strip() if isinstance(desc_val, str) else (desc_val or "")
+				invoice_adjustments_rows.append({
+					"kind": kind,
+					"kind_label": kind_label,
+					"amount": amt,
+					"tax_rate": tr,
+					"tax_amount": tax_amt,
+					"total": total,
+					"signed_amount": amt * sign,
+					"signed_tax": tax_amt * sign,
+					"signed_total": total * sign,
+					"account_id": acc_id_int,
+					"account_name": acc_name,
+					"account_code": acc_code,
+					"description": desc_str,
+				})
+		else:
+			adjustments_net_signed = _num((totals or {}).get("adjustments_net"))
+			adjustments_tax_signed = _num((totals or {}).get("adjustments_tax"))
+
+		adjustments_net_signed = round(adjustments_net_signed, 2)
+		adjustments_tax_signed = round(adjustments_tax_signed, 2)
+		adjustments_additions_total = round(adjustments_additions_total, 2)
+		adjustments_deductions_total = round(adjustments_deductions_total, 2)
+		final_payable_total = round(
+			float(invoice_view.get("payable_total") or 0)
+			+ adjustments_net_signed
+			+ adjustments_tax_signed,
+			2,
+		)
+	except Exception:
+		invoice_adjustments_rows = []
+		adjustments_net_signed = 0.0
+		adjustments_tax_signed = 0.0
+		adjustments_additions_total = 0.0
+		adjustments_deductions_total = 0.0
+		final_payable_total = invoice_view.get("payable_total")
+
+	invoice_view["invoice_adjustments"] = invoice_adjustments_rows
+	invoice_view["adjustments_net"] = adjustments_net_signed
+	invoice_view["adjustments_tax"] = adjustments_tax_signed
+	invoice_view["adjustments_additions_total"] = adjustments_additions_total
+	invoice_view["adjustments_deductions_total"] = adjustments_deductions_total
+	invoice_view["final_payable_total"] = final_payable_total
+
 	storage = FileStorageService(db)
 
 	async def _load_logo_data_uri(logo_uuid: Optional[UUID]) -> Optional[str]:

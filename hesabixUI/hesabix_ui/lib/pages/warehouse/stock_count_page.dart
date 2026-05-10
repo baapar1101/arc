@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/warehouse_service.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
@@ -72,15 +76,219 @@ class _StockCountPageState extends State<StockCountPage> {
   bool _onlyDifferences = false;
   static const double _mobileBreakpoint = 700.0;
 
+  Timer? _draftAutoSaveTimer;
+  String? _lastDraftSnapshot;
+  bool _draftRestorePromptDone = false;
+
+  static const int _draftSchemaVersion = 1;
+
+  String get _draftStorageKey => 'stock_count_draft_${widget.businessId}';
+
   @override
   void initState() {
     super.initState();
     _asOfDate = DateTime.now();
     _generateStockCountCode();
+    _startDraftAutoSave();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _promptRestoreDraftIfNeeded();
+    });
+  }
+
+  void _startDraftAutoSave() {
+    _draftAutoSaveTimer?.cancel();
+    _draftAutoSaveTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      if (!mounted || _loading || _calculating) return;
+      if (_rows.isEmpty) return;
+      await _persistDraftIfChanged();
+    });
+  }
+
+  Map<String, dynamic> _buildDraftPayload() {
+    final items = _rows.map((r) {
+      return <String, dynamic>{
+        'raw': Map<String, dynamic>.from(r.raw),
+        'physical_text': r.physicalCtrl.text,
+      };
+    }).toList();
+
+    final calculated = <String, dynamic>{};
+    for (final e in _calculatedByKey.entries) {
+      calculated[e.key] = Map<String, dynamic>.from(e.value);
+    }
+
+    return <String, dynamic>{
+      'v': _draftSchemaVersion,
+      'saved_at': DateTime.now().toIso8601String(),
+      'as_of_date': _asOfDate?.toIso8601String(),
+      'warehouse_id': _selectedWarehouseId,
+      'product': _selectedProduct == null ? null : Map<String, dynamic>.from(_selectedProduct!),
+      'stock_count_code': _stockCountCodeController.text,
+      'notes': _notesController.text,
+      'search': _searchController.text,
+      'only_differences': _onlyDifferences,
+      'items': items,
+      'calculated_by_key': calculated,
+      'summary': _summary == null ? null : Map<String, dynamic>.from(_summary!),
+    };
+  }
+
+  Future<void> _persistDraftIfChanged() async {
+    try {
+      final snapshot = jsonEncode(_buildDraftPayload());
+      if (snapshot == _lastDraftSnapshot) return;
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_draftStorageKey, snapshot);
+      _lastDraftSnapshot = snapshot;
+    } catch (_) {}
+  }
+
+  Future<void> _clearDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_draftStorageKey);
+      _lastDraftSnapshot = null;
+    } catch (_) {}
+  }
+
+  Future<void> _promptRestoreDraftIfNeeded() async {
+    if (_draftRestorePromptDone || !mounted) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_draftStorageKey);
+      if (raw == null || raw.isEmpty) return;
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return;
+
+      final ver = decoded['v'];
+      if (ver is! int || ver != _draftSchemaVersion) return;
+
+      final items = decoded['items'];
+      if (items is! List || items.isEmpty) return;
+
+      if (!mounted) return;
+      _draftRestorePromptDone = true;
+
+      final savedAt = decoded['saved_at'] as String?;
+      final subtitle = savedAt == null
+          ? 'می‌توانید همان شمارش را ادامه دهید یا از نو شروع کنید.'
+          : 'آخرین ذخیرهٔ خودکار: $savedAt\nمی‌توانید همان شمارش را ادامه دهید یا از نو شروع کنید.';
+
+      final choice = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('انبارگردانی ناتمام'),
+          content: Text(subtitle),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop('discard'),
+              child: const Text('شروع جدید'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop('resume'),
+              child: const Text('ادامه'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted) return;
+
+      if (choice == 'resume') {
+        await _restoreDraft(decoded);
+      } else if (choice == 'discard') {
+        await _clearDraft();
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _restoreDraft(Map<String, dynamic> decoded) async {
+    final itemsRaw = decoded['items'];
+    if (itemsRaw is! List || itemsRaw.isEmpty) return;
+
+    for (final r in _rows) {
+      r.physicalCtrl.dispose();
+      r.physicalFocus.dispose();
+    }
+
+    DateTime? asOf;
+    final asStr = decoded['as_of_date'] as String?;
+    if (asStr != null && asStr.isNotEmpty) {
+      asOf = DateTime.tryParse(asStr) ?? DateTime.tryParse(asStr.split('T').first);
+    }
+
+    final wh = decoded['warehouse_id'];
+    final prod = decoded['product'];
+    Map<String, dynamic>? productMap;
+    if (prod is Map) {
+      productMap = Map<String, dynamic>.from(prod);
+    }
+
+    final calculatedRaw = decoded['calculated_by_key'];
+    final calculated = <String, Map<String, dynamic>>{};
+    if (calculatedRaw is Map) {
+      for (final e in calculatedRaw.entries) {
+        final k = e.key.toString();
+        final v = e.value;
+        if (v is Map) {
+          calculated[k] = Map<String, dynamic>.from(v);
+        }
+      }
+    }
+
+    Map<String, dynamic>? summary;
+    final s = decoded['summary'];
+    if (s is Map) {
+      summary = Map<String, dynamic>.from(s);
+    }
+
+    final newRows = <_StockCountRowVm>[];
+    for (final entry in itemsRaw) {
+      if (entry is! Map) continue;
+      final m = Map<String, dynamic>.from(entry);
+      final rawItem = m['raw'];
+      final physicalText = (m['physical_text'] ?? '').toString();
+      if (rawItem is! Map) continue;
+      final rawMap = Map<String, dynamic>.from(rawItem);
+      final ctrl = TextEditingController(text: physicalText);
+      final pid = (rawMap['product_id'] as num?)?.toInt();
+      final wid = (rawMap['warehouse_id'] as num?)?.toInt();
+      final focus = FocusNode(debugLabel: 'stockcount:$pid:$wid');
+      newRows.add(_StockCountRowVm(raw: rawMap, physicalCtrl: ctrl, physicalFocus: focus));
+    }
+
+    if (newRows.isEmpty) return;
+
+    if (!mounted) return;
+    int? warehouseId;
+    if (wh != null) {
+      warehouseId = wh is int ? wh : int.tryParse(wh.toString());
+    }
+    setState(() {
+      _asOfDate = asOf ?? _asOfDate;
+      _selectedWarehouseId = warehouseId;
+      _selectedProduct = productMap;
+      _stockCountCodeController.text = (decoded['stock_count_code'] ?? '').toString();
+      _notesController.text = (decoded['notes'] ?? '').toString();
+      _searchController.text = (decoded['search'] ?? '').toString();
+      _onlyDifferences = decoded['only_differences'] == true;
+      _rows = newRows;
+      _rowVmByKey
+        ..clear()
+        ..addEntries(newRows.map((r) => MapEntry(r.key, r)));
+      _calculatedByKey = calculated;
+      _summary = summary;
+    });
+
+    _lastDraftSnapshot = jsonEncode(_buildDraftPayload());
   }
 
   @override
   void dispose() {
+    _draftAutoSaveTimer?.cancel();
     for (final r in _rows) {
       r.physicalCtrl.dispose();
       r.physicalFocus.dispose();
@@ -116,6 +324,12 @@ class _StockCountPageState extends State<StockCountPage> {
       
       final items = List<Map<String, dynamic>>.from(res['items'] ?? const []);
 
+      // قبل از dispose، شمارش فیزیکیِ قبلی را با کلید همان کالا/انبار نگه می‌داریم تا با موجودی تازهٔ سیستم ادغام شود.
+      final previousPhysicalByKey = <String, String>{};
+      for (final r in _rows) {
+        previousPhysicalByKey[r.key] = r.physicalCtrl.text;
+      }
+
       // پاک‌سازی state قبلی
       for (final r in _rows) {
         r.physicalCtrl.dispose();
@@ -124,15 +338,15 @@ class _StockCountPageState extends State<StockCountPage> {
 
       final newRows = <_StockCountRowVm>[];
       for (final it in items) {
-        final systemQty = (it['system_quantity'] as num?)?.toDouble();
+        final pid = (it['product_id'] as num?)?.toInt();
+        final wid = (it['warehouse_id'] as num?)?.toInt();
+        final rowKey = _rowKey(pid, wid);
         final physicalQty = (it['physical_quantity'] as num?)?.toDouble();
-        final ctrl = TextEditingController(text: physicalQty?.toString() ?? '');
+        final preserved = previousPhysicalByKey[rowKey];
+        final initialPhysical = preserved ??
+            (physicalQty?.toString() ?? '');
+        final ctrl = TextEditingController(text: initialPhysical);
         final focus = FocusNode(debugLabel: 'stockcount:${it['product_id']}:${it['warehouse_id']}');
-        // اگر سیستم مقدار دارد و فیزیکی خالی است، خالی می‌گذاریم (کاربر باید وارد کند)
-        // اما امکان "کپی سیستم→فیزیکی" را در UI اضافه می‌کنیم.
-        if ((ctrl.text.trim().isEmpty) && systemQty != null) {
-          // keep empty
-        }
         newRows.add(_StockCountRowVm(raw: it, physicalCtrl: ctrl, physicalFocus: focus));
       }
 
@@ -146,6 +360,9 @@ class _StockCountPageState extends State<StockCountPage> {
         _summary = null;
         _onlyDifferences = false;
         _searchController.text = '';
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _persistDraftIfChanged();
       });
     } catch (e) {
       if (!mounted) return;
@@ -201,6 +418,9 @@ class _StockCountPageState extends State<StockCountPage> {
       setState(() {
         _calculatedByKey = map;
         _summary = res['summary'] as Map<String, dynamic>?;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _persistDraftIfChanged();
       });
     } catch (e) {
       if (!mounted) return;
@@ -272,6 +492,8 @@ class _StockCountPageState extends State<StockCountPage> {
       if (!mounted) return;
       
       _showSuccess('حواله تعدیل با موفقیت ایجاد شد');
+
+      await _clearDraft();
       
       // هدایت به صفحه لیست حواله‌های انبار
       context.go('/business/${widget.businessId}/warehouse-docs');
@@ -699,7 +921,7 @@ class _StockCountPageState extends State<StockCountPage> {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _startStockCount,
-              tooltip: 'بارگذاری مجدد',
+              tooltip: 'بارگذاری مجدد از سرور (موجودی سیستم به‌روز؛ شمارش فیزیکی قبلی برای هر کالا حفظ می‌شود)',
             ),
         ],
       ),

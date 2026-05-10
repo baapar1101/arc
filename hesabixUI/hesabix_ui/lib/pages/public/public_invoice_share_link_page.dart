@@ -248,6 +248,13 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     final lines = (invoice['product_lines'] as List<dynamic>?) ?? const [];
     final extra = (invoice['extra_info'] as Map<String, dynamic>?) ?? const {};
     final totals = (extra['totals'] as Map<String, dynamic>?) ?? const {};
+    final adjustmentsRaw = extra['invoice_adjustments'];
+    final adjustments = adjustmentsRaw is List
+        ? adjustmentsRaw
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : const <Map<String, dynamic>>[];
     final currency = invoice['currency_code']?.toString();
     final curSuffix = _currencySuffix(currency);
 
@@ -274,8 +281,12 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                 lines: lines,
                 currencySuffix: curSuffix,
               ),
+              if (adjustments.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _buildAdjustmentsSection(theme, adjustments),
+              ],
               const SizedBox(height: 16),
-              _buildTotalsCard(theme, totals, curSuffix),
+              _buildTotalsCard(theme, totals, curSuffix, adjustments: adjustments),
               if ((installments?['has_installments'] == true)) ...[
                 const SizedBox(height: 16),
                 _buildInstallmentsCard(theme, installments!, curSuffix),
@@ -792,10 +803,200 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     );
   }
 
+  Widget _buildAdjustmentsSection(
+    ThemeData theme,
+    List<Map<String, dynamic>> rows,
+  ) {
+    final addBg = Colors.green.shade50;
+    final dedBg = Colors.red.shade50;
+    final addAccent = Colors.green.shade700;
+    final dedAccent = Colors.red.shade700;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'اضافات و کسورات فاکتور',
+          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < rows.length; i++) ...[
+                  _adjustmentRow(
+                    theme: theme,
+                    row: rows[i],
+                    index: i + 1,
+                    addBg: addBg,
+                    dedBg: dedBg,
+                    addAccent: addAccent,
+                    dedAccent: dedAccent,
+                  ),
+                  if (i < rows.length - 1) const SizedBox(height: 8),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _adjustmentRow({
+    required ThemeData theme,
+    required Map<String, dynamic> row,
+    required int index,
+    required Color addBg,
+    required Color dedBg,
+    required Color addAccent,
+    required Color dedAccent,
+  }) {
+    final kind = (row['kind']?.toString() ?? '').toLowerCase();
+    final isAdd = kind != 'deduction';
+    final bg = isAdd ? addBg : dedBg;
+    final accent = isAdd ? addAccent : dedAccent;
+    final label = isAdd ? 'اضافه' : 'کسر';
+    final sign = isAdd ? '+' : '−';
+
+    final amount = _asNum(row['amount']) ?? 0;
+    final taxRate = _asNum(row['tax_rate']) ?? 0;
+    final taxAmount = _asNum(row['tax_amount']) ?? 0;
+    final total = _asNum(row['total']) ?? (amount + taxAmount);
+    final accountName = (row['account_name']?.toString() ?? '').trim();
+    final accountCode = (row['account_code']?.toString() ?? '').trim();
+    final description = (row['description']?.toString() ?? '').trim();
+    final accountText = accountName.isEmpty
+        ? '—'
+        : (accountCode.isEmpty ? accountName : '$accountCode - $accountName');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent.withValues(alpha: 0.35)),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Text(
+                '#$index',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(color: accent),
+                ),
+                child: Text(
+                  '$sign $label',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: accent,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$sign${_formatAmount(total)}',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: accent,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 16,
+            runSpacing: 4,
+            children: [
+              _adjustmentKv(theme, 'حساب', accountText),
+              _adjustmentKv(theme, 'مبلغ خالص', _formatAmount(amount)),
+              if (taxRate > 0)
+                _adjustmentKv(theme, 'نرخ مالیات', '${_formatAmount(taxRate)}%'),
+              if (taxAmount > 0)
+                _adjustmentKv(theme, 'مالیات', _formatAmount(taxAmount)),
+            ],
+          ),
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              'شرح: $description',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _adjustmentKv(ThemeData theme, String key, String value) {
+    return RichText(
+      text: TextSpan(
+        style: theme.textTheme.bodySmall,
+        children: [
+          TextSpan(
+            text: '$key: ',
+            style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+          ),
+          TextSpan(
+            text: value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _suffix(String? c) => c != null && c.isNotEmpty ? ' ($c)' : '';
 
-  Widget _buildTotalsCard(ThemeData theme, Map<String, dynamic> totals, String? curSuffix) {
+  Widget _buildTotalsCard(
+    ThemeData theme,
+    Map<String, dynamic> totals,
+    String? curSuffix, {
+    List<Map<String, dynamic>> adjustments = const [],
+  }) {
     final s = _suffix(curSuffix);
+
+    num additionsTotal = 0;
+    num deductionsTotal = 0;
+    num adjustmentsNet = 0;
+    num adjustmentsTax = 0;
+    for (final r in adjustments) {
+      final kind = (r['kind']?.toString() ?? '').toLowerCase();
+      final amt = _asNum(r['amount']) ?? 0;
+      final taxAmt = _asNum(r['tax_amount']) ?? 0;
+      final total = _asNum(r['total']) ?? (amt + taxAmt);
+      final sign = kind == 'deduction' ? -1 : 1;
+      adjustmentsNet += amt * sign;
+      adjustmentsTax += taxAmt * sign;
+      if (kind == 'deduction') {
+        deductionsTotal += total;
+      } else {
+        additionsTotal += total;
+      }
+    }
+    final netRaw = _asNum(totals['net']);
+    final hasAdjustments = adjustments.isNotEmpty;
+    final num? finalPayable = (netRaw != null)
+        ? (netRaw + adjustmentsNet + adjustmentsTax)
+        : null;
+
     return Card(
       elevation: 1,
       color: theme.colorScheme.surfaceContainerLow,
@@ -813,8 +1014,45 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
             if (totals['gross'] != null) _totRow('جمع${s != '' ? s : ''}', totals['gross'], theme, negate: false),
             if (totals['discount'] != null) _totRow('تخفیف${s != '' ? s : ''}', totals['discount'], theme, negate: true),
             if (totals['tax'] != null) _totRow('مالیات${s != '' ? s : ''}', totals['tax'], theme),
-            if (totals['net'] != null) _totRow('مبلغ قابل پرداخت${s != '' ? s : ''}', totals['net'], theme, strong: true),
-            if (totals.isEmpty)
+            if (hasAdjustments) ...[
+              if (totals.isNotEmpty)
+                Divider(
+                  color: theme.colorScheme.outlineVariant,
+                  height: 16,
+                  thickness: 1,
+                ),
+              if (additionsTotal > 0)
+                _totRow(
+                  'اضافات (با مالیات)${s != '' ? s : ''}',
+                  additionsTotal,
+                  theme,
+                  color: Colors.green.shade700,
+                  prefix: '+',
+                ),
+              if (deductionsTotal > 0)
+                _totRow(
+                  'کسورات (با مالیات)${s != '' ? s : ''}',
+                  deductionsTotal,
+                  theme,
+                  color: Colors.red.shade700,
+                  prefix: '−',
+                ),
+              Divider(
+                color: theme.colorScheme.outlineVariant,
+                height: 16,
+                thickness: 1,
+              ),
+            ],
+            if (finalPayable != null)
+              _totRow(
+                'مبلغ قابل پرداخت${s != '' ? s : ''}',
+                finalPayable,
+                theme,
+                strong: true,
+              )
+            else if (totals['net'] != null)
+              _totRow('مبلغ قابل پرداخت${s != '' ? s : ''}', totals['net'], theme, strong: true),
+            if (totals.isEmpty && !hasAdjustments)
               const Text('جمعی ثبت نشده است.'),
           ],
         ),
@@ -828,6 +1066,8 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     ThemeData theme, {
     bool strong = false,
     bool negate = false,
+    Color? color,
+    String? prefix,
   }) {
     num? n;
     if (value is num) {
@@ -838,18 +1078,30 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     if (negate && n != null) {
       n = -n;
     }
+    final amountText = n != null ? _formatAmount(n) : value.toString();
+    final prefixed = (prefix != null && prefix.isNotEmpty)
+        ? '$prefix$amountText'
+        : amountText;
+    final labelStyle = TextStyle(
+      fontWeight: strong ? FontWeight.w700 : FontWeight.w400,
+      color: color,
+    );
+    final valueStyle = strong
+        ? theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: color,
+          )
+        : (color != null ? TextStyle(color: color) : null);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: strong ? const TextStyle(fontWeight: FontWeight.w700) : null),
+          Text(label, style: labelStyle),
           Text(
-            n != null ? _formatAmount(n) : value.toString(),
+            prefixed,
             textAlign: TextAlign.end,
-            style: strong
-                ? theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)
-                : null,
+            style: valueStyle,
           ),
         ],
       ),

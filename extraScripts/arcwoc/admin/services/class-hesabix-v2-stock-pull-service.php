@@ -251,6 +251,11 @@ class Hesabix_V2_Stock_Pull_Service
 			$skipped = 0;
 			$errors = 0;
 
+			$sync_pull = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+			$pinv = isset($sync_pull['track_inventory_policy']) ? sanitize_key((string) $sync_pull['track_inventory_policy']) : 'wc';
+			$policy_auto_manage_stock = !empty($sync_pull['sync_product_stock'])
+				&& in_array($pinv, array('physical_always', 'always_on'), true);
+
 			foreach ($mappings as $row) {
 				$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
 				$wc_id = isset($row['wc_id']) ? (int) $row['wc_id'] : 0;
@@ -292,7 +297,7 @@ class Hesabix_V2_Stock_Pull_Service
 				}
 
 				try {
-					if (!empty($opts['force_manage_stock'])) {
+					if (!empty($opts['force_manage_stock']) || $policy_auto_manage_stock) {
 						$product->set_manage_stock(true);
 					} elseif (!$product->managing_stock()) {
 						$skipped++;

@@ -138,16 +138,21 @@ class Hesabix_V2_Activator
 			'sync_on_product_update' => true,
 			'sync_product_price' => true,
 			'sync_product_stock' => true,
+			'track_inventory_policy' => 'wc',
 			'sync_product_categories' => true,
 			'sync_category_link_by_name_in_hesabix' => false,
 			'create_customer_on_order' => true,
 			'sync_order_on_checkout' => true,
 			'sync_order_on_payment_complete' => false,
 			'sync_order_on_statuses' => array('processing', 'completed'),
+			'finalize_proforma_on_paid' => true,
+			'finalize_proforma_order_statuses' => array('processing', 'completed'),
 			'invoice_is_proforma' => false,
 			'invoice_tag_website_enabled' => true,
 			'invoice_tag_website_name' => 'فروش سایت',
 			'invoice_extra_tag_ids' => '',
+			'order_fiscal_year_date_policy' => 'keep',
+			'queue_items_per_cron_run' => 15,
 		);
 
 		if (!get_option('hesabix_v2_sync_settings')) {
@@ -202,7 +207,4 @@ class Hesabix_V2_Activator
 		return $schedules;
 	}
 }
-
-// Add custom cron schedule
-add_filter('cron_schedules', array('Hesabix_V2_Activator', 'add_cron_schedules'));
 

@@ -732,7 +732,13 @@ def _create_warehouse_documents_for_invoice(
     ایجاد حواله(های) انبار از روی فاکتور در صورت فعال بودن post_inventory.
     در صورت ایجاد حواله، extra_info.links.warehouse_document_ids روی سند فاکتور به‌روز می‌شود.
     از اقلام پایدار دیتابیس استفاده می‌شود تا شناسه ردیف فاکتور روی خط حواله ذخیره شود.
+
+    پیش‌فاکتور: حواله ساخته نمی‌شود؛ حرکات موجودی گزارش‌ها از invoice_item_lines تنها برای اسناد قطعی
+    محاسبه می‌شود و حوالهٔ وابسته به فاکتور در همان محاسبه حذف می‌شود تا دوبرابر نشود؛
+    ثبت حوالهٔ قطعی برای پیش‌فاکتور موجودی را با گزارش ناسازگار می‌کرد.
     """
+    if bool(getattr(document, "is_proforma", False)):
+        return []
     if not bool((document.extra_info or {}).get("post_inventory", True)):
         return []
     from app.services.warehouse_service import (
