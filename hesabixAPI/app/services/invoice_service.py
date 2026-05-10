@@ -907,15 +907,12 @@ def _iter_product_movements(
 
     for line, doc in iil_rows:
         info = line.extra_info or {}
-        doc_extra = doc.extra_info or {}
         try:
             posted = info.get("inventory_posted")
             if posted is False:
                 continue
         except Exception:
             pass
-        if doc_extra.get("post_inventory") is False:
-            continue
         if info.get("inventory_tracked") is False:
             continue
         movement = info.get("movement") or None
@@ -2224,10 +2221,6 @@ def _iter_profit_movements_from_invoice_lines(
     movements: List[Dict[str, Any]] = []
     for line, doc in rows:
         info = line.extra_info or {}
-        doc_extra = doc.extra_info or {}
-        # اگر سند صراحتاً بدون اثر انبار باشد، در لایه هزینه وارد نشود.
-        if doc_extra.get("post_inventory") is False:
-            continue
         if info.get("inventory_tracked") is False:
             continue
         movement = (info.get("movement") or None)

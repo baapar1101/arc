@@ -1720,7 +1720,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         ),
         child: widget.config.expandBodyHeightToFitRows
             ? SingleChildScrollView(
-                shrinkWrap: true,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: tableBodyColumnChildren,

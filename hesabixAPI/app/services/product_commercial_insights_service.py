@@ -60,14 +60,11 @@ def _build_base_currency_payload(db: Session, b: Business) -> Optional[Dict[str,
 
 def _line_passes_inventory_filters(line: InvoiceItemLine, doc: Document) -> bool:
 	info = line.extra_info or {}
-	doc_extra = doc.extra_info or {}
 	try:
 		if info.get("inventory_posted") is False:
 			return False
 	except Exception:
 		pass
-	if doc_extra.get("post_inventory") is False:
-		return False
 	if info.get("inventory_tracked") is False:
 		return False
 	return True
