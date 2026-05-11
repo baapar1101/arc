@@ -49,20 +49,20 @@ The installation script automatically detects and verifies the operating system 
 
 **Minimum Requirements:**
 - **CPU**: 2 cores
-- **RAM**: 2 GB
+- **RAM**: 8 GB
 - **Disk Space**: 10 GB free space
 - **Network**: Internet connection for installation and updates
 
 **Recommended Requirements:**
 - **CPU**: 4+ cores (for better performance)
-- **RAM**: 4 GB or more
+- **RAM**: 12 GB or more
 - **Disk Space**: 20 GB free space
 - **Network**: Stable internet connection
 
 **Production Requirements (High Load):**
 - **CPU**: 8+ cores
-- **RAM**: 8 GB or more
-- **Disk Space**: 50 GB+ free space
+- **RAM**: 64 GB or more
+- **Disk Space**: 5000 GB+ free space
 - **Network**: High-speed internet connection
 
 ### Software Requirements
