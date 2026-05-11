@@ -302,6 +302,34 @@ class Hesabix_V2_Admin
 				);
 			}
 
+			if (isset($_GET['page']) && sanitize_text_field(wp_unslash((string) $_GET['page'])) === 'hesabix-v2-products') {
+				wp_enqueue_script(
+					'hesabix-v2-products',
+					HESABIX_V2_PLUGIN_URL . 'assets/js/hesabix-v2-products.js',
+					array('jquery'),
+					$this->version,
+					true
+				);
+				$bcp = Hesabix_V2_Sync_Service::get_bulk_sync_options();
+				$p_chunk = isset($bcp['wc_product_parents_per_ajax']) ? (int) $bcp['wc_product_parents_per_ajax'] : 35;
+
+				wp_localize_script(
+					'hesabix-v2-products',
+					'hesabix_v2_products',
+					array(
+						'ajax_url' => admin_url('admin-ajax.php'),
+						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
+						'chunk_size' => max(5, min(Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS, $p_chunk)),
+						'strings' => array(
+							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
+							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
+							'confirmSync' => __('این محصول (و در صورت متغیر بودن، واریانت‌ها) با حسابیکس همگام شود؟', 'hesabix-v2'),
+							'confirmBulkSync' => __('برای تمام محصولات انتخاب‌شده همگام‌سازی با حسابیکس انجام شود؟', 'hesabix-v2'),
+						),
+					)
+				);
+			}
+
 			$on_settings_page = ($hook_suffix === 'hesabix-v2_page_hesabix-v2-settings')
 				|| (isset($_GET['page']) && sanitize_text_field(wp_unslash((string) $_GET['page'])) === 'hesabix-v2-settings');
 
@@ -458,6 +486,15 @@ class Hesabix_V2_Admin
 			'manage_woocommerce',
 			'hesabix-v2-customers',
 			array($this, 'display_customers')
+		);
+
+		add_submenu_page(
+			'hesabix-v2',
+			__('محصولات و حسابیکس', 'hesabix-v2'),
+			__('محصولات', 'hesabix-v2'),
+			'manage_woocommerce',
+			'hesabix-v2-products',
+			array($this, 'display_products')
 		);
 
 		// Hide setup wizard from menu
@@ -623,6 +660,23 @@ class Hesabix_V2_Admin
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/class-hesabix-v2-customers-list-table.php';
 		$list_table = new Hesabix_V2_Customers_List_Table();
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/partials/hesabix-v2-customers.php';
+	}
+
+	/**
+	 * فهرست محصولات والد و همگام‌سازی کالا با حسابیکس.
+	 *
+	 * @return void
+	 */
+	public function display_products()
+	{
+		if (!current_user_can('manage_woocommerce')) {
+			wp_die(esc_html__('شما اجازهٔ دسترسی ندارید.', 'hesabix-v2'));
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/class-wp-list-table.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/class-hesabix-v2-products-list-table.php';
+		$list_table = new Hesabix_V2_Products_List_Table();
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/partials/hesabix-v2-products.php';
 	}
 
 	/**
@@ -1354,6 +1408,76 @@ class Hesabix_V2_Admin
 				'success' => !empty($slot['success']),
 				'message' => isset($slot['message']) ? (string) $slot['message'] : '',
 			);
+		}
+
+		wp_send_json_success(array('results' => $results));
+	}
+
+	/**
+	 * AJAX: همگام‌سازی دستهٔ محصولات والد با API bulk حسابیکس.
+	 *
+	 * @return void
+	 */
+	public function ajax_products_sync_batch()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$raw = isset($_POST['product_ids']) ? wp_unslash($_POST['product_ids']) : array();
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+
+		$b_opts = Hesabix_V2_Sync_Service::get_bulk_sync_options();
+		$p_max = isset($b_opts['wc_product_parents_per_ajax']) ? (int) $b_opts['wc_product_parents_per_ajax'] : 35;
+		$p_max = max(5, min(Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS, $p_max));
+
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, $p_max);
+		if (empty($ids)) {
+			wp_send_json_error(array('message' => __('محصولی انتخاب نشده است.', 'hesabix-v2')));
+		}
+
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$bulk = $sync_service->bulk_sync_products($ids);
+
+		$failed_messages = array();
+		if (!empty($bulk['errors']) && is_array($bulk['errors'])) {
+			foreach ($bulk['errors'] as $err) {
+				if (!is_array($err)) {
+					continue;
+				}
+				$pid = isset($err['product_id']) ? (int) $err['product_id'] : 0;
+				if ($pid < 1) {
+					continue;
+				}
+				$msg = isset($err['message']) ? trim((string) $err['message']) : '';
+				if (!isset($failed_messages[ $pid ])) {
+					$failed_messages[ $pid ] = array();
+				}
+				$failed_messages[ $pid ][] = $msg !== '' ? $msg : __('ناموفق', 'hesabix-v2');
+			}
+		}
+
+		$results = array();
+		foreach ($ids as $pid) {
+			$pid = (int) $pid;
+			if (isset($failed_messages[ $pid ]) && $failed_messages[ $pid ] !== array()) {
+				$results[] = array(
+					'product_id' => $pid,
+					'success' => false,
+					'message' => implode(' ', array_unique($failed_messages[ $pid ])),
+				);
+			} else {
+				$results[] = array(
+					'product_id' => $pid,
+					'success' => true,
+					'message' => '',
+				);
+			}
 		}
 
 		wp_send_json_success(array('results' => $results));
