@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
 import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
@@ -119,7 +120,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
     try {
       final data = await _service.getById(widget.checkId!);
       final personId = data['person_id'] as int?;
-      
+
       // بارگذاری شخص اگر person_id وجود داشته باشد
       Person? loadedPerson;
       if (personId != null) {
@@ -129,7 +130,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
           // اگر شخص پیدا نشد، ادامه می‌دهیم بدون شخص
         }
       }
-      
+
       if (!mounted) return;
       setState(() {
         _type = (data['type'] as String?) ?? 'received';
@@ -140,18 +141,14 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
         final amount = data['amount'];
         _amountCtrl.text = amount == null ? '' : amount.toString();
         _formatAmountControllerValue();
-        final issue = data['issue_date'] as String?;
-        final due = data['due_date'] as String?;
-        _issueDate = issue != null ? DateTime.tryParse(issue) : _issueDate;
-        _dueDate = due != null ? DateTime.tryParse(due) : _dueDate;
+        _issueDate = HesabixDateUtils.parseApiDate(data['issue_date'], rawValue: data['issue_date_raw']) ?? _issueDate;
+        _dueDate = HesabixDateUtils.parseApiDate(data['due_date'], rawValue: data['due_date_raw']) ?? _dueDate;
         _currencyId = (data['currency_id'] is int) ? data['currency_id'] as int : _currencyId;
         _selectedPerson = loadedPerson;
       });
     } catch (e) {
       if (mounted) {
-        _showError(
-          'خطا در بارگذاری اطلاعات چک: ${ErrorExtractor.forContext(e, context)}',
-        );
+        _showError('خطا در بارگذاری اطلاعات چک: ${ErrorExtractor.forContext(e, context)}');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -166,10 +163,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
   void _formatAmountControllerValue() {
     final raw = _amountCtrl.text.replaceAll(',', '').trim();
     if (raw.isEmpty) {
-      _amountCtrl.value = TextEditingValue(
-        text: '',
-        selection: const TextSelection.collapsed(offset: 0),
-      );
+      _amountCtrl.value = TextEditingValue(text: '', selection: const TextSelection.collapsed(offset: 0));
       return;
     }
 
@@ -191,9 +185,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
   String? _validate() {
     if (_type != 'received' && _type != 'transferred') return 'نوع چک الزامی است';
     if (_selectedPerson == null) {
-      return _type == 'received' 
-          ? 'انتخاب شخص برای چک دریافتی الزامی است'
-          : 'انتخاب شخص برای چک واگذار شده الزامی است';
+      return _type == 'received' ? 'انتخاب شخص برای چک دریافتی الزامی است' : 'انتخاب شخص برای چک واگذار شده الزامی است';
     }
     if ((_checkNumberCtrl.text.trim()).isEmpty) return 'شماره چک الزامی است';
     final sayadText = _sayadCtrl.text.trim();
@@ -203,7 +195,9 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
     }
     if (_issueDate == null) return 'تاریخ صدور الزامی است';
     if (_dueDate == null) return 'تاریخ سررسید الزامی است';
-    if (_issueDate != null && _dueDate != null && _dueDate!.isBefore(_issueDate!)) return 'تاریخ سررسید نمی‌تواند قبل از تاریخ صدور باشد';
+    if (_issueDate != null && _dueDate != null && _dueDate!.isBefore(_issueDate!)) {
+      return 'تاریخ سررسید نمی‌تواند قبل از تاریخ صدور باشد';
+    }
     final amount = num.tryParse(_amountCtrl.text.replaceAll(',', '').trim());
     if (amount == null || amount <= 0) return 'مبلغ باید عددی بزرگتر از صفر باشد';
     if (_currencyId == null) return 'واحد پول الزامی است';
@@ -221,8 +215,8 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       final payload = <String, dynamic>{
         'type': _type,
         'person_id': _selectedPerson!.id, // همیشه باید مقدار داشته باشد (توسط اعتبارسنجی بررسی شده)
-        'issue_date': _issueDate!.toIso8601String(),
-        'due_date': _dueDate!.toIso8601String(),
+        'issue_date': HesabixDateUtils.formatForApiDate(_issueDate!),
+        'due_date': HesabixDateUtils.formatForApiDate(_dueDate!),
         'check_number': _checkNumberCtrl.text.trim(),
         if (_sayadCtrl.text.trim().isNotEmpty) 'sayad_code': _sayadCtrl.text.trim(),
         if (_bankCtrl.text.trim().isNotEmpty) 'bank_name': _bankCtrl.text.trim(),
@@ -230,7 +224,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
         'amount': num.tryParse(_amountCtrl.text.replaceAll(',', '').trim()),
         'currency_id': _currencyId,
         // ثبت سند همیشه انجام می‌شود
-        'document_date': (_documentDate ?? _issueDate)!.toIso8601String(),
+        'document_date': HesabixDateUtils.formatForApiDate((_documentDate ?? _issueDate)!),
         if (_docDescCtrl.text.trim().isNotEmpty) 'document_description': _docDescCtrl.text.trim(),
       };
 
@@ -254,10 +248,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
     }
   }
 
-  String _buildSaveErrorMessage({
-    required Object error,
-    required AppLocalizations t,
-  }) {
+  String _buildSaveErrorMessage({required Object error, required AppLocalizations t}) {
     final extractedMessage = ErrorExtractor.userMessage(error, t);
     if (_isDuplicateSayadCodeError(error, extractedMessage)) {
       return t.checkFormDuplicateSayadCode;
@@ -269,12 +260,14 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
     final rawError = error.toString().toLowerCase();
     final extracted = extractedMessage.toLowerCase();
 
-    final looksLikeDuplicate = rawError.contains('duplicate') ||
+    final looksLikeDuplicate =
+        rawError.contains('duplicate') ||
         rawError.contains('unique constraint') ||
         rawError.contains('duplicate key') ||
         extracted.contains('duplicate') ||
         extracted.contains('unique constraint');
-    final mentionsSayad = rawError.contains('sayad') ||
+    final mentionsSayad =
+        rawError.contains('sayad') ||
         rawError.contains('sayad_code') ||
         extracted.contains('sayad') ||
         extracted.contains('شناسه صیاد');
@@ -295,12 +288,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       return AlertDialog(
         title: Text(t.accessDenied),
         content: Text(t.checkFormNeedsChecksWritePermission),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(t.cancel),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.cancel))],
       );
     }
 
@@ -309,12 +297,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       return AlertDialog(
         title: Text(t.accessDenied),
         content: Text(t.checkFormNeedsAccountingDocumentsPermission),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(t.cancel),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(t.cancel))],
       );
     }
 
@@ -352,10 +335,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                       DropdownMenuItem(value: 'transferred', child: Text('واگذار شده')),
                     ],
                     onChanged: (val) => setState(() => _type = val),
-                    decoration: const InputDecoration(
-                      labelText: 'نوع چک *',
-                      border: OutlineInputBorder(),
-                    ),
+                    decoration: const InputDecoration(labelText: 'نوع چک *', border: OutlineInputBorder()),
                   ),
                   const SizedBox(height: 12),
 
@@ -366,9 +346,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                     selectedPerson: _selectedPerson,
                     onChanged: (p) => setState(() => _selectedPerson = p),
                     isRequired: true,
-                    label: _type == 'received' 
-                        ? 'شخص (برای چک دریافتی)' 
-                        : 'شخص (برای چک واگذار شده)',
+                    label: _type == 'received' ? 'شخص (برای چک دریافتی)' : 'شخص (برای چک واگذار شده)',
                     hintText: _type == 'received'
                         ? 'جست‌وجو و انتخاب شخص'
                         : 'جست‌وجو و انتخاب شخصی که چک به او داده می‌شود',
@@ -445,18 +423,12 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                           children: [
                             TextFormField(
                               controller: _checkNumberCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'شماره چک *',
-                                border: OutlineInputBorder(),
-                              ),
+                              decoration: const InputDecoration(labelText: 'شماره چک *', border: OutlineInputBorder()),
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _sayadCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'شناسه صیاد',
-                                border: OutlineInputBorder(),
-                              ),
+                              decoration: const InputDecoration(labelText: 'شناسه صیاد', border: OutlineInputBorder()),
                             ),
                           ],
                         );
@@ -506,10 +478,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _branchCtrl,
-                              decoration: const InputDecoration(
-                                labelText: 'شعبه',
-                                border: OutlineInputBorder(),
-                              ),
+                              decoration: const InputDecoration(labelText: 'شعبه', border: OutlineInputBorder()),
                             ),
                           ],
                         );
@@ -529,10 +498,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                             Expanded(
                               child: TextFormField(
                                 controller: _branchCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'شعبه',
-                                  border: OutlineInputBorder(),
-                                ),
+                                decoration: const InputDecoration(labelText: 'شعبه', border: OutlineInputBorder()),
                               ),
                             ),
                           ],
@@ -556,10 +522,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                                 EnglishDigitsFormatter(),
                                 FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                               ],
-                              decoration: const InputDecoration(
-                                labelText: 'مبلغ *',
-                                border: OutlineInputBorder(),
-                              ),
+                              decoration: const InputDecoration(labelText: 'مبلغ *', border: OutlineInputBorder()),
                             ),
                             const SizedBox(height: 12),
                             CurrencyPickerWidget(
@@ -582,10 +545,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                                   EnglishDigitsFormatter(),
                                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                                 ],
-                                decoration: const InputDecoration(
-                                  labelText: 'مبلغ *',
-                                  border: OutlineInputBorder(),
-                                ),
+                                decoration: const InputDecoration(labelText: 'مبلغ *', border: OutlineInputBorder()),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -624,10 +584,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                               const SizedBox(height: 12),
                               TextFormField(
                                 controller: _docDescCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'شرح سند',
-                                  border: OutlineInputBorder(),
-                                ),
+                                decoration: const InputDecoration(labelText: 'شرح سند', border: OutlineInputBorder()),
                               ),
                             ],
                           );
@@ -649,10 +606,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                               Expanded(
                                 child: TextFormField(
                                   controller: _docDescCtrl,
-                                  decoration: const InputDecoration(
-                                    labelText: 'شرح سند',
-                                    border: OutlineInputBorder(),
-                                  ),
+                                  decoration: const InputDecoration(labelText: 'شرح سند', border: OutlineInputBorder()),
                                 ),
                               ),
                             ],
@@ -668,18 +622,9 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
         ),
       ),
       actions: [
-        OutlinedButton(
-          onPressed: _loading ? null : () => Navigator.of(context).pop(),
-          child: Text(t.cancel),
-        ),
-        FilledButton.icon(
-          onPressed: _loading ? null : _save,
-          icon: const Icon(Icons.save),
-          label: Text(t.save),
-        ),
+        OutlinedButton(onPressed: _loading ? null : () => Navigator.of(context).pop(), child: Text(t.cancel)),
+        FilledButton.icon(onPressed: _loading ? null : _save, icon: const Icon(Icons.save), label: Text(t.save)),
       ],
     );
   }
 }
-
-

@@ -116,23 +116,33 @@ def normalize_invoice_adjustments(
 
         desc = row.get("description")
         desc_s = str(desc).strip() if desc is not None else ""
+        source = row.get("source")
+        source_s = str(source).strip() if source is not None else ""
+        exclude_raw = row.get("exclude_from_profit", False)
+        exclude_from_profit = (
+            exclude_raw is True
+            or str(exclude_raw).strip().lower() in {"1", "true", "yes", "on"}
+        )
 
         signed_net = amount if kind == _KIND_ADD else -amount
         signed_tax = tax_amt if kind == _KIND_ADD else -tax_amt
 
-        out.append(
-            {
-                "kind": kind,
-                "amount": float(amount),
-                "tax_rate": float(tr),
-                "tax_amount": float(tax_amt),
-                "total": float(total),
-                "account_id": acc_id,
-                "description": desc_s or None,
-                "_signed_net": signed_net,
-                "_signed_tax": signed_tax,
-            }
-        )
+        normalized_row = {
+            "kind": kind,
+            "amount": float(amount),
+            "tax_rate": float(tr),
+            "tax_amount": float(tax_amt),
+            "total": float(total),
+            "account_id": acc_id,
+            "description": desc_s or None,
+            "_signed_net": signed_net,
+            "_signed_tax": signed_tax,
+        }
+        if source_s:
+            normalized_row["source"] = source_s[:80]
+        if exclude_from_profit:
+            normalized_row["exclude_from_profit"] = True
+        out.append(normalized_row)
     return out
 
 
@@ -204,6 +214,14 @@ def add_adjustment_document_lines(
         acc_id = int(r["account_id"])
         desc = (r.get("description") or "").strip() or ("اضافات/کسورات فاکتور")
 
+        def _extra(kind_value: str) -> Dict[str, Any]:
+            extra: Dict[str, Any] = {"invoice_adjustment": True, "kind": kind_value}
+            if r.get("source"):
+                extra["source"] = r.get("source")
+            if r.get("exclude_from_profit"):
+                extra["exclude_from_profit"] = True
+            return extra
+
         if invoice_type == INVOICE_SALES:
             if kind == _KIND_ADD:
                 db.add(
@@ -213,7 +231,7 @@ def add_adjustment_document_lines(
                         debit=Decimal(0),
                         credit=net,
                         description=desc,
-                        extra_info={"invoice_adjustment": True, "kind": "addition"},
+                        extra_info=_extra("addition"),
                     )
                 )
                 if tax_amt > 0:
@@ -224,7 +242,7 @@ def add_adjustment_document_lines(
                             debit=Decimal(0),
                             credit=tax_amt,
                             description=f"مالیات خروجی — {desc}",
-                            extra_info={"invoice_adjustment": True, "kind": "addition_vat"},
+                            extra_info=_extra("addition_vat"),
                         )
                     )
             else:
@@ -235,7 +253,7 @@ def add_adjustment_document_lines(
                         debit=net,
                         credit=Decimal(0),
                         description=desc,
-                        extra_info={"invoice_adjustment": True, "kind": "deduction"},
+                        extra_info=_extra("deduction"),
                     )
                 )
                 if tax_amt > 0:
@@ -246,7 +264,7 @@ def add_adjustment_document_lines(
                             debit=tax_amt,
                             credit=Decimal(0),
                             description=f"تعدیل مالیات خروجی — {desc}",
-                            extra_info={"invoice_adjustment": True, "kind": "deduction_vat"},
+                            extra_info=_extra("deduction_vat"),
                         )
                     )
 
@@ -259,7 +277,7 @@ def add_adjustment_document_lines(
                         debit=net,
                         credit=Decimal(0),
                         description=desc,
-                        extra_info={"invoice_adjustment": True, "kind": "addition"},
+                        extra_info=_extra("addition"),
                     )
                 )
                 if tax_amt > 0:
@@ -270,7 +288,7 @@ def add_adjustment_document_lines(
                             debit=tax_amt,
                             credit=Decimal(0),
                             description=f"مالیات ورودی — {desc}",
-                            extra_info={"invoice_adjustment": True, "kind": "addition_vat"},
+                            extra_info=_extra("addition_vat"),
                         )
                     )
             else:
@@ -281,7 +299,7 @@ def add_adjustment_document_lines(
                         debit=Decimal(0),
                         credit=net,
                         description=desc,
-                        extra_info={"invoice_adjustment": True, "kind": "deduction"},
+                        extra_info=_extra("deduction"),
                     )
                 )
                 if tax_amt > 0:
@@ -292,6 +310,6 @@ def add_adjustment_document_lines(
                             debit=Decimal(0),
                             credit=tax_amt,
                             description=f"تعدیل مالیات ورودی — {desc}",
-                            extra_info={"invoice_adjustment": True, "kind": "deduction_vat"},
+                            extra_info=_extra("deduction_vat"),
                         )
                     )

@@ -63,6 +63,17 @@ class Hesabix_V2_Invoice_Helper
 		if (!isset($sync['invoice_extra_tag_ids'])) {
 			$sync['invoice_extra_tag_ids'] = '';
 		}
+		if (!isset($sync['shipping_line_mode']) || !is_string($sync['shipping_line_mode'])) {
+			$sync['shipping_line_mode'] = 'service';
+		} else {
+			$sync['shipping_line_mode'] = sanitize_key($sync['shipping_line_mode']);
+		}
+		if (!in_array($sync['shipping_line_mode'], array('service', 'account_adjustment'), true)) {
+			$sync['shipping_line_mode'] = 'service';
+		}
+		$sync['shipping_adjustment_account_id'] = isset($sync['shipping_adjustment_account_id'])
+			? absint($sync['shipping_adjustment_account_id'])
+			: 0;
 		if (!array_key_exists('sync_category_link_by_name_in_hesabix', $sync)) {
 			$sync['sync_category_link_by_name_in_hesabix'] = false;
 		}

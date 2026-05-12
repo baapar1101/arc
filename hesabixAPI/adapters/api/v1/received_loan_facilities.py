@@ -110,7 +110,7 @@ def update_facility_endpoint(
 
 @router.delete(
 	"/{facility_id}",
-	summary="حذف قرارداد پیش‌نویس",
+	summary="حذف قرارداد تسهیلات در صورت مجاز بودن حسابداری",
 )
 def delete_facility_endpoint(
 	request: Request,

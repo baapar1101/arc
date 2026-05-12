@@ -565,6 +565,9 @@ class Hesabix_V2_Mapper
 			: null;
 
 		$lines = array();
+		$invoice_adjustments = array();
+		$shipping_adjustment_net = 0.0;
+		$shipping_adjustment_tax = 0.0;
 		$db_service = new Hesabix_V2_DB_Service();
 		$warehouse_id = Hesabix_V2_Invoice_Warehouse_Service::resolve_warehouse_id_for_order($order);
 
@@ -629,10 +632,44 @@ class Hesabix_V2_Mapper
 
 		// هزینه حمل و نقل
 		if ($order->get_shipping_total() > 0) {
-			$shipping_product_id = self::get_or_create_shipping_product();
+			$ship_total = Hesabix_V2_Validation::sanitize_price((float) $order->get_shipping_total() * $f);
+			$ship_tax = Hesabix_V2_Validation::sanitize_price((float) $order->get_shipping_tax() * $f);
+			$shipping_as_account = self::shipping_should_be_account_adjustment();
+			if ($shipping_as_account) {
+				$shipping_account_id = self::resolve_shipping_adjustment_account_id();
+				if ($shipping_account_id > 0) {
+					$shipping_adjustment_net = (float) $ship_total;
+					$shipping_adjustment_tax = (float) $ship_tax;
+					$tax_rate = 0.0;
+					if ($ship_total > 0 && $ship_tax > 0) {
+						$tax_rate = ((float) $ship_tax / (float) $ship_total) * 100;
+					}
+					$invoice_adjustments[] = array(
+						'kind' => 'addition',
+						'amount' => $ship_total,
+						'tax_rate' => $tax_rate,
+						'account_id' => $shipping_account_id,
+						'description' => __('هزینه حمل و نقل ووکامرس', 'hesabix-v2'),
+						'source' => 'woocommerce_shipping',
+						'exclude_from_profit' => true,
+					);
+				} else {
+					Hesabix_V2_Log_Service::warning('Shipping account adjustment requested but no shipping income account could be resolved; falling back to service line.', array(
+						'order_id' => $order->get_id(),
+						'recommended_account_code' => '60104',
+					));
+					$shipping_as_account = false;
+				}
+			}
+			if (!$shipping_as_account) {
+				$shipping_product_id = self::get_or_create_shipping_product();
+				if (!$shipping_product_id) {
+					$shipping_product_id = null;
+				}
+			} else {
+				$shipping_product_id = null;
+			}
 			if ($shipping_product_id) {
-				$ship_total = Hesabix_V2_Validation::sanitize_price((float) $order->get_shipping_total() * $f);
-				$ship_tax = Hesabix_V2_Validation::sanitize_price((float) $order->get_shipping_tax() * $f);
 				$line_extra = array(
 					'unit_price' => $ship_total,
 					'line_discount' => 0,
@@ -732,16 +769,23 @@ class Hesabix_V2_Mapper
 		$order_discount = (float) $order->get_discount_total() * $f;
 
 		$target_net_rounded = (int) round($order_total, 0);
-		self::adjust_invoice_lines_rounding_to_order_net($lines, $target_net_rounded, $order->get_id());
+		$lines_target_net_rounded = (int) round($order_total - $shipping_adjustment_net - $shipping_adjustment_tax, 0);
+		self::adjust_invoice_lines_rounding_to_order_net($lines, $lines_target_net_rounded, $order->get_id());
 
-		$gross = $order_total + $order_discount - $order_tax;
+		$gross = $order_total + $order_discount - $order_tax - $shipping_adjustment_net;
+		$header_tax_total = $order_tax - $shipping_adjustment_tax;
+		if ($header_tax_total < 0) {
+			$header_tax_total = 0;
+		}
 
 		// حسابیکس مبلغ قطعی فاکتور را از gross − discount + tax می‌گیرد؛ پرداخت افزونه از round(order_total).
 		// گرد کردن جداگانه ممکن است ۱–۲ واحد اختلاف بدهد؛ gross را در حد تحمل اصلاح می‌کنیم.
 		$gross_r = (int) round($gross, 0);
 		$discount_r = (int) round($order_discount, 0);
-		$tax_r = (int) round($order_tax, 0);
-		$from_header = $gross_r - $discount_r + $tax_r;
+		$tax_r = (int) round($header_tax_total, 0);
+		$adj_net_r = (int) round($shipping_adjustment_net, 0);
+		$adj_tax_r = (int) round($shipping_adjustment_tax, 0);
+		$from_header = $gross_r - $discount_r + $tax_r + $adj_net_r + $adj_tax_r;
 		$hdr_delta = $target_net_rounded - $from_header;
 		if ($hdr_delta !== 0) {
 			$hdr_tol = (int) apply_filters('hesabix_v2_invoice_header_totals_tolerance', 5);
@@ -767,6 +811,8 @@ class Hesabix_V2_Mapper
 						'gross_rounded' => (int) round($gross, 0),
 						'discount_r' => $discount_r,
 						'tax_r' => $tax_r,
+						'adjustments_net_r' => $adj_net_r,
+						'adjustments_tax_r' => $adj_tax_r,
 						'from_header' => $from_header,
 						'target_net_rounded' => $target_net_rounded,
 						'delta' => $hdr_delta,
@@ -803,6 +849,8 @@ class Hesabix_V2_Mapper
 					'discount' => $discount_r,
 					'tax' => $tax_r,
 					'net' => $target_net_rounded,
+					'adjustments_net' => $adj_net_r,
+					'adjustments_tax' => $adj_tax_r,
 				),
 				'post_inventory' => true,
 				'ignore_credit_check' => false,
@@ -812,6 +860,9 @@ class Hesabix_V2_Mapper
 			),
 			'lines' => $lines,
 		);
+		if (!empty($invoice_adjustments)) {
+			$payload['extra_info']['invoice_adjustments'] = $invoice_adjustments;
+		}
 
 		$tag_ids = Hesabix_V2_Invoice_Helper::resolve_invoice_tag_ids();
 		if (!empty($tag_ids)) {
@@ -1535,6 +1586,79 @@ class Hesabix_V2_Mapper
 		$chosen = (int) $candidates[0];
 
 		return (int) apply_filters('hesabix_v2_linked_hesabix_category_id', $chosen, $wc_term_name, $expected_parent_hesabix_id, $candidates);
+	}
+
+	/**
+	 * آیا هزینه حمل ووکامرس به‌جای خدمت، به‌صورت ردیف حساب فاکتور ارسال شود؟
+	 *
+	 * @return bool
+	 */
+	private static function shipping_should_be_account_adjustment()
+	{
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		return isset($sync['shipping_line_mode']) && $sync['shipping_line_mode'] === 'account_adjustment';
+	}
+
+	/**
+	 * شناسه حساب درآمد حمل کالا در حسابیکس؛ اولویت با تنظیم کاربر، سپس حساب پیش‌فرض 60104.
+	 *
+	 * @return int
+	 */
+	private static function resolve_shipping_adjustment_account_id()
+	{
+		$sync = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
+		$configured = isset($sync['shipping_adjustment_account_id']) ? absint($sync['shipping_adjustment_account_id']) : 0;
+		if ($configured > 0) {
+			return $configured;
+		}
+
+		$cached = get_transient('hesabix_v2_shipping_adjustment_account_60104');
+		if ($cached !== false && absint($cached) > 0) {
+			return absint($cached);
+		}
+
+		$api = new Hesabix_V2_Api();
+		$res = $api->get_accounts_flat();
+		$items = self::extract_accounts_items_from_api_response($res);
+		foreach ($items as $row) {
+			if (!is_array($row) || empty($row['id'])) {
+				continue;
+			}
+			$code = isset($row['code']) ? trim((string) $row['code']) : '';
+			$name = isset($row['name']) ? trim((string) $row['name']) : '';
+			if ($code === '60104' || $name === 'درآمد حمل کالا') {
+				$id = absint($row['id']);
+				if ($id > 0) {
+					set_transient('hesabix_v2_shipping_adjustment_account_60104', $id, 12 * HOUR_IN_SECONDS);
+					return $id;
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	/**
+	 * استخراج آرایه حساب‌ها از پاسخ‌های مختلف API حسابیکس.
+	 *
+	 * @param array $res
+	 * @return array<int, array<string, mixed>>
+	 */
+	private static function extract_accounts_items_from_api_response($res)
+	{
+		if (!is_array($res)) {
+			return array();
+		}
+		if (isset($res['data']['items']) && is_array($res['data']['items'])) {
+			return $res['data']['items'];
+		}
+		if (isset($res['data']) && is_array($res['data']) && array_keys($res['data']) === range(0, count($res['data']) - 1)) {
+			return $res['data'];
+		}
+		if (isset($res['items']) && is_array($res['items'])) {
+			return $res['items'];
+		}
+		return array();
 	}
 
 	/**

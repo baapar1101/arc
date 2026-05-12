@@ -20,13 +20,28 @@ from app.services.document_monetization_service import process_document_usage_fo
 logger = logging.getLogger(__name__)
 
 RECEIVED_LOAN_FACILITY_DOC_SOURCE = "received_loan_facility"
+RECEIVED_LOAN_FACILITY_DOC_TYPE = "received_loan_facility"
 
 
 def _is_received_loan_facility_manual_document(document: Any) -> bool:
     ex = getattr(document, "extra_info", None)
     if not isinstance(ex, dict):
-        return False
-    return ex.get("source") == RECEIVED_LOAN_FACILITY_DOC_SOURCE
+        ex = {}
+    return (
+        ex.get("source") == RECEIVED_LOAN_FACILITY_DOC_SOURCE
+        or getattr(document, "document_type", None) == RECEIVED_LOAN_FACILITY_DOC_TYPE
+    )
+
+
+def _assert_not_received_loan_facility_document(document: Any, *, action: str) -> None:
+    if not _is_received_loan_facility_manual_document(document):
+        return
+    verb = "حذف" if action == "delete" else "ویرایش"
+    raise ApiError(
+        "RECEIVED_LOAN_DOCUMENT_SOURCE_ONLY",
+        f"اسناد تسهیلات فقط از بخش تسهیلات و اقساط قابل {verb} هستند",
+        http_status=409,
+    )
 
 
 def _assert_received_loan_manual_fiscal_year_editable(db: Session, document: Any) -> None:
@@ -200,6 +215,8 @@ def delete_document(db: Session, document_id: int, *, commit: bool = True) -> bo
             "Document not found",
             http_status=404
         )
+
+    _assert_not_received_loan_facility_document(document, action="delete")
     
     # بررسی نوع سند - فقط اسناد manual قابل حذف هستند
     if document.document_type != "manual":
@@ -282,6 +299,14 @@ def delete_multiple_documents(db: Session, document_ids: List[int]) -> Dict[str,
             document = repo.get_document(doc_id)
             if not document:
                 errors.append({"id": doc_id, "error": "Document not found"})
+                continue
+
+            try:
+                _assert_not_received_loan_facility_document(document, action="delete")
+            except ApiError as exc:
+                err = getattr(exc, "detail", None)
+                msg = str(err) if err is not None else str(exc)
+                errors.append({"id": doc_id, "error": msg})
                 continue
             
             # بررسی نوع سند
@@ -656,6 +681,8 @@ def update_manual_document(
             "Document not found",
             http_status=404
         )
+
+    _assert_not_received_loan_facility_document(document, action="edit")
 
     # بررسی اینکه فقط اسناد manual قابل ویرایش هستند
     if document.document_type != "manual":

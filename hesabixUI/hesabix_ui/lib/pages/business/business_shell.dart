@@ -1061,6 +1061,18 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isBasalamPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'basalam_connector',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -1614,6 +1626,15 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.local_shipping_outlined,
         selectedIcon: Icons.local_shipping,
         path: _bu('distribution'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'basalam',
+        label: t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam Integration',
+        icon: Icons.storefront_outlined,
+        selectedIcon: Icons.storefront,
+        path: _bu('basalam'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -3167,6 +3188,13 @@ class _BusinessShellState extends State<BusinessShell> {
         return false;
       }
     }
+
+    // اتصال باسلام
+    if (section == 'basalam') {
+      if (!_isBasalamPluginActive()) {
+        return false;
+      }
+    }
     
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
@@ -3271,6 +3299,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
     if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
+    if (label == 'اتصال باسلام' || label == 'Basalam Integration') return 'basalam';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';

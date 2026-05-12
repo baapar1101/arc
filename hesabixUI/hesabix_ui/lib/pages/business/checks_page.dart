@@ -22,24 +22,20 @@ class ChecksPage extends StatefulWidget {
   final AuthStore authStore;
   final CalendarController calendarController;
 
-  const ChecksPage({
-    super.key,
-    required this.businessId,
-    required this.authStore,
-    required this.calendarController,
-  });
+  const ChecksPage({super.key, required this.businessId, required this.authStore, required this.calendarController});
 
   @override
   State<ChecksPage> createState() => _ChecksPageState();
-  
+
   /// Static map to store page states by business ID for external refresh
   static final Map<int, _ChecksPageState> _pageStates = {};
-  
+
   /// Get the page state for a specific business ID
+  // ignore: library_private_types_in_public_api
   static _ChecksPageState? getPageState(int businessId) {
     return _pageStates[businessId];
   }
-  
+
   /// Clear the page state for a specific business ID
   static void clearPageState(int businessId) {
     _pageStates.remove(businessId);
@@ -57,7 +53,7 @@ class _ChecksPageState extends State<ChecksPage> {
     // Register this page instance for external refresh access
     ChecksPage._pageStates[widget.businessId] = this;
   }
-  
+
   @override
   void dispose() {
     // Clean up the page state when disposed
@@ -66,9 +62,11 @@ class _ChecksPageState extends State<ChecksPage> {
   }
 
   void _refresh() {
-    try { (_tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
+    try {
+      (_tableKey.currentState as dynamic)?.refresh();
+    } catch (_) {}
   }
-  
+
   /// Public method to refresh the data table
   void refresh() {
     _refresh();
@@ -95,13 +93,24 @@ class _ChecksPageState extends State<ChecksPage> {
   }
 
   DataTableConfig<Map<String, dynamic>> _buildConfig(AppLocalizations t, BuildContext context) {
+    String formatCheckDate(Map<String, dynamic> row, String key) {
+      return HesabixDateUtils.formatApiDateForDisplay(
+        row[key],
+        widget.calendarController.isJalali,
+        rawValue: row['${key}_raw'],
+      );
+    }
+
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/checks/businesses/${widget.businessId}/checks',
       title: (t.localeName == 'fa') ? 'چک‌ها' : 'Checks',
       excelEndpoint: '/api/v1/checks/businesses/${widget.businessId}/checks/export/excel',
       pdfEndpoint: '/api/v1/checks/businesses/${widget.businessId}/checks/export/pdf',
-      getExportParams: () => {'business_id': widget.businessId, if (_selectedPerson != null) 'person_id': _selectedPerson!.id},
-      additionalParams: { if (_selectedPerson != null) 'person_id': _selectedPerson!.id },
+      getExportParams: () => {
+        'business_id': widget.businessId,
+        if (_selectedPerson != null) 'person_id': _selectedPerson!.id,
+      },
+      additionalParams: {if (_selectedPerson != null) 'person_id': _selectedPerson!.id},
       showBackButton: true,
       onBack: () {
         if (!mounted) return;
@@ -126,94 +135,49 @@ class _ChecksPageState extends State<ChecksPage> {
             FilterOption(value: 'received', label: 'دریافتی'),
             FilterOption(value: 'transferred', label: 'واگذار شده'),
           ],
-          formatter: (row) => (row['type'] == 'received') ? 'دریافتی' : (row['type'] == 'transferred' ? 'واگذار شده' : '-'),
+          formatter: (row) =>
+              (row['type'] == 'received') ? 'دریافتی' : (row['type'] == 'transferred' ? 'واگذار شده' : '-'),
         ),
-        TextColumn('person_name', 'شخص', width: ColumnWidth.large,
-          formatter: (row) => (row['person_name'] ?? '-'),
-        ),
+        TextColumn('person_name', 'شخص', width: ColumnWidth.large, formatter: (row) => (row['person_name'] ?? '-')),
         DateColumn(
           'issue_date',
           'تاریخ صدور',
           width: ColumnWidth.medium,
           filterType: ColumnFilterType.dateRange,
-          formatter: (row) {
-            final value = row['issue_date'];
-            if (value == null) return '-';
-            
-            // If value is already formatted string from backend (date_only)
-            if (value is String) {
-              // Try to parse and format based on calendar type
-              try {
-                final date = DateTime.parse(value.split('T').first);
-                return HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali);
-              } catch (e) {
-                // If it's already formatted (e.g., "1403/01/15"), return as is
-                return value;
-              }
-            } else if (value is Map<String, dynamic>) {
-              // Handle formatted date objects from backend
-              if (value.containsKey('date_only')) {
-                return value['date_only'].toString();
-              } else if (value.containsKey('formatted')) {
-                // Extract date part only (remove time)
-                final formatted = value['formatted'].toString();
-                return formatted.split(' ').first;
-              }
-            }
-            return '-';
-          },
+          formatter: (row) => formatCheckDate(row, 'issue_date'),
         ),
         DateColumn(
           'due_date',
           'تاریخ سررسید',
           width: ColumnWidth.medium,
           filterType: ColumnFilterType.dateRange,
-          formatter: (row) {
-            final value = row['due_date'];
-            if (value == null) return '-';
-            
-            // If value is already formatted string from backend (date_only)
-            if (value is String) {
-              // Try to parse and format based on calendar type
-              try {
-                final date = DateTime.parse(value.split('T').first);
-                return HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali);
-              } catch (e) {
-                // If it's already formatted (e.g., "1403/01/15"), return as is
-                return value;
-              }
-            } else if (value is Map<String, dynamic>) {
-              // Handle formatted date objects from backend
-              if (value.containsKey('date_only')) {
-                return value['date_only'].toString();
-              } else if (value.containsKey('formatted')) {
-                // Extract date part only (remove time)
-                final formatted = value['formatted'].toString();
-                return formatted.split(' ').first;
-              }
-            }
-            return '-';
-          },
+          formatter: (row) => formatCheckDate(row, 'due_date'),
         ),
-        TextColumn('check_number', 'شماره چک', width: ColumnWidth.medium,
+        TextColumn(
+          'check_number',
+          'شماره چک',
+          width: ColumnWidth.medium,
           formatter: (row) => (row['check_number'] ?? '-'),
         ),
-        TextColumn('sayad_code', 'شناسه صیاد', width: ColumnWidth.medium,
+        TextColumn(
+          'sayad_code',
+          'شناسه صیاد',
+          width: ColumnWidth.medium,
           formatter: (row) => (row['sayad_code'] ?? '-'),
         ),
-        TextColumn('bank_name', 'بانک', width: ColumnWidth.medium,
-          formatter: (row) => (row['bank_name'] ?? '-'),
-        ),
-        TextColumn('branch_name', 'شعبه', width: ColumnWidth.medium,
-          formatter: (row) => (row['branch_name'] ?? '-'),
-        ),
-        NumberColumn('amount', 'مبلغ', width: ColumnWidth.medium,
+        TextColumn('bank_name', 'بانک', width: ColumnWidth.medium, formatter: (row) => (row['bank_name'] ?? '-')),
+        TextColumn('branch_name', 'شعبه', width: ColumnWidth.medium, formatter: (row) => (row['branch_name'] ?? '-')),
+        NumberColumn(
+          'amount',
+          'مبلغ',
+          width: ColumnWidth.medium,
           formatter: (row) => formatWithThousands(row['amount']),
         ),
-        TextColumn('currency', 'ارز', width: ColumnWidth.small,
-          formatter: (row) => (row['currency'] ?? '-'),
-        ),
-        TextColumn('status', 'وضعیت', width: ColumnWidth.medium,
+        TextColumn('currency', 'ارز', width: ColumnWidth.small, formatter: (row) => (row['currency'] ?? '-')),
+        TextColumn(
+          'status',
+          'وضعیت',
+          width: ColumnWidth.medium,
           filterType: ColumnFilterType.multiSelect,
           filterOptions: const [
             FilterOption(value: 'RECEIVED_ON_HAND', label: 'در دست (دریافتی)'),
@@ -228,119 +192,133 @@ class _ChecksPageState extends State<ChecksPage> {
           formatter: (row) {
             final s = (row['status'] ?? '').toString();
             switch (s) {
-              case 'RECEIVED_ON_HAND': return 'در دست (دریافتی)';
-              case 'TRANSFERRED_ISSUED': return 'صادر شده (پرداختنی)';
-              case 'DEPOSITED': return 'سپرده به بانک';
-              case 'CLEARED': return 'پاس/وصول شده';
-              case 'ENDORSED': return 'واگذار شده';
-              case 'RETURNED': return 'عودت شده';
-              case 'BOUNCED': return 'برگشت خورده';
-              case 'CANCELLED': return 'ابطال';
+              case 'RECEIVED_ON_HAND':
+                return 'در دست (دریافتی)';
+              case 'TRANSFERRED_ISSUED':
+                return 'صادر شده (پرداختنی)';
+              case 'DEPOSITED':
+                return 'سپرده به بانک';
+              case 'CLEARED':
+                return 'پاس/وصول شده';
+              case 'ENDORSED':
+                return 'واگذار شده';
+              case 'RETURNED':
+                return 'عودت شده';
+              case 'BOUNCED':
+                return 'برگشت خورده';
+              case 'CANCELLED':
+                return 'ابطال';
             }
             return '-';
           },
         ),
-        ActionColumn('actions', t.actions, actions: [
-          DataTableAction(
-            icon: Icons.edit,
-            label: t.edit,
-            onTap: (row) {
-              final id = row is Map<String, dynamic> ? row['id'] : null;
-              if (id is int) {
-                _showCheckFormDialog(context, checkId: id);
-              }
-            },
-          ),
-          DataTableAction(
-            icon: Icons.arrow_forward,
-            label: 'واگذاری',
-            onTap: (row) {
-              final type = (row['type'] ?? '').toString();
-              final status = (row['status'] ?? '').toString();
-              final can = type == 'received' && (status.isEmpty || ['RECEIVED_ON_HAND','RETURNED','BOUNCED'].contains(status));
-              if (can) {
-                _openEndorseDialog(context, row as Map<String, dynamic>);
-              } else {
-                SnackBarHelper.show(context, message: 'این عملیات برای وضعیت فعلی مجاز نیست');
-              }
-            },
-          ),
-          DataTableAction(
-            icon: Icons.check_circle,
-            label: 'وصول',
-            onTap: (row) {
-              final type = (row['type'] ?? '').toString();
-              final status = (row['status'] ?? '').toString();
-              if (type == 'received' && status != 'CLEARED') {
-                _openClearDialog(context, row as Map<String, dynamic>);
-              } else {
-                SnackBarHelper.show(context, message: 'این عملیات برای این چک قابل انجام نیست');
-              }
-            },
-          ),
-          DataTableAction(
-            icon: Icons.payment,
-            label: 'پرداخت',
-            onTap: (row) {
-              final type = (row['type'] ?? '').toString();
-              final status = (row['status'] ?? '').toString();
-              if (type == 'transferred' && status != 'CLEARED') {
-                _openPayDialog(context, row as Map<String, dynamic>);
-              } else {
-                SnackBarHelper.show(context, message: 'این عملیات برای این چک قابل انجام نیست');
-              }
-            },
-          ),
-          DataTableAction(
-            icon: Icons.reply,
-            label: 'عودت',
-            onTap: (row) {
-              final status = (row['status'] ?? '').toString();
-              if (status != 'CLEARED') {
-                _confirmReturn(context, row as Map<String, dynamic>);
-              } else {
-                SnackBarHelper.show(context, message: 'این چک قبلاً پاس شده است');
-              }
-            },
-          ),
-          DataTableAction(
-            icon: Icons.block,
-            label: 'برگشت',
-            onTap: (row) {
-              final status = (row['status'] ?? '').toString();
-              if (status != 'CLEARED') {
-                _confirmBounce(context, row as Map<String, dynamic>);
-              } else {
-                SnackBarHelper.show(context, message: 'این چک قبلاً پاس شده است');
-              }
-            },
-          ),
-          DataTableAction(
-            icon: Icons.account_balance,
-            label: 'سپرده',
-            onTap: (row) {
-              final type = (row['type'] ?? '').toString();
-              final status = (row['status'] ?? '').toString();
-              if (type == 'received' && (status.isEmpty || status == 'RECEIVED_ON_HAND')) {
-                _confirmDeposit(context, row as Map<String, dynamic>);
-              } else {
-                SnackBarHelper.show(context, message: 'این عملیات برای وضعیت فعلی مجاز نیست');
-              }
-            },
-          ),
-          if (widget.authStore.canWriteSection('checks'))
+        ActionColumn(
+          'actions',
+          t.actions,
+          actions: [
             DataTableAction(
-              icon: Icons.delete,
-              label: t.delete,
+              icon: Icons.edit,
+              label: t.edit,
               onTap: (row) {
-                _confirmDelete(context, row as Map<String, dynamic>);
+                final id = row is Map<String, dynamic> ? row['id'] : null;
+                if (id is int) {
+                  _showCheckFormDialog(context, checkId: id);
+                }
               },
-              isDestructive: true,
             ),
-        ]),
+            DataTableAction(
+              icon: Icons.arrow_forward,
+              label: 'واگذاری',
+              onTap: (row) {
+                final type = (row['type'] ?? '').toString();
+                final status = (row['status'] ?? '').toString();
+                final can =
+                    type == 'received' &&
+                    (status.isEmpty || ['RECEIVED_ON_HAND', 'RETURNED', 'BOUNCED'].contains(status));
+                if (can) {
+                  _openEndorseDialog(context, row as Map<String, dynamic>);
+                } else {
+                  SnackBarHelper.show(context, message: 'این عملیات برای وضعیت فعلی مجاز نیست');
+                }
+              },
+            ),
+            DataTableAction(
+              icon: Icons.check_circle,
+              label: 'وصول',
+              onTap: (row) {
+                final type = (row['type'] ?? '').toString();
+                final status = (row['status'] ?? '').toString();
+                if (type == 'received' && status != 'CLEARED') {
+                  _openClearDialog(context, row as Map<String, dynamic>);
+                } else {
+                  SnackBarHelper.show(context, message: 'این عملیات برای این چک قابل انجام نیست');
+                }
+              },
+            ),
+            DataTableAction(
+              icon: Icons.payment,
+              label: 'پرداخت',
+              onTap: (row) {
+                final type = (row['type'] ?? '').toString();
+                final status = (row['status'] ?? '').toString();
+                if (type == 'transferred' && status != 'CLEARED') {
+                  _openPayDialog(context, row as Map<String, dynamic>);
+                } else {
+                  SnackBarHelper.show(context, message: 'این عملیات برای این چک قابل انجام نیست');
+                }
+              },
+            ),
+            DataTableAction(
+              icon: Icons.reply,
+              label: 'عودت',
+              onTap: (row) {
+                final status = (row['status'] ?? '').toString();
+                if (status != 'CLEARED') {
+                  _confirmReturn(context, row as Map<String, dynamic>);
+                } else {
+                  SnackBarHelper.show(context, message: 'این چک قبلاً پاس شده است');
+                }
+              },
+            ),
+            DataTableAction(
+              icon: Icons.block,
+              label: 'برگشت',
+              onTap: (row) {
+                final status = (row['status'] ?? '').toString();
+                if (status != 'CLEARED') {
+                  _confirmBounce(context, row as Map<String, dynamic>);
+                } else {
+                  SnackBarHelper.show(context, message: 'این چک قبلاً پاس شده است');
+                }
+              },
+            ),
+            DataTableAction(
+              icon: Icons.account_balance,
+              label: 'سپرده',
+              onTap: (row) {
+                final type = (row['type'] ?? '').toString();
+                final status = (row['status'] ?? '').toString();
+                if (type == 'received' && (status.isEmpty || status == 'RECEIVED_ON_HAND')) {
+                  _confirmDeposit(context, row as Map<String, dynamic>);
+                } else {
+                  SnackBarHelper.show(context, message: 'این عملیات برای وضعیت فعلی مجاز نیست');
+                }
+              },
+            ),
+            if (widget.authStore.canWriteSection('checks'))
+              DataTableAction(
+                icon: Icons.delete,
+                label: t.delete,
+                onTap: (row) {
+                  _confirmDelete(context, row as Map<String, dynamic>);
+                },
+                isDestructive: true,
+              ),
+          ],
+        ),
       ],
-      searchFields: ['check_number','sayad_code','bank_name','branch_name','person_name'],
-      filterFields: ['type','currency','issue_date','due_date','status'],
+      searchFields: ['check_number', 'sayad_code', 'bank_name', 'branch_name', 'person_name'],
+      filterFields: ['type', 'currency', 'issue_date', 'due_date', 'status'],
       defaultPageSize: 20,
       customHeaderActions: [
         // فیلتر شخص
@@ -350,7 +328,9 @@ class _ChecksPageState extends State<ChecksPage> {
             businessId: widget.businessId,
             selectedPerson: _selectedPerson,
             onChanged: (p) {
-              setState(() { _selectedPerson = p; });
+              setState(() {
+                _selectedPerson = p;
+              });
             },
             isRequired: false,
             label: 'شخص',
@@ -374,10 +354,7 @@ class _ChecksPageState extends State<ChecksPage> {
           authStore: widget.authStore,
           child: Tooltip(
             message: t.add,
-            child: IconButton(
-              onPressed: () => _showCheckFormDialog(context),
-              icon: const Icon(Icons.add),
-            ),
+            child: IconButton(onPressed: () => _showCheckFormDialog(context), icon: const Icon(Icons.add)),
           ),
         ),
       ],
@@ -419,19 +396,17 @@ class _ChecksPageState extends State<ChecksPage> {
                   if (selectedPerson == null) return;
                   if (!context.mounted) return;
                   try {
-                    await _checkService.endorse(checkId: row['id'] as int, body: {
-                      'target_person_id': selectedPerson!.id,
-                    });
+                    await _checkService.endorse(
+                      checkId: row['id'] as int,
+                      body: {'target_person_id': selectedPerson!.id},
+                    );
                     if (!context.mounted) return;
                     Navigator.pop(ctx);
                     _refresh();
                   } catch (e) {
                     if (!context.mounted) return;
                     Navigator.pop(ctx);
-                    SnackBarHelper.showError(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-      );
+                    SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
                   }
                 },
                 child: const Text('ثبت'),
@@ -469,19 +444,17 @@ class _ChecksPageState extends State<ChecksPage> {
               if (selected == null || (selected!.id).isEmpty) return;
               if (!context.mounted) return;
               try {
-                await _checkService.clear(checkId: row['id'] as int, body: {
-                  'bank_account_id': int.tryParse(selected!.id) ?? 0,
-                });
+                await _checkService.clear(
+                  checkId: row['id'] as int,
+                  body: {'bank_account_id': int.tryParse(selected!.id) ?? 0},
+                );
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
                 _refresh();
               } catch (e) {
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
-                SnackBarHelper.showError(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-      );
+                SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
               }
             },
             child: const Text('ثبت'),
@@ -517,19 +490,17 @@ class _ChecksPageState extends State<ChecksPage> {
               if (selected == null || (selected!.id).isEmpty) return;
               if (!context.mounted) return;
               try {
-                await _checkService.pay(checkId: row['id'] as int, body: {
-                  'bank_account_id': int.tryParse(selected!.id) ?? 0,
-                });
+                await _checkService.pay(
+                  checkId: row['id'] as int,
+                  body: {'bank_account_id': int.tryParse(selected!.id) ?? 0},
+                );
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
                 _refresh();
               } catch (e) {
                 if (!context.mounted) return;
                 Navigator.pop(ctx);
-                SnackBarHelper.showError(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-      );
+                SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
               }
             },
             child: const Text('ثبت'),
@@ -558,10 +529,7 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-      );
+      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
@@ -584,10 +552,7 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-      );
+      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
@@ -610,38 +575,34 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-      );
+      SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
   Future<void> _confirmDelete(BuildContext context, Map<String, dynamic> row) async {
     final checkNumber = row['check_number']?.toString() ?? 'نامشخص';
     final status = (row['status'] ?? '').toString();
-    
+
     // بررسی وضعیت چک
     if (status == 'CLEARED') {
       SnackBarHelper.show(context, message: 'نمی‌توان چک پاس شده را حذف کرد');
       return;
     }
-    
+
     if (status == 'DEPOSITED') {
       SnackBarHelper.show(context, message: 'نمی‌توان چک سپرده شده را حذف کرد. لطفاً ابتدا چک را از سپرده خارج کنید');
       return;
     }
-    
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف چک'),
-        content: Text('آیا از حذف چک شماره $checkNumber مطمئن هستید؟\n\nتوجه: تمام اسناد حسابداری مرتبط با این چک نیز حذف خواهند شد.'),
+        content: Text(
+          'آیا از حذف چک شماره $checkNumber مطمئن هستید؟\n\nتوجه: تمام اسناد حسابداری مرتبط با این چک نیز حذف خواهند شد.',
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('انصراف'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -650,10 +611,10 @@ class _ChecksPageState extends State<ChecksPage> {
         ],
       ),
     );
-    
+
     if (ok != true) return;
     if (!context.mounted) return;
-    
+
     try {
       await _checkService.delete(row['id'] as int);
       if (!context.mounted) return;
@@ -661,17 +622,14 @@ class _ChecksPageState extends State<ChecksPage> {
       _refresh();
     } catch (e) {
       if (!context.mounted) return;
-      SnackBarHelper.show(
-        context,
-        message: 'خطا در حذف چک: ${ErrorExtractor.forContext(e, context)}',
-      );
+      SnackBarHelper.show(context, message: 'خطا در حذف چک: ${ErrorExtractor.forContext(e, context)}');
     }
   }
 
   void _showCheckDetailsDialog(BuildContext context, Map<String, dynamic> row) {
     final checkId = row['id'] as int?;
     if (checkId == null) return;
-    
+
     showDialog(
       context: context,
       builder: (ctx) => CheckDetailsDialog(
@@ -687,7 +645,6 @@ class _ChecksPageState extends State<ChecksPage> {
       ),
     );
   }
-
 
   Future<void> _showCheckFormDialog(BuildContext context, {int? checkId}) async {
     final result = await showDialog<bool>(
@@ -707,5 +664,3 @@ class _ChecksPageState extends State<ChecksPage> {
     }
   }
 }
-
-

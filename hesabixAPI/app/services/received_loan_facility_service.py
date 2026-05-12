@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.document import Document
+from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.received_loan_facility import (
 	ReceivedLoanFacility,
 	ReceivedLoanInstallment,
@@ -18,6 +20,8 @@ from adapters.db.models.received_loan_facility import (
 
 from app.services import document_service
 from app.services.received_loan_facility_accounting import (
+	DOCUMENT_SOURCE_RECEIVED_LOAN_FACILITY,
+	DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY,
 	notify_document_cache_manual,
 	post_disbursement_document,
 	post_installment_payment_document,
@@ -43,15 +47,17 @@ def _detach_disbursement_document(db: Session, obj: ReceivedLoanFacility) -> Opt
 	doc_prev = db.get(Document, doc_id)
 	cache_kw: Optional[Dict[str, Any]] = None
 	if doc_prev:
-		cache_kw = {
-			"business_id": int(doc_prev.business_id),
-			"fiscal_year_id": int(doc_prev.fiscal_year_id),
-			"document_id": int(doc_prev.id),
-			"document_type": str(doc_prev.document_type),
-		}
+		current_fy = _current_fiscal_year(db, int(obj.business_id))
+		_assert_loan_document_deletable(
+			db,
+			doc_prev,
+			facility_id=int(obj.id),
+			current_fiscal_year=current_fy,
+		)
 	obj.disbursement_document_id = None
 	db.flush()
-	document_service.delete_document(db, doc_id, commit=False)
+	if doc_prev:
+		cache_kw = _delete_loan_document_row(db, doc_prev)
 	return cache_kw
 
 
@@ -119,6 +125,170 @@ def _validate_bank_same_business(db: Session, business_id: int, bank_account_id:
 		raise ApiError("INVALID_BANK_ACCOUNT", "Bank account not found or not in this business", http_status=400)
 
 
+def _current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
+	from app.core.responses import ApiError
+
+	fy = (
+		db.query(FiscalYear)
+		.filter(
+			FiscalYear.business_id == int(business_id),
+			FiscalYear.is_last == True,  # noqa: E712
+		)
+		.first()
+	)
+	if not fy:
+		raise ApiError("FISCAL_YEAR_NOT_FOUND", "Active fiscal year not found", http_status=404)
+	return fy
+
+
+def _date_in_fiscal_year(ref_date: date, fiscal_year: FiscalYear) -> bool:
+	return fiscal_year.start_date <= ref_date <= fiscal_year.end_date
+
+
+def _loan_document_cache_kw(doc: Document) -> Dict[str, Any]:
+	return {
+		"business_id": int(doc.business_id),
+		"fiscal_year_id": int(doc.fiscal_year_id),
+		"document_id": int(doc.id),
+		"document_type": str(doc.document_type),
+	}
+
+
+def _is_loan_document_for_facility(doc: Document, facility_id: int) -> bool:
+	extra = doc.extra_info if isinstance(doc.extra_info, dict) else {}
+	if doc.document_type == DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY:
+		try:
+			return int(extra.get("facility_id")) == int(facility_id)
+		except Exception:
+			return False
+	if extra.get("source") != DOCUMENT_SOURCE_RECEIVED_LOAN_FACILITY:
+		return False
+	try:
+		return int(extra.get("facility_id")) == int(facility_id)
+	except Exception:
+		return False
+
+
+def _collect_loan_documents(db: Session, facility: ReceivedLoanFacility) -> Dict[int, Document]:
+	from app.core.responses import ApiError
+
+	docs: Dict[int, Document] = {}
+	referenced_ids: set[int] = set()
+	if facility.disbursement_document_id:
+		referenced_ids.add(int(facility.disbursement_document_id))
+	for inst in facility.installments or []:
+		for pay in inst.payments or []:
+			if pay.document_id:
+				referenced_ids.add(int(pay.document_id))
+
+	if referenced_ids:
+		for doc in db.query(Document).filter(Document.id.in_(referenced_ids)).all():
+			docs[int(doc.id)] = doc
+		missing = referenced_ids.difference(docs.keys())
+		if missing:
+			raise ApiError(
+				"LOAN_DOCUMENT_MISSING",
+				"Linked loan document is missing; repair loan accounting links before deleting the facility",
+				http_status=409,
+			)
+
+	possible_docs = (
+		db.query(Document)
+		.filter(
+			Document.business_id == int(facility.business_id),
+			Document.document_type.in_((DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY, "manual")),
+		)
+		.all()
+	)
+	for doc in possible_docs:
+		if _is_loan_document_for_facility(doc, int(facility.id)):
+			docs[int(doc.id)] = doc
+	return docs
+
+
+def _assert_loan_document_deletable(
+	db: Session,
+	doc: Document,
+	*,
+	facility_id: int,
+	current_fiscal_year: FiscalYear,
+) -> None:
+	from app.core.responses import ApiError
+
+	if not _is_loan_document_for_facility(doc, facility_id):
+		raise ApiError(
+			"LOAN_DOCUMENT_MISMATCH",
+			"Linked document does not belong to this loan facility",
+			http_status=409,
+		)
+	if int(doc.fiscal_year_id) != int(current_fiscal_year.id):
+		raise ApiError(
+			"FISCAL_YEAR_LOCKED",
+			"Loan facility has linked accounting documents outside the active fiscal year",
+			http_status=409,
+		)
+	if doc.document_type not in (DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY, "manual"):
+		raise ApiError(
+			"LOAN_DOCUMENT_TYPE_UNSUPPORTED",
+			"Linked loan document type is not supported for automatic deletion",
+			http_status=409,
+		)
+	extra = doc.extra_info if isinstance(doc.extra_info, dict) else {}
+	dev = doc.developer_settings if isinstance(doc.developer_settings, dict) else {}
+	if any(bool(x.get("locked")) or bool(x.get("is_locked")) for x in (extra, dev)):
+		raise ApiError("DOCUMENT_LOCKED", "Linked loan document is locked", http_status=409)
+	has_related_checks = (
+		db.query(DocumentLine.id)
+		.filter(DocumentLine.document_id == int(doc.id), DocumentLine.check_id.isnot(None))
+		.first()
+		is not None
+	)
+	if has_related_checks:
+		raise ApiError(
+			"DOCUMENT_REFERENCED",
+			"Linked loan document has check-related lines and cannot be deleted automatically",
+			http_status=409,
+		)
+	try:
+		from app.services.wallet_service import check_document_has_wallet_transactions
+
+		wallet_check = check_document_has_wallet_transactions(db, int(doc.id))
+		if wallet_check["has_wallet_transactions"] and wallet_check.get("has_protected_transactions", False):
+			raise ApiError(
+				"DOCUMENT_HAS_WALLET_TRANSACTIONS",
+				wallet_check["message"],
+				http_status=409,
+			)
+	except ApiError:
+		raise
+	except Exception:
+		pass
+
+
+def _assert_loan_payments_deletable(
+	facility: ReceivedLoanFacility,
+	*,
+	current_fiscal_year: FiscalYear,
+) -> None:
+	from app.core.responses import ApiError
+
+	for inst in facility.installments or []:
+		for pay in inst.payments or []:
+			if not _date_in_fiscal_year(pay.payment_date, current_fiscal_year):
+				raise ApiError(
+					"FISCAL_YEAR_LOCKED",
+					"Loan facility has installment payments outside the active fiscal year",
+					http_status=409,
+				)
+
+
+def _delete_loan_document_row(db: Session, doc: Document) -> Dict[str, Any]:
+	cache_kw = _loan_document_cache_kw(doc)
+	db.delete(doc)
+	db.flush()
+	return cache_kw
+
+
 def installment_remaining(inst: ReceivedLoanInstallment) -> Tuple[Decimal, Decimal, Decimal]:
 	rm_pen = max(_money(inst.penalty_due) - _money(inst.penalty_paid), Decimal("0"))
 	rm_int = max(_money(inst.interest_due) - _money(inst.interest_paid), Decimal("0"))
@@ -169,6 +339,10 @@ def generate_installment_schedule(
 		from app.core.responses import ApiError
 
 		raise ApiError("INVALID_INSTALLMENT_COUNT", "Installment count must be at least 1", http_status=400)
+	if annual_percent is not None and annual_percent < Decimal("0"):
+		from app.core.responses import ApiError
+
+		raise ApiError("INVALID_RATE", "annual_interest_rate_percent must be zero or positive", http_status=400)
 
 	P = _money(principal_amount)
 	i_m = _monthly_rate_percent(annual_percent)
@@ -353,6 +527,7 @@ def create_facility(
 		currency_id = int(data["currency_id"])
 	except Exception:
 		raise ApiError("INVALID_CURRENCY", "currency_id is required", http_status=400)
+	_validate_bank_currency(db, currency_id, lender_bank_account_id)
 
 	try:
 		principal_amount = data.get("principal_amount")
@@ -373,6 +548,8 @@ def create_facility(
 			annual_decimal = Decimal(str(annual))
 		except Exception:
 			raise ApiError("INVALID_RATE", "Invalid annual_interest_rate_percent", http_status=400)
+		if annual_decimal < Decimal("0"):
+			raise ApiError("INVALID_RATE", "annual_interest_rate_percent must be zero or positive", http_status=400)
 
 	cd_raw = data.get("contract_date")
 	if not cd_raw:
@@ -389,6 +566,12 @@ def create_facility(
 			first_inst = date.fromisoformat(str(fi_raw)[:10])
 		except Exception:
 			raise ApiError("INVALID_FIRST_INSTALLMENT_DATE", "first_installment_date must be ISO date", http_status=400)
+		if first_inst < contract_date:
+			raise ApiError(
+				"INVALID_FIRST_INSTALLMENT_DATE",
+				"first_installment_date must be on or after contract_date",
+				http_status=400,
+			)
 
 	ic_raw = data.get("installment_count")
 	install_count: Optional[int]
@@ -399,6 +582,8 @@ def create_facility(
 			install_count = int(ic_raw)
 		except Exception:
 			raise ApiError("INVALID_INSTALLMENT_COUNT", "installment_count invalid", http_status=400)
+		if install_count < 1:
+			raise ApiError("INVALID_INSTALLMENT_COUNT", "installment_count must be at least 1", http_status=400)
 
 	obj = ReceivedLoanFacility(
 		business_id=business_id,
@@ -483,7 +668,13 @@ def update_facility(db: Session, facility_id: int, data: Dict[str, Any]) -> Opti
 			obj.principal_amount = P
 		if "annual_interest_rate_percent" in data:
 			ap = data.get("annual_interest_rate_percent")
-			obj.annual_interest_rate_percent = None if ap is None or ap == "" else Decimal(str(ap))
+			if ap is None or ap == "":
+				obj.annual_interest_rate_percent = None
+			else:
+				annual_decimal = Decimal(str(ap))
+				if annual_decimal < Decimal("0"):
+					raise ApiError("INVALID_RATE", "annual_interest_rate_percent must be zero or positive", http_status=400)
+				obj.annual_interest_rate_percent = annual_decimal
 		if "contract_date" in data:
 			cd = data["contract_date"]
 			obj.contract_date = date.fromisoformat(str(cd)[:10])
@@ -494,9 +685,21 @@ def update_facility(db: Session, facility_id: int, data: Dict[str, Any]) -> Opti
 			)
 		if "installment_count" in data:
 			ic = data.get("installment_count")
-			obj.installment_count = None if ic is None else int(ic)
+			if ic is None:
+				obj.installment_count = None
+			else:
+				install_count = int(ic)
+				if install_count < 1:
+					raise ApiError("INVALID_INSTALLMENT_COUNT", "installment_count must be at least 1", http_status=400)
+				obj.installment_count = install_count
 		if "extra_info" in data and isinstance(data["extra_info"], dict):
 			obj.extra_info = data["extra_info"]
+		if obj.first_installment_date is not None and obj.first_installment_date < obj.contract_date:
+			raise ApiError(
+				"INVALID_FIRST_INSTALLMENT_DATE",
+				"first_installment_date must be on or after contract_date",
+				http_status=400,
+			)
 
 	obj.updated_at = datetime.utcnow()
 	db.commit()
@@ -509,19 +712,34 @@ def delete_facility(db: Session, facility_id: int, business_id: int) -> bool:
 
 	obj = (
 		db.query(ReceivedLoanFacility)
+		.options(
+			selectinload(ReceivedLoanFacility.installments).selectinload(
+				ReceivedLoanInstallment.payments
+			),
+		)
 		.filter(and_(ReceivedLoanFacility.id == facility_id, ReceivedLoanFacility.business_id == business_id))
 		.first()
 	)
 	if not obj:
 		return False
-	if obj.status != LoanFacilityStatuses.draft:
-		raise ApiError("FACILITY_NOT_DRAFT", "Only draft facilities may be deleted", http_status=409)
-	if _facility_has_payments(db, facility_id):
-		raise ApiError("HAS_PAYMENTS", "Cannot delete facility with payments", http_status=409)
-	if obj.disbursement_document_id:
-		document_service.delete_document(db, int(obj.disbursement_document_id), commit=False)
+	current_fy = _current_fiscal_year(db, business_id)
+	_assert_loan_payments_deletable(obj, current_fiscal_year=current_fy)
+	related_docs = _collect_loan_documents(db, obj)
+	for doc in related_docs.values():
+		_assert_loan_document_deletable(
+			db,
+			doc,
+			facility_id=int(obj.id),
+			current_fiscal_year=current_fy,
+		)
+
+	cache_items = []
+	for doc in related_docs.values():
+		cache_items.append(_delete_loan_document_row(db, doc))
 	db.delete(obj)
 	db.commit()
+	for cache_kw in cache_items:
+		document_service.invalidate_documents_cache(**cache_kw)
 	return True
 
 
@@ -552,6 +770,12 @@ def regenerate_schedule(db: Session, facility_id: int, data: Dict[str, Any], act
 		fd = date.fromisoformat(str(fd_raw)[:10])
 	except Exception:
 		raise ApiError("BAD_SCHEDULE_PAYLOAD", "Invalid installment_count or date", http_status=400)
+	if fd < obj.contract_date:
+		raise ApiError(
+			"INVALID_FIRST_INSTALLMENT_DATE",
+			"first_installment_date must be on or after contract_date",
+			http_status=400,
+		)
 
 	rows = generate_installment_schedule(
 		method,
@@ -797,19 +1021,32 @@ def delete_loan_payment(
 
 	inst = pay_row.installment
 	fac = inst.facility
+	current_fy = _current_fiscal_year(db, business_id)
+	if not _date_in_fiscal_year(pay_row.payment_date, current_fy):
+		raise ApiError(
+			"FISCAL_YEAR_LOCKED",
+			"Loan installment payment is outside the active fiscal year",
+			http_status=409,
+		)
 
 	cache_kw: Dict[str, Any] | None = None
 	doc_id = pay_row.document_id
 	if doc_id:
 		doc_prev = db.get(Document, int(doc_id))
 		if doc_prev:
-			cache_kw = {
-				"business_id": int(doc_prev.business_id),
-				"fiscal_year_id": int(doc_prev.fiscal_year_id),
-				"document_id": int(doc_prev.id),
-				"document_type": str(doc_prev.document_type),
-			}
-			document_service.delete_document(db, int(doc_id), commit=False)
+			_assert_loan_document_deletable(
+				db,
+				doc_prev,
+				facility_id=int(fac.id),
+				current_fiscal_year=current_fy,
+			)
+			cache_kw = _delete_loan_document_row(db, doc_prev)
+		else:
+			raise ApiError(
+				"LOAN_DOCUMENT_MISSING",
+				"Linked loan payment document is missing; repair loan accounting links before deleting the payment",
+				http_status=409,
+			)
 
 	ppri = _money(pay_row.principal_part)
 	pint = _money(pay_row.interest_part)

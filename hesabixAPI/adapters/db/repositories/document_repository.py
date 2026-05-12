@@ -263,6 +263,7 @@ class DocumentRepository:
                 "payment": "پرداخت",
                 "transfer": "انتقال",
                 "manual": "سند دستی",
+                "received_loan_facility": "تسهیلات دریافتی",
                 "invoice": "فاکتور",
                 "check": "چک",
             }

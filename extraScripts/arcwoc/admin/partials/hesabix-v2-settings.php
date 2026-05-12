@@ -48,6 +48,7 @@ for ($iwp = 0; $iwp < 12; $iwp++) {
 }
 $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 $saved_currency_id = (int) get_option('hesabix_v2_currency_id', 0);
+$saved_shipping_adjustment_account_id = isset($sync_settings['shipping_adjustment_account_id']) ? (int) $sync_settings['shipping_adjustment_account_id'] : 0;
 $hesabix_v2_upd_defaults = array(
 	'current_version' => defined('HESABIX_V2_VERSION') ? HESABIX_V2_VERSION : '',
 	'remote_version' => '',
@@ -539,6 +540,34 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				</td>
 			</tr>
 			<tr>
+				<th scope="row"><?php _e('ثبت هزینه حمل ووکامرس', 'hesabix-v2'); ?></th>
+				<td>
+					<label style="display:block;margin-bottom:6px;">
+						<input type="radio" name="shipping_line_mode" value="service" <?php checked(($sync_settings['shipping_line_mode'] ?? 'service'), 'service'); ?>>
+						<?php _e('به‌عنوان خدمت در خطوط فاکتور (رفتار فعلی)', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:block;margin-bottom:8px;">
+						<input type="radio" name="shipping_line_mode" value="account_adjustment" <?php checked(($sync_settings['shipping_line_mode'] ?? 'service'), 'account_adjustment'); ?>>
+						<?php _e('به‌عنوان ردیف حساب درآمد حمل، خارج از محاسبه سود فاکتور', 'hesabix-v2'); ?>
+					</label>
+					<p class="description"><?php _e('در حالت ردیف حساب، مبلغ حمل به جمع و سند حسابداری فاکتور اضافه می‌شود اما در گزارش سود فاکتور به‌عنوان سود کالا/خدمت محاسبه نمی‌گردد.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr class="hesabix-v2-shipping-account-row">
+				<th scope="row"><?php _e('حساب درآمد حمل', 'hesabix-v2'); ?></th>
+				<td>
+					<select name="shipping_adjustment_account_id" id="hesabix_v2_shipping_adjustment_account_id" class="regular-text">
+						<option value="0"><?php _e('— انتخاب حساب —', 'hesabix-v2'); ?></option>
+						<?php if ($saved_shipping_adjustment_account_id > 0) : ?>
+							<option value="<?php echo esc_attr((string) $saved_shipping_adjustment_account_id); ?>" selected><?php echo esc_html(sprintf(__('حساب ذخیره‌شده #%d', 'hesabix-v2'), $saved_shipping_adjustment_account_id)); ?></option>
+						<?php endif; ?>
+					</select>
+					<button type="button" id="hesabix_v2_load_shipping_accounts" class="button button-secondary" style="margin-right:8px;"><?php _e('بارگذاری حساب‌ها از حسابیکس', 'hesabix-v2'); ?></button>
+					<span id="hesabix_v2_shipping_account_status" class="description" style="margin-right:8px;" aria-live="polite"></span>
+					<p class="description"><?php _e('پیشنهاد پیش‌فرض حساب «60104 — درآمد حمل کالا» است. اگر حساب انتخاب نشود، افزونه هنگام همگام‌سازی تلاش می‌کند همین حساب را از چارت حساب‌ها پیدا کند.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr>
 				<th scope="row"><?php _e('ارز فاکتور (حسابیکس)', 'hesabix-v2'); ?></th>
 				<td>
 					<select name="hesabix_v2_currency_id" id="hesabix_v2_currency_id" class="regular-text">
@@ -694,6 +723,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			var savedBank = '<?php echo esc_js((string) get_option('hesabix_v2_default_bank_id', '')); ?>';
 			var savedCashRegister = '<?php echo esc_js((string) $saved_cash_register_id); ?>';
 			var savedCurrency = '<?php echo esc_js((string) $saved_currency_id); ?>';
+			var savedShippingAdjustmentAccountId = <?php echo (int) $saved_shipping_adjustment_account_id; ?>;
 			var savedStockPullWhIds = <?php echo wp_json_encode(array_values(array_map('intval', isset($stock_pull_opts['warehouse_ids']) ? $stock_pull_opts['warehouse_ids'] : array()))); ?>;
 			var savedInvoiceWhRuleIds = <?php echo wp_json_encode(array_map('intval', $inv_wh_saved_wids)); ?>;
 			var savedInvoiceExtraTagIds = <?php echo wp_json_encode(array_values(array_map('intval', $saved_invoice_extra_tag_ids))); ?>;
@@ -728,6 +758,80 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			}
 			$('input[name="hesabix_v2_invoice_payment_destination"]').on('change', hesabixV2TogglePaymentRows);
 			hesabixV2TogglePaymentRows();
+
+			function hesabixV2ToggleShippingAccountRow() {
+				var mode = $('input[name="shipping_line_mode"]:checked').val() || 'service';
+				$('.hesabix-v2-shipping-account-row').toggle(mode === 'account_adjustment');
+			}
+			$('input[name="shipping_line_mode"]').on('change', hesabixV2ToggleShippingAccountRow);
+			hesabixV2ToggleShippingAccountRow();
+
+			function hesabixV2FillShippingAccountSelect(accounts) {
+				var $sel = $('#hesabix_v2_shipping_adjustment_account_id');
+				if (!$sel.length) {
+					return;
+				}
+				var keep = $sel.val();
+				var desired = (keep && keep !== '0') ? keep : (savedShippingAdjustmentAccountId > 0 ? String(savedShippingAdjustmentAccountId) : '');
+				$sel.empty().append($('<option></option>').val('0').text('<?php echo esc_js(__('— انتخاب حساب —', 'hesabix-v2')); ?>'));
+				(accounts || []).forEach(function(a){
+					if (!a || !a.id) {
+						return;
+					}
+					var label = a.label || (((a.code || '') ? String(a.code) + ' — ' : '') + (a.name || String(a.id)));
+					var $opt = $('<option></option>').val(String(a.id)).text(label);
+					if (a.code) {
+						$opt.attr('data-code', String(a.code));
+					}
+					$sel.append($opt);
+				});
+				if (desired !== '') {
+					$sel.val(desired);
+				}
+				if (($sel.val() === null || $sel.val() === '0') && !desired) {
+					var $default = $sel.find('option[data-code="60104"]').first();
+					if ($default.length) {
+						$sel.val($default.val());
+					}
+				}
+				if (desired !== '' && ($sel.val() === null || $sel.val() === '0')) {
+					$sel.append($('<option></option>').val(desired).text(desired + ' — ' + invoiceTagOrphanSuffix).prop('selected', true));
+				}
+			}
+
+			function hesabixV2LoadShippingAccounts(isAuto) {
+				var $btn = $('#hesabix_v2_load_shipping_accounts');
+				var $st = $('#hesabix_v2_shipping_account_status');
+				if (!$btn.length) {
+					return;
+				}
+				if (!isAuto) {
+					$btn.prop('disabled', true);
+					$st.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>').css('color', '');
+				}
+				$.post(hesabix_v2_ajax.ajax_url, {
+					action: 'hesabix_v2_opening_inventory_accounts',
+					nonce: hesabix_v2_ajax.nonce
+				}).done(function(res){
+					var accounts = (res && res.success && res.data && res.data.accounts) ? res.data.accounts : [];
+					hesabixV2FillShippingAccountSelect(accounts);
+					if (!isAuto) {
+						$st.text(accounts.length ? '<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>' : '<?php echo esc_js(__('حسابی برنگشت.', 'hesabix-v2')); ?>').css('color', accounts.length ? 'green' : 'red');
+					}
+				}).fail(function(){
+					if (!isAuto) {
+						$st.text('<?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?>').css('color', 'red');
+					}
+				}).always(function(){
+					if (!isAuto) {
+						$btn.prop('disabled', false);
+					}
+				});
+			}
+
+			$('#hesabix_v2_load_shipping_accounts').on('click', function(){
+				hesabixV2LoadShippingAccounts(false);
+			});
 
 			function hesabixV2LoadWarehousesBanksCurrencies(isAuto) {
 				var $btn = $('#hesabix_v2_load_warehouses_banks');
@@ -816,6 +920,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 
 			$(function(){
 				hesabixV2LoadWarehousesBanksCurrencies(true);
+				hesabixV2LoadShippingAccounts(true);
 			});
 
 			$('#hesabix_v2_stock_pull_now_btn').on('click', function(){

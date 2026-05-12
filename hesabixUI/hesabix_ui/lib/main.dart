@@ -119,6 +119,7 @@ import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
+import 'pages/business/basalam/basalam_integration_page.dart';
 import 'pages/business/notification_templates_page.dart';
 import 'pages/business/notification_template_form_page.dart';
 import 'pages/public/public_warranty_activation_page.dart';
@@ -2030,6 +2031,17 @@ class _MyAppState extends State<MyApp> {
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'basalam',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, BasalamIntegrationPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
                   ),
                 );
               },

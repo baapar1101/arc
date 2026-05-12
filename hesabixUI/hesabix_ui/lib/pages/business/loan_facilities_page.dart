@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,11 +11,15 @@ import '../../services/currency_service.dart';
 import '../../services/loan_facilities_service.dart';
 import '../../utils/currency_display_utils.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/number_formatters.dart' show formatWithThousands;
+import '../../utils/number_normalizer.dart'
+    show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, formatNumberForInput, toEnglishDigits;
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../widgets/date_input_field.dart';
 import '../../widgets/document/document_details_dialog.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
+import '../../widgets/money/amount_field_words_tooltip.dart';
 import '../../widgets/permission/access_denied_page.dart';
 
 /// لیست و جزئیات تسهیلات دریافتی (قرارداد، اقساط، پرداخت‌ها، سند حسابداری)
@@ -283,7 +288,7 @@ class _LoanFacilitiesPageState extends State<LoanFacilitiesPage> {
       child: ListTile(
         leading: Icon(Icons.real_estate_agent_outlined, color: Theme.of(context).colorScheme.primary),
         title: Text(titleText),
-        subtitle: Text('$st · ${_formatAmt(pr)}'),
+        subtitle: Text('$st · ${_formatAmount(pr)}'),
         trailing: const Icon(Icons.chevron_right),
         onTap: id == null
             ? null
@@ -294,7 +299,15 @@ class _LoanFacilitiesPageState extends State<LoanFacilitiesPage> {
     );
   }
 
-  String _formatAmt(dynamic x) => x?.toString() ?? '—';
+}
+
+String _normalizeNumericText(String raw) {
+  return toEnglishDigits(raw)
+      .trim()
+      .replaceAll('٫', '.')
+      .replaceAll('٬', '')
+      .replaceAll(',', '')
+      .replaceAll(RegExp(r'\s+'), '');
 }
 
 int? _asInt(dynamic v) {
@@ -302,7 +315,11 @@ int? _asInt(dynamic v) {
   if (v is int) return v;
   if (v is double) return v.round();
   if (v is num) return v.toInt();
-  if (v is String) return int.tryParse(v.trim().replaceAll(',', ''));
+  if (v is String) {
+    final normalized = _normalizeNumericText(v);
+    if (normalized.isEmpty) return null;
+    return int.tryParse(normalized) ?? double.tryParse(normalized)?.round();
+  }
   return null;
 }
 
@@ -312,11 +329,91 @@ double? _asDouble(dynamic v) {
   if (v is int) return v.toDouble();
   if (v is num) return v.toDouble();
   if (v is String) {
-    final t = v.trim().replaceAll(',', '').replaceAll('٫', '.');
+    final t = _normalizeNumericText(v);
     if (t.isEmpty) return null;
     return double.tryParse(t);
   }
   return null;
+}
+
+String _formatAmount(dynamic value, {int? decimalPlaces}) {
+  final n = _asDouble(value);
+  if (n == null) return '—';
+  final places = decimalPlaces ?? (n % 1 == 0 ? 0 : 2);
+  return formatWithThousands(n, decimalPlaces: places);
+}
+
+String _formatInputAmount(dynamic value, {int? decimalPlaces}) {
+  final n = _asDouble(value);
+  if (n == null) return '';
+  return formatNumberForInput(n, decimalPlaces: decimalPlaces);
+}
+
+String _uiText(BuildContext context, {required String fa, required String en}) {
+  final locale = Localizations.localeOf(context).languageCode.toLowerCase();
+  return locale.startsWith('fa') ? fa : en;
+}
+
+double _roundMoney(double value) => (value * 100).roundToDouble() / 100;
+
+double _installmentRemainingTotal(Map<String, dynamic> instMap) {
+  return (_asDouble(instMap['remaining_principal']) ?? 0) +
+      (_asDouble(instMap['remaining_interest']) ?? 0) +
+      (_asDouble(instMap['remaining_penalty']) ?? 0);
+}
+
+class _SchedulePreview {
+  final double firstInstallment;
+  final double lastInstallment;
+  final double totalInterest;
+  final double totalRepayment;
+
+  const _SchedulePreview({
+    required this.firstInstallment,
+    required this.lastInstallment,
+    required this.totalInterest,
+    required this.totalRepayment,
+  });
+}
+
+_SchedulePreview? _calculateSchedulePreview({
+  required String method,
+  required double principal,
+  required double annualRatePercent,
+  required int installmentCount,
+}) {
+  if (principal <= 0 || installmentCount < 1 || annualRatePercent < 0) return null;
+
+  final monthlyRate = annualRatePercent / 100 / 12;
+  var balance = _roundMoney(principal);
+  var totalInterest = 0.0;
+  double? firstInstallment;
+  double? lastInstallment;
+
+  for (var period = 1; period <= installmentCount; period++) {
+    final interestPart = _roundMoney(balance * monthlyRate);
+    double principalPart;
+    if (method == _RegenerateScheduleDialogState._equalPrincipal || monthlyRate == 0) {
+      final eachPrincipal = _roundMoney(principal / installmentCount);
+      principalPart = period < installmentCount ? eachPrincipal : _roundMoney(balance);
+    } else {
+      final onePlus = math.pow(1 + monthlyRate, installmentCount).toDouble();
+      final emi = _roundMoney(principal * monthlyRate * onePlus / (onePlus - 1));
+      principalPart = period < installmentCount ? _roundMoney(math.min(math.max(emi - interestPart, 0.0), balance)) : _roundMoney(balance);
+    }
+    final installmentTotal = _roundMoney(principalPart + interestPart);
+    firstInstallment ??= installmentTotal;
+    lastInstallment = installmentTotal;
+    totalInterest = _roundMoney(totalInterest + interestPart);
+    balance = _roundMoney(balance - principalPart);
+  }
+
+  return _SchedulePreview(
+    firstInstallment: firstInstallment ?? 0,
+    lastInstallment: lastInstallment ?? 0,
+    totalInterest: totalInterest,
+    totalRepayment: _roundMoney(principal + totalInterest),
+  );
 }
 
 DateTime? _parseIsoDate(dynamic raw) {
@@ -379,13 +476,13 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
     final i = _i ?? const {};
     _titleCtl = TextEditingController(text: '${i['title'] ?? ''}');
     _principalCtl = TextEditingController(
-      text: i['principal_amount'] != null ? '${i['principal_amount']}' : '',
+      text: _formatInputAmount(i['principal_amount']),
     );
     _rateCtl = TextEditingController(
       text: i['annual_interest_rate_percent'] != null ? '${i['annual_interest_rate_percent']}' : '',
     );
     final ic = i['installment_count'];
-    _instCountCtl = TextEditingController(text: ic != null ? '$ic' : '');
+    _instCountCtl = TextEditingController(text: _formatInputAmount(ic, decimalPlaces: 0));
     _notesCtl = TextEditingController(text: '${i['notes'] ?? ''}');
     _contractDate = _parseIsoDate(i['contract_date']) ?? DateTime.now();
     _firstInstallmentDate = _parseIsoDate(i['first_installment_date']);
@@ -428,6 +525,26 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
         );
         return;
       }
+      final annual = _asDouble(_rateCtl.text.trim());
+      if (_rateCtl.text.trim().isNotEmpty && (annual == null || annual < 0)) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(lt.loanFacilityValidationAmountInvalid)),
+        );
+        return;
+      }
+      final installmentCount = _asInt(_instCountCtl.text.trim());
+      if (_instCountCtl.text.trim().isNotEmpty && (installmentCount == null || installmentCount < 1)) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(lt.loanFacilityRegenerateValidationCount)),
+        );
+        return;
+      }
+      if (_firstInstallmentDate != null && _firstInstallmentDate!.isBefore(_contractDate)) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(lt.loanFacilityRegenerateValidationFirstDue)),
+        );
+        return;
+      }
     }
 
     setState(() => _saving = true);
@@ -442,7 +559,7 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
           'contract_date': _isoDate(_contractDate),
           if (_rateCtl.text.trim().isNotEmpty) 'annual_interest_rate_percent': _asDouble(_rateCtl.text.trim()),
           if (_firstInstallmentDate != null) 'first_installment_date': _isoDate(_firstInstallmentDate!),
-          if (_instCountCtl.text.trim().isNotEmpty) 'installment_count': int.tryParse(_instCountCtl.text.trim()),
+          if (_instCountCtl.text.trim().isNotEmpty) 'installment_count': _asInt(_instCountCtl.text.trim()),
           if (_notesCtl.text.trim().isNotEmpty) 'notes': _notesCtl.text.trim(),
         };
         final bid = _lenderBankAccountIdStr != null && _lenderBankAccountIdStr!.isNotEmpty
@@ -471,7 +588,7 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
           final fi = _firstInstallmentDate;
           body['first_installment_date'] = fi != null ? _isoDate(fi) : null;
           final icText = _instCountCtl.text.trim();
-          body['installment_count'] = icText.isEmpty ? null : int.tryParse(icText);
+          body['installment_count'] = icText.isEmpty ? null : _asInt(icText);
           final lb = _lenderBankAccountIdStr != null && _lenderBankAccountIdStr!.isNotEmpty
               ? int.tryParse(_lenderBankAccountIdStr!)
               : null;
@@ -539,13 +656,20 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
                     onChanged: (id) => setState(() => _currencyId = id),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
+                  AmountFieldWordsTooltip(
                     controller: _principalCtl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]+'))],
-                    decoration: InputDecoration(
-                      labelText: t.loanFacilityFieldPrincipal,
-                      border: const OutlineInputBorder(),
+                    currencyUnit: '',
+                    child: TextFormField(
+                      controller: _principalCtl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: const [
+                        EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(allowDecimal: true),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: t.loanFacilityFieldPrincipal,
+                        border: const OutlineInputBorder(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -561,6 +685,10 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
                   TextFormField(
                     controller: _rateCtl,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      const EnglishDigitsFormatter(),
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
                     decoration: InputDecoration(
                       labelText: t.loanFacilityFieldAnnualRate,
                       border: const OutlineInputBorder(),
@@ -570,6 +698,10 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
                   TextFormField(
                     controller: _instCountCtl,
                     keyboardType: TextInputType.number,
+                    inputFormatters: const [
+                      EnglishDigitsFormatter(),
+                      ThousandsSeparatorInputFormatter(allowDecimal: false),
+                    ],
                     decoration: InputDecoration(
                       labelText: t.loanFacilityFieldInstallmentCountOptional,
                       border: const OutlineInputBorder(),
@@ -717,7 +849,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     );
   }
 
-  Future<void> _deleteDraft() async {
+  Future<void> _deleteFacility() async {
     final t = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
@@ -840,7 +972,8 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     if (fullyPaid) return;
 
     final currencyId = _asInt(_detail?['currency_id']);
-    final amountCtl = TextEditingController();
+    final remainingTotal = _installmentRemainingTotal(instMap);
+    final amountCtl = TextEditingController(text: _formatInputAmount(remainingTotal));
     String? bankIdStr;
 
     final submitted = await showDialog<bool>(
@@ -855,10 +988,23 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  TextField(
+                  Text(
+                    '${_uiText(dlgCtx, fa: 'مانده قابل پرداخت', en: 'Remaining payable')}: ${_formatAmount(remainingTotal)}',
+                    style: Theme.of(dlgCtx).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  AmountFieldWordsTooltip(
                     controller: amountCtl,
-                    decoration: InputDecoration(labelText: dt.loanFacilityAmount),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    currencyUnit: _currencyLabel(dlgCtx, currencyId),
+                    child: TextField(
+                      controller: amountCtl,
+                      decoration: InputDecoration(labelText: dt.loanFacilityAmount),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: const [
+                        EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(allowDecimal: true),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 12),
                   BankAccountComboboxWidget(
@@ -887,7 +1033,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
               FilledButton(
                 onPressed: () {
                   final amt = _asDouble(amountCtl.text.trim());
-                  if (amt == null || amt <= 0) {
+                  if (amt == null || amt <= 0 || (remainingTotal > 0 && amt > remainingTotal + 0.000001)) {
                     ScaffoldMessenger.maybeOf(dlgCtx)?.showSnackBar(
                       SnackBar(content: Text(dt.loanFacilityValidationAmountInvalid)),
                     );
@@ -909,10 +1055,12 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
       },
     );
 
+    final amountText = amountCtl.text;
+    amountCtl.dispose();
     if (submitted != true || !mounted) return;
-    final amt = _asDouble(amountCtl.text.trim());
+    final amt = _asDouble(amountText.trim());
     final bankInt = bankIdStr != null ? int.tryParse(bankIdStr!) : null;
-    if (amt == null || amt <= 0 || bankInt == null) return;
+    if (amt == null || amt <= 0 || (remainingTotal > 0 && amt > remainingTotal + 0.000001) || bankInt == null) return;
 
     try {
       await widget.service.recordInstallmentPayment(
@@ -943,10 +1091,10 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     return false;
   }
 
-  bool get _canDeleteDraft =>
+  bool get _canDeleteFacility =>
       widget.canEdit &&
       widget.authStore.hasBusinessPermission('loan_facilities', 'delete') &&
-      _detail?['status']?.toString() == 'draft';
+      _detail != null;
 
   @override
   Widget build(BuildContext context) {
@@ -991,11 +1139,11 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
               ),
               if (widget.canEdit) ...[
                 IconButton(icon: const Icon(Icons.edit_outlined), tooltip: t.loanFacilityTooltipEdit, onPressed: _editContract),
-                if (_canDeleteDraft)
+                if (_canDeleteFacility)
                   IconButton(
                     icon: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
                     tooltip: t.loanFacilityTooltipDeleteDraft,
-                    onPressed: _deleteDraft,
+                    onPressed: _deleteFacility,
                   ),
               ],
               IconButton(icon: const Icon(Icons.refresh), onPressed: _reload),
@@ -1016,7 +1164,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
                       const SizedBox(height: 8),
                       Text('${t.loanFacilitySummaryStatus}: ${d['status'] ?? '—'}'),
                       Text('${t.loanFacilitySummaryCurrency}: ${_currencyLabel(context, cid)}'),
-                      Text('${t.loanFacilitySummaryPrincipal}: ${d['principal_amount'] ?? '—'}'),
+                      Text('${t.loanFacilitySummaryPrincipal}: ${_formatAmount(d['principal_amount'])}'),
                       Text('${t.loanFacilitySummaryAnnualRate}: ${d['annual_interest_rate_percent'] ?? '—'}'),
                       Text('${t.loanFacilitySummaryContractDate}: ${d['contract_date'] ?? '—'}'),
                       Text('${t.loanFacilitySummaryFirstInstallment}: ${d['first_installment_date'] ?? '—'}'),
@@ -1070,8 +1218,9 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
 
     final seq = instMap['sequence_no'];
     final due = '${instMap['due_date'] ?? ''}';
-    final remPri = '${instMap['remaining_principal']}';
-    final remInt = '${instMap['remaining_interest']}';
+    final remPri = _formatAmount(instMap['remaining_principal']);
+    final remInt = _formatAmount(instMap['remaining_interest']);
+    final remTotal = _formatAmount(_installmentRemainingTotal(instMap));
     final fullyPaid = instMap['is_fully_paid'] == true;
 
     final paysRaw = instMap['payments'];
@@ -1084,8 +1233,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
       child: ExpansionTile(
         leading: Icon(fullyPaid ? Icons.check_circle_outline : Icons.pending_outlined),
         title: Text(st.loanFacilityInstallmentLine('$seq', due)),
-        subtitle:
-            Text(st.loanFacilityRemainingPrincipalInterest(remPri, remInt)),
+        subtitle: Text('${st.loanFacilityRemainingPrincipalInterest(remPri, remInt)} · $remTotal'),
         children: [
           if (widget.canEdit && !fullyPaid)
             ListTile(
@@ -1095,7 +1243,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
             ),
           ...pays.map((p) {
             final docId = _asInt(p['document_id']);
-            final amt = '${p['amount_total'] ?? ''}';
+            final amt = _formatAmount(p['amount_total']);
             final pdate = '${p['payment_date'] ?? ''}';
             final pid = _asInt(p['id']);
             return ListTile(
@@ -1170,7 +1318,7 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
       _method = _annuity;
     }
     final ic = widget.detail['installment_count'];
-    _countCtl = TextEditingController(text: ic != null ? '$ic' : '');
+    _countCtl = TextEditingController(text: _formatInputAmount(ic, decimalPlaces: 0));
     _firstDue = _parseIsoDate(widget.detail['first_installment_date']);
     _disburseBankIdStr = widget.detail['lender_bank_account_id'] != null
         ? '${widget.detail['lender_bank_account_id']}'
@@ -1185,9 +1333,22 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
 
   int? get _currencyId => _asInt(widget.detail['currency_id']);
 
+  _SchedulePreview? get _preview {
+    final principal = _asDouble(widget.detail['principal_amount']);
+    final annual = _asDouble(widget.detail['annual_interest_rate_percent']) ?? 0;
+    final count = _asInt(_countCtl.text);
+    if (principal == null || count == null) return null;
+    return _calculateSchedulePreview(
+      method: _method,
+      principal: principal,
+      annualRatePercent: annual,
+      installmentCount: count,
+    );
+  }
+
   Future<void> _submit() async {
     final t = AppLocalizations.of(context);
-    final n = int.tryParse(_countCtl.text.trim());
+    final n = _asInt(_countCtl.text.trim());
     if (n == null || n < 1) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(content: Text(t.loanFacilityRegenerateValidationCount)),
@@ -1195,6 +1356,13 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
       return;
     }
     if (_firstDue == null) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(t.loanFacilityRegenerateValidationFirstDue)),
+      );
+      return;
+    }
+    final contractDate = _parseIsoDate(widget.detail['contract_date']);
+    if (contractDate != null && _firstDue!.isBefore(contractDate)) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         SnackBar(content: Text(t.loanFacilityRegenerateValidationFirstDue)),
       );
@@ -1245,6 +1413,7 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final preview = _preview;
     return AlertDialog(
       title: Text(t.loanFacilityRegenerateDialogTitle),
       content: SingleChildScrollView(
@@ -1276,10 +1445,15 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
             TextField(
               controller: _countCtl,
               keyboardType: TextInputType.number,
+              inputFormatters: const [
+                EnglishDigitsFormatter(),
+                ThousandsSeparatorInputFormatter(allowDecimal: false),
+              ],
               decoration: InputDecoration(
                 labelText: t.loanFacilityRegenerateCountRequired,
                 border: const OutlineInputBorder(),
               ),
+              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 12),
             DateInputField(
@@ -1289,6 +1463,29 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
               labelText: t.loanFacilityRegenerateFirstDueRequired,
               onChanged: (d) => setState(() => _firstDue = d),
             ),
+            if (preview != null) ...[
+              const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _uiText(context, fa: 'پیش‌نمایش اقساط', en: 'Installment preview'),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text('${_uiText(context, fa: 'قسط اول', en: 'First installment')}: ${_formatAmount(preview.firstInstallment)}'),
+                      Text('${_uiText(context, fa: 'قسط آخر', en: 'Last installment')}: ${_formatAmount(preview.lastInstallment)}'),
+                      Text('${_uiText(context, fa: 'جمع بهره', en: 'Total interest')}: ${_formatAmount(preview.totalInterest)}'),
+                      Text('${_uiText(context, fa: 'جمع بازپرداخت', en: 'Total repayment')}: ${_formatAmount(preview.totalRepayment)}'),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             BankAccountComboboxWidget(
               businessId: widget.businessId,

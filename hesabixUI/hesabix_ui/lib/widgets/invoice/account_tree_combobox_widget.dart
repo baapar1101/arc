@@ -52,6 +52,14 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
   }
 
   @override
+  void didUpdateWidget(AccountTreeComboboxWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedAccount?.id != widget.selectedAccount?.id) {
+      _searchController.text = widget.selectedAccount?.displayName ?? '';
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -218,17 +226,22 @@ class _AccountTreeDialogState extends State<_AccountTreeDialog> {
       final filteredChildren = _filterTree(node.children);
       
       if (matchesSearch || filteredChildren.isNotEmpty) {
+        // If a parent node itself matches the search, keep its children so it
+        // remains non-selectable; accounting entries must use leaf accounts.
+        final children = filteredChildren.isNotEmpty
+            ? filteredChildren
+            : (matchesSearch && node.children.isNotEmpty ? node.children : filteredChildren);
         filtered.add(AccountTreeNode(
           id: node.id,
           code: node.code,
           name: node.name,
           accountType: node.accountType,
           parentId: node.parentId,
-          children: filteredChildren,
+          children: children,
         ));
         
         // باز کردن خودکار نودهای دارای نتیجه جستجو
-        if (filteredChildren.isNotEmpty) {
+        if (children.isNotEmpty) {
           _expandedNodes.add(node.id);
         }
       }

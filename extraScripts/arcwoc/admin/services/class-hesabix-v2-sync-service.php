@@ -745,6 +745,22 @@ class Hesabix_V2_Sync_Service
 
 			foreach ($chunk as $prep) {
 				$cref = 'wc_order:' . (int) $prep['order_id'];
+				$hid_prepare = (!empty($prep['hesabix_invoice_id']) && absint($prep['hesabix_invoice_id']) > 0)
+					? absint($prep['hesabix_invoice_id'])
+					: 0;
+
+				$rp_gate_b = array(
+					'had_positive_rp' => false,
+					'omitted_payments' => false,
+				);
+				if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+					$rp_gate_b = Hesabix_V2_Order_Sync_Meta::maybe_omit_repeat_invoice_payments(
+						$prep['order'],
+						$hid_prepare > 0 ? $hid_prepare : null,
+						$prep['invoice_data']
+					);
+				}
+
 				$items[] = array(
 					'client_ref' => $cref,
 					'invoice_id' => (!empty($prep['hesabix_invoice_id']) && absint($prep['hesabix_invoice_id']) > 0)
@@ -756,6 +772,8 @@ class Hesabix_V2_Sync_Service
 				$cref_meta[ $cref ] = array(
 					'is_new_invoice' => !empty($prep['is_new_invoice']),
 					'fiscal_note' => isset($prep['fiscal_note']) ? (string) $prep['fiscal_note'] : '',
+					'rp_gate' => $rp_gate_b,
+					'invoice_payload_for_rp' => $prep['invoice_data'],
 				);
 			}
 
@@ -802,6 +820,18 @@ class Hesabix_V2_Sync_Service
 						$this->db->save_mapping('order', $oid, null, $hid, 'invoice');
 						if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
 							Hesabix_V2_Order_Sync_Meta::remove_order_system_note($oobj);
+
+							$mcref = isset($cref_meta[ $cref ]) ? $cref_meta[ $cref ] : array();
+							$rg_ok = (isset($mcref['rp_gate']) && is_array($mcref['rp_gate']))
+								? $mcref['rp_gate']
+								: array(
+									'had_positive_rp' => false,
+									'omitted_payments' => false,
+								);
+							$inv_fp = (isset($mcref['invoice_payload_for_rp']) && is_array($mcref['invoice_payload_for_rp']))
+								? $mcref['invoice_payload_for_rp']
+								: array();
+							Hesabix_V2_Order_Sync_Meta::persist_rp_sync_state_after_invoice_success($oobj, $rg_ok, $inv_fp, $hid);
 						}
 
 						$meta_note = isset($cref_meta[ $cref ]) ? $cref_meta[ $cref ] : array();
@@ -1003,6 +1033,21 @@ class Hesabix_V2_Sync_Service
 			$existing_mapping = $this->db->get_mapping('order', $order_id);
 			$is_new_invoice = !$existing_mapping;
 
+			$rp_gate = array(
+				'had_positive_rp' => false,
+				'omitted_payments' => false,
+			);
+			if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+				$hid_gate = ($existing_mapping && !empty($existing_mapping['hesabix_id']))
+					? absint((string) $existing_mapping['hesabix_id'])
+					: 0;
+				$rp_gate = Hesabix_V2_Order_Sync_Meta::maybe_omit_repeat_invoice_payments(
+					$order,
+					$hid_gate > 0 ? $hid_gate : null,
+					$invoice_data
+				);
+			}
+
 			if ($existing_mapping) {
 				// Update existing invoice
 				$api_last_result = $this->api->update_invoice($existing_mapping['hesabix_id'], $invoice_data);
@@ -1044,6 +1089,15 @@ class Hesabix_V2_Sync_Service
 				}
 				if (!empty($fiscal['note'])) {
 					$order->add_order_note((string) $fiscal['note']);
+				}
+
+				if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
+					Hesabix_V2_Order_Sync_Meta::persist_rp_sync_state_after_invoice_success(
+						$order,
+						$rp_gate,
+						$invoice_data,
+						$hesabix_id
+					);
 				}
 
 				return array(

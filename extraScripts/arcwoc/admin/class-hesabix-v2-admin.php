@@ -789,6 +789,12 @@ class Hesabix_V2_Admin
 				? sanitize_text_field(wp_unslash($_POST['invoice_tag_website_name']))
 				: 'فروش سایت',
 			'invoice_extra_tag_ids' => self::sanitize_invoice_extra_tag_ids_from_post(),
+			'shipping_line_mode' => isset($_POST['shipping_line_mode'])
+				? sanitize_key(wp_unslash($_POST['shipping_line_mode']))
+				: 'service',
+			'shipping_adjustment_account_id' => isset($_POST['shipping_adjustment_account_id'])
+				? absint(wp_unslash($_POST['shipping_adjustment_account_id']))
+				: 0,
 			'order_fiscal_year_date_policy' => isset($_POST['order_fiscal_year_date_policy'])
 				? sanitize_key(wp_unslash($_POST['order_fiscal_year_date_policy']))
 				: 'keep',
@@ -805,6 +811,9 @@ class Hesabix_V2_Admin
 		$policy_allowed = array('wc', 'physical_always', 'always_on', 'always_off');
 		if (!isset($sync_settings['track_inventory_policy']) || !in_array($sync_settings['track_inventory_policy'], $policy_allowed, true)) {
 			$sync_settings['track_inventory_policy'] = 'wc';
+		}
+		if (!in_array($sync_settings['shipping_line_mode'], array('service', 'account_adjustment'), true)) {
+			$sync_settings['shipping_line_mode'] = 'service';
 		}
 
 		update_option('hesabix_v2_sync_settings', $sync_settings);
@@ -1568,6 +1577,8 @@ class Hesabix_V2_Admin
 				$name = isset($row['name']) ? (string) $row['name'] : '';
 				$items[] = array(
 					'id' => (int) $row['id'],
+					'code' => $code,
+					'name' => $name,
 					'label' => trim($code . ' — ' . $name),
 				);
 			}

@@ -29,7 +29,7 @@ from app.core.received_loan_facility_accounts import (
 
 logger = logging.getLogger(__name__)
 
-DOCUMENT_TYPE_MANUAL = "manual"
+DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY = "received_loan_facility"
 BANK_LEDGER_ACCOUNT_CODE = "10203"
 
 DOCUMENT_SOURCE_RECEIVED_LOAN_FACILITY = "received_loan_facility"
@@ -135,19 +135,19 @@ def _create_balanced_manual_document(
 	ensure_document_policy_allows_creation(
 		db,
 		business_id,
-		document_type=DOCUMENT_TYPE_MANUAL,
+		document_type=DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY,
 		document_date=document_date,
 		amount=td,
 	)
 
 	document: Document | None = None
 	for _attempt in range(8):
-		doc_code = generate_document_code(db, business_id, DOCUMENT_TYPE_MANUAL, document_date)
+		doc_code = generate_document_code(db, business_id, DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY, document_date)
 		candidate = Document(
 			business_id=business_id,
 			fiscal_year_id=fiscal_year.id,
 			code=doc_code,
-			document_type=DOCUMENT_TYPE_MANUAL,
+			document_type=DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY,
 			document_date=document_date,
 			currency_id=int(currency_id),
 			created_by_user_id=user_id,
@@ -329,7 +329,7 @@ def notify_document_cache_manual(db: Session, document: Document) -> None:
 			business_id=document.business_id,
 			fiscal_year_id=document.fiscal_year_id,
 			document_id=document.id,
-			document_type=DOCUMENT_TYPE_MANUAL,
+			document_type=DOCUMENT_TYPE_RECEIVED_LOAN_FACILITY,
 		)
 	except Exception as e:
 		logger.warning("loan_doc_cache_invalidate_failed", extra={"error": str(e)})

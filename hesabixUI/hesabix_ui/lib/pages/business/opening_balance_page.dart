@@ -14,7 +14,7 @@ import 'package:hesabix_ui/widgets/invoice/petty_cash_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
-import 'package:hesabix_ui/widgets/invoice/account_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/services/bank_account_service.dart';
@@ -1236,7 +1236,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             ),
             SizedBox(
               width: 320,
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _inventoryAccount,
                 onChanged: (acc) {
@@ -1338,7 +1338,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
           children: [
             SizedBox(
               width: 320,
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: null,
                 onChanged: (acc) {
@@ -1354,7 +1354,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             ),
             SizedBox(
               width: 320,
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _equityAccount,
                 onChanged: (acc) {
@@ -1586,7 +1586,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         Row(
           children: [
             Expanded(
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _inventoryAccount,
                 onChanged: (acc) {
@@ -1603,7 +1603,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _equityAccount,
                 onChanged: (acc) {
@@ -1624,7 +1624,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         Row(
           children: [
             Expanded(
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _bankControlAccount,
                 onChanged: (acc) {
@@ -1641,7 +1641,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _cashControlAccount,
                 onChanged: (acc) {
@@ -1662,7 +1662,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         Row(
           children: [
             Expanded(
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _pettyControlAccount,
                 onChanged: (acc) {
@@ -1679,7 +1679,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _personReceivableAccount,
                 onChanged: (acc) {
@@ -1700,7 +1700,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
         Row(
           children: [
             Expanded(
-              child: AccountComboboxWidget(
+              child: AccountTreeComboboxWidget(
                 businessId: widget.businessId,
                 selectedAccount: _personPayableAccount,
                 onChanged: (acc) {

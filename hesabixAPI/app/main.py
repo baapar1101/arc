@@ -87,6 +87,7 @@ from adapters.api.v1.business_notifications import router as business_notificati
 from adapters.api.v1.ping_pong import router as ping_pong_router
 from adapters.api.v1.integrations.telegram import router as telegram_integration_router
 from adapters.api.v1.integrations.bale import router as bale_integration_router
+from adapters.api.v1.basalam_integration import router as basalam_integration_router
 from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
 from adapters.api.v1.admin.notification_moderation import router as admin_notification_moderation_router
@@ -1036,6 +1037,7 @@ def create_app() -> FastAPI:
     # Integrations
     application.include_router(telegram_integration_router, prefix=settings.api_v1_prefix)
     application.include_router(bale_integration_router, prefix=settings.api_v1_prefix)
+    application.include_router(basalam_integration_router, prefix=settings.api_v1_prefix)
     # Notifications
     application.include_router(notifications_router, prefix=settings.api_v1_prefix)
     application.include_router(notifications_ws_router)

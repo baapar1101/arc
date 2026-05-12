@@ -2,6 +2,7 @@
 """API مدیریت چت وب CRM (ویجت، مکالمه، پاسخ عامل)."""
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Request
@@ -20,9 +21,11 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.permissions import require_business_access, require_business_permission_dep, require_crm_web_chat_dep
 from app.core.responses import ApiError, format_datetime_fields, success_response
+from app.services import basalam_integration_service as basalam_svc
 from app.services import crm_chat_service as chat_svc
 
 router = APIRouter(tags=["CRM — چت وب"])
+logger = logging.getLogger(__name__)
 
 
 def _fmt(request: Request, data: Any) -> Any:
@@ -245,6 +248,22 @@ async def post_chat_message_agent(
 		user_id=ctx.get_user_id(),
 		file_storage_id=body.file_storage_id,
 	)
+	try:
+		await basalam_svc.relay_agent_message_from_crm(
+			db=db,
+			business_id=business_id,
+			conversation_id=conversation_id,
+			user_id=ctx.get_user_id(),
+			body=body.body,
+			file_storage_id=body.file_storage_id,
+		)
+	except Exception:
+		# ارسال پیام CRM نباید به دلیل خطای relay به باسلام fail شود.
+		logger.exception(
+			"crm basalam relay failed business_id=%s conversation_id=%s",
+			business_id,
+			conversation_id,
+		)
 	return success_response(data=_fmt(request, msg), request=request, message="CRM_CHAT_AGENT_MESSAGE_SENT")
 
 

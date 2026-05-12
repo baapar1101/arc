@@ -151,6 +151,8 @@ class Hesabix_V2_Activator
 			'invoice_tag_website_enabled' => true,
 			'invoice_tag_website_name' => 'فروش سایت',
 			'invoice_extra_tag_ids' => '',
+			'shipping_line_mode' => 'service',
+			'shipping_adjustment_account_id' => 0,
 			'order_fiscal_year_date_policy' => 'keep',
 			'queue_items_per_cron_run' => 15,
 		);

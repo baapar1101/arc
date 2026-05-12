@@ -16,6 +16,13 @@ class Hesabix_V2_Order_Sync_Meta
 	const META_PAUSE_AUTO = '_hesabix_v2_pause_auto_sync';
 
 	/**
+	 * اثر انگشت همگام‌سازی «دریافت همراه فاکتور» برای پرهیز از حذف/ایجاد مکرر سند در API با هر بار به‌روزرسانی.
+	 *
+	 * @var string
+	 */
+	const META_RP_SYNC_FP = '_hesabix_v2_invoice_rp_sync_fp';
+
+	/**
 	 * متا برای شناسهٔ نظر واحد «وضعیت همگام‌سازی حسابیکس»: ارز، سال مالی، خطای فاکتور؛ با هر رویداد همان نظر به‌روز می‌شود.
 	 */
 	const META_ORDER_SYSTEM_NOTE = '_hesabix_v2_order_system_note_id';
@@ -89,8 +96,172 @@ class Hesabix_V2_Order_Sync_Meta
 
 		$order = wc_get_order((int) $order_id);
 		if ($order) {
+			self::clear_rp_sync_fp($order);
 			self::remove_order_system_note($order);
 		}
+	}
+
+	/**
+	 * اثر انگشت پارامترهایی که رفتار ثبت دریافت ووکامرس را تعیین می‌کنند (بدون هَش کردن کل خطوط فاکتور).
+	 *
+	 * @param WC_Order $order
+	 * @param int      $hesabix_invoice_id
+	 * @param array    $invoice_data خروجی mapper بعد از فیلتر hesabix_v2_invoice_data
+	 * @return string sha256 hex
+	 */
+	public static function compute_invoice_rp_sync_fingerprint($order, $hesabix_invoice_id, array $invoice_data)
+	{
+		$hid = absint((string) $hesabix_invoice_id);
+		$ei = isset($invoice_data['extra_info']) && is_array($invoice_data['extra_info']) ? $invoice_data['extra_info'] : array();
+		$totals = isset($ei['totals']) && is_array($ei['totals']) ? $ei['totals'] : array();
+		$net = isset($totals['net']) ? (int) $totals['net'] : 0;
+		$currency_id = isset($invoice_data['currency_id']) ? (int) $invoice_data['currency_id'] : 0;
+		$is_pf = !empty($invoice_data['is_proforma']);
+
+		$dest = get_option('hesabix_v2_invoice_payment_destination', 'bank');
+		$dest = ($dest === 'cash_register') ? 'cash_register' : 'bank';
+		$account_ref = '';
+		if ($dest === 'cash_register') {
+			$account_ref = (string) absint((string) get_option('hesabix_v2_default_cash_register_id', ''));
+		} else {
+			$account_ref = trim((string) get_option('hesabix_v2_default_bank_id', ''));
+		}
+
+		$parts = array(
+			'v1',
+			(string) $hid,
+			(string) $net,
+			(string) $currency_id,
+			$is_pf ? '1' : '0',
+			$dest,
+			$account_ref,
+			is_object($order) && method_exists($order, 'is_paid') && $order->is_paid() ? '1' : '0',
+		);
+
+		return hash('sha256', implode('|', $parts));
+	}
+
+	/**
+	 * قبل از ایجاد/به‌روزرسانی فاکتور: اگر قبلاً با همین اثر انگشت دریافت ثبت شده، کلید payments حذف می‌شود تا
+	 * API دیگر اسناد پیوندخوردهٔ قبلی را حذف/جدید نکند (اسناد دستی که در لیست پیوند فاکتور نیستند دست‌نخورده می‌مانند).
+	 *
+	 * @param WC_Order   $order
+	 * @param int|null   $hesabix_invoice_id برای ایجاد فاکتور تازه null یا ۰
+	 * @param array      $invoice_data
+	 * @return array{had_positive_rp:bool,omitted_payments:bool}
+	 */
+	public static function maybe_omit_repeat_invoice_payments($order, $hesabix_invoice_id, array &$invoice_data)
+	{
+		$had_positive_rp = false;
+		if (isset($invoice_data['payments']) && is_array($invoice_data['payments'])) {
+			foreach ($invoice_data['payments'] as $p) {
+				if (!is_array($p)) {
+					continue;
+				}
+				if ((float) ($p['amount'] ?? 0) > 0) {
+					$had_positive_rp = true;
+					break;
+				}
+			}
+		}
+
+		$omitted = false;
+		$hid = absint((string) ($hesabix_invoice_id ?? 0));
+		if ($hid > 0 && $had_positive_rp && is_object($order) && ($order instanceof WC_Order)) {
+			$fp = self::compute_invoice_rp_sync_fingerprint($order, $hid, $invoice_data);
+			$stored = (string) $order->get_meta(self::META_RP_SYNC_FP, true);
+			if ($stored !== '' && hash_equals($stored, $fp)) {
+				unset($invoice_data['payments']);
+				$omitted = true;
+			}
+		}
+
+		return array(
+			'had_positive_rp' => $had_positive_rp,
+			'omitted_payments' => $omitted,
+		);
+	}
+
+	/**
+	 * پس از پاسخ موفق API فاکتور.
+	 *
+	 * @param WC_Order $order
+	 * @param array    $rp_gate خروجی {@see maybe_omit_repeat_invoice_payments}
+	 * @param array    $invoice_data همان آرایهٔ نهایی ارسالی (بعد از حذف اختیاری payments)
+	 * @param int      $hesabix_invoice_id
+	 */
+	public static function persist_rp_sync_state_after_invoice_success($order, array $rp_gate, array $invoice_data, $hesabix_invoice_id)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return;
+		}
+
+		if (!empty($rp_gate['omitted_payments'])) {
+			return;
+		}
+
+		if (empty($rp_gate['had_positive_rp'])) {
+			self::clear_rp_sync_fp($order);
+
+			return;
+		}
+
+		$hid = absint((string) $hesabix_invoice_id);
+		if ($hid < 1) {
+			return;
+		}
+
+		self::set_rp_sync_fp($order, self::compute_invoice_rp_sync_fingerprint($order, $hid, $invoice_data));
+	}
+
+	/**
+	 * @param WC_Order $order
+	 * @param string   $fp sha256 hex
+	 */
+	public static function set_rp_sync_fp($order, $fp)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return;
+		}
+
+		$fp = is_string($fp) ? trim($fp) : '';
+		if ($fp === '') {
+			self::clear_rp_sync_fp($order);
+
+			return;
+		}
+
+		$order->update_meta_data(self::META_RP_SYNC_FP, $fp);
+		self::persist_order_meta_simple($order);
+	}
+
+	/**
+	 * @param WC_Order $order
+	 */
+	public static function clear_rp_sync_fp($order)
+	{
+		if (!is_object($order) || !($order instanceof WC_Order)) {
+			return;
+		}
+
+		$order->delete_meta_data(self::META_RP_SYNC_FP);
+		self::persist_order_meta_simple($order);
+	}
+
+	/**
+	 * ذخیرهٔ متای سفارش بدون risk در هوک woocommerce_update_order.
+	 *
+	 * @param WC_Order $order
+	 */
+	private static function persist_order_meta_simple($order)
+	{
+		if (doing_action('woocommerce_update_order')) {
+			$order->save_meta_data();
+
+			return;
+		}
+
+		$order->save();
 	}
 
 	/**

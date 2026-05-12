@@ -3110,6 +3110,21 @@ def _document_global_discount_amount_for_profit(document: Document, item_lines: 
 
 def _document_adjustments_net_for_profit(document: Document) -> Decimal:
     extras = document.extra_info or {}
+    rows = extras.get("invoice_adjustments")
+    if isinstance(rows, list):
+        total = Decimal(0)
+        for row in rows:
+            if not isinstance(row, dict) or row.get("exclude_from_profit"):
+                continue
+            try:
+                amount = Decimal(str(row.get("amount", 0) or 0))
+            except Exception:
+                continue
+            if amount <= 0:
+                continue
+            kind = str(row.get("kind") or "addition").strip().lower()
+            total += amount if kind == "addition" else -amount
+        return total
     totals = dict(extras.get("totals") or {})
     try:
         return Decimal(str(totals.get("adjustments_net", 0) or 0))

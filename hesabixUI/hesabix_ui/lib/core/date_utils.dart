@@ -5,7 +5,7 @@ class HesabixDateUtils {
   /// Convert DateTime to Jalali string for display
   static String formatForDisplay(DateTime? date, bool isJalali) {
     if (date == null) return '';
-    
+
     final local = date.toLocal();
     if (isJalali) {
       final jalali = Jalali.fromDateTime(local);
@@ -13,6 +13,92 @@ class HesabixDateUtils {
     } else {
       return '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}';
     }
+  }
+
+  /// Format a date-like API value according to the active calendar.
+  ///
+  /// Accepts raw ISO Gregorian dates, DateTime values, backend formatted maps
+  /// (`date_only`/`formatted`), and Persian slash dates when no raw value is
+  /// available. Prefer passing [rawValue] when the response includes `*_raw`.
+  static String formatApiDateForDisplay(dynamic value, bool isJalali, {dynamic rawValue, String fallback = '-'}) {
+    final parsedRaw = _parseDateLike(rawValue);
+    if (parsedRaw != null) {
+      return formatForDisplay(parsedRaw, isJalali);
+    }
+
+    final parsed = _parseDateLike(value);
+    if (parsed != null) {
+      return formatForDisplay(parsed, isJalali);
+    }
+
+    if (value is Map) {
+      final dateOnly = value['date_only'];
+      if (dateOnly != null && dateOnly.toString().trim().isNotEmpty) {
+        return dateOnly.toString().trim();
+      }
+      final formatted = value['formatted'];
+      if (formatted != null && formatted.toString().trim().isNotEmpty) {
+        return formatted.toString().trim().split(' ').first;
+      }
+    }
+
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  static DateTime? parseApiDate(dynamic value, {dynamic rawValue}) {
+    return _parseDateLike(rawValue) ?? _parseDateLike(value);
+  }
+
+  static DateTime? _parseDateLike(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is Map) {
+      for (final key in const ['raw', 'gregorian', 'iso', 'date', 'date_only', 'formatted']) {
+        final parsed = _parseDateLike(value[key]);
+        if (parsed != null) return parsed;
+      }
+      return null;
+    }
+
+    var text = value.toString().trim();
+    if (text.isEmpty) return null;
+    text = text.split(' ').first;
+    text = text.split('T').first;
+
+    final isoMatch = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(text);
+    if (isoMatch != null) {
+      return _safeGregorianDate(
+        int.parse(isoMatch.group(1)!),
+        int.parse(isoMatch.group(2)!),
+        int.parse(isoMatch.group(3)!),
+      );
+    }
+
+    final slashMatch = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})$').firstMatch(text);
+    if (slashMatch != null) {
+      final year = int.parse(slashMatch.group(1)!);
+      final month = int.parse(slashMatch.group(2)!);
+      final day = int.parse(slashMatch.group(3)!);
+      if (year >= 1700) return _safeGregorianDate(year, month, day);
+      if (year >= 1200 && year <= 1600) {
+        try {
+          return Jalali(year, month, day).toDateTime();
+        } catch (_) {
+          return null;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  static DateTime? _safeGregorianDate(int year, int month, int day) {
+    try {
+      final d = DateTime(year, month, day);
+      if (d.year == year && d.month == month && d.day == day) return d;
+    } catch (_) {}
+    return null;
   }
 
   /// Format a DateTime for API date-only filters (YYYY-MM-DD).
@@ -40,11 +126,15 @@ class HesabixDateUtils {
   }
 
   /// نام روزهای هفته برای شمسی/میلادی (شنبه تا جمعه) به فارسی و انگلیسی
-  static const List<String> _weekdayNamesFa = [
-    'شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه',
-  ];
+  static const List<String> _weekdayNamesFa = ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه'];
   static const List<String> _weekdayNamesEn = [
-    'Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+    'Saturday',
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
   ];
 
   /// تاریخ و زمان به‌همراه نام روز هفته؛ چندزبانه بر اساس [localeLanguageCode] (مثلاً 'fa' یا 'en').
@@ -67,7 +157,7 @@ class HesabixDateUtils {
   /// Convert DateTime to Jalali string with month name for display
   static String formatForDisplayWithMonthName(DateTime? date, bool isJalali) {
     if (date == null) return '';
-    
+
     if (isJalali) {
       final jalali = Jalali.fromDateTime(date);
       final monthName = _getJalaliMonthName(jalali.month);
@@ -80,9 +170,9 @@ class HesabixDateUtils {
   /// Convert display string back to DateTime
   static DateTime? parseFromDisplay(String? displayString, bool isJalali) {
     if (displayString == null || displayString.isEmpty) return null;
-    
+
     try {
-        if (isJalali) {
+      if (isJalali) {
         // Parse format: YYYY/MM/DD
         final parts = displayString.split('/');
         if (parts.length == 3) {
@@ -104,7 +194,7 @@ class HesabixDateUtils {
           final year = int.parse(parts[0]);
           final month = int.parse(parts[1]);
           final day = int.parse(parts[2]);
-          
+
           // اعتبارسنجی محدوده‌های معتبر
           if (year < 1900 || year > 2100) {
             return null;
@@ -112,7 +202,7 @@ class HesabixDateUtils {
           if (month < 1 || month > 12 || day < 1 || day > 31) {
             return null;
           }
-          
+
           try {
             return DateTime(year, month, day);
           } catch (e) {
@@ -147,9 +237,7 @@ class HesabixDateUtils {
       final maxDay = Jalali(ty, tm, 1).monthLength;
       if (td > maxDay) td = maxDay;
       final jAnniversary = Jalali(ty, tm, td);
-      return toDateOnlyLocal(
-        jAnniversary.toDateTime().subtract(const Duration(days: 1)),
-      );
+      return toDateOnlyLocal(jAnniversary.toDateTime().subtract(const Duration(days: 1)));
     }
     final anniv = _gregorianSameCalendarDayNextYear(startDay);
     return toDateOnlyLocal(anniv.subtract(const Duration(days: 1)));
@@ -168,11 +256,7 @@ class HesabixDateUtils {
   }
 
   /// آیا [date] (فقط روز) بین [firstDate] و [lastDate] (شامل) است؟
-  static bool isDateOnlyInRange(
-    DateTime date,
-    DateTime? firstDate,
-    DateTime? lastDate,
-  ) {
+  static bool isDateOnlyInRange(DateTime date, DateTime? firstDate, DateTime? lastDate) {
     final d = toDateOnlyLocal(date);
     if (firstDate != null) {
       final f = toDateOnlyLocal(firstDate);
@@ -192,8 +276,18 @@ class HesabixDateUtils {
   /// Get Jalali month name
   static String _getJalaliMonthName(int month) {
     const monthNames = [
-      'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور',
-      'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'
+      'فروردین',
+      'اردیبهشت',
+      'خرداد',
+      'تیر',
+      'مرداد',
+      'شهریور',
+      'مهر',
+      'آبان',
+      'آذر',
+      'دی',
+      'بهمن',
+      'اسفند',
     ];
     return monthNames[month - 1];
   }
@@ -201,11 +295,12 @@ class HesabixDateUtils {
   /// Format date with both Jalali and Gregorian for display
   static String formatDualCalendar(DateTime? date) {
     if (date == null) return '';
-    
+
     final jalali = Jalali.fromDateTime(date);
-    final jalaliStr = '${jalali.year}/${jalali.month.toString().padLeft(2, '0')}/${jalali.day.toString().padLeft(2, '0')}';
+    final jalaliStr =
+        '${jalali.year}/${jalali.month.toString().padLeft(2, '0')}/${jalali.day.toString().padLeft(2, '0')}';
     final gregorianStr = '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
-    
+
     return '$jalaliStr (میلادی: $gregorianStr)';
   }
 
@@ -221,7 +316,7 @@ class HesabixDateUtils {
 
   static DateTime? parseFromAPI(String? apiString) {
     if (apiString == null || apiString.isEmpty) return null;
-    
+
     try {
       // Parse format: YYYY-MM-DD
       final parts = apiString.split('-');
@@ -229,7 +324,7 @@ class HesabixDateUtils {
         final year = int.parse(parts[0]);
         final month = int.parse(parts[1]);
         final day = int.parse(parts[2]);
-        
+
         // اعتبارسنجی محدوده‌های معتبر
         if (year < 1900 || year > 2100) {
           return null;
@@ -237,7 +332,7 @@ class HesabixDateUtils {
         if (month < 1 || month > 12 || day < 1 || day > 31) {
           return null;
         }
-        
+
         try {
           return DateTime(year, month, day);
         } catch (e) {

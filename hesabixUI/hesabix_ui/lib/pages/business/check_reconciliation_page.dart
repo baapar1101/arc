@@ -43,7 +43,13 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
 
   // Tab 2: History
   void _refreshHistory() {
-    try { (_tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
+    try {
+      (_tableKey.currentState as dynamic)?.refresh();
+    } catch (_) {}
+  }
+
+  String _formatDate(dynamic value, {dynamic rawValue}) {
+    return HesabixDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
   }
 
   @override
@@ -103,13 +109,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildCalculateTab(t),
-          _buildHistoryTab(t),
-        ],
-      ),
+      body: TabBarView(controller: _tabController, children: [_buildCalculateTab(t), _buildHistoryTab(t)]),
     );
   }
 
@@ -126,38 +126,38 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('انتخاب چک‌ها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                            if (_selectedCheckIds.isNotEmpty)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Text(
-                                  '${_selectedCheckIds.length} چک انتخاب شده',
-                                  style: TextStyle(
-                                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('انتخاب چک‌ها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          if (_selectedCheckIds.isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                '${_selectedCheckIds.length} چک انتخاب شده',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildCheckSelectionWidget(),
-                      ],
-                    ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _buildCheckSelectionWidget(),
+                    ],
                   ),
                 ),
+              ),
               const SizedBox(height: 16),
-              
+
               // تاریخ مبنا
               Card(
                 child: Padding(
@@ -189,9 +189,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.calculate),
                 label: Text(_calculating ? 'در حال محاسبه...' : 'محاسبه راس'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
+                style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
               ),
               const SizedBox(height: 16),
 
@@ -206,10 +204,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                         Icon(Icons.error_outline, color: Colors.red.shade700),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            _calculationError!,
-                            style: TextStyle(color: Colors.red.shade700),
-                          ),
+                          child: Text(_calculationError!, style: TextStyle(color: Colors.red.shade700)),
                         ),
                       ],
                     ),
@@ -245,39 +240,55 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
           showActiveFilters: false,
           showClearFiltersButton: false,
           columns: [
-            TextColumn('check_number', 'شماره چک', width: ColumnWidth.medium,
+            TextColumn(
+              'check_number',
+              'شماره چک',
+              width: ColumnWidth.medium,
               formatter: (row) => (row['check_number'] ?? '-').toString(),
             ),
-            TextColumn('person_name', 'شخص', width: ColumnWidth.large,
+            TextColumn(
+              'person_name',
+              'شخص',
+              width: ColumnWidth.large,
               formatter: (row) => (row['person_name'] ?? '-').toString(),
             ),
-            DateColumn('due_date', 'تاریخ سررسید', width: ColumnWidth.medium,
+            DateColumn(
+              'due_date',
+              'تاریخ سررسید',
+              width: ColumnWidth.medium,
               formatter: (row) {
-                final value = row['due_date'];
-                if (value == null) return '-';
-                try {
-                  final date = DateTime.parse(value.toString().split('T').first);
-                  return HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali);
-                } catch (e) {
-                  return value.toString();
-                }
+                return _formatDate(row['due_date'], rawValue: row['due_date_raw']);
               },
             ),
-            NumberColumn('amount', 'مبلغ', width: ColumnWidth.medium,
+            NumberColumn(
+              'amount',
+              'مبلغ',
+              width: ColumnWidth.medium,
               formatter: (row) => formatWithThousands(row['amount']),
             ),
-            TextColumn('status', 'وضعیت', width: ColumnWidth.small,
+            TextColumn(
+              'status',
+              'وضعیت',
+              width: ColumnWidth.small,
               formatter: (row) {
                 final s = (row['status'] ?? '').toString();
                 switch (s) {
-                  case 'RECEIVED_ON_HAND': return 'در دست';
-                  case 'TRANSFERRED_ISSUED': return 'صادر شده';
-                  case 'DEPOSITED': return 'سپرده';
-                  case 'CLEARED': return 'پاس شده';
-                  case 'ENDORSED': return 'واگذار شده';
-                  case 'RETURNED': return 'عودت';
-                  case 'BOUNCED': return 'برگشت';
-                  case 'CANCELLED': return 'ابطال';
+                  case 'RECEIVED_ON_HAND':
+                    return 'در دست';
+                  case 'TRANSFERRED_ISSUED':
+                    return 'صادر شده';
+                  case 'DEPOSITED':
+                    return 'سپرده';
+                  case 'CLEARED':
+                    return 'پاس شده';
+                  case 'ENDORSED':
+                    return 'واگذار شده';
+                  case 'RETURNED':
+                    return 'عودت';
+                  case 'BOUNCED':
+                    return 'برگشت';
+                  case 'CANCELLED':
+                    return 'ابطال';
                 }
                 return '-';
               },
@@ -308,19 +319,18 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                 }
               } catch (e) {
                 // در صورت خطا، از شاخص‌ها استفاده نمی‌کنیم
-                if (mounted) {
-                }
+                if (mounted) {}
               }
             });
           },
-        
-        expandBodyHeightToFitRows: true,),
+
+          expandBodyHeightToFitRows: true,
+        ),
         fromJson: (json) => json,
         calendarController: widget.calendarController,
       ),
     );
   }
-
 
   Future<void> _showReconciliationResultDialog(Map<String, dynamic> result) async {
     final items = result['items'] as List<dynamic>? ?? [];
@@ -331,15 +341,6 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final totalWeighted = items.fold<double>(0.0, (sum, item) {
       return sum + ((item['weighted_value'] as num?)?.toDouble() ?? 0.0);
     });
-
-    DateTime? calculatedDateDt;
-    if (calculatedDate != null) {
-      try {
-        calculatedDateDt = DateTime.parse(calculatedDate.split('T').first);
-      } catch (e) {
-        // ignore
-      }
-    }
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -356,11 +357,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
             color: colorScheme.surface,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, 10)),
             ],
           ),
           child: Column(
@@ -371,17 +368,11 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.primary.withValues(alpha: 0.8),
-                    ],
+                    colors: [colorScheme.primary, colorScheme.primary.withValues(alpha: 0.8)],
                     begin: Alignment.topRight,
                     end: Alignment.bottomLeft,
                   ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
                 ),
                 child: Row(
                   children: [
@@ -391,11 +382,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(
-                        Icons.calculate,
-                        color: Colors.white,
-                        size: 28,
-                      ),
+                      child: const Icon(Icons.calculate, color: Colors.white, size: 28),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -404,19 +391,12 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                         children: [
                           const Text(
                             'نتیجه محاسبه راس‌گیری',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             '${formatWithThousands(checkCount)} چک',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.9),
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
                           ),
                         ],
                       ),
@@ -459,12 +439,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                           Expanded(
                             child: _buildSummaryCard(
                               'تاریخ راس',
-                              calculatedDateDt != null
-                                  ? HesabixDateUtils.formatForDisplay(
-                                      calculatedDateDt,
-                                      widget.calendarController.isJalali,
-                                    )
-                                  : '-',
+                              _formatDate(calculatedDate, rawValue: result['calculated_date_raw']),
                               Icons.event,
                               colorScheme.tertiary,
                             ),
@@ -478,27 +453,18 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: colorScheme.outline.withValues(alpha: 0.2),
-                          ),
+                          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Icon(
-                                  Icons.bar_chart,
-                                  color: colorScheme.primary,
-                                  size: 24,
-                                ),
+                                Icon(Icons.bar_chart, color: colorScheme.primary, size: 24),
                                 const SizedBox(width: 8),
                                 const Text(
                                   'نمودار وزن چک‌ها',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
@@ -514,28 +480,16 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                         decoration: BoxDecoration(
                           color: colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: colorScheme.outline.withValues(alpha: 0.2),
-                          ),
+                          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Icon(
-                                  Icons.list_alt,
-                                  color: colorScheme.primary,
-                                  size: 24,
-                                ),
+                                Icon(Icons.list_alt, color: colorScheme.primary, size: 24),
                                 const SizedBox(width: 8),
-                                const Text(
-                                  'جزئیات چک‌ها',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                const Text('جزئیات چک‌ها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                               ],
                             ),
                             const SizedBox(height: 16),
@@ -560,10 +514,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('بستن'),
-                    ),
+                    TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('بستن')),
                     const SizedBox(width: 12),
                     FilledButton.icon(
                       onPressed: () async {
@@ -596,10 +547,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1.5,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -611,11 +559,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: color.withValues(alpha: 0.8),
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 14, color: color.withValues(alpha: 0.8), fontWeight: FontWeight.w500),
                 ),
               ),
             ],
@@ -623,11 +567,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
           const SizedBox(height: 12),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
           ),
         ],
       ),
@@ -674,28 +614,15 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                       Container(
                         width: 12,
                         height: 12,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                        ),
+                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 8),
-                      Text(
-                        'چک #$checkNumber',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
+                      Text('چک #$checkNumber', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                     ],
                   ),
                   Text(
                     '${percentage.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.bold, color: color, fontSize: 14),
                   ),
                 ],
               ),
@@ -715,18 +642,11 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                 children: [
                   Text(
                     '${formatWithThousands(amount)} × $days روز',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   Text(
                     formatWithThousands(weighted),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
                   ),
                 ],
               ),
@@ -746,18 +666,11 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         3: FlexColumnWidth(1.5),
         4: FlexColumnWidth(2),
       },
-      border: TableBorder(
-        horizontalInside: BorderSide(
-          color: Colors.grey.shade300,
-          width: 1,
-        ),
-      ),
+      border: TableBorder(horizontalInside: BorderSide(color: Colors.grey.shade300, width: 1)),
       children: [
         // Header
         TableRow(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
-          ),
+          decoration: BoxDecoration(color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3)),
           children: [
             _buildTableCell('ردیف', isHeader: true),
             _buildTableCell('شماره چک', isHeader: true),
@@ -781,10 +694,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
               _buildTableCell(checkNumber),
               _buildTableCell(formatWithThousands(amount)),
               _buildTableCell('$days'),
-              _buildTableCell(
-                formatWithThousands(weighted),
-                isBold: true,
-              ),
+              _buildTableCell(formatWithThousands(weighted), isBold: true),
             ],
           );
         }),
@@ -801,9 +711,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         style: TextStyle(
           fontWeight: isHeader || isBold ? FontWeight.bold : FontWeight.normal,
           fontSize: isHeader ? 14 : 13,
-          color: isHeader
-              ? Theme.of(context).colorScheme.primary
-              : null,
+          color: isHeader ? Theme.of(context).colorScheme.primary : null,
         ),
       ),
     );
@@ -821,10 +729,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     try {
       final result = await _checkService.calculateReconciliation(
         businessId: widget.businessId,
-        body: {
-          'check_ids': _selectedCheckIds.toList(),
-          'base_date': _baseDate!.toIso8601String(),
-        },
+        body: {'check_ids': _selectedCheckIds.toList(), 'base_date': HesabixDateUtils.formatForApiDate(_baseDate!)},
       );
       setState(() {
         _calculationResult = result;
@@ -858,28 +763,19 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
             children: [
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'نام جلسه *',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'نام جلسه *', border: OutlineInputBorder()),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'توضیحات (اختیاری)',
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(labelText: 'توضیحات (اختیاری)', border: OutlineInputBorder()),
                 maxLines: 3,
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('انصراف'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
           FilledButton(
             onPressed: () {
               if (nameController.text.trim().isEmpty) {
@@ -902,10 +798,8 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         body: {
           'name': nameController.text.trim(),
           'check_ids': _selectedCheckIds.toList(),
-          'base_date': _baseDate!.toIso8601String(),
-          'description': descriptionController.text.trim().isEmpty
-              ? null
-              : descriptionController.text.trim(),
+          'base_date': HesabixDateUtils.formatForApiDate(_baseDate!),
+          'description': descriptionController.text.trim().isEmpty ? null : descriptionController.text.trim(),
         },
       );
 
@@ -917,10 +811,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       return true;
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(
-        context,
-        message: 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}',
-      );
+        SnackBarHelper.show(context, message: 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}');
       }
       return false;
     }
@@ -947,68 +838,67 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       showActiveFilters: false,
       showClearFiltersButton: false,
       columns: [
-        TextColumn('name', 'نام جلسه', width: ColumnWidth.large,
-          formatter: (row) => (row['name'] ?? '-').toString(),
-        ),
-        DateColumn('base_date', 'تاریخ مبنا', width: ColumnWidth.medium,
+        TextColumn('name', 'نام جلسه', width: ColumnWidth.large, formatter: (row) => (row['name'] ?? '-').toString()),
+        DateColumn(
+          'base_date',
+          'تاریخ مبنا',
+          width: ColumnWidth.medium,
           formatter: (row) {
-            final value = row['base_date'];
-            if (value == null) return '-';
-            try {
-              final date = DateTime.parse(value.toString().split('T').first);
-              return HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali);
-            } catch (e) {
-              return value.toString();
-            }
+            return _formatDate(row['base_date'], rawValue: row['base_date_raw']);
           },
         ),
-        DateColumn('calculated_date', 'تاریخ راس', width: ColumnWidth.medium,
+        DateColumn(
+          'calculated_date',
+          'تاریخ راس',
+          width: ColumnWidth.medium,
           formatter: (row) {
-            final value = row['calculated_date'];
-            if (value == null) return '-';
-            try {
-              final date = DateTime.parse(value.toString().split('T').first);
-              return HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali);
-            } catch (e) {
-              return value.toString();
-            }
+            return _formatDate(row['calculated_date'], rawValue: row['calculated_date_raw']);
           },
         ),
-        NumberColumn('calculated_average_days', 'میانگین (روز)', width: ColumnWidth.small,
+        NumberColumn(
+          'calculated_average_days',
+          'میانگین (روز)',
+          width: ColumnWidth.small,
           formatter: (row) => (row['calculated_average_days'] ?? 0).toStringAsFixed(2),
         ),
-        NumberColumn('total_amount', 'مجموع مبلغ', width: ColumnWidth.medium,
+        NumberColumn(
+          'total_amount',
+          'مجموع مبلغ',
+          width: ColumnWidth.medium,
           formatter: (row) => formatWithThousands(row['total_amount']),
         ),
-        NumberColumn('check_count', 'تعداد چک', width: ColumnWidth.small,
+        NumberColumn(
+          'check_count',
+          'تعداد چک',
+          width: ColumnWidth.small,
           formatter: (row) => (row['check_count'] ?? 0).toString(),
         ),
-        DateColumn('created_at', 'تاریخ ایجاد', width: ColumnWidth.medium,
+        DateColumn(
+          'created_at',
+          'تاریخ ایجاد',
+          width: ColumnWidth.medium,
           formatter: (row) {
-            final value = row['created_at'];
-            if (value == null) return '-';
-            try {
-              final date = DateTime.parse(value.toString().split('T').first);
-              return HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali);
-            } catch (e) {
-              return value.toString();
-            }
+            return _formatDate(row['created_at'], rawValue: row['created_at_raw']);
           },
         ),
-        ActionColumn('actions', t.actions, actions: [
-          DataTableAction(
-            icon: Icons.visibility,
-            label: 'جزئیات',
-            onTap: (row) => _showReconciliationDetails(row as Map<String, dynamic>),
-          ),
-          if (widget.authStore.canWriteSection('checks'))
+        ActionColumn(
+          'actions',
+          t.actions,
+          actions: [
             DataTableAction(
-              icon: Icons.delete,
-              label: t.delete,
-              onTap: (row) => _confirmDelete(row as Map<String, dynamic>),
-              isDestructive: true,
+              icon: Icons.visibility,
+              label: 'جزئیات',
+              onTap: (row) => _showReconciliationDetails(row as Map<String, dynamic>),
             ),
-        ]),
+            if (widget.authStore.canWriteSection('checks'))
+              DataTableAction(
+                icon: Icons.delete,
+                label: t.delete,
+                onTap: (row) => _confirmDelete(row as Map<String, dynamic>),
+                isDestructive: true,
+              ),
+          ],
+        ),
       ],
       defaultPageSize: 20,
     );
@@ -1025,11 +915,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const AlertDialog(
-              content: SizedBox(
-                width: 200,
-                height: 200,
-                child: Center(child: CircularProgressIndicator()),
-              ),
+              content: SizedBox(width: 200, height: 200, child: Center(child: CircularProgressIndicator())),
             );
           }
 
@@ -1037,12 +923,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
             return AlertDialog(
               title: const Text('خطا'),
               content: Text(snapshot.error?.toString() ?? 'خطا در بارگذاری'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('بستن'),
-                ),
-              ],
+              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن'))],
             );
           }
 
@@ -1060,9 +941,11 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                   children: [
                     _buildDetailRow('تعداد چک‌ها', (data['check_count'] ?? 0).toString()),
                     _buildDetailRow('مجموع مبلغ', formatWithThousands(data['total_amount'] ?? 0)),
-                    _buildDetailRow('میانگین سررسید', '${(data['calculated_average_days'] ?? 0).toStringAsFixed(2)} روز'),
-                    if (data['description'] != null)
-                      _buildDetailRow('توضیحات', data['description'].toString()),
+                    _buildDetailRow(
+                      'میانگین سررسید',
+                      '${(data['calculated_average_days'] ?? 0).toStringAsFixed(2)} روز',
+                    ),
+                    if (data['description'] != null) _buildDetailRow('توضیحات', data['description'].toString()),
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 8),
@@ -1077,9 +960,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                         padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Row(
                           children: [
-                            Expanded(
-                              child: Text('چک #$checkNumber: ${formatWithThousands(amount)} × $days روز'),
-                            ),
+                            Expanded(child: Text('چک #$checkNumber: ${formatWithThousands(amount)} × $days روز')),
                             Text(
                               '= ${formatWithThousands(weighted)}',
                               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1092,12 +973,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                 ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('بستن'),
-              ),
-            ],
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن'))],
           );
         },
       ),
@@ -1128,10 +1004,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         title: const Text('حذف جلسه راس‌گیری'),
         content: Text('آیا از حذف جلسه "$name" مطمئن هستید؟'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('خیر'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('خیر')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -1151,12 +1024,8 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.show(
-        context,
-        message: 'خطا در حذف: ${ErrorExtractor.forContext(e, context)}',
-      );
+        SnackBarHelper.show(context, message: 'خطا در حذف: ${ErrorExtractor.forContext(e, context)}');
       }
     }
   }
 }
-

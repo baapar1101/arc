@@ -151,3 +151,17 @@ class TriggerRegistry:
 
         self.register("distribution.visit.completed", DistributionVisitCompletedTrigger())
 
+        from app.services.workflow.triggers.basalam_triggers import (
+            BasalamWebhookReceivedTrigger,
+            BasalamOrderCreatedTrigger,
+            BasalamOrderUpdatedTrigger,
+            BasalamOrderPaidTrigger,
+            BasalamChatMessageReceivedTrigger,
+        )
+
+        self.register("basalam.webhook.received", BasalamWebhookReceivedTrigger())
+        self.register("basalam.order.created", BasalamOrderCreatedTrigger())
+        self.register("basalam.order.updated", BasalamOrderUpdatedTrigger())
+        self.register("basalam.order.paid", BasalamOrderPaidTrigger())
+        self.register("basalam.chat.message.received", BasalamChatMessageReceivedTrigger())
+
