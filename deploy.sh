@@ -50,6 +50,10 @@ IFS=$'\n\t'
 # - Flutter/Dart: همیشه آینهٔ داخلی f.mirror.hesabix.ir (pub + gcs). shell.hesabix.ir فقط برای tarball SDK است.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
+#   Large tarball (~2GB): download uses --progress-bar, resume (-C -), FLUTTER_SDK_CONNECT_TIMEOUT (default 120s),
+#   FLUTTER_SDK_DOWNLOAD_MAX_TIME (default 0 = no overall time limit; was 120s and caused false failures).
+#   Unreliable links: FLUTTER_SDK_TARBALL_ATTEMPTS (default 3), post-download tar test, optional FLUTTER_SDK_TARBALL_SHA256,
+#   FLUTTER_SDK_CURL_HTTP11=1 (default) sends --http1.1 to reduce flaky proxy/CDN issues.
 # - Flutter PATH: /etc/profile.d/hesabix-flutter.sh (+ یک خط در /etc/bash.bashrc برای شِل تعاملی غیر-login).
 # - Ubuntu APT mirror (only when ID=ubuntu): UBUNTU_APT_MIRROR=keep|arvan|official (non-interactive);
 #   default keep. arvan uses http://mirror.arvancloud.ir/ubuntu for archive.ubuntu.com and security.ubuntu.com.
@@ -65,6 +69,11 @@ REPO_URL="https://source.hesabix.ir/hesabix/arc.git"
 APP_ROOT="/opt/hesabix"
 # مخزن داخلی tarball SDK (ایران)؛ کتابخانه‌های pub فقط از f.mirror.hesabix.ir
 FLUTTER_SDK_TARBALL_URL_INTERNAL="https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz"
+# tarball SDK حجیم؛ 0 یعنی بدون سقف زمانی برای کل دانلود (جلوگیری از قطع ناخواسته)
+: "${FLUTTER_SDK_CONNECT_TIMEOUT:=120}"
+: "${FLUTTER_SDK_DOWNLOAD_MAX_TIME:=0}"
+: "${FLUTTER_SDK_TARBALL_ATTEMPTS:=3}"
+: "${FLUTTER_SDK_CURL_HTTP11:=1}"
 STATE_FILE="${APP_ROOT}/.deploy_state"
 LOG_FILE="${APP_ROOT}/deploy.log"
 CHECK_MARK=$'\xE2\x9C\x94'
@@ -1521,6 +1530,29 @@ PROFILE
   fi
 }
 
+# After curl, validate .tar.xz (truncated or corrupted transfers can still exit 0).
+hesabix_verify_flutter_sdk_tarball() {
+  local f="$1"
+  local err
+  [[ -f "$f" ]] || return 1
+  if [[ -n "${FLUTTER_SDK_TARBALL_SHA256:-}" ]]; then
+    if printf '%s  %s\n' "${FLUTTER_SDK_TARBALL_SHA256}" "$f" | sha256sum -c --status 2>/dev/null; then
+      return 0
+    fi
+    log_warning "SHA256 mismatch for ${f} (expected FLUTTER_SDK_TARBALL_SHA256 from mirror/docs)."
+    return 1
+  fi
+  err="$(mktemp -t flutter_tar_test.XXXXXX 2>/dev/null || echo /tmp/flutter_tar_test.err)"
+  log_info "Verifying tarball integrity (tar -tJf; may take 1-3 min for ~1GB)..."
+  if ! tar -tJf "$f" >/dev/null 2>"${err}"; then
+    log_warning "Tarball integrity check failed (corrupt or incomplete file). First lines: $(head -3 "${err}" 2>/dev/null | tr '\n' ' ')"
+    rm -f "${err}" 2>/dev/null || true
+    return 1
+  fi
+  rm -f "${err}" 2>/dev/null || true
+  return 0
+}
+
 # Ensure Flutter SDK is available (install if missing). Exports PATH for current shell.
 # Must be called after set_flutter_mirror_env so first-run Dart SDK download uses mirror.
 # Order: 1) Existing 2) مخزن داخلی (دقیقا FLUTTER_SDK_TARBALL_URL_INTERNAL) 3) Snap 4) Git clone.
@@ -1572,9 +1604,41 @@ ensure_flutter_sdk() {
     log_info "Trying Flutter SDK from internal mirror (first): ${FLUTTER_SDK_TARBALL_URL_INTERNAL}"
     apt-get install -y -qq curl xz-utils >/dev/null 2>&1 || true
     local tarball_ok=0
-    if curl -sfL --connect-timeout 15 --max-time 120 -o /tmp/flutter_sdk.tar.xz "${FLUTTER_SDK_TARBALL_URL_INTERNAL}"; then
-      if tar -xJf /tmp/flutter_sdk.tar.xz -C /opt 2>/dev/null; then
-        rm -f /tmp/flutter_sdk.tar.xz
+    local flutter_curl_maxtime=()
+    if [[ -n "${FLUTTER_SDK_DOWNLOAD_MAX_TIME:-}" && "${FLUTTER_SDK_DOWNLOAD_MAX_TIME}" != "0" ]]; then
+      flutter_curl_maxtime=(--max-time "${FLUTTER_SDK_DOWNLOAD_MAX_TIME}")
+    fi
+    local flutter_curl_http=()
+    [[ "${FLUTTER_SDK_CURL_HTTP11:-1}" != "0" ]] && flutter_curl_http=(--http1.1)
+    local flutter_tb="/tmp/flutter_sdk.tar.xz"
+    local tb_attempt tb_max="${FLUTTER_SDK_TARBALL_ATTEMPTS:-3}"
+    [[ "${tb_max}" =~ ^[0-9]+$ ]] && [[ "${tb_max}" -lt 1 ]] && tb_max=1
+    [[ "${tb_max}" =~ ^[0-9]+$ ]] || tb_max=3
+    for ((tb_attempt = 1; tb_attempt <= tb_max; tb_attempt++)); do
+      log_info "Flutter tarball attempt ${tb_attempt}/${tb_max}: download (progress, resume) then verify+extract."
+      log_info "curl: connect_timeout=${FLUTTER_SDK_CONNECT_TIMEOUT}s max_time=${FLUTTER_SDK_DOWNLOAD_MAX_TIME:-0}s http1.1=${FLUTTER_SDK_CURL_HTTP11:-1}"
+      local flutter_curl_ok=0
+      if curl -fL "${flutter_curl_maxtime[@]}" "${flutter_curl_http[@]}" --connect-timeout "${FLUTTER_SDK_CONNECT_TIMEOUT}" \
+        --retry 5 --retry-delay 8 --retry-connrefused \
+        --progress-bar -C - -o "${flutter_tb}" \
+        -w '\n[curl] finished: %{size_download} bytes in %{time_total}s (avg %{speed_download} B/s)\n' \
+        "${FLUTTER_SDK_TARBALL_URL_INTERNAL}"; then
+        flutter_curl_ok=1
+      fi
+      if [[ "${flutter_curl_ok}" -ne 1 ]]; then
+        log_warning "Download failed (attempt ${tb_attempt}/${tb_max})."
+        rm -f "${flutter_tb}"
+        continue
+      fi
+      if ! hesabix_verify_flutter_sdk_tarball "${flutter_tb}"; then
+        log_warning "Removing corrupt/incomplete tarball; retrying download (attempt ${tb_attempt}/${tb_max})."
+        rm -f "${flutter_tb}"
+        continue
+      fi
+      local tar_xz_err
+      tar_xz_err="$(mktemp -t flutter_tar_extract.XXXXXX 2>/dev/null || echo /tmp/flutter_tar_extract.err)"
+      if tar -xJf "${flutter_tb}" -C /opt 2>"${tar_xz_err}"; then
+        rm -f "${flutter_tb}" "${tar_xz_err}" 2>/dev/null || true
         if [[ -d /opt/flutter && -x /opt/flutter/bin/flutter ]]; then
           tarball_ok=1
         else
@@ -1584,17 +1648,21 @@ ensure_flutter_sdk() {
             mv "/opt/${single_dir}" /opt/flutter 2>/dev/null && tarball_ok=1
           fi
         fi
-        if [[ $tarball_ok -eq 0 ]]; then
-          log_warning "Tarball extracted but Flutter binary not found; trying next method."
-          rm -rf /opt/flutter /opt/flutter_linux* 2>/dev/null || true
+        if [[ $tarball_ok -eq 1 ]]; then
+          break
         fi
+        log_warning "Tarball verified but Flutter binary not found after extract; cleaning and retrying."
+        rm -rf /opt/flutter /opt/flutter_linux* 2>/dev/null || true
+        rm -f "${flutter_tb}" 2>/dev/null || true
       else
-        rm -f /tmp/flutter_sdk.tar.xz
-        log_warning "Failed to extract Flutter tarball; trying next method."
+        log_warning "tar -xJf failed: $(head -5 "${tar_xz_err}" 2>/dev/null | tr '\n' ' ')"
+        rm -f "${tar_xz_err}" 2>/dev/null || true
+        rm -rf /opt/flutter /opt/flutter_linux* 2>/dev/null || true
+        rm -f "${flutter_tb}"
       fi
-    else
-      rm -f /tmp/flutter_sdk.tar.xz
-      log_info "Internal tarball not available; trying next method."
+    done
+    if [[ $tarball_ok -eq 0 ]]; then
+      log_info "Internal tarball path exhausted after ${tb_max} attempt(s); trying next method."
     fi
     if [[ $tarball_ok -eq 1 ]]; then
       export PATH="/opt/flutter/bin:$PATH"
