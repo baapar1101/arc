@@ -75,6 +75,7 @@ adapters/api/v1/warehouse_locations.py
 adapters/api/v1/warehouse_reports.py
 adapters/api/v1/warehouses.py
 adapters/api/v1/warranty.py
+adapters/api/v1/woocommerce_integration.py
 adapters/api/v1/workflow_marketplace.py
 adapters/api/v1/workflows.py
 adapters/api/v1/zohal.py
@@ -303,6 +304,7 @@ adapters/db/repositories/support/priority_repository.py
 adapters/db/repositories/support/status_repository.py
 adapters/db/repositories/support/ticket_repository.py
 adapters/db/seed_data/__init__.py
+adapters/db/seed_data/marketplace_plugins_seed.py
 adapters/db/seed_data/notification_event_types_seed.py
 app/__init__.py
 app/main.py
@@ -339,6 +341,10 @@ app/core/settings.py
 app/core/smart_normalizer.py
 app/core/transaction_lock.py
 app/core/warranty_plugin_dependency.py
+app/core/woocommerce_bridge_rate_limit.py
+app/core/woocommerce_bridge_security.py
+app/core/woocommerce_dev_flags.py
+app/core/woocommerce_plugin_dependency.py
 app/integrations/moadian/__init__.py
 app/integrations/moadian/client.py
 app/integrations/moadian/dto.py
@@ -363,6 +369,7 @@ app/services/auth_service.py
 app/services/bank_account_service.py
 app/services/basalam_integration_service.py
 app/services/basalam_observability.py
+app/services/basalam_reports_service.py
 app/services/bom_service.py
 app/services/bulk_price_update_service.py
 app/services/bulk_product_prices_sheet_service.py
@@ -504,6 +511,7 @@ app/services/warehouse_postal_label_service.py
 app/services/warehouse_reports_service.py
 app/services/warehouse_service.py
 app/services/warranty_service.py
+app/services/woocommerce_integration_service.py
 app/services/ws_api_key_handshake.py
 app/services/year_end_closing_service.py
 app/services/zohal_service.py
@@ -668,11 +676,14 @@ migrations/versions/20260612_000002_merge_heads_report_template_status_events_an
 migrations/versions/20260613_000001_seed_received_loan_facility_chart_accounts.py
 migrations/versions/20260613_000002_received_loan_facility_tables.py
 migrations/versions/20260614_000001_business_invoice_missing_line_warehouse_policy.py
+migrations/versions/20260614_000002_seed_marketplace_plugins.py
+migrations/versions/20260615_000001_seed_woocommerce_hesabix_marketplace.py
 tests/__init__.py
 tests/test_basalam_currency.py
 tests/test_basalam_dlq.py
 tests/test_basalam_observability.py
 tests/test_basalam_openapi_contract.py
+tests/test_basalam_workflow_license_gate.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py
 tests/test_permissions.py

@@ -117,8 +117,8 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
                   alignment: BarChartAlignment.spaceAround,
                   maxY: math.max(
                     1,
-                    chartPoints.fold<double>(0, (m, e) {
-                      final c = (e is Map) ? (e['count'] as num?)?.toDouble() ?? 0 : 0;
+                    chartPoints.fold<double>(0.0, (m, e) {
+                      final c = (e is Map) ? (e['count'] as num?)?.toDouble() ?? 0.0 : 0.0;
                       return c > m ? c : m;
                     }),
                   ),
@@ -129,8 +129,8 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
                         barRods: [
                           BarChartRodData(
                             toY: (chartPoints[i] is Map)
-                                ? ((chartPoints[i] as Map)['count'] as num?)?.toDouble() ?? 0
-                                : 0,
+                                ? ((chartPoints[i] as Map)['count'] as num?)?.toDouble() ?? 0.0
+                                : 0.0,
                             width: 6,
                             color: theme.colorScheme.primary,
                           ),
