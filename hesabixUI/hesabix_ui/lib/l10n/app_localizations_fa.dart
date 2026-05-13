@@ -10928,6 +10928,33 @@ class AppLocalizationsFa extends AppLocalizations {
       'در حالت «قطعی فوری»، حواله با ثبت فاکتور قطعی می‌شود و همان قوانین کسری و موجودی منفیِ همین صفحه (بخش پایین) اعمال می‌شود؛ پیش‌نویس فقط روی کاغذ مانده تا خودتان بعداً قطعی کنید.';
 
   @override
+  String get invoiceMissingLineWarehousePolicySectionTitle =>
+      'سیاست انبار برای ردیف‌های بدون انبار';
+
+  @override
+  String get invoiceMissingLineWarehousePolicySectionSubtitle =>
+      'وقتی «ثبت انبار» روی فاکتور فعال است و برای کالای انبارداری نه در ردیف و نه در سربرگ فاکتور انباری مشخص نباشد، سیستم طبق این سیاست عمل می‌کند (مثلاً ثبت تراکنش از دیالوگ جزئیات فاکتور که فاکتور را دوباره پردازش می‌کند).';
+
+  @override
+  String get invoiceMissingLineWarehousePolicyReject =>
+      'جلوگیری از ثبت / راهنما';
+
+  @override
+  String get invoiceMissingLineWarehousePolicyUseDefault =>
+      'استفاده از انبار پیش‌فرض';
+
+  @override
+  String get invoiceDefaultWarehouseForMissingLinesLabel =>
+      'انبار پیش‌فرض برای ردیف‌های بدون انبار';
+
+  @override
+  String get invoiceDefaultWarehouseFillHeaderTitle => 'تنظیم انبار سطح فاکتور';
+
+  @override
+  String get invoiceDefaultWarehouseFillHeaderSubtitle =>
+      'اگر در سربرگ فاکتور انباری نبود، همان انبار پیش‌فرض روی فاکتور هم ثبت شود (مشابه انتخاب دستی «انبار فاکتور»).';
+
+  @override
   String get ftpBackupSettingsTitle => 'مقصد FTP بکاپ';
 
   @override

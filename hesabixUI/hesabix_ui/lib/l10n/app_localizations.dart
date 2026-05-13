@@ -20480,6 +20480,48 @@ abstract class AppLocalizations {
   /// **'With “post immediately”, the warehouse document is posted when the invoice is saved and the same shortage / negative-stock rules from the section below apply. Draft keeps it until you post manually.'**
   String get invoiceWarehouseReleaseStockHint;
 
+  /// No description provided for @invoiceMissingLineWarehousePolicySectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Policy when invoice lines have no warehouse'**
+  String get invoiceMissingLineWarehousePolicySectionTitle;
+
+  /// No description provided for @invoiceMissingLineWarehousePolicySectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When “post inventory” is enabled on a finalized invoice and a tracked product line has no warehouse on the line or invoice header, this policy applies (for example saving a payment link from the invoice details dialog re-processes the invoice).'**
+  String get invoiceMissingLineWarehousePolicySectionSubtitle;
+
+  /// No description provided for @invoiceMissingLineWarehousePolicyReject.
+  ///
+  /// In en, this message translates to:
+  /// **'Block save with guidance'**
+  String get invoiceMissingLineWarehousePolicyReject;
+
+  /// No description provided for @invoiceMissingLineWarehousePolicyUseDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Use business default warehouse'**
+  String get invoiceMissingLineWarehousePolicyUseDefault;
+
+  /// No description provided for @invoiceDefaultWarehouseForMissingLinesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Default warehouse for lines missing a warehouse'**
+  String get invoiceDefaultWarehouseForMissingLinesLabel;
+
+  /// No description provided for @invoiceDefaultWarehouseFillHeaderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Also set invoice header warehouse'**
+  String get invoiceDefaultWarehouseFillHeaderTitle;
+
+  /// No description provided for @invoiceDefaultWarehouseFillHeaderSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If the invoice header has no warehouse, set it to the same default (similar to choosing “invoice warehouse” manually).'**
+  String get invoiceDefaultWarehouseFillHeaderSubtitle;
+
   /// No description provided for @ftpBackupSettingsTitle.
   ///
   /// In en, this message translates to:

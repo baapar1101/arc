@@ -24,6 +24,13 @@ from .crm_chat_triggers_i18n import (
     CRM_CHAT_MESSAGE_RECEIVED_TRANSLATIONS,
     CRM_CHAT_MESSAGE_SENT_TRANSLATIONS,
 )
+from .basalam_triggers_i18n import (
+    BASALAM_WEBHOOK_RECEIVED_TRANSLATIONS,
+    BASALAM_ORDER_CREATED_TRANSLATIONS,
+    BASALAM_ORDER_UPDATED_TRANSLATIONS,
+    BASALAM_ORDER_PAID_TRANSLATIONS,
+    BASALAM_CHAT_MESSAGE_RECEIVED_TRANSLATIONS,
+)
 
 
 class SupportedLanguage(str, Enum):
@@ -1062,6 +1069,11 @@ TRIGGER_TRANSLATIONS_BY_KEY: Dict[str, Any] = {
     "crm.chat.conversation.assigned": CRM_CHAT_CONVERSATION_ASSIGNED_TRANSLATIONS,
     "crm.chat.conversation.resolved": CRM_CHAT_CONVERSATION_RESOLVED_TRANSLATIONS,
     "crm.chat.conversation.reopened": CRM_CHAT_CONVERSATION_REOPENED_TRANSLATIONS,
+    "basalam.webhook.received": BASALAM_WEBHOOK_RECEIVED_TRANSLATIONS,
+    "basalam.order.created": BASALAM_ORDER_CREATED_TRANSLATIONS,
+    "basalam.order.updated": BASALAM_ORDER_UPDATED_TRANSLATIONS,
+    "basalam.order.paid": BASALAM_ORDER_PAID_TRANSLATIONS,
+    "basalam.chat.message.received": BASALAM_CHAT_MESSAGE_RECEIVED_TRANSLATIONS,
 }
 
 

@@ -704,6 +704,18 @@ class BusinessUpdateRequest(BaseModel):
 		default=None,
 		description="حواله پس از ثبت فاکتور: none (بدون حواله)، draft (پیش‌نویس)، posted (قطعی فوری)",
 	)
+	invoice_missing_line_warehouse_policy: Optional[str] = Field(
+		default=None,
+		description="reject (جلوگیری با پیام راهنما) | use_default_warehouse (پر کردن خودکار از انبار پیش‌فرض کسب‌وکار)",
+	)
+	invoice_default_warehouse_id: Optional[int] = Field(
+		default=None,
+		description="انبار پیش‌فرض برای ردیف‌های انبارداری بدون انبار وقتی سیاست use_default_warehouse است",
+	)
+	invoice_default_warehouse_fill_document_header: Optional[bool] = Field(
+		default=None,
+		description="هنگام پر کردن خودکار خطوط، اگر انبار سطح فاکتور خالی بود همان انبار پیش‌فرض روی سربرگ هم ست شود",
+	)
 	allow_negative_inventory_for_bulk: Optional[bool] = Field(
 		default=None,
 		description="اجازه قطعی حواله با کسری برای کالاهای فله‌ای (غیر یونیک) با کنترل موجودی",
@@ -788,6 +800,17 @@ class BusinessUpdateRequest(BaseModel):
 		if s in ("draft",):
 			return "draft"
 		raise ValueError("invoice_warehouse_release_mode نامعتبر است (none، draft یا posted)")
+
+	@validator("invoice_missing_line_warehouse_policy")
+	def _validate_invoice_missing_line_warehouse_policy(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip().lower()
+		if s in ("reject", "block", "deny", "forbid"):
+			return "reject"
+		if s in ("use_default_warehouse", "default_warehouse", "auto_default"):
+			return "use_default_warehouse"
+		raise ValueError("invoice_missing_line_warehouse_policy نامعتبر است (reject یا use_default_warehouse)")
 
 	@validator("invoice_sync_sales_price_basis", "invoice_sync_purchase_price_basis")
 	def _validate_invoice_sync_basis(cls, v):  # noqa: N805
@@ -922,6 +945,18 @@ class BusinessResponse(BaseModel):
 	invoice_warehouse_release_mode: str = Field(
 		default="draft",
 		description="حواله پس از ثبت فاکتور: none، draft، posted",
+	)
+	invoice_missing_line_warehouse_policy: str = Field(
+		default="reject",
+		description="reject | use_default_warehouse",
+	)
+	invoice_default_warehouse_id: Optional[int] = Field(
+		default=None,
+		description="انبار پیش‌فرض برای ردیف بدون انبار",
+	)
+	invoice_default_warehouse_fill_document_header: bool = Field(
+		default=True,
+		description="پر کردن انبار سطح فاکتور هنگام حالت خودکار",
 	)
 	allow_negative_inventory_for_bulk: bool = Field(
 		default=False,

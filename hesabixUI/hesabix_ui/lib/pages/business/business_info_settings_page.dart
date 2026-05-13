@@ -14,6 +14,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/invoice/warehouse_combobox_widget.dart';
 
 class BusinessInfoSettingsPage extends StatefulWidget {
   final int businessId;
@@ -80,6 +81,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _allowNegativeInventoryForBulk = false;
   bool _allowNegativeInventoryForUnique = false;
   bool _warehouseTransferRequirePositiveStock = true;
+
+  /// reject | use_default_warehouse — وقتی ردیف انبارداری بدون انبار و ثبت انبار فعال است
+  String _invoiceMissingLineWarehousePolicy = 'reject';
+  int? _invoiceDefaultWarehouseId;
+  bool _invoiceDefaultWarehouseFillDocumentHeader = true;
 
   // ارز پیش‌فرض
   int? _selectedDefaultCurrencyId;
@@ -174,6 +180,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _allowNegativeInventoryForBulk = resp.allowNegativeInventoryForBulk;
       _allowNegativeInventoryForUnique = resp.allowNegativeInventoryForUnique;
       _warehouseTransferRequirePositiveStock = resp.warehouseTransferRequirePositiveStock;
+      _invoiceMissingLineWarehousePolicy = resp.invoiceMissingLineWarehousePolicy;
+      _invoiceDefaultWarehouseId = resp.invoiceDefaultWarehouseId;
+      _invoiceDefaultWarehouseFillDocumentHeader = resp.invoiceDefaultWarehouseFillDocumentHeader;
 
       // بررسی اینکه آیا کسب‌وکار ارز پیش‌فرض دارد یا نه
       if (resp.defaultCurrency == null) {
@@ -342,6 +351,16 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_warehouseTransferRequirePositiveStock != orig.warehouseTransferRequirePositiveStock) {
       payload['warehouse_transfer_require_positive_stock'] = _warehouseTransferRequirePositiveStock;
+    }
+    if (_invoiceMissingLineWarehousePolicy != orig.invoiceMissingLineWarehousePolicy) {
+      payload['invoice_missing_line_warehouse_policy'] = _invoiceMissingLineWarehousePolicy;
+    }
+    if ((_invoiceDefaultWarehouseId ?? -1) != (orig.invoiceDefaultWarehouseId ?? -1)) {
+      payload['invoice_default_warehouse_id'] = _invoiceDefaultWarehouseId;
+    }
+    if (_invoiceDefaultWarehouseFillDocumentHeader != orig.invoiceDefaultWarehouseFillDocumentHeader) {
+      payload['invoice_default_warehouse_fill_document_header'] =
+          _invoiceDefaultWarehouseFillDocumentHeader;
     }
 
     // ارز پیش‌فرض (فقط اگر کسب‌وکار ارز پیش‌فرض ندارد)
@@ -1108,6 +1127,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               _buildInvoiceWarehouseReleaseSettings(cs),
 
               const SizedBox(height: 24),
+              _buildSectionTitle(AppLocalizations.of(context).invoiceMissingLineWarehousePolicySectionTitle, cs),
+              const SizedBox(height: 8),
+              _buildInvoiceMissingLineWarehousePolicySettings(cs),
+
+              const SizedBox(height: 24),
               _buildSectionTitle(AppLocalizations.of(context).inventoryNegativePolicySectionTitle, cs),
               const SizedBox(height: 8),
               _buildInventoryNegativePolicySettings(cs),
@@ -1635,6 +1659,65 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                 });
               },
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceMissingLineWarehousePolicySettings(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t.invoiceMissingLineWarehousePolicySectionSubtitle,
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13, height: 1.35),
+            ),
+            const SizedBox(height: 16),
+            SegmentedButton<String>(
+              segments: <ButtonSegment<String>>[
+                ButtonSegment<String>(
+                  value: 'reject',
+                  label: Text(t.invoiceMissingLineWarehousePolicyReject),
+                ),
+                ButtonSegment<String>(
+                  value: 'use_default_warehouse',
+                  label: Text(t.invoiceMissingLineWarehousePolicyUseDefault),
+                ),
+              ],
+              selected: <String>{_invoiceMissingLineWarehousePolicy},
+              onSelectionChanged: (Set<String> next) {
+                setState(() {
+                  _invoiceMissingLineWarehousePolicy = next.first;
+                });
+              },
+            ),
+            if (_invoiceMissingLineWarehousePolicy == 'use_default_warehouse') ...[
+              const SizedBox(height: 16),
+              WarehouseComboboxWidget(
+                businessId: widget.businessId,
+                selectedWarehouseId: _invoiceDefaultWarehouseId,
+                label: t.invoiceDefaultWarehouseForMissingLinesLabel,
+                hintText: t.invoiceDefaultWarehouseForMissingLinesLabel,
+                selectDefaultWhenUnset: false,
+                onChanged: (id) => setState(() => _invoiceDefaultWarehouseId = id),
+              ),
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(t.invoiceDefaultWarehouseFillHeaderTitle),
+                subtitle: Text(
+                  t.invoiceDefaultWarehouseFillHeaderSubtitle,
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                ),
+                value: _invoiceDefaultWarehouseFillDocumentHeader,
+                onChanged: (v) => setState(() => _invoiceDefaultWarehouseFillDocumentHeader = v),
+              ),
+            ],
           ],
         ),
       ),

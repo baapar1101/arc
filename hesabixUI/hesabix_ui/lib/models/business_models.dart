@@ -375,6 +375,10 @@ class BusinessResponse {
   final String? invoiceSyncPurchasePriceBasis;
   /// none | draft | posted
   final String invoiceWarehouseReleaseMode;
+  /// reject | use_default_warehouse
+  final String invoiceMissingLineWarehousePolicy;
+  final int? invoiceDefaultWarehouseId;
+  final bool invoiceDefaultWarehouseFillDocumentHeader;
   /// خروج با کسری برای کالای فله‌ای هنگام قطعی حواله
   final bool allowNegativeInventoryForBulk;
   /// خروج با کسری برای کالای یونیک هنگام قطعی حواله
@@ -434,6 +438,9 @@ class BusinessResponse {
     this.invoiceSyncSalesPriceBasis,
     this.invoiceSyncPurchasePriceBasis,
     this.invoiceWarehouseReleaseMode = 'draft',
+    this.invoiceMissingLineWarehousePolicy = 'reject',
+    this.invoiceDefaultWarehouseId,
+    this.invoiceDefaultWarehouseFillDocumentHeader = true,
     this.allowNegativeInventoryForBulk = false,
     this.allowNegativeInventoryForUnique = false,
     this.warehouseTransferRequirePositiveStock = true,
@@ -458,6 +465,14 @@ class BusinessResponse {
     final s = (raw ?? 'draft').toString().trim().toLowerCase();
     if (s == 'none' || s == 'posted' || s == 'draft') return s;
     return 'draft';
+  }
+
+  static String _normalizeInvoiceMissingLineWarehousePolicy(String? raw) {
+    final s = (raw ?? 'reject').toString().trim().toLowerCase();
+    if (s == 'use_default_warehouse' || s == 'default_warehouse' || s == 'auto_default') {
+      return 'use_default_warehouse';
+    }
+    return 'reject';
   }
 
   factory BusinessResponse.fromJson(Map<String, dynamic> json) {
@@ -501,6 +516,12 @@ class BusinessResponse {
       invoiceWarehouseReleaseMode: _normalizeInvoiceWarehouseReleaseMode(
         json['invoice_warehouse_release_mode'] as String?,
       ),
+      invoiceMissingLineWarehousePolicy: _normalizeInvoiceMissingLineWarehousePolicy(
+        json['invoice_missing_line_warehouse_policy'] as String?,
+      ),
+      invoiceDefaultWarehouseId: (json['invoice_default_warehouse_id'] as num?)?.toInt(),
+      invoiceDefaultWarehouseFillDocumentHeader:
+          (json['invoice_default_warehouse_fill_document_header'] as bool?) ?? true,
       allowNegativeInventoryForBulk: (json['allow_negative_inventory_for_bulk'] as bool?) ?? false,
       allowNegativeInventoryForUnique: (json['allow_negative_inventory_for_unique'] as bool?) ?? false,
       warehouseTransferRequirePositiveStock:

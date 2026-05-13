@@ -611,6 +611,117 @@ def _is_inventory_posting_enabled(data: Dict[str, Any]) -> bool:
         return True
 
 
+def _int_or_none(val: Any) -> Optional[int]:
+    if val is None:
+        return None
+    try:
+        i = int(val)
+        return i if i > 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _invoice_line_has_resolvable_warehouse(line: Dict[str, Any], document_extra: Dict[str, Any]) -> bool:
+    extra = dict(line.get("extra_info") or {})
+    if _int_or_none(line.get("warehouse_id")) is not None or _int_or_none(extra.get("warehouse_id")) is not None:
+        return True
+    return _int_or_none(document_extra.get("warehouse_id")) is not None
+
+
+def _apply_invoice_missing_line_warehouse_policy(
+    db: Session,
+    business_id: int,
+    lines_input: List[Dict[str, Any]],
+    document_extra_info: Dict[str, Any],
+    is_proforma: bool,
+    post_inventory_enabled: bool,
+) -> None:
+    """اگر ثبت انبار فعال باشد، برای کالاهای انبارداری بدون انبار، سیاست کسب‌وکار اعمال یا خطای راهنما داده می‌شود."""
+    if is_proforma or not post_inventory_enabled:
+        return
+    from adapters.db.models.warehouse import Warehouse as _WarehouseModel
+
+    biz = db.query(Business).filter(Business.id == int(business_id)).first()
+    if not biz:
+        return
+    policy = str(getattr(biz, "invoice_missing_line_warehouse_policy", None) or "reject").strip().lower()
+    if policy not in ("reject", "use_default_warehouse"):
+        policy = "reject"
+    default_wh = _int_or_none(getattr(biz, "invoice_default_warehouse_id", None))
+    fill_header = bool(getattr(biz, "invoice_default_warehouse_fill_document_header", True))
+
+    missing_rows: List[int] = []
+    for idx, ln in enumerate(lines_input, start=1):
+        pid = ln.get("product_id")
+        if not pid:
+            continue
+        qty = Decimal(str(ln.get("quantity", 0) or 0))
+        if qty <= 0:
+            continue
+        info = dict(ln.get("extra_info") or {})
+        if not bool(info.get("inventory_tracked", True)):
+            continue
+        if _invoice_line_has_resolvable_warehouse(ln, document_extra_info):
+            continue
+        missing_rows.append(idx)
+
+    if not missing_rows:
+        return
+
+    if policy == "use_default_warehouse":
+        if default_wh is None:
+            raise ApiError(
+                "INVOICE_DEFAULT_WAREHOUSE_NOT_SET",
+                "سیاست «استفاده از انبار پیش‌فرض» انتخاب شده اما انبار پیش‌فرض در تنظیمات کسب‌وکار (اطلاعات کسب‌وکار، بخش انبار فاکتور) تعریف نشده است. یک انبار انتخاب کنید یا سیاست را روی «جلوگیری از ثبت» بگذارید.",
+                http_status=400,
+            )
+        wh_row = (
+            db.query(_WarehouseModel)
+            .filter(
+                _WarehouseModel.id == int(default_wh),
+                _WarehouseModel.business_id == int(business_id),
+            )
+            .first()
+        )
+        if not wh_row:
+            raise ApiError(
+                "INVOICE_DEFAULT_WAREHOUSE_INVALID",
+                "انبار پیش‌فرض انتخاب‌شده معتبر نیست یا متعلق به این کسب‌وکار نیست.",
+                http_status=400,
+            )
+        for ln in lines_input:
+            pid = ln.get("product_id")
+            if not pid:
+                continue
+            qty = Decimal(str(ln.get("quantity", 0) or 0))
+            if qty <= 0:
+                continue
+            info = dict(ln.get("extra_info") or {})
+            if not bool(info.get("inventory_tracked", True)):
+                continue
+            if _invoice_line_has_resolvable_warehouse(ln, document_extra_info):
+                continue
+            info["warehouse_id"] = int(default_wh)
+            ln["extra_info"] = info
+        if fill_header and _int_or_none(document_extra_info.get("warehouse_id")) is None:
+            document_extra_info["warehouse_id"] = int(default_wh)
+        return
+
+    rows_txt = "، ".join(str(x) for x in missing_rows[:15])
+    more = f" و {len(missing_rows) - 15} ردیف دیگر" if len(missing_rows) > 15 else ""
+    raise ApiError(
+        "INVOICE_WAREHOUSE_LINE_REQUIRED",
+        (
+            f"برای ثبت یا به‌روزرسانی فاکتور با «ثبت انبار»، باید برای کالاهای انبارداری، ردیف‌های {rows_txt}{more} "
+            "انبار در همان ردیف یا «انبار فاکتور» در سربرگ مشخص شود. "
+            "فاکتور را ویرایش کرده و انبار را انتخاب کنید؛ یا در تنظیمات > اطلاعات کسب‌وکار، بخش «سیاست انبار برای ردیف‌های بدون انبار»، "
+            "گزینه «استفاده از انبار پیش‌فرض» را با تعیین انبار پیش‌فرض فعال کنید."
+        ),
+        http_status=400,
+        details={"rows": missing_rows, "policy": "reject"},
+    )
+
+
 def _normalize_invoice_warehouse_release_mode(value: Any) -> str:
     """none | draft | posted"""
     if value is None:
@@ -3904,6 +4015,14 @@ def create_invoice(
             snapshot["captured_at"] = datetime.utcnow().isoformat()
             info["tax_snapshot"] = snapshot
         ln["extra_info"] = info
+    _apply_invoice_missing_line_warehouse_policy(
+        db,
+        business_id,
+        lines_input,
+        header_extra,
+        is_proforma_req,
+        post_inventory,
+    )
     # انبار از فاکتور جدا شده است؛ انتخاب انبار در فاکتور اجباری نیست
 
     # Costing method (only for tracked products)
@@ -5008,6 +5127,22 @@ def update_invoice(
             snapshot["captured_at"] = datetime.utcnow().isoformat()
             info["tax_snapshot"] = snapshot
         ln["extra_info"] = info
+    _doc_ex_work = dict(document.extra_info or {})
+    _apply_invoice_missing_line_warehouse_policy(
+        db,
+        int(document.business_id),
+        lines_input,
+        _doc_ex_work,
+        bool(document.is_proforma),
+        _is_inventory_posting_enabled({"extra_info": _doc_ex_work}),
+    )
+    document.extra_info = _normalize_document_extra_info_for_storage(_doc_ex_work)
+    flag_modified(document, "extra_info")
+    if isinstance(data.get("extra_info"), dict) and _int_or_none(_doc_ex_work.get("warehouse_id")) is not None:
+        de = dict(data["extra_info"])
+        if _int_or_none(de.get("warehouse_id")) is None:
+            de["warehouse_id"] = _doc_ex_work.get("warehouse_id")
+            data["extra_info"] = de
     # انتخاب انبار در مرحله فاکتور الزامی نیست
 
     try:

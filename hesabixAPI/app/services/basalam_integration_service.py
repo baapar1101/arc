@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import io
 import json
 from datetime import date
 from datetime import datetime
@@ -12,6 +13,9 @@ from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
+
+import structlog
 
 from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonType
 from adapters.api.v1.schema_models.product import ProductCreateRequest
@@ -20,22 +24,47 @@ from adapters.db.models.file_storage import FileStorage
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.crm_chat import CrmChatConversation, CrmChatMessage, CrmChatWidget
+from adapters.db.models.currency import BusinessCurrency, Currency
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
+from fastapi import HTTPException
 from app.core.cache import get_cache
 from app.core.responses import ApiError
 from app.services import crm_chat_service
-from app.services.invoice_service import create_invoice
+from app.services.file_storage_service import FileStorageService
+from app.services.basalam_observability import record_basalam_metric
+from app.services.invoice_service import (
+    INVOICE_LINK_RECEIPT_PAYMENT_IDS,
+    _normalize_document_extra_info_for_storage,
+    calculate_invoice_remaining,
+    create_invoice,
+)
 from app.services.person_service import create_person
 from app.services.product_service import create_product
 from app.services.receipt_payment_service import create_receipt_payment
-from app.services.file_storage_service import FileStorageService
+from app.services.storage_subscription_service import check_storage_limit
 from app.services.workflow.workflow_trigger_service import trigger_workflows
+
+logger = structlog.get_logger(__name__)
 
 PLUGIN_CODE = "basalam_connector"
 EXTRA_INFO_KEY = "basalam_connector"
 DEDUPE_TTL_SECONDS = 60 * 60 * 48
+SYNC_DEAD_LETTER_MAX = 200
+
+_PAYMENT_DLQ_STATUSES = frozenset(
+    {
+        "invoice_not_found",
+        "manual_review_required",
+        "invalid_amount",
+        "invoice_person_not_found",
+        "missing_reference_id",
+        "invoice_currency_not_irr",
+        "payment_exceeds_invoice_remaining",
+        "payment_invoice_already_settled",
+    }
+)
 
 
 def _json_loads_safe(value: Optional[str]) -> Dict[str, Any]:
@@ -122,6 +151,12 @@ def _default_settings() -> Dict[str, Any]:
         "updated_at": None,
         "last_webhook_event_at": None,
         "last_webhook_event_type": None,
+        "sync_dead_letter": [],
+        # واحد مبلغ در API/وب‌هوک باسلام: «rial» (ریال) یا «toman» (تومان؛ به ریال داخلی ×۱۰)
+        "basalam_monetary_unit": "rial",
+        # تطبیق سند پرداخت با ماندهٔ فاکتور (IRR)
+        "payment_reconcile_block_overpayment": True,
+        "payment_reconcile_tolerance_rial": 1.0,
     }
 
 
@@ -161,6 +196,8 @@ def _normalize_settings(payload: Dict[str, Any], previous: Optional[Dict[str, An
     base["pending_product_conflicts"] = (
         [x for x in pending_conf if isinstance(x, dict)] if isinstance(pending_conf, list) else []
     )
+    dlq = base.get("sync_dead_letter")
+    base["sync_dead_letter"] = [x for x in dlq if isinstance(x, dict)] if isinstance(dlq, list) else []
     price_strategy = str(base.get("product_conflict_price_strategy") or "local_wins").strip()
     stock_strategy = str(base.get("product_conflict_stock_strategy") or "local_wins").strip()
     variant_strategy = str(base.get("product_variant_strategy") or "manual_review").strip()
@@ -168,6 +205,14 @@ def _normalize_settings(payload: Dict[str, Any], previous: Optional[Dict[str, An
     base["product_conflict_price_strategy"] = price_strategy if price_strategy in allowed else "local_wins"
     base["product_conflict_stock_strategy"] = stock_strategy if stock_strategy in allowed else "local_wins"
     base["product_variant_strategy"] = variant_strategy if variant_strategy in allowed else "manual_review"
+    mon_unit = str(base.get("basalam_monetary_unit") or "rial").strip().lower()
+    base["basalam_monetary_unit"] = "toman" if mon_unit in ("toman", "tomman", "تومان") else "rial"
+    base["payment_reconcile_block_overpayment"] = bool(base.get("payment_reconcile_block_overpayment", True))
+    try:
+        tol = float(base.get("payment_reconcile_tolerance_rial"))
+        base["payment_reconcile_tolerance_rial"] = max(0.0, tol)
+    except (TypeError, ValueError):
+        base["payment_reconcile_tolerance_rial"] = 1.0
     base["webhook_secret"] = str(base.get("webhook_secret") or "").strip()
     base["auto_create_person_mode"] = str(base.get("auto_create_person_mode") or "match_or_create").strip()
     base["auto_create_product_mode"] = str(base.get("auto_create_product_mode") or "match_or_create").strip()
@@ -340,6 +385,131 @@ def _parse_decimal(value: Any, default: float = 0.0) -> float:
         return float(default)
 
 
+def _basalam_monetary_unit(settings: Dict[str, Any]) -> str:
+    """واحد مبلغ در دادهٔ باسلام: rial یا toman (تبدیل به ریال حساب‌یکس با ×۱۰)."""
+    u = str(settings.get("basalam_monetary_unit") or "rial").strip().lower()
+    return "toman" if u == "toman" else "rial"
+
+
+def _incoming_basalam_amount_to_rial_amount(value: Any, settings: Dict[str, Any]) -> float:
+    """مبلغ خام از باسلام → ریال داخلی (IRR) مطابق تنظیمات افزونه."""
+    v = _parse_decimal(value, 0)
+    if _basalam_monetary_unit(settings) == "toman":
+        return float(v) * 10.0
+    return float(v)
+
+
+def _internal_rial_amount_to_basalam_wire(value: Any, settings: Dict[str, Any]) -> float:
+    """ریال ذخیره‌شده در حساب‌یکس → عددی که به API باسلام برای قیمت می‌فرستیم."""
+    v = _parse_decimal(value, 0)
+    if _basalam_monetary_unit(settings) == "toman":
+        return float(v) / 10.0
+    return float(v)
+
+
+def _basalam_currency_validation(db: Session, business_id: int) -> Dict[str, Any]:
+    """اعتبارسنجی IRR-only؛ بدون پرتاب — برای UI و برای ساخت خطای اول در سینک."""
+    bid = int(business_id)
+    issues: List[Dict[str, Any]] = []
+    default_code: Optional[str] = None
+    invalid_secondary: List[str] = []
+
+    biz = db.query(Business).filter(Business.id == bid).first()
+    if not biz:
+        issues.append(
+            {
+                "code": "BUSINESS_NOT_FOUND",
+                "message": "کسب‌وکار یافت نشد.",
+                "http_status": 404,
+            }
+        )
+        return {
+            "issues": issues,
+            "default_currency_code": None,
+            "invalid_secondary_currency_codes": invalid_secondary,
+        }
+
+    if not biz.default_currency_id:
+        issues.append(
+            {
+                "code": "BASALAM_CURRENCY_NOT_SET",
+                "message": "برای سینک با باسلام ابتدا ارز پیش‌فرض کسب‌وکار را تعیین کنید.",
+                "http_status": 400,
+            }
+        )
+        return {
+            "issues": issues,
+            "default_currency_code": None,
+            "invalid_secondary_currency_codes": invalid_secondary,
+        }
+
+    dc = db.query(Currency).filter(Currency.id == int(biz.default_currency_id)).first()
+    default_code = str(dc.code if dc else "").strip().upper() or None
+    if default_code != "IRR":
+        issues.append(
+            {
+                "code": "BASALAM_REQUIRES_IRR_DEFAULT_CURRENCY",
+                "message": "برای سینک با باسلام، ارز پیش‌فرض کسب‌وکار باید ریال ایران با کد IRR باشد.",
+                "http_status": 409,
+                "details": {"current_currency_code": default_code},
+            }
+        )
+
+    secondary_codes = (
+        db.query(Currency.code)
+        .join(BusinessCurrency, BusinessCurrency.currency_id == Currency.id)
+        .filter(BusinessCurrency.business_id == bid)
+        .all()
+    )
+    invalid_secondary = sorted(
+        {str(c[0]).strip().upper() for c in secondary_codes if str(c[0]).strip().upper() != "IRR"}
+    )
+    if invalid_secondary:
+        issues.append(
+            {
+                "code": "BASALAM_REQUIRES_IRR_ONLY_CURRENCIES",
+                "message": "برای سینک با باسلام فقط ارز IRR باید در ارزهای فعال کسب‌وکار باشد؛ ارزهای جانبی غیرریالی را حذف کنید.",
+                "http_status": 409,
+                "details": {"invalid_currency_codes": invalid_secondary},
+            }
+        )
+
+    return {
+        "issues": issues,
+        "default_currency_code": default_code,
+        "invalid_secondary_currency_codes": invalid_secondary,
+    }
+
+
+def get_basalam_currency_readiness(db: Session, business_id: int) -> Dict[str, Any]:
+    """وضعیت ارزی برای هشدار در UI؛ هرگز پرتاب نمی‌کند."""
+    v = _basalam_currency_validation(db, business_id)
+    issues = list(v.get("issues") or [])
+    return {
+        "ready": len(issues) == 0,
+        "issues": issues,
+        "default_currency_code": v.get("default_currency_code"),
+        "invalid_secondary_currency_codes": list(v.get("invalid_secondary_currency_codes") or []),
+    }
+
+
+def _ensure_business_irr_only_for_basalam(db: Session, business_id: int) -> None:
+    """
+    سینک باسلام فقط با ارز ریال ایران در حساب‌یکس: پیش‌فرض IRR و عدم وجود ارز جانبی غیر IRR.
+    """
+    v = _basalam_currency_validation(db, business_id)
+    issues = list(v.get("issues") or [])
+    if not issues:
+        return
+    first = issues[0]
+    raise ApiError(
+        str(first.get("code") or "BASALAM_CURRENCY_INVALID"),
+        str(first.get("message") or "Currency validation failed."),
+        http_status=int(first.get("http_status") or 409),
+        details=first.get("details"),
+    )
+
+
 def _event_dedupe_key(business_id: int, event_type: str, event_id: str, order_id: Optional[str] = None) -> str:
     if order_id:
         return f"basalam:dedupe:{business_id}:{event_type}:{event_id}:{order_id}"
@@ -476,7 +646,10 @@ def _find_or_create_product(
         code=sku if sku else None,
         name=name or "Basalam Item",
         item_type="کالا",
-        base_sales_price=_parse_decimal(line.get("unit_price") or line.get("price"), 0),
+        base_sales_price=_incoming_basalam_amount_to_rial_amount(
+            line.get("unit_price") or line.get("price"),
+            settings,
+        ),
         barcode=barcode or None,
         track_inventory=True,
     )
@@ -504,7 +677,10 @@ def _build_invoice_lines(
         if basalam_pid:
             mapped_products[basalam_pid] = pid
         qty = _parse_decimal(item.get("quantity") or item.get("qty") or 1, 1)
-        unit_price = _parse_decimal(item.get("unit_price") or item.get("price"), 0)
+        unit_price = _incoming_basalam_amount_to_rial_amount(
+            item.get("unit_price") or item.get("price"),
+            settings,
+        )
         lines.append(
             {
                 "product_id": int(pid),
@@ -601,6 +777,7 @@ def _sync_orders(
     event_id: str,
     actor_user_id: int,
 ) -> Dict[str, Any]:
+    _ensure_business_irr_only_for_basalam(db, int(business_id))
     results: List[Dict[str, Any]] = []
     processed = 0
     skipped_duplicates = 0
@@ -622,6 +799,20 @@ def _sync_orders(
         )
         processed += 1
         results.append(result)
+        if result.get("status") in ("pending_manual_person", "pending_manual_products"):
+            _append_sync_dead_letter(
+                db,
+                int(business_id),
+                {
+                    "type": "order_sync",
+                    "subtype": result.get("status"),
+                    "order_id": oid,
+                    "source": source,
+                    "event_type": event_type,
+                    "event_id": event_id,
+                    "person_id": result.get("person_id"),
+                },
+            )
         _remember_event_in_settings(db, business_id, settings, dedupe_key)
         trigger_workflows(
             db=db,
@@ -637,6 +828,12 @@ def _sync_orders(
                 "tag": settings.get("default_order_tag", "basalam"),
             },
         )
+    record_basalam_metric("sync_orders_batches", 1)
+    record_basalam_metric("sync_orders_processed", processed)
+    record_basalam_metric(
+        "sync_orders_invoices_created",
+        sum(1 for r in results if r.get("status") == "synced" and r.get("invoice_id")),
+    )
     return {"processed_orders": processed, "skipped_duplicates": skipped_duplicates, "results": results}
 
 
@@ -790,26 +987,80 @@ def _map_upload_file_type(mime_type: str) -> str:
 
 async def _upload_crm_file_to_basalam(
     db: Session,
+    business_id: int,
     settings: Dict[str, Any],
     file_storage_id: str,
 ) -> Dict[str, Any]:
     fs = db.get(FileStorage, str(file_storage_id).strip())
     if not fs:
         raise ApiError("CRM_CHAT_FILE_NOT_FOUND", "File not found", http_status=404)
-    local_path = await FileStorageService(db).resolve_local_disk_path_for_file(UUID(str(fs.id)))
-    if not local_path:
+    if fs.business_id is not None and int(fs.business_id) != int(business_id):
         raise ApiError(
-            "BASALAM_FILE_RELAY_NOT_SUPPORTED",
-            "Attachment relay supports local storage files only.",
-            http_status=422,
+            "CRM_CHAT_FILE_BUSINESS_MISMATCH",
+            "File does not belong to this business.",
+            http_status=403,
         )
+
+    limit_info = check_storage_limit(db, int(business_id), None)
+    if float(limit_info.get("total_limit_gb") or 0) <= 0:
+        raise ApiError(
+            "NO_ACTIVE_STORAGE_PLAN",
+            "برای ارسال پیوست از CRM به باسلام، ابتدا یک پلن ذخیره‌سازی فعال برای کسب‌وکار انتخاب کنید.",
+            http_status=403,
+            details={
+                "total_limit_gb": limit_info.get("total_limit_gb"),
+                "current_usage_gb": limit_info.get("current_usage_gb"),
+            },
+        )
+
+    storage_svc = FileStorageService(db)
+    try:
+        dl = await storage_svc.download_file(UUID(str(fs.id)))
+    except HTTPException as he:
+        detail = he.detail
+        if isinstance(detail, dict):
+            msg = str(detail.get("message") or detail.get("detail") or detail)
+        else:
+            msg = str(detail)
+        if he.status_code == 404:
+            raise ApiError("CRM_CHAT_FILE_NOT_FOUND", msg, http_status=404)
+        raise ApiError(
+            "FILE_STORAGE_READ_FAILED",
+            msg or "Failed to read file from storage.",
+            http_status=502,
+            details={"file_id": str(fs.id)},
+        )
+    except NotImplementedError as exc:
+        raise ApiError(
+            "STORAGE_BACKEND_NOT_SUPPORTED",
+            "خواندن این نوع فضای ذخیره‌سازی در سرور هنوز پیاده‌سازی نشده؛ با مدیر سیستم هماهنگ کنید.",
+            http_status=422,
+            details={"storage_type": getattr(fs, "storage_type", None), "reason": str(exc)},
+        )
+    except FileNotFoundError as exc:
+        raise ApiError(
+            "CRM_CHAT_FILE_MISSING_ON_STORAGE",
+            "فایل در فضای ذخیره‌سازی یافت نشد.",
+            http_status=404,
+            details={"file_id": str(fs.id), "reason": str(exc)},
+        )
+
+    file_content = dl.get("content")
+    if not isinstance(file_content, (bytes, bytearray)) or len(file_content) == 0:
+        raise ApiError(
+            "FILE_STORAGE_EMPTY_CONTENT",
+            "محتوای فایل خالی یا نامعتبر است.",
+            http_status=422,
+            details={"file_id": str(fs.id)},
+        )
+
     client = _get_basalam_sdk_client(settings)
     file_type = _map_upload_file_type(fs.mime_type)
     try:
         from basalam_sdk.upload.models import UserUploadFileTypeEnum
 
-        with open(local_path, "rb") as f:
-            uploaded = client.upload.upload_file_sync(file=f, file_type=UserUploadFileTypeEnum(file_type))
+        with io.BytesIO(bytes(file_content)) as bio:
+            uploaded = client.upload.upload_file_sync(file=bio, file_type=UserUploadFileTypeEnum(file_type))
     except Exception as exc:
         raise ApiError(
             "BASALAM_FILE_UPLOAD_FAILED",
@@ -858,7 +1109,7 @@ async def relay_agent_message_from_crm(
     text = str(body or "").strip()
     attachment = None
     if file_storage_id:
-        attachment = await _upload_crm_file_to_basalam(db, settings, file_storage_id)
+        attachment = await _upload_crm_file_to_basalam(db, int(business_id), settings, file_storage_id)
         _basalam_request(
             settings=settings,
             method="POST",
@@ -947,6 +1198,35 @@ def _find_invoice_by_basalam_reference(db: Session, business_id: int, reference_
     return None
 
 
+def _existing_basalam_receipt_for_transaction_hash(
+    db: Session,
+    business_id: int,
+    hash_id: Optional[str],
+) -> Optional[int]:
+    """جلوگیری از ثبت دوبارهٔ رسید برای همان hash_id تراکنش باسلام."""
+    hid = str(hash_id or "").strip()
+    if not hid:
+        return None
+    rows = (
+        db.query(Document.id, Document.extra_info)
+        .filter(
+            Document.business_id == int(business_id),
+            Document.document_type == "receipt",
+        )
+        .order_by(Document.id.desc())
+        .limit(1500)
+        .all()
+    )
+    for doc_id, extra in rows:
+        if not isinstance(extra, dict):
+            continue
+        if str(extra.get("source") or "").lower() != "basalam":
+            continue
+        if str(extra.get("hash_id") or "").strip() == hid:
+            return int(doc_id)
+    return None
+
+
 def _invoice_person_id(db: Session, invoice_id: int) -> Optional[int]:
     line = (
         db.query(DocumentLine)
@@ -981,6 +1261,86 @@ def _payment_account_line_from_settings(settings: Dict[str, Any], amount: float)
     return None
 
 
+def _append_basalam_receipt_to_invoice_links(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+    receipt_document_id: int,
+) -> None:
+    """پیوند رسید باسلام به فاکتور برای مانده‌گیری و گزارش."""
+    inv = (
+        db.query(Document)
+        .filter(Document.id == int(invoice_id), Document.business_id == int(business_id))
+        .first()
+    )
+    if not inv:
+        return
+    extra = dict(inv.extra_info) if isinstance(inv.extra_info, dict) else {}
+    links = dict(extra.get("links") or {})
+    raw_ids = links.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS) or []
+    ids: List[int] = []
+    for x in raw_ids:
+        try:
+            ids.append(int(x))
+        except (TypeError, ValueError):
+            continue
+    rid = int(receipt_document_id)
+    if rid not in ids:
+        ids.append(rid)
+    links[INVOICE_LINK_RECEIPT_PAYMENT_IDS] = ids
+    extra["links"] = links
+    inv.extra_info = _normalize_document_extra_info_for_storage(extra)
+    flag_modified(inv, "extra_info")
+    db.add(inv)
+
+
+def _basalam_payment_reconcile_gate(
+    db: Session,
+    business_id: int,
+    invoice: Document,
+    settings: Dict[str, Any],
+    payment_amount: float,
+) -> Optional[Dict[str, Any]]:
+    """
+    مانع ثبت رسید در صورت بیش‌پرداخت نسبت به ماندهٔ فاکتور.
+    در خطای محاسبهٔ مانده، جهت جلوگیری از قطع بی‌جهت تراکنش، عبور داده می‌شود (متریک جداگانه).
+    """
+    if not settings.get("payment_reconcile_block_overpayment", True):
+        return None
+    tol = float(settings.get("payment_reconcile_tolerance_rial") or 1.0)
+    remaining_val: Optional[float] = None
+    try:
+        rem = calculate_invoice_remaining(db, int(business_id), int(invoice.id))
+        remaining_val = float(rem.get("remaining") or 0.0)
+    except Exception as exc:
+        logger.warning(
+            "basalam_payment_remaining_calc_failed",
+            invoice_id=invoice.id,
+            business_id=int(business_id),
+            error=str(exc),
+        )
+        record_basalam_metric("payment_reconcile_remaining_calc_failed", 1)
+        return None
+    pay = float(payment_amount)
+    if remaining_val <= tol and pay > tol:
+        record_basalam_metric("payment_reconcile_blocked", 1)
+        return {
+            "status": "payment_invoice_already_settled",
+            "invoice_id": invoice.id,
+            "remaining": remaining_val,
+            "payment_amount": pay,
+        }
+    if pay > remaining_val + tol:
+        record_basalam_metric("payment_reconcile_blocked", 1)
+        return {
+            "status": "payment_exceeds_invoice_remaining",
+            "invoice_id": invoice.id,
+            "remaining": remaining_val,
+            "payment_amount": pay,
+        }
+    return None
+
+
 def _sync_single_payment_transaction(
     db: Session,
     business_id: int,
@@ -990,18 +1350,41 @@ def _sync_single_payment_transaction(
 ) -> Dict[str, Any]:
     if not _tx_is_paid_or_unverified(tx):
         return {"status": "ignored_status", "hash_id": tx.get("hash_id")}
+    _ensure_business_irr_only_for_basalam(db, business_id)
     reference_id = str(tx.get("reference_id") or "").strip()
     if not reference_id:
         return {"status": "missing_reference_id", "hash_id": tx.get("hash_id")}
+    hash_key = str(tx.get("hash_id") or "").strip()
+    if hash_key:
+        existing_receipt = _existing_basalam_receipt_for_transaction_hash(db, business_id, hash_key)
+        if existing_receipt:
+            return {
+                "status": "already_synced",
+                "receipt_payment_id": existing_receipt,
+                "hash_id": tx.get("hash_id"),
+                "reference_id": reference_id,
+            }
     invoice = _find_invoice_by_basalam_reference(db, business_id, reference_id)
     if not invoice:
         return {"status": "invoice_not_found", "reference_id": reference_id}
+    inv_currency_code = (
+        db.query(Currency.code).filter(Currency.id == int(invoice.currency_id)).scalar()
+    )
+    if str(inv_currency_code or "").strip().upper() != "IRR":
+        return {
+            "status": "invoice_currency_not_irr",
+            "invoice_id": invoice.id,
+            "currency_code": inv_currency_code,
+        }
     person_id = _invoice_person_id(db, invoice.id)
     if not person_id:
         return {"status": "invoice_person_not_found", "invoice_id": invoice.id}
-    amount = _parse_decimal(tx.get("amount"), 0)
+    amount = _incoming_basalam_amount_to_rial_amount(tx.get("amount"), settings)
     if amount <= 0:
         return {"status": "invalid_amount", "invoice_id": invoice.id}
+    blocked = _basalam_payment_reconcile_gate(db, business_id, invoice, settings, float(amount))
+    if blocked:
+        return blocked
     account_line = _payment_account_line_from_settings(settings, amount)
     if not account_line:
         return {
@@ -1035,10 +1418,22 @@ def _sync_single_payment_transaction(
         user_id=int(actor_user_id),
         data=payload,
     )
+    rp_id = created.get("data", {}).get("id") if isinstance(created, dict) else None
+    if rp_id:
+        try:
+            _append_basalam_receipt_to_invoice_links(db, int(business_id), int(invoice.id), int(rp_id))
+            db.commit()
+        except Exception as exc:
+            logger.warning(
+                "basalam_receipt_invoice_link_failed",
+                invoice_id=invoice.id,
+                receipt_id=rp_id,
+                error=str(exc),
+            )
     return {
         "status": "synced",
         "invoice_id": invoice.id,
-        "receipt_payment_id": created.get("data", {}).get("id") if isinstance(created, dict) else None,
+        "receipt_payment_id": rp_id,
         "hash_id": tx.get("hash_id"),
         "reference_id": reference_id,
     }
@@ -1065,6 +1460,8 @@ def sync_unverified_payments(
     txs = _extract_transactions(fetched)
     if not txs:
         return {"accepted": True, "processed": 0, "synced": 0, "results": []}
+    _ensure_business_irr_only_for_basalam(db, int(business_id))
+    record_basalam_metric("payment_sync_batches", 1)
     should_verify = settings.get("payment_verify_remote", True) if verify_remote is None else bool(verify_remote)
     results: List[Dict[str, Any]] = []
     synced = 0
@@ -1083,6 +1480,7 @@ def sync_unverified_payments(
         )
         if result.get("status") == "synced":
             synced += 1
+            record_basalam_metric("payment_sync_receipt_created", 1)
             trigger_workflows(
                 db=db,
                 business_id=int(business_id),
@@ -1106,7 +1504,32 @@ def sync_unverified_payments(
                     result["verified_remotely"] = False
                     result["verify_error"] = exc.code
         results.append(result)
+        if result.get("status") in _PAYMENT_DLQ_STATUSES:
+            snap: Dict[str, Any] = {}
+            if isinstance(tx, dict):
+                for k in ("hash_id", "reference_id", "amount"):
+                    if tx.get(k) is not None:
+                        snap[k] = tx.get(k)
+            details = {k: v for k, v in result.items() if k != "status"}
+            _append_sync_dead_letter(
+                db,
+                int(business_id),
+                {
+                    "type": "payment_sync",
+                    "subtype": result.get("status"),
+                    "details": details,
+                    "transaction": snap,
+                },
+            )
+            record_basalam_metric("payment_sync_dlq_appended", 1)
         _remember_event_in_settings(db, business_id, settings, dedupe_key)
+    logger.info(
+        "basalam_payment_sync_completed",
+        business_id=int(business_id),
+        processed=len(txs),
+        synced=synced,
+        results=len(results),
+    )
     return {"accepted": True, "processed": len(txs), "synced": synced, "results": results}
 
 
@@ -1355,10 +1778,14 @@ def process_webhook(
 ) -> Dict[str, Any]:
     settings = get_settings(db, business_id)
     if not settings.get("enabled"):
+        record_basalam_metric("webhook_disabled", 1)
         raise ApiError("BASALAM_DISABLED", "Basalam integration is disabled for this business.", http_status=409)
 
     if not _verify_webhook_signature(raw_body, signature, str(settings.get("webhook_secret") or "")):
+        record_basalam_metric("webhook_signature_invalid", 1)
         raise ApiError("BASALAM_INVALID_SIGNATURE", "Invalid webhook signature.", http_status=401)
+
+    record_basalam_metric("webhook_received", 1)
 
     event_type = _event_type(payload)
     event_id = _event_id(payload)
@@ -1367,6 +1794,13 @@ def process_webhook(
     dedupe_key = _event_dedupe_key(business_id, event_type, event_id)
 
     if dedupe_key in settings.get("recent_event_keys", []) or _is_duplicate_event(business_id, dedupe_key):
+        logger.info(
+            "basalam_webhook_duplicate",
+            business_id=int(business_id),
+            event_type=event_type,
+            event_id=str(event_id),
+        )
+        record_basalam_metric("webhook_duplicate", 1)
         return {"accepted": True, "event_type": event_type, "event_id": event_id, "duplicate": True}
 
     trigger_workflows(
@@ -1438,6 +1872,16 @@ def process_webhook(
         },
     )
     _remember_event_in_settings(db, business_id, settings, dedupe_key)
+    logger.info(
+        "basalam_webhook_processed",
+        business_id=int(business_id),
+        event_type=event_type,
+        workflow_trigger=trigger_key,
+        processed_orders=int(sync_info.get("processed_orders") or 0),
+        skipped_order_duplicates=int(sync_info.get("skipped_duplicates") or 0),
+        processed_messages=int(chat_info.get("processed_messages") or 0),
+    )
+    record_basalam_metric("webhook_processed_ok", 1)
     return {
         "accepted": True,
         "event_type": event_type,
@@ -1495,6 +1939,7 @@ def manual_sync_products(
         raise ApiError("BASALAM_DISABLED", "Basalam integration is disabled for this business.", http_status=409)
     if not settings.get("product_sync_enabled", True):
         raise ApiError("BASALAM_PRODUCT_SYNC_DISABLED", "Product sync is disabled in settings.", http_status=409)
+    _ensure_business_irr_only_for_basalam(db, int(business_id))
     products = payload.get("products")
     if isinstance(products, dict):
         products = [products]
@@ -1521,6 +1966,8 @@ def manual_sync_products(
                 "type": "variant_conflict",
                 "direction": "pull",
                 "reason": "remote_has_variants",
+                "basalam_product_id": _extract_product_basalam_id(p),
+                "remote_title": p.get("title") or p.get("name"),
                 "payload": p,
                 "created_at": datetime.utcnow().isoformat(),
             }
@@ -1633,7 +2080,8 @@ def _build_basalam_product_request_from_local(
     price_src = item.get("primary_price")
     if price_src is None:
         price_src = local_product.base_sales_price
-    price_int = int(_parse_decimal(price_src, 0))
+    price_wire = _internal_rial_amount_to_basalam_wire(price_src, settings)
+    price_int = int(round(price_wire))
     req_payload: Dict[str, Any] = {
         "name": str(item.get("name") or local_product.name or "").strip() or f"Product {local_product.id}",
         "brief": str(item.get("brief") or "")[:200] or None,
@@ -1660,6 +2108,7 @@ def publish_products_to_basalam(
     settings = get_settings(db, business_id)
     if not settings.get("enabled"):
         raise ApiError("BASALAM_DISABLED", "Basalam integration is disabled for this business.", http_status=409)
+    _ensure_business_irr_only_for_basalam(db, int(business_id))
     products = payload.get("products")
     if isinstance(products, dict):
         products = [products]
@@ -1713,6 +2162,8 @@ def publish_products_to_basalam(
                     "direction": "push",
                     "reason": "local_has_variants_or_unique_mode",
                     "local_product_id": int(local_product.id),
+                    "local_product_name": local_product.name,
+                    "local_product_code": local_product.code,
                     "payload": item,
                     "created_at": datetime.utcnow().isoformat(),
                 }
@@ -1739,7 +2190,10 @@ def publish_products_to_basalam(
                             "type": "field_conflict",
                             "direction": "push",
                             "local_product_id": int(local_product.id),
+                            "local_product_name": local_product.name,
+                            "local_product_code": local_product.code,
                             "basalam_product_id": int(remote_id),
+                            "remote_title": remote_dict.get("title") if isinstance(remote_dict, dict) else None,
                             "local_price": local_price,
                             "remote_price": remote_price,
                             "local_stock": local_stock,
@@ -1866,6 +2320,70 @@ def _extract_remote_price_stock(remote_payload: Dict[str, Any]) -> Tuple[Optiona
 
 def _new_conflict_id(prefix: str = "pc") -> str:
     return f"{prefix}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}"
+
+
+def _append_sync_dead_letter(db: Session, business_id: int, entry: Dict[str, Any]) -> None:
+    settings = get_settings(db, business_id)
+    q = settings.get("sync_dead_letter")
+    queue = [x for x in q if isinstance(x, dict)] if isinstance(q, list) else []
+    row = dict(entry)
+    row.setdefault("created_at", datetime.utcnow().isoformat())
+    row.setdefault("dlq_id", _new_conflict_id("dlq"))
+    queue.append(row)
+    update_settings(db, business_id, {"sync_dead_letter": queue[-SYNC_DEAD_LETTER_MAX:]})
+
+
+def list_sync_dead_letter(
+    db: Session,
+    business_id: int,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+    item_type: Optional[str] = None,
+) -> Dict[str, Any]:
+    settings = get_settings(db, business_id)
+    q = [x for x in settings.get("sync_dead_letter", []) if isinstance(x, dict)]
+    if item_type:
+        t = str(item_type).strip().lower()
+        q = [x for x in q if str(x.get("type") or "").lower() == t]
+    total = len(q)
+    lo = max(0, int(offset))
+    hi = lo + max(1, min(200, int(limit)))
+    return {"items": q[lo:hi], "total": total, "limit": limit, "offset": lo}
+
+
+def clear_sync_dead_letter(
+    db: Session,
+    business_id: int,
+    *,
+    mode: str = "all",
+    dlq_ids: Optional[List[Any]] = None,
+) -> Dict[str, Any]:
+    settings = get_settings(db, business_id)
+    q = [x for x in settings.get("sync_dead_letter", []) if isinstance(x, dict)]
+    m = str(mode or "").strip().lower()
+    if m == "all":
+        update_settings(db, business_id, {"sync_dead_letter": []})
+        return {"accepted": True, "cleared_count": len(q), "remaining_count": 0, "mode": "all"}
+    if m == "ids":
+        ids = dlq_ids if isinstance(dlq_ids, list) else []
+        id_set = {str(i).strip() for i in ids if i is not None and str(i).strip()}
+        if not id_set:
+            return {"accepted": True, "cleared_count": 0, "remaining_count": len(q), "mode": "ids"}
+        remaining = [x for x in q if str(x.get("dlq_id") or "").strip() not in id_set]
+        cleared = len(q) - len(remaining)
+        update_settings(db, business_id, {"sync_dead_letter": remaining[-SYNC_DEAD_LETTER_MAX:]})
+        return {
+            "accepted": True,
+            "cleared_count": cleared,
+            "remaining_count": len(remaining),
+            "mode": "ids",
+        }
+    raise ApiError(
+        "BASALAM_DLQ_INVALID_CLEAR_MODE",
+        "clear mode must be 'all' or 'ids'.",
+        http_status=400,
+    )
 
 
 def pull_products_from_basalam(
@@ -2066,6 +2584,13 @@ def list_product_conflicts(
     lim = max(1, min(200, int(limit)))
     off = max(0, int(offset))
     page_items = items[off:off + lim]
+    by_type: Dict[str, int] = {}
+    by_direction: Dict[str, int] = {}
+    for x in items:
+        tkey = str(x.get("type") or "unknown")
+        dkey = str(x.get("direction") or "unknown")
+        by_type[tkey] = int(by_type.get(tkey, 0)) + 1
+        by_direction[dkey] = int(by_direction.get(dkey, 0)) + 1
     return {
         "accepted": True,
         "items": page_items,
@@ -2073,6 +2598,7 @@ def list_product_conflicts(
         "limit": lim,
         "offset": off,
         "has_more": (off + lim) < total,
+        "summary": {"by_type": by_type, "by_direction": by_direction},
     }
 
 

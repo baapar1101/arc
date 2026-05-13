@@ -155,12 +155,8 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
   }
 
   String _fmt(double? v) {
-    if (v == null) return '';
-    if (v == 0) return '';
-    // Keep raw numeric (no thousands separators) for editing
-    final s = v.toString();
-    if (s.endsWith('.0')) return s.substring(0, s.length - 2);
-    return s;
+    if (v == null || v == 0) return '';
+    return formatNumberForInput(v);
   }
 
   void _addNewLine() {
@@ -396,14 +392,16 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
                     key: ValueKey('debit_${line.uid}'),
                     controller: c.debitCtrl,
                     decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'بدهکار'),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     textAlign: TextAlign.left,
+                    textDirection: TextDirection.ltr,
+                    style: theme.textTheme.bodyLarge,
                     inputFormatters: [
-                      const EnglishDigitsFormatter(),
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                      const NumberInputFormatter(allowDecimal: true),
+                      FilteringTextInputFormatter.allow(RegExp(r'^(?:[\d,]*\.?\d{0,2})?$')),
                     ],
                     onChanged: (value) {
-                      line.debit = double.tryParse(value) ?? 0;
+                      line.debit = parseFormattedDouble(value) ?? 0;
                       if (line.debit > 0) {
                         line.credit = 0;
                         if (c.creditCtrl.text.isNotEmpty) c.creditCtrl.text = '';
@@ -418,14 +416,16 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
                     key: ValueKey('credit_${line.uid}'),
                     controller: c.creditCtrl,
                     decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'بستانکار'),
-                    keyboardType: TextInputType.number,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     textAlign: TextAlign.left,
+                    textDirection: TextDirection.ltr,
+                    style: theme.textTheme.bodyLarge,
                     inputFormatters: [
-                      const EnglishDigitsFormatter(),
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                      const NumberInputFormatter(allowDecimal: true),
+                      FilteringTextInputFormatter.allow(RegExp(r'^(?:[\d,]*\.?\d{0,2})?$')),
                     ],
                     onChanged: (value) {
-                      line.credit = double.tryParse(value) ?? 0;
+                      line.credit = parseFormattedDouble(value) ?? 0;
                       if (line.credit > 0) {
                         line.debit = 0;
                         if (c.debitCtrl.text.isNotEmpty) c.debitCtrl.text = '';
@@ -572,14 +572,16 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.left,
+              textDirection: TextDirection.ltr,
+              style: theme.textTheme.bodyLarge,
               inputFormatters: [
-                const EnglishDigitsFormatter(),
-                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                const NumberInputFormatter(allowDecimal: true),
+                FilteringTextInputFormatter.allow(RegExp(r'^(?:[\d,]*\.?\d{0,2})?$')),
               ],
               onChanged: (value) {
-                line.debit = double.tryParse(value) ?? 0;
+                line.debit = parseFormattedDouble(value) ?? 0;
                 // اگر بدهکار وارد شد، بستانکار را صفر کن
                 if (line.debit > 0) {
                   line.credit = 0;
@@ -601,14 +603,16 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.left,
+              textDirection: TextDirection.ltr,
+              style: theme.textTheme.bodyLarge,
               inputFormatters: [
-                const EnglishDigitsFormatter(),
-                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+                const NumberInputFormatter(allowDecimal: true),
+                FilteringTextInputFormatter.allow(RegExp(r'^(?:[\d,]*\.?\d{0,2})?$')),
               ],
               onChanged: (value) {
-                line.credit = double.tryParse(value) ?? 0;
+                line.credit = parseFormattedDouble(value) ?? 0;
                 // اگر بستانکار وارد شد، بدهکار را صفر کن
                 if (line.credit > 0) {
                   line.debit = 0;
@@ -678,12 +682,10 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  formatWithThousands(_totalDebit.toInt()),
-                  style: const TextStyle(
+                  formatWithThousands(_totalDebit),
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
                     color: Colors.red,
-                    fontFamily: 'monospace',
                   ),
                   textDirection: TextDirection.ltr,
                 ),
@@ -708,12 +710,10 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  formatWithThousands(_totalCredit.toInt()),
-                  style: const TextStyle(
+                  formatWithThousands(_totalCredit),
+                  style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
                     color: Colors.green,
-                    fontFamily: 'monospace',
                   ),
                   textDirection: TextDirection.ltr,
                 ),
@@ -740,12 +740,10 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
                 Row(
                   children: [
                     Text(
-                      formatWithThousands(_balance.abs().toInt()),
-                      style: TextStyle(
+                      formatWithThousands(_balance.abs()),
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 18,
                         color: _isBalanced ? Colors.green : Colors.orange,
-                        fontFamily: 'monospace',
                       ),
                       textDirection: TextDirection.ltr,
                     ),

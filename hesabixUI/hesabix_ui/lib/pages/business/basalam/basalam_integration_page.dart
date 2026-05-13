@@ -39,6 +39,18 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
   bool _syncingPayments = false;
   bool _syncingInboundChats = false;
   bool _sendingChatReply = false;
+  bool _loadingCurrencyReadiness = false;
+  bool _currencyReady = true;
+  List<Map<String, dynamic>> _currencyIssues = const [];
+  List<String> _invalidSecondaryCurrencyCodes = const [];
+  bool _loadingDlq = false;
+  bool _clearingDlq = false;
+  int _dlqTotal = 0;
+  int _dlqOffset = 0;
+  bool _dlqHasMore = false;
+  List<Map<String, dynamic>> _dlqItems = const [];
+  String _dlqTypeFilter = 'all';
+  static const int _dlqPageSize = 25;
 
   final _apiKeyCtl = TextEditingController();
   final _apiRefreshTokenCtl = TextEditingController();
@@ -81,14 +93,20 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
   String _personMode = 'match_or_create';
   String _productMode = 'match_or_create';
   String _paymentMode = 'manual_review';
+  bool _paymentReconcileBlockOverpayment = true;
+  final _paymentReconcileToleranceCtl = TextEditingController(text: '1');
   String _priceConflictStrategy = 'local_wins';
   String _stockConflictStrategy = 'local_wins';
   String _variantStrategy = 'manual_review';
+  /// واحد مبلغ در دادهٔ API باسلام: ریال یا تومان (به IRR حساب‌یکس تبدیل می‌شود)
+  String _basalamMonetaryUnit = 'rial';
   String? _lastWebhookEventType;
   String? _lastWebhookEventAt;
   int _productConflictCount = 0;
   List<Map<String, dynamic>> _productConflicts = const [];
   Set<String> _selectedConflictIds = <String>{};
+  Map<String, int> _conflictSummaryByType = const {};
+  Map<String, int> _conflictSummaryByDirection = const {};
   bool _productConflictsHasMore = false;
   int _productConflictsOffset = 0;
   static const int _productConflictsPageSize = 25;
@@ -128,6 +146,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
     _replyChatIdCtl.dispose();
     _replyBodyCtl.dispose();
     _conflictSearchCtl.dispose();
+    _paymentReconcileToleranceCtl.dispose();
     super.dispose();
   }
 
@@ -154,12 +173,19 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
             .toString();
         _paymentMode = (d['payment_register_mode'] ?? 'manual_review')
             .toString();
+        _paymentReconcileBlockOverpayment =
+            d['payment_reconcile_block_overpayment'] != false;
+        _paymentReconcileToleranceCtl.text =
+            (d['payment_reconcile_tolerance_rial'] ?? 1).toString();
         _priceConflictStrategy =
             (d['product_conflict_price_strategy'] ?? 'local_wins').toString();
         _stockConflictStrategy =
             (d['product_conflict_stock_strategy'] ?? 'local_wins').toString();
         _variantStrategy =
             (d['product_variant_strategy'] ?? 'manual_review').toString();
+        final bm = (d['basalam_monetary_unit'] ?? 'rial').toString();
+        _basalamMonetaryUnit =
+            bm == 'toman' || bm == 'tomman' || bm == 'تومان' ? 'toman' : 'rial';
         _apiKeyCtl.text = (d['api_key'] ?? '').toString();
         _apiRefreshTokenCtl.text = (d['api_refresh_token'] ?? '').toString();
         _baseUrlCtl.text = (d['api_base_url'] ?? 'https://api.basalam.com')
@@ -176,6 +202,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
         _lastWebhookEventAt = d['last_webhook_event_at']?.toString();
       });
       await _loadProductConflicts();
+      await _refreshBasalamHealth();
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -185,6 +212,144 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
       }
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  bool _canSyncBasalam() {
+    final owner = widget.authStore.currentBusiness?.isOwner == true;
+    final canManage =
+        widget.authStore.hasBusinessPermission('basalam', 'manage') || owner;
+    return widget.authStore.hasBusinessPermission('basalam', 'sync') ||
+        canManage;
+  }
+
+  Future<void> _refreshBasalamHealth() async {
+    await _loadCurrencyReadiness();
+    if (_canSyncBasalam()) {
+      await _loadSyncDeadLetter();
+    }
+  }
+
+  Future<void> _loadCurrencyReadiness() async {
+    setState(() => _loadingCurrencyReadiness = true);
+    try {
+      final d = await _svc.getCurrencyReadiness(businessId: widget.businessId);
+      if (!mounted) return;
+      final ready = d['ready'] == true;
+      final issuesRaw = d['issues'];
+      final issues = issuesRaw is List
+          ? issuesRaw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : <Map<String, dynamic>>[];
+      final invRaw = d['invalid_secondary_currency_codes'];
+      final inv = invRaw is List
+          ? invRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      setState(() {
+        _currencyReady = ready;
+        _currencyIssues = issues;
+        _invalidSecondaryCurrencyCodes = inv;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _currencyReady = true;
+        _currencyIssues = const [];
+        _invalidSecondaryCurrencyCodes = const [];
+      });
+    } finally {
+      if (mounted) setState(() => _loadingCurrencyReadiness = false);
+    }
+  }
+
+  Future<void> _loadSyncDeadLetter() async {
+    setState(() => _loadingDlq = true);
+    try {
+      final itemType = _dlqTypeFilter == 'all' ? null : _dlqTypeFilter;
+      final d = await _svc.listSyncDeadLetter(
+        businessId: widget.businessId,
+        itemType: itemType,
+        limit: _dlqPageSize,
+        offset: _dlqOffset,
+      );
+      if (!mounted) return;
+      final itemsRaw = d['items'];
+      final items = itemsRaw is List
+          ? itemsRaw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : <Map<String, dynamic>>[];
+      final totalRaw = d['total'];
+      final total = totalRaw is int
+          ? totalRaw
+          : (totalRaw is num ? totalRaw.toInt() : items.length);
+      final loadedThrough = _dlqOffset + items.length;
+      setState(() {
+        _dlqItems = items;
+        _dlqTotal = total;
+        _dlqHasMore = loadedThrough < total;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _dlqItems = const [];
+        _dlqTotal = 0;
+        _dlqHasMore = false;
+      });
+    } finally {
+      if (mounted) setState(() => _loadingDlq = false);
+    }
+  }
+
+  Future<void> _confirmClearDlq() async {
+    final isFa = AppLocalizations.of(context).localeName.startsWith('fa');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isFa ? 'پاک کردن صف مردهٔ سینک؟' : 'Clear sync dead-letter?'),
+        content: Text(
+          isFa
+              ? 'همهٔ ردیف‌های ثبت‌شده برای خطاهای سینک سفارش یا پرداخت حذف می‌شوند.'
+              : 'All recorded order/payment sync failures will be removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(isFa ? 'انصراف' : 'Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(isFa ? 'پاک کن' : 'Clear'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _clearingDlq = true);
+    try {
+      await _svc.clearSyncDeadLetterAll(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _dlqOffset = 0;
+      });
+      await _loadSyncDeadLetter();
+      if (!mounted) return;
+      SnackBarHelper.showSuccess(
+        context,
+        message: isFa ? 'صف مرده پاک شد' : 'Dead-letter queue cleared',
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _clearingDlq = false);
     }
   }
 
@@ -217,9 +382,13 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           'auto_create_product_mode': _productMode,
           'default_order_tag': _defaultTagCtl.text.trim(),
           'payment_register_mode': _paymentMode,
+          'payment_reconcile_block_overpayment': _paymentReconcileBlockOverpayment,
+          'payment_reconcile_tolerance_rial':
+              double.tryParse(_paymentReconcileToleranceCtl.text.trim()) ?? 1.0,
           'product_conflict_price_strategy': _priceConflictStrategy,
           'product_conflict_stock_strategy': _stockConflictStrategy,
           'product_variant_strategy': _variantStrategy,
+          'basalam_monetary_unit': _basalamMonetaryUnit,
         },
       );
       if (!mounted) return;
@@ -259,6 +428,8 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
       setState(() {
         _productConflictCount = 0;
         _productConflicts = const [];
+        _conflictSummaryByType = const {};
+        _conflictSummaryByDirection = const {};
         _productConflictsHasMore = false;
         _productConflictsOffset = 0;
         _selectedConflictIds = <String>{};
@@ -337,6 +508,36 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
     });
   }
 
+  Widget _detailLine(
+    BuildContext context, {
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 150,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              value,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _showConflictDetailsDialog(Map<String, dynamic> item) async {
     final isFa = AppLocalizations.of(context).localeName.startsWith('fa');
     final conflictId = item['conflict_id']?.toString() ?? '';
@@ -348,11 +549,131 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           content: SizedBox(
             width: 700,
             child: SingleChildScrollView(
-              child: SelectableText(
-                const JsonEncoder.withIndent('  ').convert(item),
-                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                      fontFamily: 'monospace',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _detailLine(
+                    ctx,
+                    label: 'conflict_id',
+                    value: item['conflict_id']?.toString() ?? '-',
+                  ),
+                  _detailLine(
+                    ctx,
+                    label: 'type',
+                    value: item['type']?.toString() ?? '-',
+                  ),
+                  _detailLine(
+                    ctx,
+                    label: 'direction',
+                    value: item['direction']?.toString() ?? '-',
+                  ),
+                  _detailLine(
+                    ctx,
+                    label: 'reason',
+                    value:
+                        item['reason']?.toString() ??
+                        item['last_error']?.toString() ??
+                        '-',
+                  ),
+                  const Divider(height: 20),
+                  if (item['local_product_id'] != null ||
+                      item['local_product_name'] != null ||
+                      item['local_product_code'] != null) ...[
+                    Text(
+                      isFa ? 'اطلاعات محصول داخلی' : 'Local product',
+                      style: Theme.of(ctx).textTheme.titleSmall,
                     ),
+                    const SizedBox(height: 4),
+                    _detailLine(
+                      ctx,
+                      label: 'local_product_id',
+                      value: item['local_product_id']?.toString() ?? '-',
+                    ),
+                    _detailLine(
+                      ctx,
+                      label: 'local_product_name',
+                      value: item['local_product_name']?.toString() ?? '-',
+                    ),
+                    _detailLine(
+                      ctx,
+                      label: 'local_product_code',
+                      value: item['local_product_code']?.toString() ?? '-',
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (item['basalam_product_id'] != null ||
+                      item['remote_title'] != null) ...[
+                    Text(
+                      isFa ? 'اطلاعات محصول باسلام' : 'Basalam product',
+                      style: Theme.of(ctx).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    _detailLine(
+                      ctx,
+                      label: 'basalam_product_id',
+                      value: item['basalam_product_id']?.toString() ?? '-',
+                    ),
+                    _detailLine(
+                      ctx,
+                      label: 'remote_title',
+                      value: item['remote_title']?.toString() ?? '-',
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (item['local_price'] != null ||
+                      item['remote_price'] != null ||
+                      item['local_stock'] != null ||
+                      item['remote_stock'] != null) ...[
+                    Text(
+                      isFa ? 'مقایسه فیلدها' : 'Field comparison',
+                      style: Theme.of(ctx).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    _detailLine(
+                      ctx,
+                      label: 'local_price',
+                      value: item['local_price']?.toString() ?? '-',
+                    ),
+                    _detailLine(
+                      ctx,
+                      label: 'remote_price',
+                      value: item['remote_price']?.toString() ?? '-',
+                    ),
+                    _detailLine(
+                      ctx,
+                      label: 'local_stock',
+                      value: item['local_stock']?.toString() ?? '-',
+                    ),
+                    _detailLine(
+                      ctx,
+                      label: 'remote_stock',
+                      value: item['remote_stock']?.toString() ?? '-',
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  ExpansionTile(
+                    title: Text(isFa ? 'JSON خام' : 'Raw JSON'),
+                    children: [
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Theme.of(ctx)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withOpacity(0.35),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: SelectableText(
+                          const JsonEncoder.withIndent('  ').convert(item),
+                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                                fontFamily: 'monospace',
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -435,9 +756,26 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           .map((e) => e['conflict_id']?.toString() ?? '')
           .where((id) => id.isNotEmpty)
           .toSet();
+      final summary = result['summary'];
+      final byTypeRaw = summary is Map ? summary['by_type'] : null;
+      final byDirectionRaw = summary is Map ? summary['by_direction'] : null;
+      final byType = <String, int>{};
+      if (byTypeRaw is Map) {
+        byTypeRaw.forEach((k, v) {
+          if (k != null && v is num) byType[k.toString()] = v.toInt();
+        });
+      }
+      final byDirection = <String, int>{};
+      if (byDirectionRaw is Map) {
+        byDirectionRaw.forEach((k, v) {
+          if (k != null && v is num) byDirection[k.toString()] = v.toInt();
+        });
+      }
       setState(() {
         _productConflictCount = count;
         _productConflicts = items;
+        _conflictSummaryByType = byType;
+        _conflictSummaryByDirection = byDirection;
         _productConflictsHasMore = result['has_more'] == true;
         _selectedConflictIds = _selectedConflictIds
             .where(availableIds.contains)
@@ -470,6 +808,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
             ? 'سینک دستی انجام شد: ${result['processed_orders'] ?? 0}'
             : 'Manual sync done: ${result['processed_orders'] ?? 0}',
       );
+      await _refreshBasalamHealth();
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -477,6 +816,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           message: ErrorExtractor.forContext(e, context),
         );
       }
+      if (mounted) await _refreshBasalamHealth();
     } finally {
       if (mounted) setState(() => _syncing = false);
     }
@@ -497,6 +837,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
             ? 'همگام‌سازی پرداخت انجام شد: $synced از $processed'
             : 'Payment sync done: $synced of $processed',
       );
+      await _refreshBasalamHealth();
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -504,6 +845,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           message: ErrorExtractor.forContext(e, context),
         );
       }
+      if (mounted) await _refreshBasalamHealth();
     } finally {
       if (mounted) setState(() => _syncingPayments = false);
     }
@@ -539,6 +881,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           message: ErrorExtractor.forContext(e, context),
         );
       }
+      if (mounted) await _refreshBasalamHealth();
     } finally {
       if (mounted) setState(() => _syncingProducts = false);
     }
@@ -575,6 +918,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           message: ErrorExtractor.forContext(e, context),
         );
       }
+      if (mounted) await _refreshBasalamHealth();
     } finally {
       if (mounted) setState(() => _publishingProducts = false);
     }
@@ -603,6 +947,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           message: ErrorExtractor.forContext(e, context),
         );
       }
+      if (mounted) await _refreshBasalamHealth();
     } finally {
       if (mounted) setState(() => _pullingProducts = false);
     }
@@ -632,6 +977,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           message: ErrorExtractor.forContext(e, context),
         );
       }
+      if (mounted) await _refreshBasalamHealth();
     } finally {
       if (mounted) setState(() => _pushingIncrementalProducts = false);
     }
@@ -660,6 +1006,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           message: ErrorExtractor.forContext(e, context),
         );
       }
+      if (mounted) await _refreshBasalamHealth();
     } finally {
       if (mounted) setState(() => _retryingPublishQueue = false);
     }
@@ -784,6 +1131,99 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
                         : 'Enable Basalam integration',
                   ),
                 ),
+                if (_loadingCurrencyReadiness)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: LinearProgressIndicator(minHeight: 2),
+                  )
+                else if (!_currencyReady && _currencyIssues.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Card(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .errorContainer
+                          .withOpacity(0.92),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onErrorContainer,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    isFa
+                                        ? 'سینک باسلام فقط با ارز IRR در حساب‌یکس'
+                                        : 'Basalam sync requires IRR-only business currency',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onErrorContainer,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            ..._currencyIssues.map(
+                              (issue) => Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Text(
+                                  issue['message']?.toString() ??
+                                      issue['code']?.toString() ??
+                                      '-',
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onErrorContainer,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_invalidSecondaryCurrencyCodes.isNotEmpty)
+                              Text(
+                                '${isFa ? 'ارزهای جانبی نامعتبر' : 'Invalid secondary codes'}: ${_invalidSecondaryCurrencyCodes.join(', ')}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onErrorContainer,
+                                    ),
+                              ),
+                            const SizedBox(height: 8),
+                            Text(
+                              isFa
+                                  ? 'در تنظیمات کسب‌وکار ارز پیش‌فرض را IRR کنید و ارزهای جانبی غیر IRR را حذف کنید؛ سپس واحد ریال/تومان باسلام را مطابق پنل باسلام انتخاب کنید.'
+                                  : 'Set business default to IRR and remove non-IRR secondary currencies; then pick Basalam rial vs toman to match their panel.',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onErrorContainer,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 TextField(
                   controller: _apiKeyCtl,
                   enabled: canManage,
@@ -836,6 +1276,34 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
                         ? 'موجودی پیش‌فرض انتشار'
                         : 'Default publish stock',
                   ),
+                ),
+                DropdownButtonFormField<String>(
+                  value: _basalamMonetaryUnit,
+                  onChanged: canManage
+                      ? (v) => setState(
+                          () => _basalamMonetaryUnit =
+                              v ?? _basalamMonetaryUnit,
+                        )
+                      : null,
+                  decoration: InputDecoration(
+                    labelText: isFa
+                        ? 'واحد مبلغ در دادهٔ باسلام'
+                        : 'Basalam monetary unit',
+                    helperText: isFa
+                        ? 'حساب‌یکس فقط IRR؛ در حالت تومان مقادیر باسلام ×۱۰ به ریال تبدیل می‌شوند.'
+                        : 'Hesabix stores IRR only; toman amounts from Basalam are multiplied by 10.',
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'rial',
+                      child: Text(isFa ? 'ریال (همان IRR)' : 'Rial (IRR)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'toman',
+                      child:
+                          Text(isFa ? 'تومان (۱۰× → IRR)' : 'Toman (×10 → IRR)'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 SwitchListTile(
@@ -992,6 +1460,35 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
                     ),
                   ],
                 ),
+                SwitchListTile(
+                  value: _paymentReconcileBlockOverpayment,
+                  onChanged: canManage
+                      ? (v) => setState(
+                            () => _paymentReconcileBlockOverpayment = v,
+                          )
+                      : null,
+                  title: Text(
+                    isFa
+                        ? 'جلوگیری از بیش‌پرداخت نسبت به ماندهٔ فاکتور'
+                        : 'Block payment over invoice remaining',
+                  ),
+                  subtitle: Text(
+                    isFa
+                        ? 'پیش از ثبت رسید، ماندهٔ فاکتور (IRR) با مبلغ باسلام مقایسه می‌شود؛ ناسازگاری به صف مرده می‌رود.'
+                        : 'Compares invoice remaining (IRR) to Basalam amount before posting receipt.',
+                  ),
+                ),
+                TextField(
+                  controller: _paymentReconcileToleranceCtl,
+                  enabled: canManage,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: isFa
+                        ? 'تلورانس ماندهٔ فاکتور (ریال)'
+                        : 'Invoice remaining tolerance (IRR)',
+                  ),
+                ),
                 DropdownButtonFormField<String>(
                   value: _priceConflictStrategy,
                   onChanged: canManage
@@ -1104,10 +1601,220 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
                 Text(
                   '${isFa ? 'زمان' : 'Time'}: ${_lastWebhookEventAt ?? '-'}',
                 ),
+                const Divider(height: 28),
+                Text(
+                  isFa
+                      ? 'صف مردهٔ سینک سفارش و پرداخت'
+                      : 'Order/payment sync dead-letter',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                if (!canSync)
+                  Text(
+                    isFa
+                        ? 'برای مشاهدهٔ این صف به مجوز همگام‌سازی باسلام نیاز دارید.'
+                        : 'Basalam sync permission is required to view this queue.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  )
+                else ...[
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: _dlqTypeFilter,
+                          onChanged: _loadingDlq
+                              ? null
+                              : (v) async {
+                                  setState(() {
+                                    _dlqTypeFilter = v ?? 'all';
+                                    _dlqOffset = 0;
+                                  });
+                                  await _loadSyncDeadLetter();
+                                },
+                          decoration: InputDecoration(
+                            labelText: isFa ? 'نوع صف' : 'Queue type',
+                          ),
+                          items: [
+                            DropdownMenuItem(
+                              value: 'all',
+                              child: Text(isFa ? 'همه' : 'all'),
+                            ),
+                            const DropdownMenuItem(
+                              value: 'order_sync',
+                              child: Text('order_sync'),
+                            ),
+                            const DropdownMenuItem(
+                              value: 'payment_sync',
+                              child: Text('payment_sync'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: isFa ? 'به‌روزرسانی' : 'Refresh',
+                        onPressed: _loadingDlq
+                            ? null
+                            : () async {
+                                await _loadSyncDeadLetter();
+                              },
+                        icon: _loadingDlq
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.refresh),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    '${isFa ? 'کل ردیف‌ها' : 'Total rows'}: $_dlqTotal',
+                  ),
+                  const SizedBox(height: 6),
+                  if (_dlqItems.isNotEmpty)
+                    Container(
+                      decoration: BoxDecoration(
+                        border:
+                            Border.all(color: Theme.of(context).dividerColor),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: _dlqItems.map((row) {
+                          final typ = row['type']?.toString() ?? '-';
+                          final sub = row['subtype']?.toString() ??
+                              row['status']?.toString() ??
+                              '';
+                          final oid = row['order_id']?.toString() ??
+                              row['reference_id']?.toString() ??
+                              '';
+                          final created = row['created_at']?.toString() ?? '';
+                          var line = '';
+                          if (oid.isNotEmpty) {
+                            line =
+                                isFa ? 'شناسه: $oid' : 'Reference: $oid';
+                          }
+                          if (created.isNotEmpty) {
+                            line =
+                                line.isEmpty ? created : '$line | $created';
+                          }
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              '$typ${sub.isNotEmpty ? ' • $sub' : ''}',
+                            ),
+                            subtitle:
+                                line.isEmpty ? null : Text(line),
+                          );
+                        }).toList(),
+                      ),
+                    )
+                  else if (!_loadingDlq)
+                    Text(
+                      isFa ? 'صف خالی است.' : 'Queue is empty.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  if (_dlqTotal > _dlqPageSize || _dlqOffset > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: (_loadingDlq || _dlqOffset == 0)
+                                  ? null
+                                  : () async {
+                                      setState(() {
+                                        final next =
+                                            _dlqOffset - _dlqPageSize;
+                                        _dlqOffset =
+                                            next > 0 ? next : 0;
+                                      });
+                                      await _loadSyncDeadLetter();
+                                    },
+                              icon: const Icon(Icons.chevron_left),
+                              label: Text(isFa ? 'قبلی' : 'Prev'),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: (!_dlqHasMore || _loadingDlq)
+                                  ? null
+                                  : () async {
+                                      setState(() {
+                                        _dlqOffset += _dlqPageSize;
+                                      });
+                                      await _loadSyncDeadLetter();
+                                    },
+                              icon: const Icon(Icons.chevron_right),
+                              label: Text(isFa ? 'بعدی' : 'Next'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (canManage)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: FilledButton.tonalIcon(
+                          onPressed: (_clearingDlq || _dlqTotal == 0)
+                              ? null
+                              : _confirmClearDlq,
+                          icon: _clearingDlq
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.delete_sweep_outlined),
+                          label: Text(
+                            isFa
+                                ? 'پاک کردن کل صف مرده'
+                                : 'Clear dead-letter queue',
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
                 const SizedBox(height: 8),
                 Text(
                   '${isFa ? 'تضادهای محصول' : 'Product conflicts'}: ${_loadingConflicts ? '...' : _productConflictCount}',
                 ),
+                if (_conflictSummaryByType.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: _conflictSummaryByType.entries
+                        .map(
+                          (e) => Chip(
+                            label: Text('${e.key}: ${e.value}'),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                if (_conflictSummaryByDirection.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: _conflictSummaryByDirection.entries
+                        .map(
+                          (e) => Chip(
+                            label: Text('${e.key}: ${e.value}'),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [

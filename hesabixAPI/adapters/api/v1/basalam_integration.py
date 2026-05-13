@@ -14,6 +14,7 @@ from app.core.i18n import locale_dependency
 from app.core.permissions import require_business_access_dep, require_business_permission_dep
 from app.core.responses import ApiError, success_response
 from app.services import basalam_integration_service as basalam_svc
+from app.services.basalam_observability import get_basalam_metrics_summary
 
 router = APIRouter(prefix="/basalam", tags=["یکپارچه‌سازی"])
 
@@ -26,6 +27,37 @@ def _ensure_plugin(db: Session, business_id: int) -> None:
             http_status=403,
             details={"plugin_code": "basalam_connector"},
         )
+
+
+@router.get("/observability/metrics-summary")
+def basalam_observability_metrics_summary(
+    request: Request,
+    _ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(locale_dependency),
+) -> Dict[str, Any]:
+    """شمارندهٔ تجمیعی عملیات باسلام (Redis). نیازمند دسترسی مدیر سیستم یا سوپرادمین."""
+    if not _ctx.has_any_permission("system_settings", "superadmin"):
+        raise ApiError(
+            "FORBIDDEN",
+            "برای مشاهدهٔ متریک‌های باسلام نیاز به دسترسی مدیر سیستم است.",
+            http_status=403,
+        )
+    return success_response(get_basalam_metrics_summary(), request)
+
+
+@router.get("/business/{business_id}/currency-readiness")
+def get_basalam_currency_readiness(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    _ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(locale_dependency),
+    __: None = Depends(require_business_access_dep),
+    ___: None = Depends(require_business_permission_dep("basalam", "view")),
+) -> Dict[str, Any]:
+    _ensure_plugin(db, business_id)
+    data = basalam_svc.get_basalam_currency_readiness(db, business_id)
+    return success_response(data, request)
 
 
 @router.get("/business/{business_id}/settings")
@@ -237,6 +269,56 @@ def sync_basalam_unverified_payments(
         user_id=_ctx.get_user_id(),
         verify_remote=bool(verify_remote) if verify_remote is not None else None,
     )
+    return success_response(data, request)
+
+
+@router.get("/business/{business_id}/sync/dead-letter")
+def list_basalam_sync_dead_letter(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    item_type: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(locale_dependency),
+    __: None = Depends(require_business_access_dep),
+    ___: None = Depends(require_business_permission_dep("basalam", "sync")),
+) -> Dict[str, Any]:
+    _ensure_plugin(db, business_id)
+    data = basalam_svc.list_sync_dead_letter(
+        db,
+        business_id,
+        limit=limit,
+        offset=offset,
+        item_type=item_type,
+    )
+    return success_response(data, request)
+
+
+@router.post("/business/{business_id}/sync/dead-letter/clear")
+def clear_basalam_sync_dead_letter(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    payload: Dict[str, Any] = Body(default_factory=dict),
+    db: Session = Depends(get_db),
+    _ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(locale_dependency),
+    __: None = Depends(require_business_access_dep),
+    ___: None = Depends(require_business_permission_dep("basalam", "manage")),
+) -> Dict[str, Any]:
+    _ensure_plugin(db, business_id)
+    body = payload or {}
+    if body.get("all") is True:
+        data = basalam_svc.clear_sync_dead_letter(db, business_id, mode="all")
+    elif isinstance(body.get("dlq_ids"), list):
+        data = basalam_svc.clear_sync_dead_letter(db, business_id, mode="ids", dlq_ids=body.get("dlq_ids"))
+    else:
+        raise ApiError(
+            "BASALAM_DLQ_CLEAR_PAYLOAD",
+            'Body must include "all": true or "dlq_ids": [...].',
+            http_status=400,
+        )
     return success_response(data, request)
 
 

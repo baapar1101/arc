@@ -10985,6 +10985,34 @@ class AppLocalizationsEn extends AppLocalizations {
       'With “post immediately”, the warehouse document is posted when the invoice is saved and the same shortage / negative-stock rules from the section below apply. Draft keeps it until you post manually.';
 
   @override
+  String get invoiceMissingLineWarehousePolicySectionTitle =>
+      'Policy when invoice lines have no warehouse';
+
+  @override
+  String get invoiceMissingLineWarehousePolicySectionSubtitle =>
+      'When “post inventory” is enabled on a finalized invoice and a tracked product line has no warehouse on the line or invoice header, this policy applies (for example saving a payment link from the invoice details dialog re-processes the invoice).';
+
+  @override
+  String get invoiceMissingLineWarehousePolicyReject =>
+      'Block save with guidance';
+
+  @override
+  String get invoiceMissingLineWarehousePolicyUseDefault =>
+      'Use business default warehouse';
+
+  @override
+  String get invoiceDefaultWarehouseForMissingLinesLabel =>
+      'Default warehouse for lines missing a warehouse';
+
+  @override
+  String get invoiceDefaultWarehouseFillHeaderTitle =>
+      'Also set invoice header warehouse';
+
+  @override
+  String get invoiceDefaultWarehouseFillHeaderSubtitle =>
+      'If the invoice header has no warehouse, set it to the same default (similar to choosing “invoice warehouse” manually).';
+
+  @override
   String get ftpBackupSettingsTitle => 'FTP backup destination';
 
   @override

@@ -1396,6 +1396,13 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "invoice_warehouse_release_mode": _normalize_invoice_warehouse_release_mode(
             getattr(business, "invoice_warehouse_release_mode", None),
         ),
+        "invoice_missing_line_warehouse_policy": str(
+            getattr(business, "invoice_missing_line_warehouse_policy", None) or "reject",
+        ),
+        "invoice_default_warehouse_id": getattr(business, "invoice_default_warehouse_id", None),
+        "invoice_default_warehouse_fill_document_header": bool(
+            getattr(business, "invoice_default_warehouse_fill_document_header", True),
+        ),
         "allow_negative_inventory_for_bulk": bool(getattr(business, "allow_negative_inventory_for_bulk", False)),
         "allow_negative_inventory_for_unique": bool(getattr(business, "allow_negative_inventory_for_unique", False)),
         "warehouse_transfer_require_positive_stock": bool(

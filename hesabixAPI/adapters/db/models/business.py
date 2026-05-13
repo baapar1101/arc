@@ -117,6 +117,28 @@ class Business(Base):
         server_default="draft",
         comment="none | draft | posted",
     )
+    # ردیف‌های انبارداری بدون انبار در فاکتور (هنگام ثبت/ویرایش با post_inventory)
+    invoice_missing_line_warehouse_policy: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="reject",
+        server_default="reject",
+        comment="reject | use_default_warehouse",
+    )
+    invoice_default_warehouse_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("warehouses.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="انبار پیش‌فرض برای ردیف‌های بدون انبار وقتی سیاست use_default_warehouse است",
+    )
+    invoice_default_warehouse_fill_document_header: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
+        comment="با پر کردن خودکار خطوط، انبار سطح سربرگ فاکتور هم اگر خالی بود پر شود",
+    )
 
     # تخفیف کلی فاکتور (در کنار تخفیف ردیف)
     invoice_global_discount_percent_basis: Mapped[str] = mapped_column(

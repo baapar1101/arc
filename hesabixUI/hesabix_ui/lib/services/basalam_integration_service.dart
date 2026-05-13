@@ -20,6 +20,15 @@ class BasalamIntegrationService {
     return _dataMap(res.data);
   }
 
+  Future<Map<String, dynamic>> getCurrencyReadiness({
+    required int businessId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/basalam/business/$businessId/currency-readiness',
+    );
+    return _dataMap(res.data);
+  }
+
   Future<Map<String, dynamic>> updateSettings({
     required int businessId,
     required Map<String, dynamic> payload,
@@ -161,6 +170,33 @@ class BasalamIntegrationService {
         if (vendorId != null) 'vendor_id': vendorId,
         if (conflictIds != null && conflictIds.isNotEmpty) 'conflict_ids': conflictIds,
       },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> listSyncDeadLetter({
+    required int businessId,
+    String? itemType,
+    int limit = 25,
+    int offset = 0,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/basalam/business/$businessId/sync/dead-letter',
+      query: <String, dynamic>{
+        'limit': limit,
+        'offset': offset,
+        if (itemType != null && itemType.isNotEmpty) 'item_type': itemType,
+      },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> clearSyncDeadLetterAll({
+    required int businessId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/basalam/business/$businessId/sync/dead-letter/clear',
+      data: <String, dynamic>{'all': true},
     );
     return _dataMap(res.data);
   }

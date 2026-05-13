@@ -93,6 +93,17 @@ class ActionRegistry:
             CrmLinkDealDocumentAction,
             CrmWebChatSendMessageAction,
         )
+        from app.services.workflow.actions.basalam_actions import (
+            BasalamSendChatReplyAction,
+            BasalamSyncOrdersAction,
+            BasalamSyncProductsAction,
+            BasalamPullProductsAction,
+            BasalamPushProductsIncrementalAction,
+            BasalamPublishProductsAction,
+            BasalamRetryProductPublishQueueAction,
+            BasalamListSyncDeadLetterAction,
+            BasalamClearSyncDeadLetterAction,
+        )
         from app.services.workflow.actions.backup_action import BusinessBackupAction
         from app.services.workflow.actions.hesabix_query_actions import (
             QueryPersonsAction,
@@ -137,6 +148,17 @@ class ActionRegistry:
         self.register("crm_update_deal", UpdateDealAction())
         self.register("crm_link_deal_document", CrmLinkDealDocumentAction())
         self.register("crm_web_chat_send_message", CrmWebChatSendMessageAction())
+
+        # Basalam integration
+        self.register("basalam_send_chat_reply", BasalamSendChatReplyAction())
+        self.register("basalam_sync_orders", BasalamSyncOrdersAction())
+        self.register("basalam_sync_products", BasalamSyncProductsAction())
+        self.register("basalam_pull_products", BasalamPullProductsAction())
+        self.register("basalam_push_products_incremental", BasalamPushProductsIncrementalAction())
+        self.register("basalam_publish_products", BasalamPublishProductsAction())
+        self.register("basalam_retry_product_publish_queue", BasalamRetryProductPublishQueueAction())
+        self.register("basalam_list_sync_dead_letter", BasalamListSyncDeadLetterAction())
+        self.register("basalam_clear_sync_dead_letter", BasalamClearSyncDeadLetterAction())
 
         # HTTP actions
         self.register("http_request", HttpRequestAction())
