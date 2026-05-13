@@ -90,6 +90,8 @@ import 'pages/business/inventory_turnover_report_page.dart';
 import 'pages/business/bank_accounts_turnover_report_page.dart';
 import 'pages/business/cash_petty_turnover_report_page.dart';
 import 'pages/business/activity_logs_page.dart';
+import 'pages/business/basalam_reports_pages.dart';
+import 'pages/business/woocommerce_reports_pages.dart';
 import 'pages/business/daily_sales_report_page.dart';
 import 'pages/business/distribution_reports_dashboard_page.dart';
 import 'pages/business/monthly_sales_report_page.dart';
@@ -120,6 +122,7 @@ import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
+import 'pages/business/woocommerce/woocommerce_integration_page.dart';
 import 'pages/business/notification_templates_page.dart';
 import 'pages/business/notification_template_form_page.dart';
 import 'pages/public/public_warranty_activation_page.dart';
@@ -2047,6 +2050,17 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: 'woocommerce',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, WoocommerceIntegrationPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: 'notification-templates',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
@@ -2708,6 +2722,94 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return hesabixNoTransitionPage(state, ActivityLogsPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/basalam/overview',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, BasalamReportsOverviewPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/basalam/synced-invoices',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, BasalamSyncedInvoicesReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/basalam/dead-letter',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, BasalamDeadLetterReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/basalam/product-conflicts',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, BasalamProductConflictsReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/woocommerce/overview',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, WooCommerceReportsOverviewPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/woocommerce/recent-orders',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, WooCommerceRecentOrdersReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/woocommerce/catalog',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, WooCommerceCatalogReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/woocommerce/bridge-health',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, WooCommerceBridgeHealthReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),

@@ -240,4 +240,66 @@ class BasalamIntegrationService {
     );
     return _dataMap(res.data);
   }
+
+  Future<Map<String, dynamic>> getReportsOverview({
+    required int businessId,
+    int chartDays = 90,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/basalam/business/$businessId/reports/overview',
+      query: {'chart_days': chartDays},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> getReportsSyncedInvoices({
+    required int businessId,
+    String? dateFrom,
+    String? dateTo,
+    int skip = 0,
+    int take = 50,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/basalam/business/$businessId/reports/synced-invoices',
+      query: {
+        if (dateFrom != null && dateFrom.isNotEmpty) 'date_from': dateFrom,
+        if (dateTo != null && dateTo.isNotEmpty) 'date_to': dateTo,
+        'skip': skip,
+        'take': take,
+      },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> getReportsDeadLetter({
+    required int businessId,
+    String? itemType,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/basalam/business/$businessId/reports/dead-letter',
+      query: {
+        if (itemType != null && itemType.isNotEmpty) 'item_type': itemType,
+        'limit': limit,
+        'offset': offset,
+      },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> getReportsProductConflicts({
+    required int businessId,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/basalam/business/$businessId/reports/product-conflicts',
+      query: {
+        'limit': limit,
+        'offset': offset,
+      },
+    );
+    return _dataMap(res.data);
+  }
 }

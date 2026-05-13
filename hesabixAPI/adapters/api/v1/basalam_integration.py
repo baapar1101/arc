@@ -14,6 +14,7 @@ from app.core.i18n import locale_dependency
 from app.core.permissions import require_business_access_dep, require_business_permission_dep
 from app.core.responses import ApiError, success_response
 from app.services import basalam_integration_service as basalam_svc
+from app.services import basalam_reports_service as basalam_reports
 from app.services.basalam_observability import get_basalam_metrics_summary
 
 router = APIRouter(prefix="/basalam", tags=["یکپارچه‌سازی"])
@@ -57,6 +58,99 @@ def get_basalam_currency_readiness(
 ) -> Dict[str, Any]:
     _ensure_plugin(db, business_id)
     data = basalam_svc.get_basalam_currency_readiness(db, business_id)
+    return success_response(data, request)
+
+
+@router.get("/business/{business_id}/reports/overview")
+def basalam_reports_overview(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    chart_days: int = Query(90, ge=7, le=366),
+    db: Session = Depends(get_db),
+    _ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(locale_dependency),
+    __: None = Depends(require_business_access_dep),
+    ___: None = Depends(require_business_permission_dep("reports", "view")),
+    ____: None = Depends(require_business_permission_dep("basalam", "view")),
+) -> Dict[str, Any]:
+    _ensure_plugin(db, business_id)
+    data = basalam_reports.get_overview(db, business_id, chart_days=chart_days)
+    return success_response(data, request)
+
+
+@router.get("/business/{business_id}/reports/synced-invoices")
+def basalam_reports_synced_invoices(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    take: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    _ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(locale_dependency),
+    __: None = Depends(require_business_access_dep),
+    ___: None = Depends(require_business_permission_dep("reports", "view")),
+    ____: None = Depends(require_business_permission_dep("basalam", "view")),
+) -> Dict[str, Any]:
+    _ensure_plugin(db, business_id)
+    df = basalam_reports.parse_report_date(date_from)
+    dt = basalam_reports.parse_report_date(date_to)
+    data = basalam_reports.list_synced_invoices(db, business_id, date_from=df, date_to=dt, skip=skip, take=take)
+    return success_response(data, request)
+
+
+@router.get("/business/{business_id}/reports/dead-letter")
+def basalam_reports_dead_letter(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    item_type: Optional[str] = Query(None),
+    limit: int = Query(100, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(locale_dependency),
+    __: None = Depends(require_business_access_dep),
+    ___: None = Depends(require_business_permission_dep("reports", "view")),
+    ____: None = Depends(require_business_permission_dep("basalam", "view")),
+) -> Dict[str, Any]:
+    _ensure_plugin(db, business_id)
+    data = basalam_reports.list_dead_letter_for_report(
+        db, business_id, item_type=item_type, limit=limit, offset=offset
+    )
+    return success_response(data, request)
+
+
+@router.get("/business/{business_id}/reports/product-conflicts")
+def basalam_reports_product_conflicts(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    conflict_type: Optional[str] = Query(None),
+    direction: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    sort_by: str = Query("created_at"),
+    sort_dir: str = Query("desc"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+    _ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(locale_dependency),
+    __: None = Depends(require_business_access_dep),
+    ___: None = Depends(require_business_permission_dep("reports", "view")),
+    ____: None = Depends(require_business_permission_dep("basalam", "view")),
+) -> Dict[str, Any]:
+    _ensure_plugin(db, business_id)
+    data = basalam_reports.list_product_conflicts_for_report(
+        db,
+        business_id,
+        conflict_type=conflict_type,
+        direction=direction,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        limit=limit,
+        offset=offset,
+    )
     return success_response(data, request)
 
 

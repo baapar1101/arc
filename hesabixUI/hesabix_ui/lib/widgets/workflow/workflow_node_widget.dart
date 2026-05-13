@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/workflow_basalam_guard.dart';
 import '../../utils/workflow_constants.dart';
 
 /// Widget برای نمایش یک node در workflow
 class WorkflowNodeWidget extends StatelessWidget {
   final WorkflowNodeModel node;
+  /// اگر [false] باشد و نود باسلام باشد، آیکون هشدار در هدر نمایش داده می‌شود.
+  final bool basalamPluginActive;
   final bool isSelected;
   final VoidCallback? onTap;
   final ValueChanged<Offset>? onPositionChanged;
@@ -24,6 +28,7 @@ class WorkflowNodeWidget extends StatelessWidget {
   const WorkflowNodeWidget({
     super.key,
     required this.node,
+    this.basalamPluginActive = true,
     this.isSelected = false,
     this.runPhase = WorkflowNodeRunPhase.idle,
     this.onTap,
@@ -107,6 +112,9 @@ class WorkflowNodeWidget extends StatelessWidget {
       final isTrigger = _isTriggerNode(nodeTypeForClosure);
       final isNotTrigger = !isTrigger;
 
+      final showBasalamInactiveHint =
+          !basalamPluginActive && workflowNodeReferencesBasalam(node);
+
       // ساخت widget بدون Builder برای جلوگیری از مشکل closure
       final stackWidget = _buildStackWidget(
         context: context,
@@ -122,6 +130,7 @@ class WorkflowNodeWidget extends StatelessWidget {
         textStyle: textStyle,
         hasErrors: hasErrors,
         runPhase: runPhase,
+        showBasalamPluginInactiveHint: showBasalamInactiveHint,
       );
       
       return Positioned(
@@ -210,6 +219,7 @@ class WorkflowNodeWidget extends StatelessWidget {
     required TextStyle? textStyle,
     required bool hasErrors,
     required WorkflowNodeRunPhase runPhase,
+    required bool showBasalamPluginInactiveHint,
   }) {
     try {
       // ایجاد لیست connection points
@@ -331,6 +341,18 @@ class WorkflowNodeWidget extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (showBasalamPluginInactiveHint)
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 4),
+                      child: Tooltip(
+                        message: AppLocalizations.of(context).workflowBasalamPluginInactiveHint,
+                        child: Icon(
+                          Icons.extension_off,
+                          size: 16,
+                          color: Colors.amber.shade800,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

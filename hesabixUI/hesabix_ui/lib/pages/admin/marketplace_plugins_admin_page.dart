@@ -18,6 +18,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
   late final MarketplaceService _marketplaceService;
   late final CurrencyService _currencyService;
   bool _loading = true;
+  bool _syncing = false;
   String? _error;
   List<Map<String, dynamic>> _plugins = const <Map<String, dynamic>>[];
   List<Map<String, dynamic>> _currencies = const <Map<String, dynamic>>[];
@@ -50,6 +51,56 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
         _loading = false;
       });
     }
+  }
+
+  Future<void> _syncDefaultPluginsFromSeed() async {
+    if (_syncing) return;
+    setState(() => _syncing = true);
+    try {
+      final res = await _marketplaceService.syncDefaultPlugins();
+      if (!mounted) return;
+      final createdP = res['plugins_created'] ?? 0;
+      final updatedP = res['plugins_updated'] ?? 0;
+      final createdPlans = res['plans_created'] ?? 0;
+      final reactivated = res['plans_reactivated'] ?? 0;
+      SnackBarHelper.show(
+        context,
+        message:
+            'همگام‌سازی انجام شد. افزونه جدید: $createdP، به‌روزشده: $updatedP، '
+            'پلن جدید: $createdPlans، پلن فعال‌شده: $reactivated',
+        backgroundColor: Colors.green,
+      );
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: 'خطا در همگام‌سازی: ${ErrorExtractor.forContext(e, context)}',
+        backgroundColor: Colors.red,
+      );
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+    }
+  }
+
+  List<Widget> _appBarSyncActions() {
+    return [
+      if (_syncing)
+        const Padding(
+          padding: EdgeInsets.all(14),
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        )
+      else
+        IconButton(
+          tooltip: 'به‌روزرسانی لیست افزونه‌های پیش‌فرض (نصب قدیمی / محیط جدید)',
+          icon: const Icon(Icons.cloud_download_outlined),
+          onPressed: _syncDefaultPluginsFromSeed,
+        ),
+    ];
   }
 
   Future<void> _showCreatePluginDialog() async {
@@ -557,14 +608,20 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('مدیریت افزونه‌های بازار')),
+        appBar: AppBar(
+          title: const Text('مدیریت افزونه‌های بازار'),
+          actions: _appBarSyncActions(),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('مدیریت افزونه‌های بازار')),
+        appBar: AppBar(
+          title: const Text('مدیریت افزونه‌های بازار'),
+          actions: _appBarSyncActions(),
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -584,6 +641,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     return Scaffold(
       appBar: AppBar(
         title: const Text('مدیریت افزونه‌های بازار'),
+        actions: _appBarSyncActions(),
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),

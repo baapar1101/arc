@@ -968,3 +968,13 @@ def check_and_update_expired_licenses(db: Session) -> Dict[str, Any]:
 	}
 
 
+def sync_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
+	"""ایجاد یا تکمیل افزونه‌های پیش‌فرض بازار (همسان با seed مهاجرت)."""
+	from adapters.db.seed_data.marketplace_plugins_seed import ensure_default_marketplace_plugins
+
+	result = ensure_default_marketplace_plugins(db)
+	if result.get("ok"):
+		db.commit()
+	return result
+
+

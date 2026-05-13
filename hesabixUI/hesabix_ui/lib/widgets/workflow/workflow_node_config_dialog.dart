@@ -6,6 +6,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
 import '../../services/workflow_translation_service.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/workflow_basalam_guard.dart';
 import '../../core/api_client.dart';
 import '../../core/date_utils.dart' as date_utils;
 import '../../models/person_model.dart';
@@ -38,6 +39,10 @@ class WorkflowNodeConfigDialog extends StatefulWidget {
   final Map<String, dynamic>? schema; // JSON Schema برای validation (deprecated - use metadata)
   final List<WorkflowNodeModel>? allNodes; // برای Reference Selector
   final int? businessId; // برای دریافت کاربران متصل به تلگرام
+  /// اگر [false] باشد و نود باسلام باشد، در بالای دیالوگ هشدار نمایش داده می‌شود.
+  final bool basalamPluginActive;
+  /// بعد از بستن دیالوگ، باز کردن بازار افزونه‌ها (با [context] معتبر صفحهٔ میزبان).
+  final VoidCallback? onOpenPluginMarketplace;
 
   const WorkflowNodeConfigDialog({
     super.key,
@@ -46,6 +51,8 @@ class WorkflowNodeConfigDialog extends StatefulWidget {
     this.schema,
     this.allNodes,
     this.businessId,
+    this.basalamPluginActive = true,
+    this.onOpenPluginMarketplace,
   });
 
   @override
@@ -851,6 +858,14 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (!widget.basalamPluginActive &&
+                    widget.onOpenPluginMarketplace != null &&
+                    workflowNodeReferencesBasalam(widget.node)) ...[
+                  _BasalamInactivePluginBanner(
+                    onOpenMarketplace: widget.onOpenPluginMarketplace!,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 // نمایش فیلدهای config بر اساس schema با گروه‌بندی
                 if (_configSchema == null || _configSchema!.isEmpty)
                   if (_config.isEmpty)
@@ -5366,6 +5381,55 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
       case WorkflowNodeType.loop:
         return Icons.loop;
     }
+  }
+}
+
+class _BasalamInactivePluginBanner extends StatelessWidget {
+  const _BasalamInactivePluginBanner({required this.onOpenMarketplace});
+
+  final VoidCallback onOpenMarketplace;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
+    return Material(
+      color: theme.colorScheme.errorContainer.withOpacity(0.45),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.extension_off, size: 20, color: theme.colorScheme.onErrorContainer),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    t.workflowBasalamPluginInactiveHint,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  onOpenMarketplace();
+                },
+                child: Text(t.workflowBasalamOpenPluginMarketplace),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

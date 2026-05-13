@@ -12,6 +12,8 @@ import 'workflow_node_widget.dart';
 /// Canvas اصلی برای نمایش و ویرایش workflow
 class WorkflowCanvas extends StatefulWidget {
   final WorkflowEditorState state;
+  /// اگر [false] باشد، روی نودهای وابسته به باسلام هشدار کوچک نمایش داده می‌شود.
+  final bool basalamPluginActive;
   final Function(WorkflowNodeModel)? onNodeTap;
   final Function(WorkflowConnectionModel)? onConnectionTap;
   final Future<void> Function(WorkflowNodeModel, Offset)? onNodeLongPress;
@@ -19,6 +21,7 @@ class WorkflowCanvas extends StatefulWidget {
   const WorkflowCanvas({
     super.key,
     required this.state,
+    this.basalamPluginActive = true,
     this.onNodeTap,
     this.onConnectionTap,
     this.onNodeLongPress,
@@ -320,6 +323,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProvid
                   return WorkflowNodeWidget(
                     key: ValueKey(node.id),
                     node: nodeToDisplay,
+                    basalamPluginActive: widget.basalamPluginActive,
                     isSelected: isSelected,
                     runPhase: widget.state.nodeRunPhase(node.id),
                     zoomLevel: widget.state.zoomLevel > 0 ? widget.state.zoomLevel : 1.0,

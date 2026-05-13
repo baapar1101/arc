@@ -128,6 +128,8 @@ class Hesabix_V2
 
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-order-stock-control.php';
 
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-bridge-rest.php';
+
 		$this->loader = new Hesabix_V2_Loader();
 	}
 
@@ -209,6 +211,8 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_businesses', $plugin_admin, 'ajax_setup_businesses');
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_complete', $plugin_admin, 'ajax_setup_complete');
 
+		$this->loader->add_action('wp_ajax_hesabix_v2_bridge_generate_token', $plugin_admin, 'ajax_bridge_generate_token');
+
 		$this->loader->add_action('hesabix_v2_process_queue', 'Hesabix_V2_Queue_Service', 'process_due');
 		// پردازش صف بدون باز کردن wp-cron.php در همان لحظهٔ ذخیرهٔ سفارش (کاهش ۵۰۴ روی سرورهای با PHP-FPM محدود)
 		$this->loader->add_action('hesabix_v2_async_process_queue', 'Hesabix_V2_Queue_Service', 'process_due');
@@ -223,6 +227,8 @@ class Hesabix_V2
 	 */
 	private function define_public_hooks()
 	{
+		$this->loader->add_action('rest_api_init', 'Hesabix_V2_Bridge_Rest', 'register_routes');
+
 		// Add custom checkout fields if enabled
 		if (get_option('hesabix_v2_add_checkout_fields')) {
 			$plugin_admin = new Hesabix_V2_Admin($this->get_plugin_name(), $this->get_version());

@@ -30,6 +30,7 @@ croniter>=2.0.0
 pytz>=2024.1
 paramiko>=3.4.0
 qrcode>=7.4.2
+basalam-sdk>=0.1.0
 
 [dev]
 pytest>=8.2.0

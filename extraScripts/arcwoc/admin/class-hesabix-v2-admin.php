@@ -953,6 +953,8 @@ class Hesabix_V2_Admin
 			update_option('hesabix_v2_default_cash_register_id', $v === '' ? '' : absint($v));
 		}
 
+		update_option(Hesabix_V2_Bridge_Rest::OPT_ENABLED, isset($_POST['hesabix_v2_bridge_enabled']));
+
 		add_settings_error(
 			'hesabix_v2_messages',
 			'hesabix_v2_message',
@@ -2370,6 +2372,34 @@ class Hesabix_V2_Admin
 		Hesabix_V2_Currency_Service::invalidate_list_cache();
 
 		wp_send_json(array('success' => true, 'message' => __('راه‌اندازی با موفقیت انجام شد.', 'hesabix-v2')));
+	}
+
+	/**
+	 * AJAX: تولید توکن پل REST (نمایش یک‌باره در مرورگر).
+	 *
+	 * @return void
+	 */
+	public function ajax_bridge_generate_token()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!class_exists('Hesabix_V2_Bridge_Rest')) {
+			wp_send_json(array('success' => false, 'message' => __('کلاس پل REST بارگذاری نشده است.', 'hesabix-v2')));
+		}
+
+		$plain = wp_generate_password(48, false, false);
+		Hesabix_V2_Bridge_Rest::save_token_hash($plain);
+
+		wp_send_json_success(
+			array(
+				'token'   => $plain,
+				'message' => __(
+					'توکن جدید ایجاد شد. آن را در حسابیکس ذخیره کنید؛ پس از بستن صفحه دیگر نمایش داده نمی‌شود.',
+					'hesabix-v2'
+				),
+			)
+		);
 	}
 }
 

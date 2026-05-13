@@ -8,6 +8,7 @@ adapters/api/v1/activity_logs.py
 adapters/api/v1/announcements.py
 adapters/api/v1/auth.py
 adapters/api/v1/bank_accounts.py
+adapters/api/v1/basalam_integration.py
 adapters/api/v1/boms.py
 adapters/api/v1/business_backups.py
 adapters/api/v1/business_currency_rates.py
@@ -308,6 +309,7 @@ app/main.py
 app/openapi_local_docs.py
 app/core/__init__.py
 app/core/auth_dependency.py
+app/core/basalam_plugin_dependency.py
 app/core/batch_operations.py
 app/core/cache.py
 app/core/calendar.py
@@ -359,6 +361,8 @@ app/services/auth_dynamic_rate_limit.py
 app/services/auth_security_event_service.py
 app/services/auth_service.py
 app/services/bank_account_service.py
+app/services/basalam_integration_service.py
+app/services/basalam_observability.py
 app/services/bom_service.py
 app/services/bulk_price_update_service.py
 app/services/bulk_product_prices_sheet_service.py
@@ -410,6 +414,7 @@ app/services/firewall_service.py
 app/services/fiscal_year_rollback_service.py
 app/services/general_ledger_service.py
 app/services/invoice_adjustments_service.py
+app/services/invoice_bulk_upsert_service.py
 app/services/invoice_fx_revaluation.py
 app/services/invoice_global_discount_service.py
 app/services/invoice_product_price_sync_service.py
@@ -432,6 +437,7 @@ app/services/opening_balance_service.py
 app/services/otp_login_service.py
 app/services/password_reset_otp_service.py
 app/services/payment_service.py
+app/services/person_bulk_upsert_service.py
 app/services/person_excel_import.py
 app/services/person_group_service.py
 app/services/person_service.py
@@ -441,6 +447,7 @@ app/services/pnl_service.py
 app/services/price_list_service.py
 app/services/print_footer_settings.py
 app/services/product_attribute_service.py
+app/services/product_bulk_upsert_service.py
 app/services/product_commercial_insights_service.py
 app/services/product_general_barcode_service.py
 app/services/product_service.py
@@ -553,6 +560,7 @@ app/services/workflow/workflow_trigger_service.py
 app/services/workflow/actions/__init__.py
 app/services/workflow/actions/ai_agent_action.py
 app/services/workflow/actions/backup_action.py
+app/services/workflow/actions/basalam_actions.py
 app/services/workflow/actions/communication_actions.py
 app/services/workflow/actions/crm_actions.py
 app/services/workflow/actions/document_actions.py
@@ -561,11 +569,13 @@ app/services/workflow/actions/hesabix_query_actions.py
 app/services/workflow/actions/merge_split_actions.py
 app/services/workflow/actions/utility_actions.py
 app/services/workflow/i18n/__init__.py
+app/services/workflow/i18n/basalam_triggers_i18n.py
 app/services/workflow/i18n/crm_chat_triggers_i18n.py
 app/services/workflow/i18n/hesabix_data_actions_i18n.py
 app/services/workflow/i18n/lifecycle_triggers_i18n.py
 app/services/workflow/i18n/workflow_translations.py
 app/services/workflow/triggers/__init__.py
+app/services/workflow/triggers/basalam_triggers.py
 app/services/workflow/triggers/base_trigger.py
 app/services/workflow/triggers/crm_chat_triggers.py
 app/services/workflow/triggers/crm_triggers.py
@@ -657,7 +667,12 @@ migrations/versions/20260612_000001_business_print_settings_invoice_pdf_sections
 migrations/versions/20260612_000002_merge_heads_report_template_status_events_and_business_print_settings_invoice_pdf_sections.py
 migrations/versions/20260613_000001_seed_received_loan_facility_chart_accounts.py
 migrations/versions/20260613_000002_received_loan_facility_tables.py
+migrations/versions/20260614_000001_business_invoice_missing_line_warehouse_policy.py
 tests/__init__.py
+tests/test_basalam_currency.py
+tests/test_basalam_dlq.py
+tests/test_basalam_observability.py
+tests/test_basalam_openapi_contract.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py
 tests/test_permissions.py

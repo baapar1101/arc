@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import '../../services/bank_account_service.dart';
 import '../../core/api_client.dart';
@@ -190,20 +190,28 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
         final m = Map<String, dynamic>.from(e as Map);
         final id = m['id']?.toString();
         final name = m['name']?.toString() ?? 'نامشخص';
-        final currencyId = (m['currency_id'] ?? m['currencyId']);
+        final rawCur = m['currency_id'] ?? m['currencyId'];
+        int? optCur;
+        if (rawCur is int) {
+          optCur = rawCur;
+        } else if (rawCur is num) {
+          optCur = rawCur.toInt();
+        } else if (rawCur != null) {
+          optCur = int.tryParse(rawCur.toString());
+        }
         final balance = m['balance'];
         final balanceValue = balance is num ? balance.toDouble() : (balance != null ? double.tryParse(balance.toString()) : null);
-        log('Bank account item: id=$id, name=$name, currencyId=$currencyId, balance=$balanceValue');
         return BankAccountOption(
-          id ?? '', 
-          name, 
-          currencyId: currencyId is int ? currencyId : int.tryParse('${currencyId ?? ''}'),
+          id ?? '',
+          name,
+          currencyId: optCur,
           balance: balanceValue,
         );
       }).toList();
       // Filter by currency if requested
       if (widget.filterCurrencyId != null) {
-        items = items.where((it) => it.currencyId == widget.filterCurrencyId).toList();
+        final want = widget.filterCurrencyId!;
+        items = items.where((it) => it.currencyId == want).toList();
       }
       if (!mounted) return;
       setState(() {

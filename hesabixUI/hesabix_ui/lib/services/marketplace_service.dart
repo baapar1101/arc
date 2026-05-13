@@ -93,6 +93,14 @@ class MarketplaceService {
 
   // ========== Admin Functions ==========
 
+  /// همگام‌سازی افزونه‌ها و پلن‌های پیش‌فرض سیستم (ادمین)
+  Future<Map<String, dynamic>> syncDefaultPlugins() async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/marketplace/plugins/sync-defaults',
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
   /// لیست تمام افزونه‌ها (برای ادمین)
   Future<List<Map<String, dynamic>>> listAllPlugins({bool? onlyActive}) async {
     final query = <String, dynamic>{};

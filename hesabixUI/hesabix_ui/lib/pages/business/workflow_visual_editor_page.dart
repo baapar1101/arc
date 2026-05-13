@@ -9,6 +9,7 @@ import '../../core/business_named_route_locations.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
+import '../../services/marketplace_service.dart';
 import '../../services/workflow_service.dart';
 import '../../services/workflow_translation_service.dart';
 import '../../widgets/loading_indicator.dart';
@@ -63,6 +64,59 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   WorkflowAutoLayoutType _layoutType = WorkflowAutoLayoutType.hierarchical;
   bool _testRunBusy = false;
   VoidCallback? _restoreDesktopRailAfterQuit;
+  /// وقتی [false] است، نودهای باسلام روی بوم/پالت باید هشدار «فعال‌سازی از بازار افزونه‌ها» بگیرند.
+  bool _basalamMarketplaceActive = false;
+  bool _refreshBasalamBusy = false;
+
+  bool _readBasalamMarketplaceActiveFromRaw(dynamic pluginsRaw) {
+    var basalamOk = false;
+    if (pluginsRaw is List) {
+      for (final e in pluginsRaw) {
+        if (e is! Map) continue;
+        final m = Map<String, dynamic>.from(e.map((k, v) => MapEntry(k.toString(), v)));
+        if (m['plugin_code'] == 'basalam_connector' && m['is_active'] == true) {
+          basalamOk = true;
+          break;
+        }
+      }
+    }
+    return basalamOk;
+  }
+
+  Future<void> _refreshBasalamMarketplaceStatus() async {
+    if (!mounted || _refreshBasalamBusy) return;
+    setState(() => _refreshBasalamBusy = true);
+    try {
+      final plugins = await MarketplaceService().listBusinessPlugins(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _basalamMarketplaceActive = _readBasalamMarketplaceActiveFromRaw(plugins);
+      });
+    } catch (e, stackTrace) {
+      debugPrint('خطا در به‌روزرسانی وضعیت افزونهٔ باسلام: $e');
+      debugPrint('$stackTrace');
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        SnackBarHelper.showError(context, message: t.workflowBasalamRefreshPluginFailed);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _refreshBasalamBusy = false);
+      }
+    }
+  }
+
+  void _openPluginMarketplaceAndRefresh() {
+    BusinessNamedRoutes.pushNamed<void>(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_plugin_marketplace',
+    ).then((_) {
+      if (mounted) {
+        _refreshBasalamMarketplaceStatus();
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -97,7 +151,10 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       final results = await Future.wait([
         _translationService.getTriggersMetadata(lang: lang),
         _translationService.getActionsMetadata(lang: lang),
+        MarketplaceService().listBusinessPlugins(businessId: widget.businessId),
       ]);
+
+      _basalamMarketplaceActive = _readBasalamMarketplaceActiveFromRaw(results[2]);
 
       final triggersList = results[0] as List<dynamic>? ?? <dynamic>[];
       final triggers = <WorkflowNodeMetadata>[];
@@ -225,6 +282,17 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
             onPressed: _goBackToWorkflowsList,
           ),
           actions: [
+            IconButton(
+              icon: _refreshBasalamBusy
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.extension_outlined),
+              onPressed: (_loading || _refreshBasalamBusy) ? null : _refreshBasalamMarketplaceStatus,
+              tooltip: t.workflowBasalamRefreshPluginStatus,
+            ),
             // دکمه ویرایش نام و توضیحات
             IconButton(
               icon: const Icon(Icons.edit),
@@ -264,6 +332,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
           builder: (context) => WorkflowNodePaletteContent(
             triggers: _triggers,
             actions: _actions,
+            basalamPluginActive: _basalamMarketplaceActive,
             onNodeSelected: (type, key, name) {
               try {
                 _editorState.addNode(type, key, name);
@@ -348,6 +417,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                       Expanded(
                         child: WorkflowCanvas(
                           state: _editorState,
+                          basalamPluginActive: _basalamMarketplaceActive,
                           onNodeTap: (node) async {
                             final result = await showDialog<Map<String, dynamic>>(
                               context: context,
@@ -356,6 +426,8 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                                 editorState: _editorState,
                                 allNodes: _editorState.nodes,
                                 businessId: widget.businessId,
+                                basalamPluginActive: _basalamMarketplaceActive,
+                                onOpenPluginMarketplace: _openPluginMarketplaceAndRefresh,
                               ),
                             );
                             if (result != null) {
@@ -379,6 +451,8 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                                     editorState: _editorState,
                                     allNodes: _editorState.nodes,
                                     businessId: widget.businessId,
+                                    basalamPluginActive: _basalamMarketplaceActive,
+                                    onOpenPluginMarketplace: _openPluginMarketplaceAndRefresh,
                                   ),
                                 );
                                 if (result != null && mounted) {

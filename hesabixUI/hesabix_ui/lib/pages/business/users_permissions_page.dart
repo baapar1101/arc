@@ -1145,6 +1145,15 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'operate': t.distributionPermissionOperate,
         'reports_team': t.distributionPermissionReportsTeam,
       },
+      'basalam': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهدهٔ اتصال باسلام' : 'View Basalam integration',
+        'manage': t.localeName.startsWith('fa') ? 'مدیریت تنظیمات باسلام' : 'Manage Basalam settings',
+        'sync': t.localeName.startsWith('fa') ? 'همگام‌سازی و انتشار باسلام' : 'Basalam sync & publish',
+      },
+      'woocommerce': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهدهٔ ووکامرس' : 'View WooCommerce',
+        'manage': t.localeName.startsWith('fa') ? 'مدیریت تنظیمات ووکامرس' : 'Manage WooCommerce',
+      },
     };
   }
 
@@ -1597,6 +1606,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'icon': Icons.local_shipping_outlined,
         'sections': ['distribution'],
       },
+      {
+        'title': t.localeName.startsWith('fa') ? 'اتصال فروشگاه' : 'Store integrations',
+        'icon': Icons.store_mall_directory_outlined,
+        'sections': ['basalam', 'woocommerce'],
+      },
     ];
     
     for (int i = 0; i < sectionConfigs.length; i++) {
@@ -1741,6 +1755,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.customerClubMenu;
       case 'distribution':
         return t.distributionMenu;
+      case 'basalam':
+        return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
+      case 'woocommerce':
+        return t.localeName.startsWith('fa') ? 'ووکامرس' : 'WooCommerce';
       case 'crm':
         return t.workflowCategoryCrm;
       case 'crm_web_chat':
@@ -1833,6 +1851,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.permissionCrmWebChatDeleteMessages;
       case 'operate':
         return t.distributionPermissionOperate;
+      case 'sync':
+        if (sectionKey == 'basalam') {
+          return t.localeName.startsWith('fa') ? 'همگام‌سازی باسلام' : 'Basalam sync';
+        }
+        return action;
       case 'reports_team':
         if (sectionKey == 'crm') {
           return t.permissionCrmTeamPerformanceReports;

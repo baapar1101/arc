@@ -9,6 +9,17 @@ from app.services.workflow.triggers.base_trigger import BaseTrigger
 
 class _BasalamBaseTrigger(BaseTrigger):
     def execute(self, context: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+        db = context.get("db")
+        bid = context.get("business_id")
+        if db is not None and bid is not None:
+            from app.core.basalam_plugin_dependency import check_basalam_plugin_active
+
+            try:
+                bid_int = int(bid)
+            except (TypeError, ValueError):
+                bid_int = 0
+            if bid_int and not check_basalam_plugin_active(db, bid_int):
+                return {}
         td = context.get("trigger_data", {})
         wanted_event = str(config.get("event_type") or "").strip().lower()
         if wanted_event:

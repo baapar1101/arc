@@ -6,6 +6,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/auth_store.dart';
+import '../../services/marketplace_service.dart';
 import '../../widgets/permission/access_denied_page.dart';
 
 class ReportsPage extends StatefulWidget {
@@ -32,6 +33,9 @@ class _ReportsPageState extends State<ReportsPage> {
   String _selectedSectionId = 'all';
   _DesktopSort _desktopSort = _DesktopSort.recommended;
 
+  bool _marketplacePluginsResolved = false;
+  final Set<String> _activeMarketplacePluginCodes = <String>{};
+
   bool _prefsLoaded = false;
   Set<String> _favorites = <String>{};
   List<String> _recent = <String>[];
@@ -49,6 +53,34 @@ class _ReportsPageState extends State<ReportsPage> {
       });
     });
     _loadPrefs();
+    _loadMarketplacePlugins();
+  }
+
+  Future<void> _loadMarketplacePlugins() async {
+    try {
+      final svc = MarketplaceService();
+      final list = await svc.listBusinessPlugins(businessId: widget.businessId);
+      final codes = <String>{};
+      for (final e in list) {
+        final code = e['plugin_code']?.toString();
+        if (code != null && code.isNotEmpty && e['is_active'] == true) {
+          codes.add(code);
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _activeMarketplacePluginCodes
+          ..clear()
+          ..addAll(codes);
+        _marketplacePluginsResolved = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _activeMarketplacePluginCodes.clear();
+        _marketplacePluginsResolved = true;
+      });
+    }
   }
 
   @override
@@ -754,21 +786,26 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   bool _canOpen(_ReportLink item) {
+    if (item.marketplacePluginCode != null) {
+      if (!_marketplacePluginsResolved) return false;
+      if (!_activeMarketplacePluginCodes.contains(item.marketplacePluginCode!)) {
+        return false;
+      }
+    }
+
     // هماهنگ با سایر بخش‌ها: مالک همه دسترسی‌ها را دارد
     if (widget.authStore.currentBusiness?.isOwner == true) {
       return true;
     }
 
-    final section = item.permissionSection;
-    if (section == null || section.isEmpty) return true;
-
-    // حالت امن برای جلوگیری از قفل اشتباه: اگر سکشن در permissions موجود نبود، قفل نکن
-    final perms = widget.authStore.businessPermissions;
-    if (perms == null || !perms.containsKey(section)) {
-      return true;
+    bool allow(String? section, String action) {
+      if (section == null || section.isEmpty) return true;
+      return widget.authStore.hasBusinessPermission(section, action);
     }
 
-    return widget.authStore.hasBusinessPermission(section, item.permissionAction);
+    if (!allow(item.permissionSection, item.permissionAction)) return false;
+    if (!allow(item.permissionSection2, item.permissionAction2)) return false;
+    return true;
   }
 
   void _showAccessDenied(BuildContext context, AppLocalizations t) {
@@ -779,7 +816,7 @@ class _ReportsPageState extends State<ReportsPage> {
 
   List<_ReportSection> _buildData(BuildContext context, {required AppLocalizations t}) {
     final b = widget.businessId;
-    return <_ReportSection>[
+    final sections = <_ReportSection>[
       _ReportSection(
         id: 'general',
         title: t.reportsGeneralSection,
@@ -1208,6 +1245,117 @@ class _ReportsPageState extends State<ReportsPage> {
         ],
       ),
     ];
+    if (_marketplacePluginsResolved && _activeMarketplacePluginCodes.contains('basalam_connector')) {
+      sections.add(
+        _ReportSection(
+          id: 'basalam_reports',
+          title: t.reportsBasalamSection,
+          icon: Icons.store_mall_directory_outlined,
+          items: [
+            _ReportLink(
+              key: 'basalam_reports_overview',
+              title: t.reportsBasalamOverviewTitle,
+              subtitle: t.reportsBasalamOverviewSubtitle,
+              icon: Icons.insights_outlined,
+              route: '/business/$b/reports/basalam/overview',
+              keywords: const ['باسلام', 'basalam', 'وبهوک', 'webhook', 'dlq'],
+              permissionSection: 'reports',
+              permissionSection2: 'basalam',
+              marketplacePluginCode: 'basalam_connector',
+            ),
+            _ReportLink(
+              key: 'basalam_reports_invoices',
+              title: t.reportsBasalamSyncedInvoicesTitle,
+              subtitle: t.reportsBasalamSyncedInvoicesSubtitle,
+              icon: Icons.receipt_long_outlined,
+              route: '/business/$b/reports/basalam/synced-invoices',
+              keywords: const ['باسلام', 'فاکتور', 'سفارش', 'sync'],
+              permissionSection: 'reports',
+              permissionSection2: 'basalam',
+              marketplacePluginCode: 'basalam_connector',
+            ),
+            _ReportLink(
+              key: 'basalam_reports_dlq',
+              title: t.reportsBasalamDeadLetterTitle,
+              subtitle: t.reportsBasalamDeadLetterSubtitle,
+              icon: Icons.error_outline,
+              route: '/business/$b/reports/basalam/dead-letter',
+              keywords: const ['باسلام', 'dlq', 'صف', 'خطا'],
+              permissionSection: 'reports',
+              permissionSection2: 'basalam',
+              marketplacePluginCode: 'basalam_connector',
+            ),
+            _ReportLink(
+              key: 'basalam_reports_conflicts',
+              title: t.reportsBasalamProductConflictsTitle,
+              subtitle: t.reportsBasalamProductConflictsSubtitle,
+              icon: Icons.warning_amber_outlined,
+              route: '/business/$b/reports/basalam/product-conflicts',
+              keywords: const ['باسلام', 'تعارض', 'محصول', 'conflict'],
+              permissionSection: 'reports',
+              permissionSection2: 'basalam',
+              marketplacePluginCode: 'basalam_connector',
+            ),
+          ],
+        ),
+      );
+    }
+    if (_marketplacePluginsResolved && _activeMarketplacePluginCodes.contains('woocommerce_hesabix')) {
+      sections.add(
+        _ReportSection(
+          id: 'woocommerce_reports',
+          title: t.reportsWooSection,
+          icon: Icons.shopping_cart_outlined,
+          items: [
+            _ReportLink(
+              key: 'woo_reports_overview',
+              title: t.reportsWooOverviewTitle,
+              subtitle: t.reportsWooOverviewSubtitle,
+              icon: Icons.pie_chart_outline,
+              route: '/business/$b/reports/woocommerce/overview',
+              keywords: const ['ووکامرس', 'woocommerce', 'فروشگاه', 'arcwoc'],
+              permissionSection: 'reports',
+              permissionSection2: 'woocommerce',
+              marketplacePluginCode: 'woocommerce_hesabix',
+            ),
+            _ReportLink(
+              key: 'woo_reports_orders',
+              title: t.reportsWooRecentOrdersTitle,
+              subtitle: t.reportsWooRecentOrdersSubtitle,
+              icon: Icons.receipt_long,
+              route: '/business/$b/reports/woocommerce/recent-orders',
+              keywords: const ['سفارش', 'orders', 'woo'],
+              permissionSection: 'reports',
+              permissionSection2: 'woocommerce',
+              marketplacePluginCode: 'woocommerce_hesabix',
+            ),
+            _ReportLink(
+              key: 'woo_reports_catalog',
+              title: t.reportsWooCatalogTitle,
+              subtitle: t.reportsWooCatalogSubtitle,
+              icon: Icons.inventory_2_outlined,
+              route: '/business/$b/reports/woocommerce/catalog',
+              keywords: const ['محصول', 'products', 'woo'],
+              permissionSection: 'reports',
+              permissionSection2: 'woocommerce',
+              marketplacePluginCode: 'woocommerce_hesabix',
+            ),
+            _ReportLink(
+              key: 'woo_reports_bridge',
+              title: t.reportsWooBridgeTitle,
+              subtitle: t.reportsWooBridgeSubtitle,
+              icon: Icons.link,
+              route: '/business/$b/reports/woocommerce/bridge-health',
+              keywords: const ['پل', 'bridge', 'health', 'woo'],
+              permissionSection: 'reports',
+              permissionSection2: 'woocommerce',
+              marketplacePluginCode: 'woocommerce_hesabix',
+            ),
+          ],
+        ),
+      );
+    }
+    return sections;
   }
 }
 
@@ -1236,6 +1384,9 @@ class _ReportLink {
   final List<String> keywords;
   final String? permissionSection;
   final String permissionAction;
+  final String? permissionSection2;
+  final String permissionAction2;
+  final String? marketplacePluginCode;
 
   const _ReportLink({
     required this.key,
@@ -1246,6 +1397,9 @@ class _ReportLink {
     this.keywords = const <String>[],
     this.permissionSection,
     this.permissionAction = 'view',
+    this.permissionSection2,
+    this.permissionAction2 = 'view',
+    this.marketplacePluginCode,
   });
 }
 

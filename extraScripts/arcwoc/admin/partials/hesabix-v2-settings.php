@@ -94,6 +94,10 @@ if (defined('WC_VERSION')) {
 
 $hsx_conn_ok = !empty(get_option('hesabix_v2_api_key'));
 
+$hsx_bridge_enabled = class_exists('Hesabix_V2_Bridge_Rest', false) && (bool) get_option(Hesabix_V2_Bridge_Rest::OPT_ENABLED);
+$hsx_bridge_token_set = class_exists('Hesabix_V2_Bridge_Rest', false) && (string) get_option(Hesabix_V2_Bridge_Rest::OPT_TOKEN_HASH, '') !== '';
+$hsx_bridge_base = class_exists('Hesabix_V2_Bridge_Rest', false) ? rest_url(Hesabix_V2_Bridge_Rest::NS) : '';
+
 $hsx_max_exec = (string) ini_get('max_execution_time');
 $saved_invoice_extra_tag_ids = Hesabix_V2_Invoice_Helper::parse_extra_tag_ids(
 	isset($sync_settings['invoice_extra_tag_ids']) ? (string) $sync_settings['invoice_extra_tag_ids'] : ''
@@ -254,6 +258,37 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							</a>
 						</p>
 					<?php endif; ?>
+				</td>
+			</tr>
+		</table>
+
+		<h2 style="margin-top:1.5em;"><?php esc_html_e('پل REST برای حسابیکس', 'hesabix-v2'); ?></h2>
+		<p class="description"><?php esc_html_e('با این پل، سرور حسابیکس می‌تواند (با توکن) سفارشات، محصولات و مشتریان ووکامرس را بخواند. آدرس پایهٔ API:', 'hesabix-v2'); ?>
+			<code dir="ltr" style="user-select:all;"><?php echo esc_html(rtrim((string) $hsx_bridge_base, '/')); ?></code>
+		</p>
+		<table class="form-table">
+			<tr>
+				<th scope="row"><?php esc_html_e('فعال‌سازی پل', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="hesabix_v2_bridge_enabled" value="1" <?php checked($hsx_bridge_enabled); ?>>
+						<?php esc_html_e('اجازهٔ دسترسی با توکن (پس از ذخیره، توکن را در حسابیکس وارد کنید)', 'hesabix-v2'); ?>
+					</label>
+					<p class="description">
+						<?php
+						echo esc_html(
+							$hsx_bridge_token_set
+								? __('توکن ذخیره شده است. برای چرخش، دکمهٔ زیر را بزنید.', 'hesabix-v2')
+								: __('هنوز توکنی ایجاد نشده است.', 'hesabix-v2')
+						);
+						?>
+					</p>
+					<p>
+						<button type="button" class="button button-secondary" id="hesabix-v2-bridge-generate-token">
+							<?php esc_html_e('تولید / چرخش توکن', 'hesabix-v2'); ?>
+						</button>
+						<span id="hesabix-v2-bridge-token-inline" class="description" dir="ltr" style="display:block;margin-top:8px;"></span>
+					</p>
 				</td>
 			</tr>
 		</table>

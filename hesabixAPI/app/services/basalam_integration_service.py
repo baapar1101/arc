@@ -29,6 +29,7 @@ from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
 from fastapi import HTTPException
+from app.core.basalam_plugin_dependency import check_basalam_plugin_active
 from app.core.cache import get_cache
 from app.core.responses import ApiError
 from app.services import crm_chat_service
@@ -235,6 +236,13 @@ def _normalize_settings(payload: Dict[str, Any], previous: Optional[Dict[str, An
 
 def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
     row = _find_business_plugin(db, business_id)
+    if not check_basalam_plugin_active(db, int(business_id)):
+        raise ApiError(
+            "BASALAM_PLUGIN_NOT_ACTIVE",
+            "Basalam plugin is not active.",
+            http_status=403,
+            details={"plugin_code": PLUGIN_CODE},
+        )
     extra = _json_loads_safe(row.extra_info)
     saved = extra.get(EXTRA_INFO_KEY)
     if not isinstance(saved, dict):
@@ -244,6 +252,13 @@ def get_settings(db: Session, business_id: int) -> Dict[str, Any]:
 
 def update_settings(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
     row = _find_business_plugin(db, business_id)
+    if not check_basalam_plugin_active(db, int(business_id)):
+        raise ApiError(
+            "BASALAM_PLUGIN_NOT_ACTIVE",
+            "Basalam plugin is not active.",
+            http_status=403,
+            details={"plugin_code": PLUGIN_CODE},
+        )
     extra = _json_loads_safe(row.extra_info)
     prev = extra.get(EXTRA_INFO_KEY) if isinstance(extra.get(EXTRA_INFO_KEY), dict) else _default_settings()
     settings = _normalize_settings(payload or {}, prev)
@@ -483,6 +498,18 @@ def _basalam_currency_validation(db: Session, business_id: int) -> Dict[str, Any
 
 def get_basalam_currency_readiness(db: Session, business_id: int) -> Dict[str, Any]:
     """وضعیت ارزی برای هشدار در UI؛ هرگز پرتاب نمی‌کند."""
+    if not check_basalam_plugin_active(db, int(business_id)):
+        return {
+            "ready": False,
+            "issues": [
+                {
+                    "code": "BASALAM_PLUGIN_NOT_ACTIVE",
+                    "message": "افزونهٔ باسلام برای این کسب‌وکار فعال نیست یا اعتبار آن به پایان رسیده است.",
+                }
+            ],
+            "default_currency_code": None,
+            "invalid_secondary_currency_codes": [],
+        }
     v = _basalam_currency_validation(db, business_id)
     issues = list(v.get("issues") or [])
     return {

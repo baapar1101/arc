@@ -62,8 +62,7 @@ import 'app_localizations_fa.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale)
-    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -71,8 +70,7 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations)!;
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate =
-      _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -84,18 +82,17 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
-      <LocalizationsDelegate<dynamic>>[
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-      ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+  ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('fa'),
+    Locale('fa')
   ];
 
   /// No description provided for @appTitle.
@@ -678,11 +675,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Requested: {total} | Found: {found} | Will update: {willUpdate}'**
-  String bulkDefaultWarehousePreviewSummary(
-    String total,
-    String found,
-    String willUpdate,
-  );
+  String bulkDefaultWarehousePreviewSummary(String total, String found, String willUpdate);
 
   /// No description provided for @bulkDefaultWarehouseSkippedCount.
   ///
@@ -706,12 +699,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Requested: {total} | Found: {found} | Updated: {updated} | Skipped: {skipped}'**
-  String bulkDefaultWarehouseApplySummary(
-    String total,
-    String found,
-    String updated,
-    String skipped,
-  );
+  String bulkDefaultWarehouseApplySummary(String total, String found, String updated, String skipped);
 
   /// No description provided for @bulkDefaultWarehouseReasonAlreadySet.
   ///
@@ -1089,10 +1077,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Rem. pr./int.: {principal} / {interest}'**
-  String loanFacilityRemainingPrincipalInterest(
-    String principal,
-    String interest,
-  );
+  String loanFacilityRemainingPrincipalInterest(String principal, String interest);
 
   /// No description provided for @loanFacilityRecordPayment.
   ///
@@ -14282,6 +14267,36 @@ abstract class AppLocalizations {
   /// **'This node does not require any special settings.'**
   String get workflowNodeNoSettings;
 
+  /// No description provided for @workflowBasalamPluginInactiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The Basalam add-on is inactive. Enable it from the plugin marketplace for this node to run.'**
+  String get workflowBasalamPluginInactiveHint;
+
+  /// No description provided for @workflowBasalamPluginInactivePalette.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam add-on inactive — enable from the plugin marketplace.'**
+  String get workflowBasalamPluginInactivePalette;
+
+  /// No description provided for @workflowBasalamOpenPluginMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Open plugin marketplace'**
+  String get workflowBasalamOpenPluginMarketplace;
+
+  /// No description provided for @workflowBasalamRefreshPluginStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh Basalam add-on status'**
+  String get workflowBasalamRefreshPluginStatus;
+
+  /// No description provided for @workflowBasalamRefreshPluginFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not refresh add-on status. Try again.'**
+  String get workflowBasalamRefreshPluginFailed;
+
   /// No description provided for @workflowNodeFieldRequired.
   ///
   /// In en, this message translates to:
@@ -22034,6 +22049,114 @@ abstract class AppLocalizations {
   /// **'Visit and return statistics for a date range'**
   String get reportsDistributionDashboardSubtitle;
 
+  /// No description provided for @reportsBasalamSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam reports'**
+  String get reportsBasalamSection;
+
+  /// No description provided for @reportsBasalamOverviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam overview & trends'**
+  String get reportsBasalamOverviewTitle;
+
+  /// No description provided for @reportsBasalamOverviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Webhook, dead-letter queue, product conflicts, synced invoice counts'**
+  String get reportsBasalamOverviewSubtitle;
+
+  /// No description provided for @reportsBasalamSyncedInvoicesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices synced from Basalam'**
+  String get reportsBasalamSyncedInvoicesTitle;
+
+  /// No description provided for @reportsBasalamSyncedInvoicesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales invoices with Basalam order id'**
+  String get reportsBasalamSyncedInvoicesSubtitle;
+
+  /// No description provided for @reportsBasalamDeadLetterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam sync dead-letter'**
+  String get reportsBasalamDeadLetterTitle;
+
+  /// No description provided for @reportsBasalamDeadLetterSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Items that need manual follow-up'**
+  String get reportsBasalamDeadLetterSubtitle;
+
+  /// No description provided for @reportsBasalamProductConflictsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam product conflicts'**
+  String get reportsBasalamProductConflictsTitle;
+
+  /// No description provided for @reportsBasalamProductConflictsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Price/stock/variant mismatches awaiting resolution'**
+  String get reportsBasalamProductConflictsSubtitle;
+
+  /// No description provided for @reportsWooSection.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce reports'**
+  String get reportsWooSection;
+
+  /// No description provided for @reportsWooOverviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce store overview'**
+  String get reportsWooOverviewTitle;
+
+  /// No description provided for @reportsWooOverviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders by status, products, customers, last 7 days'**
+  String get reportsWooOverviewSubtitle;
+
+  /// No description provided for @reportsWooRecentOrdersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent WooCommerce orders'**
+  String get reportsWooRecentOrdersTitle;
+
+  /// No description provided for @reportsWooRecentOrdersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order table from the store bridge'**
+  String get reportsWooRecentOrdersSubtitle;
+
+  /// No description provided for @reportsWooCatalogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce product catalog'**
+  String get reportsWooCatalogTitle;
+
+  /// No description provided for @reportsWooCatalogSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Products from the store bridge'**
+  String get reportsWooCatalogSubtitle;
+
+  /// No description provided for @reportsWooBridgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce bridge health'**
+  String get reportsWooBridgeTitle;
+
+  /// No description provided for @reportsWooBridgeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin, WooCommerce versions and connection test'**
+  String get reportsWooBridgeSubtitle;
+
   /// No description provided for @invoiceGlobalDiscountSection.
   ///
   /// In en, this message translates to:
@@ -23577,8 +23700,7 @@ abstract class AppLocalizations {
   String get mobileLauncherQuickSalesTile;
 }
 
-class _AppLocalizationsDelegate
-    extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -23587,26 +23709,25 @@ class _AppLocalizationsDelegate
   }
 
   @override
-  bool isSupported(Locale locale) =>
-      <String>['en', 'fa'].contains(locale.languageCode);
+  bool isSupported(Locale locale) => <String>['en', 'fa'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'en':
-      return AppLocalizationsEn();
-    case 'fa':
-      return AppLocalizationsFa();
+    case 'en': return AppLocalizationsEn();
+    case 'fa': return AppLocalizationsFa();
   }
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
     'an issue with the localizations generation tool. Please file an issue '
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.',
+    'that was used.'
   );
 }

@@ -7,13 +7,19 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
 import '../../services/currency_service.dart';
 import '../../services/loan_facilities_service.dart';
 import '../../utils/currency_display_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/number_normalizer.dart'
-    show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, formatNumberForInput, toEnglishDigits;
+    show
+        EnglishDigitsFormatter,
+        ThousandsSeparatorInputFormatter,
+        formatNumberForInput,
+        parseFormattedDouble,
+        toEnglishDigits;
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../widgets/date_input_field.dart';
@@ -82,6 +88,7 @@ class _LoanFacilitiesPageState extends State<LoanFacilitiesPage> {
   String? _error;
   List<Map<String, dynamic>> _items = [];
   int? _listTotal;
+  List<Map<String, dynamic>> _bizCurrencies = const [];
   static const _pageSize = 50;
   Timer? _searchDebounce;
 
@@ -92,6 +99,16 @@ class _LoanFacilitiesPageState extends State<LoanFacilitiesPage> {
     super.initState();
     LoanFacilitiesPage._states[widget.businessId] = this;
     _load(refresh: true);
+    _loadBizCurrencies();
+  }
+
+  Future<void> _loadBizCurrencies() async {
+    try {
+      final list = await CurrencyService(ApiClient()).listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
+      if (mounted) setState(() => _bizCurrencies = list);
+    } catch (_) {}
   }
 
   @override
@@ -283,12 +300,16 @@ class _LoanFacilitiesPageState extends State<LoanFacilitiesPage> {
     final st = '${row['status'] ?? ''}';
     final pr = row['principal_amount'];
     final titleText = '${row['title'] ?? id}';
+    final moneyDp = loanFacilityMoneyDecimalPlaces(row, _bizCurrencies);
+    final cid = _asInt(row['currency_id']);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: Icon(Icons.real_estate_agent_outlined, color: Theme.of(context).colorScheme.primary),
         title: Text(titleText),
-        subtitle: Text('$st · ${_formatAmount(pr)}'),
+        subtitle: Text(
+          '$st · ${_formatMoneyLine(pr, currencyId: cid, bizCurrencies: _bizCurrencies, decimalPlaces: moneyDp)}',
+        ),
         trailing: const Icon(Icons.chevron_right),
         onTap: id == null
             ? null
@@ -336,6 +357,27 @@ double? _asDouble(dynamic v) {
   return null;
 }
 
+/// تعداد اعشار نمایش مبلغ از `currency_decimal_places` (API) یا ستون `decimal_places` در ارزهای کسب‌کار.
+int loanFacilityMoneyDecimalPlaces(
+  Map<String, dynamic>? facilityRow,
+  List<Map<String, dynamic>> bizCurrencies,
+) {
+  if (facilityRow != null && facilityRow['currency_decimal_places'] != null) {
+    final api = facilityRow['currency_decimal_places'];
+    if (api is num) return api.toInt().clamp(0, 8);
+  }
+  final cid = facilityRow == null ? null : _asInt(facilityRow['currency_id']);
+  if (cid != null && bizCurrencies.isNotEmpty) {
+    for (final raw in bizCurrencies) {
+      if (_asInt(raw['id']) == cid) {
+        final dp = (raw['decimal_places'] as num?)?.toInt();
+        if (dp != null) return dp.clamp(0, 8);
+      }
+    }
+  }
+  return 2;
+}
+
 String _formatAmount(dynamic value, {int? decimalPlaces}) {
   final n = _asDouble(value);
   if (n == null) return '—';
@@ -343,9 +385,26 @@ String _formatAmount(dynamic value, {int? decimalPlaces}) {
   return formatWithThousands(n, decimalPlaces: places);
 }
 
+/// مبلغ + برچسب کوتاه ارز (نماد/کد از فهرست ارز کسب‌کار).
+String _formatMoneyLine(
+  dynamic value, {
+  required int? currencyId,
+  required List<Map<String, dynamic>> bizCurrencies,
+  int? decimalPlaces,
+}) {
+  final a = _formatAmount(value, decimalPlaces: decimalPlaces);
+  if (a == '—') return a;
+  final unit = currencyUnitLabelForBusinessCurrencyIdOrNull(currencyId, bizCurrencies);
+  if (unit == null || unit.isEmpty) return a;
+  return '$a $unit';
+}
+
 String _formatInputAmount(dynamic value, {int? decimalPlaces}) {
   final n = _asDouble(value);
   if (n == null) return '';
+  if (decimalPlaces != null && decimalPlaces <= 0) {
+    return formatNumberForInput(n.round(), decimalPlaces: 0);
+  }
   return formatNumberForInput(n, decimalPlaces: decimalPlaces);
 }
 
@@ -354,7 +413,19 @@ String _uiText(BuildContext context, {required String fa, required String en}) {
   return locale.startsWith('fa') ? fa : en;
 }
 
-double _roundMoney(double value) => (value * 100).roundToDouble() / 100;
+/// نمایش تاریخ API (میلادی `YYYY-MM-DD`) مطابق تقویم انتخاب‌شده در اپ.
+String _formatLoanFacilityDateLabel(CalendarController calendar, dynamic apiValue) {
+  if (apiValue == null) return '—';
+  final raw = apiValue.toString().trim();
+  if (raw.isEmpty) return '—';
+  return HesabixDateUtils.formatApiDateForDisplay(apiValue, calendar.isJalali, fallback: '—');
+}
+
+double _roundMoney(double value, int moneyDecimalPlaces) {
+  final factor = math.pow(10, moneyDecimalPlaces).toDouble();
+  if (factor <= 0) return value;
+  return (value * factor).roundToDouble() / factor;
+}
 
 double _installmentRemainingTotal(Map<String, dynamic> instMap) {
   return (_asDouble(instMap['remaining_principal']) ?? 0) +
@@ -381,38 +452,41 @@ _SchedulePreview? _calculateSchedulePreview({
   required double principal,
   required double annualRatePercent,
   required int installmentCount,
+  int moneyDecimalPlaces = 2,
 }) {
   if (principal <= 0 || installmentCount < 1 || annualRatePercent < 0) return null;
 
   final monthlyRate = annualRatePercent / 100 / 12;
-  var balance = _roundMoney(principal);
+  var balance = _roundMoney(principal, moneyDecimalPlaces);
   var totalInterest = 0.0;
   double? firstInstallment;
   double? lastInstallment;
 
   for (var period = 1; period <= installmentCount; period++) {
-    final interestPart = _roundMoney(balance * monthlyRate);
+    final interestPart = _roundMoney(balance * monthlyRate, moneyDecimalPlaces);
     double principalPart;
     if (method == _RegenerateScheduleDialogState._equalPrincipal || monthlyRate == 0) {
-      final eachPrincipal = _roundMoney(principal / installmentCount);
-      principalPart = period < installmentCount ? eachPrincipal : _roundMoney(balance);
+      final eachPrincipal = _roundMoney(principal / installmentCount, moneyDecimalPlaces);
+      principalPart = period < installmentCount ? eachPrincipal : _roundMoney(balance, moneyDecimalPlaces);
     } else {
       final onePlus = math.pow(1 + monthlyRate, installmentCount).toDouble();
-      final emi = _roundMoney(principal * monthlyRate * onePlus / (onePlus - 1));
-      principalPart = period < installmentCount ? _roundMoney(math.min(math.max(emi - interestPart, 0.0), balance)) : _roundMoney(balance);
+      final emi = _roundMoney(principal * monthlyRate * onePlus / (onePlus - 1), moneyDecimalPlaces);
+      principalPart = period < installmentCount
+          ? _roundMoney(math.min(math.max(emi - interestPart, 0.0), balance), moneyDecimalPlaces)
+          : _roundMoney(balance, moneyDecimalPlaces);
     }
-    final installmentTotal = _roundMoney(principalPart + interestPart);
+    final installmentTotal = _roundMoney(principalPart + interestPart, moneyDecimalPlaces);
     firstInstallment ??= installmentTotal;
     lastInstallment = installmentTotal;
-    totalInterest = _roundMoney(totalInterest + interestPart);
-    balance = _roundMoney(balance - principalPart);
+    totalInterest = _roundMoney(totalInterest + interestPart, moneyDecimalPlaces);
+    balance = _roundMoney(balance - principalPart, moneyDecimalPlaces);
   }
 
   return _SchedulePreview(
     firstInstallment: firstInstallment ?? 0,
     lastInstallment: lastInstallment ?? 0,
     totalInterest: totalInterest,
-    totalRepayment: _roundMoney(principal + totalInterest),
+    totalRepayment: _roundMoney(principal + totalInterest, moneyDecimalPlaces),
   );
 }
 
@@ -465,18 +539,30 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
   int? _currencyId;
   String? _lenderBankAccountIdStr;
   bool _saving = false;
+  List<Map<String, dynamic>> _formCurrencies = const [];
 
   bool get _isEdit => widget.facilityId != null;
 
   Map<String, dynamic>? get _i => widget.initial;
+
+  Map<String, dynamic> _rowSnapshotForMoneyDp() {
+    final i = _i ?? const {};
+    final row = Map<String, dynamic>.from(i);
+    if (_currencyId != null) row['currency_id'] = _currencyId;
+    return row;
+  }
+
+  int _moneyDpForForm() => loanFacilityMoneyDecimalPlaces(_rowSnapshotForMoneyDp(), _formCurrencies);
 
   @override
   void initState() {
     super.initState();
     final i = _i ?? const {};
     _titleCtl = TextEditingController(text: '${i['title'] ?? ''}');
+    _currencyId = _asInt(i['currency_id']);
+    final startDp = loanFacilityMoneyDecimalPlaces(_rowSnapshotForMoneyDp(), const []);
     _principalCtl = TextEditingController(
-      text: _formatInputAmount(i['principal_amount']),
+      text: _formatInputAmount(i['principal_amount'], decimalPlaces: startDp),
     );
     _rateCtl = TextEditingController(
       text: i['annual_interest_rate_percent'] != null ? '${i['annual_interest_rate_percent']}' : '',
@@ -486,9 +572,26 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
     _notesCtl = TextEditingController(text: '${i['notes'] ?? ''}');
     _contractDate = _parseIsoDate(i['contract_date']) ?? DateTime.now();
     _firstInstallmentDate = _parseIsoDate(i['first_installment_date']);
-    _currencyId = _asInt(i['currency_id']);
     final lb = i['lender_bank_account_id'];
     _lenderBankAccountIdStr = lb != null ? '$lb' : null;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadFormCurrencies());
+  }
+
+  Future<void> _loadFormCurrencies() async {
+    try {
+      final list = await CurrencyService(ApiClient()).listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _formCurrencies = list;
+        final dpp = _moneyDpForForm();
+        final parsed = parseFormattedDouble(_principalCtl.text) ?? _asDouble(_principalCtl.text);
+        if (parsed != null) {
+          _principalCtl.text = _formatInputAmount(parsed, decimalPlaces: dpp);
+        }
+      });
+    } catch (_) {}
   }
 
   @override
@@ -626,6 +729,8 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final finOpen = !_isEdit || _financialUnlockedInitial;
+    final moneyDp = _moneyDpForForm();
+    final allowDec = moneyDp > 0;
 
     return AlertDialog(
       title: Text(_isEdit ? t.loanFacilityDialogEditTitle : t.loanFacilityDialogNewTitle),
@@ -653,18 +758,33 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
                     isDense: true,
                     label: t.loanFacilityFieldCurrency,
                     hintText: t.loanFacilityFieldCurrencyHint,
-                    onChanged: (id) => setState(() => _currencyId = id),
+                    onChanged: (id) {
+                      setState(() {
+                        final prev = _currencyId;
+                        _currencyId = id;
+                        if (prev != id) {
+                          _lenderBankAccountIdStr = null;
+                        }
+                        final dpp = _moneyDpForForm();
+                        final parsed =
+                            parseFormattedDouble(_principalCtl.text) ?? _asDouble(_principalCtl.text);
+                        if (parsed != null) {
+                          _principalCtl.text = _formatInputAmount(parsed, decimalPlaces: dpp);
+                        }
+                      });
+                    },
                   ),
                   const SizedBox(height: 12),
                   AmountFieldWordsTooltip(
                     controller: _principalCtl,
-                    currencyUnit: '',
+                    currencyUnit:
+                        currencyUnitLabelForBusinessCurrencyIdOrNull(_currencyId, _formCurrencies) ?? '',
                     child: TextFormField(
                       controller: _principalCtl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: const [
-                        EnglishDigitsFormatter(),
-                        ThousandsSeparatorInputFormatter(allowDecimal: true),
+                      keyboardType: TextInputType.numberWithOptions(decimal: allowDec),
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(allowDecimal: allowDec),
                       ],
                       decoration: InputDecoration(
                         labelText: t.loanFacilityFieldPrincipal,
@@ -716,16 +836,18 @@ class _LoanFacilityUpsertDialogState extends State<LoanFacilityUpsertDialog> {
                     hintText: t.loanFacilityFieldFirstInstallmentHint,
                     onChanged: (d) => setState(() => _firstInstallmentDate = d),
                   ),
-                  const SizedBox(height: 12),
-                  BankAccountComboboxWidget(
-                    businessId: widget.businessId,
-                    filterCurrencyId: _currencyId,
-                    isRequired: false,
-                    dense: true,
-                    label: t.loanFacilityFieldLenderBank,
-                    selectedAccountId: _lenderBankAccountIdStr,
-                    onChanged: (opt) => setState(() => _lenderBankAccountIdStr = opt?.id),
-                  ),
+                  if (_currencyId != null) ...[
+                    const SizedBox(height: 12),
+                    BankAccountComboboxWidget(
+                      businessId: widget.businessId,
+                      filterCurrencyId: _currencyId,
+                      isRequired: false,
+                      dense: true,
+                      label: t.loanFacilityFieldLenderBank,
+                      selectedAccountId: _lenderBankAccountIdStr,
+                      onChanged: (opt) => setState(() => _lenderBankAccountIdStr = opt?.id),
+                    ),
+                  ],
                 ],
                 const SizedBox(height: 12),
                 TextField(
@@ -809,6 +931,8 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     if (label != null && label.isNotEmpty) return label;
     return t.loanFacilityCurrencyId('$id');
   }
+
+  int _moneyDp() => loanFacilityMoneyDecimalPlaces(_detail, _bizCurrencies);
 
   Future<void> _reload() async {
     setState(() {
@@ -897,6 +1021,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
         calendarController: widget.calendarController,
         service: widget.service,
         detail: d,
+        businessCurrencies: _bizCurrencies,
         onSuccess: () {
           _reload();
           widget.onClosedRefreshList();
@@ -973,8 +1098,12 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
 
     final currencyId = _asInt(_detail?['currency_id']);
     final remainingTotal = _installmentRemainingTotal(instMap);
-    final amountCtl = TextEditingController(text: _formatInputAmount(remainingTotal));
+    final moneyDp = _moneyDp();
+    final amountCtl = TextEditingController(
+      text: _formatInputAmount(remainingTotal, decimalPlaces: moneyDp),
+    );
     String? bankIdStr;
+    final allowPayDec = moneyDp > 0;
 
     final submitted = await showDialog<bool>(
       context: sheetCtx,
@@ -989,7 +1118,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '${_uiText(dlgCtx, fa: 'مانده قابل پرداخت', en: 'Remaining payable')}: ${_formatAmount(remainingTotal)}',
+                    '${_uiText(dlgCtx, fa: 'مانده قابل پرداخت', en: 'Remaining payable')}: ${_formatMoneyLine(remainingTotal, currencyId: currencyId, bizCurrencies: _bizCurrencies, decimalPlaces: moneyDp)}',
                     style: Theme.of(dlgCtx).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
@@ -999,10 +1128,10 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
                     child: TextField(
                       controller: amountCtl,
                       decoration: InputDecoration(labelText: dt.loanFacilityAmount),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: const [
-                        EnglishDigitsFormatter(),
-                        ThousandsSeparatorInputFormatter(allowDecimal: true),
+                      keyboardType: TextInputType.numberWithOptions(decimal: allowPayDec),
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(allowDecimal: allowPayDec),
                       ],
                     ),
                   ),
@@ -1127,6 +1256,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
         : <Map<String, dynamic>>[];
 
     final cid = _asInt(d['currency_id']);
+    final moneyDp = _moneyDp();
 
     return Column(
       children: [
@@ -1164,10 +1294,16 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
                       const SizedBox(height: 8),
                       Text('${t.loanFacilitySummaryStatus}: ${d['status'] ?? '—'}'),
                       Text('${t.loanFacilitySummaryCurrency}: ${_currencyLabel(context, cid)}'),
-                      Text('${t.loanFacilitySummaryPrincipal}: ${_formatAmount(d['principal_amount'])}'),
+                      Text(
+                        '${t.loanFacilitySummaryPrincipal}: ${_formatMoneyLine(d['principal_amount'], currencyId: cid, bizCurrencies: _bizCurrencies, decimalPlaces: moneyDp)}',
+                      ),
                       Text('${t.loanFacilitySummaryAnnualRate}: ${d['annual_interest_rate_percent'] ?? '—'}'),
-                      Text('${t.loanFacilitySummaryContractDate}: ${d['contract_date'] ?? '—'}'),
-                      Text('${t.loanFacilitySummaryFirstInstallment}: ${d['first_installment_date'] ?? '—'}'),
+                      Text(
+                        '${t.loanFacilitySummaryContractDate}: ${_formatLoanFacilityDateLabel(widget.calendarController, d['contract_date'])}',
+                      ),
+                      Text(
+                        '${t.loanFacilitySummaryFirstInstallment}: ${_formatLoanFacilityDateLabel(widget.calendarController, d['first_installment_date'])}',
+                      ),
                       Text('${t.loanFacilitySummaryInstallmentCount}: ${d['installment_count'] ?? '—'}'),
                       Text('${t.loanFacilitySummaryScheduleMethod}: ${d['schedule_method'] ?? '—'}'),
                       Text('${t.loanFacilitySummaryLenderBankId}: ${d['lender_bank_account_id'] ?? '—'}'),
@@ -1217,10 +1353,27 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     if (installmentId == null) return const SizedBox.shrink();
 
     final seq = instMap['sequence_no'];
-    final due = '${instMap['due_date'] ?? ''}';
-    final remPri = _formatAmount(instMap['remaining_principal']);
-    final remInt = _formatAmount(instMap['remaining_interest']);
-    final remTotal = _formatAmount(_installmentRemainingTotal(instMap));
+    final due = _formatLoanFacilityDateLabel(widget.calendarController, instMap['due_date']);
+    final moneyDp = _moneyDp();
+    final facCid = _asInt(_detail?['currency_id']);
+    final remPri = _formatMoneyLine(
+      instMap['remaining_principal'],
+      currencyId: facCid,
+      bizCurrencies: _bizCurrencies,
+      decimalPlaces: moneyDp,
+    );
+    final remInt = _formatMoneyLine(
+      instMap['remaining_interest'],
+      currencyId: facCid,
+      bizCurrencies: _bizCurrencies,
+      decimalPlaces: moneyDp,
+    );
+    final remTotal = _formatMoneyLine(
+      _installmentRemainingTotal(instMap),
+      currencyId: facCid,
+      bizCurrencies: _bizCurrencies,
+      decimalPlaces: moneyDp,
+    );
     final fullyPaid = instMap['is_fully_paid'] == true;
 
     final paysRaw = instMap['payments'];
@@ -1243,8 +1396,13 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
             ),
           ...pays.map((p) {
             final docId = _asInt(p['document_id']);
-            final amt = _formatAmount(p['amount_total']);
-            final pdate = '${p['payment_date'] ?? ''}';
+            final amt = _formatMoneyLine(
+              p['amount_total'],
+              currencyId: facCid,
+              bizCurrencies: _bizCurrencies,
+              decimalPlaces: moneyDp,
+            );
+            final pdate = _formatLoanFacilityDateLabel(widget.calendarController, p['payment_date']);
             final pid = _asInt(p['id']);
             return ListTile(
               dense: true,
@@ -1282,6 +1440,7 @@ class _RegenerateScheduleDialog extends StatefulWidget {
   final CalendarController calendarController;
   final LoanFacilitiesService service;
   final Map<String, dynamic> detail;
+  final List<Map<String, dynamic>> businessCurrencies;
   final VoidCallback onSuccess;
 
   const _RegenerateScheduleDialog({
@@ -1290,6 +1449,7 @@ class _RegenerateScheduleDialog extends StatefulWidget {
     required this.calendarController,
     required this.service,
     required this.detail,
+    this.businessCurrencies = const [],
     required this.onSuccess,
   });
 
@@ -1338,11 +1498,16 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
     final annual = _asDouble(widget.detail['annual_interest_rate_percent']) ?? 0;
     final count = _asInt(_countCtl.text);
     if (principal == null || count == null) return null;
+    final moneyDp = loanFacilityMoneyDecimalPlaces(
+      Map<String, dynamic>.from(widget.detail),
+      widget.businessCurrencies,
+    );
     return _calculateSchedulePreview(
       method: _method,
       principal: principal,
       annualRatePercent: annual,
       installmentCount: count,
+      moneyDecimalPlaces: moneyDp,
     );
   }
 
@@ -1414,6 +1579,10 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final preview = _preview;
+    final moneyDp = loanFacilityMoneyDecimalPlaces(
+      Map<String, dynamic>.from(widget.detail),
+      widget.businessCurrencies,
+    );
     return AlertDialog(
       title: Text(t.loanFacilityRegenerateDialogTitle),
       content: SingleChildScrollView(
@@ -1477,10 +1646,18 @@ class _RegenerateScheduleDialogState extends State<_RegenerateScheduleDialog> {
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                       const SizedBox(height: 8),
-                      Text('${_uiText(context, fa: 'قسط اول', en: 'First installment')}: ${_formatAmount(preview.firstInstallment)}'),
-                      Text('${_uiText(context, fa: 'قسط آخر', en: 'Last installment')}: ${_formatAmount(preview.lastInstallment)}'),
-                      Text('${_uiText(context, fa: 'جمع بهره', en: 'Total interest')}: ${_formatAmount(preview.totalInterest)}'),
-                      Text('${_uiText(context, fa: 'جمع بازپرداخت', en: 'Total repayment')}: ${_formatAmount(preview.totalRepayment)}'),
+                      Text(
+                        '${_uiText(context, fa: 'قسط اول', en: 'First installment')}: ${_formatMoneyLine(preview.firstInstallment, currencyId: _currencyId, bizCurrencies: widget.businessCurrencies, decimalPlaces: moneyDp)}',
+                      ),
+                      Text(
+                        '${_uiText(context, fa: 'قسط آخر', en: 'Last installment')}: ${_formatMoneyLine(preview.lastInstallment, currencyId: _currencyId, bizCurrencies: widget.businessCurrencies, decimalPlaces: moneyDp)}',
+                      ),
+                      Text(
+                        '${_uiText(context, fa: 'جمع بهره', en: 'Total interest')}: ${_formatMoneyLine(preview.totalInterest, currencyId: _currencyId, bizCurrencies: widget.businessCurrencies, decimalPlaces: moneyDp)}',
+                      ),
+                      Text(
+                        '${_uiText(context, fa: 'جمع بازپرداخت', en: 'Total repayment')}: ${_formatMoneyLine(preview.totalRepayment, currencyId: _currencyId, bizCurrencies: widget.businessCurrencies, decimalPlaces: moneyDp)}',
+                      ),
                     ],
                   ),
                 ),

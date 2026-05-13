@@ -32,6 +32,7 @@
 			// Test connection
 			$(document).on('click', '.hesabix-v2-test-connection', this.testConnection);
 
+			$(document).on('click', '#hesabix-v2-bridge-generate-token', this.bridgeGenerateToken);
 		},
 
 		bootstrapConnectionPanels: function() {
@@ -266,6 +267,45 @@
 			setTimeout(function() {
 				$ovl.find('.hesabix-v2-warn-cancel').trigger('focus');
 			}, 30);
+		},
+
+		bridgeGenerateToken: function(e) {
+			if (e) {
+				e.preventDefault();
+			}
+			if (typeof hesabix_v2_ajax === 'undefined') {
+				return;
+			}
+			var $btn = $('#hesabix-v2-bridge-generate-token');
+			var $out = $('#hesabix-v2-bridge-token-inline');
+			$btn.prop('disabled', true);
+			$out.text('…');
+			$.ajax({
+				url: hesabix_v2_ajax.ajax_url,
+				type: 'POST',
+				data: {
+					action: 'hesabix_v2_bridge_generate_token',
+					nonce: hesabix_v2_ajax.nonce
+				},
+				success: function(response) {
+					var token = (response && response.data && response.data.token) ? response.data.token : '';
+					if (response && response.success && token) {
+						$out.html('<strong style="color:#1d2327;">' + HesabixV2Admin.escapeHtml(token) + '</strong>');
+					} else {
+						var m = (response && response.data && response.data.message) ? response.data.message : '';
+						if (!m && response && response.message) {
+							m = response.message;
+						}
+						$out.text(m || 'Error');
+					}
+				},
+				error: function() {
+					$out.text('Request failed');
+				},
+				complete: function() {
+					$btn.prop('disabled', false);
+				}
+			});
 		},
 
 		/**

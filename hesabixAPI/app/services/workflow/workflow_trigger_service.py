@@ -116,6 +116,18 @@ def _trigger_workflows_inner(
     trigger_data: Dict[str, Any],
     user_id: Optional[int] = None
 ) -> int:
+    # تریگرهای باسلام بدون لایسنس/اعتبار فعال اجرا نشوند (اتوماسیون و مسیرهای داخلی)
+    if str(trigger_type or "").startswith("basalam."):
+        from app.core.basalam_plugin_dependency import check_basalam_plugin_active
+
+        if not check_basalam_plugin_active(db, int(business_id)):
+            logger.info(
+                "trigger_workflows skipped: basalam trigger with inactive plugin business_id=%s type=%s",
+                business_id,
+                trigger_type,
+            )
+            return 0
+
     # پیدا کردن workflowهای فعال که با این trigger شروع می‌شوند
     stmt = select(Workflow).where(
         and_(

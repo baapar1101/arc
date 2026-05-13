@@ -1061,6 +1061,18 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isWooCommerceHesabixPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'woocommerce_hesabix',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   bool _isBasalamPluginActive() {
     try {
       final plug = _businessPlugins.firstWhere(
@@ -1635,6 +1647,15 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.storefront_outlined,
         selectedIcon: Icons.storefront,
         path: _bu('basalam'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'woocommerce',
+        label: t.localeName.startsWith('fa') ? 'ووکامرس' : 'WooCommerce',
+        icon: Icons.shopping_cart_outlined,
+        selectedIcon: Icons.shopping_cart,
+        path: _bu('woocommerce'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -3149,6 +3170,16 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _hasAccessToMenuItem(_MenuItem item) {
     final section = _sectionForLabel(item.label, AppLocalizations.of(context));
 
+    if (item.path != null && item.path!.contains('/woocommerce')) {
+      if (!_isWooCommerceHesabixPluginActive()) {
+        return false;
+      }
+      if (widget.authStore.currentBusiness?.isOwner == true) {
+        return true;
+      }
+      return widget.authStore.hasBusinessPermission('woocommerce', 'view');
+    }
+
     if (item.path != null && item.path!.contains('/crm/web-chat')) {
       if (widget.authStore.currentBusiness?.isOwner == true) return true;
       return widget.authStore.canViewCrmWebChat();
@@ -3300,6 +3331,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
     if (label == 'اتصال باسلام' || label == 'Basalam Integration') return 'basalam';
+    if (label == 'ووکامرس' || label == 'WooCommerce') return 'woocommerce';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';

@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
+import '../../utils/workflow_basalam_guard.dart';
 
 /// پالت node های قابل افزودن به workflow
 class WorkflowNodePalette extends StatelessWidget {
   final List<WorkflowNodeMetadata> triggers;
   final List<WorkflowNodeMetadata> actions;
+  final bool basalamPluginActive;
   final Function(WorkflowNodeType type, String key, String name) onNodeSelected;
 
   const WorkflowNodePalette({
     super.key,
     required this.triggers,
     required this.actions,
+    this.basalamPluginActive = true,
     required this.onNodeSelected,
   });
 
@@ -25,6 +28,7 @@ class WorkflowNodePalette extends StatelessWidget {
       child: WorkflowNodePaletteContent(
         triggers: triggers,
         actions: actions,
+        basalamPluginActive: basalamPluginActive,
         onNodeSelected: onNodeSelected,
       ),
     );
@@ -35,12 +39,14 @@ class WorkflowNodePalette extends StatelessWidget {
 class WorkflowNodePaletteContent extends StatefulWidget {
   final List<WorkflowNodeMetadata> triggers;
   final List<WorkflowNodeMetadata> actions;
+  final bool basalamPluginActive;
   final Function(WorkflowNodeType type, String key, String name) onNodeSelected;
 
   const WorkflowNodePaletteContent({
     super.key,
     required this.triggers,
     required this.actions,
+    this.basalamPluginActive = true,
     required this.onNodeSelected,
   });
 
@@ -413,6 +419,27 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.primary,
                       fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (!widget.basalamPluginActive &&
+              workflowMetadataKeyReferencesBasalam(item.key))
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 14, color: Colors.amber.shade800),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      AppLocalizations.of(context).workflowBasalamPluginInactivePalette,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.amber.shade900,
+                        fontSize: 11,
+                      ),
                     ),
                   ),
                 ],

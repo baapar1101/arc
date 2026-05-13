@@ -9,6 +9,7 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from adapters.db.models.bank_account import BankAccount
+from adapters.db.models.currency import Currency
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.fiscal_year import FiscalYear
@@ -402,15 +403,34 @@ def generate_installment_schedule(
 	return rows
 
 
+def _currency_decimal_places_by_ids(db: Session, currency_ids: set[int]) -> dict[int, int]:
+	if not currency_ids:
+		return {}
+	out: dict[int, int] = {}
+	for row in db.query(Currency.id, Currency.decimal_places).filter(Currency.id.in_(currency_ids)).all():
+		dp = int(row.decimal_places) if row.decimal_places is not None else 2
+		out[int(row.id)] = max(0, min(8, dp))
+	return out
+
+
 def facility_to_dict(
 	obj: ReceivedLoanFacility,
 	*,
 	include_installments: bool = False,
+	db: Session | None = None,
+	currency_decimal_places: int | None = None,
 ) -> Dict[str, Any]:
+	if currency_decimal_places is None:
+		if db is None:
+			raise ValueError("facility_to_dict requires db or currency_decimal_places")
+		row = db.query(Currency.decimal_places).filter(Currency.id == int(obj.currency_id)).first()
+		currency_decimal_places = int(row.decimal_places) if row and row.decimal_places is not None else 2
+	dp = max(0, min(8, int(currency_decimal_places)))
 	data: Dict[str, Any] = {
 		"id": obj.id,
 		"business_id": obj.business_id,
 		"currency_id": obj.currency_id,
+		"currency_decimal_places": dp,
 		"created_by_user_id": obj.created_by_user_id,
 		"title": obj.title,
 		"notes": obj.notes,
@@ -496,8 +516,16 @@ def list_facilities(db: Session, business_id: int, query: Dict[str, Any]) -> Dic
 	items = (
 		q.order_by(col.desc() if sort_desc else col.asc()).offset(skip).limit(take).all()
 	)
+	currency_ids = {int(x.currency_id) for x in items}
+	dp_map = _currency_decimal_places_by_ids(db, currency_ids)
 	return {
-		"items": [facility_to_dict(x) for x in items],
+		"items": [
+			facility_to_dict(
+				x,
+				currency_decimal_places=dp_map.get(int(x.currency_id), 2),
+			)
+			for x in items
+		],
 		"pagination": {"total": total, "take": take, "skip": skip},
 	}
 
@@ -603,7 +631,7 @@ def create_facility(
 	db.add(obj)
 	db.commit()
 	db.refresh(obj)
-	return facility_to_dict(obj)
+	return facility_to_dict(obj, db=db)
 
 
 def get_facility_by_id(db: Session, facility_id: int, *, with_installments: bool = False) -> Optional[Dict[str, Any]]:
@@ -615,7 +643,7 @@ def get_facility_by_id(db: Session, facility_id: int, *, with_installments: bool
 			),
 		)
 	obj = q.first()
-	return facility_to_dict(obj, include_installments=with_installments) if obj else None
+	return facility_to_dict(obj, include_installments=with_installments, db=db) if obj else None
 
 
 def update_facility(db: Session, facility_id: int, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -704,7 +732,7 @@ def update_facility(db: Session, facility_id: int, data: Dict[str, Any]) -> Opti
 	obj.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(obj)
-	return facility_to_dict(obj)
+	return facility_to_dict(obj, db=db)
 
 
 def delete_facility(db: Session, facility_id: int, business_id: int) -> bool:
@@ -855,7 +883,7 @@ def regenerate_schedule(db: Session, facility_id: int, data: Dict[str, Any], act
 			"Facility not found after schedule",
 			http_status=500,
 		)
-	return facility_to_dict(obj, include_installments=True)
+	return facility_to_dict(obj, include_installments=True, db=db)
 
 
 def record_payment(

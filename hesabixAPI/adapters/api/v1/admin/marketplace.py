@@ -21,6 +21,7 @@ from app.services.marketplace_service import (
 	delete_plugin_plan,
 	list_all_plugins,
 	check_and_update_expired_licenses,
+	sync_default_marketplace_plugins,
 )
 
 
@@ -98,6 +99,29 @@ def list_all_plugins_endpoint(
 	
 	data = list_all_plugins(db, only_active=only_active)
 	return success_response(data, request)
+
+
+@router.post(
+	"/plugins/sync-defaults",
+	summary="به‌روزرسانی لیست افزونه‌های پیش‌فرض بازار",
+	description="ایجاد یا تکمیل افزونه‌ها و پلن‌های سیستمی (نصب‌های قدیمی و محیط‌های جدید)",
+)
+def sync_default_plugins_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+
+	result = sync_default_marketplace_plugins(db)
+	if not result.get("ok"):
+		raise ApiError(
+			result.get("error") or "SYNC_FAILED",
+			str(result.get("message") or "همگام‌سازی افزونه‌ها انجام نشد"),
+			http_status=400,
+		)
+	return success_response(result, request, "لیست افزونه‌های پیش‌فرض به‌روزرسانی شد")
 
 
 @router.post(
