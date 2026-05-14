@@ -230,7 +230,8 @@ assign_pg_memory_profile_from_mem_kb() {
   if [[ ! "${mem_kb}" =~ ^[0-9]+$ ]]; then
     mem_kb=0
   fi
-  # آستانه‌ها بر حسب kB: 8GiB=8388608، 16GiB=16777216، 32GiB=33554432
+  # آستانه‌ها بر حسب kB؛ ~۷٫۵GiB برای وی‌پی‌اس «۸ گیگ» تبلیغی (MemTotal ≈ ۷٫۸GiB)
+  # 16GiB=16777216، 32GiB=33554432
   if [[ "${mem_kb}" -ge 33554432 ]]; then
     PG_SHARED_BUFFERS="8GB"
     PG_EFFECTIVE_CACHE_SIZE="24GB"
@@ -243,7 +244,7 @@ assign_pg_memory_profile_from_mem_kb() {
     PG_WORK_MEM="12MB"
     PG_MAINTENANCE_WORK_MEM="256MB"
     PG_MAX_CONN_CAP=500
-  elif [[ "${mem_kb}" -ge 8388608 ]]; then
+  elif [[ "${mem_kb}" -ge 7864320 ]]; then
     PG_SHARED_BUFFERS="1GB"
     PG_EFFECTIVE_CACHE_SIZE="6GB"
     PG_WORK_MEM="8MB"
@@ -328,6 +329,47 @@ write_postgresql_hesabix_optimization_conf() {
   sudo install -o postgres -g postgres -m 0644 "${tmpf}" "${pg_conf_dest}"
   rm -f "${tmpf}"
   log_success "فایل بهینه‌سازی PostgreSQL نوشته شد: ${pg_conf_dest}"
+}
+
+# نسخهٔ major را بدون نیاز به PostgreSQL در حال اجرا تشخیص می‌دهد (برای بازنویسی conf قبل از start)
+detect_postgresql_major_version_for_config() {
+  local v d
+  if command -v pg_lsclusters >/dev/null 2>&1; then
+    v=$(pg_lsclusters 2>/dev/null | awk 'NR>1 && $1 ~ /^[0-9]+$/ {print $1; exit}')
+    if [[ -n "${v}" ]]; then
+      echo "${v}"
+      return 0
+    fi
+  fi
+  shopt -s nullglob
+  for d in /etc/postgresql/*/main; do
+    [[ -d "${d}" ]] || continue
+    v=$(basename "$(dirname "${d}")")
+    if [[ "${v}" =~ ^[0-9]+$ ]]; then
+      echo "${v}"
+      shopt -u nullglob
+      return 0
+    fi
+  done
+  shopt -u nullglob
+  return 1
+}
+
+# بارگذاری مجدد سرویس پس از تغییر conf.d (postgresql@VERSION-main یا meta سرویس)
+restart_postgresql_after_config_change() {
+  local pgv="${1:-}"
+  local meta_svc="${2:-}"
+  [[ -z "${pgv}" ]] && return 0
+  systemctl daemon-reload 2>/dev/null || true
+  if [[ -n "${meta_svc}" ]]; then
+    systemctl restart "${meta_svc}" 2>/dev/null || true
+  fi
+  if systemctl restart "postgresql@${pgv}-main" 2>/dev/null; then
+    sleep 2
+    return 0
+  fi
+  systemctl restart postgresql 2>/dev/null || true
+  sleep 2
 }
 
 # Validate domain format
@@ -1194,6 +1236,18 @@ clone_repo() {
 setup_db() {
   log_step "Configuring database (PostgreSQL)..."
   
+  # اگر قبلاً conf.d با shared_buffers غیرواقعی نوشته شده باشد، PostgreSQL اصلاً بالا نمی‌آید و
+  # wait_for_db هرگز موفق نمی‌شود؛ بنابراین ابتدا نسخه را از دیسک تشخیص می‌دهیم، conf را می‌نویسیم و سرویس را ری‌استارت می‌کنیم.
+  local pg_opt_applied_early=false
+  local pg_ver_early=""
+  pg_ver_early=$(detect_postgresql_major_version_for_config 2>/dev/null || true)
+  if [[ -n "${pg_ver_early}" ]] && [[ "${pg_ver_early}" =~ ^[0-9]+$ ]]; then
+    log_info "اعمال پیش‌گیرانهٔ تنظیمات PostgreSQL (نسخه ${pg_ver_early}) تا سرویس با conf معتبر بالا بیاید..."
+    write_postgresql_hesabix_optimization_conf "${pg_ver_early}"
+    restart_postgresql_after_config_change "${pg_ver_early}" ""
+    pg_opt_applied_early=true
+  fi
+  
   # Start and enable PostgreSQL service
   # PostgreSQL service may be named 'postgresql' or 'postgresql@VERSION-main'
   local pg_service_found=false
@@ -1304,14 +1358,10 @@ setup_db() {
     log_warning "Connection test failed, but database may still be accessible. Continuing..."
   fi
 
-  # بهینه‌سازی PostgreSQL بر اساس RAM سرور و workers/pool (نه فایل ثابت ۳۲GB)
-  log_info "اعمال تنظیمات PostgreSQL متناسب با RAM و بار Hesabix..."
-  write_postgresql_hesabix_optimization_conf "${pg_version}"
-  systemctl daemon-reload 2>/dev/null || true
-  if [[ -n "${pg_service:-}" ]]; then
-    systemctl restart "${pg_service}" 2>/dev/null || systemctl restart "postgresql@${pg_version}-main" 2>/dev/null || systemctl restart postgresql 2>/dev/null || true
-  else
-    systemctl restart "postgresql@${pg_version}-main" 2>/dev/null || systemctl restart postgresql 2>/dev/null || true
+  if [[ "${pg_opt_applied_early}" != "true" ]]; then
+    log_info "اعمال تنظیمات PostgreSQL پس از بالا آمدن سرویس (نسخه ${pg_version})..."
+    write_postgresql_hesabix_optimization_conf "${pg_version}"
+    restart_postgresql_after_config_change "${pg_version}" "${pg_service:-}"
   fi
 }
 
