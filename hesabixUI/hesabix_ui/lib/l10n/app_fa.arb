@@ -894,6 +894,18 @@
   "userEmailOrPhone": "ایمیل یا شماره تلفن",
   "userEmailOrPhoneHint": "ایمیل یا شماره تلفن کاربر را وارد کنید",
   "addUser": "افزودن کاربر",
+  "businessMembershipUnlimited": "عضویت نامحدود",
+  "businessMembershipLimited": "تاریخ پایان عضویت",
+  "businessMembershipPickDate": "انتخاب تاریخ پایان",
+  "businessMembershipSectionTitle": "مدت عضویت در کسب‌وکار",
+  "businessMembershipUntil": "عضویت تا {date}",
+  "@businessMembershipUntil": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "businessMembershipExpired": "منقضی",
+  "businessMembershipEndDateRequired": "لطفاً تاریخ پایان عضویت را انتخاب کنید",
   "userAddedSuccessfully": "کاربر با موفقیت اضافه شد",
   "userAddFailed": "خطا در افزودن کاربر",
   "userRemovedSuccessfully": "کاربر با موفقیت حذف شد",
@@ -1096,6 +1108,7 @@
   "permissionsCategoryInvoicesAndExpenses": "فاکتورها و هزینه‌ها",
   "permissionSectionInvoiceTypes": "نوع‌های مجاز فاکتور",
   "permissionSectionPricing": "نمایش قیمت فروش و خرید",
+  "permissionInvoiceChangeUnitPrice": "تغییر دستی فی در فاکتور و فروش سریع",
   "permissionSectionCrmWebChat": "چت وب (ویجت CRM)",
   "permissionCrmEditAndAdd": "ایجاد و ویرایش رکوردهای CRM",
   "permissionCrmViewReports": "مشاهده گزارش‌های CRM",
@@ -2204,6 +2217,7 @@
   "invalidInstallmentsCount": "تعداد اقساط معتبر نیست"
   ,
   "unitPricePickHint": "قیمت واحد (انتخاب از لیست یا ورود دستی)",
+  "unitPriceReadOnlyFieldHint": "بدون مجوز تغییر فی: فقط انتخاب از آیکون لیست یا قیمت پایه کالا",
   "lineTotalAmount": "مبلغ کل این ردیف",
   "lineDescription": "شرح ردیف",
   "descriptionOptional": "شرح (اختیاری)",
@@ -4758,6 +4772,31 @@
   "woocommerceHubSyncProductConfirmBody": "محصول انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.",
   "woocommerceHubSyncCustomerConfirmTitle": "همگام این مشتری؟",
   "woocommerceHubSyncCustomerConfirmBody": "مشتری انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.",
+  "woocommerceHubBulkSyncTitle": "همگام‌سازی دسته‌ای (مرکز عملیات)",
+  "woocommerceHubBulkEffectiveHint": "در هر درخواست حداکثر {applied} مورد ارسال می‌شود (سقف افزونه {bridge}؛ اندازهٔ دستهٔ انتخابی شما {choice}).",
+  "@woocommerceHubBulkEffectiveHint": {
+    "placeholders": {
+      "applied": {"type": "String"},
+      "bridge": {"type": "String"},
+      "choice": {"type": "String"}
+    }
+  },
+  "woocommerceHubBulkBatchSizeLabel": "اندازهٔ دسته در هر درخواست",
+  "woocommerceHubBulkSyncCurrentPage": "همگام این صفحهٔ جدول",
+  "woocommerceHubBulkSyncAllFiltered": "همگام همه با فیلتر فعلی",
+  "woocommerceHubBulkConfirmCurrentPage": "همگام‌سازی {count} مورد در صفحهٔ فعلی جدول؟",
+  "@woocommerceHubBulkConfirmCurrentPage": {"placeholders": {"count": {"type": "String"}}},
+  "woocommerceHubBulkConfirmAll": "همگام‌سازی همهٔ {count} مورد مطابق فیلتر فعلی؟ ممکن است چند درخواست پشت‌سرهم اجرا شود.",
+  "@woocommerceHubBulkConfirmAll": {"placeholders": {"count": {"type": "String"}}},
+  "woocommerceHubBulkEmpty": "در این نما موردی برای همگام‌سازی نیست.",
+  "woocommerceHubBulkFinishedOk": "{processed} مورد در {batches} دستهٔ درخواست همگام شد.",
+  "@woocommerceHubBulkFinishedOk": {
+    "placeholders": {
+      "processed": {"type": "String"},
+      "batches": {"type": "String"}
+    }
+  },
+  "woocommerceHubBulkProgressLabel": "دستهٔ درخواست",
   "woocommerceSyncDone": "همگام‌سازی انجام شد",
   "woocommerceControlQueueTitle": "صف همگام‌سازی پس‌زمینه",
   "woocommerceControlQueueBatchHint": "حداکثر ردیف در هر اجرا (از تنظیمات افزونه): {n}",
@@ -4842,6 +4881,8 @@
   "invoiceSummaryDiscount": "جمع تخفیف",
   "invoiceSummaryTax": "جمع مالیات",
   "invoiceSummaryTotal": "جمع کل",
+  "invoiceSummaryLinesAndQuantity": "تعداد اقلام: {lineCount} قلم، جمع مقدار: {totalQuantity}",
+  "@invoiceSummaryLinesAndQuantity": {"placeholders": {"lineCount": {"type": "String"}, "totalQuantity": {"type": "String"}}},
   "businessSettingsInvoiceGlobalDiscountTitle": "تخفیف کلی فاکتور (محاسبه)",
   "businessSettingsInvoiceGlobalDiscountBasisLabel": "مبنای درصد تخفیف کلی",
   "businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines": "جمع خالص پس از تخفیف ردیف (پیش از مالیات)",

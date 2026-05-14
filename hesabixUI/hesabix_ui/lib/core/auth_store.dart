@@ -551,6 +551,17 @@ class AuthStore with ChangeNotifier {
     return hasBusinessPermission('pricing', 'purchase_price_view');
   }
 
+  /// ویرایش دستی قیمت واحد در فاکتور/فروش سریع؛ در نبود کلید در JSON = مجاز (سازگاری با قبل).
+  bool canChangeInvoiceUnitPrice() {
+    if (_currentBusiness?.isOwner == true) return true;
+    final p = _businessPermissions;
+    if (p == null) return true;
+    final inv = p['invoices'];
+    if (inv is! Map) return true;
+    if (!inv.containsKey('change_unit_price')) return true;
+    return inv['change_unit_price'] == true;
+  }
+
   /// ثبت یا ویرایش سند حسابداری (شامل اسناد خودکار از چک، دریافت‌وپرداخت و …).
   /// هم‌ارز بررسیٔ `accounting.write` در سرور.
   bool canCreateOrEditAccountingDocuments() {

@@ -3,29 +3,24 @@ import 'package:flutter/foundation.dart';
 import 'helpers/column_settings_service.dart';
 
 /// Configuration for data table columns
-enum ColumnWidth {
-  small,
-  medium,
-  large,
-  extraLarge,
-}
+enum ColumnWidth { small, medium, large, extraLarge }
 
 /// Types of column filters
 enum ColumnFilterType {
-  text,           // Text filter (default)
-  dateRange,      // Date range filter
-  multiSelect,    // Multi-select filter with checkboxes
-  categoryTree,   // Category tree filter with hierarchical selection
+  text, // Text filter (default)
+  dateRange, // Date range filter
+  multiSelect, // Multi-select filter with checkboxes
+  categoryTree, // Category tree filter with hierarchical selection
 }
 
 /// Filter option for multi-select filters
 class FilterOption {
-  final String value;        // Value for API
-  final String label;        // Display label
+  final String value; // Value for API
+  final String label; // Display label
   final String? description; // Additional description
-  final IconData? icon;      // Icon
-  final Color? color;        // Icon/text color
-  
+  final IconData? icon; // Icon
+  final Color? color; // Icon/text color
+
   const FilterOption({
     required this.value,
     required this.label,
@@ -215,6 +210,7 @@ class DataTableConfig<T> {
   final bool showColumnSearch;
   final int defaultPageSize;
   final List<int> pageSizeOptions;
+
   /// ذخیرهٔ تعداد ردیف در هر صفحه در حافظهٔ محلی، با کلید [effectiveTableId].
   final bool persistPageSize;
   final bool enableSorting;
@@ -260,7 +256,7 @@ class DataTableConfig<T> {
   final VoidCallback? onDateRangeClear;
   // Custom filters callback
   final List<FilterItem> Function()? getCustomFilters;
-  
+
   // Export configuration
   final String? excelEndpoint;
   final String? pdfEndpoint;
@@ -272,7 +268,7 @@ class DataTableConfig<T> {
   final int? businessId; // needed to fetch templates
   final String? reportModuleKey;
   final String? reportSubtype;
-  
+
   // Row styling
   final Color? Function(dynamic item, int index)? rowColorBuilder;
 
@@ -285,26 +281,28 @@ class DataTableConfig<T> {
   final bool showColumnSettingsButton;
   final ColumnSettings? initialColumnSettings;
   final void Function(ColumnSettings settings)? onColumnSettingsChanged;
-  
+
   // Custom header actions
   final List<Widget>? customHeaderActions;
-  
+
   // Show individual action buttons
   final bool showFiltersButton;
-  
+
   // Alignment configuration
-  final TextAlign? cellTextAlign;       // If set, overrides all cell text alignment
-  final TextAlign? headerTextAlign;     // If set, overrides all header text alignment
+  final TextAlign? cellTextAlign; // If set, overrides all cell text alignment
+  final TextAlign?
+  headerTextAlign; // If set, overrides all header text alignment
 
   // Row height configuration (useful for mobile/card-like rows)
   final double? headingRowHeight;
   final double? dataRowHeight;
-  
+
   // Refresh callback
   final VoidCallback? onRefresh;
 
   /// وقتی دادهٔ **صفحهٔ جاری** (raw) از API یا حالت local به‌روز می‌شود؛ برای نگاشت ایندکس انتخاب به id و غیره
-  final void Function(List<Map<String, dynamic>> currentPageRawItems)? onTableDataChanged;
+  final void Function(List<Map<String, dynamic>> currentPageRawItems)?
+  onTableDataChanged;
 
   /// وقتی کاربر «پاک کردن فیلترها» را می‌زند (هم‌گام با نوار فیلتر سریع مثل دسته در صفحهٔ کالاها)
   final VoidCallback? onAllFiltersCleared;
@@ -312,15 +310,15 @@ class DataTableConfig<T> {
   /// اگر با [businessId] تنظیم شود، وضعیت فیلترهای داخل جدول (جستجوی سراسری، فیلتر ستون‌ها، چندانتخابی، بازهٔ تاریخ ستون)
   /// در [ListFilterPreferencesService] ذخیره و پس از بازگشت به صفحه بازگردانده می‌شود.
   final String? persistTableFiltersPageId;
-  
+
   // Auto-fit configuration
   final bool autoFitColumnsOnFirstLoad;
   final int autoFitSampleRows;
-  
+
   // Auto-fill available width: if true, columns will expand to fill available width
   // when user hasn't customized column widths
   final bool autoFillAvailableWidth;
-  
+
   // HTTP method for data fetching (default: POST)
   final String httpMethod;
 
@@ -328,9 +326,14 @@ class DataTableConfig<T> {
   final String? pageSizeQueryParam;
 
   /// اگر true باشد، ناحیهٔ بدنهٔ جدول به‌جای [Expanded] با ارتفاع محاسبه‌شده از تعداد سطرها
-  /// اندازه می‌گیرد تا اسکرول عمودی داخل [DataTable2] حذف شود؛ خود [DataTableWidget] محتوای کارت را
-  /// در [SingleChildScrollView] می‌پیچد تا با ارتفاع زیاد، صفحه اسکرول شود. پیش‌فرض: غیرفعال.
+  /// اندازه می‌گیرد تا اسکرول عمودی داخل [DataTable2] حذف شود. معمولاً کل کارت در
+  /// [SingleChildScrollView] می‌پیچد؛ اگر [deferVerticalScrollToParent] را true کنید،
+  /// اسکرول عمودی فقط در والد (مثلاً [CustomScrollView] صفحه) انجام می‌شود.
   final bool expandBodyHeightToFitRows;
+
+  /// فقط همراه با [expandBodyHeightToFitRows]: اگر true باشد، [SingleChildScrollView] عمودی
+  /// دور کارت حذف می‌شود تا والد (مثلاً [CustomScrollView] صفحه) کل محتوا از جمله فیلترها و جدول را اسکرول کند.
+  final bool deferVerticalScrollToParent;
 
   const DataTableConfig({
     required this.endpoint,
@@ -423,6 +426,7 @@ class DataTableConfig<T> {
     this.httpMethod = 'POST',
     this.pageSizeQueryParam,
     this.expandBodyHeightToFitRows = false,
+    this.deferVerticalScrollToParent = false,
   });
 
   /// Get column width as double
@@ -498,9 +502,11 @@ class DataTableResponse<T> {
   ) {
     final data = json['data'];
     if (data == null || data is! Map<String, dynamic>) {
-      throw FormatException('Invalid response format: missing or invalid "data" field');
+      throw FormatException(
+        'Invalid response format: missing or invalid "data" field',
+      );
     }
-    
+
     final itemsList = data['items'];
     List<dynamic> items;
     if (itemsList == null) {
@@ -510,7 +516,7 @@ class DataTableResponse<T> {
     } else {
       items = [];
     }
-    
+
     // Support both old and new pagination shapes (persons-style pagination + products-style total_count/has_more)
     final pagination = data['pagination'] as Map<String, dynamic>?;
     int total = pagination != null
@@ -519,9 +525,9 @@ class DataTableResponse<T> {
     int limit = pagination != null
         ? (pagination['per_page'] as num?)?.toInt() ?? 20
         : (data['limit'] as num?)?.toInt() ??
-            (data['take'] as num?)?.toInt() ??
-            (data['per_page'] as num?)?.toInt() ??
-            20;
+              (data['take'] as num?)?.toInt() ??
+              (data['per_page'] as num?)?.toInt() ??
+              20;
     final int? rawPage = pagination != null
         ? (pagination['page'] as num?)?.toInt()
         : (data['page'] as num?)?.toInt();
@@ -547,7 +553,7 @@ class DataTableResponse<T> {
     }
     if (page < 1) page = 1;
     if (limit < 1) limit = 20;
-    
+
     // Parse items safely
     final parsedItems = <T>[];
     final rawItems = <Map<String, dynamic>>[];
@@ -562,7 +568,7 @@ class DataTableResponse<T> {
         // Skip invalid items instead of failing completely
       }
     }
-    
+
     return DataTableResponse<T>(
       items: parsedItems,
       rawItems: rawItems,
@@ -648,11 +654,7 @@ class FilterItem {
   });
 
   Map<String, dynamic> toJson() {
-    return {
-      'property': property,
-      'operator': operator,
-      'value': value,
-    };
+    return {'property': property, 'operator': operator, 'value': value};
   }
 }
 
@@ -661,8 +663,5 @@ class SortItem {
   final String by;
   final bool desc;
   const SortItem({required this.by, this.desc = false});
-  Map<String, dynamic> toJson() => {
-        'by': by,
-        'desc': desc,
-      };
+  Map<String, dynamic> toJson() => {'by': by, 'desc': desc};
 }

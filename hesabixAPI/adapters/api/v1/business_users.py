@@ -18,9 +18,40 @@ from app.core.cache import get_cache
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from adapters.db.models.user import User
 from adapters.db.models.business import Business
+from adapters.db.models.business_permission import BusinessPermission
 from sqlalchemy import select, and_, or_
+from app.core.business_membership import membership_is_active
 
 router = APIRouter(prefix="/business", tags=["business-users"])
+
+
+def _membership_fields(permission_obj: BusinessPermission | None, role: str) -> dict:
+    if role == "owner":
+        return {
+            "membership_expires_at": None,
+            "membership_unlimited": True,
+            "membership_active": True,
+        }
+    if not permission_obj:
+        return {
+            "membership_expires_at": None,
+            "membership_unlimited": True,
+            "membership_active": False,
+        }
+    exp = permission_obj.membership_expires_at
+    return {
+        "membership_expires_at": exp,
+        "membership_unlimited": exp is None,
+        "membership_active": membership_is_active(permission_obj),
+    }
+
+
+def _member_status(permission_obj: BusinessPermission | None, role: str) -> str:
+    if role == "owner":
+        return "active"
+    if permission_obj and not membership_is_active(permission_obj):
+        return "expired"
+    return "active"
 
 
 def _localize(request: Request, key: str, default_en: str) -> str:
@@ -318,10 +349,11 @@ def get_user_details(
         "user_email": user.email or "",
         "user_phone": user.mobile,
         "role": role,
-        "status": "active",
+        "status": _member_status(permission_obj, role),
         "added_at": permission_obj.created_at if permission_obj else business.created_at,
         "last_active": permission_obj.updated_at if permission_obj else business.updated_at,
         "permissions": permissions,
+        **(_membership_fields(permission_obj, role) if role == "member" else _membership_fields(None, "owner")),
     }
     
     logger.info(f"Returning user data: {user_data}")
@@ -431,6 +463,7 @@ def get_users(
             "added_at": business.created_at,
             "last_active": business.updated_at,
             "permissions": {},  # Owner has all permissions
+            **_membership_fields(None, "owner"),
         }
         formatted_users.append(owner_data)
     else:
@@ -454,10 +487,11 @@ def get_users(
                 "user_email": user.email or "",
                 "user_phone": user.mobile,
                 "role": "member",
-                "status": "active",
+                "status": _member_status(perm, "member"),
                 "added_at": perm.created_at,
                 "last_active": perm.updated_at,
                 "permissions": perm.business_permissions or {},
+                **_membership_fields(perm, "member"),
             }
             formatted_users.append(user_data)
         else:
@@ -578,6 +612,13 @@ def add_user(
         )
     
     logger.info(f"Found user: {user.id} - {user.email}")
+
+    if user.id == business.owner_id:
+        raise ApiError(
+            "BUSINESS_USERS_CANNOT_ADD_OWNER_AS_MEMBER",
+            "This user is already the business owner.",
+            http_status=400,
+        )
     
     # Check if user is already added to this business
     permission_repo = BusinessPermissionRepository(db)
@@ -596,7 +637,8 @@ def add_user(
     permission_obj = permission_repo.create_or_update(
         user_id=user.id,
         business_id=business_id,
-        permissions={'join': True}  # Default permissions with join access
+        permissions={'join': True},  # Default permissions with join access
+        membership_expires_at=add_request.membership_expires_at,
     )
     
     logger.info(f"Created permission object: {permission_obj.id}")
@@ -620,10 +662,11 @@ def add_user(
         "user_email": user.email or "",
         "user_phone": user.mobile,
         "role": "member",
-        "status": "active",
+        "status": _member_status(permission_obj, "member"),
         "added_at": permission_obj.created_at,
         "last_active": None,
         "permissions": permission_obj.business_permissions or {},
+        **_membership_fields(permission_obj, "member"),
     }
     
     logger.info(f"Returning user data: {user_data}")
@@ -690,14 +733,38 @@ def update_permissions(
     target_user = db.get(User, user_id)
     if not target_user:
         raise ApiError("BUSINESS_USERS_USER_NOT_FOUND", "User not found.", http_status=404)
+
+    if business.owner_id == user_id and update_request.apply_membership_expiry:
+        raise ApiError(
+            "BUSINESS_USERS_OWNER_MEMBERSHIP_IMMUTABLE",
+            "Business owner membership cannot be time-limited.",
+            http_status=400,
+        )
     
     # Update permissions
     permission_repo = BusinessPermissionRepository(db)
-    permission_obj = permission_repo.create_or_update(
-        user_id=user_id,
-        business_id=business_id,
-        permissions=update_request.permissions
-    )
+    if update_request.apply_membership_expiry:
+        permission_repo.create_or_update(
+            user_id=user_id,
+            business_id=business_id,
+            permissions=update_request.permissions,
+            membership_expires_at=update_request.membership_expires_at,
+        )
+    else:
+        permission_repo.create_or_update(
+            user_id=user_id,
+            business_id=business_id,
+            permissions=update_request.permissions,
+        )
+
+    if update_request.apply_membership_expiry:
+        cache = get_cache()
+        if cache.enabled:
+            try:
+                cache.delete_pattern("user_businesses:*")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning("Failed to invalidate cache after membership update: %s", e)
     
     return success_response(
         data={},

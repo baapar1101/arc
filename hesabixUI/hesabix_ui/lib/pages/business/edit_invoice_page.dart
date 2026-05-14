@@ -1172,6 +1172,12 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final t = AppLocalizations.of(context);
     final showGlobalDisc = invoiceTypeSupportsGlobalDiscount(_selectedInvoiceType?.value);
     final lineDiscOnly = _lineItems.fold<num>(0, (acc, e) => acc + e.discountAmount);
+    final filledProductLines = _lineItems.where((e) => e.productId != null).toList();
+    final summaryTotalQuantity =
+        filledProductLines.fold<num>(0, (a, e) => a + e.quantity);
+    final summaryTotalQtyStr = summaryTotalQuantity.remainder(1) == 0
+        ? summaryTotalQuantity.truncate().toString()
+        : summaryTotalQuantity.toString();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -1270,6 +1276,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                   spacing: 16,
                   runSpacing: 8,
                   children: [
+                    Text(
+                      t.invoiceSummaryLinesAndQuantity(
+                        filledProductLines.length.toString(),
+                        summaryTotalQtyStr,
+                      ),
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
                     Text('${t.invoiceSummarySubtotal}: ${formatWithThousands(_sumSubtotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
                     Text('${t.invoiceSummaryDiscount}: ${formatWithThousands(_sumDiscount, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),
                     Text('${t.invoiceSummaryTax}: ${formatWithThousands(_sumTax, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge),

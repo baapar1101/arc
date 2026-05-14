@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.business_permission import BusinessPermission
 from adapters.db.repositories.base_repo import BaseRepository
+from app.core.business_membership import membership_is_active
+
+_MEMBERSHIP_EXPIRY_UNSET = object()
 
 
 class BusinessPermissionRepository(BaseRepository[BusinessPermission]):
@@ -41,7 +44,14 @@ class BusinessPermissionRepository(BaseRepository[BusinessPermission]):
         logger.info(f"=== get_by_user_and_business END ===")
         return result
 
-    def create_or_update(self, user_id: int, business_id: int, permissions: dict) -> BusinessPermission:
+    def create_or_update(
+        self,
+        user_id: int,
+        business_id: int,
+        permissions: dict,
+        *,
+        membership_expires_at: object = _MEMBERSHIP_EXPIRY_UNSET,
+    ) -> BusinessPermission:
         """ایجاد یا به‌روزرسانی دسترسی‌های کاربر برای کسب و کار"""
         existing = self.get_by_user_and_business(user_id, business_id)
         
@@ -60,6 +70,8 @@ class BusinessPermissionRepository(BaseRepository[BusinessPermission]):
             merged_permissions['join'] = True
 
             existing.business_permissions = merged_permissions
+            if membership_expires_at is not _MEMBERSHIP_EXPIRY_UNSET:
+                existing.membership_expires_at = membership_expires_at  # type: ignore[assignment]
             self.db.commit()
             self.db.refresh(existing)
             return existing
@@ -70,10 +82,15 @@ class BusinessPermissionRepository(BaseRepository[BusinessPermission]):
             if 'join' in incoming_permissions:
                 incoming_permissions.pop('join', None)
 
+            expiry_val = None
+            if membership_expires_at is not _MEMBERSHIP_EXPIRY_UNSET:
+                expiry_val = membership_expires_at
+
             new_permission = BusinessPermission(
                 user_id=user_id,
                 business_id=business_id,
-                business_permissions={**base_permissions, **incoming_permissions}
+                business_permissions={**base_permissions, **incoming_permissions},
+                membership_expires_at=expiry_val,
             )
             self.db.add(new_permission)
             self.db.commit()
@@ -132,7 +149,7 @@ class BusinessPermissionRepository(BaseRepository[BusinessPermission]):
                 # Unsupported type, skip safely
                 normalized = {}
 
-            if normalized.get('join') == True:
+            if normalized.get('join') == True and membership_is_active(perm):
                 member_permissions.append(perm)
         
         return member_permissions

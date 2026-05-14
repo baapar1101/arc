@@ -2235,6 +2235,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addUser => 'Add User';
 
   @override
+  String get businessMembershipUnlimited => 'Unlimited membership';
+
+  @override
+  String get businessMembershipLimited => 'Membership end date';
+
+  @override
+  String get businessMembershipPickDate => 'Pick end date';
+
+  @override
+  String get businessMembershipSectionTitle => 'Membership duration';
+
+  @override
+  String businessMembershipUntil(String date) {
+    return 'Until $date';
+  }
+
+  @override
+  String get businessMembershipExpired => 'Expired';
+
+  @override
+  String get businessMembershipEndDateRequired =>
+      'Please select a membership end date';
+
+  @override
   String get userAddedSuccessfully => 'User added successfully';
 
   @override
@@ -2735,6 +2759,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get permissionSectionPricing => 'Sales / purchase price visibility';
+
+  @override
+  String get permissionInvoiceChangeUnitPrice =>
+      'Change invoice unit price manually (invoice & quick sales)';
 
   @override
   String get permissionSectionCrmWebChat => 'Web chat widget (CRM)';
@@ -5065,6 +5093,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get unitPricePickHint =>
       'Unit price (pick from list or enter manually)';
+
+  @override
+  String get unitPriceReadOnlyFieldHint =>
+      'No permission to edit unit price — use the list icon or product base price';
 
   @override
   String get lineTotalAmount => 'Line total amount';
@@ -12584,6 +12616,48 @@ class AppLocalizationsEn extends AppLocalizations {
       'The selected customer will be pushed to Hesabix through the plugin API.';
 
   @override
+  String get woocommerceHubBulkSyncTitle => 'Bulk sync (hub)';
+
+  @override
+  String woocommerceHubBulkEffectiveHint(
+    String applied,
+    String bridge,
+    String choice,
+  ) {
+    return 'Each request sends up to $applied items (plugin cap $bridge; selected batch size $choice).';
+  }
+
+  @override
+  String get woocommerceHubBulkBatchSizeLabel => 'Batch size (per request)';
+
+  @override
+  String get woocommerceHubBulkSyncCurrentPage => 'This table page';
+
+  @override
+  String get woocommerceHubBulkSyncAllFiltered => 'All with current filters';
+
+  @override
+  String woocommerceHubBulkConfirmCurrentPage(String count) {
+    return 'Sync $count item(s) on the current page?';
+  }
+
+  @override
+  String woocommerceHubBulkConfirmAll(String count) {
+    return 'Sync all $count item(s) matching the current filters? This may run multiple requests.';
+  }
+
+  @override
+  String get woocommerceHubBulkEmpty => 'Nothing to sync in this view.';
+
+  @override
+  String woocommerceHubBulkFinishedOk(String processed, String batches) {
+    return 'Synced $processed item(s) in $batches request batch(es).';
+  }
+
+  @override
+  String get woocommerceHubBulkProgressLabel => 'Request batch';
+
+  @override
   String get woocommerceSyncDone => 'Sync completed';
 
   @override
@@ -12839,6 +12913,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invoiceSummaryTotal => 'Grand total';
+
+  @override
+  String invoiceSummaryLinesAndQuantity(
+    String lineCount,
+    String totalQuantity,
+  ) {
+    return 'Items: $lineCount line(s), total quantity: $totalQuantity';
+  }
 
   @override
   String get businessSettingsInvoiceGlobalDiscountTitle =>

@@ -795,6 +795,18 @@
   "userEmailOrPhone": "Email or Phone",
   "userEmailOrPhoneHint": "Enter user email or phone number",
   "addUser": "Add User",
+  "businessMembershipUnlimited": "Unlimited membership",
+  "businessMembershipLimited": "Membership end date",
+  "businessMembershipPickDate": "Pick end date",
+  "businessMembershipSectionTitle": "Membership duration",
+  "businessMembershipUntil": "Until {date}",
+  "@businessMembershipUntil": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "businessMembershipExpired": "Expired",
+  "businessMembershipEndDateRequired": "Please select a membership end date",
   "userAddedSuccessfully": "User added successfully",
   "userAddFailed": "Failed to add user",
   "userRemovedSuccessfully": "User removed successfully",
@@ -997,6 +1009,7 @@
   "permissionsCategoryInvoicesAndExpenses": "Invoices & expenses",
   "permissionSectionInvoiceTypes": "Allowed invoice types",
   "permissionSectionPricing": "Sales / purchase price visibility",
+  "permissionInvoiceChangeUnitPrice": "Change invoice unit price manually (invoice & quick sales)",
   "permissionSectionCrmWebChat": "Web chat widget (CRM)",
   "permissionCrmEditAndAdd": "Create and edit CRM records",
   "permissionCrmViewReports": "View CRM reports",
@@ -1837,6 +1850,7 @@
   "invalidInstallmentsCount": "Invalid number of installments"
   ,
   "unitPricePickHint": "Unit price (pick from list or enter manually)",
+  "unitPriceReadOnlyFieldHint": "No permission to edit unit price — use the list icon or product base price",
   "lineTotalAmount": "Line total amount",
   "lineDescription": "Line description",
   "descriptionOptional": "Description (optional)",
@@ -4716,6 +4730,31 @@
   "woocommerceHubSyncProductConfirmBody": "The selected product will be pushed to Hesabix through the plugin API.",
   "woocommerceHubSyncCustomerConfirmTitle": "Sync this customer?",
   "woocommerceHubSyncCustomerConfirmBody": "The selected customer will be pushed to Hesabix through the plugin API.",
+  "woocommerceHubBulkSyncTitle": "Bulk sync (hub)",
+  "woocommerceHubBulkEffectiveHint": "Each request sends up to {applied} items (plugin cap {bridge}; selected batch size {choice}).",
+  "@woocommerceHubBulkEffectiveHint": {
+    "placeholders": {
+      "applied": {"type": "String"},
+      "bridge": {"type": "String"},
+      "choice": {"type": "String"}
+    }
+  },
+  "woocommerceHubBulkBatchSizeLabel": "Batch size (per request)",
+  "woocommerceHubBulkSyncCurrentPage": "This table page",
+  "woocommerceHubBulkSyncAllFiltered": "All with current filters",
+  "woocommerceHubBulkConfirmCurrentPage": "Sync {count} item(s) on the current page?",
+  "@woocommerceHubBulkConfirmCurrentPage": {"placeholders": {"count": {"type": "String"}}},
+  "woocommerceHubBulkConfirmAll": "Sync all {count} item(s) matching the current filters? This may run multiple requests.",
+  "@woocommerceHubBulkConfirmAll": {"placeholders": {"count": {"type": "String"}}},
+  "woocommerceHubBulkEmpty": "Nothing to sync in this view.",
+  "woocommerceHubBulkFinishedOk": "Synced {processed} item(s) in {batches} request batch(es).",
+  "@woocommerceHubBulkFinishedOk": {
+    "placeholders": {
+      "processed": {"type": "String"},
+      "batches": {"type": "String"}
+    }
+  },
+  "woocommerceHubBulkProgressLabel": "Request batch",
   "woocommerceSyncDone": "Sync completed",
   "woocommerceControlQueueTitle": "Background sync queue",
   "woocommerceControlQueueBatchHint": "Max rows per run (from plugin settings): {n}",
@@ -4800,6 +4839,8 @@
   "invoiceSummaryDiscount": "Total discount",
   "invoiceSummaryTax": "Total tax",
   "invoiceSummaryTotal": "Grand total",
+  "invoiceSummaryLinesAndQuantity": "Items: {lineCount} line(s), total quantity: {totalQuantity}",
+  "@invoiceSummaryLinesAndQuantity": {"placeholders": {"lineCount": {"type": "String"}, "totalQuantity": {"type": "String"}}},
   "businessSettingsInvoiceGlobalDiscountTitle": "Invoice-level discount (calculation)",
   "businessSettingsInvoiceGlobalDiscountBasisLabel": "Percent discount basis",
   "businessSettingsInvoiceGlobalDiscountBasisSubtotalAfterLines": "Net after line discounts (pre-tax)",

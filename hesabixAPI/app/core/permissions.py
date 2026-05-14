@@ -392,6 +392,27 @@ def get_business_permissions_for_user(auth_context: AuthContext, db: Session, bu
     return auth_context._normalize_permissions_value(permission_obj.business_permissions)
 
 
+def user_can_change_invoice_unit_price_from_permissions(permissions: Optional[dict]) -> bool:
+    """تغییر دستی فی ردیف فاکتور؛ در نبود کلید در JSON سازگار با قبل = مجاز."""
+    if not permissions or not isinstance(permissions, dict):
+        return True
+    inv = permissions.get("invoices")
+    if not isinstance(inv, dict):
+        return True
+    if "change_unit_price" not in inv:
+        return True
+    return bool(inv.get("change_unit_price"))
+
+
+def user_can_change_invoice_unit_price(auth_context: AuthContext, db: Session, business_id: int) -> bool:
+    if auth_context.is_superadmin():
+        return True
+    if auth_context.is_business_owner(business_id):
+        return True
+    perms = get_business_permissions_for_user(auth_context, db, business_id)
+    return user_can_change_invoice_unit_price_from_permissions(perms)
+
+
 def has_business_permission_for_business(
     auth_context: AuthContext,
     db: Session,

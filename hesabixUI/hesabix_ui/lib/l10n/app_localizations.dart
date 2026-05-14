@@ -4292,6 +4292,48 @@ abstract class AppLocalizations {
   /// **'Add User'**
   String get addUser;
 
+  /// No description provided for @businessMembershipUnlimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlimited membership'**
+  String get businessMembershipUnlimited;
+
+  /// No description provided for @businessMembershipLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Membership end date'**
+  String get businessMembershipLimited;
+
+  /// No description provided for @businessMembershipPickDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick end date'**
+  String get businessMembershipPickDate;
+
+  /// No description provided for @businessMembershipSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Membership duration'**
+  String get businessMembershipSectionTitle;
+
+  /// No description provided for @businessMembershipUntil.
+  ///
+  /// In en, this message translates to:
+  /// **'Until {date}'**
+  String businessMembershipUntil(String date);
+
+  /// No description provided for @businessMembershipExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get businessMembershipExpired;
+
+  /// No description provided for @businessMembershipEndDateRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a membership end date'**
+  String get businessMembershipEndDateRequired;
+
   /// No description provided for @userAddedSuccessfully.
   ///
   /// In en, this message translates to:
@@ -5251,6 +5293,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sales / purchase price visibility'**
   String get permissionSectionPricing;
+
+  /// No description provided for @permissionInvoiceChangeUnitPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Change invoice unit price manually (invoice & quick sales)'**
+  String get permissionInvoiceChangeUnitPrice;
 
   /// No description provided for @permissionSectionCrmWebChat.
   ///
@@ -9637,6 +9685,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unit price (pick from list or enter manually)'**
   String get unitPricePickHint;
+
+  /// No description provided for @unitPriceReadOnlyFieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No permission to edit unit price — use the list icon or product base price'**
+  String get unitPriceReadOnlyFieldHint;
 
   /// No description provided for @lineTotalAmount.
   ///
@@ -23408,6 +23462,70 @@ abstract class AppLocalizations {
   /// **'The selected customer will be pushed to Hesabix through the plugin API.'**
   String get woocommerceHubSyncCustomerConfirmBody;
 
+  /// No description provided for @woocommerceHubBulkSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk sync (hub)'**
+  String get woocommerceHubBulkSyncTitle;
+
+  /// No description provided for @woocommerceHubBulkEffectiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Each request sends up to {applied} items (plugin cap {bridge}; selected batch size {choice}).'**
+  String woocommerceHubBulkEffectiveHint(
+    String applied,
+    String bridge,
+    String choice,
+  );
+
+  /// No description provided for @woocommerceHubBulkBatchSizeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch size (per request)'**
+  String get woocommerceHubBulkBatchSizeLabel;
+
+  /// No description provided for @woocommerceHubBulkSyncCurrentPage.
+  ///
+  /// In en, this message translates to:
+  /// **'This table page'**
+  String get woocommerceHubBulkSyncCurrentPage;
+
+  /// No description provided for @woocommerceHubBulkSyncAllFiltered.
+  ///
+  /// In en, this message translates to:
+  /// **'All with current filters'**
+  String get woocommerceHubBulkSyncAllFiltered;
+
+  /// No description provided for @woocommerceHubBulkConfirmCurrentPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync {count} item(s) on the current page?'**
+  String woocommerceHubBulkConfirmCurrentPage(String count);
+
+  /// No description provided for @woocommerceHubBulkConfirmAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync all {count} item(s) matching the current filters? This may run multiple requests.'**
+  String woocommerceHubBulkConfirmAll(String count);
+
+  /// No description provided for @woocommerceHubBulkEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to sync in this view.'**
+  String get woocommerceHubBulkEmpty;
+
+  /// No description provided for @woocommerceHubBulkFinishedOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced {processed} item(s) in {batches} request batch(es).'**
+  String woocommerceHubBulkFinishedOk(String processed, String batches);
+
+  /// No description provided for @woocommerceHubBulkProgressLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Request batch'**
+  String get woocommerceHubBulkProgressLabel;
+
   /// No description provided for @woocommerceSyncDone.
   ///
   /// In en, this message translates to:
@@ -23875,6 +23993,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Grand total'**
   String get invoiceSummaryTotal;
+
+  /// No description provided for @invoiceSummaryLinesAndQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Items: {lineCount} line(s), total quantity: {totalQuantity}'**
+  String invoiceSummaryLinesAndQuantity(String lineCount, String totalQuantity);
 
   /// No description provided for @businessSettingsInvoiceGlobalDiscountTitle.
   ///

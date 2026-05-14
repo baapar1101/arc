@@ -2220,6 +2220,30 @@ class AppLocalizationsFa extends AppLocalizations {
   String get addUser => 'افزودن کاربر';
 
   @override
+  String get businessMembershipUnlimited => 'عضویت نامحدود';
+
+  @override
+  String get businessMembershipLimited => 'تاریخ پایان عضویت';
+
+  @override
+  String get businessMembershipPickDate => 'انتخاب تاریخ پایان';
+
+  @override
+  String get businessMembershipSectionTitle => 'مدت عضویت در کسب‌وکار';
+
+  @override
+  String businessMembershipUntil(String date) {
+    return 'عضویت تا $date';
+  }
+
+  @override
+  String get businessMembershipExpired => 'منقضی';
+
+  @override
+  String get businessMembershipEndDateRequired =>
+      'لطفاً تاریخ پایان عضویت را انتخاب کنید';
+
+  @override
   String get userAddedSuccessfully => 'کاربر با موفقیت اضافه شد';
 
   @override
@@ -2719,6 +2743,10 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get permissionSectionPricing => 'نمایش قیمت فروش و خرید';
+
+  @override
+  String get permissionInvoiceChangeUnitPrice =>
+      'تغییر دستی فی در فاکتور و فروش سریع';
 
   @override
   String get permissionSectionCrmWebChat => 'چت وب (ویجت CRM)';
@@ -5034,6 +5062,10 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get unitPricePickHint => 'قیمت واحد (انتخاب از لیست یا ورود دستی)';
+
+  @override
+  String get unitPriceReadOnlyFieldHint =>
+      'بدون مجوز تغییر فی: فقط انتخاب از آیکون لیست یا قیمت پایه کالا';
 
   @override
   String get lineTotalAmount => 'مبلغ کل این ردیف';
@@ -12515,6 +12547,49 @@ class AppLocalizationsFa extends AppLocalizations {
       'مشتری انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.';
 
   @override
+  String get woocommerceHubBulkSyncTitle => 'همگام‌سازی دسته‌ای (مرکز عملیات)';
+
+  @override
+  String woocommerceHubBulkEffectiveHint(
+    String applied,
+    String bridge,
+    String choice,
+  ) {
+    return 'در هر درخواست حداکثر $applied مورد ارسال می‌شود (سقف افزونه $bridge؛ اندازهٔ دستهٔ انتخابی شما $choice).';
+  }
+
+  @override
+  String get woocommerceHubBulkBatchSizeLabel => 'اندازهٔ دسته در هر درخواست';
+
+  @override
+  String get woocommerceHubBulkSyncCurrentPage => 'همگام این صفحهٔ جدول';
+
+  @override
+  String get woocommerceHubBulkSyncAllFiltered => 'همگام همه با فیلتر فعلی';
+
+  @override
+  String woocommerceHubBulkConfirmCurrentPage(String count) {
+    return 'همگام‌سازی $count مورد در صفحهٔ فعلی جدول؟';
+  }
+
+  @override
+  String woocommerceHubBulkConfirmAll(String count) {
+    return 'همگام‌سازی همهٔ $count مورد مطابق فیلتر فعلی؟ ممکن است چند درخواست پشت‌سرهم اجرا شود.';
+  }
+
+  @override
+  String get woocommerceHubBulkEmpty =>
+      'در این نما موردی برای همگام‌سازی نیست.';
+
+  @override
+  String woocommerceHubBulkFinishedOk(String processed, String batches) {
+    return '$processed مورد در $batches دستهٔ درخواست همگام شد.';
+  }
+
+  @override
+  String get woocommerceHubBulkProgressLabel => 'دستهٔ درخواست';
+
+  @override
   String get woocommerceSyncDone => 'همگام‌سازی انجام شد';
 
   @override
@@ -12768,6 +12843,14 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get invoiceSummaryTotal => 'جمع کل';
+
+  @override
+  String invoiceSummaryLinesAndQuantity(
+    String lineCount,
+    String totalQuantity,
+  ) {
+    return 'تعداد اقلام: $lineCount قلم، جمع مقدار: $totalQuantity';
+  }
 
   @override
   String get businessSettingsInvoiceGlobalDiscountTitle =>

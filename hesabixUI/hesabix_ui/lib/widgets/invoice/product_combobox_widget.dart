@@ -293,6 +293,10 @@ class ProductComboboxWidget extends StatefulWidget {
 }
 
 class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
+  /// افزودن کالای جدید در API نیازمند `products.add` است؛ صرفاً وجود [AuthStore] کافی نیست.
+  bool get _canCreateProducts =>
+      widget.authStore != null && widget.authStore!.hasBusinessPermission('products', 'add');
+
   final ProductService _service = ProductService(apiClient: ApiClient());
   final CategoryService _categoryService = CategoryService(ApiClient());
   final TextEditingController _searchCtrl = TextEditingController();
@@ -939,7 +943,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
 
   Future<void> _addNewProduct(BuildContext bottomSheetContext) async {
     final authStore = widget.authStore;
-    if (authStore == null) {
+    if (authStore == null || !_canCreateProducts) {
       return;
     }
 
@@ -962,7 +966,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   /// افزودن کالا از دکمه + کنار فیلد (بدون بستن باتم‌شیت)
   Future<void> _addNewProductFromField() async {
     final authStore = widget.authStore;
-    if (authStore == null) return;
+    if (authStore == null || !_canCreateProducts) return;
 
     _removeDesktopOverlay();
     FocusManager.instance.primaryFocus?.unfocus();
@@ -998,12 +1002,12 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
             pickerStateNotifier: _pickerStateNotifier,
             scrollController: _scrollController,
             searchController: _searchCtrl,
-            canAddNewProduct: widget.authStore != null,
+            canAddNewProduct: _canCreateProducts,
             categoryTree: _categoryTree,
             selectedCategoryId: _selectedCategoryId,
             loadingCategories: _loadingCategories,
             onClose: () => Navigator.pop(ctx),
-            onAddNewProduct: widget.authStore != null ? (bottomSheetContext) => _addNewProduct(bottomSheetContext) : null,
+            onAddNewProduct: _canCreateProducts ? (bottomSheetContext) => _addNewProduct(bottomSheetContext) : null,
             onQueryChanged: _onQueryChanged,
             onCategorySelected: (categoryId) {
               setState(() {
@@ -1032,12 +1036,12 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
             pickerStateNotifier: _pickerStateNotifier,
             scrollController: _scrollController,
             searchController: _searchCtrl,
-            canAddNewProduct: widget.authStore != null,
+            canAddNewProduct: _canCreateProducts,
             categoryTree: _categoryTree,
             selectedCategoryId: _selectedCategoryId,
             loadingCategories: _loadingCategories,
             onClose: () => Navigator.pop(ctx),
-            onAddNewProduct: widget.authStore != null ? (dialogContext) => _addNewProduct(dialogContext) : null,
+            onAddNewProduct: _canCreateProducts ? (dialogContext) => _addNewProduct(dialogContext) : null,
             onQueryChanged: _onQueryChanged,
             onCategorySelected: (categoryId) {
               setState(() {
@@ -1105,7 +1109,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                     ),
                   ),
                 ),
-                if (widget.authStore != null) ...[
+                if (_canCreateProducts) ...[
                   Tooltip(
                     message: 'افزودن کالای جدید',
                     child: IconButton(
@@ -1183,7 +1187,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           ),
                         ),
-                      if (widget.authStore != null)
+                      if (_canCreateProducts)
                         IconButton(
                           visualDensity: VisualDensity.compact,
                           tooltip: 'افزودن کالای جدید',

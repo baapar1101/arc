@@ -1188,6 +1188,10 @@ def create_app() -> FastAPI:
         # Business deletion check: هر 24 ساعت یکبار (فقط لاگ - حذف نمی‌کند)
         asyncio.create_task(check_expired_deleted_businesses_loop(24))
 
+        # عضویت زمانی اعضای کسب‌وکار: هر 60 دقیقه حذف رکوردهای منقضی
+        from app.services.business_membership_background_jobs import revoke_expired_business_memberships_loop
+        asyncio.create_task(revoke_expired_business_memberships_loop(60))
+
         # ورک‌فلو: cron زمان‌بندی‌شده + یادآوری سررسید چک
         from app.services.workflow.workflow_background_jobs import workflow_automation_background_loop
         asyncio.create_task(workflow_automation_background_loop(60))

@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
 import '../../services/business_user_service.dart';
 import '../../models/business_user_model.dart';
 import '../../utils/number_normalizer.dart';
@@ -11,7 +12,12 @@ import '../../utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/jalali_date_picker.dart';
 
+DateTime _membershipEndOfLocalDayUtc(DateTime d) {
+  final endLocal = DateTime(d.year, d.month, d.day, 23, 59, 59);
+  return endLocal.toUtc();
+}
 
 class UsersPermissionsPage extends StatefulWidget {
   final String businessId;
@@ -37,6 +43,8 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
   bool _loading = true;
   bool _isLeaving = false;
   String? _error;
+  bool _addMembershipUnlimited = true;
+  DateTime? _addMembershipEndDate;
 
   @override
   void initState() {
@@ -48,6 +56,26 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
   void dispose() {
     _emailOrPhoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAddMembershipEndDate() async {
+    final t = AppLocalizations.of(context);
+    final now = DateTime.now();
+    final initial = _addMembershipEndDate ?? now.add(const Duration(days: 1));
+    final picked = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: initial,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 10, 12, 31),
+      helpText: t.businessMembershipPickDate,
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _addMembershipEndDate = picked;
+        _addMembershipUnlimited = false;
+      });
+    }
   }
 
   Future<void> _loadUsers() async {
@@ -104,10 +132,22 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
 
     if (!context.mounted) return;
     final ctx = context;
+    final t = AppLocalizations.of(ctx);
+    if (!_addMembershipUnlimited) {
+      if (_addMembershipEndDate == null) {
+        _showErrorSnackBar(t.businessMembershipEndDateRequired);
+        return;
+      }
+    }
+    DateTime? membershipExpiresAt;
+    if (!_addMembershipUnlimited && _addMembershipEndDate != null) {
+      membershipExpiresAt = _membershipEndOfLocalDayUtc(_addMembershipEndDate!);
+    }
     try {
       final request = AddUserRequest(
         businessId: int.parse(widget.businessId),
         emailOrPhone: emailOrPhone,
+        membershipExpiresAt: membershipExpiresAt,
       );
 
       final response = await _userService.addUser(request);
@@ -115,6 +155,10 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       if (response.success) {
         _showSuccessSnackBar(response.message);
         _emailOrPhoneController.clear();
+        setState(() {
+          _addMembershipUnlimited = true;
+          _addMembershipEndDate = null;
+        });
         _loadUsers(); // Refresh the list
       } else {
         _showErrorSnackBar(response.message);
@@ -475,6 +519,45 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
               }
             },
           ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.businessMembershipUnlimited),
+            value: _addMembershipUnlimited,
+            onChanged: (v) {
+              setState(() {
+                _addMembershipUnlimited = v;
+                if (v) {
+                  _addMembershipEndDate = null;
+                }
+              });
+            },
+          ),
+          if (!_addMembershipUnlimited) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _addMembershipEndDate == null
+                        ? t.businessMembershipLimited
+                        : HesabixDateUtils.formatForDisplay(
+                            _addMembershipEndDate!,
+                            widget.calendarController.isJalali,
+                          ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _pickAddMembershipEndDate,
+                  icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                  label: Text(t.businessMembershipPickDate),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -665,6 +748,16 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
                       ),
                     ),
                   ],
+                  if (user.role != 'owner') ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      _membershipLineForUserCard(user, t),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: user.membershipActive ? colorScheme.primary : colorScheme.error,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -735,6 +828,21 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     );
   }
 
+  String _membershipLineForUserCard(BusinessUser user, AppLocalizations t) {
+    if (user.membershipUnlimited) {
+      return t.businessMembershipUnlimited;
+    }
+    if (!user.membershipActive) {
+      return t.businessMembershipExpired;
+    }
+    final d = user.membershipExpiresAt;
+    if (d == null) {
+      return t.businessMembershipUnlimited;
+    }
+    final formatted = HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali);
+    return t.businessMembershipUntil(formatted);
+  }
+
   Widget _buildOwnerChip(ThemeData theme, ColorScheme colorScheme) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -781,6 +889,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
             user: freshUser,
             businessId: widget.businessId,
             userService: _userService,
+            calendarController: widget.calendarController,
             onPermissionsUpdated: () {
               // Refresh the users list after permissions are updated
               _loadUsers();
@@ -816,6 +925,9 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
         addedAt: DateTime.now(),
         lastActive: null,
         permissions: {},
+        membershipExpiresAt: null,
+        membershipUnlimited: true,
+        membershipActive: true,
       ),
     );
     
@@ -917,12 +1029,14 @@ class _PermissionsDialog extends StatefulWidget {
   final BusinessUser user;
   final String businessId;
   final BusinessUserService userService;
+  final CalendarController calendarController;
   final VoidCallback onPermissionsUpdated;
 
   const _PermissionsDialog({
     required this.user,
     required this.businessId,
     required this.userService,
+    required this.calendarController,
     required this.onPermissionsUpdated,
   });
 
@@ -933,11 +1047,16 @@ class _PermissionsDialog extends StatefulWidget {
 class _PermissionsDialogState extends State<_PermissionsDialog> {
   late Map<String, dynamic> _currentPermissions;
   bool _isUpdating = false;
+  late bool _membershipUnlimited;
+  DateTime? _membershipEndDate;
+  bool _membershipTouched = false;
 
   @override
   void initState() {
     super.initState();
     _currentPermissions = _mergePermissions(widget.user.permissions);
+    _membershipEndDate = widget.user.membershipExpiresAt;
+    _membershipUnlimited = widget.user.membershipUnlimited;
   }
 
   /// ساختار کامل دسترسی‌های سیستم
@@ -1027,6 +1146,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'delete': '${t.delete} ${t.invoices}',
         'draft': '${t.draft} ${t.invoices}',
         'export': '${t.export} ${t.invoices}',
+        'change_unit_price': t.permissionInvoiceChangeUnitPrice,
       },
       'invoice_types': {
         'sales': t.invoiceTypeSales,
@@ -1168,13 +1288,24 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       
       for (final action in allPermissions[section]!.keys) {
         // فقط از سکشن جدید استفاده می‌کنیم؛ بدون OR با کلیدهای قدیمی
-        if (dbPermissions.containsKey(section) &&
+        late bool sectionPermissionsValue;
+        if (section == 'invoices' && action == 'change_unit_price') {
+          if (dbPermissions.containsKey(section) &&
+              dbPermissions[section] is Map<String, dynamic> &&
+              (dbPermissions[section] as Map<String, dynamic>).containsKey(action)) {
+            sectionPermissionsValue = dbPermissions[section][action] == true;
+          } else {
+            // پیش‌فرض سازگاری: بدون این کلید مثل قبل اجازهٔ تغییر فی
+            sectionPermissionsValue = true;
+          }
+        } else if (dbPermissions.containsKey(section) &&
             dbPermissions[section] is Map<String, dynamic> &&
             (dbPermissions[section] as Map<String, dynamic>).containsKey(action)) {
-          sectionPermissions[action] = dbPermissions[section][action] == true;
+          sectionPermissionsValue = dbPermissions[section][action] == true;
         } else {
-          sectionPermissions[action] = false;
+          sectionPermissionsValue = false;
         }
+        sectionPermissions[action] = sectionPermissionsValue;
       }
       
       mergedPermissions[section] = sectionPermissions;
@@ -1244,10 +1375,90 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
     return false;
   }
 
+  Widget _buildMembershipSection(AppLocalizations t, ThemeData theme, ColorScheme colorScheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.schedule, size: 18, color: colorScheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              t.businessMembershipSectionTitle,
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t.businessMembershipUnlimited),
+          value: _membershipUnlimited,
+          onChanged: (v) {
+            setState(() {
+              _membershipUnlimited = v;
+              _membershipTouched = true;
+              if (v) {
+                _membershipEndDate = null;
+              }
+            });
+          },
+        ),
+        if (!_membershipUnlimited) ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _membershipEndDate == null
+                      ? t.businessMembershipLimited
+                      : HesabixDateUtils.formatForDisplay(
+                          _membershipEndDate!,
+                          widget.calendarController.isJalali,
+                        ),
+                  style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: _pickDialogMembershipEndDate,
+                icon: const Icon(Icons.calendar_today_outlined, size: 18),
+                label: Text(t.businessMembershipPickDate),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _pickDialogMembershipEndDate() async {
+    final t = AppLocalizations.of(context);
+    final now = DateTime.now();
+    final initial = _membershipEndDate ?? now.add(const Duration(days: 1));
+    final picked = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: initial,
+      firstDate: DateTime(now.year, now.month, now.day),
+      lastDate: DateTime(now.year + 10, 12, 31),
+      helpText: t.businessMembershipPickDate,
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _membershipEndDate = picked;
+        _membershipUnlimited = false;
+        _membershipTouched = true;
+      });
+    }
+  }
+
   /// به‌روزرسانی دسترسی‌ها
   Future<void> _updatePermissions() async {
     if (_isUpdating) return;
-    
+    final t = AppLocalizations.of(context);
+    if (widget.user.role != 'owner' && _membershipTouched && !_membershipUnlimited && _membershipEndDate == null) {
+      _showErrorSnackBar(t.businessMembershipEndDateRequired);
+      return;
+    }
+
     setState(() {
       _isUpdating = true;
     });
@@ -1257,6 +1468,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         businessId: int.parse(widget.businessId),
         userId: widget.user.userId,
         permissions: _currentPermissions,
+        applyMembershipExpiry: _membershipTouched,
+        membershipExpiresAt: _membershipUnlimited
+            ? null
+            : (_membershipEndDate != null ? _membershipEndOfLocalDayUtc(_membershipEndDate!) : null),
       );
 
       final response = await widget.userService.updatePermissions(request);
@@ -1490,7 +1705,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(24),
                       child: Column(
-                  children: _buildAllPermissionSections(t, theme, colorScheme),
+                  children: [
+                    if (widget.user.role != 'owner') ...[
+                      _buildMembershipSection(t, theme, colorScheme),
+                      const SizedBox(height: 20),
+                    ],
+                    ..._buildAllPermissionSections(t, theme, colorScheme),
+                  ],
                 ),
                     ),
                   ),
@@ -1835,6 +2056,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return sectionKey == 'fiscal_years' ? t.permissionFiscalYearRollbackDangerous : action;
       case 'export':
         return t.export;
+      case 'change_unit_price':
+        return t.permissionInvoiceChangeUnitPrice;
       case 'manage':
         return t.manage;
       case 'adjust':

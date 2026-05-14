@@ -12,6 +12,9 @@ class BusinessUser {
   final DateTime addedAt;
   final DateTime? lastActive;
   final Map<String, dynamic> permissions;
+  final DateTime? membershipExpiresAt;
+  final bool membershipUnlimited;
+  final bool membershipActive;
 
   const BusinessUser({
     required this.id,
@@ -25,9 +28,16 @@ class BusinessUser {
     required this.addedAt,
     this.lastActive,
     required this.permissions,
+    this.membershipExpiresAt,
+    this.membershipUnlimited = true,
+    this.membershipActive = true,
   });
 
   factory BusinessUser.fromJson(Map<String, dynamic> json) {
+    final expiresRaw = json['membership_expires_at'];
+    final expiresAt = _parseOptionalDateTime(expiresRaw);
+    final unlimited = json['membership_unlimited'] as bool? ?? (expiresAt == null);
+    final active = json['membership_active'] as bool? ?? true;
     return BusinessUser(
       id: json['id'] as int,
       businessId: json['business_id'] as int,
@@ -42,6 +52,9 @@ class BusinessUser {
           ? _parseDateTime(json['last_active'])
           : null,
       permissions: (json['permissions'] as Map<String, dynamic>?) ?? {},
+      membershipExpiresAt: expiresAt,
+      membershipUnlimited: unlimited,
+      membershipActive: active,
     );
   }
 
@@ -76,6 +89,34 @@ class BusinessUser {
     return DateTime.now();
   }
 
+  static DateTime? _parseOptionalDateTime(dynamic dateValue) {
+    if (dateValue == null) return null;
+    if (dateValue is String) {
+      if (dateValue.isEmpty) return null;
+      try {
+        if (dateValue.contains('/') && !dateValue.contains('-')) {
+          final parts = dateValue.split(' ');
+          if (parts.isNotEmpty) {
+            final dateParts = parts[0].split('/');
+            if (dateParts.length == 3) {
+              final year = int.parse(dateParts[0]);
+              final month = int.parse(dateParts[1]);
+              final day = int.parse(dateParts[2]);
+              final jalali = Jalali(year, month, day);
+              return jalali.toDateTime();
+            }
+          }
+        }
+        return DateTime.parse(dateValue);
+      } catch (_) {
+        return null;
+      }
+    } else if (dateValue is int) {
+      return DateTime.fromMillisecondsSinceEpoch(dateValue);
+    }
+    return null;
+  }
+
 
   Map<String, dynamic> toJson() {
     return {
@@ -90,6 +131,9 @@ class BusinessUser {
       'added_at': addedAt.toIso8601String(),
       'last_active': lastActive?.toIso8601String(),
       'permissions': permissions,
+      'membership_expires_at': membershipExpiresAt?.toUtc().toIso8601String(),
+      'membership_unlimited': membershipUnlimited,
+      'membership_active': membershipActive,
     };
   }
 
@@ -105,6 +149,9 @@ class BusinessUser {
     DateTime? addedAt,
     DateTime? lastActive,
     Map<String, dynamic>? permissions,
+    DateTime? membershipExpiresAt,
+    bool? membershipUnlimited,
+    bool? membershipActive,
   }) {
     return BusinessUser(
       id: id ?? this.id,
@@ -118,6 +165,9 @@ class BusinessUser {
       addedAt: addedAt ?? this.addedAt,
       lastActive: lastActive ?? this.lastActive,
       permissions: permissions ?? this.permissions,
+      membershipExpiresAt: membershipExpiresAt ?? this.membershipExpiresAt,
+      membershipUnlimited: membershipUnlimited ?? this.membershipUnlimited,
+      membershipActive: membershipActive ?? this.membershipActive,
     );
   }
 
@@ -173,16 +223,19 @@ class BusinessUser {
 class AddUserRequest {
   final int businessId;
   final String emailOrPhone;
+  final DateTime? membershipExpiresAt;
 
   const AddUserRequest({
     required this.businessId,
     required this.emailOrPhone,
+    this.membershipExpiresAt,
   });
 
   Map<String, dynamic> toJson() {
     return {
-      'business_id': businessId,
       'email_or_phone': emailOrPhone,
+      if (membershipExpiresAt != null)
+        'membership_expires_at': membershipExpiresAt!.toUtc().toIso8601String(),
     };
   }
 }
@@ -213,19 +266,24 @@ class UpdatePermissionsRequest {
   final int businessId;
   final int userId;
   final Map<String, dynamic> permissions;
+  final bool applyMembershipExpiry;
+  final DateTime? membershipExpiresAt;
 
   const UpdatePermissionsRequest({
     required this.businessId,
     required this.userId,
     required this.permissions,
+    this.applyMembershipExpiry = false,
+    this.membershipExpiresAt,
   });
 
   Map<String, dynamic> toJson() {
-    return {
-      'business_id': businessId,
-      'user_id': userId,
-      'permissions': permissions,
-    };
+    final m = <String, dynamic>{'permissions': permissions};
+    if (applyMembershipExpiry) {
+      m['apply_membership_expiry'] = true;
+      m['membership_expires_at'] = membershipExpiresAt?.toUtc().toIso8601String();
+    }
+    return m;
   }
 }
 

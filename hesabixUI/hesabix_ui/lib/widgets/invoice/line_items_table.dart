@@ -82,6 +82,35 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   /// فوکوس به‌ازای [InvoiceLineItem.lineKey]؛ با جابه‌جایی ردیف نیازی به بازچین‌شدن نیست
   final Map<String, Map<String, FocusNode>> _focusNodesByLineKey = {};
 
+  bool get _allowManualInvoiceUnitPrice =>
+      widget.authStore?.canChangeInvoiceUnitPrice() ?? true;
+
+  void _onAuthStoreChanged() {
+    if (!mounted) return;
+    setState(() {});
+    unawaited(_coerceRowsIfUnitPriceLocked());
+  }
+
+  /// اگر مجوز تغییر فی نیست، ردیف‌های دستی به قیمت پایه/لیست برگردانده می‌شوند.
+  Future<void> _coerceRowsIfUnitPriceLocked() async {
+    if (_allowManualInvoiceUnitPrice) return;
+    var changed = false;
+    for (var i = 0; i < _rows.length; i++) {
+      final item = _rows[i];
+      if (item.unitPriceSource == 'manual') {
+        final priced = await _resolveUnitPrice(item, preferManual: false);
+        if (priced.unitPrice != item.unitPrice || priced.unitPriceSource != item.unitPriceSource) {
+          _rows[i] = priced;
+          changed = true;
+        }
+      }
+    }
+    if (changed && mounted) {
+      setState(() {});
+      _notify();
+    }
+  }
+
   void _notify() => widget.onChanged?.call(List<InvoiceLineItem>.from(_rows));
 
   bool _subtreeHasEditableText(Element root) {
@@ -668,6 +697,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   @override
   void initState() {
     super.initState();
+    widget.authStore?.addListener(_onAuthStoreChanged);
     HardwareKeyboard.instance.addHandler(_onLineAddQiHardwareKey);
     unawaited(_loadSecondaryAddRowShortcut());
     if ((widget.initialRows ?? const <InvoiceLineItem>[]).isNotEmpty) {
@@ -686,6 +716,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   
   @override
   void dispose() {
+    widget.authStore?.removeListener(_onAuthStoreChanged);
     HardwareKeyboard.instance.removeHandler(_onLineAddQiHardwareKey);
     _disposeAllFocusNodes();
     super.dispose();
@@ -698,6 +729,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     for (final pid in ids) {
       await _loadProductInfo(pid, force: true);
     }
+    await _coerceRowsIfUnitPriceLocked();
     if (mounted) setState(() {});
     _invoiceLineAttrsLog('loadProductInfosForInitialRows done');
   }
@@ -705,6 +737,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   @override
   void didUpdateWidget(covariant InvoiceLineItemsTable oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.authStore, widget.authStore)) {
+      oldWidget.authStore?.removeListener(_onAuthStoreChanged);
+      widget.authStore?.addListener(_onAuthStoreChanged);
+    }
     if (!widget.lineAddRowShortcutsLayerActive) {
       _lineAddQiPendingSince = null;
     }
@@ -768,7 +804,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
 
   Future<InvoiceLineItem> _resolveUnitPrice(InvoiceLineItem item, {bool preferManual = true}) async {
     // اگر کاربر دستی وارد کرده، همان را نگه داریم (در مدل جدید، فیلد همیشه قابل ویرایش است)
-    if (preferManual && item.unitPriceSource == 'manual') return item;
+    if (preferManual && _allowManualInvoiceUnitPrice && item.unitPriceSource == 'manual') return item;
 
     // تلاش بر اساس لیست قیمت (در مدل جدید از انتخاب داخل سلول استفاده می‌کنیم،
     // این تابع همچنان fallback قیمت پایه را فراهم می‌کند.)
@@ -1348,7 +1384,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                           },
                           (unit) async {
                             final changed = item.copyWith(selectedUnit: unit);
-                            final priced = await _resolveUnitPrice(changed, preferManual: item.unitPriceSource == 'manual');
+                            final priced = await _resolveUnitPrice(changed, preferManual: item.unitPriceSource == 'manual' && _allowManualInvoiceUnitPrice);
                             setState(() => _rows[index] = priced);
                             _notify();
                           },
@@ -1400,7 +1436,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             SizedBox(
               height: fieldHeight,
               child: Tooltip(
-                message: t.unitPricePickHint,
+                message: _allowManualInvoiceUnitPrice ? t.unitPricePickHint : t.unitPriceReadOnlyFieldHint,
                 child: _UnitPriceCell(
                   businessId: widget.businessId,
                   invoiceType: widget.invoiceType,
@@ -1408,11 +1444,12 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   currencyDecimalPlaces: widget.currencyDecimalPlaces,
                   currencyUnitLabel: widget.currencyUnitLabel,
                   item: item,
+                  allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
                   onChanged: (src, price) {
                     final validatedPrice = price < 0 ? 0 : price;
                     _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
                   },
-                  resolver: () => _resolveUnitPrice(item, preferManual: true),
+                  resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
                   unitTitleResolver: (u) => _unitTitle(item, u),
                   focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
                   onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
@@ -1634,7 +1671,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     },
                     (unit) async {
                       final changed = item.copyWith(selectedUnit: unit);
-                      final priced = await _resolveUnitPrice(changed, preferManual: item.unitPriceSource == 'manual');
+                      final priced = await _resolveUnitPrice(changed, preferManual: item.unitPriceSource == 'manual' && _allowManualInvoiceUnitPrice);
                       setState(() => _rows[index] = priced);
                       _notify();
                     },
@@ -1669,7 +1706,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: SizedBox(
                   height: fieldHeight,
                   child: Tooltip(
-                    message: t.unitPricePickHint,
+                    message: _allowManualInvoiceUnitPrice ? t.unitPricePickHint : t.unitPriceReadOnlyFieldHint,
                     child: _UnitPriceCell(
                       businessId: widget.businessId,
                       invoiceType: widget.invoiceType,
@@ -1677,11 +1714,12 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       currencyDecimalPlaces: widget.currencyDecimalPlaces,
                       currencyUnitLabel: widget.currencyUnitLabel,
                       item: item,
+                      allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
                       onChanged: (src, price) {
                         final validatedPrice = price < 0 ? 0 : price;
                         _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
                       },
-                      resolver: () => _resolveUnitPrice(item, preferManual: true),
+                      resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
                       unitTitleResolver: (u) => _unitTitle(item, u),
                       focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
                       onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
@@ -2395,6 +2433,7 @@ class _UnitPriceCell extends StatefulWidget {
   final int currencyDecimalPlaces;
   final String currencyUnitLabel;
   final InvoiceLineItem item;
+  final bool allowManualUnitPriceEdit;
   final void Function(String source, num price) onChanged;
   final Future<InvoiceLineItem> Function() resolver;
   final String Function(String? unit) unitTitleResolver;
@@ -2408,6 +2447,7 @@ class _UnitPriceCell extends StatefulWidget {
     required this.currencyDecimalPlaces,
     this.currencyUnitLabel = 'ریال',
     required this.item,
+    this.allowManualUnitPriceEdit = true,
     required this.onChanged,
     required this.resolver,
     required this.unitTitleResolver,
@@ -2465,6 +2505,9 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final locked = !widget.allowManualUnitPriceEdit;
     final fieldHeight = ResponsiveHelper.responsiveValue(
       context,
       mobile: 56.0,
@@ -2486,27 +2529,37 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
         child: TextFormField(
           controller: _ctrl,
           focusNode: effectiveFocusNode,
+          readOnly: locked,
+          showCursor: !locked,
+          enableInteractiveSelection: !locked,
+          style: locked
+              ? theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant)
+              : theme.textTheme.bodyLarge,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: const [
             EnglishDigitsFormatter(),
             ThousandsSeparatorInputFormatter(allowDecimal: true),
           ],
-          onChanged: (v) {
-            _isUserTyping = true;
-            final price = parseFormattedDouble(v) ?? 0;
-            widget.onChanged('manual', price < 0 ? 0 : price);
-            // بعد از یک فریم، فلگ را ریست کن
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                _isUserTyping = false;
-              }
-            });
-          },
+          onChanged: widget.allowManualUnitPriceEdit
+              ? (v) {
+                  _isUserTyping = true;
+                  final price = parseFormattedDouble(v) ?? 0;
+                  widget.onChanged('manual', price < 0 ? 0 : price);
+                  // بعد از یک فریم، فلگ را ریست کن
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      _isUserTyping = false;
+                    }
+                  });
+                }
+              : null,
           onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
           textInputAction: TextInputAction.next,
           decoration: InputDecoration(
             border: const OutlineInputBorder(),
             contentPadding: fieldPadding,
+            filled: locked,
+            fillColor: locked ? colorScheme.surfaceContainerHighest : null,
             suffixIcon: _loading
                 ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
                 : IconButton(
@@ -2554,7 +2607,8 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
                         subtitle: label.isNotEmpty ? Text(label) : null,
                         onTap: () {
                           _ctrl.text = formatNumberForInput(price, decimalPlaces: _priceFormatDp);
-                          widget.onChanged('manual', price);
+                          final src = (opt['source'] as String?) ?? 'priceList';
+                          widget.onChanged(src, price);
                           Navigator.pop(ctx);
                         },
                       );
@@ -2581,6 +2635,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
       result.add(<String, dynamic>{
         'label': AppLocalizations.of(ctx).baseEstimatedPrice,
         'price': resolved.unitPrice,
+        'source': 'base',
       });
     } catch (_) {}
 
@@ -2628,6 +2683,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
               result.add(<String, dynamic>{
                 'label': '$plName - $unitLabel',
                 'price': price,
+                'source': 'priceList',
               });
             }
           } catch (_) {

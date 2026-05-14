@@ -24,6 +24,7 @@ from app.core.permissions import (
     require_invoice_type_permission_from_payload_dep,
     has_invoice_type_permission_for_business,
     allowed_invoice_types_for_business,
+    user_can_change_invoice_unit_price,
 )
 from app.core.responses import success_response, format_datetime_fields
 from app.core.cache import get_cache
@@ -195,12 +196,14 @@ def create_invoice_endpoint(
     __: None = Depends(require_invoice_type_permission_from_payload_dep("add")),
 ) -> Dict[str, Any]:
     can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
+    can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
     result = create_invoice(
         db=db,
         business_id=business_id,
         user_id=ctx.get_user_id(),
         data=payload,
         user_can_select_fx_rate=can_pick,
+        user_can_change_invoice_unit_price=can_change_unit,
     )
     return success_response(data=result, request=request, message="INVOICE_CREATED")
 
@@ -591,12 +594,14 @@ def update_invoice_endpoint(
         raise ApiError("FORBIDDEN", f"Missing invoice type permission for {doc.document_type}", http_status=403)
     try:
         can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
+        can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
         result = update_invoice(
             db=db,
             document_id=invoice_id,
             user_id=ctx.get_user_id(),
             data=payload,
             user_can_select_fx_rate=can_pick,
+            user_can_change_invoice_unit_price=can_change_unit,
         )
     except IntegrityError as e:
         db.rollback()
@@ -5120,6 +5125,7 @@ async def import_invoices_excel(
         # Create invoices if not dry run
         if not is_dry_run and valid_invoices:
             user_id = ctx.get_user_id()
+            can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
             for inv_info in valid_invoices:
                 try:
                     create_invoice(
@@ -5127,6 +5133,7 @@ async def import_invoices_excel(
                         business_id=business_id,
                         user_id=user_id,
                         data=inv_info["payload"],
+                        user_can_change_invoice_unit_price=can_change_unit,
                     )
                     created_count += 1
                 except Exception as e:

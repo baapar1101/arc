@@ -3677,6 +3677,7 @@ def create_invoice(
     user_id: int,
     data: Dict[str, Any],
     user_can_select_fx_rate: bool = False,
+    user_can_change_invoice_unit_price: bool = True,
 ) -> Dict[str, Any]:
     logger.info("=== شروع ایجاد فاکتور ===")
 
@@ -4169,6 +4170,17 @@ def create_invoice(
                 "تولید شماره سند پس از چند تلاش ناموفق بود. لطفاً دوباره تلاش کنید.",
                 http_status=409,
             )
+
+    from app.services.invoice_line_unit_price_guard import validate_invoice_lines_unit_price_policy
+
+    validate_invoice_lines_unit_price_policy(
+        db,
+        business_id,
+        invoice_type,
+        int(currency_id),
+        lines_input,
+        user_can_change_invoice_unit_price,
+    )
 
     # ذخیره اقلام فاکتور در جدول مجزا (invoice_item_lines)
     for line in lines_input:
@@ -4958,6 +4970,7 @@ def update_invoice(
     user_id: int,
     data: Dict[str, Any],
     user_can_select_fx_rate: bool = False,
+    user_can_change_invoice_unit_price: bool = True,
 ) -> Dict[str, Any]:
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
@@ -5160,6 +5173,17 @@ def update_invoice(
             "خطا در محاسبه تخفیف کلی فاکتور",
             http_status=400,
         )
+
+    from app.services.invoice_line_unit_price_guard import validate_invoice_lines_unit_price_policy
+
+    validate_invoice_lines_unit_price_policy(
+        db,
+        int(document.business_id),
+        inv_type,
+        int(currency_id),
+        lines_input,
+        user_can_change_invoice_unit_price,
+    )
 
     header_for_costing = data if data else {"extra_info": document.extra_info}
     post_inventory_update: bool = _is_inventory_posting_enabled(header_for_costing)

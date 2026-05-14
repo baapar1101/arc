@@ -64,6 +64,12 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
   int _total = 0;
   int _hubTableEpoch = 0;
 
+  Map<String, dynamic> _bulkSyncOptions = {};
+  int _hubBulkChunkChoice = 50;
+  bool _hubBulkRunning = false;
+  int _hubBulkProgressIndex = 0;
+  int _hubBulkProgressTotal = 0;
+
   bool _canWooCommerceManage() {
     if (widget.authStore.currentBusiness?.isOwner == true) return true;
     return widget.authStore.hasBusinessPermission('woocommerce', 'manage');
@@ -80,7 +86,12 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     _tabs = TabController(length: 3, vsync: this);
     _tabs.addListener(_onTabChanged);
     if (_canWooCommerceView()) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshList());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refreshList();
+        if (_canWooCommerceManage()) {
+          _loadBulkSyncOptions();
+        }
+      });
     }
   }
 
@@ -342,6 +353,314 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     });
   }
 
+  Future<void> _loadBulkSyncOptions() async {
+    if (!_canWooCommerceManage()) return;
+    try {
+      final m = await _svc.controlSettingsSummary(businessId: widget.businessId);
+      final b = m['bulk_sync_options'];
+      if (!mounted) return;
+      if (b is Map) {
+        setState(() => _bulkSyncOptions = Map<String, dynamic>.from(b));
+      }
+    } catch (_) {}
+  }
+
+  int _readBulkOptionInt(String key, int fallback) {
+    final v = _bulkSyncOptions[key];
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? fallback;
+    return fallback;
+  }
+
+  int _effectiveBridgeChunk(String kind) {
+    switch (kind) {
+      case 'orders':
+        return _readBulkOptionInt('wc_orders_ajax_batch', 40).clamp(5, 1000);
+      case 'products':
+        return _readBulkOptionInt('wc_product_parents_per_ajax', 35).clamp(5, 1000);
+      case 'customers':
+        return _readBulkOptionInt('wc_customers_per_ajax', 45).clamp(5, 500);
+      default:
+        return 40;
+    }
+  }
+
+  int _appliedChunkFor(String kind) {
+    final target = _hubBulkChunkChoice.clamp(20, 500);
+    final cap = _effectiveBridgeChunk(kind);
+    return target < cap ? target : cap;
+  }
+
+  List<int> _idsFromCurrentRows() {
+    final out = <int>[];
+    for (final r in _rows) {
+      final id = int.tryParse('${r['id'] ?? ''}') ?? 0;
+      if (id > 0) out.add(id);
+    }
+    return out;
+  }
+
+  Future<List<int>> _collectAllIds(String kind) async {
+    const fetchSize = 50;
+    final seen = <int>{};
+    final out = <int>[];
+    var page = 1;
+    while (true) {
+      Map<String, dynamic> raw;
+      if (kind == 'orders') {
+        raw = await _svc.listOrders(
+          businessId: widget.businessId,
+          page: page,
+          perPage: fetchSize,
+          status: _selectedOrderStatuses.isEmpty
+              ? null
+              : _selectedOrderStatuses.join(','),
+          after: _orderFilterDateAfter == null
+              ? null
+              : _wooIsoDayStartUtc(_orderFilterDateAfter!),
+          before: _orderFilterDateBefore == null
+              ? null
+              : _wooIsoDayEndUtc(_orderFilterDateBefore!),
+          customerId: _parsePositiveInt(_ordCustomerCtl.text),
+          search: _ordSearchCtl.text.trim().isEmpty
+              ? null
+              : _ordSearchCtl.text.trim(),
+          orderby: _ordOrderby,
+          order: _ordOrder,
+        );
+      } else if (kind == 'products') {
+        raw = await _svc.listProducts(
+          businessId: widget.businessId,
+          page: page,
+          perPage: fetchSize,
+          search: _searchCtl.text.trim().isEmpty
+              ? null
+              : _searchCtl.text.trim(),
+        );
+      } else {
+        raw = await _svc.listCustomers(
+          businessId: widget.businessId,
+          page: page,
+          perPage: fetchSize,
+          search: _searchCtl.text.trim().isEmpty
+              ? null
+              : _searchCtl.text.trim(),
+        );
+      }
+      if (!mounted) return out;
+      final items = raw['items'];
+      final list = items is List ? items : const [];
+      final total = int.tryParse('${raw['total'] ?? 0}') ?? 0;
+      for (final e in list) {
+        if (e is Map) {
+          final id = int.tryParse('${e['id'] ?? ''}') ?? 0;
+          if (id > 0 && seen.add(id)) out.add(id);
+        }
+      }
+      if (list.isEmpty || out.length >= total || list.length < fetchSize) {
+        break;
+      }
+      page++;
+      if (page > 4000) break;
+    }
+    return out;
+  }
+
+  Future<void> _onHubBulkSyncCurrentPage(
+    BuildContext context,
+    AppLocalizations t,
+    String kind,
+  ) async {
+    if (!_canWooCommerceManage()) return;
+    final ids = _idsFromCurrentRows();
+    if (ids.isEmpty) {
+      SnackBarHelper.showError(context, message: t.woocommerceHubBulkEmpty);
+      return;
+    }
+    final ok = await _confirmSyncAction(
+      context,
+      t,
+      title: t.woocommerceHubBulkSyncCurrentPage,
+      body: t.woocommerceHubBulkConfirmCurrentPage('${ids.length}'),
+    );
+    if (!ok || !context.mounted) return;
+    await _runHubBulkSync(context, t, kind, ids);
+  }
+
+  Future<void> _onHubBulkSyncAllFiltered(
+    BuildContext context,
+    AppLocalizations t,
+    String kind,
+  ) async {
+    if (!_canWooCommerceManage()) return;
+    await _loadBulkSyncOptions();
+    if (!context.mounted) return;
+    final ids = await _collectAllIds(kind);
+    if (!context.mounted) return;
+    if (ids.isEmpty) {
+      SnackBarHelper.showError(context, message: t.woocommerceHubBulkEmpty);
+      return;
+    }
+    final ok = await _confirmSyncAction(
+      context,
+      t,
+      title: t.woocommerceHubBulkSyncAllFiltered,
+      body: t.woocommerceHubBulkConfirmAll('${ids.length}'),
+    );
+    if (!ok || !context.mounted) return;
+    await _runHubBulkSync(context, t, kind, ids);
+  }
+
+  Future<void> _runHubBulkSync(
+    BuildContext context,
+    AppLocalizations t,
+    String kind,
+    List<int> ids,
+  ) async {
+    final chunk = _appliedChunkFor(kind);
+    final batches = (ids.length + chunk - 1) ~/ chunk;
+    setState(() {
+      _hubBulkRunning = true;
+      _hubBulkProgressIndex = 0;
+      _hubBulkProgressTotal = batches;
+    });
+    var processed = 0;
+    try {
+      for (var b = 0; b < batches; b++) {
+        if (!mounted) break;
+        setState(() => _hubBulkProgressIndex = b + 1);
+        final slice = ids.skip(b * chunk).take(chunk).toList();
+        if (slice.isEmpty) break;
+        try {
+          if (kind == 'orders') {
+            await _svc.postControlSyncOrders(
+              businessId: widget.businessId,
+              orderIds: slice,
+            );
+          } else if (kind == 'products') {
+            await _svc.postControlSyncProducts(
+              businessId: widget.businessId,
+              productIds: slice,
+            );
+          } else {
+            await _svc.postControlSyncCustomers(
+              businessId: widget.businessId,
+              customerIds: slice,
+            );
+          }
+          processed += slice.length;
+        } catch (e) {
+          if (context.mounted) {
+            SnackBarHelper.showError(
+              context,
+              message: ErrorExtractor.forContext(e, context),
+            );
+          }
+          break;
+        }
+      }
+      if (context.mounted && processed > 0) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: t.woocommerceHubBulkFinishedOk('$processed', '$batches'),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _hubBulkRunning = false;
+          _hubBulkProgressIndex = 0;
+          _hubBulkProgressTotal = 0;
+        });
+        await _refreshList();
+      }
+    }
+  }
+
+  Widget _hubBulkActionsCard(
+    BuildContext context,
+    AppLocalizations t,
+    String kind,
+  ) {
+    if (!_canWooCommerceManage()) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final applied = _appliedChunkFor(kind);
+    final bridgeMax = _effectiveBridgeChunk(kind);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.woocommerceHubBulkSyncTitle, style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              t.woocommerceHubBulkEffectiveHint(
+                '$applied',
+                '$bridgeMax',
+                '$_hubBulkChunkChoice',
+              ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(t.woocommerceHubBulkBatchSizeLabel, style: theme.textTheme.labelLarge),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [20, 50, 100, 500].map((v) {
+                return ChoiceChip(
+                  label: Text('$v'),
+                  selected: _hubBulkChunkChoice == v,
+                  onSelected: _hubBulkRunning
+                      ? null
+                      : (sel) {
+                          if (sel) setState(() => _hubBulkChunkChoice = v);
+                        },
+                );
+              }).toList(),
+            ),
+            if (_hubBulkRunning) ...[
+              const SizedBox(height: 10),
+              LinearProgressIndicator(
+                value: _hubBulkProgressTotal > 0
+                    ? _hubBulkProgressIndex / _hubBulkProgressTotal
+                    : null,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${t.woocommerceHubBulkProgressLabel} $_hubBulkProgressIndex / $_hubBulkProgressTotal',
+              ),
+            ],
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: (_loadingList || _hubBulkRunning)
+                      ? null
+                      : () => _onHubBulkSyncCurrentPage(context, t, kind),
+                  icon: const Icon(Icons.sync_alt, size: 20),
+                  label: Text(t.woocommerceHubBulkSyncCurrentPage),
+                ),
+                FilledButton.icon(
+                  onPressed: (_loadingList || _hubBulkRunning)
+                      ? null
+                      : () => _onHubBulkSyncAllFiltered(context, t, kind),
+                  icon: const Icon(Icons.cloud_sync_outlined, size: 20),
+                  label: Text(t.woocommerceHubBulkSyncAllFiltered),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _refreshList() async {
     if (!_canWooCommerceView()) return;
     setState(() => _loadingList = true);
@@ -500,233 +819,248 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
 
   Widget _buildOrdersTab(BuildContext context, AppLocalizations t) {
     final isJalali = ApiClient.getCalendarController()?.isJalali ?? true;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: Card(
-            child: ExpansionTile(
-              initiallyExpanded: true,
-              title: Text(t.woocommerceOrdersFilterExpandTitle),
-              subtitle: Text(t.woocommerceOrdersFiltersTitle),
-              childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              children: [
-                Text(
-                  t.woocommerceOrderStatusQuickTitle,
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: _wooOrderStatusSlugs.map((slug) {
-                    return FilterChip(
-                      label: Text(wooOrderStatusLabel(t, slug)),
-                      selected: _selectedOrderStatuses.contains(slug),
-                      onSelected: (sel) {
-                        setState(() {
-                          if (sel) {
-                            _selectedOrderStatuses.add(slug);
-                          } else {
-                            _selectedOrderStatuses.remove(slug);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      Text(
-                        t.woocommerceOrderDateAfterLabel,
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-                      TextButton(
-                        onPressed: () => _pickOrderDate(context, isAfter: true),
-                        child: Text(
-                          _orderFilterDateAfter == null
-                              ? t.woocommerceOrderDatePickFrom
-                              : HesabixDateUtils.formatForDisplay(
-                                  _orderFilterDateAfter,
-                                  isJalali,
-                                ),
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Card(
+              child: ExpansionTile(
+                initiallyExpanded: true,
+                title: Text(t.woocommerceOrdersFilterExpandTitle),
+                subtitle: Text(t.woocommerceOrdersFiltersTitle),
+                childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                children: [
+                  Text(
+                    t.woocommerceOrderStatusQuickTitle,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: _wooOrderStatusSlugs.map((slug) {
+                      return FilterChip(
+                        label: Text(wooOrderStatusLabel(t, slug)),
+                        selected: _selectedOrderStatuses.contains(slug),
+                        onSelected: (sel) {
+                          setState(() {
+                            if (sel) {
+                              _selectedOrderStatuses.add(slug);
+                            } else {
+                              _selectedOrderStatuses.remove(slug);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          t.woocommerceOrderDateAfterLabel,
+                          style: Theme.of(context).textTheme.labelMedium,
                         ),
-                      ),
-                      Text(
-                        t.woocommerceOrderDateBeforeLabel,
-                        style: Theme.of(context).textTheme.labelMedium,
-                      ),
-                      TextButton(
-                        onPressed: () =>
-                            _pickOrderDate(context, isAfter: false),
-                        child: Text(
-                          _orderFilterDateBefore == null
-                              ? t.woocommerceOrderDatePickTo
-                              : HesabixDateUtils.formatForDisplay(
-                                  _orderFilterDateBefore,
-                                  isJalali,
-                                ),
-                        ),
-                      ),
-                      if (_orderFilterDateAfter != null ||
-                          _orderFilterDateBefore != null)
                         TextButton(
-                          onPressed: () => setState(() {
-                            _orderFilterDateAfter = null;
-                            _orderFilterDateBefore = null;
-                          }),
-                          child: Text(t.woocommerceOrderDateClear),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _ordCustomerCtl,
-                  decoration: InputDecoration(
-                    labelText: t.woocommerceOrderCustomerIdLabel,
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  keyboardType: TextInputType.number,
-                  textDirection: TextDirection.ltr,
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _ordSearchCtl,
-                  decoration: InputDecoration(
-                    labelText: t.woocommerceOrderSearchLabel,
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  textDirection: TextDirection.ltr,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: t.woocommerceOrderSortByLabel,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            value: _ordOrderby,
-                            items: [
-                              DropdownMenuItem(
-                                value: 'date',
-                                child: Text(t.woocommerceOrderSortByDate),
-                              ),
-                              DropdownMenuItem(
-                                value: 'modified',
-                                child: Text(t.woocommerceOrderSortByModified),
-                              ),
-                              DropdownMenuItem(
-                                value: 'id',
-                                child: Text(t.woocommerceOrderSortById),
-                              ),
-                            ],
-                            onChanged: (v) {
-                              if (v != null) setState(() => _ordOrderby = v);
-                            },
+                          onPressed: () =>
+                              _pickOrderDate(context, isAfter: true),
+                          child: Text(
+                            _orderFilterDateAfter == null
+                                ? t.woocommerceOrderDatePickFrom
+                                : HesabixDateUtils.formatForDisplay(
+                                    _orderFilterDateAfter,
+                                    isJalali,
+                                  ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InputDecorator(
-                        decoration: InputDecoration(
-                          labelText: t.woocommerceOrderSortOrderLabel,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
+                        Text(
+                          t.woocommerceOrderDateBeforeLabel,
+                          style: Theme.of(context).textTheme.labelMedium,
                         ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            value: _ordOrder,
-                            items: [
-                              DropdownMenuItem(
-                                value: 'DESC',
-                                child: Text(t.woocommerceSortDesc),
-                              ),
-                              DropdownMenuItem(
-                                value: 'ASC',
-                                child: Text(t.woocommerceSortAsc),
-                              ),
-                            ],
-                            onChanged: (v) {
-                              if (v != null) setState(() => _ordOrder = v);
-                            },
+                        TextButton(
+                          onPressed: () =>
+                              _pickOrderDate(context, isAfter: false),
+                          child: Text(
+                            _orderFilterDateBefore == null
+                                ? t.woocommerceOrderDatePickTo
+                                : HesabixDateUtils.formatForDisplay(
+                                    _orderFilterDateBefore,
+                                    isJalali,
+                                  ),
                           ),
                         ),
-                      ),
+                        if (_orderFilterDateAfter != null ||
+                            _orderFilterDateBefore != null)
+                          TextButton(
+                            onPressed: () => setState(() {
+                              _orderFilterDateAfter = null;
+                              _orderFilterDateBefore = null;
+                            }),
+                            child: Text(t.woocommerceOrderDateClear),
+                          ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _ordCustomerCtl,
+                    decoration: InputDecoration(
+                      labelText: t.woocommerceOrderCustomerIdLabel,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    textDirection: TextDirection.ltr,
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _ordSearchCtl,
+                    decoration: InputDecoration(
+                      labelText: t.woocommerceOrderSearchLabel,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    textDirection: TextDirection.ltr,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
                     children: [
-                      OutlinedButton(
-                        onPressed: _loadingList
-                            ? null
-                            : () {
-                                _clearOrderFilters();
-                                _listPage = 1;
-                                _refreshList();
+                      Expanded(
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: t.woocommerceOrderSortByLabel,
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _ordOrderby,
+                              items: [
+                                DropdownMenuItem(
+                                  value: 'date',
+                                  child: Text(t.woocommerceOrderSortByDate),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'modified',
+                                  child: Text(t.woocommerceOrderSortByModified),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'id',
+                                  child: Text(t.woocommerceOrderSortById),
+                                ),
+                              ],
+                              onChanged: (v) {
+                                if (v != null) setState(() => _ordOrderby = v);
                               },
-                        child: Text(t.woocommerceClearOrderFilters),
+                            ),
+                          ),
+                        ),
                       ),
-                      FilledButton.icon(
-                        onPressed: _loadingList
-                            ? null
-                            : () {
-                                _listPage = 1;
-                                _refreshList();
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText: t.woocommerceOrderSortOrderLabel,
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: _ordOrder,
+                              items: [
+                                DropdownMenuItem(
+                                  value: 'DESC',
+                                  child: Text(t.woocommerceSortDesc),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'ASC',
+                                  child: Text(t.woocommerceSortAsc),
+                                ),
+                              ],
+                              onChanged: (v) {
+                                if (v != null) setState(() => _ordOrder = v);
                               },
-                        icon: const Icon(Icons.filter_alt),
-                        label: Text(t.woocommerceApplyFiltersButton),
+                            ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton(
+                          onPressed: _loadingList
+                              ? null
+                              : () {
+                                  _clearOrderFilters();
+                                  _listPage = 1;
+                                  _refreshList();
+                                },
+                          child: Text(t.woocommerceClearOrderFilters),
+                        ),
+                        FilledButton.icon(
+                          onPressed: _loadingList
+                              ? null
+                              : () {
+                                  _listPage = 1;
+                                  _refreshList();
+                                },
+                          icon: const Icon(Icons.filter_alt),
+                          label: Text(t.woocommerceApplyFiltersButton),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_canWooCommerceManage())
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: _hubBulkActionsCard(context, t, 'orders'),
+            ),
+          ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+            child: Row(
+              children: [
+                const Spacer(),
+                IconButton(
+                  onPressed: _loadingList ? null : _refreshList,
+                  icon: const Icon(Icons.refresh),
                 ),
               ],
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-          child: Row(
-            children: [
-              const Spacer(),
-              IconButton(
-                onPressed: _loadingList ? null : _refreshList,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: _tabs.index == 0
-              ? (_loadingList
-                    ? const Center(child: CircularProgressIndicator())
-                    : Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
-                        child: DataTableWidget<Map<String, dynamic>>(
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+            child: _tabs.index == 0
+                ? (_loadingList
+                      ? const SizedBox(
+                          height: 280,
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : DataTableWidget<Map<String, dynamic>>(
                           key: ValueKey(
                             'woo_hub_o_${_listPage}_$_hubTableEpoch',
                           ),
@@ -748,12 +1082,9 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                             });
                             _refreshList();
                           },
-                        ),
-                      ))
-              : const ColoredBox(
-                  color: Colors.transparent,
-                  child: SizedBox.expand(),
-                ),
+                        ))
+                : const SizedBox.shrink(),
+          ),
         ),
       ],
     );
@@ -766,52 +1097,69 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     required bool isProducts,
   }) {
     final active = _tabs.index == tabIndex;
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchCtl,
-                  decoration: InputDecoration(
-                    labelText: isProducts
-                        ? t.woocommerceSearchProductsLabel
-                        : t.woocommerceSearchCustomersLabel,
-                    border: const OutlineInputBorder(),
-                    isDense: true,
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtl,
+                    decoration: InputDecoration(
+                      labelText: isProducts
+                          ? t.woocommerceSearchProductsLabel
+                          : t.woocommerceSearchCustomersLabel,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) {
+                      _listPage = 1;
+                      _refreshList();
+                    },
                   ),
-                  onSubmitted: (_) {
-                    _listPage = 1;
-                    _refreshList();
-                  },
                 ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: _loadingList
-                    ? null
-                    : () {
-                        _listPage = 1;
-                        _refreshList();
-                      },
-                icon: const Icon(Icons.search),
-              ),
-              IconButton(
-                onPressed: _loadingList ? null : _refreshList,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _loadingList
+                      ? null
+                      : () {
+                          _listPage = 1;
+                          _refreshList();
+                        },
+                  icon: const Icon(Icons.search),
+                ),
+                IconButton(
+                  onPressed: _loadingList ? null : _refreshList,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
+            ),
           ),
         ),
-        Expanded(
-          child: active
-              ? (_loadingList
-                    ? const Center(child: CircularProgressIndicator())
-                    : Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 0, 8, 0),
-                        child: DataTableWidget<Map<String, dynamic>>(
+        if (_canWooCommerceManage())
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: _hubBulkActionsCard(
+                context,
+                t,
+                isProducts ? 'products' : 'customers',
+              ),
+            ),
+          ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 24),
+            child: active
+                ? (_loadingList
+                      ? const SizedBox(
+                          height: 280,
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : DataTableWidget<Map<String, dynamic>>(
                           key: ValueKey(
                             'woo_hub_${isProducts ? 'p' : 'c'}_${_listPage}_$_hubTableEpoch',
                           ),
@@ -835,12 +1183,9 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                             });
                             _refreshList();
                           },
-                        ),
-                      ))
-              : const ColoredBox(
-                  color: Colors.transparent,
-                  child: SizedBox.expand(),
-                ),
+                        ))
+                : const SizedBox.shrink(),
+          ),
         ),
       ],
     );
@@ -961,6 +1306,8 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       showActiveFilters: false,
       emptyStateMessage: t.woocommerceNoData,
       minTableWidth: 980,
+      expandBodyHeightToFitRows: true,
+      deferVerticalScrollToParent: true,
     );
   }
 
@@ -1071,6 +1418,8 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       showActiveFilters: false,
       emptyStateMessage: t.woocommerceNoData,
       minTableWidth: 900,
+      expandBodyHeightToFitRows: true,
+      deferVerticalScrollToParent: true,
     );
   }
 
@@ -1175,6 +1524,8 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       showActiveFilters: false,
       emptyStateMessage: t.woocommerceNoData,
       minTableWidth: 800,
+      expandBodyHeightToFitRows: true,
+      deferVerticalScrollToParent: true,
     );
   }
 }

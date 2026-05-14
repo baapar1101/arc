@@ -19,13 +19,13 @@ def _user_can_access_business(db: Session, user_id: int, business_id: int) -> bo
 	"""
 	اعتبارسنجی business_id ارسالی از کلاینت (مثل X-Business-ID).
 	این تابع فقط owner/member بودن (join=True) را بررسی می‌کند و به هیچ مقدار client-trusted تکیه نمی‌کند.
+	عضویت زمانی منقضی‌شده رد می‌شود.
 	"""
 	try:
+		from app.core.business_membership import membership_is_active
 		from adapters.db.models.business import Business
 		from adapters.db.models.business_permission import BusinessPermission
-	except Exception:
-		return False
-	try:
+
 		biz = db.get(Business, int(business_id))
 		if not biz:
 			return False
@@ -60,7 +60,9 @@ def _user_can_access_business(db: Session, user_id: int, business_id: int) -> bo
 					normalized = merged
 			except Exception:
 				normalized = {}
-		return normalized.get("join") is True
+		if normalized.get("join") is not True:
+			return False
+		return membership_is_active(perm)
 	except Exception:
 		return False
 
@@ -162,6 +164,9 @@ class AuthContext:
 		permission_obj = repo.get_by_user_and_business(self.user.id, self.business_id)
 		
 		if permission_obj and permission_obj.business_permissions:
+			from app.core.business_membership import membership_is_active
+			if not membership_is_active(permission_obj):
+				return {}
 			raw_permissions = permission_obj.business_permissions
 			normalized_permissions = AuthContext._normalize_permissions_value(raw_permissions)
 			return normalized_permissions
@@ -425,33 +430,28 @@ class AuthContext:
 		# بررسی عضویت در کسب و کار
 		if self.db:
 			from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+			from app.core.business_membership import membership_is_active
+
 			permission_repo = BusinessPermissionRepository(self.db)
 			business_permission = permission_repo.get_by_user_and_business(self.user.id, business_id)
 			logger.info(f"Business permission lookup result: {business_permission}")
 			
 			if business_permission:
-				# بررسی دسترسی join
-				permissions = business_permission.business_permissions or {}
+				permissions = AuthContext._normalize_permissions_value(business_permission.business_permissions or {})
 				logger.info(f"User permissions for business {business_id}: {permissions}")
 				join_permission = permissions.get('join')
 				logger.info(f"Join permission: {join_permission}")
 				
-				if join_permission == True:
+				if join_permission == True and membership_is_active(business_permission):
 					logger.info(f"User {self.user.id} is member of business {business_id}, granting access")
 					logger.info(f"=== can_access_business END (member) ===")
 					return True
 				else:
-					logger.info(f"User {self.user.id} does not have join permission for business {business_id}")
+					logger.info(f"User {self.user.id} does not have active membership for business {business_id}")
 			else:
 				logger.info(f"No business permission found for user {self.user.id} and business {business_id}")
 		else:
 			logger.info("No database connection available for permission lookup")
-		
-		# اگر کسب و کار در context کاربر است، دسترسی دارد
-		if business_id == self.business_id:
-			logger.info(f"User {self.user.id} has context access to business {business_id}")
-			logger.info(f"=== can_access_business END (context) ===")
-			return True
 		
 		logger.info(f"User {self.user.id} does not have access to business {business_id}")
 		logger.info(f"=== can_access_business END (denied) ===")
@@ -480,6 +480,8 @@ class AuthContext:
 			return False
 		
 		from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
+		from app.core.business_membership import membership_is_active
+
 		repo = BusinessPermissionRepository(self.db)
 		permission_obj = repo.get_by_user_and_business(self.user.id, business_id)
 		
@@ -491,7 +493,9 @@ class AuthContext:
 		business_perms = AuthContext._normalize_permissions_value(permission_obj.business_permissions)
 		has_join_access = business_perms.get('join', False)
 		logger.info(f"Business membership check: user {self.user.id} join access to business {business_id}: {has_join_access}")
-		return has_join_access
+		if not has_join_access:
+			return False
+		return membership_is_active(permission_obj)
 	
 	def to_dict(self) -> dict:
 		"""تبدیل به dictionary برای استفاده در API"""

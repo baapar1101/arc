@@ -1046,6 +1046,9 @@ class BusinessUserSchema(BaseModel):
     added_at: datetime
     last_active: Optional[datetime] = None
     permissions: dict
+    membership_expires_at: Optional[datetime] = None
+    membership_unlimited: bool = True
+    membership_active: bool = True
 
     class Config:
         from_attributes = True
@@ -1053,11 +1056,28 @@ class BusinessUserSchema(BaseModel):
 
 class AddUserRequest(BaseModel):
     email_or_phone: str
+    membership_expires_at: Optional[datetime] = Field(
+        default=None,
+        description="پایان عضویت؛ خالی یا null یعنی نامحدود.",
+    )
+
+    @model_validator(mode="after")
+    def validate_membership_expires_at(self) -> "AddUserRequest":
+        if self.membership_expires_at is None:
+            return self
+        from app.core.business_membership import to_naive_utc
+
+        exp = to_naive_utc(self.membership_expires_at)
+        if exp <= datetime.utcnow():
+            raise ValueError("membership_expires_at must be in the future")
+        self.membership_expires_at = exp
+        return self
 
     class Config:
         json_schema_extra = {
             "example": {
-                "email_or_phone": "user@example.com"
+                "email_or_phone": "user@example.com",
+                "membership_expires_at": None,
             }
         }
 
@@ -1070,6 +1090,20 @@ class AddUserResponse(BaseModel):
 
 class UpdatePermissionsRequest(BaseModel):
     permissions: dict
+    apply_membership_expiry: bool = Field(
+        default=False,
+        description="اگر True باشد، مقدار membership_expires_at اعمال می‌شود (null = نامحدود).",
+    )
+    membership_expires_at: Optional[datetime] = None
+
+    @model_validator(mode="after")
+    def normalize_membership_expires_at(self) -> "UpdatePermissionsRequest":
+        if not self.apply_membership_expiry or self.membership_expires_at is None:
+            return self
+        from app.core.business_membership import to_naive_utc
+
+        self.membership_expires_at = to_naive_utc(self.membership_expires_at)
+        return self
 
     class Config:
         json_schema_extra = {
@@ -1087,7 +1121,9 @@ class UpdatePermissionsRequest(BaseModel):
                     "settings": {
                         "manage_users": True
                     }
-                }
+                },
+                "apply_membership_expiry": False,
+                "membership_expires_at": None,
             }
         }
 

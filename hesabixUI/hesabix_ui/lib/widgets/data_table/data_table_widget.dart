@@ -70,13 +70,17 @@ class DataTableWidget<T> extends StatefulWidget {
   // Useful for screens that already have data in memory but want to reuse the unified table UI.
   final List<Map<String, dynamic>>? localRawItems;
   final Map<String, dynamic>? localSummary;
+
   /// وقتی [localRawItems] فقط **صفحهٔ جاری** از API است؛ جمع کل ردیف‌ها برای فوتر و صفحه‌بندی.
   final int? localTotalCount;
+
   /// شمارهٔ صفحهٔ جاری (۱-based) از والد؛ با تغییر، جدول همگام می‌شود.
   final int? localCurrentPage;
+
   /// اندازهٔ صفحه از والد (مثلاً `per_page`). اگر null باشد از [DataTableConfig.defaultPageSize] استفاده می‌شود.
   final int? localPageSize;
   final ValueChanged<int>? onLocalPageChange;
+
   /// تغییر اندازهٔ صفحه از فوتر (حالت دادهٔ محلی + سرور).
   final ValueChanged<int>? onLocalPageSizeChange;
 
@@ -105,7 +109,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   List<Map<String, dynamic>> _rawItems = [];
   bool _loadingList = false;
   String? _error;
-  Map<String, dynamic>? _summary;  // Summary from API response
+  Map<String, dynamic>? _summary; // Summary from API response
 
   // Local mode: store all items for pagination
   List<T> _allItems = [];
@@ -126,7 +130,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   final Map<String, String> _columnSearchValues = {};
   final Map<String, String> _columnSearchTypes = {};
   final Map<String, TextEditingController> _columnSearchControllers = {};
-  
+
   // Enhanced filter state
   final Map<String, List<String>> _columnMultiSelectValues = {};
   final Map<String, DateTime?> _columnDateFromValues = {};
@@ -150,15 +154,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   bool _templateLoadCallbackAdded = false;
   // Auto-fit
   bool _autoFitApplied = false;
-  
+
   // Column settings state
   ColumnSettings? _columnSettings;
   List<DataTableColumn> _visibleColumns = [];
   bool _isLoadingColumnSettings = false;
-  
+
   // Scroll controller for horizontal scrolling
   late ScrollController _horizontalScrollController;
-  
+
   // Density (row height)
   // Default: non-dense (normal) rows
   bool _dense = false;
@@ -166,7 +170,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Calendar type for export header when no CalendarController is provided
   // (loaded from SharedPreferences: app_calendar_type)
   String? _exportCalendarType;
-  
+
   // Keyboard focus and navigation
   final FocusNode _tableFocusNode = FocusNode(debugLabel: 'DataTableFocus');
   final FocusNode _searchFocusNode = FocusNode(debugLabel: 'SearchFieldFocus');
@@ -176,7 +180,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Prevent row-level onTap from triggering when user clicks
   // an interactive control inside the row (e.g. actions menu).
   bool _suppressNextRowTap = false;
-  
+
   @override
   void initState() {
     super.initState();
@@ -270,6 +274,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       });
     } catch (_) {}
   }
+
   /// Public method to refresh the data table
   void refresh() {
     _fetchData();
@@ -287,8 +292,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (categoryIds.isEmpty) {
         _columnMultiSelectValues.remove('category_id');
       } else {
-        _columnMultiSelectValues['category_id'] =
-            categoryIds.map((e) => e.toString()).toList();
+        _columnMultiSelectValues['category_id'] = categoryIds
+            .map((e) => e.toString())
+            .toList();
       }
     });
     _page = 1;
@@ -302,7 +308,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (personGroupId == null) {
         _columnMultiSelectValues.remove('person_group_id');
       } else {
-        _columnMultiSelectValues['person_group_id'] = [personGroupId.toString()];
+        _columnMultiSelectValues['person_group_id'] = [
+          personGroupId.toString(),
+        ];
       }
     });
     _page = 1;
@@ -343,11 +351,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   void _onSearchTextChanged() {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(widget.config.searchDebounce ?? const Duration(milliseconds: 500), () {
-      _page = 1;
-      _fetchData();
-      _scheduleSavePersistedTableFilters();
-    });
+    _searchDebounce = Timer(
+      widget.config.searchDebounce ?? const Duration(milliseconds: 500),
+      () {
+        _page = 1;
+        _fetchData();
+        _scheduleSavePersistedTableFilters();
+      },
+    );
   }
 
   bool get _tableFiltersPersistenceEnabled {
@@ -412,18 +423,21 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   void _scheduleSavePersistedTableFilters() {
     if (!_tableFiltersPersistenceEnabled) return;
     _persistTableFiltersDebounce?.cancel();
-    _persistTableFiltersDebounce = Timer(const Duration(milliseconds: 450), () async {
-      _persistTableFiltersDebounce = null;
-      if (!_tableFiltersPersistenceEnabled || !mounted) return;
-      final pid = widget.config.persistTableFiltersPageId!;
-      final bid = widget.config.businessId!;
-      final m = _serializeTableFiltersForPersist();
-      if (_isSerializedTableFiltersEmpty(m)) {
-        await ListFilterPreferencesService.clear(pid, bid);
-      } else {
-        await ListFilterPreferencesService.save(pid, bid, m);
-      }
-    });
+    _persistTableFiltersDebounce = Timer(
+      const Duration(milliseconds: 450),
+      () async {
+        _persistTableFiltersDebounce = null;
+        if (!_tableFiltersPersistenceEnabled || !mounted) return;
+        final pid = widget.config.persistTableFiltersPageId!;
+        final bid = widget.config.businessId!;
+        final m = _serializeTableFiltersForPersist();
+        if (_isSerializedTableFiltersEmpty(m)) {
+          await ListFilterPreferencesService.clear(pid, bid);
+        } else {
+          await ListFilterPreferencesService.save(pid, bid, m);
+        }
+      },
+    );
   }
 
   void _applyLoadedTableFiltersMap(Map<String, dynamic> d) {
@@ -448,8 +462,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       for (final e in cms.entries) {
         final v = e.value;
         if (v is List) {
-          _columnMultiSelectValues[e.key.toString()] =
-              v.map((x) => x.toString()).where((s) => s.isNotEmpty).toList();
+          _columnMultiSelectValues[e.key.toString()] = v
+              .map((x) => x.toString())
+              .where((s) => s.isNotEmpty)
+              .toList();
         }
       }
     }
@@ -499,7 +515,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
   }
 
-
   Future<void> _loadDensityPreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -534,7 +549,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         tableId,
         businessId: widget.config.businessId,
       );
-      
+
       ColumnSettings effectiveSettings;
       if (savedSettings != null) {
         effectiveSettings = ColumnSettingsService.mergeWithDefaults(
@@ -547,7 +562,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           widget.config.columnKeys,
         );
       } else {
-        effectiveSettings = ColumnSettingsService.getDefaultSettings(widget.config.columnKeys);
+        effectiveSettings = ColumnSettingsService.getDefaultSettings(
+          widget.config.columnKeys,
+        );
       }
 
       setState(() {
@@ -566,9 +583,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
   }
 
-  List<DataTableColumn> _getVisibleColumnsFromSettings(ColumnSettings settings) {
+  List<DataTableColumn> _getVisibleColumnsFromSettings(
+    ColumnSettings settings,
+  ) {
     final visibleColumns = <DataTableColumn>[];
-    
+
     // Add columns in the order specified by settings
     for (final key in settings.columnOrder) {
       final column = widget.config.getColumnByKey(key);
@@ -576,7 +595,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         visibleColumns.add(column);
       }
     }
-    
+
     return visibleColumns;
   }
 
@@ -594,11 +613,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   /// Apply pagination to local items
   void _applyLocalPagination() {
     if (widget.localRawItems == null) return;
-    
+
     // Apply search filter if search is active
     List<T> filteredItems = _allItems;
     List<Map<String, dynamic>> filteredRawItems = _allRawItems;
-    
+
     final searchQuery = _searchCtrl.text.trim();
     if (searchQuery.isNotEmpty &&
         widget.config.searchFields.isNotEmpty &&
@@ -606,11 +625,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final lowerQuery = searchQuery.toLowerCase();
       final filtered = <T>[];
       final filteredRaw = <Map<String, dynamic>>[];
-      
+
       for (int i = 0; i < _allItems.length; i++) {
         final rawItem = _allRawItems[i];
         bool matches = false;
-        
+
         // Search in specified fields
         for (final field in widget.config.searchFields) {
           final value = rawItem[field]?.toString().toLowerCase() ?? '';
@@ -619,21 +638,20 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             break;
           }
         }
-        
+
         if (matches) {
           filtered.add(_allItems[i]);
           filteredRaw.add(rawItem);
         }
       }
-      
+
       filteredItems = filtered;
       filteredRawItems = filteredRaw;
     }
 
     // مرتب‌سازی محلی (چندستونه یا تک‌ستونه) قبل از صفحه‌بندی
     if (widget.config.enableSorting &&
-        (_multiSort.isNotEmpty ||
-            (_sortBy != null && _sortBy!.isNotEmpty))) {
+        (_multiSort.isNotEmpty || (_sortBy != null && _sortBy!.isNotEmpty))) {
       final specs = _multiSort.isNotEmpty
           ? List<_SortSpec>.from(_multiSort)
           : [_SortSpec(by: _sortBy!, desc: _sortDesc)];
@@ -675,7 +693,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       _total = widget.localTotalCount!;
       _totalPages = _total > 0 ? ((_total - 1) ~/ _limit) + 1 : 0;
       if (widget.localCurrentPage != null) {
-        _page = widget.localCurrentPage!.clamp(1, _totalPages > 0 ? _totalPages : 1);
+        _page = widget.localCurrentPage!.clamp(
+          1,
+          _totalPages > 0 ? _totalPages : 1,
+        );
       } else {
         if (_page < 1) _page = 1;
         if (_totalPages > 0 && _page > _totalPages) _page = _totalPages;
@@ -684,26 +705,26 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       _rawItems = filteredRawItems;
       return;
     }
-    
+
     // Calculate total pages based on filtered items
     _total = filteredItems.length;
     _totalPages = _total > 0 ? ((_total - 1) ~/ _limit) + 1 : 0;
-    
+
     // Clamp page to valid range
     if (_page < 1) _page = 1;
     if (_page > _totalPages && _totalPages > 0) _page = _totalPages;
-    
+
     // Handle empty case
     if (filteredItems.isEmpty) {
       _items = [];
       _rawItems = [];
       return;
     }
-    
+
     // Calculate pagination bounds
     final startIndex = (_page - 1) * _limit;
     final endIndex = (startIndex + _limit).clamp(0, filteredItems.length);
-    
+
     // Slice items and raw items
     _items = filteredItems.sublist(startIndex, endIndex);
     _rawItems = filteredRawItems.sublist(startIndex, endIndex);
@@ -727,15 +748,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             debugPrint('Error parsing local item: $e, item: $r');
           }
         }
-        
+
         // Check if data has changed (by comparing length or content)
-        final dataChanged = _allItems.length != parsed.length || 
-                           _allRawItems.length != raw.length;
-        
+        final dataChanged =
+            _allItems.length != parsed.length ||
+            _allRawItems.length != raw.length;
+
         // Store all items for pagination
         _allItems = parsed;
         _allRawItems = raw;
-        
+
         if (widget.localTotalCount == null) {
           if (dataChanged) {
             _page = 1;
@@ -748,10 +770,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             _page = widget.localCurrentPage!;
           }
         }
-        
+
         // Apply pagination to items
         _applyLocalPagination();
-        
+
         if (mounted) {
           setState(() {
             _summary = widget.localSummary;
@@ -771,11 +793,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
 
       final api = ApiClient();
-      
+
       // Build QueryInfo payload
-      final includeInventory = widget.config.additionalParams?['include_inventory'] == true;
-      final inventoryAsOfDate = widget.config.additionalParams?['inventory_as_of_date'] as String?;
-      
+      final includeInventory =
+          widget.config.additionalParams?['include_inventory'] == true;
+      final inventoryAsOfDate =
+          widget.config.additionalParams?['inventory_as_of_date'] as String?;
+
       final queryInfo = QueryInfo(
         take: _limit,
         skip: (_page - 1) * _limit,
@@ -784,8 +808,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         sorts: _multiSort.isNotEmpty
             ? _multiSort.map((s) => SortItem(by: s.by, desc: s.desc)).toList()
             : null,
-        search: _searchCtrl.text.trim().isNotEmpty ? _searchCtrl.text.trim() : null,
-        searchFields: widget.config.searchFields.isNotEmpty ? widget.config.searchFields : null,
+        search: _searchCtrl.text.trim().isNotEmpty
+            ? _searchCtrl.text.trim()
+            : null,
+        searchFields: widget.config.searchFields.isNotEmpty
+            ? widget.config.searchFields
+            : null,
         filters: _buildFilters(),
         includeInventory: includeInventory,
         inventoryAsOfDate: inventoryAsOfDate,
@@ -800,7 +828,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           sizeKey: _limit,
           'skip': (_page - 1) * _limit,
         };
-        
+
         // Add sorting (قدیمی: sort_by/sort_desc؛ چندستونه: پارامتر JSON sort)
         if (_sortBy != null) {
           queryParams['sort_by'] = _sortBy;
@@ -813,34 +841,42 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 .toList(),
           );
         }
-        
+
         // Add search
         if (_searchCtrl.text.trim().isNotEmpty) {
           queryParams['search'] = _searchCtrl.text.trim();
         }
-        
+
         // Add additional parameters
         if (widget.config.additionalParams != null) {
           queryParams.addAll(widget.config.additionalParams!);
         }
-        
-        res = await api.get<Map<String, dynamic>>(widget.config.endpoint, query: queryParams);
+
+        res = await api.get<Map<String, dynamic>>(
+          widget.config.endpoint,
+          query: queryParams,
+        );
       } else {
         // For POST requests, use QueryInfo structure
         final requestData = queryInfo.toJson();
         if (widget.config.additionalParams != null) {
-          final additionalParamsCopy = Map<String, dynamic>.from(widget.config.additionalParams!);
+          final additionalParamsCopy = Map<String, dynamic>.from(
+            widget.config.additionalParams!,
+          );
           additionalParamsCopy.remove('include_inventory');
           additionalParamsCopy.remove('inventory_as_of_date');
           if (additionalParamsCopy.isNotEmpty) {
             requestData.addAll(additionalParamsCopy);
           }
         }
-        
-        res = await api.post<Map<String, dynamic>>(widget.config.endpoint, data: requestData);
+
+        res = await api.post<Map<String, dynamic>>(
+          widget.config.endpoint,
+          data: requestData,
+        );
       }
       final body = res.data;
-      
+
       if (body == null) {
         throw Exception('Response data is null');
       }
@@ -877,7 +913,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (body['data'] is Map<String, dynamic>) {
         summaryData = body['data']['summary'] as Map<String, dynamic>?;
       }
-      
+
       if (mounted) {
         setState(() {
           _items = response.items;
@@ -893,10 +929,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         });
         _notifyTableDataChanged();
       }
-      
+
       // Auto-fit columns on first load if configured
       await _maybeAutoFitColumns();
-      
+
       // Call the refresh callback if provided
       if (widget.onRefresh != null) {
         widget.onRefresh!();
@@ -955,8 +991,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
     // If local data or server-side paging meta changes, refresh immediately.
     if (widget.localRawItems != null) {
-      final listChanged = !identical(oldWidget.localRawItems, widget.localRawItems);
-      final serverMetaChanged = widget.localTotalCount != null &&
+      final listChanged = !identical(
+        oldWidget.localRawItems,
+        widget.localRawItems,
+      );
+      final serverMetaChanged =
+          widget.localTotalCount != null &&
           (oldWidget.localCurrentPage != widget.localCurrentPage ||
               oldWidget.localTotalCount != widget.localTotalCount ||
               oldWidget.localPageSize != widget.localPageSize);
@@ -965,7 +1005,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
     }
   }
-  
+
   Future<void> _maybeAutoFitColumns() async {
     // Conditions:
     // - Feature enabled
@@ -979,7 +1019,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         widget.config.autoFitColumnsOnFirstLoad &&
         _items.isNotEmpty) {
       // Ensure we have column settings to update
-      ColumnSettings settings = _columnSettings ??
+      ColumnSettings settings =
+          _columnSettings ??
           ColumnSettingsService.getDefaultSettings(widget.config.columnKeys);
       // Respect user widths: only apply if no widths are set yet
       if (settings.columnWidths.isNotEmpty) {
@@ -988,7 +1029,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
       // Build styles and parameters
       final theme = Theme.of(context);
-      final headerTextStyle = theme.textTheme.titleSmall?.copyWith(
+      final headerTextStyle =
+          theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w700,
             color: theme.colorScheme.onSurface,
           ) ??
@@ -997,10 +1039,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
       final minWidth = 96.0;
       // Columns to show (exclude action)
-      final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
+      final columnsToShow =
+          widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
           ? _visibleColumns
           : widget.config.columns;
-      final dataColumns = columnsToShow.where((c) => c is! ActionColumn).toList();
+      final dataColumns = columnsToShow
+          .where((c) => c is! ActionColumn)
+          .toList();
       // Compute widths
       final Map<String, double> computed = {};
       for (final column in dataColumns) {
@@ -1017,10 +1062,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
       // Update and save
       final updated = settings.copyWith(
-        columnWidths: {
-          ...settings.columnWidths,
-          ...computed,
-        },
+        columnWidths: {...settings.columnWidths, ...computed},
       );
       try {
         await ColumnSettingsService.saveColumnSettings(
@@ -1051,13 +1093,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final columnName = entry.key;
       final searchValue = entry.value.trim();
       final searchType = _columnSearchTypes[columnName] ?? '*';
-      
+
       if (searchValue.isNotEmpty) {
-        filters.add(DataTableUtils.createColumnFilter(
-          columnName,
-          searchValue,
-          searchType,
-        ));
+        filters.add(
+          DataTableUtils.createColumnFilter(
+            columnName,
+            searchValue,
+            searchType,
+          ),
+        );
       }
     }
 
@@ -1065,12 +1109,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     for (var entry in _columnMultiSelectValues.entries) {
       final columnName = entry.key;
       final selectedValues = entry.value;
-      
+
       if (selectedValues.isNotEmpty) {
-        filters.add(DataTableUtils.createMultiSelectFilter(
-          columnName,
-          selectedValues,
-        ));
+        filters.add(
+          DataTableUtils.createMultiSelectFilter(columnName, selectedValues),
+        );
       }
     }
 
@@ -1079,13 +1122,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       final columnName = entry.key;
       final fromDate = entry.value;
       final toDate = _columnDateToValues[columnName];
-      
+
       if (fromDate != null && toDate != null) {
-        filters.addAll(DataTableUtils.createDateRangeFilter(
-          columnName,
-          fromDate,
-          toDate,
-        ));
+        filters.addAll(
+          DataTableUtils.createDateRangeFilter(columnName, fromDate, toDate),
+        );
       }
     }
 
@@ -1107,8 +1148,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // اگر filterType از ستون برابر با categoryTree است، از فیلتر درختی استفاده کن
     // همچنین اگر columnName برابر با category_name یا category_id است و businessId موجود است
     if (filterType == ColumnFilterType.categoryTree ||
-        ((columnName == 'category_id' || columnName == 'category_name') && 
-         widget.config.businessId != null)) {
+        ((columnName == 'category_id' || columnName == 'category_name') &&
+            widget.config.businessId != null)) {
       filterType = ColumnFilterType.categoryTree;
     }
 
@@ -1118,7 +1159,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         text: _columnSearchValues[columnName] ?? '',
       );
     }
-    
+
     // Initialize search type if not exists
     _columnSearchTypes[columnName] ??= '*';
 
@@ -1161,7 +1202,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         onApplyCategoryTree: (categoryIds) {
           setState(() {
             // اگر columnName برابر با category_name است، از category_id برای فیلتر استفاده کن
-            final filterColumnName = columnName == 'category_name' ? 'category_id' : columnName;
+            final filterColumnName = columnName == 'category_name'
+                ? 'category_id'
+                : columnName;
             _columnMultiSelectValues[filterColumnName] = categoryIds;
           });
           _page = 1;
@@ -1191,21 +1234,22 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     );
   }
 
-
   bool _hasActiveFilters() {
-    return _searchCtrl.text.isNotEmpty || 
-           _columnSearchValues.isNotEmpty ||
-           _columnMultiSelectValues.isNotEmpty ||
-           _columnDateFromValues.isNotEmpty;
+    return _searchCtrl.text.isNotEmpty ||
+        _columnSearchValues.isNotEmpty ||
+        _columnMultiSelectValues.isNotEmpty ||
+        _columnDateFromValues.isNotEmpty;
   }
 
   void _clearAllFilters() {
     _persistTableFiltersDebounce?.cancel();
     if (_tableFiltersPersistenceEnabled) {
-      unawaited(ListFilterPreferencesService.clear(
-        widget.config.persistTableFiltersPageId!,
-        widget.config.businessId!,
-      ));
+      unawaited(
+        ListFilterPreferencesService.clear(
+          widget.config.persistTableFiltersPageId!,
+          widget.config.businessId!,
+        ),
+      );
     }
     setState(() {
       _searchCtrl.clear();
@@ -1263,12 +1307,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   void _toggleRowSelection(int rowIndex) {
     if (!widget.config.enableRowSelection) return;
-    
-    setState(() {
-      final bool isShift = HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftLeft) ||
-          HardwareKeyboard.instance.logicalKeysPressed.contains(LogicalKeyboardKey.shiftRight);
 
-      if (widget.config.enableMultiRowSelection && isShift && _lastSelectedRowIndex != null) {
+    setState(() {
+      final bool isShift =
+          HardwareKeyboard.instance.logicalKeysPressed.contains(
+            LogicalKeyboardKey.shiftLeft,
+          ) ||
+          HardwareKeyboard.instance.logicalKeysPressed.contains(
+            LogicalKeyboardKey.shiftRight,
+          );
+
+      if (widget.config.enableMultiRowSelection &&
+          isShift &&
+          _lastSelectedRowIndex != null) {
         final int start = math.min(_lastSelectedRowIndex!, rowIndex);
         final int end = math.max(_lastSelectedRowIndex!, rowIndex);
         for (int i = start; i <= end; i++) {
@@ -1288,22 +1339,24 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         _lastSelectedRowIndex = rowIndex;
       }
     });
-    
+
     if (widget.config.onRowSelectionChanged != null) {
       widget.config.onRowSelectionChanged!(_selectedRows);
     }
   }
 
   void _selectAllRows() {
-    if (!widget.config.enableRowSelection || !widget.config.enableMultiRowSelection) return;
-    
+    if (!widget.config.enableRowSelection ||
+        !widget.config.enableMultiRowSelection)
+      return;
+
     setState(() {
       _selectedRows.clear();
       for (int i = 0; i < _items.length; i++) {
         _selectedRows.add(i);
       }
     });
-    
+
     if (widget.config.onRowSelectionChanged != null) {
       widget.config.onRowSelectionChanged!(_selectedRows);
     }
@@ -1311,11 +1364,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   void _clearRowSelection() {
     if (!widget.config.enableRowSelection) return;
-    
+
     setState(() {
       _selectedRows.clear();
     });
-    
+
     if (widget.config.onRowSelectionChanged != null) {
       widget.config.onRowSelectionChanged!(_selectedRows);
     }
@@ -1344,14 +1397,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     try {
       // Ensure at least one column is visible
       final validatedSettings = _validateColumnSettings(settings);
-      
+
       final tableId = widget.config.effectiveTableId;
       await ColumnSettingsService.saveColumnSettings(
         tableId,
         validatedSettings,
         businessId: widget.config.businessId,
       );
-      
+
       setState(() {
         _columnSettings = validatedSettings;
         _visibleColumns = _getVisibleColumnsFromSettings(validatedSettings);
@@ -1364,7 +1417,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     } catch (e) {
       debugPrint('Error saving column settings: $e');
       if (mounted) {
-        final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+        final t = Localizations.of<AppLocalizations>(
+          context,
+          AppLocalizations,
+        )!;
         SnackBarHelper.showError(
           context,
           message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
@@ -1418,7 +1474,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     required bool useGetExportParams,
     int? pdfTemplateOverride,
   }) async {
-    if (widget.config.excelEndpoint == null && widget.config.pdfEndpoint == null) {
+    if (widget.config.excelEndpoint == null &&
+        widget.config.pdfEndpoint == null) {
       return false;
     }
 
@@ -1471,7 +1528,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         'take': _limit,
         'skip': (_page - 1) * _limit,
         'search': _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null,
-        'search_fields': _searchCtrl.text.isNotEmpty && widget.config.searchFields.isNotEmpty
+        'search_fields':
+            _searchCtrl.text.isNotEmpty && widget.config.searchFields.isNotEmpty
             ? widget.config.searchFields
             : null,
         'filters': filters.isNotEmpty ? filters : null,
@@ -1482,9 +1540,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             .toList();
       }
 
-      final params = <String, dynamic>{
-        'selected_only': selectedOnly,
-      };
+      final params = <String, dynamic>{'selected_only': selectedOnly};
 
       if (selectedOnly && _selectedRows.isNotEmpty) {
         params['selected_indices'] = _selectedRows.toList();
@@ -1503,14 +1559,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         } catch (_) {}
       }
 
-      final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
+      final columnsToShow =
+          widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
           ? _visibleColumns
           : widget.config.columns;
-      final dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
-      params['export_columns'] = dataColumnsToShow.map((c) => {
-            'key': c.key,
-            'label': c.label,
-          }).toList();
+      final dataColumnsToShow = columnsToShow
+          .where((c) => c is! ActionColumn)
+          .toList();
+      params['export_columns'] = dataColumnsToShow
+          .map((c) => {'key': c.key, 'label': c.label})
+          .toList();
 
       if (useGetExportParams && widget.config.getExportParams != null) {
         params.addAll(widget.config.getExportParams!());
@@ -1521,16 +1579,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         params['template_id'] = tid;
       }
 
-      if (mergedBodyParamsOverride != null && mergedBodyParamsOverride.isNotEmpty) {
+      if (mergedBodyParamsOverride != null &&
+          mergedBodyParamsOverride.isNotEmpty) {
         params.addAll(mergedBodyParamsOverride);
       }
 
       final response = await api.post(
         endpoint,
-        data: {
-          ...queryInfo,
-          ...params,
-        },
+        data: {...queryInfo, ...params},
         options: Options(
           headers: {
             'X-Calendar-Type': (() {
@@ -1548,7 +1604,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               final loc = Localizations.localeOf(context);
               final lang = loc.languageCode;
               final country = loc.countryCode;
-              return (country != null && country.isNotEmpty) ? '$lang-$country' : lang;
+              return (country != null && country.isNotEmpty)
+                  ? '$lang-$country'
+                  : lang;
             })(),
           },
         ),
@@ -1556,15 +1614,20 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       );
 
       if (response.data != null) {
-        String? contentDisposition = response.headers.value('content-disposition');
-        String filename = 'export_${DateTime.now().millisecondsSinceEpoch}.${format == 'pdf' ? 'pdf' : 'xlsx'}';
+        String? contentDisposition = response.headers.value(
+          'content-disposition',
+        );
+        String filename =
+            'export_${DateTime.now().millisecondsSinceEpoch}.${format == 'pdf' ? 'pdf' : 'xlsx'}';
         if (contentDisposition != null) {
           try {
             final parts = contentDisposition.split(';').map((s) => s.trim());
             for (final p in parts) {
               if (p.toLowerCase().startsWith('filename=')) {
                 var name = p.substring('filename='.length).trim();
-                if (name.startsWith('"') && name.endsWith('"') && name.length >= 2) {
+                if (name.startsWith('"') &&
+                    name.endsWith('"') &&
+                    name.length >= 2) {
                   name = name.substring(1, name.length - 1);
                 }
                 if (name.isNotEmpty) {
@@ -1644,16 +1707,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     } else {
       throw Exception('Unsupported binary data type: ${data.runtimeType}');
     }
-    
+
     // Use file_saver package for cross-platform file saving
     try {
       final fileSaver = FileSaver.instance;
       final extension = filename.split('.').last;
-      await fileSaver.saveFile(
-        name: filename,
-        bytes: bytes,
-        ext: extension,
-      );
+      await fileSaver.saveFile(name: filename, bytes: bytes, ext: extension);
     } catch (e) {
       rethrow;
     }
@@ -1720,7 +1779,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   double _measureHeaderTextWidth(String text, TextStyle style) {
     final dir = Directionality.of(context);
-    final textScaler = MediaQuery.maybeOf(context)?.textScaler ?? const TextScaler.linear(1.0);
+    final textScaler =
+        MediaQuery.maybeOf(context)?.textScaler ?? const TextScaler.linear(1.0);
     final scale = textScaler.scale(1.0);
     final locale = Localizations.localeOf(context);
     return _measureTextWidthAdvanced(
@@ -1757,10 +1817,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   Widget _wrapTableBody(Widget child) {
     if (widget.config.expandBodyHeightToFitRows) {
-      return SizedBox(
-        height: _expandModeBodyHeight(),
-        child: child,
-      );
+      return SizedBox(height: _expandModeBodyHeight(), child: child);
     }
     return Expanded(child: child);
   }
@@ -1772,12 +1829,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // Left group: sort icon spacing + icon (always shows when sortable)
     final bool showSortIcon = widget.config.enableSorting && column.sortable;
     if (showSortIcon) {
-      padding += 3.0;  // gap between text and icon - reduced
+      padding += 3.0; // gap between text and icon - reduced
       padding += 12.0; // icon width - reduced
     }
     // Resize edge areas (6px each side, but only need minimal space as they're overlay)
     if (widget.config.enableColumnSettings) {
-      padding += 2.0;   // minimal space for right edge
+      padding += 2.0; // minimal space for right edge
     }
     // Safety margin - reduced
     padding += 4.0;
@@ -1790,146 +1847,166 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     final theme = Theme.of(context);
 
     final List<Widget> tableBodyColumnChildren = [
-            // Header
-            if (_shouldShowHeader()) ...[
-              _buildHeader(t, theme),
-              const SizedBox(height: 16),
+      // Header
+      if (_shouldShowHeader()) ...[
+        _buildHeader(t, theme),
+        const SizedBox(height: 16),
+      ],
+
+      // Search
+      if (widget.config.showSearch) ...[_buildSearch(t, theme)],
+
+      // Active Filters
+      if (widget.config.showActiveFilters) ...[
+        ActiveFiltersWidget(
+          columnSearchValues: _columnSearchValues,
+          columnSearchTypes: _columnSearchTypes,
+          columnMultiSelectValues: _columnMultiSelectValues,
+          columnDateFromValues: _columnDateFromValues,
+          columnDateToValues: _columnDateToValues,
+          fromDate: null,
+          toDate: null,
+          columns: widget.config.columns,
+          calendarController: widget.calendarController,
+          onRemoveColumnFilter: (columnName) {
+            setState(() {
+              _columnSearchValues.remove(columnName);
+              _columnSearchTypes.remove(columnName);
+              // اگر category_name پاک می‌شود، category_id را نیز پاک کن
+              if (columnName == 'category_name') {
+                _columnMultiSelectValues.remove('category_id');
+              } else {
+                _columnMultiSelectValues.remove(columnName);
+              }
+              _columnDateFromValues.remove(columnName);
+              _columnDateToValues.remove(columnName);
+              _columnSearchControllers[columnName]?.clear();
+            });
+            _page = 1;
+            _fetchData();
+            _scheduleSavePersistedTableFilters();
+          },
+          onClearAll: _clearAllFilters,
+        ),
+      ],
+
+      // Selection toolbar
+      if (widget.config.enableRowSelection && _selectedRows.isNotEmpty) ...[
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: theme.colorScheme.primary.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.check_box, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                '${_selectedRows.length} مورد انتخاب شده',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: _clearRowSelection,
+                icon: const Icon(Icons.clear),
+                label: const Text('لغو انتخاب'),
+              ),
             ],
-            
-            // Search
-            if (widget.config.showSearch) ...[
-              _buildSearch(t, theme),
-            ],
-            
-            // Active Filters
-            if (widget.config.showActiveFilters) ...[
-              ActiveFiltersWidget(
-                columnSearchValues: _columnSearchValues,
-                columnSearchTypes: _columnSearchTypes,
-                columnMultiSelectValues: _columnMultiSelectValues,
-                columnDateFromValues: _columnDateFromValues,
-                columnDateToValues: _columnDateToValues,
-                fromDate: null,
-                toDate: null,
-                columns: widget.config.columns,
-                calendarController: widget.calendarController,
-                onRemoveColumnFilter: (columnName) {
+          ),
+        ),
+      ],
+
+      // Data Table
+      _wrapTableBody(
+        Shortcuts(
+          shortcuts: <LogicalKeySet, Intent>{
+            LogicalKeySet(LogicalKeyboardKey.keyJ): const MoveRowIntent(1),
+            LogicalKeySet(LogicalKeyboardKey.keyK): const MoveRowIntent(-1),
+            LogicalKeySet(LogicalKeyboardKey.arrowDown): const MoveRowIntent(1),
+            LogicalKeySet(LogicalKeyboardKey.arrowUp): const MoveRowIntent(-1),
+            LogicalKeySet(LogicalKeyboardKey.enter): const ActivateRowIntent(),
+            LogicalKeySet(LogicalKeyboardKey.space):
+                const ToggleSelectionIntent(),
+            LogicalKeySet(LogicalKeyboardKey.escape):
+                const ClearSelectionIntent(),
+            LogicalKeySet(LogicalKeyboardKey.keyA, LogicalKeyboardKey.control):
+                const SelectAllIntent(),
+          },
+          child: Actions(
+            actions: <Type, Action<Intent>>{
+              MoveRowIntent: CallbackAction<MoveRowIntent>(
+                onInvoke: (intent) {
+                  // اگر فیلد جست‌وجو focus دارد، کلیدها را به عنوان متن وارد کن
+                  if (_searchFocusNode.hasFocus) {
+                    return null; // اجازه می‌دهد کلید به صورت عادی پردازش شود
+                  }
+                  if (_items.isEmpty) return null;
                   setState(() {
-                    _columnSearchValues.remove(columnName);
-                    _columnSearchTypes.remove(columnName);
-                    // اگر category_name پاک می‌شود، category_id را نیز پاک کن
-                    if (columnName == 'category_name') {
-                      _columnMultiSelectValues.remove('category_id');
-                    } else {
-                      _columnMultiSelectValues.remove(columnName);
-                    }
-                    _columnDateFromValues.remove(columnName);
-                    _columnDateToValues.remove(columnName);
-                    _columnSearchControllers[columnName]?.clear();
+                    final next =
+                        (_activeRowIndex == -1 ? 0 : _activeRowIndex) +
+                        intent.delta;
+                    _activeRowIndex = next.clamp(0, _items.length - 1);
                   });
-                  _page = 1;
-                  _fetchData();
-                  _scheduleSavePersistedTableFilters();
+                  return null;
                 },
-                onClearAll: _clearAllFilters,
               ),
-            ],
-            
-            // Selection toolbar
-            if (widget.config.enableRowSelection && _selectedRows.isNotEmpty) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: theme.colorScheme.primary.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_box, size: 18, color: theme.colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Text('${_selectedRows.length} مورد انتخاب شده',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: theme.colorScheme.onPrimaryContainer,
-                      ),
-                    ),
-                    const Spacer(),
-                    TextButton.icon(
-                      onPressed: _clearRowSelection,
-                      icon: const Icon(Icons.clear),
-                      label: const Text('لغو انتخاب'),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            
-            // Data Table
-            _wrapTableBody(
-              Shortcuts(
-                shortcuts: <LogicalKeySet, Intent>{
-                  LogicalKeySet(LogicalKeyboardKey.keyJ): const MoveRowIntent(1),
-                  LogicalKeySet(LogicalKeyboardKey.keyK): const MoveRowIntent(-1),
-                  LogicalKeySet(LogicalKeyboardKey.arrowDown): const MoveRowIntent(1),
-                  LogicalKeySet(LogicalKeyboardKey.arrowUp): const MoveRowIntent(-1),
-                  LogicalKeySet(LogicalKeyboardKey.enter): const ActivateRowIntent(),
-                  LogicalKeySet(LogicalKeyboardKey.space): const ToggleSelectionIntent(),
-                  LogicalKeySet(LogicalKeyboardKey.escape): const ClearSelectionIntent(),
-                  LogicalKeySet(LogicalKeyboardKey.keyA, LogicalKeyboardKey.control): const SelectAllIntent(),
+              ActivateRowIntent: CallbackAction<ActivateRowIntent>(
+                onInvoke: (intent) {
+                  if (_activeRowIndex >= 0 &&
+                      _activeRowIndex < _items.length &&
+                      widget.config.onRowTap != null) {
+                    widget.config.onRowTap!(_items[_activeRowIndex]);
+                  }
+                  return null;
                 },
-                child: Actions(
-                  actions: <Type, Action<Intent>>{
-                    MoveRowIntent: CallbackAction<MoveRowIntent>(onInvoke: (intent) {
-                      // اگر فیلد جست‌وجو focus دارد، کلیدها را به عنوان متن وارد کن
-                      if (_searchFocusNode.hasFocus) {
-                        return null; // اجازه می‌دهد کلید به صورت عادی پردازش شود
-                      }
-                      if (_items.isEmpty) return null;
-                      setState(() {
-                        final next = (_activeRowIndex == -1 ? 0 : _activeRowIndex) + intent.delta;
-                        _activeRowIndex = next.clamp(0, _items.length - 1);
-                      });
-                      return null;
-                    }),
-                    ActivateRowIntent: CallbackAction<ActivateRowIntent>(onInvoke: (intent) {
-                      if (_activeRowIndex >= 0 && _activeRowIndex < _items.length && widget.config.onRowTap != null) {
-                        widget.config.onRowTap!(_items[_activeRowIndex]);
-                      }
-                      return null;
-                    }),
-                    ToggleSelectionIntent: CallbackAction<ToggleSelectionIntent>(onInvoke: (intent) {
-                      if (widget.config.enableRowSelection && _activeRowIndex >= 0 && _activeRowIndex < _items.length) {
-                        _toggleRowSelection(_activeRowIndex);
-                      }
-                      return null;
-                    }),
-                    ClearSelectionIntent: CallbackAction<ClearSelectionIntent>(onInvoke: (intent) {
-                      _clearRowSelection();
-                      return null;
-                    }),
-                    SelectAllIntent: CallbackAction<SelectAllIntent>(onInvoke: (intent) {
-                      _selectAllRows();
-                      return null;
-                    }),
-                  },
-                  child: Focus(
-                    focusNode: _tableFocusNode,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTapDown: (_) => _tableFocusNode.requestFocus(),
-                      child: _buildDataTable(t, theme),
-                    ),
-                  ),
-                ),
+              ),
+              ToggleSelectionIntent: CallbackAction<ToggleSelectionIntent>(
+                onInvoke: (intent) {
+                  if (widget.config.enableRowSelection &&
+                      _activeRowIndex >= 0 &&
+                      _activeRowIndex < _items.length) {
+                    _toggleRowSelection(_activeRowIndex);
+                  }
+                  return null;
+                },
+              ),
+              ClearSelectionIntent: CallbackAction<ClearSelectionIntent>(
+                onInvoke: (intent) {
+                  _clearRowSelection();
+                  return null;
+                },
+              ),
+              SelectAllIntent: CallbackAction<SelectAllIntent>(
+                onInvoke: (intent) {
+                  _selectAllRows();
+                  return null;
+                },
+              ),
+            },
+            child: Focus(
+              focusNode: _tableFocusNode,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (_) => _tableFocusNode.requestFocus(),
+                child: _buildDataTable(t, theme),
               ),
             ),
-            
-            // Footer with Pagination
-            if (widget.config.showPagination) ...[
-              const SizedBox(height: 12),
-              _buildFooter(t, theme),
-            ],
+          ),
+        ),
+      ),
+
+      // Footer with Pagination
+      if (widget.config.showPagination) ...[
+        const SizedBox(height: 12),
+        _buildFooter(t, theme),
+      ],
     ];
 
     return Card(
@@ -1944,7 +2021,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         decoration: BoxDecoration(
           color: widget.config.backgroundColor,
           borderRadius: widget.config.borderRadius ?? BorderRadius.circular(12),
-          border: widget.config.showBorder 
+          border: widget.config.showBorder
               ? Border.all(
                   color: widget.config.borderColor ?? theme.dividerColor,
                   width: widget.config.borderWidth ?? 1.0,
@@ -1952,15 +2029,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               : null,
         ),
         child: widget.config.expandBodyHeightToFitRows
-            ? SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: tableBodyColumnChildren,
-                ),
-              )
-            : Column(
-                children: tableBodyColumnChildren,
-              ),
+            ? (widget.config.deferVerticalScrollToParent
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: tableBodyColumnChildren,
+                    )
+                  : SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: tableBodyColumnChildren,
+                      ),
+                    ))
+            : Column(children: tableBodyColumnChildren),
       ),
     );
   }
@@ -1974,12 +2055,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           Tooltip(
             message: MaterialLocalizations.of(context).backButtonTooltip,
             child: IconButton(
-              onPressed: widget.config.onBack ?? () {
-                if (!mounted) return;
-                if (context.canPop()) {
-                  context.pop();
-                }
-              },
+              onPressed:
+                  widget.config.onBack ??
+                  () {
+                    if (!mounted) return;
+                    if (context.canPop()) {
+                      context.pop();
+                    }
+                  },
               icon: const Icon(Icons.arrow_back),
             ),
           ),
@@ -1993,8 +2076,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               borderRadius: BorderRadius.circular(6),
             ),
             child: Icon(
-              Icons.table_chart, 
-              color: theme.colorScheme.onPrimaryContainer, 
+              Icons.table_chart,
+              color: theme.colorScheme.onPrimaryContainer,
               size: 18,
             ),
           ),
@@ -2017,7 +2100,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       ),
                     ),
                   ),
-                if (widget.config.title != null && widget.config.subtitle != null) const SizedBox(width: 8),
+                if (widget.config.title != null &&
+                    widget.config.subtitle != null)
+                  const SizedBox(width: 8),
                 if (widget.config.subtitle != null)
                   Flexible(
                     child: Text(
@@ -2032,7 +2117,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               ],
             ),
           ),
-        
+
         if (isMobileHeader)
           Tooltip(
             message: 'امکانات بیشتر',
@@ -2056,13 +2141,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       mainAxisAlignment: MainAxisAlignment.end,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (widget.config.customHeaderActions != null) ...widget.config.customHeaderActions!,
+                        if (widget.config.customHeaderActions != null)
+                          ...widget.config.customHeaderActions!,
                         if (widget.config.showExportButtons &&
-                            (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null)) ...[
+                            (widget.config.excelEndpoint != null ||
+                                widget.config.pdfEndpoint != null)) ...[
                           const SizedBox(width: 8),
                           _buildExportButtons(t, theme),
                         ],
-                        if (widget.config.showClearFiltersButton && _hasActiveFilters()) ...[
+                        if (widget.config.showClearFiltersButton &&
+                            _hasActiveFilters()) ...[
                           const SizedBox(width: 4),
                           Tooltip(
                             message: t.clear,
@@ -2080,7 +2168,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               },
             ),
           ),
-        
+
         // Actions menu
         PopupMenuButton<String>(
           icon: const Icon(Icons.more_vert),
@@ -2152,11 +2240,18 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   enabled: !_isExporting,
                   child: Row(
                     children: [
-                      Icon(Icons.table_chart_outlined, size: 20, color: Colors.green[700]),
+                      Icon(
+                        Icons.table_chart_outlined,
+                        size: 20,
+                        color: Colors.green[700],
+                      ),
                       const SizedBox(width: 8),
                       Text(t.exportToExcel),
                       const SizedBox(width: 6),
-                      Text('(${t.exportSelected})', style: theme.textTheme.bodySmall),
+                      Text(
+                        '(${t.exportSelected})',
+                        style: theme.textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
@@ -2168,7 +2263,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 enabled: !_isExporting,
                 child: Row(
                   children: [
-                    Icon(Icons.picture_as_pdf, size: 20, color: Colors.red[700]),
+                    Icon(
+                      Icons.picture_as_pdf,
+                      size: 20,
+                      color: Colors.red[700],
+                    ),
                     const SizedBox(width: 8),
                     Text(t.exportToPdf),
                     const SizedBox(width: 6),
@@ -2182,17 +2281,25 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   enabled: !_isExporting,
                   child: Row(
                     children: [
-                      Icon(Icons.picture_as_pdf_outlined, size: 20, color: Colors.red[700]),
+                      Icon(
+                        Icons.picture_as_pdf_outlined,
+                        size: 20,
+                        color: Colors.red[700],
+                      ),
                       const SizedBox(width: 8),
                       Text(t.exportToPdf),
                       const SizedBox(width: 6),
-                      Text('(${t.exportSelected})', style: theme.textTheme.bodySmall),
+                      Text(
+                        '(${t.exportSelected})',
+                        style: theme.textTheme.bodySmall,
+                      ),
                     ],
                   ),
                 ),
             ],
             if (widget.config.showExportButtons &&
-                (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null))
+                (widget.config.excelEndpoint != null ||
+                    widget.config.pdfEndpoint != null))
               PopupMenuItem(
                 value: 'exportOptions',
                 enabled: !_isExporting,
@@ -2222,7 +2329,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   ],
                 ),
               ),
-            if (widget.config.showColumnSettingsButton && widget.config.enableColumnSettings)
+            if (widget.config.showColumnSettingsButton &&
+                widget.config.enableColumnSettings)
               PopupMenuItem(
                 value: 'columnSettings',
                 enabled: !_isLoadingColumnSettings,
@@ -2245,7 +2353,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               value: 'toggleDensity',
               child: Row(
                 children: [
-                  Icon(_dense ? Icons.check_box : Icons.check_box_outline_blank, size: 20),
+                  Icon(
+                    _dense ? Icons.check_box : Icons.check_box_outline_blank,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   const Text('حالت فشرده'),
                 ],
@@ -2255,7 +2366,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               value: 'userGuide',
               child: Row(
                 children: [
-                  Icon(Icons.help_outline, size: 20, color: theme.colorScheme.primary),
+                  Icon(
+                    Icons.help_outline,
+                    size: 20,
+                    color: theme.colorScheme.primary,
+                  ),
                   const SizedBox(width: 8),
                   Text(t.dataTableHelpMenu),
                 ],
@@ -2322,13 +2437,34 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   ),
                   const SizedBox(height: 8),
                   Divider(height: 24, color: theme.colorScheme.outlineVariant),
-                  section(t.dataTableHelpSectionSearchTitle, t.dataTableHelpSectionSearchBody),
-                  section(t.dataTableHelpSectionExportTitle, t.dataTableHelpSectionExportBody),
-                  section(t.dataTableHelpSectionSortTitle, t.dataTableHelpSectionSortBody),
-                  section(t.dataTableHelpSectionKeyboardTitle, t.dataTableHelpSectionKeyboardBody),
-                  section(t.dataTableHelpSectionScrollTitle, t.dataTableHelpSectionScrollBody),
-                  section(t.dataTableHelpSectionSelectionTitle, t.dataTableHelpSectionSelectionBody),
-                  section(t.dataTableHelpSectionOtherTitle, t.dataTableHelpSectionOtherBody),
+                  section(
+                    t.dataTableHelpSectionSearchTitle,
+                    t.dataTableHelpSectionSearchBody,
+                  ),
+                  section(
+                    t.dataTableHelpSectionExportTitle,
+                    t.dataTableHelpSectionExportBody,
+                  ),
+                  section(
+                    t.dataTableHelpSectionSortTitle,
+                    t.dataTableHelpSectionSortBody,
+                  ),
+                  section(
+                    t.dataTableHelpSectionKeyboardTitle,
+                    t.dataTableHelpSectionKeyboardBody,
+                  ),
+                  section(
+                    t.dataTableHelpSectionScrollTitle,
+                    t.dataTableHelpSectionScrollBody,
+                  ),
+                  section(
+                    t.dataTableHelpSectionSelectionTitle,
+                    t.dataTableHelpSectionSelectionBody,
+                  ),
+                  section(
+                    t.dataTableHelpSectionOtherTitle,
+                    t.dataTableHelpSectionOtherBody,
+                  ),
                 ],
               ),
             ),
@@ -2347,8 +2483,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   void _showMobileHeaderActionsSheet(AppLocalizations t, ThemeData theme) {
     final hasClearFilters =
         widget.config.showClearFiltersButton && _hasActiveFilters();
-    final hasExportButtons = widget.config.showExportButtons &&
-        (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null);
+    final hasExportButtons =
+        widget.config.showExportButtons &&
+        (widget.config.excelEndpoint != null ||
+            widget.config.pdfEndpoint != null);
     final customActions = widget.config.customHeaderActions ?? const <Widget>[];
 
     if (!hasClearFilters && !hasExportButtons && customActions.isEmpty) return;
@@ -2392,7 +2530,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   const SizedBox(height: 8),
                   if (widget.config.excelEndpoint != null)
                     ListTile(
-                      leading: Icon(Icons.table_chart, color: Colors.green[700]),
+                      leading: Icon(
+                        Icons.table_chart,
+                        color: Colors.green[700],
+                      ),
                       title: Text(t.exportToExcel),
                       subtitle: Text(t.exportAll),
                       onTap: () {
@@ -2406,7 +2547,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       widget.config.enableRowSelection &&
                       _selectedRows.isNotEmpty)
                     ListTile(
-                      leading: Icon(Icons.table_chart_outlined, color: Colors.green[700]),
+                      leading: Icon(
+                        Icons.table_chart_outlined,
+                        color: Colors.green[700],
+                      ),
                       title: Text(t.exportToExcel),
                       subtitle: Text(t.exportSelected),
                       onTap: () {
@@ -2418,7 +2562,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ),
                   if (widget.config.pdfEndpoint != null)
                     ListTile(
-                      leading: Icon(Icons.picture_as_pdf, color: Colors.red[700]),
+                      leading: Icon(
+                        Icons.picture_as_pdf,
+                        color: Colors.red[700],
+                      ),
                       title: Text(t.exportToPdf),
                       subtitle: Text(t.exportAll),
                       onTap: () {
@@ -2432,7 +2579,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       widget.config.enableRowSelection &&
                       _selectedRows.isNotEmpty)
                     ListTile(
-                      leading: Icon(Icons.picture_as_pdf_outlined, color: Colors.red[700]),
+                      leading: Icon(
+                        Icons.picture_as_pdf_outlined,
+                        color: Colors.red[700],
+                      ),
                       title: Text(t.exportToPdf),
                       subtitle: Text(t.exportSelected),
                       onTap: () {
@@ -2464,11 +2614,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: customActions,
-                  ),
+                  Wrap(spacing: 6, runSpacing: 6, children: customActions),
                 ],
               ],
             ),
@@ -2482,10 +2628,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     return _buildExportButton(t, theme);
   }
 
-  Widget _buildExportButton(
-    AppLocalizations t,
-    ThemeData theme,
-  ) {
+  Widget _buildExportButton(AppLocalizations t, ThemeData theme) {
     return Tooltip(
       message: t.export,
       child: GestureDetector(
@@ -2493,7 +2636,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.5,
+            ),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: theme.colorScheme.outline.withValues(alpha: 0.3),
@@ -2520,13 +2665,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     );
   }
 
-  void _showExportOptions(
-    AppLocalizations t,
-    ThemeData theme,
-  ) {
+  void _showExportOptions(AppLocalizations t, ThemeData theme) {
     // Reset callback flag when opening bottom sheet
     _templateLoadCallbackAdded = false;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -2534,14 +2676,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         builder: (context, setModalState) {
           Future<void> ensureTemplatesLoaded() async {
             if (widget.config.pdfEndpoint == null) return;
-            if (widget.config.businessId == null || widget.config.reportModuleKey == null) return;
-            if (_isLoadingTemplates) return; // Prevent multiple simultaneous loads
-            
+            if (widget.config.businessId == null ||
+                widget.config.reportModuleKey == null)
+              return;
+            if (_isLoadingTemplates)
+              return; // Prevent multiple simultaneous loads
+
             setState(() {
               _isLoadingTemplates = true;
             });
             setModalState(() {});
-            
+
             try {
               final service = ReportTemplateService(ApiClient());
               final list = await service.listTemplates(
@@ -2586,7 +2731,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           return Container(
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -2597,17 +2744,26 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   height: 4,
                   margin: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.4,
+                    ),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                
+
                 // Title
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
-                      Icon(Icons.download, color: theme.colorScheme.primary, size: 20),
+                      Icon(
+                        Icons.download,
+                        color: theme.colorScheme.primary,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         t.export,
@@ -2618,13 +2774,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ],
                   ),
                 ),
-                
+
                 const Divider(height: 1),
-                
+
                 if (widget.config.pdfEndpoint != null) ...[
-                  if (widget.config.businessId != null && widget.config.reportModuleKey != null) ...[
+                  if (widget.config.businessId != null &&
+                      widget.config.reportModuleKey != null) ...[
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       child: Row(
                         children: [
                           const Icon(Icons.description_outlined, size: 18),
@@ -2636,25 +2796,38 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                                     value: _selectedTemplateIdFromList,
                                     isExpanded: true,
                                     decoration: InputDecoration(
-                                      labelText: AppLocalizations.of(context).printTemplatePublished,
+                                      labelText: AppLocalizations.of(
+                                        context,
+                                      ).printTemplatePublished,
                                       isDense: true,
                                       border: const OutlineInputBorder(),
                                     ),
                                     items: [
                                       DropdownMenuItem<int?>(
                                         value: null,
-                                        child: Text(AppLocalizations.of(context).noCustomTemplate),
+                                        child: Text(
+                                          AppLocalizations.of(
+                                            context,
+                                          ).noCustomTemplate,
+                                        ),
                                       ),
                                       ..._availableTemplates.map((tpl) {
                                         final id = (tpl['id'] as num).toInt();
-                                        final name = (tpl['name'] ?? 'Template').toString();
-                                        final isDefault = tpl['is_default'] == true;
+                                        final name = (tpl['name'] ?? 'Template')
+                                            .toString();
+                                        final isDefault =
+                                            tpl['is_default'] == true;
                                         return DropdownMenuItem<int?>(
                                           value: id,
                                           child: Row(
                                             children: [
-                                              if (isDefault) const Icon(Icons.star, size: 16),
-                                              if (isDefault) const SizedBox(width: 6),
+                                              if (isDefault)
+                                                const Icon(
+                                                  Icons.star,
+                                                  size: 16,
+                                                ),
+                                              if (isDefault)
+                                                const SizedBox(width: 6),
                                               Expanded(child: Text(name)),
                                             ],
                                           ),
@@ -2673,12 +2846,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           const SizedBox(width: 8),
                           IconButton(
                             tooltip: AppLocalizations.of(context).reload,
-                            onPressed: _isLoadingTemplates ? null : () {
-                              setState(() {
-                                _templatesLoaded = false;
-                              });
-                              ensureTemplatesLoaded();
-                            },
+                            onPressed: _isLoadingTemplates
+                                ? null
+                                : () {
+                                    setState(() {
+                                      _templatesLoaded = false;
+                                    });
+                                    ensureTemplatesLoaded();
+                                  },
                             icon: const Icon(Icons.refresh),
                           ),
                         ],
@@ -2687,61 +2862,70 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     const Divider(height: 1),
                   ],
                 ],
-            
-            // Excel options
-            if (widget.config.excelEndpoint != null) ...[
-              ListTile(
-                leading: Icon(Icons.table_chart, color: Colors.green[600]),
-                title: Text(t.exportToExcel),
-                subtitle: Text(t.exportAll),
-                onTap: () {
-                  Navigator.pop(context);
-                  _exportData('excel', false);
-                },
-              ),
-              
-              if (widget.config.enableRowSelection && _selectedRows.isNotEmpty)
-                ListTile(
-                  leading: Icon(Icons.table_chart, color: theme.colorScheme.primary),
-                  title: Text(t.exportToExcel),
-                  subtitle: Text(t.exportSelected),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _exportData('excel', true);
-                  },
-                ),
-            ],
-            
-            // PDF options
-            if (widget.config.pdfEndpoint != null) ...[
-              if (widget.config.excelEndpoint != null) const Divider(height: 1),
-              
-              ListTile(
-                leading: Icon(Icons.picture_as_pdf, color: Colors.red[600]),
-                title: Text(t.exportToPdf),
-                subtitle: Text(t.exportAll),
-                onTap: () {
-                  Navigator.pop(context);
-                  _exportData('pdf', false);
-                },
-              ),
-              
-              if (widget.config.enableRowSelection && _selectedRows.isNotEmpty)
-                ListTile(
-                  leading: Icon(Icons.picture_as_pdf, color: theme.colorScheme.primary),
-                  title: Text(t.exportToPdf),
-                  subtitle: Text(t.exportSelected),
-                  onTap: () {
-                    Navigator.pop(context);
-                    _exportData('pdf', true);
-                  },
-                ),
-            ],
-            
-            const SizedBox(height: 16),
-          ],
-        ),
-      );
+
+                // Excel options
+                if (widget.config.excelEndpoint != null) ...[
+                  ListTile(
+                    leading: Icon(Icons.table_chart, color: Colors.green[600]),
+                    title: Text(t.exportToExcel),
+                    subtitle: Text(t.exportAll),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _exportData('excel', false);
+                    },
+                  ),
+
+                  if (widget.config.enableRowSelection &&
+                      _selectedRows.isNotEmpty)
+                    ListTile(
+                      leading: Icon(
+                        Icons.table_chart,
+                        color: theme.colorScheme.primary,
+                      ),
+                      title: Text(t.exportToExcel),
+                      subtitle: Text(t.exportSelected),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _exportData('excel', true);
+                      },
+                    ),
+                ],
+
+                // PDF options
+                if (widget.config.pdfEndpoint != null) ...[
+                  if (widget.config.excelEndpoint != null)
+                    const Divider(height: 1),
+
+                  ListTile(
+                    leading: Icon(Icons.picture_as_pdf, color: Colors.red[600]),
+                    title: Text(t.exportToPdf),
+                    subtitle: Text(t.exportAll),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _exportData('pdf', false);
+                    },
+                  ),
+
+                  if (widget.config.enableRowSelection &&
+                      _selectedRows.isNotEmpty)
+                    ListTile(
+                      leading: Icon(
+                        Icons.picture_as_pdf,
+                        color: theme.colorScheme.primary,
+                      ),
+                      title: Text(t.exportToPdf),
+                      subtitle: Text(t.exportSelected),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _exportData('pdf', true);
+                      },
+                    ),
+                ],
+
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
         },
       ),
     );
@@ -2749,7 +2933,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   Widget _buildFooter(AppLocalizations t, ThemeData theme) {
     // Always show footer if pagination is enabled
-    
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       decoration: BoxDecoration(
@@ -2761,7 +2945,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Footer totals for current page (optional) - on separate row
-          if (widget.config.footerTotals != null && widget.config.footerTotals!.isNotEmpty && _items.isNotEmpty)
+          if (widget.config.footerTotals != null &&
+              widget.config.footerTotals!.isNotEmpty &&
+              _items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: SingleChildScrollView(
@@ -2771,12 +2957,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     final colKey = entry.key;
                     final label = entry.value;
                     double value = 0;
-                    
+
                     // برای balance، اگر summary.current_balance موجود باشد، از آن استفاده می‌کنیم
                     // در غیر این صورت، مانده آخرین ردیف صفحه را نمایش می‌دهیم
                     if (colKey == 'balance') {
                       // ابتدا از summary استفاده می‌کنیم
-                      if (_summary != null && _summary!['current_balance'] != null) {
+                      if (_summary != null &&
+                          _summary!['current_balance'] != null) {
                         try {
                           final summaryValue = _summary!['current_balance'];
                           if (summaryValue is num) {
@@ -2790,7 +2977,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           if (_rawItems.isNotEmpty) {
                             final lastItem = _rawItems.last;
                             try {
-                              final v = DataTableUtils.getCellValue(lastItem, colKey);
+                              final v = DataTableUtils.getCellValue(
+                                lastItem,
+                                colKey,
+                              );
                               if (v is num) {
                                 value = v.toDouble();
                               } else if (v != null) {
@@ -2802,10 +2992,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         }
                       } else if (_items.isNotEmpty) {
                         // اگر summary موجود نباشد، مانده آخرین ردیف را استفاده می‌کنیم
-                        final lastItem = _rawItems.isNotEmpty ? _rawItems.last : null;
+                        final lastItem = _rawItems.isNotEmpty
+                            ? _rawItems.last
+                            : null;
                         try {
                           if (lastItem != null) {
-                            final v = DataTableUtils.getCellValue(lastItem, colKey);
+                            final v = DataTableUtils.getCellValue(
+                              lastItem,
+                              colKey,
+                            );
                             if (v is num) {
                               value = v.toDouble();
                             } else if (v != null) {
@@ -2817,7 +3012,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       }
                     } else {
                       // برای سایر فیلدها، مجموع را محاسبه می‌کنیم
-                      final source = _rawItems.isNotEmpty ? _rawItems : const <Map<String, dynamic>>[];
+                      final source = _rawItems.isNotEmpty
+                          ? _rawItems
+                          : const <Map<String, dynamic>>[];
                       for (final it in source) {
                         try {
                           final v = DataTableUtils.getCellValue(it, colKey);
@@ -2830,7 +3027,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         } catch (_) {}
                       }
                     }
-                    
+
                     // Format number with thousand separators and remove unnecessary decimals
                     final formattedText = DataTableUtils.formatNumber(
                       value,
@@ -2838,11 +3035,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     );
                     return Container(
                       margin: const EdgeInsetsDirectional.only(end: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surface,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
+                        border: Border.all(
+                          color: theme.dividerColor.withValues(alpha: 0.3),
+                        ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -2858,7 +3060,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           Text(
                             formattedText,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              fontFeatures: const [FontFeature.tabularFigures()],
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
                               color: theme.colorScheme.onSurface,
                               fontWeight: FontWeight.w700,
                             ),
@@ -2871,7 +3075,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 ),
               ),
             ),
-          
+
           // Results info and pagination on second row
           LayoutBuilder(
             builder: (context, constraints) {
@@ -2906,7 +3110,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     }).toList(),
                     onChanged: (value) {
                       if (value != null) {
-                        if (widget.localTotalCount != null && widget.onLocalPageSizeChange != null) {
+                        if (widget.localTotalCount != null &&
+                            widget.onLocalPageSizeChange != null) {
                           widget.onLocalPageSizeChange!(value);
                           return;
                         }
@@ -2960,7 +3165,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           tooltip: t.previousPage,
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: theme.colorScheme.primaryContainer,
                             borderRadius: BorderRadius.circular(4),
@@ -3040,22 +3248,25 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   Widget _buildSearch(AppLocalizations t, ThemeData theme) {
     return Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _searchCtrl,
-              focusNode: _searchFocusNode,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search, size: 18),
-                hintText: t.searchInNameEmail,
-                border: const OutlineInputBorder(),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _searchCtrl,
+            focusNode: _searchFocusNode,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search, size: 18),
+              hintText: t.searchInNameEmail,
+              border: const OutlineInputBorder(),
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
               ),
             ),
           ),
-        ],
-      );
+        ),
+      ],
+    );
   }
 
   Widget _buildDataTable(AppLocalizations t, ThemeData theme) {
@@ -3075,7 +3286,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           height: _dense ? 28 : 36,
                           margin: const EdgeInsets.symmetric(horizontal: 6),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
@@ -3087,7 +3299,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             ),
           ),
           const SizedBox(height: 12),
-          Text(widget.config.loadingMessage ?? t.loading, style: theme.textTheme.bodyMedium),
+          Text(
+            widget.config.loadingMessage ?? t.loading,
+            style: theme.textTheme.bodyMedium,
+          ),
           const SizedBox(height: 8),
         ],
       );
@@ -3135,13 +3350,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               Icon(
                 Icons.inbox_outlined,
                 size: 64,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             const SizedBox(height: 16),
             Text(
               widget.config.emptyStateMessage ?? t.noDataFound,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                color: theme.colorScheme.onSurfaceVariant.withValues(
+                  alpha: 0.6,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -3176,46 +3395,56 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   /// ساخت ستون‌های جدول با در نظر گرفتن عرض موجود
-  Widget _buildTableColumns(AppLocalizations t, ThemeData theme, double availableWidth) {
+  Widget _buildTableColumns(
+    AppLocalizations t,
+    ThemeData theme,
+    double availableWidth,
+  ) {
     // Build columns list
     final List<DataColumn2> columns = [];
-    
+
     // Add selection column if enabled (first)
     if (widget.config.enableRowSelection) {
-      columns.add(DataColumn2(
-        label: widget.config.enableMultiRowSelection
-            ? Checkbox(
-                value: _selectedRows.length == _items.length && _items.isNotEmpty,
-                tristate: true,
-                onChanged: (value) {
-                  if (value == true) {
-                    _selectAllRows();
-                  } else {
-                    _clearRowSelection();
-                  }
-                },
-              )
-            : const SizedBox.shrink(),
-        size: ColumnSize.S,
-        fixedWidth: 50.0,
-      ));
+      columns.add(
+        DataColumn2(
+          label: widget.config.enableMultiRowSelection
+              ? Checkbox(
+                  value:
+                      _selectedRows.length == _items.length &&
+                      _items.isNotEmpty,
+                  tristate: true,
+                  onChanged: (value) {
+                    if (value == true) {
+                      _selectAllRows();
+                    } else {
+                      _clearRowSelection();
+                    }
+                  },
+                )
+              : const SizedBox.shrink(),
+          size: ColumnSize.S,
+          fixedWidth: 50.0,
+        ),
+      );
     }
-    
+
     // Add row number column if enabled (second)
     if (widget.config.showRowNumbers) {
-      columns.add(DataColumn2(
-        label: Text(
-          '#',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface,
+      columns.add(
+        DataColumn2(
+          label: Text(
+            '#',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
           ),
+          size: ColumnSize.S,
+          fixedWidth: 60.0,
         ),
-        size: ColumnSize.S,
-        fixedWidth: 60.0,
-      ));
+      );
     }
-    
+
     // Resolve action column (if defined in config)
     ActionColumn? actionColumn;
     for (final c in widget.config.columns) {
@@ -3227,223 +3456,286 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     // Fixed action column immediately after selection and row number columns
     if (actionColumn != null) {
-      columns.add(DataColumn2(
-        label: Text(
-          actionColumn.label,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface,
+      columns.add(
+        DataColumn2(
+          label: Text(
+            actionColumn.label,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
-          overflow: TextOverflow.ellipsis,
+          size: ColumnSize.S,
+          fixedWidth: 80.0,
         ),
-        size: ColumnSize.S,
-        fixedWidth: 80.0,
-      ));
+      );
     }
 
     // Add data columns (use visible columns if column settings are enabled), excluding ActionColumn
-    final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
+    final columnsToShow =
+        widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
         ? _visibleColumns
         : widget.config.columns;
-    List<DataTableColumn> dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
+    List<DataTableColumn> dataColumnsToShow = columnsToShow
+        .where((c) => c is! ActionColumn)
+        .toList();
     // Reorder by pinning if settings available
     if (widget.config.enableColumnSettings && _columnSettings != null) {
       final visibleKeys = _columnSettings!.visibleColumns.toSet();
       final order = _columnSettings!.columnOrder;
-      List<String> middleKeys = order.where((k) => visibleKeys.contains(k)).toList();
-      final leftKeys = _columnSettings!.pinnedLeft.where((k) => middleKeys.contains(k)).toList();
-      final rightKeys = _columnSettings!.pinnedRight.where((k) => middleKeys.contains(k)).toList();
-      middleKeys.removeWhere((k) => leftKeys.contains(k) || rightKeys.contains(k));
+      List<String> middleKeys = order
+          .where((k) => visibleKeys.contains(k))
+          .toList();
+      final leftKeys = _columnSettings!.pinnedLeft
+          .where((k) => middleKeys.contains(k))
+          .toList();
+      final rightKeys = _columnSettings!.pinnedRight
+          .where((k) => middleKeys.contains(k))
+          .toList();
+      middleKeys.removeWhere(
+        (k) => leftKeys.contains(k) || rightKeys.contains(k),
+      );
       List<String> finalOrder = [...leftKeys, ...middleKeys, ...rightKeys];
       final mapByKey = {for (final c in dataColumnsToShow) c.key: c};
-      dataColumnsToShow = finalOrder.map((k) => mapByKey[k]).whereType<DataTableColumn>().toList();
+      dataColumnsToShow = finalOrder
+          .map((k) => mapByKey[k])
+          .whereType<DataTableColumn>()
+          .toList();
     }
-    
+
     // محاسبه و تنظیم عرض ستون‌ها برای پر کردن فضای موجود
     final adjustedColumnWidths = _calculateAndAdjustColumnWidths(
       dataColumnsToShow,
       theme,
       availableWidth,
     );
-    
-    columns.addAll(dataColumnsToShow.map((column) {
-      final headerTextStyle = theme.textTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w600,
-        color: theme.colorScheme.onSurface,
-      ) ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
-      final double baseWidth = DataTableUtils.getColumnWidth(column.width);
-      final double affordancePadding = _getHeaderAffordancePadding(column);
-      final double headerTextWidth = _measureHeaderTextWidth(column.label, headerTextStyle) + affordancePadding;
-      final double minWidth = 96.0;
-      final double defaultWidth = math.max(baseWidth, headerTextWidth);
-      final double savedWidth = _columnSettings?.columnWidths[column.key] ?? defaultWidth;
-      // استفاده از عرض تنظیم شده از متد کمکی
-      final double computedWidth = math.max(
-        adjustedColumnWidths[column.key] ?? savedWidth,
-        minWidth,
-      );
 
-      return DataColumn2(
-        label: _ColumnHeaderWithSearch(
-          text: column.label,
-          sortBy: column.key,
-          currentSort: _sortBy,
-          sortDesc: _sortDesc,
-          headerTextAlign: widget.config.headerTextAlign ?? TextAlign.center,
-          onSort: widget.config.enableSorting
-              ? (key, additive) => _sortByColumnInternal(key, additive: additive)
-              : (_, __) {},
-          onSearch: widget.config.showColumnSearch && column.searchable
-              ? () => _openColumnSearchDialog(column.key, column.label)
-              : () { },
-          hasActiveFilter: _columnSearchValues.containsKey(column.key),
-          enabled: widget.config.enableSorting && column.sortable,
-          onResizeDrag: widget.config.enableColumnSettings ? (dx) {
-            if (_columnSettings == null) return;
-            final current = _columnSettings!.columnWidths[column.key] ?? savedWidth;
-            final next = math.max(minWidth, current + dx);
-            final updated = _columnSettings!.copyWith(
-              columnWidths: {
-                ..._columnSettings!.columnWidths,
-                column.key: next,
-              },
-            );
-            setState(() {
-              _columnSettings = updated;
-            });
-            // Delay saving until drag end to reduce write frequency
-          } : null,
-          onResizeDragEnd: widget.config.enableColumnSettings ? () {
-            if (_columnSettings == null) return;
-            unawaited(
-              ColumnSettingsService.saveColumnSettings(
-                widget.config.effectiveTableId,
-                _columnSettings!,
-                businessId: widget.config.businessId,
-              ),
-            );
-          } : null,
-          onAutoFit: widget.config.enableColumnSettings ? () {
-            if (_columnSettings == null) return;
-            final headerStyle = headerTextStyle;
-            final cellStyle = theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
-            final width = _autoFitColumnWidth(column, headerStyle, cellStyle, minWidth, affordancePadding);
-            final updated = _columnSettings!.copyWith(
-              columnWidths: {
-                ..._columnSettings!.columnWidths,
-                column.key: width,
-              },
-            );
-            setState(() {
-              _columnSettings = updated;
-            });
-            unawaited(
-              ColumnSettingsService.saveColumnSettings(
-                widget.config.effectiveTableId,
-                updated,
-                businessId: widget.config.businessId,
-              ),
-            );
-          } : null,
-          onPinLeft: widget.config.enableColumnSettings ? () {
-            if (_columnSettings == null) return;
-            final updated = _columnSettings!.copyWith(
-              pinnedLeft: {
-                ..._columnSettings!.pinnedLeft,
-                column.key,
-              }.toList(),
-              pinnedRight: _columnSettings!.pinnedRight.where((k) => k != column.key).toList(),
-            );
-            setState(() {
-              _columnSettings = updated;
-              _visibleColumns = _getVisibleColumnsFromSettings(updated);
-            });
-            unawaited(
-              ColumnSettingsService.saveColumnSettings(
-                widget.config.effectiveTableId,
-                updated,
-                businessId: widget.config.businessId,
-              ),
-            );
-          } : null,
-          onPinRight: widget.config.enableColumnSettings ? () {
-            if (_columnSettings == null) return;
-            final updated = _columnSettings!.copyWith(
-              pinnedRight: {
-                ..._columnSettings!.pinnedRight,
-                column.key,
-              }.toList(),
-              pinnedLeft: _columnSettings!.pinnedLeft.where((k) => k != column.key).toList(),
-            );
-            setState(() {
-              _columnSettings = updated;
-              _visibleColumns = _getVisibleColumnsFromSettings(updated);
-            });
-            unawaited(
-              ColumnSettingsService.saveColumnSettings(
-                widget.config.effectiveTableId,
-                updated,
-                businessId: widget.config.businessId,
-              ),
-            );
-          } : null,
-          onUnpin: widget.config.enableColumnSettings ? () {
-            if (_columnSettings == null) return;
-            final updated = _columnSettings!.copyWith(
-              pinnedLeft: _columnSettings!.pinnedLeft.where((k) => k != column.key).toList(),
-              pinnedRight: _columnSettings!.pinnedRight.where((k) => k != column.key).toList(),
-            );
-            setState(() {
-              _columnSettings = updated;
-              _visibleColumns = _getVisibleColumnsFromSettings(updated);
-            });
-            unawaited(
-              ColumnSettingsService.saveColumnSettings(
-                widget.config.effectiveTableId,
-                updated,
-                businessId: widget.config.businessId,
-              ),
-            );
-          } : null,
-          onHide: widget.config.enableColumnSettings ? () {
-            if (_columnSettings == null) return;
-            final updated = _columnSettings!.copyWith(
-              visibleColumns: _columnSettings!.visibleColumns.where((k) => k != column.key).toList(),
-            );
-            setState(() {
-              _columnSettings = updated;
-              _visibleColumns = _getVisibleColumnsFromSettings(updated);
-            });
-            unawaited(
-              ColumnSettingsService.saveColumnSettings(
-                widget.config.effectiveTableId,
-                updated,
-                businessId: widget.config.businessId,
-              ),
-            );
-          } : null,
-          onResetColumns: widget.config.enableColumnSettings ? () async {
-            final defaults = ColumnSettingsService.getDefaultSettings(widget.config.columnKeys);
-            setState(() {
-              _columnSettings = defaults;
-              _visibleColumns = _getVisibleColumnsFromSettings(defaults);
-            });
-            await ColumnSettingsService.saveColumnSettings(
-              widget.config.effectiveTableId,
-              defaults,
-              businessId: widget.config.businessId,
-            );
-          } : null,
-        ),
-        size: DataTableUtils.getColumnSize(column.width),
-        fixedWidth: computedWidth,
-      );
-    }));
+    columns.addAll(
+      dataColumnsToShow.map((column) {
+        final headerTextStyle =
+            theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: theme.colorScheme.onSurface,
+            ) ??
+            const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+        final double baseWidth = DataTableUtils.getColumnWidth(column.width);
+        final double affordancePadding = _getHeaderAffordancePadding(column);
+        final double headerTextWidth =
+            _measureHeaderTextWidth(column.label, headerTextStyle) +
+            affordancePadding;
+        final double minWidth = 96.0;
+        final double defaultWidth = math.max(baseWidth, headerTextWidth);
+        final double savedWidth =
+            _columnSettings?.columnWidths[column.key] ?? defaultWidth;
+        // استفاده از عرض تنظیم شده از متد کمکی
+        final double computedWidth = math.max(
+          adjustedColumnWidths[column.key] ?? savedWidth,
+          minWidth,
+        );
+
+        return DataColumn2(
+          label: _ColumnHeaderWithSearch(
+            text: column.label,
+            sortBy: column.key,
+            currentSort: _sortBy,
+            sortDesc: _sortDesc,
+            headerTextAlign: widget.config.headerTextAlign ?? TextAlign.center,
+            onSort: widget.config.enableSorting
+                ? (key, additive) =>
+                      _sortByColumnInternal(key, additive: additive)
+                : (_, __) {},
+            onSearch: widget.config.showColumnSearch && column.searchable
+                ? () => _openColumnSearchDialog(column.key, column.label)
+                : () {},
+            hasActiveFilter: _columnSearchValues.containsKey(column.key),
+            enabled: widget.config.enableSorting && column.sortable,
+            onResizeDrag: widget.config.enableColumnSettings
+                ? (dx) {
+                    if (_columnSettings == null) return;
+                    final current =
+                        _columnSettings!.columnWidths[column.key] ?? savedWidth;
+                    final next = math.max(minWidth, current + dx);
+                    final updated = _columnSettings!.copyWith(
+                      columnWidths: {
+                        ..._columnSettings!.columnWidths,
+                        column.key: next,
+                      },
+                    );
+                    setState(() {
+                      _columnSettings = updated;
+                    });
+                    // Delay saving until drag end to reduce write frequency
+                  }
+                : null,
+            onResizeDragEnd: widget.config.enableColumnSettings
+                ? () {
+                    if (_columnSettings == null) return;
+                    unawaited(
+                      ColumnSettingsService.saveColumnSettings(
+                        widget.config.effectiveTableId,
+                        _columnSettings!,
+                        businessId: widget.config.businessId,
+                      ),
+                    );
+                  }
+                : null,
+            onAutoFit: widget.config.enableColumnSettings
+                ? () {
+                    if (_columnSettings == null) return;
+                    final headerStyle = headerTextStyle;
+                    final cellStyle =
+                        theme.textTheme.bodyMedium ??
+                        const TextStyle(fontSize: 14);
+                    final width = _autoFitColumnWidth(
+                      column,
+                      headerStyle,
+                      cellStyle,
+                      minWidth,
+                      affordancePadding,
+                    );
+                    final updated = _columnSettings!.copyWith(
+                      columnWidths: {
+                        ..._columnSettings!.columnWidths,
+                        column.key: width,
+                      },
+                    );
+                    setState(() {
+                      _columnSettings = updated;
+                    });
+                    unawaited(
+                      ColumnSettingsService.saveColumnSettings(
+                        widget.config.effectiveTableId,
+                        updated,
+                        businessId: widget.config.businessId,
+                      ),
+                    );
+                  }
+                : null,
+            onPinLeft: widget.config.enableColumnSettings
+                ? () {
+                    if (_columnSettings == null) return;
+                    final updated = _columnSettings!.copyWith(
+                      pinnedLeft: {
+                        ..._columnSettings!.pinnedLeft,
+                        column.key,
+                      }.toList(),
+                      pinnedRight: _columnSettings!.pinnedRight
+                          .where((k) => k != column.key)
+                          .toList(),
+                    );
+                    setState(() {
+                      _columnSettings = updated;
+                      _visibleColumns = _getVisibleColumnsFromSettings(updated);
+                    });
+                    unawaited(
+                      ColumnSettingsService.saveColumnSettings(
+                        widget.config.effectiveTableId,
+                        updated,
+                        businessId: widget.config.businessId,
+                      ),
+                    );
+                  }
+                : null,
+            onPinRight: widget.config.enableColumnSettings
+                ? () {
+                    if (_columnSettings == null) return;
+                    final updated = _columnSettings!.copyWith(
+                      pinnedRight: {
+                        ..._columnSettings!.pinnedRight,
+                        column.key,
+                      }.toList(),
+                      pinnedLeft: _columnSettings!.pinnedLeft
+                          .where((k) => k != column.key)
+                          .toList(),
+                    );
+                    setState(() {
+                      _columnSettings = updated;
+                      _visibleColumns = _getVisibleColumnsFromSettings(updated);
+                    });
+                    unawaited(
+                      ColumnSettingsService.saveColumnSettings(
+                        widget.config.effectiveTableId,
+                        updated,
+                        businessId: widget.config.businessId,
+                      ),
+                    );
+                  }
+                : null,
+            onUnpin: widget.config.enableColumnSettings
+                ? () {
+                    if (_columnSettings == null) return;
+                    final updated = _columnSettings!.copyWith(
+                      pinnedLeft: _columnSettings!.pinnedLeft
+                          .where((k) => k != column.key)
+                          .toList(),
+                      pinnedRight: _columnSettings!.pinnedRight
+                          .where((k) => k != column.key)
+                          .toList(),
+                    );
+                    setState(() {
+                      _columnSettings = updated;
+                      _visibleColumns = _getVisibleColumnsFromSettings(updated);
+                    });
+                    unawaited(
+                      ColumnSettingsService.saveColumnSettings(
+                        widget.config.effectiveTableId,
+                        updated,
+                        businessId: widget.config.businessId,
+                      ),
+                    );
+                  }
+                : null,
+            onHide: widget.config.enableColumnSettings
+                ? () {
+                    if (_columnSettings == null) return;
+                    final updated = _columnSettings!.copyWith(
+                      visibleColumns: _columnSettings!.visibleColumns
+                          .where((k) => k != column.key)
+                          .toList(),
+                    );
+                    setState(() {
+                      _columnSettings = updated;
+                      _visibleColumns = _getVisibleColumnsFromSettings(updated);
+                    });
+                    unawaited(
+                      ColumnSettingsService.saveColumnSettings(
+                        widget.config.effectiveTableId,
+                        updated,
+                        businessId: widget.config.businessId,
+                      ),
+                    );
+                  }
+                : null,
+            onResetColumns: widget.config.enableColumnSettings
+                ? () async {
+                    final defaults = ColumnSettingsService.getDefaultSettings(
+                      widget.config.columnKeys,
+                    );
+                    setState(() {
+                      _columnSettings = defaults;
+                      _visibleColumns = _getVisibleColumnsFromSettings(
+                        defaults,
+                      );
+                    });
+                    await ColumnSettingsService.saveColumnSettings(
+                      widget.config.effectiveTableId,
+                      defaults,
+                      businessId: widget.config.businessId,
+                    );
+                  }
+                : null,
+          ),
+          size: DataTableUtils.getColumnSize(column.width),
+          fixedWidth: computedWidth,
+        );
+      }),
+    );
 
     // استفاده از Scrollbar با controller برای اطمینان از اسکرول دوطرفه
     // Scrollbar می‌تواند controller را حتی قبل از attach شدن handle کند
     final hasScrollPosition = _horizontalScrollController.hasClients;
-    
+
     return Scrollbar(
       controller: _horizontalScrollController,
       thumbVisibility: hasScrollPosition,
@@ -3451,7 +3743,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         data: DataTableThemeData(
           headingRowColor: WidgetStatePropertyAll(
             widget.config.headerBackgroundColor ??
-            theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+                theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.7,
+                ),
           ),
           headingTextStyle: theme.textTheme.titleSmall?.copyWith(
             fontWeight: FontWeight.w700,
@@ -3472,122 +3766,152 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               : 0,
           dataRowHeight: widget.config.dataRowHeight ?? (_dense ? 38 : 48),
           columns: columns,
-      rows: _items.asMap().entries.map((entry) {
-        final index = entry.key;
-        final item = entry.value;
-        final isSelected = _selectedRows.contains(index);
-        
-        // Build cells list
-        final List<DataCell> cells = [];
-        
-        // Add selection cell if enabled (first)
-        if (widget.config.enableRowSelection) {
-          cells.add(DataCell(
-            Checkbox(
-              value: isSelected,
-              onChanged: (value) => _toggleRowSelection(index),
-            ),
-          ));
-        }
-        
-        // Add row number cell if enabled (second)
-        if (widget.config.showRowNumbers) {
-          cells.add(DataCell(
-            Text(
-              '${((_page - 1) * _limit) + index + 1}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ));
-        }
-        
-        // 3) Fixed action cell (immediately after selection and row number)
-        // Resolve action column once (same logic as header)
-        ActionColumn? actionColumn;
-        for (final c in widget.config.columns) {
-          if (c is ActionColumn) {
-            actionColumn = c;
-            break;
-          }
-        }
-        if (actionColumn != null) {
-          cells.add(DataCell(
-            _buildActionButtons(item, actionColumn),
-          ));
-        }
+          rows: _items.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            final isSelected = _selectedRows.contains(index);
 
-        // 4) Add data cells
-        if (widget.config.customRowBuilder != null) {
-          cells.add(DataCell(
-            widget.config.customRowBuilder!(item) ?? const SizedBox.shrink(),
-          ));
-        } else {
-          final columnsToShow = widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
-              ? _visibleColumns
-              : widget.config.columns;
-          List<DataTableColumn> dataColumnsToShow = columnsToShow.where((c) => c is! ActionColumn).toList();
-          
-          // Reorder by pinning if settings available (same logic as headers)
-          if (widget.config.enableColumnSettings && _columnSettings != null) {
-            final visibleKeys = _columnSettings!.visibleColumns.toSet();
-            final order = _columnSettings!.columnOrder;
-            List<String> middleKeys = order.where((k) => visibleKeys.contains(k)).toList();
-            final leftKeys = _columnSettings!.pinnedLeft.where((k) => middleKeys.contains(k)).toList();
-            final rightKeys = _columnSettings!.pinnedRight.where((k) => middleKeys.contains(k)).toList();
-            middleKeys.removeWhere((k) => leftKeys.contains(k) || rightKeys.contains(k));
-            List<String> finalOrder = [...leftKeys, ...middleKeys, ...rightKeys];
-            final mapByKey = {for (final c in dataColumnsToShow) c.key: c};
-            dataColumnsToShow = finalOrder.map((k) => mapByKey[k]).whereType<DataTableColumn>().toList();
-          }
-              
-          cells.addAll(dataColumnsToShow.map((column) {
-            return DataCell(
-              _buildCellContent(item, column, index),
-            );
-          }));
-        }
-        
-        return DataRow2(
-          color: WidgetStateProperty.resolveWith<Color?>((states) {
-            if (states.contains(WidgetState.selected)) {
-              return theme.colorScheme.primary.withValues(alpha: 0.08);
+            // Build cells list
+            final List<DataCell> cells = [];
+
+            // Add selection cell if enabled (first)
+            if (widget.config.enableRowSelection) {
+              cells.add(
+                DataCell(
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (value) => _toggleRowSelection(index),
+                  ),
+                ),
+              );
             }
-            if (states.contains(WidgetState.hovered)) {
-              return theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3);
+
+            // Add row number cell if enabled (second)
+            if (widget.config.showRowNumbers) {
+              cells.add(
+                DataCell(
+                  Text(
+                    '${((_page - 1) * _limit) + index + 1}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              );
             }
-            if (index == _activeRowIndex && _tableFocusNode.hasFocus) {
-              return theme.colorScheme.primary.withValues(alpha: 0.06);
+
+            // 3) Fixed action cell (immediately after selection and row number)
+            // Resolve action column once (same logic as header)
+            ActionColumn? actionColumn;
+            for (final c in widget.config.columns) {
+              if (c is ActionColumn) {
+                actionColumn = c;
+                break;
+              }
             }
-            // Custom per-row color if provided
-            if (widget.config.rowColorBuilder != null) {
-              try {
-                final c = widget.config.rowColorBuilder!(item, index);
-                if (c != null) return c;
-              } catch (_) {}
+            if (actionColumn != null) {
+              cells.add(DataCell(_buildActionButtons(item, actionColumn)));
             }
-            final Color? base = widget.config.rowBackgroundColor;
-            final Color? alt = widget.config.alternateRowBackgroundColor ??
-                theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.15);
-            return (index % 2 == 1) ? alt : base;
-          }),
-          selected: isSelected,
-          onTap: widget.config.onRowTap != null
-              ? () {
-                  if (_suppressNextRowTap) {
-                    _suppressNextRowTap = false;
-                    return;
-                  }
-                  widget.config.onRowTap!(item);
+
+            // 4) Add data cells
+            if (widget.config.customRowBuilder != null) {
+              cells.add(
+                DataCell(
+                  widget.config.customRowBuilder!(item) ??
+                      const SizedBox.shrink(),
+                ),
+              );
+            } else {
+              final columnsToShow =
+                  widget.config.enableColumnSettings &&
+                      _visibleColumns.isNotEmpty
+                  ? _visibleColumns
+                  : widget.config.columns;
+              List<DataTableColumn> dataColumnsToShow = columnsToShow
+                  .where((c) => c is! ActionColumn)
+                  .toList();
+
+              // Reorder by pinning if settings available (same logic as headers)
+              if (widget.config.enableColumnSettings &&
+                  _columnSettings != null) {
+                final visibleKeys = _columnSettings!.visibleColumns.toSet();
+                final order = _columnSettings!.columnOrder;
+                List<String> middleKeys = order
+                    .where((k) => visibleKeys.contains(k))
+                    .toList();
+                final leftKeys = _columnSettings!.pinnedLeft
+                    .where((k) => middleKeys.contains(k))
+                    .toList();
+                final rightKeys = _columnSettings!.pinnedRight
+                    .where((k) => middleKeys.contains(k))
+                    .toList();
+                middleKeys.removeWhere(
+                  (k) => leftKeys.contains(k) || rightKeys.contains(k),
+                );
+                List<String> finalOrder = [
+                  ...leftKeys,
+                  ...middleKeys,
+                  ...rightKeys,
+                ];
+                final mapByKey = {for (final c in dataColumnsToShow) c.key: c};
+                dataColumnsToShow = finalOrder
+                    .map((k) => mapByKey[k])
+                    .whereType<DataTableColumn>()
+                    .toList();
+              }
+
+              cells.addAll(
+                dataColumnsToShow.map((column) {
+                  return DataCell(_buildCellContent(item, column, index));
+                }),
+              );
+            }
+
+            return DataRow2(
+              color: WidgetStateProperty.resolveWith<Color?>((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return theme.colorScheme.primary.withValues(alpha: 0.08);
                 }
-              : null,
-          onDoubleTap: widget.config.onRowDoubleTap != null 
-              ? () => widget.config.onRowDoubleTap!(item)
-              : null,
-          cells: cells,
-        );
-      }).toList(),
-      ),
+                if (states.contains(WidgetState.hovered)) {
+                  return theme.colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.3,
+                  );
+                }
+                if (index == _activeRowIndex && _tableFocusNode.hasFocus) {
+                  return theme.colorScheme.primary.withValues(alpha: 0.06);
+                }
+                // Custom per-row color if provided
+                if (widget.config.rowColorBuilder != null) {
+                  try {
+                    final c = widget.config.rowColorBuilder!(item, index);
+                    if (c != null) return c;
+                  } catch (_) {}
+                }
+                final Color? base = widget.config.rowBackgroundColor;
+                final Color? alt =
+                    widget.config.alternateRowBackgroundColor ??
+                    theme.colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.15,
+                    );
+                return (index % 2 == 1) ? alt : base;
+              }),
+              selected: isSelected,
+              onTap: widget.config.onRowTap != null
+                  ? () {
+                      if (_suppressNextRowTap) {
+                        _suppressNextRowTap = false;
+                        return;
+                      }
+                      widget.config.onRowTap!(item);
+                    }
+                  : null,
+              onDoubleTap: widget.config.onRowDoubleTap != null
+                  ? () => widget.config.onRowDoubleTap!(item)
+                  : null,
+              cells: cells,
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -3605,11 +3929,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           return Alignment.center;
       }
     }
+
     // 1) Custom widget builder takes precedence
     if (column is CustomColumn && column.builder != null) {
       return column.builder!(item, index);
     }
-    
+
     // 2) Action column
     if (column is ActionColumn) {
       return _buildActionButtons(item, column);
@@ -3620,7 +3945,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (column is TextColumn && column.formatter != null) {
       final text = column.formatter!(item) ?? '';
       final overflow = _getOverflow(column);
-       final align = _getTextAlign(column);
+      final align = _getTextAlign(column);
       final textWidget = Text(
         text,
         textAlign: align,
@@ -3714,7 +4039,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   Widget _buildActionButtons(dynamic item, ActionColumn column) {
     if (column.actions.isEmpty) return const SizedBox.shrink();
-    
+
     return Listener(
       onPointerDown: (_) {
         // Clicking the actions menu is inside the row; suppress row onTap once.
@@ -3743,7 +4068,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 children: [
                   Icon(
                     action.icon,
-                    color: action.isDestructive 
+                    color: action.isDestructive
                         ? Theme.of(context).colorScheme.error
                         : (action.color ?? Theme.of(context).iconTheme.color),
                     size: 18,
@@ -3765,7 +4090,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       return widget.config.cellTextAlign!;
     }
     // Fallbacks to column-specific alignment, then default center
-    if (column is TextColumn && column.textAlign != null) return column.textAlign!;
+    if (column is TextColumn && column.textAlign != null)
+      return column.textAlign!;
     if (column is NumberColumn) return column.textAlign;
     if (column is DateColumn) return column.textAlign;
     return TextAlign.center;
@@ -3775,11 +4101,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // Show header if there is a title OR any header controls/actions are enabled.
     if (widget.config.title != null) return true;
     if (widget.config.showBackButton) return true;
-    if (widget.config.showClearFiltersButton && _hasActiveFilters()) return true;
-    if (widget.config.showExportButtons && (widget.config.excelEndpoint != null || widget.config.pdfEndpoint != null)) return true;
-    if (widget.config.customHeaderActions != null && widget.config.customHeaderActions!.isNotEmpty) return true;
+    if (widget.config.showClearFiltersButton && _hasActiveFilters())
+      return true;
+    if (widget.config.showExportButtons &&
+        (widget.config.excelEndpoint != null ||
+            widget.config.pdfEndpoint != null))
+      return true;
+    if (widget.config.customHeaderActions != null &&
+        widget.config.customHeaderActions!.isNotEmpty)
+      return true;
     if (widget.config.showRefreshButton) return true;
-    if (widget.config.showColumnSettingsButton && widget.config.enableColumnSettings) return true;
+    if (widget.config.showColumnSettingsButton &&
+        widget.config.enableColumnSettings)
+      return true;
     // Keep header for density toggle / overflow menu consistency
     return true;
   }
@@ -3803,9 +4137,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     double minWidth,
     double affordancePadding, {
     int? sampleCountOverride,
-  }
-  ) {
-    final double headerWidth = _measureHeaderTextWidth(column.label, headerTextStyle) + affordancePadding;
+  }) {
+    final double headerWidth =
+        _measureHeaderTextWidth(column.label, headerTextStyle) +
+        affordancePadding;
     final TextDirection dir = Directionality.of(context);
     double maxCellWidth = 0;
     final limit = sampleCountOverride ?? 50;
@@ -3821,7 +4156,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         text = column.formatter!(item) ?? '';
       }
       if (text.isEmpty) continue;
-      final textScaler = MediaQuery.maybeOf(context)?.textScaler ?? const TextScaler.linear(1.0);
+      final textScaler =
+          MediaQuery.maybeOf(context)?.textScaler ??
+          const TextScaler.linear(1.0);
       final scale = textScaler.scale(1.0);
       final locale = Localizations.localeOf(context);
       final w = _measureTextWidthAdvanced(
@@ -3835,13 +4172,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     }
     // Padding for cell content
     final cellPadding = 32.0;
-    final computed = math.max(minWidth, math.max(headerWidth, maxCellWidth + cellPadding));
+    final computed = math.max(
+      minWidth,
+      math.max(headerWidth, maxCellWidth + cellPadding),
+    );
     return computed;
   }
 
   /// محاسبه minWidth برای DataTable2 بر اساس عرض ستون‌ها
   /// این جلوی warning "combined width of columns ... is greater than available parent width" را می‌گیرد
-  double _calculateMinTableWidth(List<DataColumn2> columns, double availableWidth) {
+  double _calculateMinTableWidth(
+    List<DataColumn2> columns,
+    double availableWidth,
+  ) {
     // محاسبه مجموع fixedWidth ستون‌ها
     double totalFixedWidth = 0.0;
     for (final col in columns) {
@@ -3849,19 +4192,19 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         totalFixedWidth += col.fixedWidth!;
       }
     }
-    
+
     // DataTable2 assertion چک می‌کند که minWidth >= totalFixedWidth + (horizontalMargin * 2)
     // horizontalMargin در DataTable2 برابر با 10 است، پس باید 20 اضافه کنیم
     const horizontalMarginTotal = 20.0; // horizontalMargin * 2 = 10 * 2
-    
+
     // minWidth باید حداقل برابر با totalFixedWidth + horizontalMarginTotal باشد تا assertion نخورد
     final minRequiredWidth = totalFixedWidth + horizontalMarginTotal;
-    
+
     // اگر availableWidth infinity است یا نامعتبر است، فقط minRequiredWidth را برگردانیم
     if (!availableWidth.isFinite || availableWidth <= 0) {
       return minRequiredWidth;
     }
-    
+
     // همیشه minRequiredWidth را برگردانیم تا از assertion error جلوگیری شود
     // DataTable2 به صورت خودکار scroll می‌شود اگر فضا کافی نباشد
     return minRequiredWidth;
@@ -3875,25 +4218,27 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     ThemeData theme,
     double availableWidth,
   ) {
-    final headerTextStyle = theme.textTheme.titleSmall?.copyWith(
-      fontWeight: FontWeight.w600,
-      color: theme.colorScheme.onSurface,
-    ) ?? const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
-    
+    final headerTextStyle =
+        theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+          color: theme.colorScheme.onSurface,
+        ) ??
+        const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+
     // محاسبه عرض کل ستون‌ها
     double totalColumnsWidth = 0.0;
     final Map<String, double> columnWidths = {};
-    
+
     // عرض ستون selection (اگر فعال باشد)
     if (widget.config.enableRowSelection) {
       totalColumnsWidth += 50.0; // عرض تقریبی checkbox column
     }
-    
+
     // عرض ستون row number (اگر فعال باشد)
     if (widget.config.showRowNumbers) {
       totalColumnsWidth += 60.0; // عرض تقریبی row number column
     }
-    
+
     // عرض ستون action (اگر وجود داشته باشد)
     ActionColumn? actionColumn;
     for (final c in widget.config.columns) {
@@ -3903,43 +4248,51 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         break;
       }
     }
-    
+
     // محاسبه عرض ستون‌های داده
     for (final column in dataColumnsToShow) {
       final double baseWidth = DataTableUtils.getColumnWidth(column.width);
       final double affordancePadding = _getHeaderAffordancePadding(column);
-      final double headerTextWidth = _measureHeaderTextWidth(column.label, headerTextStyle) + affordancePadding;
+      final double headerTextWidth =
+          _measureHeaderTextWidth(column.label, headerTextStyle) +
+          affordancePadding;
       final double minWidth = 96.0;
       final double defaultWidth = math.max(baseWidth, headerTextWidth);
-      final double savedWidth = _columnSettings?.columnWidths[column.key] ?? defaultWidth;
+      final double savedWidth =
+          _columnSettings?.columnWidths[column.key] ?? defaultWidth;
       final double computedWidth = math.max(savedWidth, minWidth);
-      
+
       columnWidths[column.key] = computedWidth;
       totalColumnsWidth += computedWidth;
     }
-    
+
     // اضافه کردن horizontalMargin (10 * 2 = 20)
     totalColumnsWidth += 20.0;
-    
+
     // اگر autoFillAvailableWidth فعال باشد و عرض کل کمتر از عرض موجود باشد،
     // عرض ستون‌ها را به نسبت افزایش می‌دهیم تا فضای خالی پر شود
-    if (widget.config.autoFillAvailableWidth && 
+    if (widget.config.autoFillAvailableWidth &&
         totalColumnsWidth < availableWidth &&
         dataColumnsToShow.isNotEmpty) {
       // محاسبه ضریب افزایش (فقط برای ستون‌های داده)
-      final dataColumnsTotalWidth = totalColumnsWidth - 20.0 - 
+      final dataColumnsTotalWidth =
+          totalColumnsWidth -
+          20.0 -
           (widget.config.enableRowSelection ? 50.0 : 0.0) -
           (widget.config.showRowNumbers ? 60.0 : 0.0) -
           (actionColumn != null ? 80.0 : 0.0);
-      
-      final availableForDataColumns = availableWidth - 20.0 - 
+
+      final availableForDataColumns =
+          availableWidth -
+          20.0 -
           (widget.config.enableRowSelection ? 50.0 : 0.0) -
           (widget.config.showRowNumbers ? 60.0 : 0.0) -
           (actionColumn != null ? 80.0 : 0.0);
-      
-      if (dataColumnsTotalWidth > 0 && availableForDataColumns > dataColumnsTotalWidth) {
+
+      if (dataColumnsTotalWidth > 0 &&
+          availableForDataColumns > dataColumnsTotalWidth) {
         final scaleFactor = availableForDataColumns / dataColumnsTotalWidth;
-        
+
         // افزایش عرض ستون‌های داده به نسبت
         for (final column in dataColumnsToShow) {
           final currentWidth = columnWidths[column.key] ?? 0.0;
@@ -3949,7 +4302,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
       }
     }
-    
+
     return columnWidths;
   }
 }
@@ -3995,7 +4348,8 @@ class _ColumnHeaderWithSearch extends StatefulWidget {
   });
 
   @override
-  State<_ColumnHeaderWithSearch> createState() => _ColumnHeaderWithSearchState();
+  State<_ColumnHeaderWithSearch> createState() =>
+      _ColumnHeaderWithSearchState();
 }
 
 class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
@@ -4006,7 +4360,7 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isActive = widget.currentSort == widget.sortBy;
-    
+
     Alignment _mapTextAlign(TextAlign align) {
       switch (align) {
         case TextAlign.left:
@@ -4018,22 +4372,25 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
           return Alignment.center;
       }
     }
-    
-    final bool showColumnSettings = widget.onPinLeft != null || 
-                                    widget.onPinRight != null || 
-                                    widget.onUnpin != null || 
-                                    widget.onHide != null;
+
+    final bool showColumnSettings =
+        widget.onPinLeft != null ||
+        widget.onPinRight != null ||
+        widget.onUnpin != null ||
+        widget.onHide != null;
     final bool canResize = widget.onResizeDrag != null;
     // Show menu if there are column settings or search is available (always show menu on hover)
-    final bool showMenu = showColumnSettings || (_isHovered || widget.hasActiveFilter);
-    
+    final bool showMenu =
+        showColumnSettings || (_isHovered || widget.hasActiveFilter);
+
     // Common button size and padding
     const double buttonIconSize = 16.0;
     const double buttonPadding = 6.0;
     const double buttonSize = buttonIconSize + (buttonPadding * 2);
-    
+
     return Tooltip(
-      message: 'کلیک برای مرتب‌سازی • Shift+کلیک برای افزودن سطح دوم مرتب‌سازی • راست‌کلیک برای منوی تنظیمات • درگ لبه راست برای تغییر عرض',
+      message:
+          'کلیک برای مرتب‌سازی • Shift+کلیک برای افزودن سطح دوم مرتب‌سازی • راست‌کلیک برای منوی تنظیمات • درگ لبه راست برای تغییر عرض',
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() {
@@ -4044,23 +4401,29 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
           onTap: widget.enabled
               ? () {
                   final keys = HardwareKeyboard.instance.logicalKeysPressed;
-                  final additive = keys.contains(LogicalKeyboardKey.shiftLeft) || keys.contains(LogicalKeyboardKey.shiftRight);
+                  final additive =
+                      keys.contains(LogicalKeyboardKey.shiftLeft) ||
+                      keys.contains(LogicalKeyboardKey.shiftRight);
                   widget.onSort(widget.sortBy, additive);
                 }
               : null,
-          overlayColor: WidgetStatePropertyAll(theme.colorScheme.primary.withValues(alpha: 0.05)),
+          overlayColor: WidgetStatePropertyAll(
+            theme.colorScheme.primary.withValues(alpha: 0.05),
+          ),
           borderRadius: BorderRadius.zero,
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 6.0),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+              color: theme.colorScheme.surfaceContainerHighest.withValues(
+                alpha: 0.7,
+              ),
             ),
             child: Stack(
               children: [
                 // Main content: text and sort icon
                 Padding(
                   padding: EdgeInsets.only(
-                    right: showMenu 
+                    right: showMenu
                         ? (canResize ? buttonSize + 6.0 : buttonSize)
                         : (canResize ? 6.0 : 0),
                   ),
@@ -4078,7 +4441,9 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
                               textAlign: widget.headerTextAlign,
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface,
+                                color: isActive
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.onSurface,
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -4088,7 +4453,9 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
                           const SizedBox(width: 3),
                           if (isActive)
                             Icon(
-                              widget.sortDesc ? Icons.arrow_downward : Icons.arrow_upward,
+                              widget.sortDesc
+                                  ? Icons.arrow_downward
+                                  : Icons.arrow_upward,
                               size: 12,
                               color: theme.colorScheme.primary,
                             )
@@ -4096,7 +4463,8 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
                             Icon(
                               Icons.unfold_more,
                               size: 12,
-                              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+                              color: theme.colorScheme.onSurfaceVariant
+                                  .withValues(alpha: 0.5),
                             ),
                         ],
                       ],
@@ -4119,13 +4487,15 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
                           height: buttonSize,
                           padding: const EdgeInsets.all(buttonPadding),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.6),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Icon(
                             Icons.more_vert,
                             size: buttonIconSize,
-                            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.8),
                           ),
                         ),
                         onSelected: (value) {
@@ -4159,7 +4529,7 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
                                 Icon(
                                   Icons.search,
                                   size: 16,
-                                  color: widget.hasActiveFilter 
+                                  color: widget.hasActiveFilter
                                       ? theme.colorScheme.primary
                                       : theme.iconTheme.color,
                                 ),
@@ -4179,21 +4549,37 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
                               ],
                             ),
                           ),
-                          if (showColumnSettings)
-                            const PopupMenuDivider(),
+                          if (showColumnSettings) const PopupMenuDivider(),
                           if (widget.onPinLeft != null)
-                            const PopupMenuItem(value: 'pinLeft', child: Text('پین چپ')),
+                            const PopupMenuItem(
+                              value: 'pinLeft',
+                              child: Text('پین چپ'),
+                            ),
                           if (widget.onPinRight != null)
-                            const PopupMenuItem(value: 'pinRight', child: Text('پین راست')),
+                            const PopupMenuItem(
+                              value: 'pinRight',
+                              child: Text('پین راست'),
+                            ),
                           if (widget.onUnpin != null)
-                            const PopupMenuItem(value: 'unpin', child: Text('برداشتن پین')),
-                          if (widget.onUnpin != null || widget.onPinLeft != null || widget.onPinRight != null)
+                            const PopupMenuItem(
+                              value: 'unpin',
+                              child: Text('برداشتن پین'),
+                            ),
+                          if (widget.onUnpin != null ||
+                              widget.onPinLeft != null ||
+                              widget.onPinRight != null)
                             const PopupMenuDivider(),
                           if (widget.onHide != null)
-                            const PopupMenuItem(value: 'hide', child: Text('مخفی کردن ستون')),
+                            const PopupMenuItem(
+                              value: 'hide',
+                              child: Text('مخفی کردن ستون'),
+                            ),
                           if (widget.onResetColumns != null) ...[
                             const PopupMenuDivider(),
-                            const PopupMenuItem(value: 'reset', child: Text('بازنشانی ستون‌ها')),
+                            const PopupMenuItem(
+                              value: 'reset',
+                              child: Text('بازنشانی ستون‌ها'),
+                            ),
                           ],
                         ],
                       ),
@@ -4207,26 +4593,36 @@ class _ColumnHeaderWithSearchState extends State<_ColumnHeaderWithSearch> {
                     bottom: 0,
                     child: MouseRegion(
                       cursor: SystemMouseCursors.resizeLeftRight,
-                      onEnter: (_) => setState(() => _isHoveringRightEdge = true),
-                      onExit: (_) => setState(() => _isHoveringRightEdge = false),
+                      onEnter: (_) =>
+                          setState(() => _isHoveringRightEdge = true),
+                      onExit: (_) =>
+                          setState(() => _isHoveringRightEdge = false),
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onHorizontalDragUpdate: (details) => widget.onResizeDrag!(details.delta.dx),
-                        onHorizontalDragEnd: (_) => widget.onResizeDragEnd?.call(),
+                        onHorizontalDragUpdate: (details) =>
+                            widget.onResizeDrag!(details.delta.dx),
+                        onHorizontalDragEnd: (_) =>
+                            widget.onResizeDragEnd?.call(),
                         onDoubleTap: widget.onAutoFit,
                         child: Container(
                           width: 6,
                           decoration: BoxDecoration(
-                            color: _isHoveringRightEdge 
-                                ? theme.colorScheme.primary.withValues(alpha: 0.1)
+                            color: _isHoveringRightEdge
+                                ? theme.colorScheme.primary.withValues(
+                                    alpha: 0.1,
+                                  )
                                 : Colors.transparent,
                             border: Border(
                               right: BorderSide(
-                                color: _isHoveringRightEdge 
-                                    ? theme.colorScheme.primary.withValues(alpha: 0.5)
-                                    : (_isHovered 
-                                        ? theme.dividerColor.withValues(alpha: 0.3)
-                                        : Colors.transparent),
+                                color: _isHoveringRightEdge
+                                    ? theme.colorScheme.primary.withValues(
+                                        alpha: 0.5,
+                                      )
+                                    : (_isHovered
+                                          ? theme.dividerColor.withValues(
+                                              alpha: 0.3,
+                                            )
+                                          : Colors.transparent),
                                 width: 2,
                               ),
                             ),
@@ -4270,5 +4666,6 @@ class _SortSpec {
   final String by;
   final bool desc;
   const _SortSpec({required this.by, required this.desc});
-  _SortSpec copyWith({String? by, bool? desc}) => _SortSpec(by: by ?? this.by, desc: desc ?? this.desc);
+  _SortSpec copyWith({String? by, bool? desc}) =>
+      _SortSpec(by: by ?? this.by, desc: desc ?? this.desc);
 }

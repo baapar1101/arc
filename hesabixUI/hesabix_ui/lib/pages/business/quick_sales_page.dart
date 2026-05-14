@@ -137,6 +137,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   int _mobileTabIndex = 0;
   Timer? _searchDebounce;
   String? _lastFailedSearchQuery; // آخرین جستجوی ناموفق برای نمایش دکمه افزودن کالا
+
+  /// هم‌سو با API (`products.add`)؛ بدون این مجوز نباید دیالوگ افزودن کالا باز شود.
+  bool get _canCreateProducts => widget.authStore.hasBusinessPermission('products', 'add');
   
   // دسته‌بندی‌ها
   List<CategoryNode> _categoryTree = [];
@@ -454,7 +457,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         // اگر دیالوگ انتخاب بسته شد بدون انتخاب، جستجوی ناموفق را ثبت کن
         if (mounted) {
           setState(() {
-            _lastFailedSearchQuery = code.trim();
+            _lastFailedSearchQuery = _canCreateProducts ? code.trim() : null;
           });
         }
         return;
@@ -511,7 +514,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       if (products.isEmpty) {
         if (mounted) {
           setState(() {
-            _lastFailedSearchQuery = code.trim();
+            _lastFailedSearchQuery = _canCreateProducts ? code.trim() : null;
           });
           SnackBarHelper.show(context, message: 'محصولی یافت نشد', isError: true);
         }
@@ -551,7 +554,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           // اگر دیالوگ انتخاب بسته شد بدون انتخاب، جستجوی ناموفق را ثبت کن
           if (mounted) {
             setState(() {
-              _lastFailedSearchQuery = code.trim();
+              _lastFailedSearchQuery = _canCreateProducts ? code.trim() : null;
             });
           }
         }
@@ -590,6 +593,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
   /// باز کردن دیالوگ افزودن کالا؛ [presetName] در صورت خالی بودن از متن فیلد جستجو استفاده می‌شود.
   Future<void> _openAddProductDialog({String? presetName}) async {
+    if (!_canCreateProducts) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: 'مجوز افزودن کالا و خدمات را ندارید.',
+          isError: true,
+        );
+      }
+      return;
+    }
     _removeBarcodeOverlay();
     final name = (presetName ?? _barcodeController.text).trim();
     try {
@@ -1371,6 +1384,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       builder: (context) => _CartItemEditDialog(
         item: item,
         currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
+        allowEditUnitPrice: widget.authStore.canChangeInvoiceUnitPrice(),
       ),
     );
     
@@ -3036,12 +3050,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           suffixIcon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                icon: const Icon(Icons.add),
-                tooltip: 'افزودن کالای جدید',
-                onPressed: () => _openAddProductDialog(),
-                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
-              ),
+              if (_canCreateProducts)
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: 'افزودن کالای جدید',
+                  onPressed: () => _openAddProductDialog(),
+                  visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                ),
               if (_supportsInlineCameraScan)
                 IconButton(
                   icon: const Icon(Icons.photo_camera_outlined),
@@ -3049,7 +3064,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                   onPressed: _scanBarcodeWithCamera,
                   visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
                 ),
-              if (_lastFailedSearchQuery != null && _lastFailedSearchQuery!.isNotEmpty)
+              if (_canCreateProducts &&
+                  _lastFailedSearchQuery != null &&
+                  _lastFailedSearchQuery!.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.add_circle, color: Colors.green),
                   tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
@@ -3686,10 +3703,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 class _CartItemEditDialog extends StatefulWidget {
   final InvoiceLineItem item;
   final int currencyDecimalPlaces;
+  final bool allowEditUnitPrice;
 
   const _CartItemEditDialog({
     required this.item,
     required this.currencyDecimalPlaces,
+    this.allowEditUnitPrice = true,
   });
 
   @override
@@ -3737,7 +3756,9 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
     final taxRateValue = number_utils.parseFormattedNumber(_taxRateController.text);
     
     final quantity = (quantityValue != null && quantityValue > 0) ? quantityValue : widget.item.quantity;
-    final price = (priceValue != null && priceValue >= 0) ? priceValue : widget.item.unitPrice;
+    final price = widget.allowEditUnitPrice
+        ? ((priceValue != null && priceValue >= 0) ? priceValue : widget.item.unitPrice)
+        : widget.item.unitPrice;
     final discount = (discountValue != null && discountValue >= 0) ? discountValue : widget.item.discountValue;
     final taxRate = (taxRateValue != null && taxRateValue >= 0) ? taxRateValue : widget.item.taxRate;
 
@@ -3838,81 +3859,105 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                     // قیمت واحد
                     TextField(
                       controller: _priceController,
+                      readOnly: !widget.allowEditUnitPrice,
+                      showCursor: widget.allowEditUnitPrice,
+                      enableInteractiveSelection: widget.allowEditUnitPrice,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: widget.allowEditUnitPrice
+                            ? null
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'قیمت واحد',
-                        hintText: 'مثال: 100,000',
+                        hintText: widget.allowEditUnitPrice ? 'مثال: 100,000' : AppLocalizations.of(context).unitPriceReadOnlyFieldHint,
+                        helperText: widget.allowEditUnitPrice ? null : AppLocalizations.of(context).unitPriceReadOnlyFieldHint,
+                        helperMaxLines: 2,
                         prefixIcon: const Icon(Icons.attach_money),
                         suffixText: 'ریال',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         filled: true,
-                        fillColor: cs.surfaceContainerHighest,
+                        fillColor: widget.allowEditUnitPrice
+                            ? cs.surfaceContainerHighest
+                            : cs.surfaceContainerHigh.withValues(alpha: 0.85),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         number_utils.EnglishDigitsFormatter(),
                         const number_utils.ThousandsSeparatorInputFormatter(allowDecimal: false),
                       ],
-                      onChanged: (_) => setState(() {}),
+                      onChanged: widget.allowEditUnitPrice ? (_) => setState(() {}) : null,
                     ),
                     const SizedBox(height: 16),
-                    // نوع تخفیف و مبلغ تخفیف
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<String>(
-                            value: _discountType,
-                            decoration: InputDecoration(
-                              labelText: 'نوع تخفیف',
-                              prefixIcon: const Icon(Icons.percent),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              filled: true,
-                              fillColor: cs.surfaceContainerHighest,
+                    // نوع تخفیف و مبلغ تخفیف (در موبایل هر کدام یک سطر تا آیکون % با برچسب قاطی نشود)
+                    Builder(
+                      builder: (context) {
+                        final stackedDiscount =
+                            MediaQuery.sizeOf(context).width < _QuickSalesPageState._mobileBreakpoint;
+                        final discountDropdown = DropdownButtonFormField<String>(
+                          value: _discountType,
+                          decoration: InputDecoration(
+                            labelText: 'نوع تخفیف',
+                            prefixIcon: const Icon(Icons.percent),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            items: const [
-                              DropdownMenuItem(value: 'amount', child: Text('مبلغی')),
-                              DropdownMenuItem(value: 'percent', child: Text('درصدی')),
-                            ],
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() {
-                                  _discountType = value;
-                                });
-                              }
-                            },
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: _discountController,
-                            decoration: InputDecoration(
-                              labelText: _discountType == 'percent' ? 'درصد تخفیف' : 'مبلغ تخفیف',
-                              hintText: _discountType == 'percent' ? 'مثال: 10' : 'مثال: 5,000',
-                              prefixIcon: Icon(_discountType == 'percent' ? Icons.percent : Icons.discount),
-                              suffixText: _discountType == 'percent' ? '%' : 'ریال',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              filled: true,
-                              fillColor: cs.surfaceContainerHighest,
+                          items: const [
+                            DropdownMenuItem(value: 'amount', child: Text('مبلغی')),
+                            DropdownMenuItem(value: 'percent', child: Text('درصدی')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                _discountType = value;
+                              });
+                            }
+                          },
+                        );
+                        final discountValueField = TextField(
+                          controller: _discountController,
+                          decoration: InputDecoration(
+                            labelText: _discountType == 'percent' ? 'درصد تخفیف' : 'مبلغ تخفیف',
+                            hintText: _discountType == 'percent' ? 'مثال: 10' : 'مثال: 5,000',
+                            prefixIcon: Icon(_discountType == 'percent' ? Icons.percent : Icons.discount),
+                            suffixText: _discountType == 'percent' ? '%' : 'ریال',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            inputFormatters: [
-                              number_utils.EnglishDigitsFormatter(),
-                              number_utils.ThousandsSeparatorInputFormatter(
-                                allowDecimal: _discountType == 'percent' ? false : true,
-                              ),
-                            ],
-                            onChanged: (_) => setState(() {}),
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
                           ),
-                        ),
-                      ],
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            number_utils.EnglishDigitsFormatter(),
+                            number_utils.ThousandsSeparatorInputFormatter(
+                              allowDecimal: _discountType == 'percent' ? false : true,
+                            ),
+                          ],
+                          onChanged: (_) => setState(() {}),
+                        );
+                        if (stackedDiscount) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              discountDropdown,
+                              const SizedBox(height: 16),
+                              discountValueField,
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(flex: 2, child: discountDropdown),
+                            const SizedBox(width: 12),
+                            Expanded(flex: 3, child: discountValueField),
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 16),
                     // نرخ مالیات
