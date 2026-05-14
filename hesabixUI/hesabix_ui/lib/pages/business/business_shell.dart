@@ -1432,6 +1432,33 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.separator,
       ),
       _MenuItem(
+        key: 'basalam',
+        label: t.basalamIntegrationMenuTitle,
+        icon: Icons.storefront_outlined,
+        selectedIcon: Icons.storefront,
+        path: _bu('basalam'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'woocommerce',
+        label: t.woocommerceIntegrationMenuTitle,
+        icon: Icons.shopping_cart_outlined,
+        selectedIcon: Icons.shopping_cart,
+        path: _bu('woocommerce'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'plugin-marketplace',
+        label: t.pluginMarketplace,
+        icon: Icons.store,
+        selectedIcon: Icons.store,
+        path: _bu('plugin-marketplace'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
         key: 'group:warehouses',
         label: t.warehouseManagement,
         icon: Icons.warehouse,
@@ -1642,24 +1669,6 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: false,
       ),
       _MenuItem(
-        key: 'basalam',
-        label: t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam Integration',
-        icon: Icons.storefront_outlined,
-        selectedIcon: Icons.storefront,
-        path: _bu('basalam'),
-        type: _MenuItemType.simple,
-        hasAddButton: false,
-      ),
-      _MenuItem(
-        key: 'woocommerce',
-        label: t.localeName.startsWith('fa') ? 'ووکامرس' : 'WooCommerce',
-        icon: Icons.shopping_cart_outlined,
-        selectedIcon: Icons.shopping_cart,
-        path: _bu('woocommerce'),
-        type: _MenuItemType.simple,
-        hasAddButton: false,
-      ),
-      _MenuItem(
         key: 'zohal/inquiries',
         label: 'استعلامات',
         icon: Icons.search_outlined,
@@ -1691,15 +1700,6 @@ class _BusinessShellState extends State<BusinessShell> {
         selectedIcon: Icons.picture_as_pdf,
         path: _bu('report-templates'),
         type: _MenuItemType.simple,
-      ),
-      _MenuItem(
-        key: 'plugin-marketplace',
-        label: t.pluginMarketplace,
-        icon: Icons.store,
-        selectedIcon: Icons.store,
-        path: _bu('plugin-marketplace'),
-        type: _MenuItemType.simple,
-        hasAddButton: false,
       ),
     ];
 
@@ -3330,8 +3330,8 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
     if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
-    if (label == 'اتصال باسلام' || label == 'Basalam Integration') return 'basalam';
-    if (label == 'ووکامرس' || label == 'WooCommerce') return 'woocommerce';
+    if (label == t.basalamIntegrationMenuTitle) return 'basalam';
+    if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
     if (label == 'چت با AI' || label == 'AI Chat') return 'ai';
     if (label == 'اشتراک AI' || label == 'AI Subscription') return 'ai';

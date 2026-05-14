@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth_store.dart';
+import '../../../core/business_nav.dart';
+import '../../../l10n/app_localizations.dart';
 import '../../../services/woocommerce_integration_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
@@ -25,8 +28,6 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
   final WoocommerceIntegrationService _svc = WoocommerceIntegrationService();
   late TabController _tabs;
 
-  final _storeUrlCtl = TextEditingController();
-  final _tokenCtl = TextEditingController();
   final _searchCtl = TextEditingController();
 
   final _ordStatusCtl = TextEditingController();
@@ -37,9 +38,6 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
   String _ordOrderby = 'date';
   String _ordOrder = 'DESC';
 
-  bool _loadingSettings = true;
-  bool _saving = false;
-  bool _testing = false;
   bool _loadingList = false;
 
   int _listPage = 1;
@@ -52,32 +50,23 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     return widget.authStore.hasBusinessPermission('woocommerce', 'view');
   }
 
-  bool _canWooCommerceManage() {
-    if (widget.authStore.currentBusiness?.isOwner == true) return true;
-    return widget.authStore.hasBusinessPermission('woocommerce', 'manage');
-  }
-
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
     _tabs.addListener(_onTabChanged);
     if (_canWooCommerceView()) {
-      _loadSettings();
-    } else {
-      _loadingSettings = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshList());
     }
   }
 
   void _onTabChanged() {
     if (!_tabs.indexIsChanging) {
       _listPage = 1;
-      if (_tabs.index == 2 || _tabs.index == 3) {
+      if (_tabs.index == 1 || _tabs.index == 2) {
         _searchCtl.clear();
       }
-      if (_tabs.index > 0) {
-        _refreshList();
-      }
+      _refreshList();
     }
   }
 
@@ -85,8 +74,6 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
   void dispose() {
     _tabs.removeListener(_onTabChanged);
     _tabs.dispose();
-    _storeUrlCtl.dispose();
-    _tokenCtl.dispose();
     _searchCtl.dispose();
     _ordStatusCtl.dispose();
     _ordSearchCtl.dispose();
@@ -94,64 +81,6 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     _ordAfterCtl.dispose();
     _ordBeforeCtl.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadSettings() async {
-    if (!_canWooCommerceView()) return;
-    setState(() => _loadingSettings = true);
-    try {
-      final m = await _svc.getSettings(businessId: widget.businessId);
-      _storeUrlCtl.text = (m['store_base_url'] ?? '').toString();
-      final tok = (m['bridge_token'] ?? '').toString();
-      _tokenCtl.text = tok == '***' ? '' : tok;
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-      }
-    } finally {
-      if (mounted) setState(() => _loadingSettings = false);
-    }
-  }
-
-  Future<void> _saveSettings() async {
-    if (!_canWooCommerceManage()) return;
-    setState(() => _saving = true);
-    try {
-      await _svc.updateSettings(
-        businessId: widget.businessId,
-        payload: <String, dynamic>{
-          'store_base_url': _storeUrlCtl.text.trim(),
-          'bridge_token': _tokenCtl.text.trim().isEmpty ? '***' : _tokenCtl.text.trim(),
-        },
-      );
-      if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'تنظیمات ذخیره شد');
-      }
-      await _loadSettings();
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _testBridge() async {
-    if (!_canWooCommerceView()) return;
-    setState(() => _testing = true);
-    try {
-      await _svc.testBridge(businessId: widget.businessId);
-      if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'اتصال موفق');
-      }
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-      }
-    } finally {
-      if (mounted) setState(() => _testing = false);
-    }
   }
 
   int? _parsePositiveInt(String s) {
@@ -166,7 +95,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     try {
       Map<String, dynamic> raw;
       final idx = _tabs.index;
-      if (idx == 1) {
+      if (idx == 0) {
         raw = await _svc.listOrders(
           businessId: widget.businessId,
           page: _listPage,
@@ -179,14 +108,14 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
           orderby: _ordOrderby,
           order: _ordOrder,
         );
-      } else if (idx == 2) {
+      } else if (idx == 1) {
         raw = await _svc.listProducts(
           businessId: widget.businessId,
           page: _listPage,
           perPage: _perPage,
           search: _searchCtl.text.trim().isEmpty ? null : _searchCtl.text.trim(),
         );
-      } else if (idx == 3) {
+      } else if (idx == 2) {
         raw = await _svc.listCustomers(
           businessId: widget.businessId,
           page: _listPage,
@@ -214,16 +143,17 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     if (!_canWooCommerceView()) {
       return Scaffold(
         appBar: AppBar(
           leading: businessSubpageBackLeading(context, widget.businessId),
-          title: const Text('ووکامرس'),
+          title: Text(t.woocommercePermissionDeniedTitle),
         ),
-        body: const Center(
+        body: Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text('برای مشاهدهٔ این بخش به دسترسی «ووکامرس — مشاهده» نیاز دارید.'),
+            padding: const EdgeInsets.all(24),
+            child: Text(t.woocommercePermissionDeniedBody, textAlign: TextAlign.center),
           ),
         ),
       );
@@ -232,106 +162,62 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     return Scaffold(
       appBar: AppBar(
         leading: businessSubpageBackLeading(context, widget.businessId),
-        title: const Text('ووکامرس'),
+        title: Text(t.woocommerceIntegrationMenuTitle),
+        actions: [
+          IconButton(
+            tooltip: t.woocommerceGoToSettingsTooltip,
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push(
+                  context.businessPanelUrl(widget.businessId, 'settings/woocommerce'),
+                ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           isScrollable: true,
-          tabs: const [
-            Tab(text: 'تنظیمات'),
-            Tab(text: 'سفارشات'),
-            Tab(text: 'محصولات'),
-            Tab(text: 'مشتریان'),
+          tabs: [
+            Tab(text: t.woocommerceHubOrdersTab),
+            Tab(text: t.woocommerceHubProductsTab),
+            Tab(text: t.woocommerceHubCustomersTab),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildSettingsTab(),
-          _buildOrdersTab(),
-          _buildListTab(isProducts: true),
-          _buildListTab(isProducts: false),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Card(
+              child: ListTile(
+                leading: Icon(
+                  Icons.settings_suggest_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                title: Text(t.woocommerceHubSettingsPromoTitle),
+                subtitle: Text(t.woocommerceHubSettingsPromoSubtitle),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push(
+                      context.businessPanelUrl(widget.businessId, 'settings/woocommerce'),
+                    ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                _buildOrdersTab(context, t),
+                _buildListTab(context, t, isProducts: true),
+                _buildListTab(context, t, isProducts: false),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSettingsTab() {
-    if (_loadingSettings) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    final canManage = _canWooCommerceManage();
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (!canManage)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Text(
-              'فقط مشاهده: برای ذخیرهٔ تنظیمات به دسترسی «مدیریت ووکامرس» نیاز است.',
-              style: TextStyle(color: Colors.orange),
-            ),
-          ),
-        TextField(
-          controller: _storeUrlCtl,
-          readOnly: !canManage,
-          decoration: const InputDecoration(
-            labelText: 'آدرس فروشگاه (WordPress)',
-            hintText: 'https://example.com',
-            border: OutlineInputBorder(),
-          ),
-          textDirection: TextDirection.ltr,
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _tokenCtl,
-          readOnly: !canManage,
-          decoration: const InputDecoration(
-            labelText: 'توکن پل (از افزونه ArcWOC)',
-            border: OutlineInputBorder(),
-          ),
-          obscureText: true,
-          textDirection: TextDirection.ltr,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'اگر توکن را قبلاً ذخیره کرده‌اید، برای حفظ همان مقدار این فیلد را خالی بگذارید و ذخیره کنید.',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FilledButton.icon(
-              onPressed: (!canManage || _saving) ? null : _saveSettings,
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save),
-              label: const Text('ذخیره'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _testing ? null : _testBridge,
-              icon: _testing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.link),
-              label: const Text('تست اتصال'),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildOrdersTab() {
+  Widget _buildOrdersTab(BuildContext context, AppLocalizations t) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -343,14 +229,14 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('فیلتر سفارشات', style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(t.woocommerceOrdersFiltersTitle, style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _ordStatusCtl,
-                    decoration: const InputDecoration(
-                      labelText: 'وضعیت (wc) یا چندتایی با کاما',
-                      hintText: 'processing یا processing,completed',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t.woocommerceOrderStatusLabel,
+                      hintText: t.woocommerceOrderStatusHint,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     textDirection: TextDirection.ltr,
@@ -358,9 +244,9 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                   const SizedBox(height: 8),
                   TextField(
                     controller: _ordCustomerCtl,
-                    decoration: const InputDecoration(
-                      labelText: 'شناسهٔ مشتری ووکامرس',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t.woocommerceOrderCustomerIdLabel,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     keyboardType: TextInputType.number,
@@ -369,9 +255,9 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                   const SizedBox(height: 8),
                   TextField(
                     controller: _ordSearchCtl,
-                    decoration: const InputDecoration(
-                      labelText: 'جستجو در سفارش',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: t.woocommerceOrderSearchLabel,
+                      border: const OutlineInputBorder(),
                       isDense: true,
                     ),
                     textDirection: TextDirection.ltr,
@@ -382,9 +268,9 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                       Expanded(
                         child: TextField(
                           controller: _ordAfterCtl,
-                          decoration: const InputDecoration(
-                            labelText: 'از تاریخ (ISO)',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: t.woocommerceOrderDateAfterLabel,
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           textDirection: TextDirection.ltr,
@@ -394,9 +280,9 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                       Expanded(
                         child: TextField(
                           controller: _ordBeforeCtl,
-                          decoration: const InputDecoration(
-                            labelText: 'تا تاریخ (ISO)',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: t.woocommerceOrderDateBeforeLabel,
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           textDirection: TextDirection.ltr,
@@ -409,19 +295,20 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                     children: [
                       Expanded(
                         child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'مرتب‌سازی',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: t.woocommerceOrderSortByLabel,
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               isExpanded: true,
                               value: _ordOrderby,
-                              items: const [
-                                DropdownMenuItem(value: 'date', child: Text('تاریخ')),
-                                DropdownMenuItem(value: 'modified', child: Text('ویرایش')),
-                                DropdownMenuItem(value: 'id', child: Text('شناسه')),
+                              items: [
+                                DropdownMenuItem(value: 'date', child: Text(t.woocommerceOrderSortByDate)),
+                                DropdownMenuItem(
+                                    value: 'modified', child: Text(t.woocommerceOrderSortByModified)),
+                                DropdownMenuItem(value: 'id', child: Text(t.woocommerceOrderSortById)),
                               ],
                               onChanged: (v) {
                                 if (v != null) setState(() => _ordOrderby = v);
@@ -433,18 +320,18 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                       const SizedBox(width: 8),
                       Expanded(
                         child: InputDecorator(
-                          decoration: const InputDecoration(
-                            labelText: 'ترتیب',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: t.woocommerceOrderSortOrderLabel,
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               isExpanded: true,
                               value: _ordOrder,
-                              items: const [
-                                DropdownMenuItem(value: 'DESC', child: Text('نزولی')),
-                                DropdownMenuItem(value: 'ASC', child: Text('صعودی')),
+                              items: [
+                                DropdownMenuItem(value: 'DESC', child: Text(t.woocommerceSortDesc)),
+                                DropdownMenuItem(value: 'ASC', child: Text(t.woocommerceSortAsc)),
                               ],
                               onChanged: (v) {
                                 if (v != null) setState(() => _ordOrder = v);
@@ -466,7 +353,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                               _refreshList();
                             },
                       icon: const Icon(Icons.filter_alt),
-                      label: const Text('اعمال فیلتر'),
+                      label: Text(t.woocommerceApplyFiltersButton),
                     ),
                   ),
                 ],
@@ -489,14 +376,14 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
         Expanded(
           child: _loadingList
               ? const Center(child: CircularProgressIndicator())
-              : _buildDataTable(isOrders: true, isProducts: false),
+              : _buildDataTable(context, t, isOrders: true, isProducts: false),
         ),
-        _buildPager(),
+        _buildPager(context, t),
       ],
     );
   }
 
-  Widget _buildListTab({required bool isProducts}) {
+  Widget _buildListTab(BuildContext context, AppLocalizations t, {required bool isProducts}) {
     return Column(
       children: [
         Padding(
@@ -507,7 +394,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                 child: TextField(
                   controller: _searchCtl,
                   decoration: InputDecoration(
-                    labelText: isProducts ? 'جستجوی محصول' : 'جستجوی مشتری',
+                    labelText: isProducts ? t.woocommerceSearchProductsLabel : t.woocommerceSearchCustomersLabel,
                     border: const OutlineInputBorder(),
                     isDense: true,
                   ),
@@ -537,27 +424,32 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
         Expanded(
           child: _loadingList
               ? const Center(child: CircularProgressIndicator())
-              : _buildDataTable(isOrders: false, isProducts: isProducts),
+              : _buildDataTable(context, t, isOrders: false, isProducts: isProducts),
         ),
-        _buildPager(),
+        _buildPager(context, t),
       ],
     );
   }
 
-  Widget _buildDataTable({required bool isOrders, required bool isProducts}) {
+  Widget _buildDataTable(
+    BuildContext context,
+    AppLocalizations t, {
+    required bool isOrders,
+    required bool isProducts,
+  }) {
     if (_rows.isEmpty) {
-      return const Center(child: Text('داده‌ای نیست'));
+      return Center(child: Text(t.woocommerceNoData));
     }
     if (isOrders) {
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          columns: const [
-            DataColumn(label: Text('شناسه')),
-            DataColumn(label: Text('شماره')),
-            DataColumn(label: Text('وضعیت')),
-            DataColumn(label: Text('مبلغ')),
-            DataColumn(label: Text('ایمیل')),
+          columns: [
+            DataColumn(label: Text(t.woocommerceColumnOrderId)),
+            DataColumn(label: Text(t.woocommerceColumnOrderNumber)),
+            DataColumn(label: Text(t.woocommerceColumnOrderStatus)),
+            DataColumn(label: Text(t.woocommerceColumnOrderTotal)),
+            DataColumn(label: Text(t.woocommerceColumnBillingEmail)),
           ],
           rows: _rows
               .map(
@@ -579,12 +471,12 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       return SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          columns: const [
-            DataColumn(label: Text('شناسه')),
-            DataColumn(label: Text('نام')),
-            DataColumn(label: Text('SKU')),
-            DataColumn(label: Text('نوع')),
-            DataColumn(label: Text('قیمت')),
+          columns: [
+            DataColumn(label: Text(t.woocommerceColumnProductId)),
+            DataColumn(label: Text(t.woocommerceColumnProductName)),
+            DataColumn(label: Text(t.woocommerceColumnSku)),
+            DataColumn(label: Text(t.woocommerceColumnProductType)),
+            DataColumn(label: Text(t.woocommerceColumnPrice)),
           ],
           rows: _rows
               .map(
@@ -605,11 +497,11 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
-        columns: const [
-          DataColumn(label: Text('شناسه')),
-          DataColumn(label: Text('ایمیل')),
-          DataColumn(label: Text('نام')),
-          DataColumn(label: Text('نام کاربری')),
+        columns: [
+          DataColumn(label: Text(t.woocommerceColumnCustomerId)),
+          DataColumn(label: Text(t.woocommerceColumnCustomerEmail)),
+          DataColumn(label: Text(t.woocommerceColumnCustomerName)),
+          DataColumn(label: Text(t.woocommerceColumnUsername)),
         ],
         rows: _rows
             .map(
@@ -627,7 +519,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     );
   }
 
-  Widget _buildPager() {
+  Widget _buildPager(BuildContext context, AppLocalizations t) {
     final pages = (_total / _perPage).ceil().clamp(1, 999999);
     return Padding(
       padding: const EdgeInsets.all(8),
@@ -643,7 +535,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                   },
             icon: const Icon(Icons.chevron_right),
           ),
-          Text('صفحه $_listPage از $pages (مجموع $_total)'),
+          Text(t.woocommercePagerLine(_listPage, pages, _total)),
           IconButton(
             onPressed: _listPage >= pages || _loadingList
                 ? null

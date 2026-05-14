@@ -22118,6 +22118,510 @@ abstract class AppLocalizations {
   /// **'Price/stock/variant mismatches awaiting resolution'**
   String get reportsBasalamProductConflictsSubtitle;
 
+  /// No description provided for @basalamIntegrationMenuTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam'**
+  String get basalamIntegrationMenuTitle;
+
+  /// No description provided for @woocommerceIntegrationMenuTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce'**
+  String get woocommerceIntegrationMenuTitle;
+
+  /// No description provided for @basalamSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam settings'**
+  String get basalamSettingsPageTitle;
+
+  /// No description provided for @basalamSettingsPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'API keys, sync behaviour, webhooks and monetary unit for the Basalam bridge.'**
+  String get basalamSettingsPageSubtitle;
+
+  /// No description provided for @basalamOpenIntegrationHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Basalam hub'**
+  String get basalamOpenIntegrationHub;
+
+  /// No description provided for @basalamOpenIntegrationHubSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Queues, manual sync, product conflicts and operational tools'**
+  String get basalamOpenIntegrationHubSubtitle;
+
+  /// No description provided for @basalamGoToSettingsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam settings'**
+  String get basalamGoToSettingsTooltip;
+
+  /// No description provided for @basalamSettingsSavedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam settings saved'**
+  String get basalamSettingsSavedSnackbar;
+
+  /// No description provided for @basalamHubSettingsPromoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection settings'**
+  String get basalamHubSettingsPromoTitle;
+
+  /// No description provided for @basalamHubSettingsPromoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage API keys, defaults and sync rules in business settings.'**
+  String get basalamHubSettingsPromoSubtitle;
+
+  /// No description provided for @basalamReportsOverviewCardIntegration.
+  ///
+  /// In en, this message translates to:
+  /// **'Integration'**
+  String get basalamReportsOverviewCardIntegration;
+
+  /// No description provided for @basalamReportsOverviewCardWebhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Webhook'**
+  String get basalamReportsOverviewCardWebhook;
+
+  /// No description provided for @basalamReportsOverviewCardDlq.
+  ///
+  /// In en, this message translates to:
+  /// **'Dead-letter queue'**
+  String get basalamReportsOverviewCardDlq;
+
+  /// No description provided for @basalamReportsOverviewCardNetPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Net (period)'**
+  String get basalamReportsOverviewCardNetPeriod;
+
+  /// No description provided for @basalamReportsOverviewStateOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On'**
+  String get basalamReportsOverviewStateOn;
+
+  /// No description provided for @basalamReportsOverviewStateOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get basalamReportsOverviewStateOff;
+
+  /// No description provided for @basalamReportsSyncedInvoicesTableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paged list of sales documents linked to Basalam orders.'**
+  String get basalamReportsSyncedInvoicesTableHint;
+
+  /// No description provided for @basalamReportsDeadLetterTableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed sync entries stored for manual review.'**
+  String get basalamReportsDeadLetterTableHint;
+
+  /// No description provided for @basalamReportsProductConflictsTableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Product mismatches awaiting resolution.'**
+  String get basalamReportsProductConflictsTableHint;
+
+  /// No description provided for @reportsBasalamColumnDocumentCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Document code'**
+  String get reportsBasalamColumnDocumentCode;
+
+  /// No description provided for @reportsBasalamColumnDocumentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get reportsBasalamColumnDocumentDate;
+
+  /// No description provided for @reportsBasalamColumnBasalamOrderId.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam order id'**
+  String get reportsBasalamColumnBasalamOrderId;
+
+  /// No description provided for @reportsBasalamColumnNet.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get reportsBasalamColumnNet;
+
+  /// No description provided for @reportsBasalamColumnDocumentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Document type'**
+  String get reportsBasalamColumnDocumentType;
+
+  /// No description provided for @reportsBasalamColumnDeadLetterType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get reportsBasalamColumnDeadLetterType;
+
+  /// No description provided for @reportsBasalamColumnDlqId.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue id'**
+  String get reportsBasalamColumnDlqId;
+
+  /// No description provided for @reportsBasalamColumnCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Created at'**
+  String get reportsBasalamColumnCreatedAt;
+
+  /// No description provided for @reportsBasalamColumnOrderId.
+  ///
+  /// In en, this message translates to:
+  /// **'Order id'**
+  String get reportsBasalamColumnOrderId;
+
+  /// No description provided for @reportsBasalamColumnConflictId.
+  ///
+  /// In en, this message translates to:
+  /// **'Conflict id'**
+  String get reportsBasalamColumnConflictId;
+
+  /// No description provided for @reportsBasalamColumnConflictType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get reportsBasalamColumnConflictType;
+
+  /// No description provided for @reportsBasalamColumnDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get reportsBasalamColumnDirection;
+
+  /// No description provided for @reportsBasalamColumnReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Reason'**
+  String get reportsBasalamColumnReason;
+
+  /// No description provided for @settingsBasalamTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam integration'**
+  String get settingsBasalamTitle;
+
+  /// No description provided for @settingsBasalamSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'API, webhooks, sync and conflict defaults'**
+  String get settingsBasalamSubtitle;
+
+  /// No description provided for @basalamSettingsEnableConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Basalam integration'**
+  String get basalamSettingsEnableConnection;
+
+  /// No description provided for @basalamSettingsCurrencyIrrTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam sync requires IRR-only business currency'**
+  String get basalamSettingsCurrencyIrrTitle;
+
+  /// No description provided for @basalamSettingsCurrencyInvalidSecondaries.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid secondary codes'**
+  String get basalamSettingsCurrencyInvalidSecondaries;
+
+  /// No description provided for @basalamSettingsCurrencyFixHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Set business default to IRR and remove non-IRR secondary currencies; then pick Basalam rial vs toman to match their panel.'**
+  String get basalamSettingsCurrencyFixHint;
+
+  /// No description provided for @basalamSettingsApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam API key'**
+  String get basalamSettingsApiKey;
+
+  /// No description provided for @basalamSettingsRefreshTokenOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam refresh token (optional)'**
+  String get basalamSettingsRefreshTokenOptional;
+
+  /// No description provided for @basalamSettingsApiBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'API base URL'**
+  String get basalamSettingsApiBaseUrl;
+
+  /// No description provided for @basalamSettingsDefaultVendorId.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Basalam vendor ID'**
+  String get basalamSettingsDefaultVendorId;
+
+  /// No description provided for @basalamSettingsDefaultCategoryId.
+  ///
+  /// In en, this message translates to:
+  /// **'Default Basalam category ID'**
+  String get basalamSettingsDefaultCategoryId;
+
+  /// No description provided for @basalamSettingsDefaultPublishStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Default publish stock'**
+  String get basalamSettingsDefaultPublishStock;
+
+  /// No description provided for @basalamSettingsMonetaryUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam monetary unit'**
+  String get basalamSettingsMonetaryUnit;
+
+  /// No description provided for @basalamSettingsMonetaryUnitHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Hesabix stores IRR only; toman amounts from Basalam are multiplied by 10.'**
+  String get basalamSettingsMonetaryUnitHelper;
+
+  /// No description provided for @basalamSettingsMonetaryUnitRial.
+  ///
+  /// In en, this message translates to:
+  /// **'Rial (IRR)'**
+  String get basalamSettingsMonetaryUnitRial;
+
+  /// No description provided for @basalamSettingsMonetaryUnitToman.
+  ///
+  /// In en, this message translates to:
+  /// **'Toman (×10 → IRR)'**
+  String get basalamSettingsMonetaryUnitToman;
+
+  /// No description provided for @basalamSettingsEnableWebhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable webhook'**
+  String get basalamSettingsEnableWebhook;
+
+  /// No description provided for @basalamSettingsWebhookSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Webhook secret'**
+  String get basalamSettingsWebhookSecret;
+
+  /// No description provided for @basalamSettingsEnableChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable chat bridge'**
+  String get basalamSettingsEnableChat;
+
+  /// No description provided for @basalamSettingsEnableOrderSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable order sync'**
+  String get basalamSettingsEnableOrderSync;
+
+  /// No description provided for @basalamSettingsEnableProductSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable product sync'**
+  String get basalamSettingsEnableProductSync;
+
+  /// No description provided for @basalamSettingsCreateInvoiceOnSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Create invoice on order sync'**
+  String get basalamSettingsCreateInvoiceOnSync;
+
+  /// No description provided for @basalamSettingsSyncInvoiceType.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync invoice type'**
+  String get basalamSettingsSyncInvoiceType;
+
+  /// No description provided for @basalamSettingsPersonMatchMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Person matching mode'**
+  String get basalamSettingsPersonMatchMode;
+
+  /// No description provided for @basalamSettingsProductMatchMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Product matching mode'**
+  String get basalamSettingsProductMatchMode;
+
+  /// No description provided for @basalamSettingsPaymentMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment accounting mode'**
+  String get basalamSettingsPaymentMode;
+
+  /// No description provided for @basalamSettingsBlockOverpayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Block payment over invoice remaining'**
+  String get basalamSettingsBlockOverpayment;
+
+  /// No description provided for @basalamSettingsBlockOverpaymentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compares invoice remaining (IRR) to Basalam amount before posting receipt.'**
+  String get basalamSettingsBlockOverpaymentSubtitle;
+
+  /// No description provided for @basalamSettingsInvoiceToleranceIrr.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice remaining tolerance (IRR)'**
+  String get basalamSettingsInvoiceToleranceIrr;
+
+  /// No description provided for @basalamSettingsPriceConflictStrategy.
+  ///
+  /// In en, this message translates to:
+  /// **'Price conflict strategy'**
+  String get basalamSettingsPriceConflictStrategy;
+
+  /// No description provided for @basalamSettingsStockConflictStrategy.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock conflict strategy'**
+  String get basalamSettingsStockConflictStrategy;
+
+  /// No description provided for @basalamSettingsVariantStrategy.
+  ///
+  /// In en, this message translates to:
+  /// **'Variant strategy'**
+  String get basalamSettingsVariantStrategy;
+
+  /// No description provided for @basalamSettingsDefaultOrderTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Default order tag'**
+  String get basalamSettingsDefaultOrderTag;
+
+  /// No description provided for @basalamSettingsSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save Basalam settings'**
+  String get basalamSettingsSave;
+
+  /// No description provided for @basalamSettingsLatestWebhook.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest webhook event'**
+  String get basalamSettingsLatestWebhook;
+
+  /// No description provided for @basalamSettingsWebhookEventType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get basalamSettingsWebhookEventType;
+
+  /// No description provided for @basalamSettingsWebhookEventTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get basalamSettingsWebhookEventTime;
+
+  /// No description provided for @basalamModeMatchOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Match only'**
+  String get basalamModeMatchOnly;
+
+  /// No description provided for @basalamModeCreateOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Create only'**
+  String get basalamModeCreateOnly;
+
+  /// No description provided for @basalamModeMatchOrCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Match or create'**
+  String get basalamModeMatchOrCreate;
+
+  /// No description provided for @basalamModeManualReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual review'**
+  String get basalamModeManualReview;
+
+  /// No description provided for @basalamPaymentModeManualReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual review'**
+  String get basalamPaymentModeManualReview;
+
+  /// No description provided for @basalamPaymentModeAutoBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto bank'**
+  String get basalamPaymentModeAutoBank;
+
+  /// No description provided for @basalamPaymentModeAutoCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto cash'**
+  String get basalamPaymentModeAutoCash;
+
+  /// No description provided for @basalamStrategyLocalWins.
+  ///
+  /// In en, this message translates to:
+  /// **'Local wins'**
+  String get basalamStrategyLocalWins;
+
+  /// No description provided for @basalamStrategyRemoteWins.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote wins'**
+  String get basalamStrategyRemoteWins;
+
+  /// No description provided for @basalamSyncInvoiceTypeSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales invoice'**
+  String get basalamSyncInvoiceTypeSales;
+
+  /// No description provided for @basalamSyncInvoiceTypeSalesReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales return'**
+  String get basalamSyncInvoiceTypeSalesReturn;
+
+  /// No description provided for @basalamDlqClearDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear sync dead-letter?'**
+  String get basalamDlqClearDialogTitle;
+
+  /// No description provided for @basalamDlqClearDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'All recorded order/payment sync failures will be removed.'**
+  String get basalamDlqClearDialogBody;
+
+  /// No description provided for @basalamDlqClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get basalamDlqClearConfirm;
+
+  /// No description provided for @basalamDlqClearedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Dead-letter queue cleared'**
+  String get basalamDlqClearedSnackbar;
+
   /// No description provided for @reportsWooSection.
   ///
   /// In en, this message translates to:
@@ -22171,6 +22675,492 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Plugin, WooCommerce versions and connection test'**
   String get reportsWooBridgeSubtitle;
+
+  /// No description provided for @reportsWooKeywordsOverview.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce|woocommerce|store|arcwoc|woo'**
+  String get reportsWooKeywordsOverview;
+
+  /// No description provided for @reportsWooKeywordsOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'order|orders|woo|woocommerce'**
+  String get reportsWooKeywordsOrders;
+
+  /// No description provided for @reportsWooKeywordsCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'product|products|catalog|sku|woo'**
+  String get reportsWooKeywordsCatalog;
+
+  /// No description provided for @reportsWooKeywordsBridge.
+  ///
+  /// In en, this message translates to:
+  /// **'bridge|health|connection|woo|wordpress'**
+  String get reportsWooKeywordsBridge;
+
+  /// No description provided for @reportsWooStatCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers'**
+  String get reportsWooStatCustomers;
+
+  /// No description provided for @reportsWooStatOrders7d.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders (last 7 days)'**
+  String get reportsWooStatOrders7d;
+
+  /// No description provided for @reportsWooStatOrderStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Order storage'**
+  String get reportsWooStatOrderStorage;
+
+  /// No description provided for @reportsWooStatBridgeVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge version'**
+  String get reportsWooStatBridgeVersion;
+
+  /// No description provided for @reportsWooStatWcVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce'**
+  String get reportsWooStatWcVersion;
+
+  /// No description provided for @reportsWooStatWpVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'WordPress'**
+  String get reportsWooStatWpVersion;
+
+  /// No description provided for @reportsWooStatPluginVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'ArcWOC plugin'**
+  String get reportsWooStatPluginVersion;
+
+  /// No description provided for @reportsWooOverviewChartCaption.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} — {subtitle}'**
+  String reportsWooOverviewChartCaption(String title, String subtitle);
+
+  /// No description provided for @reportsWooBridgeTableHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical values returned by the store bridge. Use them to verify versions and connectivity.'**
+  String get reportsWooBridgeTableHint;
+
+  /// No description provided for @wooBridgeFieldBridgeVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge software version'**
+  String get wooBridgeFieldBridgeVersion;
+
+  /// No description provided for @wooBridgeFieldWcVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce version on the store'**
+  String get wooBridgeFieldWcVersion;
+
+  /// No description provided for @wooBridgeFieldWpVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'WordPress version on the store'**
+  String get wooBridgeFieldWpVersion;
+
+  /// No description provided for @wooBridgeFieldPluginVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Hesabix ArcWOC plugin version'**
+  String get wooBridgeFieldPluginVersion;
+
+  /// No description provided for @wooBridgeFieldGenericTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{key}'**
+  String wooBridgeFieldGenericTitle(String key);
+
+  /// No description provided for @wooBridgeFieldGenericSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw value from the bridge response.'**
+  String get wooBridgeFieldGenericSubtitle;
+
+  /// No description provided for @woocommerceSettingsPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce bridge settings'**
+  String get woocommerceSettingsPageTitle;
+
+  /// No description provided for @woocommerceSettingsPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Store URL and bridge token used by the Hesabix ↔ WooCommerce connector.'**
+  String get woocommerceSettingsPageSubtitle;
+
+  /// No description provided for @woocommerceOpenIntegrationHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Open WooCommerce hub'**
+  String get woocommerceOpenIntegrationHub;
+
+  /// No description provided for @woocommerceGoToSettingsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce settings'**
+  String get woocommerceGoToSettingsTooltip;
+
+  /// No description provided for @woocommerceHubSettingsPromoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge connection settings'**
+  String get woocommerceHubSettingsPromoTitle;
+
+  /// No description provided for @woocommerceHubSettingsPromoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage store URL, bridge token and connection test in business settings.'**
+  String get woocommerceHubSettingsPromoSubtitle;
+
+  /// No description provided for @woocommerceSettingsSavedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce settings saved'**
+  String get woocommerceSettingsSavedSnackbar;
+
+  /// No description provided for @woocommerceSettingsBridgeIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get woocommerceSettingsBridgeIntroTitle;
+
+  /// No description provided for @woocommerceSettingsBridgeIntroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your WordPress site base URL and the bridge token generated in the Hesabix ArcWOC plugin. Leave the token field empty when saving to keep the existing secret.'**
+  String get woocommerceSettingsBridgeIntroBody;
+
+  /// No description provided for @woocommerceStoreUrlLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Store base URL (WordPress)'**
+  String get woocommerceStoreUrlLabel;
+
+  /// No description provided for @woocommerceStoreUrlHint.
+  ///
+  /// In en, this message translates to:
+  /// **'https://example.com'**
+  String get woocommerceStoreUrlHint;
+
+  /// No description provided for @woocommerceBridgeTokenLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge token (from ArcWOC plugin)'**
+  String get woocommerceBridgeTokenLabel;
+
+  /// No description provided for @woocommerceBridgeTokenHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'If a token is already stored, leave this field empty and press save to keep the current value.'**
+  String get woocommerceBridgeTokenHelp;
+
+  /// No description provided for @woocommerceManagePermissionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Read-only: saving requires WooCommerce “manage” permission.'**
+  String get woocommerceManagePermissionHint;
+
+  /// No description provided for @woocommerceSaveButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get woocommerceSaveButton;
+
+  /// No description provided for @woocommerceTestConnectionButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get woocommerceTestConnectionButton;
+
+  /// No description provided for @woocommerceConnectionTestSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection successful'**
+  String get woocommerceConnectionTestSuccess;
+
+  /// No description provided for @woocommercePermissionDeniedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce'**
+  String get woocommercePermissionDeniedTitle;
+
+  /// No description provided for @woocommercePermissionDeniedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'You need WooCommerce “view” permission to open this section.'**
+  String get woocommercePermissionDeniedBody;
+
+  /// No description provided for @woocommerceHubOrdersTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders'**
+  String get woocommerceHubOrdersTab;
+
+  /// No description provided for @woocommerceHubProductsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Products'**
+  String get woocommerceHubProductsTab;
+
+  /// No description provided for @woocommerceHubCustomersTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers'**
+  String get woocommerceHubCustomersTab;
+
+  /// No description provided for @woocommerceOrdersFiltersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order filters'**
+  String get woocommerceOrdersFiltersTitle;
+
+  /// No description provided for @woocommerceOrderStatusLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Status (WC slug or comma-separated)'**
+  String get woocommerceOrderStatusLabel;
+
+  /// No description provided for @woocommerceOrderStatusHint.
+  ///
+  /// In en, this message translates to:
+  /// **'processing or processing,completed'**
+  String get woocommerceOrderStatusHint;
+
+  /// No description provided for @woocommerceOrderCustomerIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce customer ID'**
+  String get woocommerceOrderCustomerIdLabel;
+
+  /// No description provided for @woocommerceOrderSearchLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in orders'**
+  String get woocommerceOrderSearchLabel;
+
+  /// No description provided for @woocommerceOrderDateAfterLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'After (ISO date)'**
+  String get woocommerceOrderDateAfterLabel;
+
+  /// No description provided for @woocommerceOrderDateBeforeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Before (ISO date)'**
+  String get woocommerceOrderDateBeforeLabel;
+
+  /// No description provided for @woocommerceOrderSortByLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort by'**
+  String get woocommerceOrderSortByLabel;
+
+  /// No description provided for @woocommerceOrderSortOrderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get woocommerceOrderSortOrderLabel;
+
+  /// No description provided for @woocommerceOrderSortByDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get woocommerceOrderSortByDate;
+
+  /// No description provided for @woocommerceOrderSortByModified.
+  ///
+  /// In en, this message translates to:
+  /// **'Modified'**
+  String get woocommerceOrderSortByModified;
+
+  /// No description provided for @woocommerceOrderSortById.
+  ///
+  /// In en, this message translates to:
+  /// **'ID'**
+  String get woocommerceOrderSortById;
+
+  /// No description provided for @woocommerceSortDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Descending'**
+  String get woocommerceSortDesc;
+
+  /// No description provided for @woocommerceSortAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Ascending'**
+  String get woocommerceSortAsc;
+
+  /// No description provided for @woocommerceApplyFiltersButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply filters'**
+  String get woocommerceApplyFiltersButton;
+
+  /// No description provided for @woocommerceSearchProductsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search products'**
+  String get woocommerceSearchProductsLabel;
+
+  /// No description provided for @woocommerceSearchCustomersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Search customers'**
+  String get woocommerceSearchCustomersLabel;
+
+  /// No description provided for @woocommerceNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No data'**
+  String get woocommerceNoData;
+
+  /// No description provided for @woocommercePagerLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {pages} (total {total})'**
+  String woocommercePagerLine(int page, int pages, int total);
+
+  /// No description provided for @woocommerceColumnOrderId.
+  ///
+  /// In en, this message translates to:
+  /// **'ID'**
+  String get woocommerceColumnOrderId;
+
+  /// No description provided for @woocommerceColumnOrderNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Number'**
+  String get woocommerceColumnOrderNumber;
+
+  /// No description provided for @woocommerceColumnOrderStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get woocommerceColumnOrderStatus;
+
+  /// No description provided for @woocommerceColumnOrderTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get woocommerceColumnOrderTotal;
+
+  /// No description provided for @woocommerceColumnBillingEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get woocommerceColumnBillingEmail;
+
+  /// No description provided for @woocommerceColumnProductId.
+  ///
+  /// In en, this message translates to:
+  /// **'ID'**
+  String get woocommerceColumnProductId;
+
+  /// No description provided for @woocommerceColumnProductName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get woocommerceColumnProductName;
+
+  /// No description provided for @woocommerceColumnSku.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU'**
+  String get woocommerceColumnSku;
+
+  /// No description provided for @woocommerceColumnProductType.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get woocommerceColumnProductType;
+
+  /// No description provided for @woocommerceColumnPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'Price'**
+  String get woocommerceColumnPrice;
+
+  /// No description provided for @woocommerceColumnCustomerId.
+  ///
+  /// In en, this message translates to:
+  /// **'ID'**
+  String get woocommerceColumnCustomerId;
+
+  /// No description provided for @woocommerceColumnCustomerEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get woocommerceColumnCustomerEmail;
+
+  /// No description provided for @woocommerceColumnCustomerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get woocommerceColumnCustomerName;
+
+  /// No description provided for @woocommerceColumnUsername.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get woocommerceColumnUsername;
+
+  /// No description provided for @reportsWooTableHintOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders loaded from the live store bridge (read-only).'**
+  String get reportsWooTableHintOrders;
+
+  /// No description provided for @reportsWooTableHintCatalog.
+  ///
+  /// In en, this message translates to:
+  /// **'Products loaded from the live store bridge (read-only).'**
+  String get reportsWooTableHintCatalog;
+
+  /// No description provided for @reportsWooSettingsPromoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge settings'**
+  String get reportsWooSettingsPromoTitle;
+
+  /// No description provided for @reportsWooSettingsPromoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If numbers or lists look wrong, update the store URL or bridge token here, then refresh this report.'**
+  String get reportsWooSettingsPromoSubtitle;
+
+  /// No description provided for @woocommerceOpenReportsOverviewTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce reports overview'**
+  String get woocommerceOpenReportsOverviewTooltip;
+
+  /// No description provided for @settingsWooCommerceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce bridge'**
+  String get settingsWooCommerceTitle;
+
+  /// No description provided for @settingsWooCommerceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Store URL, bridge token and connection test'**
+  String get settingsWooCommerceSubtitle;
 
   /// No description provided for @invoiceGlobalDiscountSection.
   ///

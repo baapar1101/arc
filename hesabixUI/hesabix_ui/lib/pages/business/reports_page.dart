@@ -5,19 +5,26 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/business_nav.dart';
 import '../../core/auth_store.dart';
 import '../../services/marketplace_service.dart';
 import '../../widgets/permission/access_denied_page.dart';
 
-class ReportsPage extends StatefulWidget {
-  final int businessId;
-  final AuthStore authStore;
+/// شناسهٔ سکشن «گزارش‌های ووکامرس» در فهرست گزارش‌ها؛ با `?section=` در مسیر `reports` هماهنگ است.
+const String kReportsSectionWooCommerce = 'woocommerce_reports';
 
+class ReportsPage extends StatefulWidget {
   const ReportsPage({
     super.key,
     required this.businessId,
     required this.authStore,
+    this.initialSectionId,
   });
+
+  final int businessId;
+  final AuthStore authStore;
+  /// اگر ست شود، پس از بارگذاری افزونه‌ها سکشن متناظر در فهرست گزارش‌ها انتخاب می‌شود (مثلاً [kReportsSectionWooCommerce]).
+  final String? initialSectionId;
 
   @override
   State<ReportsPage> createState() => _ReportsPageState();
@@ -39,6 +46,37 @@ class _ReportsPageState extends State<ReportsPage> {
   bool _prefsLoaded = false;
   Set<String> _favorites = <String>{};
   List<String> _recent = <String>[];
+
+  List<String> _reportKeywordsFromPipe(String raw) {
+    return raw
+        .split('|')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  void _tryApplyInitialSectionFromWidget() {
+    final id = widget.initialSectionId?.trim();
+    if (id == null || id.isEmpty) return;
+    if (!_marketplacePluginsResolved) return;
+    if (!mounted) return;
+    final t = AppLocalizations.of(context);
+    final sections = _buildData(context, t: t);
+    if (!sections.any((s) => s.id == id)) return;
+    if (_selectedSectionId == id) return;
+    setState(() => _selectedSectionId = id);
+  }
+
+  @override
+  void didUpdateWidget(covariant ReportsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialSectionId != widget.initialSectionId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _tryApplyInitialSectionFromWidget();
+      });
+    }
+  }
 
   @override
   void initState() {
@@ -74,11 +112,19 @@ class _ReportsPageState extends State<ReportsPage> {
           ..addAll(codes);
         _marketplacePluginsResolved = true;
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _tryApplyInitialSectionFromWidget();
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _activeMarketplacePluginCodes.clear();
         _marketplacePluginsResolved = true;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _tryApplyInitialSectionFromWidget();
       });
     }
   }
@@ -570,7 +616,13 @@ class _ReportsPageState extends State<ReportsPage> {
     final t = AppLocalizations.of(context);
     if (!_canOpen(item)) return _showAccessDenied(context, t);
     _recordRecent(item.key);
-    context.go(item.route);
+    final prefix = '/business/${widget.businessId}/';
+    var target = item.route;
+    if (target.startsWith(prefix) && !target.contains('/tab')) {
+      final tail = target.substring(prefix.length);
+      target = context.businessPanelUrl(widget.businessId, tail);
+    }
+    context.go(target);
   }
 
   Widget _buildSectionChips(BuildContext context, List<_ReportSection> sections) {
@@ -1303,7 +1355,7 @@ class _ReportsPageState extends State<ReportsPage> {
     if (_marketplacePluginsResolved && _activeMarketplacePluginCodes.contains('woocommerce_hesabix')) {
       sections.add(
         _ReportSection(
-          id: 'woocommerce_reports',
+          id: kReportsSectionWooCommerce,
           title: t.reportsWooSection,
           icon: Icons.shopping_cart_outlined,
           items: [
@@ -1313,7 +1365,7 @@ class _ReportsPageState extends State<ReportsPage> {
               subtitle: t.reportsWooOverviewSubtitle,
               icon: Icons.pie_chart_outline,
               route: '/business/$b/reports/woocommerce/overview',
-              keywords: const ['ووکامرس', 'woocommerce', 'فروشگاه', 'arcwoc'],
+              keywords: _reportKeywordsFromPipe(t.reportsWooKeywordsOverview),
               permissionSection: 'reports',
               permissionSection2: 'woocommerce',
               marketplacePluginCode: 'woocommerce_hesabix',
@@ -1324,7 +1376,7 @@ class _ReportsPageState extends State<ReportsPage> {
               subtitle: t.reportsWooRecentOrdersSubtitle,
               icon: Icons.receipt_long,
               route: '/business/$b/reports/woocommerce/recent-orders',
-              keywords: const ['سفارش', 'orders', 'woo'],
+              keywords: _reportKeywordsFromPipe(t.reportsWooKeywordsOrders),
               permissionSection: 'reports',
               permissionSection2: 'woocommerce',
               marketplacePluginCode: 'woocommerce_hesabix',
@@ -1335,7 +1387,7 @@ class _ReportsPageState extends State<ReportsPage> {
               subtitle: t.reportsWooCatalogSubtitle,
               icon: Icons.inventory_2_outlined,
               route: '/business/$b/reports/woocommerce/catalog',
-              keywords: const ['محصول', 'products', 'woo'],
+              keywords: _reportKeywordsFromPipe(t.reportsWooKeywordsCatalog),
               permissionSection: 'reports',
               permissionSection2: 'woocommerce',
               marketplacePluginCode: 'woocommerce_hesabix',
@@ -1346,7 +1398,7 @@ class _ReportsPageState extends State<ReportsPage> {
               subtitle: t.reportsWooBridgeSubtitle,
               icon: Icons.link,
               route: '/business/$b/reports/woocommerce/bridge-health',
-              keywords: const ['پل', 'bridge', 'health', 'woo'],
+              keywords: _reportKeywordsFromPipe(t.reportsWooKeywordsBridge),
               permissionSection: 'reports',
               permissionSection2: 'woocommerce',
               marketplacePluginCode: 'woocommerce_hesabix',

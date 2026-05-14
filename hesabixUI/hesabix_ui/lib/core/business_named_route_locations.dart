@@ -109,6 +109,8 @@ abstract final class BusinessNamedRoutes {
     'business_quick_sales': 'quick-sales',
     'business_settings_credit': 'settings/credit',
     'business_settings_crm': 'settings/crm',
+    'business_settings_basalam': 'settings/basalam',
+    'business_settings_woocommerce': 'settings/woocommerce',
     'business_settings_customer_club': 'settings/customer-club',
     'business_settings_document_numbering': 'settings/document-numbering',
     'business_settings_tax': 'settings/tax',

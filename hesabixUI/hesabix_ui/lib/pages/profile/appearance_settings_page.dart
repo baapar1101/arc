@@ -65,6 +65,9 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   ];
 
   static const List<String> _defaultOrderPrograms = [
+    'basalam',
+    'woocommerce',
+    'plugin-marketplace',
     'group:warehouses',
     'storage-files',
     'tax-workspace',
@@ -81,7 +84,6 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   static const List<String> _defaultOrderOther = [
     'settings',
     'report-templates',
-    'plugin-marketplace',
   ];
 
   static const Map<String, List<String>> _defaultChildrenOrder = {
@@ -122,6 +124,8 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'documents': 'اسناد',
     'group:chart-of-accounts': 'حسابداری پیشرفته',
     'reports': 'گزارش‌ها',
+    'basalam': 'باسلام',
+    'woocommerce': 'ووکامرس',
     'group:warehouses': 'مدیریت انبار',
     'storage-files': 'فضای ذخیره‌سازی',
     'tax-workspace': 'مودیان',

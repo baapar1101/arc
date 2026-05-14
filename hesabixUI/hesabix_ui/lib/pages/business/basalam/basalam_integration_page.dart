@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth_store.dart';
+import '../../../core/business_nav.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/basalam_integration_service.dart';
 import '../../../utils/error_extractor.dart';
@@ -26,7 +28,6 @@ class BasalamIntegrationPage extends StatefulWidget {
 class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
   final BasalamIntegrationService _svc = BasalamIntegrationService();
   bool _loading = true;
-  bool _saving = false;
   bool _syncing = false;
   bool _syncingProducts = false;
   bool _publishingProducts = false;
@@ -52,20 +53,15 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
   String _dlqTypeFilter = 'all';
   static const int _dlqPageSize = 25;
 
-  final _apiKeyCtl = TextEditingController();
-  final _apiRefreshTokenCtl = TextEditingController();
-  final _baseUrlCtl = TextEditingController();
-  final _defaultVendorIdCtl = TextEditingController();
-  final _defaultCategoryIdCtl = TextEditingController();
-  final _defaultBasalamStockCtl = TextEditingController(text: '1');
+  /// از تنظیمات ذخیره‌شده برای عملیات سینک/انتشار (بدون تکرار فرم تنظیمات).
+  int? _vendorIdFromSettings;
+
   final _pullPageCtl = TextEditingController(text: '1');
   final _pullPerPageCtl = TextEditingController(text: '50');
   final _pushSinceMinutesCtl = TextEditingController(text: '120');
   final _pushLimitCtl = TextEditingController(text: '50');
   final _retryLimitCtl = TextEditingController(text: '20');
   final _resolveLimitCtl = TextEditingController(text: '20');
-  final _webhookSecretCtl = TextEditingController();
-  final _defaultTagCtl = TextEditingController();
   final _sampleOrdersCtl = TextEditingController(
     text: '[{"order_id":"demo-1","status":"paid"}]',
   );
@@ -83,25 +79,6 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
   final _replyChatIdCtl = TextEditingController();
   final _replyBodyCtl = TextEditingController();
 
-  bool _enabled = false;
-  bool _webhookEnabled = false;
-  bool _chatEnabled = true;
-  bool _orderSyncEnabled = true;
-  bool _productSyncEnabled = true;
-  bool _createInvoiceOnSync = true;
-  String _invoiceTypeOnSync = 'invoice_sales';
-  String _personMode = 'match_or_create';
-  String _productMode = 'match_or_create';
-  String _paymentMode = 'manual_review';
-  bool _paymentReconcileBlockOverpayment = true;
-  final _paymentReconcileToleranceCtl = TextEditingController(text: '1');
-  String _priceConflictStrategy = 'local_wins';
-  String _stockConflictStrategy = 'local_wins';
-  String _variantStrategy = 'manual_review';
-  /// واحد مبلغ در دادهٔ API باسلام: ریال یا تومان (به IRR حساب‌یکس تبدیل می‌شود)
-  String _basalamMonetaryUnit = 'rial';
-  String? _lastWebhookEventType;
-  String? _lastWebhookEventAt;
   int _productConflictCount = 0;
   List<Map<String, dynamic>> _productConflicts = const [];
   Set<String> _selectedConflictIds = <String>{};
@@ -124,20 +101,12 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
 
   @override
   void dispose() {
-    _apiKeyCtl.dispose();
-    _apiRefreshTokenCtl.dispose();
-    _baseUrlCtl.dispose();
-    _defaultVendorIdCtl.dispose();
-    _defaultCategoryIdCtl.dispose();
-    _defaultBasalamStockCtl.dispose();
     _pullPageCtl.dispose();
     _pullPerPageCtl.dispose();
     _pushSinceMinutesCtl.dispose();
     _pushLimitCtl.dispose();
     _retryLimitCtl.dispose();
     _resolveLimitCtl.dispose();
-    _webhookSecretCtl.dispose();
-    _defaultTagCtl.dispose();
     _sampleOrdersCtl.dispose();
     _sampleProductsCtl.dispose();
     _samplePublishProductsCtl.dispose();
@@ -146,60 +115,25 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
     _replyChatIdCtl.dispose();
     _replyBodyCtl.dispose();
     _conflictSearchCtl.dispose();
-    _paymentReconcileToleranceCtl.dispose();
     super.dispose();
   }
 
-  String _title(AppLocalizations t) =>
-      t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam Integration';
+  String _title(AppLocalizations t) => t.basalamIntegrationMenuTitle;
 
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       final d = await _svc.getSettings(businessId: widget.businessId);
       if (!mounted) return;
+      final rawVid = d['default_basalam_vendor_id'];
+      int? vid;
+      if (rawVid is int) {
+        vid = rawVid;
+      } else {
+        vid = int.tryParse('${rawVid ?? ''}'.trim());
+      }
       setState(() {
-        _enabled = d['enabled'] == true;
-        _webhookEnabled = d['webhook_enabled'] == true;
-        _chatEnabled = d['chat_enabled'] == true;
-        _orderSyncEnabled = d['order_sync_enabled'] == true;
-        _productSyncEnabled = d['product_sync_enabled'] == true;
-        _createInvoiceOnSync = d['create_sales_invoice_on_sync'] != false;
-        _invoiceTypeOnSync = (d['invoice_type_on_sync'] ?? 'invoice_sales')
-            .toString();
-        _personMode = (d['auto_create_person_mode'] ?? 'match_or_create')
-            .toString();
-        _productMode = (d['auto_create_product_mode'] ?? 'match_or_create')
-            .toString();
-        _paymentMode = (d['payment_register_mode'] ?? 'manual_review')
-            .toString();
-        _paymentReconcileBlockOverpayment =
-            d['payment_reconcile_block_overpayment'] != false;
-        _paymentReconcileToleranceCtl.text =
-            (d['payment_reconcile_tolerance_rial'] ?? 1).toString();
-        _priceConflictStrategy =
-            (d['product_conflict_price_strategy'] ?? 'local_wins').toString();
-        _stockConflictStrategy =
-            (d['product_conflict_stock_strategy'] ?? 'local_wins').toString();
-        _variantStrategy =
-            (d['product_variant_strategy'] ?? 'manual_review').toString();
-        final bm = (d['basalam_monetary_unit'] ?? 'rial').toString();
-        _basalamMonetaryUnit =
-            bm == 'toman' || bm == 'tomman' || bm == 'تومان' ? 'toman' : 'rial';
-        _apiKeyCtl.text = (d['api_key'] ?? '').toString();
-        _apiRefreshTokenCtl.text = (d['api_refresh_token'] ?? '').toString();
-        _baseUrlCtl.text = (d['api_base_url'] ?? 'https://api.basalam.com')
-            .toString();
-        _defaultVendorIdCtl.text = (d['default_basalam_vendor_id'] ?? '')
-            .toString();
-        _defaultCategoryIdCtl.text = (d['default_basalam_category_id'] ?? '')
-            .toString();
-        _defaultBasalamStockCtl.text = (d['default_basalam_stock'] ?? 1)
-            .toString();
-        _webhookSecretCtl.text = (d['webhook_secret'] ?? '').toString();
-        _defaultTagCtl.text = (d['default_order_tag'] ?? 'basalam').toString();
-        _lastWebhookEventType = d['last_webhook_event_type']?.toString();
-        _lastWebhookEventAt = d['last_webhook_event_at']?.toString();
+        _vendorIdFromSettings = vid;
       });
       await _loadProductConflicts();
       await _refreshBasalamHealth();
@@ -305,27 +239,26 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
   }
 
   Future<void> _confirmClearDlq() async {
-    final isFa = AppLocalizations.of(context).localeName.startsWith('fa');
+    final t = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isFa ? 'پاک کردن صف مردهٔ سینک؟' : 'Clear sync dead-letter?'),
-        content: Text(
-          isFa
-              ? 'همهٔ ردیف‌های ثبت‌شده برای خطاهای سینک سفارش یا پرداخت حذف می‌شوند.'
-              : 'All recorded order/payment sync failures will be removed.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(isFa ? 'انصراف' : 'Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(isFa ? 'پاک کن' : 'Clear'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        final d = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(d.basalamDlqClearDialogTitle),
+          content: Text(d.basalamDlqClearDialogBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(d.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(d.basalamDlqClearConfirm),
+            ),
+          ],
+        );
+      },
     );
     if (ok != true || !mounted) return;
     setState(() => _clearingDlq = true);
@@ -339,7 +272,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
       if (!mounted) return;
       SnackBarHelper.showSuccess(
         context,
-        message: isFa ? 'صف مرده پاک شد' : 'Dead-letter queue cleared',
+        message: t.basalamDlqClearedSnackbar,
       );
     } catch (e) {
       if (mounted) {
@@ -350,64 +283,6 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
       }
     } finally {
       if (mounted) setState(() => _clearingDlq = false);
-    }
-  }
-
-  Future<void> _save() async {
-    setState(() => _saving = true);
-    try {
-      await _svc.updateSettings(
-        businessId: widget.businessId,
-        payload: <String, dynamic>{
-          'enabled': _enabled,
-          'api_key': _apiKeyCtl.text.trim(),
-          'api_refresh_token': _apiRefreshTokenCtl.text.trim(),
-          'api_base_url': _baseUrlCtl.text.trim(),
-          'default_basalam_vendor_id': int.tryParse(
-            _defaultVendorIdCtl.text.trim(),
-          ),
-          'default_basalam_category_id': int.tryParse(
-            _defaultCategoryIdCtl.text.trim(),
-          ),
-          'default_basalam_stock':
-              int.tryParse(_defaultBasalamStockCtl.text.trim()) ?? 1,
-          'webhook_secret': _webhookSecretCtl.text.trim(),
-          'webhook_enabled': _webhookEnabled,
-          'chat_enabled': _chatEnabled,
-          'order_sync_enabled': _orderSyncEnabled,
-          'product_sync_enabled': _productSyncEnabled,
-          'create_sales_invoice_on_sync': _createInvoiceOnSync,
-          'invoice_type_on_sync': _invoiceTypeOnSync,
-          'auto_create_person_mode': _personMode,
-          'auto_create_product_mode': _productMode,
-          'default_order_tag': _defaultTagCtl.text.trim(),
-          'payment_register_mode': _paymentMode,
-          'payment_reconcile_block_overpayment': _paymentReconcileBlockOverpayment,
-          'payment_reconcile_tolerance_rial':
-              double.tryParse(_paymentReconcileToleranceCtl.text.trim()) ?? 1.0,
-          'product_conflict_price_strategy': _priceConflictStrategy,
-          'product_conflict_stock_strategy': _stockConflictStrategy,
-          'product_variant_strategy': _variantStrategy,
-          'basalam_monetary_unit': _basalamMonetaryUnit,
-        },
-      );
-      if (!mounted) return;
-      SnackBarHelper.showSuccess(
-        context,
-        message: AppLocalizations.of(context).localeName.startsWith('fa')
-            ? 'تنظیمات باسلام ذخیره شد'
-            : 'Basalam settings saved',
-      );
-      await _load();
-    } catch (e) {
-      if (mounted) {
-        SnackBarHelper.showError(
-          context,
-          message: ErrorExtractor.forContext(e, context),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -462,7 +337,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
         businessId: widget.businessId,
         resolution: resolution,
         limit: int.tryParse(_resolveLimitCtl.text.trim()) ?? 20,
-        vendorId: int.tryParse(_defaultVendorIdCtl.text.trim()),
+        vendorId: _vendorIdFromSettings,
         conflictIds: conflictIds ??
             (_selectedConflictIds.isEmpty
                 ? null
@@ -901,7 +776,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
       final result = await _svc.publishProducts(
         businessId: widget.businessId,
         products: products,
-        vendorId: int.tryParse(_defaultVendorIdCtl.text.trim()),
+        vendorId: _vendorIdFromSettings,
       );
       if (!mounted) return;
       SnackBarHelper.showSuccess(
@@ -960,7 +835,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
         businessId: widget.businessId,
         sinceMinutes: int.tryParse(_pushSinceMinutesCtl.text.trim()) ?? 120,
         limit: int.tryParse(_pushLimitCtl.text.trim()) ?? 50,
-        vendorId: int.tryParse(_defaultVendorIdCtl.text.trim()),
+        vendorId: _vendorIdFromSettings,
       );
       if (!mounted) return;
       SnackBarHelper.showSuccess(
@@ -989,7 +864,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
       final result = await _svc.retryProductPublishQueue(
         businessId: widget.businessId,
         limit: int.tryParse(_retryLimitCtl.text.trim()) ?? 20,
-        vendorId: int.tryParse(_defaultVendorIdCtl.text.trim()),
+        vendorId: _vendorIdFromSettings,
       );
       if (!mounted) return;
       SnackBarHelper.showSuccess(
@@ -1109,6 +984,17 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
         title: Text(_title(t)),
         leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
+          if (canView)
+            IconButton(
+              tooltip: t.basalamGoToSettingsTooltip,
+              onPressed: () => context.push(
+                    context.businessPanelUrl(
+                      widget.businessId,
+                      'settings/basalam',
+                    ),
+                  ),
+              icon: const Icon(Icons.settings_outlined),
+            ),
           IconButton(
             onPressed: _loading ? null : _load,
             icon: const Icon(Icons.refresh),
@@ -1120,17 +1006,24 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                SwitchListTile(
-                  value: _enabled,
-                  onChanged: canManage
-                      ? (v) => setState(() => _enabled = v)
-                      : null,
-                  title: Text(
-                    isFa
-                        ? 'فعال‌سازی اتصال باسلام'
-                        : 'Enable Basalam integration',
+                Card(
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.settings_suggest_outlined,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    title: Text(t.basalamHubSettingsPromoTitle),
+                    subtitle: Text(t.basalamHubSettingsPromoSubtitle),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.push(
+                          context.businessPanelUrl(
+                            widget.businessId,
+                            'settings/basalam',
+                          ),
+                        ),
                   ),
                 ),
+                const SizedBox(height: 12),
                 if (_loadingCurrencyReadiness)
                   const Padding(
                     padding: EdgeInsets.only(bottom: 8),
@@ -1161,9 +1054,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    isFa
-                                        ? 'سینک باسلام فقط با ارز IRR در حساب‌یکس'
-                                        : 'Basalam sync requires IRR-only business currency',
+                                    t.basalamSettingsCurrencyIrrTitle,
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleSmall
@@ -1195,7 +1086,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
                             ),
                             if (_invalidSecondaryCurrencyCodes.isNotEmpty)
                               Text(
-                                '${isFa ? 'ارزهای جانبی نامعتبر' : 'Invalid secondary codes'}: ${_invalidSecondaryCurrencyCodes.join(', ')}',
+                                '${t.basalamSettingsCurrencyInvalidSecondaries}: ${_invalidSecondaryCurrencyCodes.join(', ')}',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -1207,9 +1098,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
                               ),
                             const SizedBox(height: 8),
                             Text(
-                              isFa
-                                  ? 'در تنظیمات کسب‌وکار ارز پیش‌فرض را IRR کنید و ارزهای جانبی غیر IRR را حذف کنید؛ سپس واحد ریال/تومان باسلام را مطابق پنل باسلام انتخاب کنید.'
-                                  : 'Set business default to IRR and remove non-IRR secondary currencies; then pick Basalam rial vs toman to match their panel.',
+                              t.basalamSettingsCurrencyFixHint,
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -1224,384 +1113,6 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
                       ),
                     ),
                   ),
-                TextField(
-                  controller: _apiKeyCtl,
-                  enabled: canManage,
-                  decoration: InputDecoration(
-                    labelText: isFa ? 'API Key باسلام' : 'Basalam API key',
-                  ),
-                ),
-                TextField(
-                  controller: _apiRefreshTokenCtl,
-                  enabled: canManage,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'Refresh Token باسلام (اختیاری)'
-                        : 'Basalam refresh token (optional)',
-                  ),
-                ),
-                TextField(
-                  controller: _baseUrlCtl,
-                  enabled: canManage,
-                  decoration: InputDecoration(
-                    labelText: isFa ? 'آدرس پایه API' : 'API base URL',
-                  ),
-                ),
-                TextField(
-                  controller: _defaultVendorIdCtl,
-                  enabled: canManage,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'Vendor ID پیش‌فرض باسلام'
-                        : 'Default Basalam vendor ID',
-                  ),
-                ),
-                TextField(
-                  controller: _defaultCategoryIdCtl,
-                  enabled: canManage,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'Category ID پیش‌فرض باسلام'
-                        : 'Default Basalam category ID',
-                  ),
-                ),
-                TextField(
-                  controller: _defaultBasalamStockCtl,
-                  enabled: canManage,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'موجودی پیش‌فرض انتشار'
-                        : 'Default publish stock',
-                  ),
-                ),
-                DropdownButtonFormField<String>(
-                  value: _basalamMonetaryUnit,
-                  onChanged: canManage
-                      ? (v) => setState(
-                          () => _basalamMonetaryUnit =
-                              v ?? _basalamMonetaryUnit,
-                        )
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'واحد مبلغ در دادهٔ باسلام'
-                        : 'Basalam monetary unit',
-                    helperText: isFa
-                        ? 'حساب‌یکس فقط IRR؛ در حالت تومان مقادیر باسلام ×۱۰ به ریال تبدیل می‌شوند.'
-                        : 'Hesabix stores IRR only; toman amounts from Basalam are multiplied by 10.',
-                  ),
-                  items: [
-                    DropdownMenuItem(
-                      value: 'rial',
-                      child: Text(isFa ? 'ریال (همان IRR)' : 'Rial (IRR)'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'toman',
-                      child:
-                          Text(isFa ? 'تومان (۱۰× → IRR)' : 'Toman (×10 → IRR)'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                SwitchListTile(
-                  value: _webhookEnabled,
-                  onChanged: canManage
-                      ? (v) => setState(() => _webhookEnabled = v)
-                      : null,
-                  title: Text(isFa ? 'فعال‌سازی وب‌هوک' : 'Enable webhook'),
-                ),
-                TextField(
-                  controller: _webhookSecretCtl,
-                  enabled: canManage,
-                  decoration: InputDecoration(
-                    labelText: isFa ? 'Webhook Secret' : 'Webhook secret',
-                  ),
-                ),
-                SwitchListTile(
-                  value: _chatEnabled,
-                  onChanged: canManage
-                      ? (v) => setState(() => _chatEnabled = v)
-                      : null,
-                  title: Text(isFa ? 'فعال‌سازی چت' : 'Enable chat bridge'),
-                ),
-                SwitchListTile(
-                  value: _orderSyncEnabled,
-                  onChanged: canManage
-                      ? (v) => setState(() => _orderSyncEnabled = v)
-                      : null,
-                  title: Text(
-                    isFa ? 'فعال‌سازی سینک سفارش' : 'Enable order sync',
-                  ),
-                ),
-                SwitchListTile(
-                  value: _productSyncEnabled,
-                  onChanged: canManage
-                      ? (v) => setState(() => _productSyncEnabled = v)
-                      : null,
-                  title: Text(
-                    isFa ? 'فعال‌سازی سینک کالا' : 'Enable product sync',
-                  ),
-                ),
-                SwitchListTile(
-                  value: _createInvoiceOnSync,
-                  onChanged: canManage
-                      ? (v) => setState(() => _createInvoiceOnSync = v)
-                      : null,
-                  title: Text(
-                    isFa
-                        ? 'ایجاد فاکتور هنگام سینک سفارش'
-                        : 'Create invoice on order sync',
-                  ),
-                ),
-                DropdownButtonFormField<String>(
-                  value: _invoiceTypeOnSync,
-                  onChanged: canManage
-                      ? (v) => setState(
-                          () => _invoiceTypeOnSync = v ?? _invoiceTypeOnSync,
-                        )
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: isFa ? 'نوع فاکتور سینک' : 'Sync invoice type',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'invoice_sales',
-                      child: Text('invoice_sales'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'invoice_sales_return',
-                      child: Text('invoice_sales_return'),
-                    ),
-                  ],
-                ),
-                DropdownButtonFormField<String>(
-                  value: _personMode,
-                  onChanged: canManage
-                      ? (v) => setState(() => _personMode = v ?? _personMode)
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'حالت تطبیق/ایجاد شخص'
-                        : 'Person matching mode',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'match_only',
-                      child: Text('match_only'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'create_only',
-                      child: Text('create_only'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'match_or_create',
-                      child: Text('match_or_create'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'manual_review',
-                      child: Text('manual_review'),
-                    ),
-                  ],
-                ),
-                DropdownButtonFormField<String>(
-                  value: _productMode,
-                  onChanged: canManage
-                      ? (v) => setState(() => _productMode = v ?? _productMode)
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'حالت تطبیق/ایجاد کالا'
-                        : 'Product matching mode',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'match_only',
-                      child: Text('match_only'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'create_only',
-                      child: Text('create_only'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'match_or_create',
-                      child: Text('match_or_create'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'manual_review',
-                      child: Text('manual_review'),
-                    ),
-                  ],
-                ),
-                DropdownButtonFormField<String>(
-                  value: _paymentMode,
-                  onChanged: canManage
-                      ? (v) => setState(() => _paymentMode = v ?? _paymentMode)
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'حالت ثبت سند پرداخت'
-                        : 'Payment accounting mode',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'manual_review',
-                      child: Text('manual_review'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'auto_bank',
-                      child: Text('auto_bank'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'auto_cash',
-                      child: Text('auto_cash'),
-                    ),
-                  ],
-                ),
-                SwitchListTile(
-                  value: _paymentReconcileBlockOverpayment,
-                  onChanged: canManage
-                      ? (v) => setState(
-                            () => _paymentReconcileBlockOverpayment = v,
-                          )
-                      : null,
-                  title: Text(
-                    isFa
-                        ? 'جلوگیری از بیش‌پرداخت نسبت به ماندهٔ فاکتور'
-                        : 'Block payment over invoice remaining',
-                  ),
-                  subtitle: Text(
-                    isFa
-                        ? 'پیش از ثبت رسید، ماندهٔ فاکتور (IRR) با مبلغ باسلام مقایسه می‌شود؛ ناسازگاری به صف مرده می‌رود.'
-                        : 'Compares invoice remaining (IRR) to Basalam amount before posting receipt.',
-                  ),
-                ),
-                TextField(
-                  controller: _paymentReconcileToleranceCtl,
-                  enabled: canManage,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'تلورانس ماندهٔ فاکتور (ریال)'
-                        : 'Invoice remaining tolerance (IRR)',
-                  ),
-                ),
-                DropdownButtonFormField<String>(
-                  value: _priceConflictStrategy,
-                  onChanged: canManage
-                      ? (v) => setState(
-                            () =>
-                                _priceConflictStrategy = v ?? _priceConflictStrategy,
-                          )
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'استراتژی تضاد قیمت'
-                        : 'Price conflict strategy',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'local_wins',
-                      child: Text('local_wins'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'remote_wins',
-                      child: Text('remote_wins'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'manual_review',
-                      child: Text('manual_review'),
-                    ),
-                  ],
-                ),
-                DropdownButtonFormField<String>(
-                  value: _stockConflictStrategy,
-                  onChanged: canManage
-                      ? (v) => setState(
-                            () =>
-                                _stockConflictStrategy = v ?? _stockConflictStrategy,
-                          )
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: isFa
-                        ? 'استراتژی تضاد موجودی'
-                        : 'Stock conflict strategy',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'local_wins',
-                      child: Text('local_wins'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'remote_wins',
-                      child: Text('remote_wins'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'manual_review',
-                      child: Text('manual_review'),
-                    ),
-                  ],
-                ),
-                DropdownButtonFormField<String>(
-                  value: _variantStrategy,
-                  onChanged: canManage
-                      ? (v) => setState(
-                            () => _variantStrategy = v ?? _variantStrategy,
-                          )
-                      : null,
-                  decoration: InputDecoration(
-                    labelText: isFa ? 'استراتژی واریانت' : 'Variant strategy',
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'manual_review',
-                      child: Text('manual_review'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'local_wins',
-                      child: Text('local_wins'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'remote_wins',
-                      child: Text('remote_wins'),
-                    ),
-                  ],
-                ),
-                TextField(
-                  controller: _defaultTagCtl,
-                  enabled: canManage,
-                  decoration: InputDecoration(
-                    labelText: isFa ? 'تگ پیش‌فرض سفارش' : 'Default order tag',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.icon(
-                  onPressed: canManage && !_saving ? _save : null,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save),
-                  label: Text(isFa ? 'ذخیره تنظیمات' : 'Save settings'),
-                ),
-                const Divider(height: 28),
-                Text(
-                  isFa ? 'وب‌هوک آخرین رویداد' : 'Latest webhook event',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '${isFa ? 'نوع' : 'Type'}: ${_lastWebhookEventType ?? '-'}',
-                ),
-                Text(
-                  '${isFa ? 'زمان' : 'Time'}: ${_lastWebhookEventAt ?? '-'}',
-                ),
-                const Divider(height: 28),
                 Text(
                   isFa
                       ? 'صف مردهٔ سینک سفارش و پرداخت'

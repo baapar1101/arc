@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../core/business_nav.dart';
 import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
@@ -180,6 +181,50 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!_isDistributionPluginActive()) return false;
     if (authStore.currentBusiness?.isOwner == true) return true;
     return authStore.hasBusinessPermission('distribution', 'view');
+  }
+
+  bool _isBasalamPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'basalam_connector',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _canAccessBasalamSettings() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    if (!authStore.hasBusinessPermission('settings', 'join')) return false;
+    if (!_isBasalamPluginActive()) return false;
+    if (authStore.currentBusiness?.isOwner == true) return true;
+    return authStore.hasBusinessPermission('basalam', 'view') ||
+        authStore.hasBusinessPermission('basalam', 'manage');
+  }
+
+  bool _isWooCommerceHesabixPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'woocommerce_hesabix',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _canAccessWooCommerceSettings() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    if (!authStore.hasBusinessPermission('settings', 'join')) return false;
+    if (!_isWooCommerceHesabixPluginActive()) return false;
+    if (authStore.currentBusiness?.isOwner == true) return true;
+    return authStore.hasBusinessPermission('woocommerce', 'view') ||
+        authStore.hasBusinessPermission('woocommerce', 'manage');
   }
 
   bool _canAccessCrmSettings() {
@@ -414,6 +459,32 @@ class _SettingsPageState extends State<SettingsPage> {
                                     subtitle: t.distributionSettingsSubtitle,
                                     icon: Icons.local_shipping_outlined,
                                     onTap: () => context.push('/business/${widget.businessId}/distribution'),
+                                  ),
+                                if (_canAccessBasalamSettings())
+                                  _buildSettingItem(
+                                    context,
+                                    title: t.settingsBasalamTitle,
+                                    subtitle: t.settingsBasalamSubtitle,
+                                    icon: Icons.storefront_outlined,
+                                    onTap: () => context.push(
+                                          context.businessPanelUrl(
+                                            widget.businessId,
+                                            'settings/basalam',
+                                          ),
+                                        ),
+                                  ),
+                                if (_canAccessWooCommerceSettings())
+                                  _buildSettingItem(
+                                    context,
+                                    title: t.settingsWooCommerceTitle,
+                                    subtitle: t.settingsWooCommerceSubtitle,
+                                    icon: Icons.shopping_cart_outlined,
+                                    onTap: () => context.push(
+                                          context.businessPanelUrl(
+                                            widget.businessId,
+                                            'settings/woocommerce',
+                                          ),
+                                        ),
                                   ),
                                 _buildSettingItem(
                                   context,
@@ -721,6 +792,32 @@ class _SettingsPageState extends State<SettingsPage> {
                               subtitle: t.distributionSettingsSubtitle,
                               icon: Icons.local_shipping_outlined,
                               onTap: () => context.push('/business/${widget.businessId}/distribution'),
+                            ),
+                          if (_canAccessBasalamSettings())
+                            _buildSettingItem(
+                              context,
+                              title: t.settingsBasalamTitle,
+                              subtitle: t.settingsBasalamSubtitle,
+                              icon: Icons.storefront_outlined,
+                              onTap: () => context.push(
+                                    context.businessPanelUrl(
+                                      widget.businessId,
+                                      'settings/basalam',
+                                    ),
+                                  ),
+                            ),
+                          if (_canAccessWooCommerceSettings())
+                            _buildSettingItem(
+                              context,
+                              title: t.settingsWooCommerceTitle,
+                              subtitle: t.settingsWooCommerceSubtitle,
+                              icon: Icons.shopping_cart_outlined,
+                              onTap: () => context.push(
+                                    context.businessPanelUrl(
+                                      widget.businessId,
+                                      'settings/woocommerce',
+                                    ),
+                                  ),
                             ),
                           _buildSettingItem(
                             context,

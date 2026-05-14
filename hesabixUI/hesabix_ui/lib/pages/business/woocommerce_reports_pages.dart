@@ -1,10 +1,65 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/core/business_nav.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/woocommerce_integration_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
+
+String _wooBridgeFieldTitle(AppLocalizations t, String key) {
+  switch (key) {
+    case 'bridge_version':
+      return t.wooBridgeFieldBridgeVersion;
+    case 'wc_version':
+      return t.wooBridgeFieldWcVersion;
+    case 'wp_version':
+      return t.wooBridgeFieldWpVersion;
+    case 'plugin_version':
+      return t.wooBridgeFieldPluginVersion;
+    default:
+      return t.wooBridgeFieldGenericTitle(key);
+  }
+}
+
+Widget _reportsWooSettingsPromoCard(BuildContext context, int businessId) {
+  final t = AppLocalizations.of(context);
+  final theme = Theme.of(context);
+  return Card(
+    child: ListTile(
+      leading: Icon(
+        Icons.settings_suggest_outlined,
+        color: theme.colorScheme.primary,
+      ),
+      title: Text(t.reportsWooSettingsPromoTitle),
+      subtitle: Text(t.reportsWooSettingsPromoSubtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => context.push(
+            context.businessPanelUrl(businessId, 'settings/woocommerce'),
+          ),
+    ),
+  );
+}
+
+List<Widget> _reportsWooAppBarActions(
+  BuildContext context,
+  AppLocalizations t,
+  int businessId,
+  VoidCallback onRefresh,
+) {
+  return [
+    IconButton(
+      tooltip: t.woocommerceGoToSettingsTooltip,
+      icon: const Icon(Icons.settings_outlined),
+      onPressed: () => context.push(
+            context.businessPanelUrl(businessId, 'settings/woocommerce'),
+          ),
+    ),
+    IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh)),
+  ];
+}
 
 class WooCommerceReportsOverviewPage extends StatefulWidget {
   final int businessId;
@@ -69,7 +124,7 @@ class _WooCommerceReportsOverviewPageState extends State<WooCommerceReportsOverv
       appBar: AppBar(
         title: Text(t.reportsWooOverviewTitle),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
         child: _loading
@@ -83,7 +138,6 @@ class _WooCommerceReportsOverviewPageState extends State<WooCommerceReportsOverv
 
   Widget _buildBody(BuildContext context, ThemeData theme, AppLocalizations t) {
     final s = _summary ?? const <String, dynamic>{};
-    final fa = t.localeName.startsWith('fa');
     final counts = (s['counts_by_status'] is Map)
         ? Map<String, dynamic>.from(s['counts_by_status'] as Map)
         : const <String, dynamic>{};
@@ -99,6 +153,8 @@ class _WooCommerceReportsOverviewPageState extends State<WooCommerceReportsOverv
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _reportsWooSettingsPromoCard(context, widget.businessId),
+          const SizedBox(height: 4),
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -107,29 +163,33 @@ class _WooCommerceReportsOverviewPageState extends State<WooCommerceReportsOverv
                   '${s['orders_total'] ?? 0}'),
               _infoCard(theme, t.reportsWooCatalogTitle, Icons.inventory_2_outlined,
                   '${s['products_total'] ?? 0}'),
-              _infoCard(theme, fa ? 'مشتریان' : 'Customers', Icons.people_outline, '${s['customers_total'] ?? 0}'),
-              _infoCard(theme, fa ? 'سفارش ۷ روز اخیر' : 'Orders (7d)', Icons.trending_up, '${s['orders_last_7_days'] ?? 0}'),
-              _infoCard(theme, fa ? 'ذخیرهٔ سفارش' : 'Order storage', Icons.storage, '${s['orders_storage'] ?? '-'}'),
+              _infoCard(theme, t.reportsWooStatCustomers, Icons.people_outline, '${s['customers_total'] ?? 0}'),
+              _infoCard(theme, t.reportsWooStatOrders7d, Icons.trending_up, '${s['orders_last_7_days'] ?? 0}'),
+              _infoCard(theme, t.reportsWooStatOrderStorage, Icons.storage, '${s['orders_storage'] ?? '-'}'),
             ],
           ),
           if (remote.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(t.reportsWooBridgeTitle, style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
+            Text(t.reportsWooBridgeSubtitle, style: theme.textTheme.bodySmall),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 12,
               runSpacing: 12,
               children: [
-                _infoCard(theme, fa ? 'نسخهٔ پل' : 'Bridge', Icons.hub, '${remote['bridge_version'] ?? '-'}'),
-                _infoCard(theme, 'WooCommerce', Icons.shopping_cart, '${remote['wc_version'] ?? '-'}'),
-                _infoCard(theme, 'WordPress', Icons.language, '${remote['wp_version'] ?? '-'}'),
-                _infoCard(theme, fa ? 'افزونهٔ ArcWOC' : 'ArcWOC plugin', Icons.extension, '${remote['plugin_version'] ?? '-'}'),
+                _infoCard(theme, t.reportsWooStatBridgeVersion, Icons.hub, '${remote['bridge_version'] ?? '-'}'),
+                _infoCard(theme, t.reportsWooStatWcVersion, Icons.shopping_cart, '${remote['wc_version'] ?? '-'}'),
+                _infoCard(theme, t.reportsWooStatWpVersion, Icons.language, '${remote['wp_version'] ?? '-'}'),
+                _infoCard(theme, t.reportsWooStatPluginVersion, Icons.extension, '${remote['plugin_version'] ?? '-'}'),
               ],
             ),
           ],
           const SizedBox(height: 20),
-          Text('${t.reportsWooOverviewTitle} · ${t.reportsWooOverviewSubtitle}',
-              style: theme.textTheme.titleSmall),
+          Text(
+            t.reportsWooOverviewChartCaption(t.reportsWooOverviewTitle, t.reportsWooOverviewSubtitle),
+            style: theme.textTheme.titleSmall,
+          ),
           const SizedBox(height: 12),
           if (entries.isEmpty)
             Text(t.reportsSearchNoResults, style: TextStyle(color: theme.colorScheme.outline))
@@ -231,6 +291,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _rows = const [];
+  int _dataEpoch = 0;
 
   @override
   void initState() {
@@ -253,6 +314,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
       setState(() {
         _rows = list;
         _loading = false;
+        _dataEpoch++;
       });
     } catch (e) {
       if (!mounted) return;
@@ -263,47 +325,76 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
     }
   }
 
+  DataTableConfig<Map<String, dynamic>> _tableConfig(AppLocalizations t) {
+    return DataTableConfig<Map<String, dynamic>>(
+      endpoint: '/_local/woocommerce/recent-orders',
+      tableId: 'woo_report_recent_orders',
+      title: t.reportsWooRecentOrdersTitle,
+      subtitle: t.reportsWooTableHintOrders,
+      columns: [
+        TextColumn('id', t.woocommerceColumnOrderId),
+        TextColumn('number', t.woocommerceColumnOrderNumber),
+        TextColumn('status', t.woocommerceColumnOrderStatus),
+        TextColumn('total', t.woocommerceColumnOrderTotal),
+        TextColumn('billing_email', t.woocommerceColumnBillingEmail),
+      ],
+      searchFields: const ['id', 'number', 'status', 'billing_email', 'total'],
+      showFilters: false,
+      showPagination: true,
+      showRefreshButton: false,
+      showClearFiltersButton: false,
+      enableDateRangeFilter: false,
+      defaultPageSize: 20,
+      enableColumnSettings: true,
+      showColumnSearch: false,
+      emptyStateMessage: t.reportsSearchNoResults,
+      minTableWidth: 640,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooRecentOrdersTitle),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
                 ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)))
-                : _rows.isEmpty
-                    ? Center(child: Text(t.reportsSearchNoResults))
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text('ID')),
-                            DataColumn(label: Text('#')),
-                            DataColumn(label: Text('status')),
-                            DataColumn(label: Text('total')),
-                            DataColumn(label: Text('email')),
-                          ],
-                          rows: _rows
-                              .map(
-                                (r) => DataRow(
-                                  cells: [
-                                    DataCell(Text('${r['id'] ?? ''}')),
-                                    DataCell(Text('${r['number'] ?? ''}')),
-                                    DataCell(Text('${r['status'] ?? ''}')),
-                                    DataCell(Text('${r['total'] ?? ''}')),
-                                    DataCell(Text('${r['billing_email'] ?? ''}')),
-                                  ],
-                                ),
-                              )
-                              .toList(),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: _reportsWooSettingsPromoCard(context, widget.businessId),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Text(
+                          t.reportsWooTableHintOrders,
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
                         ),
                       ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: DataTableWidget<Map<String, dynamic>>(
+                            key: ValueKey(_dataEpoch),
+                            config: _tableConfig(t),
+                            fromJson: (json) => Map<String, dynamic>.from(json as Map),
+                            calendarController: widget.calendarController,
+                            localRawItems: _rows,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
       ),
     );
   }
@@ -328,6 +419,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
   bool _loading = true;
   String? _error;
   List<Map<String, dynamic>> _rows = const [];
+  int _dataEpoch = 0;
 
   @override
   void initState() {
@@ -350,6 +442,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
       setState(() {
         _rows = list;
         _loading = false;
+        _dataEpoch++;
       });
     } catch (e) {
       if (!mounted) return;
@@ -360,45 +453,76 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
     }
   }
 
+  DataTableConfig<Map<String, dynamic>> _tableConfig(AppLocalizations t) {
+    return DataTableConfig<Map<String, dynamic>>(
+      endpoint: '/_local/woocommerce/catalog',
+      tableId: 'woo_report_catalog',
+      title: t.reportsWooCatalogTitle,
+      subtitle: t.reportsWooTableHintCatalog,
+      columns: [
+        TextColumn('id', t.woocommerceColumnProductId),
+        TextColumn('name', t.woocommerceColumnProductName),
+        TextColumn('sku', t.woocommerceColumnSku),
+        TextColumn('type', t.woocommerceColumnProductType),
+        TextColumn('price', t.woocommerceColumnPrice),
+      ],
+      searchFields: const ['id', 'name', 'sku', 'type', 'price'],
+      showFilters: false,
+      showPagination: true,
+      showRefreshButton: false,
+      showClearFiltersButton: false,
+      enableDateRangeFilter: false,
+      defaultPageSize: 20,
+      enableColumnSettings: true,
+      showColumnSearch: false,
+      emptyStateMessage: t.reportsSearchNoResults,
+      minTableWidth: 640,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooCatalogTitle),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
                 ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)))
-                : _rows.isEmpty
-                    ? Center(child: Text(t.reportsSearchNoResults))
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text('ID')),
-                            DataColumn(label: Text('name')),
-                            DataColumn(label: Text('SKU')),
-                            DataColumn(label: Text('price')),
-                          ],
-                          rows: _rows
-                              .map(
-                                (r) => DataRow(
-                                  cells: [
-                                    DataCell(Text('${r['id'] ?? ''}')),
-                                    DataCell(Text('${r['name'] ?? ''}')),
-                                    DataCell(Text('${r['sku'] ?? ''}')),
-                                    DataCell(Text('${r['price'] ?? ''}')),
-                                  ],
-                                ),
-                              )
-                              .toList(),
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: _reportsWooSettingsPromoCard(context, widget.businessId),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Text(
+                          t.reportsWooTableHintCatalog,
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
                         ),
                       ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: DataTableWidget<Map<String, dynamic>>(
+                            key: ValueKey(_dataEpoch),
+                            config: _tableConfig(t),
+                            fromJson: (json) => Map<String, dynamic>.from(json as Map),
+                            calendarController: widget.calendarController,
+                            localRawItems: _rows,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
       ),
     );
   }
@@ -456,11 +580,12 @@ class _WooCommerceBridgeHealthReportPageState extends State<WooCommerceBridgeHea
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final keys = (_remote ?? {}).keys.toList()..sort();
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooBridgeTitle),
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
         child: _loading
@@ -470,11 +595,19 @@ class _WooCommerceBridgeHealthReportPageState extends State<WooCommerceBridgeHea
                 : ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      for (final e in (_remote ?? {}).entries)
+                      _reportsWooSettingsPromoCard(context, widget.businessId),
+                      const SizedBox(height: 8),
+                      Text(t.reportsWooBridgeTableHint, style: theme.textTheme.bodyMedium),
+                      const SizedBox(height: 16),
+                      for (final k in keys)
                         Card(
+                          margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
-                            title: Text(e.key, style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
-                            subtitle: Text('${e.value}', style: theme.textTheme.bodyMedium),
+                            title: Text(_wooBridgeFieldTitle(t, k)),
+                            subtitle: SelectableText(
+                              '${_remote![k]}',
+                              style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
+                            ),
                           ),
                         ),
                     ],

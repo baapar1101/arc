@@ -11885,6 +11885,275 @@ class AppLocalizationsEn extends AppLocalizations {
       'Price/stock/variant mismatches awaiting resolution';
 
   @override
+  String get basalamIntegrationMenuTitle => 'Basalam';
+
+  @override
+  String get woocommerceIntegrationMenuTitle => 'WooCommerce';
+
+  @override
+  String get basalamSettingsPageTitle => 'Basalam settings';
+
+  @override
+  String get basalamSettingsPageSubtitle =>
+      'API keys, sync behaviour, webhooks and monetary unit for the Basalam bridge.';
+
+  @override
+  String get basalamOpenIntegrationHub => 'Open Basalam hub';
+
+  @override
+  String get basalamOpenIntegrationHubSubtitle =>
+      'Queues, manual sync, product conflicts and operational tools';
+
+  @override
+  String get basalamGoToSettingsTooltip => 'Basalam settings';
+
+  @override
+  String get basalamSettingsSavedSnackbar => 'Basalam settings saved';
+
+  @override
+  String get basalamHubSettingsPromoTitle => 'Connection settings';
+
+  @override
+  String get basalamHubSettingsPromoSubtitle =>
+      'Manage API keys, defaults and sync rules in business settings.';
+
+  @override
+  String get basalamReportsOverviewCardIntegration => 'Integration';
+
+  @override
+  String get basalamReportsOverviewCardWebhook => 'Webhook';
+
+  @override
+  String get basalamReportsOverviewCardDlq => 'Dead-letter queue';
+
+  @override
+  String get basalamReportsOverviewCardNetPeriod => 'Net (period)';
+
+  @override
+  String get basalamReportsOverviewStateOn => 'On';
+
+  @override
+  String get basalamReportsOverviewStateOff => 'Off';
+
+  @override
+  String get basalamReportsSyncedInvoicesTableHint =>
+      'Paged list of sales documents linked to Basalam orders.';
+
+  @override
+  String get basalamReportsDeadLetterTableHint =>
+      'Failed sync entries stored for manual review.';
+
+  @override
+  String get basalamReportsProductConflictsTableHint =>
+      'Product mismatches awaiting resolution.';
+
+  @override
+  String get reportsBasalamColumnDocumentCode => 'Document code';
+
+  @override
+  String get reportsBasalamColumnDocumentDate => 'Date';
+
+  @override
+  String get reportsBasalamColumnBasalamOrderId => 'Basalam order id';
+
+  @override
+  String get reportsBasalamColumnNet => 'Net';
+
+  @override
+  String get reportsBasalamColumnDocumentType => 'Document type';
+
+  @override
+  String get reportsBasalamColumnDeadLetterType => 'Type';
+
+  @override
+  String get reportsBasalamColumnDlqId => 'Queue id';
+
+  @override
+  String get reportsBasalamColumnCreatedAt => 'Created at';
+
+  @override
+  String get reportsBasalamColumnOrderId => 'Order id';
+
+  @override
+  String get reportsBasalamColumnConflictId => 'Conflict id';
+
+  @override
+  String get reportsBasalamColumnConflictType => 'Type';
+
+  @override
+  String get reportsBasalamColumnDirection => 'Direction';
+
+  @override
+  String get reportsBasalamColumnReason => 'Reason';
+
+  @override
+  String get settingsBasalamTitle => 'Basalam integration';
+
+  @override
+  String get settingsBasalamSubtitle =>
+      'API, webhooks, sync and conflict defaults';
+
+  @override
+  String get basalamSettingsEnableConnection => 'Enable Basalam integration';
+
+  @override
+  String get basalamSettingsCurrencyIrrTitle =>
+      'Basalam sync requires IRR-only business currency';
+
+  @override
+  String get basalamSettingsCurrencyInvalidSecondaries =>
+      'Invalid secondary codes';
+
+  @override
+  String get basalamSettingsCurrencyFixHint =>
+      'Set business default to IRR and remove non-IRR secondary currencies; then pick Basalam rial vs toman to match their panel.';
+
+  @override
+  String get basalamSettingsApiKey => 'Basalam API key';
+
+  @override
+  String get basalamSettingsRefreshTokenOptional =>
+      'Basalam refresh token (optional)';
+
+  @override
+  String get basalamSettingsApiBaseUrl => 'API base URL';
+
+  @override
+  String get basalamSettingsDefaultVendorId => 'Default Basalam vendor ID';
+
+  @override
+  String get basalamSettingsDefaultCategoryId => 'Default Basalam category ID';
+
+  @override
+  String get basalamSettingsDefaultPublishStock => 'Default publish stock';
+
+  @override
+  String get basalamSettingsMonetaryUnit => 'Basalam monetary unit';
+
+  @override
+  String get basalamSettingsMonetaryUnitHelper =>
+      'Hesabix stores IRR only; toman amounts from Basalam are multiplied by 10.';
+
+  @override
+  String get basalamSettingsMonetaryUnitRial => 'Rial (IRR)';
+
+  @override
+  String get basalamSettingsMonetaryUnitToman => 'Toman (×10 → IRR)';
+
+  @override
+  String get basalamSettingsEnableWebhook => 'Enable webhook';
+
+  @override
+  String get basalamSettingsWebhookSecret => 'Webhook secret';
+
+  @override
+  String get basalamSettingsEnableChat => 'Enable chat bridge';
+
+  @override
+  String get basalamSettingsEnableOrderSync => 'Enable order sync';
+
+  @override
+  String get basalamSettingsEnableProductSync => 'Enable product sync';
+
+  @override
+  String get basalamSettingsCreateInvoiceOnSync =>
+      'Create invoice on order sync';
+
+  @override
+  String get basalamSettingsSyncInvoiceType => 'Sync invoice type';
+
+  @override
+  String get basalamSettingsPersonMatchMode => 'Person matching mode';
+
+  @override
+  String get basalamSettingsProductMatchMode => 'Product matching mode';
+
+  @override
+  String get basalamSettingsPaymentMode => 'Payment accounting mode';
+
+  @override
+  String get basalamSettingsBlockOverpayment =>
+      'Block payment over invoice remaining';
+
+  @override
+  String get basalamSettingsBlockOverpaymentSubtitle =>
+      'Compares invoice remaining (IRR) to Basalam amount before posting receipt.';
+
+  @override
+  String get basalamSettingsInvoiceToleranceIrr =>
+      'Invoice remaining tolerance (IRR)';
+
+  @override
+  String get basalamSettingsPriceConflictStrategy => 'Price conflict strategy';
+
+  @override
+  String get basalamSettingsStockConflictStrategy => 'Stock conflict strategy';
+
+  @override
+  String get basalamSettingsVariantStrategy => 'Variant strategy';
+
+  @override
+  String get basalamSettingsDefaultOrderTag => 'Default order tag';
+
+  @override
+  String get basalamSettingsSave => 'Save Basalam settings';
+
+  @override
+  String get basalamSettingsLatestWebhook => 'Latest webhook event';
+
+  @override
+  String get basalamSettingsWebhookEventType => 'Type';
+
+  @override
+  String get basalamSettingsWebhookEventTime => 'Time';
+
+  @override
+  String get basalamModeMatchOnly => 'Match only';
+
+  @override
+  String get basalamModeCreateOnly => 'Create only';
+
+  @override
+  String get basalamModeMatchOrCreate => 'Match or create';
+
+  @override
+  String get basalamModeManualReview => 'Manual review';
+
+  @override
+  String get basalamPaymentModeManualReview => 'Manual review';
+
+  @override
+  String get basalamPaymentModeAutoBank => 'Auto bank';
+
+  @override
+  String get basalamPaymentModeAutoCash => 'Auto cash';
+
+  @override
+  String get basalamStrategyLocalWins => 'Local wins';
+
+  @override
+  String get basalamStrategyRemoteWins => 'Remote wins';
+
+  @override
+  String get basalamSyncInvoiceTypeSales => 'Sales invoice';
+
+  @override
+  String get basalamSyncInvoiceTypeSalesReturn => 'Sales return';
+
+  @override
+  String get basalamDlqClearDialogTitle => 'Clear sync dead-letter?';
+
+  @override
+  String get basalamDlqClearDialogBody =>
+      'All recorded order/payment sync failures will be removed.';
+
+  @override
+  String get basalamDlqClearConfirm => 'Clear';
+
+  @override
+  String get basalamDlqClearedSnackbar => 'Dead-letter queue cleared';
+
+  @override
   String get reportsWooSection => 'WooCommerce reports';
 
   @override
@@ -11913,6 +12182,271 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reportsWooBridgeSubtitle =>
       'Plugin, WooCommerce versions and connection test';
+
+  @override
+  String get reportsWooKeywordsOverview =>
+      'WooCommerce|woocommerce|store|arcwoc|woo';
+
+  @override
+  String get reportsWooKeywordsOrders => 'order|orders|woo|woocommerce';
+
+  @override
+  String get reportsWooKeywordsCatalog => 'product|products|catalog|sku|woo';
+
+  @override
+  String get reportsWooKeywordsBridge =>
+      'bridge|health|connection|woo|wordpress';
+
+  @override
+  String get reportsWooStatCustomers => 'Customers';
+
+  @override
+  String get reportsWooStatOrders7d => 'Orders (last 7 days)';
+
+  @override
+  String get reportsWooStatOrderStorage => 'Order storage';
+
+  @override
+  String get reportsWooStatBridgeVersion => 'Bridge version';
+
+  @override
+  String get reportsWooStatWcVersion => 'WooCommerce';
+
+  @override
+  String get reportsWooStatWpVersion => 'WordPress';
+
+  @override
+  String get reportsWooStatPluginVersion => 'ArcWOC plugin';
+
+  @override
+  String reportsWooOverviewChartCaption(String title, String subtitle) {
+    return '$title — $subtitle';
+  }
+
+  @override
+  String get reportsWooBridgeTableHint =>
+      'Technical values returned by the store bridge. Use them to verify versions and connectivity.';
+
+  @override
+  String get wooBridgeFieldBridgeVersion => 'Bridge software version';
+
+  @override
+  String get wooBridgeFieldWcVersion => 'WooCommerce version on the store';
+
+  @override
+  String get wooBridgeFieldWpVersion => 'WordPress version on the store';
+
+  @override
+  String get wooBridgeFieldPluginVersion => 'Hesabix ArcWOC plugin version';
+
+  @override
+  String wooBridgeFieldGenericTitle(String key) {
+    return '$key';
+  }
+
+  @override
+  String get wooBridgeFieldGenericSubtitle =>
+      'Raw value from the bridge response.';
+
+  @override
+  String get woocommerceSettingsPageTitle => 'WooCommerce bridge settings';
+
+  @override
+  String get woocommerceSettingsPageSubtitle =>
+      'Store URL and bridge token used by the Hesabix ↔ WooCommerce connector.';
+
+  @override
+  String get woocommerceOpenIntegrationHub => 'Open WooCommerce hub';
+
+  @override
+  String get woocommerceGoToSettingsTooltip => 'WooCommerce settings';
+
+  @override
+  String get woocommerceHubSettingsPromoTitle => 'Bridge connection settings';
+
+  @override
+  String get woocommerceHubSettingsPromoSubtitle =>
+      'Manage store URL, bridge token and connection test in business settings.';
+
+  @override
+  String get woocommerceSettingsSavedSnackbar => 'WooCommerce settings saved';
+
+  @override
+  String get woocommerceSettingsBridgeIntroTitle => 'Connection';
+
+  @override
+  String get woocommerceSettingsBridgeIntroBody =>
+      'Enter your WordPress site base URL and the bridge token generated in the Hesabix ArcWOC plugin. Leave the token field empty when saving to keep the existing secret.';
+
+  @override
+  String get woocommerceStoreUrlLabel => 'Store base URL (WordPress)';
+
+  @override
+  String get woocommerceStoreUrlHint => 'https://example.com';
+
+  @override
+  String get woocommerceBridgeTokenLabel => 'Bridge token (from ArcWOC plugin)';
+
+  @override
+  String get woocommerceBridgeTokenHelp =>
+      'If a token is already stored, leave this field empty and press save to keep the current value.';
+
+  @override
+  String get woocommerceManagePermissionHint =>
+      'Read-only: saving requires WooCommerce “manage” permission.';
+
+  @override
+  String get woocommerceSaveButton => 'Save';
+
+  @override
+  String get woocommerceTestConnectionButton => 'Test connection';
+
+  @override
+  String get woocommerceConnectionTestSuccess => 'Connection successful';
+
+  @override
+  String get woocommercePermissionDeniedTitle => 'WooCommerce';
+
+  @override
+  String get woocommercePermissionDeniedBody =>
+      'You need WooCommerce “view” permission to open this section.';
+
+  @override
+  String get woocommerceHubOrdersTab => 'Orders';
+
+  @override
+  String get woocommerceHubProductsTab => 'Products';
+
+  @override
+  String get woocommerceHubCustomersTab => 'Customers';
+
+  @override
+  String get woocommerceOrdersFiltersTitle => 'Order filters';
+
+  @override
+  String get woocommerceOrderStatusLabel =>
+      'Status (WC slug or comma-separated)';
+
+  @override
+  String get woocommerceOrderStatusHint => 'processing or processing,completed';
+
+  @override
+  String get woocommerceOrderCustomerIdLabel => 'WooCommerce customer ID';
+
+  @override
+  String get woocommerceOrderSearchLabel => 'Search in orders';
+
+  @override
+  String get woocommerceOrderDateAfterLabel => 'After (ISO date)';
+
+  @override
+  String get woocommerceOrderDateBeforeLabel => 'Before (ISO date)';
+
+  @override
+  String get woocommerceOrderSortByLabel => 'Sort by';
+
+  @override
+  String get woocommerceOrderSortOrderLabel => 'Direction';
+
+  @override
+  String get woocommerceOrderSortByDate => 'Date';
+
+  @override
+  String get woocommerceOrderSortByModified => 'Modified';
+
+  @override
+  String get woocommerceOrderSortById => 'ID';
+
+  @override
+  String get woocommerceSortDesc => 'Descending';
+
+  @override
+  String get woocommerceSortAsc => 'Ascending';
+
+  @override
+  String get woocommerceApplyFiltersButton => 'Apply filters';
+
+  @override
+  String get woocommerceSearchProductsLabel => 'Search products';
+
+  @override
+  String get woocommerceSearchCustomersLabel => 'Search customers';
+
+  @override
+  String get woocommerceNoData => 'No data';
+
+  @override
+  String woocommercePagerLine(int page, int pages, int total) {
+    return 'Page $page of $pages (total $total)';
+  }
+
+  @override
+  String get woocommerceColumnOrderId => 'ID';
+
+  @override
+  String get woocommerceColumnOrderNumber => 'Number';
+
+  @override
+  String get woocommerceColumnOrderStatus => 'Status';
+
+  @override
+  String get woocommerceColumnOrderTotal => 'Total';
+
+  @override
+  String get woocommerceColumnBillingEmail => 'Email';
+
+  @override
+  String get woocommerceColumnProductId => 'ID';
+
+  @override
+  String get woocommerceColumnProductName => 'Name';
+
+  @override
+  String get woocommerceColumnSku => 'SKU';
+
+  @override
+  String get woocommerceColumnProductType => 'Type';
+
+  @override
+  String get woocommerceColumnPrice => 'Price';
+
+  @override
+  String get woocommerceColumnCustomerId => 'ID';
+
+  @override
+  String get woocommerceColumnCustomerEmail => 'Email';
+
+  @override
+  String get woocommerceColumnCustomerName => 'Name';
+
+  @override
+  String get woocommerceColumnUsername => 'Username';
+
+  @override
+  String get reportsWooTableHintOrders =>
+      'Orders loaded from the live store bridge (read-only).';
+
+  @override
+  String get reportsWooTableHintCatalog =>
+      'Products loaded from the live store bridge (read-only).';
+
+  @override
+  String get reportsWooSettingsPromoTitle => 'Bridge settings';
+
+  @override
+  String get reportsWooSettingsPromoSubtitle =>
+      'If numbers or lists look wrong, update the store URL or bridge token here, then refresh this report.';
+
+  @override
+  String get woocommerceOpenReportsOverviewTooltip =>
+      'WooCommerce reports overview';
+
+  @override
+  String get settingsWooCommerceTitle => 'WooCommerce bridge';
+
+  @override
+  String get settingsWooCommerceSubtitle =>
+      'Store URL, bridge token and connection test';
 
   @override
   String get invoiceGlobalDiscountSection => 'Invoice-level discount';

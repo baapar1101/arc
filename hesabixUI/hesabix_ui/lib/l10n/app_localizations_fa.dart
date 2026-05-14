@@ -11819,6 +11819,274 @@ class AppLocalizationsFa extends AppLocalizations {
       'تداخل قیمت/موجودات یا واریانت در انتظار تصمیم';
 
   @override
+  String get basalamIntegrationMenuTitle => 'باسلام';
+
+  @override
+  String get woocommerceIntegrationMenuTitle => 'ووکامرس';
+
+  @override
+  String get basalamSettingsPageTitle => 'تنظیمات باسلام';
+
+  @override
+  String get basalamSettingsPageSubtitle =>
+      'کلید API، رفتار سینک، وب‌هوک و واحد پولی پل باسلام.';
+
+  @override
+  String get basalamOpenIntegrationHub => 'مرکز عملیات باسلام';
+
+  @override
+  String get basalamOpenIntegrationHubSubtitle =>
+      'صف‌ها، سینک دستی، تعارض محصول و ابزارهای عملیاتی';
+
+  @override
+  String get basalamGoToSettingsTooltip => 'تنظیمات باسلام';
+
+  @override
+  String get basalamSettingsSavedSnackbar => 'تنظیمات باسلام ذخیره شد';
+
+  @override
+  String get basalamHubSettingsPromoTitle => 'تنظیمات اتصال';
+
+  @override
+  String get basalamHubSettingsPromoSubtitle =>
+      'مدیریت کلید API، پیش‌فرض‌ها و قوانین سینک در تنظیمات کسب‌وکار.';
+
+  @override
+  String get basalamReportsOverviewCardIntegration => 'یکپارچه‌سازی';
+
+  @override
+  String get basalamReportsOverviewCardWebhook => 'وب‌هوک';
+
+  @override
+  String get basalamReportsOverviewCardDlq => 'صف مرده';
+
+  @override
+  String get basalamReportsOverviewCardNetPeriod => 'خالص دوره';
+
+  @override
+  String get basalamReportsOverviewStateOn => 'روشن';
+
+  @override
+  String get basalamReportsOverviewStateOff => 'خاموش';
+
+  @override
+  String get basalamReportsSyncedInvoicesTableHint =>
+      'فهرست صفحه‌بندی‌شده اسناد فروش مرتبط با سفارش باسلام.';
+
+  @override
+  String get basalamReportsDeadLetterTableHint =>
+      'موارد ناموفق سینک برای بررسی دستی.';
+
+  @override
+  String get basalamReportsProductConflictsTableHint =>
+      'تعارض‌های محصول در انتظار تصمیم.';
+
+  @override
+  String get reportsBasalamColumnDocumentCode => 'کد سند';
+
+  @override
+  String get reportsBasalamColumnDocumentDate => 'تاریخ';
+
+  @override
+  String get reportsBasalamColumnBasalamOrderId => 'شناسه سفارش باسلام';
+
+  @override
+  String get reportsBasalamColumnNet => 'خالص';
+
+  @override
+  String get reportsBasalamColumnDocumentType => 'نوع سند';
+
+  @override
+  String get reportsBasalamColumnDeadLetterType => 'نوع';
+
+  @override
+  String get reportsBasalamColumnDlqId => 'شناسه صف';
+
+  @override
+  String get reportsBasalamColumnCreatedAt => 'زمان ایجاد';
+
+  @override
+  String get reportsBasalamColumnOrderId => 'شناسه سفارش';
+
+  @override
+  String get reportsBasalamColumnConflictId => 'شناسه تعارض';
+
+  @override
+  String get reportsBasalamColumnConflictType => 'نوع';
+
+  @override
+  String get reportsBasalamColumnDirection => 'جهت';
+
+  @override
+  String get reportsBasalamColumnReason => 'دلیل';
+
+  @override
+  String get settingsBasalamTitle => 'یکپارچه‌سازی باسلام';
+
+  @override
+  String get settingsBasalamSubtitle => 'API، وب‌هوک، سینک و پیش‌فرض‌های تعارض';
+
+  @override
+  String get basalamSettingsEnableConnection => 'فعال‌سازی اتصال باسلام';
+
+  @override
+  String get basalamSettingsCurrencyIrrTitle =>
+      'سینک باسلام فقط با ارز IRR در حساب‌یکس';
+
+  @override
+  String get basalamSettingsCurrencyInvalidSecondaries =>
+      'ارزهای جانبی نامعتبر';
+
+  @override
+  String get basalamSettingsCurrencyFixHint =>
+      'در تنظیمات کسب‌وکار ارز پیش‌فرض را IRR کنید و ارزهای جانبی غیر IRR را حذف کنید؛ سپس واحد ریال/تومان باسلام را مطابق پنل باسلام انتخاب کنید.';
+
+  @override
+  String get basalamSettingsApiKey => 'API Key باسلام';
+
+  @override
+  String get basalamSettingsRefreshTokenOptional =>
+      'Refresh Token باسلام (اختیاری)';
+
+  @override
+  String get basalamSettingsApiBaseUrl => 'آدرس پایه API';
+
+  @override
+  String get basalamSettingsDefaultVendorId => 'Vendor ID پیش‌فرض باسلام';
+
+  @override
+  String get basalamSettingsDefaultCategoryId => 'Category ID پیش‌فرض باسلام';
+
+  @override
+  String get basalamSettingsDefaultPublishStock => 'موجودی پیش‌فرض انتشار';
+
+  @override
+  String get basalamSettingsMonetaryUnit => 'واحد مبلغ در دادهٔ باسلام';
+
+  @override
+  String get basalamSettingsMonetaryUnitHelper =>
+      'حساب‌یکس فقط IRR؛ در حالت تومان مقادیر باسلام ×۱۰ به ریال تبدیل می‌شوند.';
+
+  @override
+  String get basalamSettingsMonetaryUnitRial => 'ریال (همان IRR)';
+
+  @override
+  String get basalamSettingsMonetaryUnitToman => 'تومان (۱۰× → IRR)';
+
+  @override
+  String get basalamSettingsEnableWebhook => 'فعال‌سازی وب‌هوک';
+
+  @override
+  String get basalamSettingsWebhookSecret => 'Webhook Secret';
+
+  @override
+  String get basalamSettingsEnableChat => 'فعال‌سازی چت';
+
+  @override
+  String get basalamSettingsEnableOrderSync => 'فعال‌سازی سینک سفارش';
+
+  @override
+  String get basalamSettingsEnableProductSync => 'فعال‌سازی سینک کالا';
+
+  @override
+  String get basalamSettingsCreateInvoiceOnSync =>
+      'ایجاد فاکتور هنگام سینک سفارش';
+
+  @override
+  String get basalamSettingsSyncInvoiceType => 'نوع فاکتور سینک';
+
+  @override
+  String get basalamSettingsPersonMatchMode => 'حالت تطبیق/ایجاد شخص';
+
+  @override
+  String get basalamSettingsProductMatchMode => 'حالت تطبیق/ایجاد کالا';
+
+  @override
+  String get basalamSettingsPaymentMode => 'حالت ثبت سند پرداخت';
+
+  @override
+  String get basalamSettingsBlockOverpayment =>
+      'جلوگیری از بیش‌پرداخت نسبت به ماندهٔ فاکتور';
+
+  @override
+  String get basalamSettingsBlockOverpaymentSubtitle =>
+      'پیش از ثبت رسید، ماندهٔ فاکتور (IRR) با مبلغ باسلام مقایسه می‌شود؛ ناسازگاری به صف مرده می‌رود.';
+
+  @override
+  String get basalamSettingsInvoiceToleranceIrr =>
+      'تلورانس ماندهٔ فاکتور (ریال)';
+
+  @override
+  String get basalamSettingsPriceConflictStrategy => 'استراتژی تضاد قیمت';
+
+  @override
+  String get basalamSettingsStockConflictStrategy => 'استراتژی تضاد موجودی';
+
+  @override
+  String get basalamSettingsVariantStrategy => 'استراتژی واریانت';
+
+  @override
+  String get basalamSettingsDefaultOrderTag => 'تگ پیش‌فرض سفارش';
+
+  @override
+  String get basalamSettingsSave => 'ذخیره تنظیمات باسلام';
+
+  @override
+  String get basalamSettingsLatestWebhook => 'وب‌هوک آخرین رویداد';
+
+  @override
+  String get basalamSettingsWebhookEventType => 'نوع';
+
+  @override
+  String get basalamSettingsWebhookEventTime => 'زمان';
+
+  @override
+  String get basalamModeMatchOnly => 'فقط تطبیق';
+
+  @override
+  String get basalamModeCreateOnly => 'فقط ایجاد';
+
+  @override
+  String get basalamModeMatchOrCreate => 'تطبیق یا ایجاد';
+
+  @override
+  String get basalamModeManualReview => 'بررسی دستی';
+
+  @override
+  String get basalamPaymentModeManualReview => 'بررسی دستی';
+
+  @override
+  String get basalamPaymentModeAutoBank => 'بانک خودکار';
+
+  @override
+  String get basalamPaymentModeAutoCash => 'نقد خودکار';
+
+  @override
+  String get basalamStrategyLocalWins => 'اولویت محلی';
+
+  @override
+  String get basalamStrategyRemoteWins => 'اولویت باسلام';
+
+  @override
+  String get basalamSyncInvoiceTypeSales => 'فاکتور فروش';
+
+  @override
+  String get basalamSyncInvoiceTypeSalesReturn => 'برگشت از فروش';
+
+  @override
+  String get basalamDlqClearDialogTitle => 'پاک کردن صف مردهٔ سینک؟';
+
+  @override
+  String get basalamDlqClearDialogBody =>
+      'همهٔ ردیف‌های ثبت‌شده برای خطاهای سینک سفارش یا پرداخت حذف می‌شوند.';
+
+  @override
+  String get basalamDlqClearConfirm => 'پاک کن';
+
+  @override
+  String get basalamDlqClearedSnackbar => 'صف مرده پاک شد';
+
+  @override
   String get reportsWooSection => 'گزارش‌های ووکامرس';
 
   @override
@@ -11846,6 +12114,267 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get reportsWooBridgeSubtitle => 'نسخهٔ افزونه، ووکامرس و وضعیت اتصال';
+
+  @override
+  String get reportsWooKeywordsOverview =>
+      'ووکامرس|woocommerce|فروشگاه|arcwoc|woo';
+
+  @override
+  String get reportsWooKeywordsOrders => 'سفارش|orders|woo|woocommerce';
+
+  @override
+  String get reportsWooKeywordsCatalog => 'محصول|products|کاتالوگ|sku|woo';
+
+  @override
+  String get reportsWooKeywordsBridge => 'پل|bridge|اتصال|woo|وردپرس';
+
+  @override
+  String get reportsWooStatCustomers => 'مشتریان';
+
+  @override
+  String get reportsWooStatOrders7d => 'سفارش ۷ روز اخیر';
+
+  @override
+  String get reportsWooStatOrderStorage => 'ذخیرهٔ سفارش';
+
+  @override
+  String get reportsWooStatBridgeVersion => 'نسخهٔ پل';
+
+  @override
+  String get reportsWooStatWcVersion => 'ووکامرس';
+
+  @override
+  String get reportsWooStatWpVersion => 'وردپرس';
+
+  @override
+  String get reportsWooStatPluginVersion => 'افزونهٔ ArcWOC';
+
+  @override
+  String reportsWooOverviewChartCaption(String title, String subtitle) {
+    return '$title — $subtitle';
+  }
+
+  @override
+  String get reportsWooBridgeTableHint =>
+      'مقادیر فنی برگشتی از پل فروشگاه؛ برای اطمینان از نسخه‌ها و اتصال استفاده کنید.';
+
+  @override
+  String get wooBridgeFieldBridgeVersion => 'نسخهٔ نرم‌افزار پل';
+
+  @override
+  String get wooBridgeFieldWcVersion => 'نسخهٔ ووکامرس در فروشگاه';
+
+  @override
+  String get wooBridgeFieldWpVersion => 'نسخهٔ وردپرس در فروشگاه';
+
+  @override
+  String get wooBridgeFieldPluginVersion => 'نسخهٔ افزونهٔ Hesabix ArcWOC';
+
+  @override
+  String wooBridgeFieldGenericTitle(String key) {
+    return '$key';
+  }
+
+  @override
+  String get wooBridgeFieldGenericSubtitle => 'مقدار خام پاسخ پل.';
+
+  @override
+  String get woocommerceSettingsPageTitle => 'تنظیمات پل ووکامرس';
+
+  @override
+  String get woocommerceSettingsPageSubtitle =>
+      'آدرس فروشگاه و توکن پل برای اتصال حسابیکس به ووکامرس.';
+
+  @override
+  String get woocommerceOpenIntegrationHub => 'مرکز عملیات ووکامرس';
+
+  @override
+  String get woocommerceGoToSettingsTooltip => 'تنظیمات ووکامرس';
+
+  @override
+  String get woocommerceHubSettingsPromoTitle => 'تنظیمات اتصال پل';
+
+  @override
+  String get woocommerceHubSettingsPromoSubtitle =>
+      'مدیریت آدرس فروشگاه، توکن پل و تست اتصال در تنظیمات کسب‌وکار.';
+
+  @override
+  String get woocommerceSettingsSavedSnackbar => 'تنظیمات ووکامرس ذخیره شد';
+
+  @override
+  String get woocommerceSettingsBridgeIntroTitle => 'اتصال';
+
+  @override
+  String get woocommerceSettingsBridgeIntroBody =>
+      'آدرس پایهٔ سایت وردپرس و توکن پل تولیدشده در افزونهٔ Hesabix ArcWOC را وارد کنید. برای حفظ توکن ذخیره‌شده، فیلد توکن را خالی بگذارید و ذخیره کنید.';
+
+  @override
+  String get woocommerceStoreUrlLabel => 'آدرس فروشگاه (WordPress)';
+
+  @override
+  String get woocommerceStoreUrlHint => 'https://example.com';
+
+  @override
+  String get woocommerceBridgeTokenLabel => 'توکن پل (از افزونه ArcWOC)';
+
+  @override
+  String get woocommerceBridgeTokenHelp =>
+      'اگر توکن قبلاً ذخیره شده، برای حفظ همان مقدار این فیلد را خالی بگذارید و ذخیره کنید.';
+
+  @override
+  String get woocommerceManagePermissionHint =>
+      'فقط مشاهده: برای ذخیرهٔ تنظیمات به دسترسی «مدیریت ووکامرس» نیاز است.';
+
+  @override
+  String get woocommerceSaveButton => 'ذخیره';
+
+  @override
+  String get woocommerceTestConnectionButton => 'تست اتصال';
+
+  @override
+  String get woocommerceConnectionTestSuccess => 'اتصال موفق';
+
+  @override
+  String get woocommercePermissionDeniedTitle => 'ووکامرس';
+
+  @override
+  String get woocommercePermissionDeniedBody =>
+      'برای مشاهدهٔ این بخش به دسترسی «ووکامرس — مشاهده» نیاز دارید.';
+
+  @override
+  String get woocommerceHubOrdersTab => 'سفارشات';
+
+  @override
+  String get woocommerceHubProductsTab => 'محصولات';
+
+  @override
+  String get woocommerceHubCustomersTab => 'مشتریان';
+
+  @override
+  String get woocommerceOrdersFiltersTitle => 'فیلتر سفارشات';
+
+  @override
+  String get woocommerceOrderStatusLabel => 'وضعیت (wc) یا چندتایی با کاما';
+
+  @override
+  String get woocommerceOrderStatusHint => 'processing یا processing,completed';
+
+  @override
+  String get woocommerceOrderCustomerIdLabel => 'شناسهٔ مشتری ووکامرس';
+
+  @override
+  String get woocommerceOrderSearchLabel => 'جستجو در سفارش';
+
+  @override
+  String get woocommerceOrderDateAfterLabel => 'از تاریخ (ISO)';
+
+  @override
+  String get woocommerceOrderDateBeforeLabel => 'تا تاریخ (ISO)';
+
+  @override
+  String get woocommerceOrderSortByLabel => 'مرتب‌سازی';
+
+  @override
+  String get woocommerceOrderSortOrderLabel => 'ترتیب';
+
+  @override
+  String get woocommerceOrderSortByDate => 'تاریخ';
+
+  @override
+  String get woocommerceOrderSortByModified => 'ویرایش';
+
+  @override
+  String get woocommerceOrderSortById => 'شناسه';
+
+  @override
+  String get woocommerceSortDesc => 'نزولی';
+
+  @override
+  String get woocommerceSortAsc => 'صعودی';
+
+  @override
+  String get woocommerceApplyFiltersButton => 'اعمال فیلتر';
+
+  @override
+  String get woocommerceSearchProductsLabel => 'جستجوی محصول';
+
+  @override
+  String get woocommerceSearchCustomersLabel => 'جستجوی مشتری';
+
+  @override
+  String get woocommerceNoData => 'داده‌ای نیست';
+
+  @override
+  String woocommercePagerLine(int page, int pages, int total) {
+    return 'صفحه $page از $pages (مجموع $total)';
+  }
+
+  @override
+  String get woocommerceColumnOrderId => 'شناسه';
+
+  @override
+  String get woocommerceColumnOrderNumber => 'شماره';
+
+  @override
+  String get woocommerceColumnOrderStatus => 'وضعیت';
+
+  @override
+  String get woocommerceColumnOrderTotal => 'مبلغ';
+
+  @override
+  String get woocommerceColumnBillingEmail => 'ایمیل';
+
+  @override
+  String get woocommerceColumnProductId => 'شناسه';
+
+  @override
+  String get woocommerceColumnProductName => 'نام';
+
+  @override
+  String get woocommerceColumnSku => 'SKU';
+
+  @override
+  String get woocommerceColumnProductType => 'نوع';
+
+  @override
+  String get woocommerceColumnPrice => 'قیمت';
+
+  @override
+  String get woocommerceColumnCustomerId => 'شناسه';
+
+  @override
+  String get woocommerceColumnCustomerEmail => 'ایمیل';
+
+  @override
+  String get woocommerceColumnCustomerName => 'نام';
+
+  @override
+  String get woocommerceColumnUsername => 'نام کاربری';
+
+  @override
+  String get reportsWooTableHintOrders =>
+      'سفارش‌ها از پل زندهٔ فروشگاه (فقط خواندنی).';
+
+  @override
+  String get reportsWooTableHintCatalog =>
+      'محصولات از پل زندهٔ فروشگاه (فقط خواندنی).';
+
+  @override
+  String get reportsWooSettingsPromoTitle => 'تنظیمات پل';
+
+  @override
+  String get reportsWooSettingsPromoSubtitle =>
+      'اگر اعداد یا لیست‌ها درست نیستند، آدرس فروشگاه یا توکن پل را اینجا به‌روز کنید و گزارش را رفرش کنید.';
+
+  @override
+  String get woocommerceOpenReportsOverviewTooltip =>
+      'خلاصهٔ گزارش‌های ووکامرس';
+
+  @override
+  String get settingsWooCommerceTitle => 'پل ووکامرس';
+
+  @override
+  String get settingsWooCommerceSubtitle => 'آدرس فروشگاه، توکن پل و تست اتصال';
 
   @override
   String get invoiceGlobalDiscountSection => 'تخفیف کلی فاکتور';

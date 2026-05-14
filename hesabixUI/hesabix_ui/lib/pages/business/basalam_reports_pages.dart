@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/basalam_integration_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class BasalamReportsOverviewPage extends StatefulWidget {
@@ -18,7 +21,8 @@ class BasalamReportsOverviewPage extends StatefulWidget {
   });
 
   @override
-  State<BasalamReportsOverviewPage> createState() => _BasalamReportsOverviewPageState();
+  State<BasalamReportsOverviewPage> createState() =>
+      _BasalamReportsOverviewPageState();
 }
 
 class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage> {
@@ -39,7 +43,10 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
       _error = null;
     });
     try {
-      final d = await _svc.getReportsOverview(businessId: widget.businessId, chartDays: 90);
+      final d = await _svc.getReportsOverview(
+        businessId: widget.businessId,
+        chartDays: 90,
+      );
       if (!mounted) return;
       setState(() {
         _payload = d;
@@ -48,7 +55,7 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
@@ -61,7 +68,10 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsBasalamOverviewTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
@@ -70,18 +80,31 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Padding(padding: const EdgeInsets.all(24), child: Text(_error!)))
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(_error!),
+                    ),
+                  )
                 : _buildBody(context, theme, t),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, ThemeData theme, AppLocalizations t) {
-    final summary = (_payload?['summary'] is Map) ? _payload!['summary'] as Map<String, dynamic> : <String, dynamic>{};
+  Widget _buildBody(
+    BuildContext context,
+    ThemeData theme,
+    AppLocalizations t,
+  ) {
+    final summary = (_payload?['summary'] is Map)
+        ? _payload!['summary'] as Map<String, dynamic>
+        : <String, dynamic>{};
     final rawDays = _payload?['orders_by_day'];
-    final days = rawDays is List ? rawDays.cast<dynamic>() : const <dynamic>[];
+    final days =
+        rawDays is List ? rawDays.cast<dynamic>() : const <dynamic>[];
 
-    final chartPoints = days.length > 45 ? days.sublist(days.length - 45) : days;
+    final chartPoints =
+        days.length > 45 ? days.sublist(days.length - 45) : days;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -92,23 +115,63 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
             spacing: 12,
             runSpacing: 12,
             children: [
-              _infoCard(theme, '${t.reportsBasalamSection} · sync', Icons.power_settings_new,
-                  summary['integration_enabled'] == true ? 'ON' : 'OFF'),
-              _infoCard(theme, 'Webhook', Icons.webhook, summary['webhook_enabled'] == true ? 'ON' : 'OFF'),
-              _infoCard(theme, 'DLQ', Icons.warning_amber_outlined, '${summary['dead_letter_count'] ?? 0}'),
-              _infoCard(theme, t.reportsBasalamProductConflictsTitle, Icons.merge_type,
-                  '${summary['pending_product_conflicts_count'] ?? 0}'),
-              _infoCard(theme, t.reportsBasalamSyncedInvoicesTitle, Icons.receipt_long,
-                  '${summary['basalam_invoices_in_period'] ?? 0}'),
-              _infoCard(theme, 'Net (period)', Icons.payments_outlined,
-                  '${summary['basalam_invoices_net_sum_in_period'] ?? 0}'),
+              _infoCard(
+                theme,
+                t.basalamReportsOverviewCardIntegration,
+                Icons.power_settings_new,
+                summary['integration_enabled'] == true
+                    ? t.basalamReportsOverviewStateOn
+                    : t.basalamReportsOverviewStateOff,
+              ),
+              _infoCard(
+                theme,
+                t.basalamReportsOverviewCardWebhook,
+                Icons.webhook,
+                summary['webhook_enabled'] == true
+                    ? t.basalamReportsOverviewStateOn
+                    : t.basalamReportsOverviewStateOff,
+              ),
+              _infoCard(
+                theme,
+                t.basalamReportsOverviewCardDlq,
+                Icons.warning_amber_outlined,
+                '${summary['dead_letter_count'] ?? 0}',
+              ),
+              _infoCard(
+                theme,
+                t.reportsBasalamProductConflictsTitle,
+                Icons.merge_type,
+                '${summary['pending_product_conflicts_count'] ?? 0}',
+              ),
+              _infoCard(
+                theme,
+                t.reportsBasalamSyncedInvoicesTitle,
+                Icons.receipt_long,
+                '${summary['basalam_invoices_in_period'] ?? 0}',
+              ),
+              _infoCard(
+                theme,
+                t.basalamReportsOverviewCardNetPeriod,
+                Icons.payments_outlined,
+                '${summary['basalam_invoices_net_sum_in_period'] ?? 0}',
+              ),
             ],
           ),
           const SizedBox(height: 16),
+          Text(t.reportsBasalamOverviewSubtitle,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              )),
+          const SizedBox(height: 8),
           Text(t.reportsBasalamOverviewTitle, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           if (chartPoints.isEmpty)
-            Text(t.reportsSearchNoResults, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.outline))
+            Text(
+              t.reportsSearchNoResults,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
+            )
           else
             SizedBox(
               height: 220,
@@ -118,7 +181,9 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
                   maxY: math.max(
                     1,
                     chartPoints.fold<double>(0.0, (m, e) {
-                      final c = (e is Map) ? (e['count'] as num?)?.toDouble() ?? 0.0 : 0.0;
+                      final c = (e is Map)
+                          ? (e['count'] as num?)?.toDouble() ?? 0.0
+                          : 0.0;
                       return c > m ? c : m;
                     }),
                   ),
@@ -129,7 +194,9 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
                         barRods: [
                           BarChartRodData(
                             toY: (chartPoints[i] is Map)
-                                ? ((chartPoints[i] as Map)['count'] as num?)?.toDouble() ?? 0.0
+                                ? ((chartPoints[i] as Map)['count'] as num?)
+                                        ?.toDouble() ??
+                                    0.0
                                 : 0.0,
                             width: 6,
                             color: theme.colorScheme.primary,
@@ -144,19 +211,35 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
                         reservedSize: 28,
                         getTitlesWidget: (v, m) {
                           final idx = v.toInt();
-                          if (idx < 0 || idx >= chartPoints.length) return const SizedBox.shrink();
-                          final d = (chartPoints[idx] is Map) ? (chartPoints[idx] as Map)['date']?.toString() ?? '' : '';
-                          final short = d.length >= 10 ? d.substring(5, 10) : d;
+                          if (idx < 0 || idx >= chartPoints.length) {
+                            return const SizedBox.shrink();
+                          }
+                          final d = (chartPoints[idx] is Map)
+                              ? (chartPoints[idx] as Map)['date']?.toString() ??
+                                  ''
+                              : '';
+                          final short =
+                              d.length >= 10 ? d.substring(5, 10) : d;
                           return Padding(
                             padding: const EdgeInsets.only(top: 6),
-                            child: Text(short, style: const TextStyle(fontSize: 9)),
+                            child: Text(
+                              short,
+                              style: const TextStyle(fontSize: 9),
+                            ),
                           );
                         },
                       ),
                     ),
-                    leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: AxisTitles(
+                      sideTitles:
+                          SideTitles(showTitles: true, reservedSize: 32),
+                    ),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   gridData: FlGridData(show: true, drawVerticalLine: false),
                   borderData: FlBorderData(show: false),
@@ -168,7 +251,12 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
     );
   }
 
-  Widget _infoCard(ThemeData theme, String title, IconData icon, String value) {
+  Widget _infoCard(
+    ThemeData theme,
+    String title,
+    IconData icon,
+    String value,
+  ) {
     return SizedBox(
       width: 160,
       child: Card(
@@ -179,9 +267,18 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
             children: [
               Icon(icon, color: theme.colorScheme.primary, size: 22),
               const SizedBox(height: 8),
-              Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.labelMedium),
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium,
+              ),
               const SizedBox(height: 4),
-              Text(value, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                value,
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
             ],
           ),
         ),
@@ -201,56 +298,59 @@ class BasalamSyncedInvoicesReportPage extends StatefulWidget {
   });
 
   @override
-  State<BasalamSyncedInvoicesReportPage> createState() => _BasalamSyncedInvoicesReportPageState();
+  State<BasalamSyncedInvoicesReportPage> createState() =>
+      _BasalamSyncedInvoicesReportPageState();
 }
 
-class _BasalamSyncedInvoicesReportPageState extends State<BasalamSyncedInvoicesReportPage> {
-  final _svc = BasalamIntegrationService();
-  final List<Map<String, dynamic>> _rows = [];
-  bool _loading = false;
-  String? _error;
-  int _skip = 0;
-  int _total = 0;
-  static const _take = 40;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetch(reset: true);
-  }
-
-  Future<void> _fetch({required bool reset}) async {
-    if (_loading) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-      if (reset) {
-        _skip = 0;
-        _rows.clear();
-      }
-    });
-    try {
-      final d = await _svc.getReportsSyncedInvoices(
-        businessId: widget.businessId,
-        skip: _skip,
-        take: _take,
-      );
-      if (!mounted) return;
-      final items = d['items'];
-      final list = items is List ? items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
-      setState(() {
-        _rows.addAll(list);
-        _total = (d['total'] as num?)?.toInt() ?? _rows.length;
-        _skip += list.length;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = '$e';
-        _loading = false;
-      });
-    }
+class _BasalamSyncedInvoicesReportPageState
+    extends State<BasalamSyncedInvoicesReportPage> {
+  DataTableConfig<Map<String, dynamic>> _tableConfig(AppLocalizations t) {
+    return DataTableConfig<Map<String, dynamic>>(
+      endpoint:
+          '/api/v1/basalam/business/${widget.businessId}/reports/synced-invoices',
+      httpMethod: 'GET',
+      pageSizeQueryParam: 'take',
+      tableId: 'basalam_reports_synced_invoices',
+      title: t.reportsBasalamSyncedInvoicesTitle,
+      subtitle: t.basalamReportsSyncedInvoicesTableHint,
+      showExportButtons: false,
+      enableSorting: false,
+      enableGlobalSearch: false,
+      showSearch: false,
+      showColumnSearch: false,
+      columns: [
+        TextColumn(
+          'code',
+          t.reportsBasalamColumnDocumentCode,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'document_date',
+          t.reportsBasalamColumnDocumentDate,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'basalam_order_id',
+          t.reportsBasalamColumnBasalamOrderId,
+          sortable: false,
+          searchable: false,
+        ),
+        NumberColumn(
+          'net',
+          t.reportsBasalamColumnNet,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'document_type',
+          t.reportsBasalamColumnDocumentType,
+          sortable: false,
+          searchable: false,
+        ),
+      ],
+    );
   }
 
   @override
@@ -259,36 +359,20 @@ class _BasalamSyncedInvoicesReportPageState extends State<BasalamSyncedInvoicesR
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsBasalamSyncedInvoicesTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            if (_error != null) Padding(padding: const EdgeInsets.all(12), child: Text(_error!)),
-            Expanded(
-              child: ListView.builder(
-                itemCount: _rows.length + 1,
-                itemBuilder: (ctx, i) {
-                  if (i == _rows.length) {
-                    if (_rows.length >= _total) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Center(
-                        child: _loading
-                            ? const CircularProgressIndicator()
-                            : TextButton(onPressed: () => _fetch(reset: false), child: Text(t.loanFacilityLoadMore)),
-                      ),
-                    );
-                  }
-                  final r = _rows[i];
-                  return ListTile(
-                    title: Text('${r['code'] ?? '-'}  ·  ${r['document_date'] ?? ''}'),
-                    subtitle: Text('Basalam: ${r['basalam_order_id'] ?? '-'}  ·  net: ${r['net'] ?? 0}'),
-                  );
-                },
-              ),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: DataTableWidget<Map<String, dynamic>>(
+            key: ValueKey('basalam_synced_${widget.businessId}'),
+            config: _tableConfig(t),
+            fromJson: (json) => Map<String, dynamic>.from(json),
+            calendarController: widget.calendarController,
+          ),
         ),
       ),
     );
@@ -306,14 +390,15 @@ class BasalamDeadLetterReportPage extends StatefulWidget {
   });
 
   @override
-  State<BasalamDeadLetterReportPage> createState() => _BasalamDeadLetterReportPageState();
+  State<BasalamDeadLetterReportPage> createState() =>
+      _BasalamDeadLetterReportPageState();
 }
 
 class _BasalamDeadLetterReportPageState extends State<BasalamDeadLetterReportPage> {
   final _svc = BasalamIntegrationService();
   bool _loading = true;
   String? _error;
-  List<Map<String, dynamic>> _items = [];
+  List<Map<String, dynamic>> _items = const [];
 
   @override
   void initState() {
@@ -327,10 +412,19 @@ class _BasalamDeadLetterReportPageState extends State<BasalamDeadLetterReportPag
       _error = null;
     });
     try {
-      final d = await _svc.getReportsDeadLetter(businessId: widget.businessId, limit: 200, offset: 0);
+      final d = await _svc.getReportsDeadLetter(
+        businessId: widget.businessId,
+        limit: 200,
+        offset: 0,
+      );
       if (!mounted) return;
       final raw = d['items'];
-      final list = raw is List ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
+      final list = raw is List
+          ? raw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : <Map<String, dynamic>>[];
       setState(() {
         _items = list;
         _loading = false;
@@ -338,10 +432,52 @@ class _BasalamDeadLetterReportPageState extends State<BasalamDeadLetterReportPag
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
+  }
+
+  DataTableConfig<Map<String, dynamic>> _tableConfig(AppLocalizations t) {
+    return DataTableConfig<Map<String, dynamic>>(
+      endpoint:
+          '/api/v1/basalam/business/${widget.businessId}/reports/dead-letter-local',
+      tableId: 'basalam_reports_dead_letter',
+      title: t.reportsBasalamDeadLetterTitle,
+      subtitle: t.basalamReportsDeadLetterTableHint,
+      showExportButtons: false,
+      enableSorting: false,
+      enableGlobalSearch: false,
+      showSearch: false,
+      showColumnSearch: false,
+      showPagination: false,
+      columns: [
+        TextColumn(
+          'type',
+          t.reportsBasalamColumnDeadLetterType,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'dlq_id',
+          t.reportsBasalamColumnDlqId,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'created_at',
+          t.reportsBasalamColumnCreatedAt,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'order_id',
+          t.reportsBasalamColumnOrderId,
+          sortable: false,
+          searchable: false,
+        ),
+      ],
+    );
   }
 
   @override
@@ -350,34 +486,29 @@ class _BasalamDeadLetterReportPageState extends State<BasalamDeadLetterReportPag
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsBasalamDeadLetterTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        actions: [
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+        ],
       ),
       body: SafeArea(
         child: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
                 ? Center(child: Text(_error!))
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      columns: const [
-                        DataColumn(label: Text('type')),
-                        DataColumn(label: Text('dlq_id')),
-                        DataColumn(label: Text('created_at')),
-                        DataColumn(label: Text('order_id')),
-                      ],
-                      rows: [
-                        for (final r in _items)
-                          DataRow(
-                            cells: [
-                              DataCell(Text('${r['type'] ?? ''}')),
-                              DataCell(Text('${r['dlq_id'] ?? ''}')),
-                              DataCell(Text('${r['created_at'] ?? ''}')),
-                              DataCell(Text('${r['order_id'] ?? ''}')),
-                            ],
-                          ),
-                      ],
+                : Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: DataTableWidget<Map<String, dynamic>>(
+                      key: ValueKey(
+                        'basalam_dlq_${widget.businessId}_${_items.length}',
+                      ),
+                      config: _tableConfig(t),
+                      fromJson: (json) => Map<String, dynamic>.from(json),
+                      calendarController: widget.calendarController,
+                      localRawItems: _items,
                     ),
                   ),
       ),
@@ -396,10 +527,12 @@ class BasalamProductConflictsReportPage extends StatefulWidget {
   });
 
   @override
-  State<BasalamProductConflictsReportPage> createState() => _BasalamProductConflictsReportPageState();
+  State<BasalamProductConflictsReportPage> createState() =>
+      _BasalamProductConflictsReportPageState();
 }
 
-class _BasalamProductConflictsReportPageState extends State<BasalamProductConflictsReportPage> {
+class _BasalamProductConflictsReportPageState
+    extends State<BasalamProductConflictsReportPage> {
   final _svc = BasalamIntegrationService();
   bool _loading = true;
   String? _error;
@@ -417,7 +550,11 @@ class _BasalamProductConflictsReportPageState extends State<BasalamProductConfli
       _error = null;
     });
     try {
-      final d = await _svc.getReportsProductConflicts(businessId: widget.businessId, limit: 100, offset: 0);
+      final d = await _svc.getReportsProductConflicts(
+        businessId: widget.businessId,
+        limit: 100,
+        offset: 0,
+      );
       if (!mounted) return;
       setState(() {
         _data = d;
@@ -426,18 +563,69 @@ class _BasalamProductConflictsReportPageState extends State<BasalamProductConfli
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = ErrorExtractor.forContext(e, context);
         _loading = false;
       });
     }
   }
 
+  DataTableConfig<Map<String, dynamic>> _tableConfig(AppLocalizations t) {
+    return DataTableConfig<Map<String, dynamic>>(
+      endpoint:
+          '/api/v1/basalam/business/${widget.businessId}/reports/product-conflicts-local',
+      tableId: 'basalam_reports_product_conflicts',
+      title: t.reportsBasalamProductConflictsTitle,
+      subtitle: t.basalamReportsProductConflictsTableHint,
+      showExportButtons: false,
+      enableSorting: false,
+      enableGlobalSearch: false,
+      showSearch: false,
+      showColumnSearch: false,
+      showPagination: false,
+      columns: [
+        TextColumn(
+          'conflict_id',
+          t.reportsBasalamColumnConflictId,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'type',
+          t.reportsBasalamColumnConflictType,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'direction',
+          t.reportsBasalamColumnDirection,
+          sortable: false,
+          searchable: false,
+        ),
+        TextColumn(
+          'reason',
+          t.reportsBasalamColumnReason,
+          sortable: false,
+          searchable: false,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final items = (_data?['items'] is List) ? (_data!['items'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : <Map<String, dynamic>>[];
-    final summary = (_data?['summary'] is Map) ? _data!['summary'] as Map<String, dynamic> : <String, dynamic>{};
-    final byType = (summary['by_type'] is Map) ? Map<String, dynamic>.from(summary['by_type'] as Map) : <String, dynamic>{};
+    final items = (_data?['items'] is List)
+        ? (_data!['items'] as List)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList()
+        : <Map<String, dynamic>>[];
+    final summary = (_data?['summary'] is Map)
+        ? _data!['summary'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final byType = (summary['by_type'] is Map)
+        ? Map<String, dynamic>.from(summary['by_type'] as Map)
+        : <String, dynamic>{};
 
     final palette = [
       Colors.blue,
@@ -447,7 +635,7 @@ class _BasalamProductConflictsReportPageState extends State<BasalamProductConfli
       Colors.teal,
       Colors.deepOrange,
     ];
-    int pi = 0;
+    var pi = 0;
     final pieSections = <PieChartSectionData>[
       for (final e in byType.entries)
         if (((e.value as num?)?.toDouble() ?? 0) > 0)
@@ -462,8 +650,13 @@ class _BasalamProductConflictsReportPageState extends State<BasalamProductConfli
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsBasalamProductConflictsTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
-        actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        actions: [
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+        ],
       ),
       body: SafeArea(
         child: _loading
@@ -480,26 +673,16 @@ class _BasalamProductConflictsReportPageState extends State<BasalamProductConfli
                           ),
                         ),
                       Expanded(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: DataTable(
-                            columns: const [
-                              DataColumn(label: Text('conflict_id')),
-                              DataColumn(label: Text('type')),
-                              DataColumn(label: Text('direction')),
-                              DataColumn(label: Text('reason')),
-                            ],
-                            rows: [
-                              for (final r in items)
-                                DataRow(
-                                  cells: [
-                                    DataCell(Text('${r['conflict_id'] ?? ''}')),
-                                    DataCell(Text('${r['type'] ?? ''}')),
-                                    DataCell(Text('${r['direction'] ?? ''}')),
-                                    DataCell(Text('${r['reason'] ?? ''}')),
-                                  ],
-                                ),
-                            ],
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: DataTableWidget<Map<String, dynamic>>(
+                            key: ValueKey(
+                              'basalam_pc_${widget.businessId}_${items.length}',
+                            ),
+                            config: _tableConfig(t),
+                            fromJson: (json) => Map<String, dynamic>.from(json),
+                            calendarController: widget.calendarController,
+                            localRawItems: items,
                           ),
                         ),
                       ),

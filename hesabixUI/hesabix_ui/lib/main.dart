@@ -122,7 +122,9 @@ import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
+import 'pages/business/basalam/basalam_settings_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
+import 'pages/business/woocommerce/woocommerce_settings_page.dart';
 import 'pages/business/notification_templates_page.dart';
 import 'pages/business/notification_template_form_page.dart';
 import 'pages/public/public_warranty_activation_page.dart';
@@ -2988,6 +2990,49 @@ class _MyAppState extends State<MyApp> {
                     businessId: businessId,
                     authStore: _authStore!,
                     apiClient: ApiClient(),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'settings/basalam',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                }
+                final canBasalam =
+                    _authStore!.hasBusinessPermission('basalam', 'view') ||
+                    _authStore!.currentBusiness?.isOwner == true;
+                if (!canBasalam) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  BasalamSettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'settings/woocommerce',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                }
+                final canWoo = _authStore!.hasBusinessPermission('woocommerce', 'view') ||
+                    _authStore!.currentBusiness?.isOwner == true;
+                if (!canWoo) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  WoocommerceSettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
                   ),
                 );
               },
