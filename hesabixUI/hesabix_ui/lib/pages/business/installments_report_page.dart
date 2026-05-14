@@ -324,7 +324,11 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       children: pays.map((p) {
         final pm = p is Map<String, dynamic> ? p : <String, dynamic>{};
         final code = pm['document_code']?.toString() ?? '';
-        final d = pm['document_date']?.toString() ?? '';
+        final d = HesabixDateUtils.formatApiDateForDisplay(
+          pm['document_date'],
+          widget.calendarController.isJalali,
+          rawValue: pm['document_date_raw'],
+        );
         final amt = _formatNumber(pm['amount']);
         return Padding(
           padding: const EdgeInsets.only(bottom: 4),

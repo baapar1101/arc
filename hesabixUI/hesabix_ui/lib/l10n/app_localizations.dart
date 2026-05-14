@@ -1385,8 +1385,32 @@ abstract class AppLocalizations {
   /// No description provided for @invoiceLineItemsAddRowKeyboardHint.
   ///
   /// In en, this message translates to:
-  /// **'Tip: Press Q then I in quick succession to add rows (outside text fields).'**
+  /// **'Tab or Enter on the tax rate field of the last row adds a new line. Pick a quick shortcut from the keyboard icon. Outside text fields: Q then I.'**
   String get invoiceLineItemsAddRowKeyboardHint;
+
+  /// No description provided for @invoiceLineItemsQuickShortcutMenuTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose add-row shortcut'**
+  String get invoiceLineItemsQuickShortcutMenuTooltip;
+
+  /// No description provided for @invoiceLineItemsShortcutOptionF2.
+  ///
+  /// In en, this message translates to:
+  /// **'F2 (default; web-friendly)'**
+  String get invoiceLineItemsShortcutOptionF2;
+
+  /// No description provided for @invoiceLineItemsShortcutOptionCtrlShiftN.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl+Shift+N (desktop)'**
+  String get invoiceLineItemsShortcutOptionCtrlShiftN;
+
+  /// No description provided for @invoiceLineItemsShortcutOptionNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get invoiceLineItemsShortcutOptionNone;
 
   /// No description provided for @support.
   ///
@@ -23155,6 +23179,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Customers'**
   String get woocommerceHubCustomersTab;
+
+  /// No description provided for @woocommerceHubControlTab.
+  ///
+  /// In en, this message translates to:
+  /// **'ArcWOC control'**
+  String get woocommerceHubControlTab;
+
+  /// No description provided for @woocommerceControlIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin operations dashboard'**
+  String get woocommerceControlIntroTitle;
+
+  /// No description provided for @woocommerceControlIntroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mapping stats, Hesabix API health, plugin version, recent logs and bulk sync via the same secure bridge token as the operations hub.'**
+  String get woocommerceControlIntroSubtitle;
+
+  /// No description provided for @woocommerceControlRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh all sections'**
+  String get woocommerceControlRefreshTooltip;
+
+  /// No description provided for @woocommerceControlStatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Mapping stats (hesabix_v2 table)'**
+  String get woocommerceControlStatsTitle;
+
+  /// No description provided for @woocommerceControlPluginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin version & updates'**
+  String get woocommerceControlPluginTitle;
+
+  /// No description provided for @woocommerceControlConnectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hesabix API from the store'**
+  String get woocommerceControlConnectionTitle;
+
+  /// No description provided for @woocommerceControlSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin settings summary (no full API key)'**
+  String get woocommerceControlSettingsTitle;
+
+  /// No description provided for @woocommerceControlLogsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent plugin logs'**
+  String get woocommerceControlLogsTitle;
+
+  /// No description provided for @woocommerceControlBulkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk sync'**
+  String get woocommerceControlBulkTitle;
+
+  /// No description provided for @woocommerceControlBulkIdsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter WooCommerce IDs separated by commas (e.g. 101,102,103)'**
+  String get woocommerceControlBulkIdsHint;
+
+  /// No description provided for @woocommerceControlSyncOrdersButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync orders'**
+  String get woocommerceControlSyncOrdersButton;
+
+  /// No description provided for @woocommerceControlSyncProductsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync products (parents)'**
+  String get woocommerceControlSyncProductsButton;
+
+  /// No description provided for @woocommerceControlSyncCustomersButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync customers'**
+  String get woocommerceControlSyncCustomersButton;
+
+  /// No description provided for @woocommerceControlManageRequiredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remote sync requires WooCommerce “manage” permission.'**
+  String get woocommerceControlManageRequiredHint;
+
+  /// No description provided for @woocommerceControlConnectionOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get woocommerceControlConnectionOk;
+
+  /// No description provided for @woocommerceControlConnectionFail.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get woocommerceControlConnectionFail;
+
+  /// No description provided for @woocommerceControlCurrentVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed version'**
+  String get woocommerceControlCurrentVersion;
+
+  /// No description provided for @woocommerceControlRemoteVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Repository version'**
+  String get woocommerceControlRemoteVersion;
+
+  /// No description provided for @woocommerceControlUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get woocommerceControlUpdateAvailable;
+
+  /// No description provided for @woocommerceControlColumnLogId.
+  ///
+  /// In en, this message translates to:
+  /// **'ID'**
+  String get woocommerceControlColumnLogId;
+
+  /// No description provided for @woocommerceControlColumnEntityType.
+  ///
+  /// In en, this message translates to:
+  /// **'Entity'**
+  String get woocommerceControlColumnEntityType;
+
+  /// No description provided for @woocommerceControlColumnEntityId.
+  ///
+  /// In en, this message translates to:
+  /// **'WC ID'**
+  String get woocommerceControlColumnEntityId;
+
+  /// No description provided for @woocommerceControlColumnAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Action'**
+  String get woocommerceControlColumnAction;
+
+  /// No description provided for @woocommerceControlColumnStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get woocommerceControlColumnStatus;
+
+  /// No description provided for @woocommerceControlColumnCreatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Time'**
+  String get woocommerceControlColumnCreatedAt;
+
+  /// No description provided for @woocommerceControlColumnError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get woocommerceControlColumnError;
+
+  /// No description provided for @woocommerceHubSyncRowTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync to Hesabix'**
+  String get woocommerceHubSyncRowTooltip;
+
+  /// No description provided for @woocommerceHubSyncColumnLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync'**
+  String get woocommerceHubSyncColumnLabel;
+
+  /// No description provided for @woocommerceHubSyncOrderConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync this order?'**
+  String get woocommerceHubSyncOrderConfirmTitle;
+
+  /// No description provided for @woocommerceHubSyncOrderConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected order will be pushed to Hesabix through the plugin API.'**
+  String get woocommerceHubSyncOrderConfirmBody;
+
+  /// No description provided for @woocommerceHubSyncProductConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync this product?'**
+  String get woocommerceHubSyncProductConfirmTitle;
+
+  /// No description provided for @woocommerceHubSyncProductConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected product will be pushed to Hesabix through the plugin API.'**
+  String get woocommerceHubSyncProductConfirmBody;
+
+  /// No description provided for @woocommerceHubSyncCustomerConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync this customer?'**
+  String get woocommerceHubSyncCustomerConfirmTitle;
+
+  /// No description provided for @woocommerceHubSyncCustomerConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected customer will be pushed to Hesabix through the plugin API.'**
+  String get woocommerceHubSyncCustomerConfirmBody;
+
+  /// No description provided for @woocommerceSyncDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync completed'**
+  String get woocommerceSyncDone;
+
+  /// No description provided for @woocommerceControlQueueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Background sync queue'**
+  String get woocommerceControlQueueTitle;
+
+  /// No description provided for @woocommerceControlQueueBatchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Max rows per run (from plugin settings): {n}'**
+  String woocommerceControlQueueBatchHint(String n);
+
+  /// No description provided for @woocommerceControlQueueProcessOnceButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Process one queue batch'**
+  String get woocommerceControlQueueProcessOnceButton;
+
+  /// No description provided for @woocommerceControlPluginForceCheckButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Re-check version from repository'**
+  String get woocommerceControlPluginForceCheckButton;
+
+  /// No description provided for @woocommerceControlDebugModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin debug mode'**
+  String get woocommerceControlDebugModeTitle;
+
+  /// No description provided for @woocommerceControlDebugModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verbose logging in the plugin; only users with manage permission can change this.'**
+  String get woocommerceControlDebugModeSubtitle;
+
+  /// No description provided for @woocommerceControlSettingsApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugin settings updated'**
+  String get woocommerceControlSettingsApplied;
+
+  /// No description provided for @woocommerceControlQueueProcessDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Processed one queue batch; about {delta} fewer pending row(s).'**
+  String woocommerceControlQueueProcessDone(String delta);
+
+  /// No description provided for @woocommerceControlPluginCheckDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Repository version check refreshed'**
+  String get woocommerceControlPluginCheckDone;
 
   /// No description provided for @woocommerceOrdersFiltersTitle.
   ///

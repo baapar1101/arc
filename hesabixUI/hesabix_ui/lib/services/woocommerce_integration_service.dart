@@ -120,4 +120,136 @@ class WoocommerceIntegrationService {
     );
     return _dataMap(res.data);
   }
+
+  Future<Map<String, dynamic>> controlSyncStats({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/sync-stats',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> controlSettingsSummary({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/settings-summary',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> controlLogs({
+    required int businessId,
+    int page = 1,
+    int perPage = 20,
+    String? action,
+  }) async {
+    final q = <String, dynamic>{
+      'page': page,
+      'per_page': perPage,
+      if (action != null && action.trim().isNotEmpty) 'action': action.trim(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/logs',
+      query: q,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> controlConnection({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/connection',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> controlPlugin({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/plugin',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlSyncProduct({
+    required int businessId,
+    required int productId,
+    int? variationId,
+  }) async {
+    final body = <String, dynamic>{
+      'product_id': productId,
+      if (variationId != null && variationId > 0) 'variation_id': variationId,
+    };
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/sync/product',
+      data: body,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlSyncOrders({
+    required int businessId,
+    required List<int> orderIds,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/sync/orders',
+      data: <String, dynamic>{'order_ids': orderIds},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlSyncProducts({
+    required int businessId,
+    required List<int> productIds,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/sync/products',
+      data: <String, dynamic>{'product_ids': productIds},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlSyncCustomers({
+    required int businessId,
+    required List<int> customerIds,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/sync/customers',
+      data: <String, dynamic>{'customer_ids': customerIds},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> controlQueueSnapshot({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/queue/snapshot',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlQueueProcessOnce({required int businessId}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/queue/process-once',
+      data: const <String, dynamic>{},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlPluginUpdateCheck({
+    required int businessId,
+    bool force = false,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/plugin/update-check',
+      data: <String, dynamic>{'force': force},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlSettingsPatch({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/settings/patch',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
 }

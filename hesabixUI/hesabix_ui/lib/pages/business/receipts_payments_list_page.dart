@@ -2623,7 +2623,12 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
                     final it = _results[i];
                     final code = (it['code']?.toString() ?? '-');
                     final desc = (it['description']?.toString() ?? '').trim();
-                    final docDate = (it['document_date']?.toString() ?? '').split('T').first;
+                    final docDate = HesabixDateUtils.formatApiDateForDisplay(
+                      it['document_date'],
+                      widget.calendarController.isJalali,
+                      rawValue: it['document_date_raw'],
+                      fallback: '',
+                    );
                     final total = (it['total_amount'] is num) ? (it['total_amount'] as num).toDouble() : null;
                     final remaining = (it['remaining_amount'] is num) ? (it['remaining_amount'] as num).toDouble() : null;
                     final currency = (it['currency_code']?.toString() ?? '').trim();
@@ -3546,9 +3551,12 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         final code = invoice['code']?.toString() ?? '';
                         final total = _getInvoiceTotal(invoice);
                         final remaining = (invoice['_remaining'] as num?)?.toDouble() ?? (total - 0);
-                        final dateStr = invoice['document_date']?.toString();
-                        final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
-                        final dateDisplay = date != null ? HesabixDateUtils.formatForDisplay(date, true) : '';
+                        final dateDisplay = HesabixDateUtils.formatApiDateForDisplay(
+                          invoice['document_date'],
+                          widget.calendarController.isJalali,
+                          rawValue: invoice['document_date_raw'],
+                          fallback: '',
+                        );
                         
                         return DropdownMenuItem<int>(
                           value: id,

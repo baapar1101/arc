@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -19,6 +19,20 @@ String formatWooDecimal(BuildContext context, Object? value, {int maxFractionDig
   fmt.maximumFractionDigits = maxFractionDigits;
   fmt.minimumFractionDigits = 0;
   return fmt.format(n);
+}
+
+/// سلول وضعیت سینک با Tooltip برای خطای همگام‌سازی (گزارش‌ها و مرکز عملیات).
+Widget wooReportSyncStatusCell(AppLocalizations t, dynamic item) {
+  if (item is! Map<String, dynamic>) return const SizedBox.shrink();
+  final err = '${item['hesabix_error_message'] ?? ''}'.trim();
+  final label = wooSyncStatusLabel(t, item['sync_status'] as String?);
+  final textWidget = Text(label, maxLines: 2, overflow: TextOverflow.ellipsis);
+  if (err.isEmpty) return textWidget;
+  return Tooltip(
+    message: err,
+    waitDuration: const Duration(milliseconds: 400),
+    child: textWidget,
+  );
 }
 
 String wooOrderStorageLabel(AppLocalizations t, Object? raw) {

@@ -41,6 +41,7 @@
   
   <!-- Preload critical resources for faster page loads -->
   <link rel="preload" href="flutter_bootstrap.js" as="script">
+  <link rel="preload" href="flutter_web_preload.js" as="script">
   <link rel="preload" href="assets/images/logo-light.svg" as="image" type="image/svg+xml">
   
   <!-- Initial Loading Screen Styles -->
@@ -306,14 +307,15 @@
       }, 1000);
     }, { once: true });
     
-    // Fallback: اگر بعد از 10 ثانیه Flutter لود نشد، loading screen را پنهان کن
+    // Fallback: اگر بعد از مدت طولانی Flutter لود نشد، loading screen را پنهان کن
+    // (پیش‌بار main.dart.js + CanvasKit ممکن است بیش از ۱۰ ثانیه طول بکشد)
     setTimeout(function() {
       const loadingScreen = document.getElementById('flutter-loading-screen');
       if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
         console.warn('Flutter loading timeout - hiding loading screen');
         hideLoadingScreen();
       }
-    }, 10000);
+    }, 120000);
     
     // پیکربندی صحیح Flutter با روش جدید - intercept loader قبل از اجرای flutter_bootstrap
     if (!window._flutter) {
@@ -630,6 +632,7 @@
     })();
   </script>
 
+  <script src="flutter_web_preload.js" defer></script>
   <script src="flutter_bootstrap.js" defer></script>
 </body>
 </html>

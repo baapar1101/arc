@@ -75,6 +75,15 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
     }
   }
 
+  ButtonStyle _suffixIconButtonStyle() {
+    return IconButton.styleFrom(
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      minimumSize: const Size(32, 32),
+      padding: const EdgeInsets.all(4),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<int?>(
@@ -85,6 +94,12 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
         border: const OutlineInputBorder(),
         errorText: _error != null ? 'خطا در بارگذاری پروژه‌ها' : null,
         suffixIcon: _buildSuffixIcon(),
+        suffixIconConstraints: BoxConstraints(
+          minWidth: widget.isDense ? 36 : 40,
+          maxWidth: 120,
+          minHeight: widget.isDense ? 36 : 40,
+          maxHeight: widget.isDense ? 44 : 48,
+        ),
         isDense: widget.isDense,
         contentPadding: widget.isDense
             ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
@@ -237,15 +252,18 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
         children: [
           if (canCreate)
             IconButton(
+              style: _suffixIconButtonStyle(),
               icon: const Icon(Icons.add_circle, color: Colors.blue),
               onPressed: widget.enabled ? _showQuickCreateDialog : null,
               tooltip: 'ایجاد پروژه جدید',
-              iconSize: 24,
+              iconSize: 20,
             ),
           IconButton(
+            style: _suffixIconButtonStyle(),
             icon: const Icon(Icons.refresh),
             onPressed: _loadProjects,
             tooltip: 'تلاش مجدد',
+            iconSize: 20,
           ),
         ],
       );
@@ -258,10 +276,11 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
         children: [
           if (canCreate)
             IconButton(
+              style: _suffixIconButtonStyle(),
               icon: const Icon(Icons.add_circle, color: Colors.blue),
               onPressed: widget.enabled ? _showQuickCreateDialog : null,
               tooltip: 'ایجاد پروژه جدید',
-              iconSize: 24,
+              iconSize: 20,
             ),
           const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
         ],
@@ -271,10 +290,11 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
     // در حالت عادی، فقط دکمه + (اگر دسترسی داشته باشد)
     if (canCreate) {
       return IconButton(
+        style: _suffixIconButtonStyle(),
         icon: const Icon(Icons.add_circle, color: Colors.blue),
         onPressed: widget.enabled ? _showQuickCreateDialog : null,
         tooltip: 'ایجاد پروژه جدید',
-        iconSize: 24,
+        iconSize: 20,
       );
     }
 

@@ -333,6 +333,74 @@ def _bridge_get(db: Session, business_id: int, path: str, params: Dict[str, Any]
 	return data
 
 
+def _bridge_post(
+	db: Session,
+	business_id: int,
+	path: str,
+	json_body: Optional[Dict[str, Any]] = None,
+	*,
+	timeout_sec: float = 120.0,
+) -> Dict[str, Any]:
+	enforce_woocommerce_bridge_rate_limit(int(business_id), path or "/")
+	store, token = _load_bridge_credentials(db, business_id)
+	url = store + BRIDGE_REST_PREFIX + path
+	headers = {BRIDGE_HEADER: token, "Accept": "application/json", "Content-Type": "application/json"}
+	payload = json_body if isinstance(json_body, dict) else {}
+	try:
+		with httpx.Client(
+			timeout=timeout_sec,
+			follow_redirects=True,
+			verify=woocommerce_bridge_tls_verify_enabled(),
+		) as client:
+			resp = client.post(url, headers=headers, json=payload)
+	except httpx.RequestError as exc:
+		logger.warning(
+			"woocommerce_bridge_network_error",
+			business_id=int(business_id),
+			path=path,
+			error=str(exc),
+		)
+		raise ApiError(
+			"WOOCOMMERCE_BRIDGE_NETWORK",
+			f"خطا در اتصال به فروشگاه: {exc!s}",
+			http_status=502,
+		) from exc
+
+	if resp.status_code == 401:
+		raise ApiError("WOOCOMMERCE_BRIDGE_UNAUTHORIZED", "توکن پل نامعتبر است یا پل در وردپرس غیرفعال است.", http_status=401)
+	if resp.status_code == 403:
+		raise ApiError("WOOCOMMERCE_BRIDGE_FORBIDDEN", "پل REST در وردپرس غیرفعال است.", http_status=403)
+	if resp.status_code >= 400:
+		logger.warning(
+			"woocommerce_bridge_http_error",
+			business_id=int(business_id),
+			path=path,
+			status_code=resp.status_code,
+			body_len=len(resp.text or ""),
+		)
+		raise ApiError(
+			"WOOCOMMERCE_BRIDGE_HTTP",
+			f"پاسخ فروشگاه: HTTP {resp.status_code}",
+			http_status=502,
+			details={"body_preview": (resp.text or "")[:500]},
+		)
+
+	try:
+		data = resp.json()
+	except Exception as exc:
+		logger.warning(
+			"woocommerce_bridge_bad_json",
+			business_id=int(business_id),
+			path=path,
+			error=str(exc),
+		)
+		raise ApiError("WOOCOMMERCE_BRIDGE_BAD_JSON", "پاسخ فروشگاه JSON معتبر نیست.", http_status=502) from exc
+
+	if not isinstance(data, dict):
+		raise ApiError("WOOCOMMERCE_BRIDGE_BAD_JSON", "ساختار پاسخ فروشگاه نامعتبر است.", http_status=502)
+	return data
+
+
 def _unwrap_bridge_body(body: Dict[str, Any], *, business_id: Optional[int] = None, path: str = "") -> Dict[str, Any]:
 	if not body.get("success"):
 		if business_id is not None:
@@ -440,6 +508,129 @@ def reports_summary(
 		_bridge_get(db, business_id, "/reports/summary", params),
 		business_id=business_id,
 		path="/reports/summary",
+	)
+
+
+def control_sync_stats(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/sync-stats", {}),
+		business_id=business_id,
+		path="/control/sync-stats",
+	)
+
+
+def control_settings_summary(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/settings-summary", {}),
+		business_id=business_id,
+		path="/control/settings-summary",
+	)
+
+
+def control_logs(
+	db: Session,
+	business_id: int,
+	page: int = 1,
+	per_page: int = 20,
+	action: Optional[str] = None,
+) -> Dict[str, Any]:
+	params: Dict[str, Any] = {"page": max(1, page), "per_page": max(1, min(100, per_page))}
+	if action and str(action).strip():
+		params["action"] = str(action).strip()
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/logs", params),
+		business_id=business_id,
+		path="/control/logs",
+	)
+
+
+def control_connection(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/connection", {}),
+		business_id=business_id,
+		path="/control/connection",
+	)
+
+
+def control_plugin(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/plugin", {}),
+		business_id=business_id,
+		path="/control/plugin",
+	)
+
+
+def post_control_sync_product(
+	db: Session,
+	business_id: int,
+	*,
+	product_id: int,
+	variation_id: Optional[int] = None,
+) -> Dict[str, Any]:
+	body: Dict[str, Any] = {"product_id": int(product_id)}
+	if variation_id is not None and int(variation_id) > 0:
+		body["variation_id"] = int(variation_id)
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/sync/product", body, timeout_sec=120.0),
+		business_id=business_id,
+		path="/control/sync/product",
+	)
+
+
+def post_control_sync_orders(db: Session, business_id: int, order_ids: list) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/sync/orders", {"order_ids": list(order_ids)}, timeout_sec=120.0),
+		business_id=business_id,
+		path="/control/sync/orders",
+	)
+
+
+def post_control_sync_products(db: Session, business_id: int, product_ids: list) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/sync/products", {"product_ids": list(product_ids)}, timeout_sec=120.0),
+		business_id=business_id,
+		path="/control/sync/products",
+	)
+
+
+def post_control_sync_customers(db: Session, business_id: int, customer_ids: list) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/sync/customers", {"customer_ids": list(customer_ids)}, timeout_sec=120.0),
+		business_id=business_id,
+		path="/control/sync/customers",
+	)
+
+
+def control_queue_snapshot(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/queue/snapshot", {}),
+		business_id=business_id,
+		path="/control/queue/snapshot",
+	)
+
+
+def post_control_queue_process_once(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/queue/process-once", {}, timeout_sec=120.0),
+		business_id=business_id,
+		path="/control/queue/process-once",
+	)
+
+
+def post_control_plugin_update_check(db: Session, business_id: int, *, force: bool = False) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/plugin/update-check", {"force": bool(force)}, timeout_sec=90.0),
+		business_id=business_id,
+		path="/control/plugin/update-check",
+	)
+
+
+def post_control_settings_patch(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	body = payload if isinstance(payload, dict) else {}
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/settings/patch", body, timeout_sec=45.0),
+		business_id=business_id,
+		path="/control/settings/patch",
 	)
 
 

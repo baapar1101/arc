@@ -108,6 +108,7 @@ class _ReceiptsPaymentsPageState extends State<ReceiptsPaymentsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: _DraftsList(
                   businessId: widget.businessId,
+                  calendarController: widget.calendarController,
                   drafts: _drafts.where((d) => d.isReceipt == (_tabIndex == 0)).toList(),
                   onEdit: (d) async {
                     final updated = await showDialog<_BulkSettlementDraft>(
@@ -147,11 +148,13 @@ class _ReceiptsPaymentsPageState extends State<ReceiptsPaymentsPage> {
 
 class _DraftsList extends StatelessWidget {
   final int businessId;
+  final CalendarController calendarController;
   final List<_BulkSettlementDraft> drafts;
   final ValueChanged<_BulkSettlementDraft> onEdit;
   final ValueChanged<_BulkSettlementDraft> onDelete;
   const _DraftsList({
     required this.businessId,
+    required this.calendarController,
     required this.drafts,
     required this.onEdit,
     required this.onDelete,
@@ -184,7 +187,9 @@ class _DraftsList extends StatelessWidget {
                       final sumCenters = d.centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
                       return ListTile(
                         title: Text('${formatWithThousands(sumPersons)}  |  ${formatWithThousands(sumCenters)}'),
-                        subtitle: Text('${HesabixDateUtils.formatForDisplay(d.documentDate, true)}  •  ${d.isReceipt ? t.receipts : t.payments}'),
+                        subtitle: Text(
+                          '${HesabixDateUtils.formatForDisplay(d.documentDate, calendarController.isJalali)}  •  ${d.isReceipt ? t.receipts : t.payments}',
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -397,6 +402,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
 
     final Widget personsPanel = _PersonsPanel(
       businessId: widget.businessId,
+      calendarController: widget.calendarController,
       isReceipt: _isReceipt,
       lines: _personLines,
       selectedCurrencyId: _selectedCurrencyId,
@@ -954,6 +960,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
 
 class _PersonsPanel extends StatefulWidget {
   final int businessId;
+  final CalendarController calendarController;
   final bool isReceipt;
   final List<_PersonLine> lines;
   final ValueChanged<List<_PersonLine>> onChanged;
@@ -961,6 +968,7 @@ class _PersonsPanel extends StatefulWidget {
   final String currencyUnitLabel;
   const _PersonsPanel({
     required this.businessId,
+    required this.calendarController,
     required this.isReceipt,
     required this.lines,
     required this.onChanged,
@@ -993,6 +1001,7 @@ class _PersonsPanelState extends State<_PersonsPanel> {
                     final line = widget.lines[i];
                     return _PersonLineTile(
                       businessId: widget.businessId,
+                      calendarController: widget.calendarController,
                       isReceipt: widget.isReceipt,
                       line: line,
                       selectedCurrencyId: widget.selectedCurrencyId,
@@ -1057,6 +1066,7 @@ class _PersonsPanelState extends State<_PersonsPanel> {
 
 class _PersonLineTile extends StatefulWidget {
   final int businessId;
+  final CalendarController calendarController;
   final bool isReceipt;
   final _PersonLine line;
   final ValueChanged<_PersonLine> onChanged;
@@ -1065,6 +1075,7 @@ class _PersonLineTile extends StatefulWidget {
   final String currencyUnit;
   const _PersonLineTile({
     required this.businessId,
+    required this.calendarController,
     required this.isReceipt,
     required this.line,
     required this.onChanged,
@@ -1473,9 +1484,12 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         final code = invoice['code']?.toString() ?? '';
                         final total = _getInvoiceTotal(invoice);
                         final remaining = (invoice['_remaining'] as num?)?.toDouble() ?? (total - 0);
-                        final dateStr = invoice['document_date']?.toString();
-                        final date = dateStr != null ? DateTime.tryParse(dateStr) : null;
-                        final dateDisplay = date != null ? HesabixDateUtils.formatForDisplay(date, true) : '';
+                        final dateDisplay = HesabixDateUtils.formatApiDateForDisplay(
+                          invoice['document_date'],
+                          widget.calendarController.isJalali,
+                          rawValue: invoice['document_date_raw'],
+                          fallback: '',
+                        );
                         
                         return DropdownMenuItem<int>(
                           value: id,

@@ -728,7 +728,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get invoiceLineItemsAddRowKeyboardHint =>
-      'Tip: Press Q then I in quick succession to add rows (outside text fields).';
+      'Tab or Enter on the tax rate field of the last row adds a new line. Pick a quick shortcut from the keyboard icon. Outside text fields: Q then I.';
+
+  @override
+  String get invoiceLineItemsQuickShortcutMenuTooltip =>
+      'Choose add-row shortcut';
+
+  @override
+  String get invoiceLineItemsShortcutOptionF2 => 'F2 (default; web-friendly)';
+
+  @override
+  String get invoiceLineItemsShortcutOptionCtrlShiftN =>
+      'Ctrl+Shift+N (desktop)';
+
+  @override
+  String get invoiceLineItemsShortcutOptionNone => 'Off';
 
   @override
   String get support => 'Support';
@@ -12445,6 +12459,156 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceHubCustomersTab => 'Customers';
+
+  @override
+  String get woocommerceHubControlTab => 'ArcWOC control';
+
+  @override
+  String get woocommerceControlIntroTitle => 'Plugin operations dashboard';
+
+  @override
+  String get woocommerceControlIntroSubtitle =>
+      'Mapping stats, Hesabix API health, plugin version, recent logs and bulk sync via the same secure bridge token as the operations hub.';
+
+  @override
+  String get woocommerceControlRefreshTooltip => 'Refresh all sections';
+
+  @override
+  String get woocommerceControlStatsTitle => 'Mapping stats (hesabix_v2 table)';
+
+  @override
+  String get woocommerceControlPluginTitle => 'Plugin version & updates';
+
+  @override
+  String get woocommerceControlConnectionTitle => 'Hesabix API from the store';
+
+  @override
+  String get woocommerceControlSettingsTitle =>
+      'Plugin settings summary (no full API key)';
+
+  @override
+  String get woocommerceControlLogsTitle => 'Recent plugin logs';
+
+  @override
+  String get woocommerceControlBulkTitle => 'Bulk sync';
+
+  @override
+  String get woocommerceControlBulkIdsHint =>
+      'Enter WooCommerce IDs separated by commas (e.g. 101,102,103)';
+
+  @override
+  String get woocommerceControlSyncOrdersButton => 'Sync orders';
+
+  @override
+  String get woocommerceControlSyncProductsButton => 'Sync products (parents)';
+
+  @override
+  String get woocommerceControlSyncCustomersButton => 'Sync customers';
+
+  @override
+  String get woocommerceControlManageRequiredHint =>
+      'Remote sync requires WooCommerce “manage” permission.';
+
+  @override
+  String get woocommerceControlConnectionOk => 'OK';
+
+  @override
+  String get woocommerceControlConnectionFail => 'Failed';
+
+  @override
+  String get woocommerceControlCurrentVersion => 'Installed version';
+
+  @override
+  String get woocommerceControlRemoteVersion => 'Repository version';
+
+  @override
+  String get woocommerceControlUpdateAvailable => 'Update available';
+
+  @override
+  String get woocommerceControlColumnLogId => 'ID';
+
+  @override
+  String get woocommerceControlColumnEntityType => 'Entity';
+
+  @override
+  String get woocommerceControlColumnEntityId => 'WC ID';
+
+  @override
+  String get woocommerceControlColumnAction => 'Action';
+
+  @override
+  String get woocommerceControlColumnStatus => 'Status';
+
+  @override
+  String get woocommerceControlColumnCreatedAt => 'Time';
+
+  @override
+  String get woocommerceControlColumnError => 'Error';
+
+  @override
+  String get woocommerceHubSyncRowTooltip => 'Sync to Hesabix';
+
+  @override
+  String get woocommerceHubSyncColumnLabel => 'Sync';
+
+  @override
+  String get woocommerceHubSyncOrderConfirmTitle => 'Sync this order?';
+
+  @override
+  String get woocommerceHubSyncOrderConfirmBody =>
+      'The selected order will be pushed to Hesabix through the plugin API.';
+
+  @override
+  String get woocommerceHubSyncProductConfirmTitle => 'Sync this product?';
+
+  @override
+  String get woocommerceHubSyncProductConfirmBody =>
+      'The selected product will be pushed to Hesabix through the plugin API.';
+
+  @override
+  String get woocommerceHubSyncCustomerConfirmTitle => 'Sync this customer?';
+
+  @override
+  String get woocommerceHubSyncCustomerConfirmBody =>
+      'The selected customer will be pushed to Hesabix through the plugin API.';
+
+  @override
+  String get woocommerceSyncDone => 'Sync completed';
+
+  @override
+  String get woocommerceControlQueueTitle => 'Background sync queue';
+
+  @override
+  String woocommerceControlQueueBatchHint(String n) {
+    return 'Max rows per run (from plugin settings): $n';
+  }
+
+  @override
+  String get woocommerceControlQueueProcessOnceButton =>
+      'Process one queue batch';
+
+  @override
+  String get woocommerceControlPluginForceCheckButton =>
+      'Re-check version from repository';
+
+  @override
+  String get woocommerceControlDebugModeTitle => 'Plugin debug mode';
+
+  @override
+  String get woocommerceControlDebugModeSubtitle =>
+      'Verbose logging in the plugin; only users with manage permission can change this.';
+
+  @override
+  String get woocommerceControlSettingsApplied => 'Plugin settings updated';
+
+  @override
+  String woocommerceControlQueueProcessDone(String delta) {
+    return 'Processed one queue batch; about $delta fewer pending row(s).';
+  }
+
+  @override
+  String get woocommerceControlPluginCheckDone =>
+      'Repository version check refreshed';
 
   @override
   String get woocommerceOrdersFiltersTitle => 'Order filters';

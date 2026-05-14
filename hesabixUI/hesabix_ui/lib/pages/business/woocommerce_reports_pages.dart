@@ -10,19 +10,6 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 
-Widget _wooReportSyncStatusCell(AppLocalizations t, dynamic item) {
-  if (item is! Map<String, dynamic>) return const SizedBox.shrink();
-  final err = '${item['hesabix_error_message'] ?? ''}'.trim();
-  final label = wooSyncStatusLabel(t, item['sync_status'] as String?);
-  final textWidget = Text(label, maxLines: 2, overflow: TextOverflow.ellipsis);
-  if (err.isEmpty) return textWidget;
-  return Tooltip(
-    message: err,
-    waitDuration: const Duration(milliseconds: 400),
-    child: textWidget,
-  );
-}
-
 Widget _reportsWooSettingsPromoCard(BuildContext context, int businessId) {
   final t = AppLocalizations.of(context);
   final theme = Theme.of(context);
@@ -372,7 +359,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
           t.woocommerceColumnSyncStatus,
           sortable: false,
           searchable: true,
-          builder: (item, index) => _wooReportSyncStatusCell(t, item),
+          builder: (item, index) => wooReportSyncStatusCell(t, item),
         ),
       ],
       searchFields: const ['id', 'number', 'type', 'status', 'billing_email', 'hesabix_id', 'sync_status'],
@@ -528,7 +515,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
           t.woocommerceColumnSyncStatus,
           sortable: false,
           searchable: true,
-          builder: (item, index) => _wooReportSyncStatusCell(t, item),
+          builder: (item, index) => wooReportSyncStatusCell(t, item),
         ),
       ],
       searchFields: const ['id', 'name', 'sku', 'type', 'price', 'hesabix_id', 'sync_status'],

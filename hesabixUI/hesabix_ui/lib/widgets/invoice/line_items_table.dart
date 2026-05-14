@@ -77,6 +77,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   final Set<int> _invoiceLineAttrsLoggedUniquePid = {};
   final Set<int> _invoiceLineAttrsLoggedNoAttrPid = {};
   int? _preferredAddRowCount;
+  /// میان‌بر ثانویهٔ افزودن ردیف (`f2` | `ctrl_shift_n` | `none`)؛ از [InvoiceLinePreferences] بارگذاری می‌شود.
+  String _secondaryAddRowShortcut = 'f2';
   /// فوکوس به‌ازای [InvoiceLineItem.lineKey]؛ با جابه‌جایی ردیف نیازی به بازچین‌شدن نیست
   final Map<String, Map<String, FocusNode>> _focusNodesByLineKey = {};
 
@@ -118,6 +120,11 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     }
 
     final hw = HardwareKeyboard.instance;
+    if (_trySecondaryAddRowShortcut(down, hw)) {
+      _lineAddQiPendingSince = null;
+      return true;
+    }
+
     if (hw.isControlPressed || hw.isMetaPressed || hw.isAltPressed) {
       _lineAddQiPendingSince = null;
       return false;
@@ -155,6 +162,43 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     unawaited(_addRows(1));
     return true;
   }
+
+  /// میان‌بر ثانویه (قابل ذخیره)؛ حتی داخل فیلدهای متنی هم کار می‌کند.
+  bool _trySecondaryAddRowShortcut(KeyDownEvent down, HardwareKeyboard hw) {
+    if (_secondaryAddRowShortcut == 'none') {
+      return false;
+    }
+    if (_secondaryAddRowShortcut == 'f2') {
+      if (down.logicalKey == LogicalKeyboardKey.f2 &&
+          !hw.isControlPressed &&
+          !hw.isMetaPressed &&
+          !hw.isAltPressed &&
+          !hw.isShiftPressed) {
+        unawaited(_addRows(1));
+        return true;
+      }
+      return false;
+    }
+    if (_secondaryAddRowShortcut == 'ctrl_shift_n') {
+      if (hw.isControlPressed &&
+          hw.isShiftPressed &&
+          !hw.isMetaPressed &&
+          !hw.isAltPressed &&
+          down.logicalKey.keyId == LogicalKeyboardKey.keyN.keyId) {
+        unawaited(_addRows(1));
+        return true;
+      }
+      return false;
+    }
+    return false;
+  }
+
+  Future<void> _loadSecondaryAddRowShortcut() async {
+    final v = await InvoiceLinePreferences.getSecondaryAddRowShortcut();
+    if (mounted) {
+      setState(() => _secondaryAddRowShortcut = v);
+    }
+  }
   
   /// دریافت ارتفاع فیلد بر اساس اندازه صفحه
   double _getFieldHeight(BuildContext context) {
@@ -186,6 +230,31 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         'tax': FocusNode(),
       };
     }
+    _bindTaxFieldKeyHandler(lineKey);
+  }
+
+  KeyEventResult _onTaxFieldKeyEvent(String lineKey, KeyEvent event) {
+    if (event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (event.logicalKey != LogicalKeyboardKey.tab) {
+      return KeyEventResult.ignored;
+    }
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      return KeyEventResult.ignored;
+    }
+    final index = _rows.indexWhere((r) => r.lineKey == lineKey);
+    if (index < 0 || index != _rows.length - 1) {
+      return KeyEventResult.ignored;
+    }
+    unawaited(_addRows(1));
+    return KeyEventResult.handled;
+  }
+
+  void _bindTaxFieldKeyHandler(String lineKey) {
+    final tax = _focusNodesByLineKey[lineKey]?['tax'];
+    if (tax == null) return;
+    tax.onKeyEvent = (node, event) => _onTaxFieldKeyEvent(lineKey, event);
   }
 
   Map<String, FocusNode>? _focusNodesForLine(String lineKey) {
@@ -198,6 +267,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     final nodes = _focusNodesByLineKey.remove(lineKey);
     if (nodes != null) {
       for (final node in nodes.values) {
+        node.onKeyEvent = null;
         node.dispose();
       }
     }
@@ -207,6 +277,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   void _disposeAllFocusNodes() {
     for (final nodes in _focusNodesByLineKey.values) {
       for (final node in nodes.values) {
+        node.onKeyEvent = null;
         node.dispose();
       }
     }
@@ -234,6 +305,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       if (nextRowNodes != null) {
         nextRowNodes['product']?.requestFocus();
       }
+    } else if (currentIndex == fieldOrder.length - 1 && index == _rows.length - 1) {
+      unawaited(_addRows(1));
     }
   }
   
@@ -596,6 +669,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onLineAddQiHardwareKey);
+    unawaited(_loadSecondaryAddRowShortcut());
     if ((widget.initialRows ?? const <InvoiceLineItem>[]).isNotEmpty) {
       _invoiceLineAttrsLog('initState: initialRows count=${widget.initialRows!.length}');
       _rows.clear();
@@ -933,12 +1007,52 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 alignment: AlignmentDirectional.centerEnd,
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    t.invoiceLineItemsAddRowKeyboardHint,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.end,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          t.invoiceLineItemsAddRowKeyboardHint,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.end,
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: t.invoiceLineItemsQuickShortcutMenuTooltip,
+                        icon: Icon(
+                          Icons.keyboard_outlined,
+                          size: 20,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        onSelected: (v) async {
+                          await InvoiceLinePreferences.setSecondaryAddRowShortcut(v);
+                          if (mounted) {
+                            setState(() => _secondaryAddRowShortcut = v);
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          CheckedPopupMenuItem<String>(
+                            value: 'f2',
+                            checked: _secondaryAddRowShortcut == 'f2',
+                            child: Text(t.invoiceLineItemsShortcutOptionF2),
+                          ),
+                          CheckedPopupMenuItem<String>(
+                            value: 'ctrl_shift_n',
+                            checked: _secondaryAddRowShortcut == 'ctrl_shift_n',
+                            child: Text(t.invoiceLineItemsShortcutOptionCtrlShiftN),
+                          ),
+                          CheckedPopupMenuItem<String>(
+                            value: 'none',
+                            checked: _secondaryAddRowShortcut == 'none',
+                            child: Text(t.invoiceLineItemsShortcutOptionNone),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),

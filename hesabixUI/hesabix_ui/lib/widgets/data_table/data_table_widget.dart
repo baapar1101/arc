@@ -69,6 +69,15 @@ class DataTableWidget<T> extends StatefulWidget {
   // Useful for screens that already have data in memory but want to reuse the unified table UI.
   final List<Map<String, dynamic>>? localRawItems;
   final Map<String, dynamic>? localSummary;
+  /// وقتی [localRawItems] فقط **صفحهٔ جاری** از API است؛ جمع کل ردیف‌ها برای فوتر و صفحه‌بندی.
+  final int? localTotalCount;
+  /// شمارهٔ صفحهٔ جاری (۱-based) از والد؛ با تغییر، جدول همگام می‌شود.
+  final int? localCurrentPage;
+  /// اندازهٔ صفحه از والد (مثلاً `per_page`). اگر null باشد از [DataTableConfig.defaultPageSize] استفاده می‌شود.
+  final int? localPageSize;
+  final ValueChanged<int>? onLocalPageChange;
+  /// تغییر اندازهٔ صفحه از فوتر (حالت دادهٔ محلی + سرور).
+  final ValueChanged<int>? onLocalPageSizeChange;
 
   const DataTableWidget({
     super.key,
@@ -78,6 +87,11 @@ class DataTableWidget<T> extends StatefulWidget {
     this.onRefresh,
     this.localRawItems,
     this.localSummary,
+    this.localTotalCount,
+    this.localCurrentPage,
+    this.localPageSize,
+    this.onLocalPageChange,
+    this.onLocalPageSizeChange,
   });
 
   @override
@@ -407,6 +421,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     return visibleColumns;
   }
 
+  bool get _serverBackedLocalPaging =>
+      widget.localRawItems != null &&
+      widget.localTotalCount != null &&
+      widget.onLocalPageChange != null;
+
+  void _goToLocalServerPage(int targetPage) {
+    final maxP = _totalPages > 0 ? _totalPages : 1;
+    final p = targetPage.clamp(1, maxP);
+    widget.onLocalPageChange!(p);
+  }
+
   /// Apply pagination to local items
   void _applyLocalPagination() {
     if (widget.localRawItems == null) return;
@@ -416,7 +441,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     List<Map<String, dynamic>> filteredRawItems = _allRawItems;
     
     final searchQuery = _searchCtrl.text.trim();
-    if (searchQuery.isNotEmpty && widget.config.searchFields.isNotEmpty) {
+    if (searchQuery.isNotEmpty &&
+        widget.config.searchFields.isNotEmpty &&
+        widget.localTotalCount == null) {
       final lowerQuery = searchQuery.toLowerCase();
       final filtered = <T>[];
       final filteredRaw = <Map<String, dynamic>>[];
@@ -479,6 +506,25 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       filteredItems = order.map((i) => filteredItems[i]).toList();
       filteredRawItems = order.map((i) => filteredRawItems[i]).toList();
     }
+
+    if (widget.localTotalCount != null) {
+      if (widget.localPageSize != null && widget.localPageSize! > 0) {
+        _limit = widget.localPageSize!;
+      } else {
+        _limit = widget.config.defaultPageSize;
+      }
+      _total = widget.localTotalCount!;
+      _totalPages = _total > 0 ? ((_total - 1) ~/ _limit) + 1 : 0;
+      if (widget.localCurrentPage != null) {
+        _page = widget.localCurrentPage!.clamp(1, _totalPages > 0 ? _totalPages : 1);
+      } else {
+        if (_page < 1) _page = 1;
+        if (_totalPages > 0 && _page > _totalPages) _page = _totalPages;
+      }
+      _items = filteredItems;
+      _rawItems = filteredRawItems;
+      return;
+    }
     
     // Calculate total pages based on filtered items
     _total = filteredItems.length;
@@ -531,9 +577,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         _allItems = parsed;
         _allRawItems = raw;
         
-        // Reset page to 1 only if data changed
-        if (dataChanged) {
-          _page = 1;
+        if (widget.localTotalCount == null) {
+          if (dataChanged) {
+            _page = 1;
+          }
+        } else {
+          if (widget.localPageSize != null && widget.localPageSize! > 0) {
+            _limit = widget.localPageSize!;
+          }
+          if (widget.localCurrentPage != null) {
+            _page = widget.localCurrentPage!;
+          }
         }
         
         // Apply pagination to items
@@ -740,9 +794,16 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       _fetchData();
       return;
     }
-    // If local data changes, refresh immediately.
-    if (widget.localRawItems != null && !identical(oldWidget.localRawItems, widget.localRawItems)) {
-      _fetchData();
+    // If local data or server-side paging meta changes, refresh immediately.
+    if (widget.localRawItems != null) {
+      final listChanged = !identical(oldWidget.localRawItems, widget.localRawItems);
+      final serverMetaChanged = widget.localTotalCount != null &&
+          (oldWidget.localCurrentPage != widget.localCurrentPage ||
+              oldWidget.localTotalCount != widget.localTotalCount ||
+              oldWidget.localPageSize != widget.localPageSize);
+      if (listChanged || serverMetaChanged) {
+        _fetchData();
+      }
     }
   }
   
@@ -2555,7 +2616,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               final isWide = constraints.maxWidth >= 900;
 
               final resultsInfo = Text(
-                '${t.showing} ${((_page - 1) * _limit) + 1} ${t.to} ${(_page * _limit).clamp(0, _total)} ${t.ofText} $_total ${t.results}',
+                _total <= 0
+                    ? '${t.showing} 0 ${t.ofText} 0 ${t.results}'
+                    : '${t.showing} ${((_page - 1) * _limit) + 1} ${t.to} ${(_page * _limit).clamp(0, _total)} ${t.ofText} $_total ${t.results}',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -2581,6 +2644,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     }).toList(),
                     onChanged: (value) {
                       if (value != null) {
+                        if (widget.localTotalCount != null && widget.onLocalPageSizeChange != null) {
+                          widget.onLocalPageSizeChange!(value);
+                          return;
+                        }
                         setState(() {
                           _limit = value;
                           _page = 1;
@@ -2603,8 +2670,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         IconButton(
                           onPressed: _page > 1
                               ? () {
-                                  setState(() => _page = 1);
-                                  _fetchData();
+                                  if (_serverBackedLocalPaging) {
+                                    _goToLocalServerPage(1);
+                                  } else {
+                                    setState(() => _page = 1);
+                                    _fetchData();
+                                  }
                                 }
                               : null,
                           icon: const Icon(Icons.first_page),
@@ -2614,8 +2685,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         IconButton(
                           onPressed: _page > 1
                               ? () {
-                                  setState(() => _page--);
-                                  _fetchData();
+                                  if (_serverBackedLocalPaging) {
+                                    _goToLocalServerPage(_page - 1);
+                                  } else {
+                                    setState(() => _page--);
+                                    _fetchData();
+                                  }
                                 }
                               : null,
                           icon: const Icon(Icons.chevron_left),
@@ -2639,8 +2714,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         IconButton(
                           onPressed: _page < _totalPages
                               ? () {
-                                  setState(() => _page++);
-                                  _fetchData();
+                                  if (_serverBackedLocalPaging) {
+                                    _goToLocalServerPage(_page + 1);
+                                  } else {
+                                    setState(() => _page++);
+                                    _fetchData();
+                                  }
                                 }
                               : null,
                           icon: const Icon(Icons.chevron_right),
@@ -2650,8 +2729,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                         IconButton(
                           onPressed: _page < _totalPages
                               ? () {
-                                  setState(() => _page = _totalPages);
-                                  _fetchData();
+                                  if (_serverBackedLocalPaging) {
+                                    _goToLocalServerPage(_totalPages);
+                                  } else {
+                                    setState(() => _page = _totalPages);
+                                    _fetchData();
+                                  }
                                 }
                               : null,
                           icon: const Icon(Icons.last_page),

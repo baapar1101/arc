@@ -177,3 +177,222 @@ def get_woocommerce_bridge_customers(
 	_ensure_plugin(db, business_id)
 	data = wc_svc.list_customers(db, business_id, page=page, per_page=per_page, search=search)
 	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/bridge/control/sync-stats")
+def get_woocommerce_bridge_control_sync_stats(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.control_sync_stats(db, business_id)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/bridge/control/settings-summary")
+def get_woocommerce_bridge_control_settings_summary(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.control_settings_summary(db, business_id)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/bridge/control/logs")
+def get_woocommerce_bridge_control_logs(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	page: int = Query(1, ge=1),
+	per_page: int = Query(20, ge=1, le=100),
+	action: Optional[str] = Query(None),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.control_logs(db, business_id, page=page, per_page=per_page, action=action)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/bridge/control/connection")
+def get_woocommerce_bridge_control_connection(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.control_connection(db, business_id)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/bridge/control/plugin")
+def get_woocommerce_bridge_control_plugin(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.control_plugin(db, business_id)
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/sync/product")
+def post_woocommerce_bridge_control_sync_product(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(...),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	pid = int(payload.get("product_id") or 0)
+	vid = payload.get("variation_id")
+	vid_i = int(vid) if vid is not None and str(vid).strip() != "" else None
+	if vid_i is not None and vid_i < 1:
+		vid_i = None
+	if pid < 1:
+		raise ApiError("INVALID_PRODUCT_ID", "شناسهٔ محصول نامعتبر است.", http_status=400)
+	data = wc_svc.post_control_sync_product(db, business_id, product_id=pid, variation_id=vid_i)
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/sync/orders")
+def post_woocommerce_bridge_control_sync_orders(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(...),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	raw = payload.get("order_ids")
+	ids = [int(x) for x in raw] if isinstance(raw, list) else []
+	data = wc_svc.post_control_sync_orders(db, business_id, ids)
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/sync/products")
+def post_woocommerce_bridge_control_sync_products(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(...),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	raw = payload.get("product_ids")
+	ids = [int(x) for x in raw] if isinstance(raw, list) else []
+	data = wc_svc.post_control_sync_products(db, business_id, ids)
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/sync/customers")
+def post_woocommerce_bridge_control_sync_customers(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(...),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	raw = payload.get("customer_ids")
+	ids = [int(x) for x in raw] if isinstance(raw, list) else []
+	data = wc_svc.post_control_sync_customers(db, business_id, ids)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/bridge/control/queue/snapshot")
+def get_woocommerce_bridge_control_queue_snapshot(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.control_queue_snapshot(db, business_id)
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/queue/process-once")
+def post_woocommerce_bridge_control_queue_process_once(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.post_control_queue_process_once(db, business_id)
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/plugin/update-check")
+def post_woocommerce_bridge_control_plugin_update_check(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Optional[Dict[str, Any]] = Body(None),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	body = payload if isinstance(payload, dict) else {}
+	force = bool(body.get("force"))
+	data = wc_svc.post_control_plugin_update_check(db, business_id, force=force)
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/settings/patch")
+def post_woocommerce_bridge_control_settings_patch(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(...),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.post_control_settings_patch(db, business_id, payload or {})
+	return success_response(data, request)

@@ -2445,20 +2445,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
 
     String fmtDue(dynamic v) {
-      if (v == null) return '-';
-      if (v is Map<String, dynamic>) {
-        final dateOnly = v['date_only'] ?? v['formatted'] ?? v['date_time'];
-        if (dateOnly != null) return dateOnly.toString();
-        return '-';
-      }
-      final s = v.toString();
-      if (s.isEmpty) return '-';
-      try {
-        final d = DateTime.parse(s.split('T').first);
-        return HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali == true);
-      } catch (_) {
-        return s;
-      }
+      return HesabixDateUtils.formatApiDateForDisplay(
+        v,
+        widget.calendarController.isJalali == true,
+        rawValue: v is Map ? (v['raw'] ?? v['gregorian'] ?? v['iso']) : null,
+      );
     }
 
     Color statusColor(String? status) {

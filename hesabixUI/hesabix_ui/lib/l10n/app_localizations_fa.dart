@@ -723,7 +723,21 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get invoiceLineItemsAddRowKeyboardHint =>
-      'راهنما: پشت‌سرهم و خارج از فیلدهای متنی، کلیدهای Q سپس I را بزنید تا ردیف اضافه شود.';
+      'Tab یا Enter روی نرخ مالیات آخرین ردیف، ردیف جدید می‌سازد. میان‌بر سریع را از آیکون صفحه‌کلید کنار این متن انتخاب کنید. خارج از فیلد متنی: Q سپس I.';
+
+  @override
+  String get invoiceLineItemsQuickShortcutMenuTooltip =>
+      'انتخاب میان‌بر افزودن یک ردیف';
+
+  @override
+  String get invoiceLineItemsShortcutOptionF2 => 'F2 (پیش‌فرض؛ مناسب وب)';
+
+  @override
+  String get invoiceLineItemsShortcutOptionCtrlShiftN =>
+      'Ctrl+Shift+N (دسکتاپ)';
+
+  @override
+  String get invoiceLineItemsShortcutOptionNone => 'غیرفعال';
 
   @override
   String get support => 'پشتیبانی';
@@ -12376,6 +12390,155 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceHubCustomersTab => 'مشتریان';
+
+  @override
+  String get woocommerceHubControlTab => 'کنترل ArcWOC';
+
+  @override
+  String get woocommerceControlIntroTitle => 'داشبورد عملیات افزونه';
+
+  @override
+  String get woocommerceControlIntroSubtitle =>
+      'آمار نگاشت، اتصال به حسابیکس، نسخهٔ افزونه، لاگ اخیر و همگام‌سازی دسته‌ای از طریق پل امن (همان توکن مرکز عملیات).';
+
+  @override
+  String get woocommerceControlRefreshTooltip => 'به‌روزرسانی همهٔ بخش‌ها';
+
+  @override
+  String get woocommerceControlStatsTitle => 'آمار نگاشت (جدول hesabix_v2)';
+
+  @override
+  String get woocommerceControlPluginTitle => 'نسخهٔ افزونه و به‌روزرسانی';
+
+  @override
+  String get woocommerceControlConnectionTitle =>
+      'اتصال API حسابیکس از دید فروشگاه';
+
+  @override
+  String get woocommerceControlSettingsTitle =>
+      'خلاصهٔ تنظیمات افزونه (بدون کلید کامل)';
+
+  @override
+  String get woocommerceControlLogsTitle => 'لاگ اخیر افزونه';
+
+  @override
+  String get woocommerceControlBulkTitle => 'همگام‌سازی دسته‌ای';
+
+  @override
+  String get woocommerceControlBulkIdsHint =>
+      'شناسه‌های ووکامرس را با کاما جدا کنید (مثلاً ۱۰۱،۱۰۲،۱۰۳)';
+
+  @override
+  String get woocommerceControlSyncOrdersButton => 'همگام سفارش‌ها';
+
+  @override
+  String get woocommerceControlSyncProductsButton => 'همگام محصولات (والد)';
+
+  @override
+  String get woocommerceControlSyncCustomersButton => 'همگام مشتریان';
+
+  @override
+  String get woocommerceControlManageRequiredHint =>
+      'برای همگام‌سازی از راه دور به دسترسی «ووکامرس — مدیریت» نیاز دارید.';
+
+  @override
+  String get woocommerceControlConnectionOk => 'برقرار';
+
+  @override
+  String get woocommerceControlConnectionFail => 'ناموفق';
+
+  @override
+  String get woocommerceControlCurrentVersion => 'نسخهٔ نصب‌شده';
+
+  @override
+  String get woocommerceControlRemoteVersion => 'نسخهٔ مخزن';
+
+  @override
+  String get woocommerceControlUpdateAvailable => 'به‌روزرسانی در دسترس';
+
+  @override
+  String get woocommerceControlColumnLogId => 'شناسه';
+
+  @override
+  String get woocommerceControlColumnEntityType => 'نوع موجودیت';
+
+  @override
+  String get woocommerceControlColumnEntityId => 'شناسهٔ WC';
+
+  @override
+  String get woocommerceControlColumnAction => 'عمل';
+
+  @override
+  String get woocommerceControlColumnStatus => 'وضعیت';
+
+  @override
+  String get woocommerceControlColumnCreatedAt => 'زمان';
+
+  @override
+  String get woocommerceControlColumnError => 'خطا';
+
+  @override
+  String get woocommerceHubSyncRowTooltip => 'همگام‌سازی با حسابیکس';
+
+  @override
+  String get woocommerceHubSyncColumnLabel => 'همگام';
+
+  @override
+  String get woocommerceHubSyncOrderConfirmTitle => 'همگام این سفارش؟';
+
+  @override
+  String get woocommerceHubSyncOrderConfirmBody =>
+      'سفارش انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.';
+
+  @override
+  String get woocommerceHubSyncProductConfirmTitle => 'همگام این محصول؟';
+
+  @override
+  String get woocommerceHubSyncProductConfirmBody =>
+      'محصول انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.';
+
+  @override
+  String get woocommerceHubSyncCustomerConfirmTitle => 'همگام این مشتری؟';
+
+  @override
+  String get woocommerceHubSyncCustomerConfirmBody =>
+      'مشتری انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.';
+
+  @override
+  String get woocommerceSyncDone => 'همگام‌سازی انجام شد';
+
+  @override
+  String get woocommerceControlQueueTitle => 'صف همگام‌سازی پس‌زمینه';
+
+  @override
+  String woocommerceControlQueueBatchHint(String n) {
+    return 'حداکثر ردیف در هر اجرا (از تنظیمات افزونه): $n';
+  }
+
+  @override
+  String get woocommerceControlQueueProcessOnceButton => 'پردازش یک دسته از صف';
+
+  @override
+  String get woocommerceControlPluginForceCheckButton =>
+      'بررسی مجدد نسخه از مخزن';
+
+  @override
+  String get woocommerceControlDebugModeTitle => 'حالت دیباگ افزونه';
+
+  @override
+  String get woocommerceControlDebugModeSubtitle =>
+      'لاگ تفصیلی در افزونه؛ فقط با دسترسی مدیریت قابل تغییر است.';
+
+  @override
+  String get woocommerceControlSettingsApplied => 'تنظیمات افزونه به‌روز شد';
+
+  @override
+  String woocommerceControlQueueProcessDone(String delta) {
+    return 'یک مرحله از صف اجرا شد؛ حدود $delta ردیف کمتر در وضعیت «در انتظار».';
+  }
+
+  @override
+  String get woocommerceControlPluginCheckDone => 'بررسی نسخهٔ مخزن به‌روز شد';
 
   @override
   String get woocommerceOrdersFiltersTitle => 'فیلتر سفارشات';

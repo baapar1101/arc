@@ -10,7 +10,7 @@ class CurrencyPickerWidget extends StatefulWidget {
   final String? label;
   final String? hintText;
   final bool enabled;
-  /// هم‌ارتفاع‌تر با [TextField] فشرده و [DateInputField] با `isDense`.
+  /// با `isDense` پدینگ فیلد را با [DateInputField] در حالت فشرده هماهنگ می‌کند.
   final bool isDense;
 
   const CurrencyPickerWidget({
@@ -104,118 +104,105 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
     return base;
   }
 
-  Widget _maybeFixedHeight({required Widget child}) {
-    if (widget.isDense) return child;
-    return SizedBox(height: 56, child: child);
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return _maybeFixedHeight(
-        child: InputDecorator(
-          decoration: _decoration(enabled: false),
-          child: const Center(
-            child: SizedBox(
-              height: 20,
-              width: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+      return InputDecorator(
+        decoration: _decoration(enabled: false),
+        child: const Center(
+          child: SizedBox(
+            height: 20,
+            width: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
           ),
         ),
       );
     }
 
     if (_error != null) {
-      return _maybeFixedHeight(
-        child: InputDecorator(
-          decoration: _decoration(
-            border: OutlineInputBorder(
-              borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
+      return InputDecorator(
+        decoration: _decoration(
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: Theme.of(context).colorScheme.error),
+          ),
+          enabled: false,
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'خطا در بارگذاری ارزها',
+                style: const TextStyle(color: Colors.red),
+              ),
             ),
-            enabled: false,
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.error_outline, color: Colors.red),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'خطا در بارگذاری ارزها',
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-              TextButton(
-                onPressed: _loadCurrencies,
-                child: const Text('تلاش مجدد'),
-              ),
-            ],
-          ),
+            TextButton(
+              onPressed: _loadCurrencies,
+              child: const Text('تلاش مجدد'),
+            ),
+          ],
         ),
       );
     }
 
     if (_currencies.isEmpty) {
-      return _maybeFixedHeight(
-        child: InputDecorator(
-          decoration: _decoration(enabled: false),
-          child: const Center(
-            child: Text('هیچ ارزی یافت نشد'),
-          ),
+      return InputDecorator(
+        decoration: _decoration(enabled: false),
+        child: const Center(
+          child: Text('هیچ ارزی یافت نشد'),
         ),
       );
     }
 
-    return _maybeFixedHeight(
-      child: InputDecorator(
-        decoration: _decoration(enabled: widget.enabled),
-        child: DropdownButtonHideUnderline(
-          child: DropdownButton<int>(
-            value: _selectedValue,
-            isExpanded: true,
-            iconSize: widget.isDense ? 20 : 24,
-            isDense: widget.isDense,
-            onChanged: widget.enabled ? (value) {
-              setState(() {
-                _selectedValue = value;
-              });
-              widget.onChanged(value);
-            } : null,
-            items: _currencies.map((currency) {
-              final isDefault = currency['is_default'] == true;
-              return DropdownMenuItem<int>(
-                value: currency['id'] as int,
-                child: Row(
-                  children: [
-                    Expanded(
+    return InputDecorator(
+      decoration: _decoration(enabled: widget.enabled),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<int>(
+          value: _selectedValue,
+          isExpanded: true,
+          iconSize: widget.isDense ? 20 : 24,
+          isDense: widget.isDense,
+          onChanged: widget.enabled ? (value) {
+            setState(() {
+              _selectedValue = value;
+            });
+            widget.onChanged(value);
+          } : null,
+          items: _currencies.map((currency) {
+            final isDefault = currency['is_default'] == true;
+            return DropdownMenuItem<int>(
+              value: currency['id'] as int,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '${currency['title']} (${currency['code']})',
+                      style: TextStyle(
+                        fontWeight: isDefault ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  if (isDefault)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                       child: Text(
-                        '${currency['title']} (${currency['code']})',
+                        'پیش‌فرض',
                         style: TextStyle(
-                          fontWeight: isDefault ? FontWeight.bold : FontWeight.normal,
+                          fontSize: 10,
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                    if (isDefault)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          'پیش‌فرض',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Theme.of(context).primaryColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ),
+                ],
+              ),
+            );
+          }).toList(),
         ),
       ),
     );
