@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -10,6 +12,7 @@ import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/product_list_category_filter_bar.dart';
 import '../../widgets/product/category_tree_widget.dart';
 import '../../services/category_service.dart';
+import '../../services/list_filter_preferences_service.dart';
 import '../../services/report_template_service.dart';
 import '../../widgets/product/bulk_price_update_dialog.dart';
 import '../../widgets/product/bulk_default_warehouse_dialog.dart';
@@ -119,19 +122,75 @@ class _ProductsPageState extends State<ProductsPage> {
 
   Future<void> _loadCategoryTreeForFilter() async {
     setState(() => _categoriesLoading = true);
+    Map<String, dynamic>? saved;
+    try {
+      saved = await ListFilterPreferencesService.load(ListFilterPageIds.products, widget.businessId);
+    } catch (_) {}
+    int? savedCategoryId;
+    if (saved != null) {
+      final raw = saved['category_id'];
+      if (raw is int) {
+        savedCategoryId = raw;
+      } else if (raw != null) {
+        savedCategoryId = int.tryParse('$raw');
+      }
+    }
     try {
       final svc = CategoryService(ApiClient());
       final raw = await svc.getCategoriesTree(businessId: widget.businessId);
       if (!mounted) return;
+      final tree = raw.map((e) => CategoryNode.fromMap(e)).toList();
+      final validSaved =
+          savedCategoryId != null && findCategoryNode(tree, savedCategoryId) != null;
       setState(() {
-        _categoryTree = raw.map((e) => CategoryNode.fromMap(e)).toList();
+        _categoryTree = tree;
         _categoriesLoading = false;
+        if (validSaved) {
+          _quickCategoryFilterId = savedCategoryId;
+        }
       });
+      if (validSaved) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _applyProductCategoryFilter(savedCategoryId, persist: false);
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _categoriesLoading = false);
       }
     }
+  }
+
+  void _applyProductCategoryFilter(int? categoryId, {required bool persist}) {
+    setState(() => _quickCategoryFilterId = categoryId);
+    final ids = <int>[];
+    if (categoryId != null) {
+      final node = findCategoryNode(_categoryTree, categoryId);
+      if (node != null) {
+        ids.addAll(getAllCategoryIds(node));
+      } else {
+        ids.add(categoryId);
+      }
+    }
+    try {
+      (_tableKey.currentState as dynamic)?.applyCategoryIdFilter(ids);
+    } catch (_) {}
+    if (persist) {
+      if (categoryId == null) {
+        unawaited(ListFilterPreferencesService.clear(ListFilterPageIds.products, widget.businessId));
+      } else {
+        unawaited(ListFilterPreferencesService.save(
+          ListFilterPageIds.products,
+          widget.businessId,
+          <String, dynamic>{'category_id': categoryId},
+        ));
+      }
+    }
+  }
+
+  void _onQuickCategoryFilterChanged(int? categoryId) {
+    _applyProductCategoryFilter(categoryId, persist: true);
   }
 
   Future<void> _showProductPriceReportExportDialog() async {
@@ -158,22 +217,6 @@ class _ProductsPageState extends State<ProductsPage> {
         },
       ),
     );
-  }
-
-  void _onQuickCategoryFilterChanged(int? categoryId) {
-    setState(() => _quickCategoryFilterId = categoryId);
-    final ids = <int>[];
-    if (categoryId != null) {
-      final node = findCategoryNode(_categoryTree, categoryId);
-      if (node != null) {
-        ids.addAll(getAllCategoryIds(node));
-      } else {
-        ids.add(categoryId);
-      }
-    }
-    try {
-      (_tableKey.currentState as dynamic)?.applyCategoryIdFilter(ids);
-    } catch (_) {}
   }
 
   String? _buildFullImageUrl(String? imageUrl) {
@@ -2035,7 +2078,11 @@ class _ProductsPageState extends State<ProductsPage> {
                 expandBodyHeightToFitRows: true,
                 onAllFiltersCleared: () {
                   if (!mounted) return;
+                  unawaited(ListFilterPreferencesService.clear(ListFilterPageIds.products, widget.businessId));
                   setState(() => _quickCategoryFilterId = null);
+                  try {
+                    (_tableKey.currentState as dynamic)?.applyCategoryIdFilter(<int>[]);
+                  } catch (_) {}
                 },
               ),
               fromJson: (json) => json,

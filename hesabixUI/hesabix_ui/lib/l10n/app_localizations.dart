@@ -23051,13 +23051,13 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceSettingsPageTitle.
   ///
   /// In en, this message translates to:
-  /// **'WooCommerce bridge settings'**
+  /// **'WooCommerce & ArcWOC settings'**
   String get woocommerceSettingsPageTitle;
 
   /// No description provided for @woocommerceSettingsPageSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Store URL and bridge token used by the Hesabix ↔ WooCommerce connector.'**
+  /// **'Bridge, store health, queue and ArcWOC plugin options.'**
   String get woocommerceSettingsPageSubtitle;
 
   /// No description provided for @woocommerceOpenIntegrationHub.
@@ -23081,7 +23081,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSettingsPromoSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Manage store URL, bridge token and connection test in business settings.'**
+  /// **'ArcWOC plugin options, queue, logs and bulk actions are under WooCommerce settings.'**
   String get woocommerceHubSettingsPromoSubtitle;
 
   /// No description provided for @woocommerceSettingsSavedSnackbar.
@@ -23185,6 +23185,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'ArcWOC control'**
   String get woocommerceHubControlTab;
+
+  /// No description provided for @woocommerceHubArcwocSettingsBannerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'ArcWOC plugin settings'**
+  String get woocommerceHubArcwocSettingsBannerTitle;
+
+  /// No description provided for @woocommerceHubArcwocSettingsBannerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue, logs, debug mode and bulk sync now live on the WooCommerce settings page.'**
+  String get woocommerceHubArcwocSettingsBannerSubtitle;
+
+  /// No description provided for @woocommerceHubOpenWooSettingsButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get woocommerceHubOpenWooSettingsButton;
 
   /// No description provided for @woocommerceControlIntroTitle.
   ///
@@ -23540,6 +23558,114 @@ abstract class AppLocalizations {
   /// **'Apply filters'**
   String get woocommerceApplyFiltersButton;
 
+  /// No description provided for @woocommerceClearOrderFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear filters'**
+  String get woocommerceClearOrderFilters;
+
+  /// No description provided for @woocommerceOrderStatusQuickTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Order status (WooCommerce)'**
+  String get woocommerceOrderStatusQuickTitle;
+
+  /// No description provided for @woocommerceOrderDatePickFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From date'**
+  String get woocommerceOrderDatePickFrom;
+
+  /// No description provided for @woocommerceOrderDatePickTo.
+  ///
+  /// In en, this message translates to:
+  /// **'To date'**
+  String get woocommerceOrderDatePickTo;
+
+  /// No description provided for @woocommerceOrderDateClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear date range'**
+  String get woocommerceOrderDateClear;
+
+  /// No description provided for @woocommerceOrdersFilterExpandTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filters & sorting'**
+  String get woocommerceOrdersFilterExpandTitle;
+
+  /// No description provided for @woocommerceSettingsArcwocPluginTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'ArcWOC plugin (general)'**
+  String get woocommerceSettingsArcwocPluginTitle;
+
+  /// No description provided for @woocommerceSettingsArcwocPluginIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Mapping stats, Hesabix API status from the store, background queue, plugin version, settings summary, debug, bulk sync and logs.'**
+  String get woocommerceSettingsArcwocPluginIntro;
+
+  /// No description provided for @woocommerceBridgeTokenStored.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge token saved'**
+  String get woocommerceBridgeTokenStored;
+
+  /// No description provided for @woocommerceBridgeTokenMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'No bridge token saved'**
+  String get woocommerceBridgeTokenMissing;
+
+  /// No description provided for @woocommerceShowTokenTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Reveal token temporarily'**
+  String get woocommerceShowTokenTooltip;
+
+  /// No description provided for @woocommerceHideTokenTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide token'**
+  String get woocommerceHideTokenTooltip;
+
+  /// No description provided for @woocommerceConnectionTestDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test details'**
+  String get woocommerceConnectionTestDetailsTitle;
+
+  /// No description provided for @woocommerceConnectionHealthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest store health payload'**
+  String get woocommerceConnectionHealthTitle;
+
+  /// No description provided for @woocommerceShowRawSettingsJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Show raw settings JSON'**
+  String get woocommerceShowRawSettingsJson;
+
+  /// No description provided for @woocommerceHideRawSettingsJson.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide raw JSON'**
+  String get woocommerceHideRawSettingsJson;
+
+  /// No description provided for @woocommerceStatsTotalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get woocommerceStatsTotalLabel;
+
+  /// No description provided for @woocommerceControlBulkConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Run remote sync for {count} ID(s)?'**
+  String woocommerceControlBulkConfirmBody(String count);
+
   /// No description provided for @woocommerceSearchProductsLabel.
   ///
   /// In en, this message translates to:
@@ -23687,7 +23813,7 @@ abstract class AppLocalizations {
   /// No description provided for @settingsWooCommerceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Store URL, bridge token and connection test'**
+  /// **'Bridge, health, ArcWOC, queue & logs'**
   String get settingsWooCommerceSubtitle;
 
   /// No description provided for @invoiceGlobalDiscountSection.
@@ -25231,6 +25357,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quick sales'**
   String get mobileLauncherQuickSalesTile;
+
+  /// No description provided for @dataTableHelpMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Help'**
+  String get dataTableHelpMenu;
+
+  /// No description provided for @dataTableHelpDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to use this table'**
+  String get dataTableHelpDialogTitle;
+
+  /// No description provided for @dataTableHelpIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'These tips help you search, filter, sort, export, and move around large lists comfortably.'**
+  String get dataTableHelpIntro;
+
+  /// No description provided for @dataTableHelpSectionSearchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search and filters'**
+  String get dataTableHelpSectionSearchTitle;
+
+  /// No description provided for @dataTableHelpSectionSearchBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• When a search box appears above the table, type to filter. The list refreshes shortly after you pause typing.\n• For a specific column, open the ⋮ menu on that column header and choose Search, set the condition, then Apply.\n• Active filters appear as chips below the header. Remove one chip or use Clear filters when that button is shown.'**
+  String get dataTableHelpSectionSearchBody;
+
+  /// No description provided for @dataTableHelpSectionExportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export (Excel / PDF)'**
+  String get dataTableHelpSectionExportTitle;
+
+  /// No description provided for @dataTableHelpSectionExportBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• Open the ⋮ menu at the top right of the table.\n• Choose Excel or PDF for all rows, or for selected rows only when row checkboxes are enabled and you have selected rows.\n• The Export entry with extra text opens more options (templates, layout, etc.) when the business enables them.\n• A download icon in the header may offer the same export flow.'**
+  String get dataTableHelpSectionExportBody;
+
+  /// No description provided for @dataTableHelpSectionSortTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sorting and columns'**
+  String get dataTableHelpSectionSortTitle;
+
+  /// No description provided for @dataTableHelpSectionSortBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• Click a column title to sort by that column; click again to switch ascending / descending.\n• Hold Shift and click another column title to add or adjust a second-level sort.\n• When you hover a header, use its ⋮ menu for column search, pin to left or right, hide column, auto-fit width, or reset column layout (depending on what this table allows).\n• Column settings in the top ⋮ menu lets you show, hide, and reorder columns.'**
+  String get dataTableHelpSectionSortBody;
+
+  /// No description provided for @dataTableHelpSectionKeyboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyboard shortcuts'**
+  String get dataTableHelpSectionKeyboardTitle;
+
+  /// No description provided for @dataTableHelpSectionKeyboardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'First click on the table body (not inside the search field) so the table has focus.\n\n• J or Down arrow: move highlight to the next row.\n• K or Up arrow: move highlight to the previous row.\n• Enter: open the highlighted row when this page supports opening a row.\n• Space: toggle selection of the highlighted row when selection is enabled.\n• Escape: clear row selection.\n• Ctrl+A: select all rows on the current page when multi-select is enabled.'**
+  String get dataTableHelpSectionKeyboardBody;
+
+  /// No description provided for @dataTableHelpSectionScrollTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Wide tables and horizontal scroll'**
+  String get dataTableHelpSectionScrollTitle;
+
+  /// No description provided for @dataTableHelpSectionScrollBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• When there are many columns, a horizontal scrollbar appears under the table. Drag it to see hidden columns.\n• With a mouse wheel: move the pointer over the table and hold Shift while scrolling the wheel to scroll sideways (common on Windows and Linux browsers).\n• On a trackpad, use a horizontal two-finger swipe. On touch screens, drag the table sideways.'**
+  String get dataTableHelpSectionScrollBody;
+
+  /// No description provided for @dataTableHelpSectionSelectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Row selection and copying'**
+  String get dataTableHelpSectionSelectionTitle;
+
+  /// No description provided for @dataTableHelpSectionSelectionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• Use the checkboxes in the first column when selection is enabled.\n• With multi-select, hold Shift and click another row to select everything between the last selection and that row.\n• Long-press (or right-click where supported) on a cell value to copy it to the clipboard.'**
+  String get dataTableHelpSectionSelectionBody;
+
+  /// No description provided for @dataTableHelpSectionOtherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other controls'**
+  String get dataTableHelpSectionOtherTitle;
+
+  /// No description provided for @dataTableHelpSectionOtherBody.
+  ///
+  /// In en, this message translates to:
+  /// **'• Refresh in the ⋮ menu reloads data from the server.\n• Compact mode toggles denser row height; your choice may be remembered for this table.\n• Use pagination at the bottom to change page size and move between pages.'**
+  String get dataTableHelpSectionOtherBody;
 }
 
 class _AppLocalizationsDelegate

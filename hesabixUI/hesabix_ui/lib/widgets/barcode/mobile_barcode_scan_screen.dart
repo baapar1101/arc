@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-/// صفحهٔ تمام‌صفحه برای اسکن بارکد و QR با دوربین (اندروید، iOS، وب).
+/// صفحهٔ تمام‌صفحه برای اسکن بارکد و QR با دوربین (موبایل؛ پلاگین `mobile_scanner` وب را پشتیبانی نمی‌کند).
 /// در صورت موفقیت، مقدار خوانده‌شده را با [Navigator.pop] برمی‌گرداند.
 class MobileBarcodeScanScreen extends StatefulWidget {
   const MobileBarcodeScanScreen({super.key});

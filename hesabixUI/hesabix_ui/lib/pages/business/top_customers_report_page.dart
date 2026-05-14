@@ -6,6 +6,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
@@ -112,6 +113,7 @@ class _TopCustomersReportPageState extends State<TopCustomersReportPage> {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/businesses/${widget.businessId}/reports/top-customers',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.topCustomersReportTable,
       reportModuleKey: 'top_customers',
       reportSubtype: 'list',
       title: t.reportsTopCustomersTitle,

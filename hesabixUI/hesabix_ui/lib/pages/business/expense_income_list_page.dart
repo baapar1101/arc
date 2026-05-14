@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
@@ -7,6 +8,7 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/expense_income_document.dart';
 import 'package:hesabix_ui/services/expense_income_list_service.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
@@ -22,6 +24,7 @@ import '../../services/project_service.dart';
 import '../../widgets/invoice/account_tree_combobox_widget.dart';
 import '../../models/account_model.dart';
 import '../../services/business_dashboard_service.dart';
+import '../../services/account_service.dart';
 
 /// صفحه لیست اسناد هزینه و درآمد با ویجت جدول
 class ExpenseIncomeListPage extends StatefulWidget {
@@ -80,6 +83,106 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   int _selectedCount = 0; // تعداد سطرهای انتخاب‌شده
   bool _isInitialized = false;
 
+  Timer? _expenseIncomeFilterPrefsDebounce;
+
+  Map<String, dynamic> _serializeExpenseIncomeFilters() {
+    return <String, dynamic>{
+      if (_selectedDocumentType != null && _selectedDocumentType!.isNotEmpty)
+        'document_type': _selectedDocumentType,
+      if (_fromDate != null) 'from_date': _fromDate!.toIso8601String(),
+      if (_toDate != null) 'to_date': _toDate!.toIso8601String(),
+      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+      if (_filterAccount?.id != null) 'account_id': _filterAccount!.id,
+    };
+  }
+
+  void _schedulePersistExpenseIncomeFilters() {
+    _expenseIncomeFilterPrefsDebounce?.cancel();
+    _expenseIncomeFilterPrefsDebounce = Timer(const Duration(milliseconds: 400), () {
+      _expenseIncomeFilterPrefsDebounce = null;
+      if (!mounted) return;
+      ListFilterPreferencesService.save(
+        ListFilterPageIds.expenseIncome,
+        widget.businessId,
+        _serializeExpenseIncomeFilters(),
+      );
+    });
+  }
+
+  /// در صورت وجود [account_id] در ذخیره، شناسه را برمی‌گرداند تا بعد از [setState] هیدرات شود.
+  int? _applyExpenseIncomeSavedFiltersMap(Map<String, dynamic> s) {
+    final dt = s['document_type']?.toString();
+    if (dt == 'income' || dt == 'expense') {
+      _selectedDocumentType = dt;
+    }
+    final from = s['from_date']?.toString();
+    if (from != null && from.isNotEmpty) {
+      _fromDate = DateTime.tryParse(from);
+    }
+    final to = s['to_date']?.toString();
+    if (to != null && to.isNotEmpty) {
+      _toDate = DateTime.tryParse(to);
+    }
+    final pid = s['project_id'];
+    if (pid is int) {
+      _selectedProjectId = pid;
+    } else if (pid != null) {
+      _selectedProjectId = int.tryParse('$pid');
+    }
+    final fy = s['fiscal_year_id'];
+    int? fyId;
+    if (fy is int) {
+      fyId = fy;
+    } else if (fy != null) {
+      fyId = int.tryParse('$fy');
+    }
+    if (fyId != null && _fiscalYears.any((e) => e['id'] == fyId)) {
+      _selectedFiscalYearId = fyId;
+    }
+    final aid = s['account_id'];
+    int? accountId;
+    if (aid is int) {
+      accountId = aid;
+    } else if (aid != null) {
+      accountId = int.tryParse('$aid');
+    }
+    if (accountId != null) {
+      _filterAccount = null;
+    }
+    return accountId;
+  }
+
+  Future<void> _hydrateExpenseIncomeFilterAccount(int accountId) async {
+    try {
+      final svc = AccountService(client: widget.apiClient);
+      final raw = await svc.getAccount(businessId: widget.businessId, accountId: accountId);
+      if (!mounted) return;
+      setState(() => _filterAccount = Account.fromJson(Map<String, dynamic>.from(raw)));
+    } catch (_) {
+      if (mounted) setState(() => _filterAccount = null);
+    }
+  }
+
+  void _touchExpenseIncomeFilters(VoidCallback fn) {
+    setState(fn);
+    _schedulePersistExpenseIncomeFilters();
+  }
+
+  Future<void> _onProjectFilterChangedWithPersist(int? v) async {
+    setState(() {
+      _selectedProjectId = v;
+      _selectedProjectName = null;
+    });
+    await _hydrateSelectedProjectName();
+    _schedulePersistExpenseIncomeFilters();
+  }
+
+  void _onExpenseIncomeDataTableAllFiltersCleared() {
+    _expenseIncomeFilterPrefsDebounce?.cancel();
+    unawaited(_clearExternalFilters());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -94,9 +197,18 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   }
 
   Future<void> _loadFiscalYears() async {
+    Map<String, dynamic>? savedFilters;
+    try {
+      savedFilters = await ListFilterPreferencesService.load(
+        ListFilterPageIds.expenseIncome,
+        widget.businessId,
+      );
+    } catch (_) {}
+
     try {
       final items = await _dashboardService.listFiscalYears(widget.businessId);
       if (!mounted) return;
+      int? accountIdToHydrate;
       setState(() {
         _fiscalYears = items;
         if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
@@ -106,8 +218,18 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           );
           _selectedFiscalYearId = current['id'] as int?;
         }
+        if (savedFilters != null && savedFilters.isNotEmpty) {
+          accountIdToHydrate = _applyExpenseIncomeSavedFiltersMap(savedFilters);
+        }
         _fiscalYearsResolved = true;
       });
+      final accHydrate = accountIdToHydrate;
+      if (accHydrate != null) {
+        unawaited(_hydrateExpenseIncomeFilterAccount(accHydrate));
+      }
+      if (mounted && _selectedProjectId != null) {
+        unawaited(_hydrateSelectedProjectName());
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _fiscalYearsResolved = true);
@@ -145,6 +267,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   
   @override
   void dispose() {
+    _expenseIncomeFilterPrefsDebounce?.cancel();
     // Clean up the page state when disposed
     ExpenseIncomeListPage._pageStates.remove(widget.businessId);
     super.dispose();
@@ -299,7 +422,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
             if (_hasExternalFiltersActive()) ...[
               const SizedBox(width: 8),
               IconButton(
-                onPressed: _clearExternalFilters,
+                onPressed: () => unawaited(_clearExternalFilters()),
                 icon: const Icon(Icons.clear_all),
                 tooltip: t.clear,
               ),
@@ -338,7 +461,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
               if (_hasExternalFiltersActive()) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: _clearExternalFilters,
+                  onPressed: () => unawaited(_clearExternalFilters()),
                   icon: const Icon(Icons.clear_all),
                   tooltip: t.clear,
                 ),
@@ -357,29 +480,25 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
               fromDate: _fromDate,
               toDate: _toDate,
               onDocumentTypeChanged: (v) {
-                setState(() => _selectedDocumentType = v);
+                _touchExpenseIncomeFilters(() => _selectedDocumentType = v);
               },
               onFiscalYearChanged: (v) {
-                setState(() => _selectedFiscalYearId = v);
+                _touchExpenseIncomeFilters(() => _selectedFiscalYearId = v);
               },
               onProjectChanged: (v) async {
-                setState(() {
-                  _selectedProjectId = v;
-                  _selectedProjectName = null;
-                });
-                await _hydrateSelectedProjectName();
+                await _onProjectFilterChangedWithPersist(v);
               },
               onAccountChanged: (v) {
-                setState(() => _filterAccount = v);
+                _touchExpenseIncomeFilters(() => _filterAccount = v);
               },
               onFromDateChanged: (v) {
-                setState(() => _fromDate = v);
+                _touchExpenseIncomeFilters(() => _fromDate = v);
               },
               onToDateChanged: (v) {
-                setState(() => _toDate = v);
+                _touchExpenseIncomeFilters(() => _toDate = v);
               },
               onClearDateRange: () {
-                setState(() {
+                _touchExpenseIncomeFilters(() {
                   _fromDate = null;
                   _toDate = null;
                 });
@@ -487,7 +606,13 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         _filterAccount != null;
   }
 
-  void _clearExternalFilters() {
+  Future<void> _clearExternalFilters() async {
+    _expenseIncomeFilterPrefsDebounce?.cancel();
+    await ListFilterPreferencesService.clear(
+      ListFilterPageIds.expenseIncome,
+      widget.businessId,
+    );
+    if (!mounted) return;
     setState(() {
       _selectedDocumentType = null;
       _fromDate = null;
@@ -496,6 +621,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       _selectedProjectName = null;
       _filterAccount = null;
     });
+    _refreshData();
   }
 
   Future<void> _openMobileFiltersSheet(AppLocalizations t) async {
@@ -608,6 +734,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         _toDate = toDate;
       });
       await _hydrateSelectedProjectName();
+      _schedulePersistExpenseIncomeFilters();
     }
   }
 
@@ -842,6 +969,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         excelEndpoint: '/businesses/${widget.businessId}/expense-income/export/excel',
         pdfEndpoint: '/businesses/${widget.businessId}/expense-income/export/pdf',
         businessId: widget.businessId,
+        persistTableFiltersPageId: ListFilterPageIds.expenseIncomeTable,
         reportModuleKey: 'expense_income',
         reportSubtype: 'list',
         enableColumnSettings: false,
@@ -892,6 +1020,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       excelEndpoint: '/businesses/${widget.businessId}/expense-income/export/excel',
       pdfEndpoint: '/businesses/${widget.businessId}/expense-income/export/pdf',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.expenseIncomeTable,
       reportModuleKey: 'expense_income',
       reportSubtype: 'list',
       // دکمه حذف گروهی در هدر جدول
@@ -1060,6 +1189,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       loadingMessage: 'در حال بارگذاری اسناد...',
       errorMessage: 'خطا در بارگذاری اسناد',
       expandBodyHeightToFitRows: true,
+      onAllFiltersCleared: _onExpenseIncomeDataTableAllFiltersCleared,
     );
   }
 

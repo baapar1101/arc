@@ -13,6 +13,7 @@ import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 
 /// مدیریت تاریخچه نرخ تسعیر ارزهای فعال نسبت به ارز اصلی؛ چند نرخ در یک روز با زمان مؤثر متفاوت مجاز است.
 class CurrencyRevaluationPage extends StatefulWidget {
@@ -400,6 +401,8 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
               config: DataTableConfig<Map<String, dynamic>>(
                 tableId: 'currency_revaluation_rates',
                 endpoint: '/api/v1/businesses/${widget.businessId}/currency-rates',
+                businessId: widget.businessId,
+                persistTableFiltersPageId: ListFilterPageIds.currencyRevaluationRatesTable,
                 httpMethod: 'GET',
                 pageSizeQueryParam: 'take',
                 title: t.currencyRevaluation,

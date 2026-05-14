@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
@@ -386,6 +387,7 @@ class _KardexPageState extends State<KardexPage> {
       excelEndpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines/export/excel',
       pdfEndpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines/export/pdf',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.kardexLinesTable,
       reportModuleKey: 'kardex',
       reportSubtype: 'list',
       title: t.kardexDocuments,

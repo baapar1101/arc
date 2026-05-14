@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -17,6 +18,7 @@ import 'package:hesabix_ui/widgets/invoice/invoice_pdf_print_flow.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/invoice_warehouse_bulk_service.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/invoice_import_dialog.dart';
@@ -106,33 +108,94 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   bool _showDesktopFilters = false;
   int _selectedCount = 0;
 
-  String get _invoiceDocumentTypePrefsKey => 'invoices_list_document_type_${widget.businessId}';
+  Timer? _invoiceFilterPrefsDebounce;
 
-  Future<void> _persistInvoiceDocumentType(String? type) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (type == null || type.isEmpty) {
-        await prefs.remove(_invoiceDocumentTypePrefsKey);
-      } else {
-        await prefs.setString(_invoiceDocumentTypePrefsKey, type);
-      }
-    } catch (_) {}
+  Map<String, dynamic> _serializeInvoiceFilters() {
+    return <String, dynamic>{
+      if (_selectedInvoiceType != null && _selectedInvoiceType!.isNotEmpty)
+        'document_type': _selectedInvoiceType,
+      if (_fromDate != null) 'from_date': _fromDate!.toIso8601String(),
+      if (_toDate != null) 'to_date': _toDate!.toIso8601String(),
+      if (_isProforma != null) 'is_proforma': _isProforma,
+      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+      if (_selectedTagIds.isNotEmpty) 'tag_ids': List<int>.from(_selectedTagIds)..sort(),
+      'tag_match': _tagMatch,
+    };
   }
 
-  Future<void> _loadSavedInvoiceDocumentType() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString(_invoiceDocumentTypePrefsKey);
+  void _schedulePersistInvoiceFilters() {
+    _invoiceFilterPrefsDebounce?.cancel();
+    _invoiceFilterPrefsDebounce = Timer(const Duration(milliseconds: 400), () {
+      _invoiceFilterPrefsDebounce = null;
       if (!mounted) return;
-      if (saved != null && saved.isNotEmpty && isKnownInvoiceDocumentType(saved)) {
-        setState(() => _selectedInvoiceType = saved);
-      }
-    } catch (_) {}
+      ListFilterPreferencesService.save(
+        ListFilterPageIds.invoices,
+        widget.businessId,
+        _serializeInvoiceFilters(),
+      );
+    });
+  }
+
+  void _applyInvoiceSavedFiltersMap(Map<String, dynamic> s) {
+    final dt = s['document_type']?.toString();
+    if (dt != null && dt.isNotEmpty && isKnownInvoiceDocumentType(dt)) {
+      _selectedInvoiceType = dt;
+    }
+    final from = s['from_date']?.toString();
+    if (from != null && from.isNotEmpty) {
+      _fromDate = DateTime.tryParse(from);
+    }
+    final to = s['to_date']?.toString();
+    if (to != null && to.isNotEmpty) {
+      _toDate = DateTime.tryParse(to);
+    }
+    final ip = s['is_proforma'];
+    if (ip is bool) {
+      _isProforma = ip;
+    } else if (ip is int) {
+      if (ip == 1) _isProforma = true;
+      if (ip == 0) _isProforma = false;
+    }
+    final pid = s['project_id'];
+    if (pid is int) {
+      _selectedProjectId = pid;
+    } else if (pid != null) {
+      _selectedProjectId = int.tryParse('$pid');
+    }
+    final rawTags = s['tag_ids'];
+    if (rawTags is List) {
+      _selectedTagIds = rawTags.map((e) => int.tryParse('$e')).whereType<int>().toList()..sort();
+    }
+    final tm = s['tag_match']?.toString();
+    if (tm == 'all' || tm == 'any') {
+      _tagMatch = tm!;
+    }
+    final fy = s['fiscal_year_id'];
+    int? fyId;
+    if (fy is int) {
+      fyId = fy;
+    } else if (fy != null) {
+      fyId = int.tryParse('$fy');
+    }
+    if (fyId != null && _fiscalYears.any((e) => e['id'] == fyId)) {
+      _selectedFiscalYearId = fyId;
+    }
   }
 
   void _onInvoiceTypeFilterChanged(String? v) {
     setState(() => _selectedInvoiceType = v);
-    _persistInvoiceDocumentType(v);
+    _schedulePersistInvoiceFilters();
+  }
+
+  void _onDataTableAllFiltersCleared() {
+    _invoiceFilterPrefsDebounce?.cancel();
+    unawaited(_clearExternalFilters());
+  }
+
+  void _touchInvoiceFilters(VoidCallback fn) {
+    setState(fn);
+    _schedulePersistInvoiceFilters();
   }
 
   void _refreshData([int attempt = 0]) {
@@ -170,11 +233,11 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     _loadFiscalYears();
     _loadProjects();
     _loadInvoiceTagsForFilter();
-    _loadSavedInvoiceDocumentType();
   }
   
   @override
   void dispose() {
+    _invoiceFilterPrefsDebounce?.cancel();
     InvoicesListPage._pageStates.remove(widget.businessId);
     super.dispose();
   }
@@ -239,18 +302,25 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   }
 
   Future<void> _loadFiscalYears() async {
+    Map<String, dynamic>? savedFilters;
+    try {
+      savedFilters = await ListFilterPreferencesService.loadInvoicesMergedLegacy(widget.businessId);
+    } catch (_) {}
+
     try {
       final items = await _dashboardService.listFiscalYears(widget.businessId);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        // اگر سال مالی انتخاب نشده، سال مالی جاری را انتخاب کن
         if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
           final current = _fiscalYears.firstWhere(
             (fy) => fy['is_current'] == true,
             orElse: () => _fiscalYears.first,
           );
           _selectedFiscalYearId = current['id'] as int?;
+        }
+        if (savedFilters != null && savedFilters.isNotEmpty) {
+          _applyInvoiceSavedFiltersMap(savedFilters);
         }
         _fiscalYearsResolved = true;
       });
@@ -378,7 +448,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             if (_hasExternalFiltersActive()) ...[
               const SizedBox(width: 8),
               IconButton(
-                onPressed: _clearExternalFilters,
+                onPressed: () => unawaited(_clearExternalFilters()),
                 icon: const Icon(Icons.clear_all),
                 tooltip: t.clear,
               ),
@@ -415,7 +485,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               if (_hasExternalFiltersActive()) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: _clearExternalFilters,
+                  onPressed: () => unawaited(_clearExternalFilters()),
                   icon: const Icon(Icons.clear_all),
                   tooltip: t.clear,
                 ),
@@ -435,33 +505,33 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               isProforma: _isProforma,
               onInvoiceTypeChanged: (v) => _onInvoiceTypeFilterChanged(v),
               onFiscalYearChanged: (v) {
-                setState(() => _selectedFiscalYearId = v);
+                _touchInvoiceFilters(() => _selectedFiscalYearId = v);
               },
               onProjectChanged: (v) {
-                setState(() => _selectedProjectId = v);
+                _touchInvoiceFilters(() => _selectedProjectId = v);
               },
               onFromDateChanged: (v) {
-                setState(() => _fromDate = v);
+                _touchInvoiceFilters(() => _fromDate = v);
               },
               onToDateChanged: (v) {
-                setState(() => _toDate = v);
+                _touchInvoiceFilters(() => _toDate = v);
               },
               onClearDateRange: () {
-                setState(() {
+                _touchInvoiceFilters(() {
                   _fromDate = null;
                   _toDate = null;
                 });
               },
               onIsProformaChanged: (v) {
-                setState(() => _isProforma = v);
+                _touchInvoiceFilters(() => _isProforma = v);
               },
               selectedTagIds: _selectedTagIds,
               tagMatch: _tagMatch,
               onTagIdsChanged: (v) {
-                setState(() => _selectedTagIds = v);
+                _touchInvoiceFilters(() => _selectedTagIds = v);
               },
               onTagMatchChanged: (v) {
-                setState(() => _tagMatch = v);
+                _touchInvoiceFilters(() => _tagMatch = v);
               },
             ),
           ],
@@ -480,7 +550,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         _selectedTagIds.isNotEmpty;
   }
 
-  void _clearExternalFilters() {
+  Future<void> _clearExternalFilters() async {
+    _invoiceFilterPrefsDebounce?.cancel();
+    await ListFilterPreferencesService.clearInvoicesWithLegacy(widget.businessId);
+    if (!mounted) return;
     setState(() {
       _selectedInvoiceType = null;
       _fromDate = null;
@@ -491,7 +564,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       _tagMatch = 'any';
       // Fiscal year is typically important; keep it unless explicitly cleared by user.
     });
-    _persistInvoiceDocumentType(null);
+    _refreshData();
   }
 
   List<Widget> _buildExternalFilterChips(AppLocalizations t) {
@@ -674,7 +747,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         _selectedTagIds = tagIds;
         _tagMatch = tagMatchLocal;
       });
-      _persistInvoiceDocumentType(invoiceType);
+      _schedulePersistInvoiceFilters();
     }
   }
 
@@ -912,7 +985,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       apiClient: widget.apiClient,
       selectedProjectId: _selectedProjectId,
       onChanged: (projectId) {
-        setState(() {
+        _touchInvoiceFilters(() {
           _selectedProjectId = projectId;
         });
       },
@@ -932,6 +1005,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         excelEndpoint: '/invoices/business/${widget.businessId}/export/excel',
         pdfEndpoint: '/invoices/business/${widget.businessId}/export/pdf',
         businessId: widget.businessId,
+        persistTableFiltersPageId: ListFilterPageIds.invoicesListTable,
         reportModuleKey: 'invoices',
         reportSubtype: 'list',
         enableColumnSettings: false,
@@ -993,6 +1067,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         ],
         footerTotals: { 'total_amount': 'جمع مبلغ این صفحه' },
         expandBodyHeightToFitRows: true,
+        onAllFiltersCleared: _onDataTableAllFiltersCleared,
       );
     }
 
@@ -1003,6 +1078,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       excelEndpoint: '/invoices/business/${widget.businessId}/export/excel',
       pdfEndpoint: '/invoices/business/${widget.businessId}/export/pdf',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.invoicesListTable,
       reportModuleKey: 'invoices',
       reportSubtype: 'list',
       defaultSortBy: 'document_date',
@@ -1395,6 +1471,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         'remaining_amount': t.invoiceRemainingAmount,
       },
       expandBodyHeightToFitRows: true,
+      onAllFiltersCleared: _onDataTableAllFiltersCleared,
     );
   }
 

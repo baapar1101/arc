@@ -7,6 +7,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/category_service.dart';
 import 'package:hesabix_ui/services/product_service.dart';
@@ -402,6 +403,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/products/businesses/${widget.businessId}/reports/inventory-stock',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.inventoryStockReportTable,
       reportModuleKey: 'inventory_stock',
       reportSubtype: 'list',
       title: t.reportsInventoryStockTitle,

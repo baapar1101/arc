@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +15,7 @@ import '../../widgets/permission/permission_widgets.dart';
 import '../../models/person_model.dart';
 import '../../models/person_group_model.dart';
 import '../../services/person_group_service.dart';
+import '../../services/list_filter_preferences_service.dart';
 import '../../services/person_service.dart';
 import '../../core/auth_store.dart';
 import 'person_details_dialog.dart';
@@ -70,6 +73,19 @@ class _PersonsPageState extends State<PersonsPage> {
 
   Future<void> _loadPersonGroupsForFilter() async {
     setState(() => _personGroupsLoading = true);
+    Map<String, dynamic>? saved;
+    try {
+      saved = await ListFilterPreferencesService.load(ListFilterPageIds.persons, widget.businessId);
+    } catch (_) {}
+    int? savedGroupId;
+    if (saved != null) {
+      final raw = saved['person_group_id'];
+      if (raw is int) {
+        savedGroupId = raw;
+      } else if (raw != null) {
+        savedGroupId = int.tryParse('$raw');
+      }
+    }
     try {
       final list = await _personGroupService.listGroups(
         businessId: widget.businessId,
@@ -79,10 +95,22 @@ class _PersonsPageState extends State<PersonsPage> {
         rootOnly: true,
       );
       if (!mounted) return;
+      final validSaved = savedGroupId != null && list.any((g) => g.id == savedGroupId);
       setState(() {
         _personGroupsForFilter = list;
         _personGroupsLoading = false;
+        if (validSaved) {
+          _quickPersonGroupFilterId = savedGroupId;
+        }
       });
+      if (validSaved) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          try {
+            (_personsTableKey.currentState as dynamic)?.applyPersonGroupIdFilter(savedGroupId);
+          } catch (_) {}
+        });
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _personGroupsLoading = false);
@@ -95,6 +123,29 @@ class _PersonsPageState extends State<PersonsPage> {
     try {
       (_personsTableKey.currentState as dynamic)?.applyPersonGroupIdFilter(groupId);
     } catch (_) {}
+    if (groupId == null) {
+      unawaited(ListFilterPreferencesService.clear(ListFilterPageIds.persons, widget.businessId));
+    } else {
+      unawaited(ListFilterPreferencesService.save(
+        ListFilterPageIds.persons,
+        widget.businessId,
+        <String, dynamic>{'person_group_id': groupId},
+      ));
+    }
+  }
+
+  void _onPersonsDataTableAllFiltersCleared() {
+    unawaited(_clearPersonsQuickGroupAndPrefs());
+  }
+
+  Future<void> _clearPersonsQuickGroupAndPrefs() async {
+    await ListFilterPreferencesService.clear(ListFilterPageIds.persons, widget.businessId);
+    if (!mounted) return;
+    setState(() => _quickPersonGroupFilterId = null);
+    try {
+      (_personsTableKey.currentState as dynamic)?.applyPersonGroupIdFilter(null);
+    } catch (_) {}
+    refresh();
   }
   
   @override
@@ -546,10 +597,7 @@ class _PersonsPageState extends State<PersonsPage> {
         'country',
         'province',
       ],
-      onAllFiltersCleared: () {
-        if (!mounted) return;
-        setState(() => _quickPersonGroupFilterId = null);
-      },
+      onAllFiltersCleared: _onPersonsDataTableAllFiltersCleared,
       defaultPageSize: 20,
       // انتقال دکمه افزودن به اکشن‌های هدر جدول با کنترل دسترسی
       customHeaderActions: [

@@ -6,6 +6,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
@@ -128,6 +129,7 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/people-transactions',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.peopleTransactionsReportTable,
       reportModuleKey: 'people_transactions',
       reportSubtype: 'list',
       title: t.reportsPeopleTransactionsTitle,

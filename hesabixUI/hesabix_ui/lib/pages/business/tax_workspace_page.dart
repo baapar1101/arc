@@ -9,6 +9,7 @@ import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -495,6 +496,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       endpoint: '/invoices/business/${widget.businessId}/tax-workspace/search',
       title: t.taxWorkspaceTitle,
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.taxWorkspaceTable,
       reportModuleKey: 'tax_workspace',
       reportSubtype: 'list',
       enableRowSelection: true,

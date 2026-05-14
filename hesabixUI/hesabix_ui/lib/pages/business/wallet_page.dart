@@ -11,6 +11,7 @@ import '../../core/business_named_route_locations.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import '../../core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
@@ -388,6 +389,8 @@ class _WalletPageState extends State<WalletPage> {
                           DataTableWidget<Map<String, dynamic>>(
                               config: DataTableConfig<Map<String, dynamic>>(
                                 endpoint: '/businesses/${widget.businessId}/wallet/transactions/table',
+                                businessId: widget.businessId,
+                                persistTableFiltersPageId: ListFilterPageIds.walletTransactionsTable,
                                 title: t.walletTransactions,
                                 showTableIcon: true,
                                 showSearch: false,

@@ -20,6 +20,7 @@ import '../../services/business_dashboard_service.dart';
 import '../../models/person_model.dart';
 import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/person_combobox_widget.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 /// صفحه لیست اسناد حسابداری (عمومی و اتوماتیک)
 class DocumentsPage extends StatefulWidget {
@@ -604,6 +605,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
   DataTableConfig<DocumentModel> _buildTableConfig(AppLocalizations t) {
     return DataTableConfig<DocumentModel>(
       endpoint: '/businesses/${widget.businessId}/documents',
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.documentsTable,
       title: t.accountingDocuments,
       excelEndpoint: '/businesses/${widget.businessId}/documents/export/excel',
       customHeaderActions: [
@@ -803,7 +806,6 @@ class _DocumentsPageState extends State<DocumentsPage> {
       showExcelExport: true,
       pdfEndpoint: '/businesses/${widget.businessId}/documents/export/pdf',
       showPdfExport: true,
-      businessId: widget.businessId,
       reportModuleKey: 'documents',
       reportSubtype: 'list',
       defaultPageSize: 50,

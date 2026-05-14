@@ -12320,11 +12320,11 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
-  String get woocommerceSettingsPageTitle => 'تنظیمات پل ووکامرس';
+  String get woocommerceSettingsPageTitle => 'تنظیمات ووکامرس و ArcWOC';
 
   @override
   String get woocommerceSettingsPageSubtitle =>
-      'آدرس فروشگاه و توکن پل برای اتصال حسابیکس به ووکامرس.';
+      'اتصال پل، سلامت فروشگاه، صف و تنظیمات افزونهٔ ArcWOC.';
 
   @override
   String get woocommerceOpenIntegrationHub => 'مرکز عملیات ووکامرس';
@@ -12337,7 +12337,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceHubSettingsPromoSubtitle =>
-      'مدیریت آدرس فروشگاه، توکن پل و تست اتصال در تنظیمات کسب‌وکار.';
+      'تنظیمات افزونه، صف، لاگ و عملیات ArcWOC در تنظیمات ووکامرس.';
 
   @override
   String get woocommerceSettingsSavedSnackbar => 'تنظیمات ووکامرس ذخیره شد';
@@ -12393,6 +12393,16 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceHubControlTab => 'کنترل ArcWOC';
+
+  @override
+  String get woocommerceHubArcwocSettingsBannerTitle => 'تنظیمات افزونه ArcWOC';
+
+  @override
+  String get woocommerceHubArcwocSettingsBannerSubtitle =>
+      'صف، لاگ، دیباگ و همگام‌سازی دسته‌ای اکنون در صفحهٔ تنظیمات ووکامرس است.';
+
+  @override
+  String get woocommerceHubOpenWooSettingsButton => 'باز کردن تنظیمات';
 
   @override
   String get woocommerceControlIntroTitle => 'داشبورد عملیات افزونه';
@@ -12586,6 +12596,64 @@ class AppLocalizationsFa extends AppLocalizations {
   String get woocommerceApplyFiltersButton => 'اعمال فیلتر';
 
   @override
+  String get woocommerceClearOrderFilters => 'پاک کردن فیلترها';
+
+  @override
+  String get woocommerceOrderStatusQuickTitle => 'وضعیت سفارش (ووکامرس)';
+
+  @override
+  String get woocommerceOrderDatePickFrom => 'از تاریخ';
+
+  @override
+  String get woocommerceOrderDatePickTo => 'تا تاریخ';
+
+  @override
+  String get woocommerceOrderDateClear => 'حذف بازهٔ تاریخ';
+
+  @override
+  String get woocommerceOrdersFilterExpandTitle => 'فیلتر و مرتب‌سازی سفارشات';
+
+  @override
+  String get woocommerceSettingsArcwocPluginTitle =>
+      'تنظیمات کلی افزونهٔ ArcWOC';
+
+  @override
+  String get woocommerceSettingsArcwocPluginIntro =>
+      'آمار نگاشت، اتصال افزونه به API حسابیکس، صف پس‌زمینه، نسخهٔ افزونه، خلاصهٔ تنظیمات، دیباگ، همگام‌سازی دسته‌ای و لاگ.';
+
+  @override
+  String get woocommerceBridgeTokenStored => 'توکن پل ذخیره شده';
+
+  @override
+  String get woocommerceBridgeTokenMissing => 'توکن پل ذخیره نشده';
+
+  @override
+  String get woocommerceShowTokenTooltip => 'نمایش موقت توکن';
+
+  @override
+  String get woocommerceHideTokenTooltip => 'مخفی کردن توکن';
+
+  @override
+  String get woocommerceConnectionTestDetailsTitle => 'جزئیات تست اتصال';
+
+  @override
+  String get woocommerceConnectionHealthTitle => 'آخرین پاسخ سلامت فروشگاه';
+
+  @override
+  String get woocommerceShowRawSettingsJson => 'نمایش JSON خام تنظیمات';
+
+  @override
+  String get woocommerceHideRawSettingsJson => 'پنهان کردن JSON خام';
+
+  @override
+  String get woocommerceStatsTotalLabel => 'جمع';
+
+  @override
+  String woocommerceControlBulkConfirmBody(String count) {
+    return 'همگام‌سازی از راه دور برای $count شناسه انجام شود؟';
+  }
+
+  @override
   String get woocommerceSearchProductsLabel => 'جستجوی محصول';
 
   @override
@@ -12664,7 +12732,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsWooCommerceTitle => 'پل ووکامرس';
 
   @override
-  String get settingsWooCommerceSubtitle => 'آدرس فروشگاه، توکن پل و تست اتصال';
+  String get settingsWooCommerceSubtitle =>
+      'پل، سلامت فروشگاه، ArcWOC، صف و لاگ';
 
   @override
   String get invoiceGlobalDiscountSection => 'تخفیف کلی فاکتور';
@@ -13560,4 +13629,63 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get mobileLauncherQuickSalesTile => 'فروش سریع';
+
+  @override
+  String get dataTableHelpMenu => 'راهنما';
+
+  @override
+  String get dataTableHelpDialogTitle => 'راهنمای کار با این جدول';
+
+  @override
+  String get dataTableHelpIntro =>
+      'با این نکات می‌توانید در لیست‌های بزرگ راحت‌تر جست‌وجو، فیلتر، مرتب‌سازی، خروجی بگیرید و بین ستون‌ها جابه‌جا شوید.';
+
+  @override
+  String get dataTableHelpSectionSearchTitle => 'جست‌وجو و فیلتر';
+
+  @override
+  String get dataTableHelpSectionSearchBody =>
+      '• اگر بالای جدول جعبهٔ جست‌وجو هست، متن بزنید؛ معمولاً کمی بعد از توقف تایپ، لیست به‌روز می‌شود.\n• برای فیلتر روی یک ستون، روی سرستون منوی ⋮ را باز کنید، «جست‌وجو» را بزنید، شرط را بگذارید و اعمال کنید.\n• فیلترهای فعال به‌صورت برچسب زیر هدر دیده می‌شوند؛ هرکدام را حذف کنید یا در صورت وجود دکمه، همه را پاک کنید.';
+
+  @override
+  String get dataTableHelpSectionExportTitle => 'خروجی اکسل و PDF';
+
+  @override
+  String get dataTableHelpSectionExportBody =>
+      '• منوی ⋮ گوشهٔ بالا سمت راست جدول را باز کنید.\n• خروجی اکسل یا PDF را برای همهٔ ردیف‌ها بزنید؛ اگر انتخاب ردیف با چک‌باکس فعال باشد و ردیفی انتخاب کرده باشید، گزینهٔ خروجی فقط انتخاب‌شده‌ها هم هست.\n• ورودی «خروجی» با توضیح تکمیلی، گاهی تنظیمات پیشرفتهٔ قالب یا چیدمان را باز می‌کند.\n• اگر آیکن دانلود در نوار بالای جدول هست، همان مسیر خروجی را دارد.';
+
+  @override
+  String get dataTableHelpSectionSortTitle => 'مرتب‌سازی و ستون‌ها';
+
+  @override
+  String get dataTableHelpSectionSortBody =>
+      '• یک‌بار روی عنوان ستون بزنید تا بر همان ستون مرتب شود؛ دوباره بزنید تا صعودی / نزولی عوض شود.\n• با نگه داشتن Shift روی عنوان ستون دیگر کلیک کنید تا مرتب‌سازی دوم اضافه یا برعکس شود.\n• با قرار گرفتن موس روی سرستون، منوی ⋮ را ببینید: جست‌وجوی همان ستون، پین چپ یا راست، مخفی کردن ستون، تنظیم خودکار عرض و بازنشانی چیدمان (بسته به امکانات همان جدول).\n• «تنظیمات ستون‌ها» در منوی ⋮ بالا، نمایش، پنهان و ترتیب ستون‌ها را مدیریت می‌کند.';
+
+  @override
+  String get dataTableHelpSectionKeyboardTitle => 'کلیدهای میانبر';
+
+  @override
+  String get dataTableHelpSectionKeyboardBody =>
+      'ابتدا یک‌بار روی ناحیهٔ جدول (نه داخل کادر جست‌وجو) کلیک کنید تا فوکوس روی جدول باشد.\n\n• J یا فلش پایین: ردیف بعدی.\n• K یا فلش بالا: ردیف قبلی.\n• Enter: باز کردن ردیف برجسته اگر این صفحه از باز شدن ردیف پشتیبانی کند.\n• Space: روشن/خاموش کردن انتخاب ردیف برجسته وقتی انتخاب ردیف فعال است.\n• Escape: لغو انتخاب ردیف‌ها.\n• Ctrl+A: انتخاب همهٔ ردیف‌های همین صفحه وقتی انتخاب چندگانه فعال است.';
+
+  @override
+  String get dataTableHelpSectionScrollTitle => 'جدول‌های پهنا و اسکرول افقی';
+
+  @override
+  String get dataTableHelpSectionScrollBody =>
+      '• وقتی ستون‌ها زیادند، نوار اسکرول افقی زیر جدول دیده می‌شود؛ با درگ کردن آن ستون‌های پنهان را ببینید.\n• با موس: اشاره‌گر را روی جدول بگذارید، Shift را نگه دارید و چرخ موس را بچرخانید تا افقی حرکت کند (در مرورگرهای ویندوز و لینوکس رایج است).\n• با تاچ‌پد می‌توانید با حرکت دو انگشت افقی اسکرول کنید؛ روی موبایل و تبلت، جدول را افقی بکشید.';
+
+  @override
+  String get dataTableHelpSectionSelectionTitle => 'انتخاب ردیف و کپی';
+
+  @override
+  String get dataTableHelpSectionSelectionBody =>
+      '• وقتی ستون چک‌باکس هست، از آن برای انتخاب ردیف استفاده کنید.\n• در حالت انتخاب چندگانه، Shift را نگه دارید و روی ردیف دیگر کلیک کنید تا بازه بین آخرین انتخاب و آن ردیف انتخاب شود.\n• برای کپی مقدار یک سلول، روی متن آن نگه دارید (لانگ‌پرس)؛ در جاهایی که سیستم‌عامل اجازه دهد راست‌کلیک هم ممکن است همان کار را انجام دهد.';
+
+  @override
+  String get dataTableHelpSectionOtherTitle => 'سایر امکانات';
+
+  @override
+  String get dataTableHelpSectionOtherBody =>
+      '• «به‌روزرسانی» در منوی ⋮ داده را دوباره از سرور می‌گیرد.\n• «حالت فشرده» ارتفاع ردیف‌ها را کمتر می‌کند؛ ممکن است برای همین جدول به خاطر سپرده شود.\n• از بخش صفحه‌بندی پایین برای اندازهٔ صفحه و رفتن به صفحهٔ بعد/قبل استفاده کنید.';
 }

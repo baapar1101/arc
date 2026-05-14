@@ -12389,11 +12389,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get woocommerceSettingsPageTitle => 'WooCommerce bridge settings';
+  String get woocommerceSettingsPageTitle => 'WooCommerce & ArcWOC settings';
 
   @override
   String get woocommerceSettingsPageSubtitle =>
-      'Store URL and bridge token used by the Hesabix ↔ WooCommerce connector.';
+      'Bridge, store health, queue and ArcWOC plugin options.';
 
   @override
   String get woocommerceOpenIntegrationHub => 'Open WooCommerce hub';
@@ -12406,7 +12406,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceHubSettingsPromoSubtitle =>
-      'Manage store URL, bridge token and connection test in business settings.';
+      'ArcWOC plugin options, queue, logs and bulk actions are under WooCommerce settings.';
 
   @override
   String get woocommerceSettingsSavedSnackbar => 'WooCommerce settings saved';
@@ -12462,6 +12462,17 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceHubControlTab => 'ArcWOC control';
+
+  @override
+  String get woocommerceHubArcwocSettingsBannerTitle =>
+      'ArcWOC plugin settings';
+
+  @override
+  String get woocommerceHubArcwocSettingsBannerSubtitle =>
+      'Queue, logs, debug mode and bulk sync now live on the WooCommerce settings page.';
+
+  @override
+  String get woocommerceHubOpenWooSettingsButton => 'Open settings';
 
   @override
   String get woocommerceControlIntroTitle => 'Plugin operations dashboard';
@@ -12657,6 +12668,63 @@ class AppLocalizationsEn extends AppLocalizations {
   String get woocommerceApplyFiltersButton => 'Apply filters';
 
   @override
+  String get woocommerceClearOrderFilters => 'Clear filters';
+
+  @override
+  String get woocommerceOrderStatusQuickTitle => 'Order status (WooCommerce)';
+
+  @override
+  String get woocommerceOrderDatePickFrom => 'From date';
+
+  @override
+  String get woocommerceOrderDatePickTo => 'To date';
+
+  @override
+  String get woocommerceOrderDateClear => 'Clear date range';
+
+  @override
+  String get woocommerceOrdersFilterExpandTitle => 'Filters & sorting';
+
+  @override
+  String get woocommerceSettingsArcwocPluginTitle => 'ArcWOC plugin (general)';
+
+  @override
+  String get woocommerceSettingsArcwocPluginIntro =>
+      'Mapping stats, Hesabix API status from the store, background queue, plugin version, settings summary, debug, bulk sync and logs.';
+
+  @override
+  String get woocommerceBridgeTokenStored => 'Bridge token saved';
+
+  @override
+  String get woocommerceBridgeTokenMissing => 'No bridge token saved';
+
+  @override
+  String get woocommerceShowTokenTooltip => 'Reveal token temporarily';
+
+  @override
+  String get woocommerceHideTokenTooltip => 'Hide token';
+
+  @override
+  String get woocommerceConnectionTestDetailsTitle => 'Connection test details';
+
+  @override
+  String get woocommerceConnectionHealthTitle => 'Latest store health payload';
+
+  @override
+  String get woocommerceShowRawSettingsJson => 'Show raw settings JSON';
+
+  @override
+  String get woocommerceHideRawSettingsJson => 'Hide raw JSON';
+
+  @override
+  String get woocommerceStatsTotalLabel => 'Total';
+
+  @override
+  String woocommerceControlBulkConfirmBody(String count) {
+    return 'Run remote sync for $count ID(s)?';
+  }
+
+  @override
   String get woocommerceSearchProductsLabel => 'Search products';
 
   @override
@@ -12736,7 +12804,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsWooCommerceSubtitle =>
-      'Store URL, bridge token and connection test';
+      'Bridge, health, ArcWOC, queue & logs';
 
   @override
   String get invoiceGlobalDiscountSection => 'Invoice-level discount';
@@ -13639,4 +13707,64 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mobileLauncherQuickSalesTile => 'Quick sales';
+
+  @override
+  String get dataTableHelpMenu => 'Help';
+
+  @override
+  String get dataTableHelpDialogTitle => 'How to use this table';
+
+  @override
+  String get dataTableHelpIntro =>
+      'These tips help you search, filter, sort, export, and move around large lists comfortably.';
+
+  @override
+  String get dataTableHelpSectionSearchTitle => 'Search and filters';
+
+  @override
+  String get dataTableHelpSectionSearchBody =>
+      '• When a search box appears above the table, type to filter. The list refreshes shortly after you pause typing.\n• For a specific column, open the ⋮ menu on that column header and choose Search, set the condition, then Apply.\n• Active filters appear as chips below the header. Remove one chip or use Clear filters when that button is shown.';
+
+  @override
+  String get dataTableHelpSectionExportTitle => 'Export (Excel / PDF)';
+
+  @override
+  String get dataTableHelpSectionExportBody =>
+      '• Open the ⋮ menu at the top right of the table.\n• Choose Excel or PDF for all rows, or for selected rows only when row checkboxes are enabled and you have selected rows.\n• The Export entry with extra text opens more options (templates, layout, etc.) when the business enables them.\n• A download icon in the header may offer the same export flow.';
+
+  @override
+  String get dataTableHelpSectionSortTitle => 'Sorting and columns';
+
+  @override
+  String get dataTableHelpSectionSortBody =>
+      '• Click a column title to sort by that column; click again to switch ascending / descending.\n• Hold Shift and click another column title to add or adjust a second-level sort.\n• When you hover a header, use its ⋮ menu for column search, pin to left or right, hide column, auto-fit width, or reset column layout (depending on what this table allows).\n• Column settings in the top ⋮ menu lets you show, hide, and reorder columns.';
+
+  @override
+  String get dataTableHelpSectionKeyboardTitle => 'Keyboard shortcuts';
+
+  @override
+  String get dataTableHelpSectionKeyboardBody =>
+      'First click on the table body (not inside the search field) so the table has focus.\n\n• J or Down arrow: move highlight to the next row.\n• K or Up arrow: move highlight to the previous row.\n• Enter: open the highlighted row when this page supports opening a row.\n• Space: toggle selection of the highlighted row when selection is enabled.\n• Escape: clear row selection.\n• Ctrl+A: select all rows on the current page when multi-select is enabled.';
+
+  @override
+  String get dataTableHelpSectionScrollTitle =>
+      'Wide tables and horizontal scroll';
+
+  @override
+  String get dataTableHelpSectionScrollBody =>
+      '• When there are many columns, a horizontal scrollbar appears under the table. Drag it to see hidden columns.\n• With a mouse wheel: move the pointer over the table and hold Shift while scrolling the wheel to scroll sideways (common on Windows and Linux browsers).\n• On a trackpad, use a horizontal two-finger swipe. On touch screens, drag the table sideways.';
+
+  @override
+  String get dataTableHelpSectionSelectionTitle => 'Row selection and copying';
+
+  @override
+  String get dataTableHelpSectionSelectionBody =>
+      '• Use the checkboxes in the first column when selection is enabled.\n• With multi-select, hold Shift and click another row to select everything between the last selection and that row.\n• Long-press (or right-click where supported) on a cell value to copy it to the clipboard.';
+
+  @override
+  String get dataTableHelpSectionOtherTitle => 'Other controls';
+
+  @override
+  String get dataTableHelpSectionOtherBody =>
+      '• Refresh in the ⋮ menu reloads data from the server.\n• Compact mode toggles denser row height; your choice may be remembered for this table.\n• Use pagination at the bottom to change page size and move between pages.';
 }

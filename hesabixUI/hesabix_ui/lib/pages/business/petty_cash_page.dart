@@ -13,6 +13,7 @@ import '../../widgets/banking/petty_cash_form_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class PettyCashPage extends StatefulWidget {
 	final int businessId;
@@ -116,6 +117,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
 			excelEndpoint: '/api/v1/petty-cash/businesses/${widget.businessId}/petty-cash/export/excel',
 			pdfEndpoint: '/api/v1/petty-cash/businesses/${widget.businessId}/petty-cash/export/pdf',
 			businessId: widget.businessId,
+			persistTableFiltersPageId: ListFilterPageIds.pettyCashTable,
 			reportModuleKey: 'petty_cash',
 			reportSubtype: 'list',
 			getExportParams: () => {'business_id': widget.businessId},

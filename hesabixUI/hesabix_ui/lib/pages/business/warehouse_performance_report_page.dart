@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 
@@ -58,6 +59,7 @@ class _WarehousePerformanceReportPageState extends State<WarehousePerformanceRep
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/warehouse-reports/businesses/${widget.businessId}/warehouse-performance',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.warehousePerformanceReportTable,
       reportModuleKey: 'warehouse_performance',
       reportSubtype: 'list',
       title: 'گزارش عملکرد انبارها',

@@ -9,6 +9,7 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/warehouse/warehouse_form_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class WarehousesPage extends StatefulWidget {
   final int businessId;
@@ -38,6 +39,8 @@ class _WarehousesPageState extends State<WarehousesPage> {
         config: DataTableConfig<Warehouse>(
           endpoint: '/api/v1/warehouses/business/${widget.businessId}/query',
           title: 'فهرست انبارها',
+          businessId: widget.businessId,
+          persistTableFiltersPageId: ListFilterPageIds.warehousesTable,
           showBackButton: true,
           onBack: () {
             if (!mounted) return;

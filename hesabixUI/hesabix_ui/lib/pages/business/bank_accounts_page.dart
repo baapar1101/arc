@@ -13,6 +13,7 @@ import '../../services/currency_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class BankAccountsPage extends StatefulWidget {
   final int businessId;
@@ -118,6 +119,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
       excelEndpoint: '/api/v1/bank-accounts/businesses/${widget.businessId}/bank-accounts/export/excel',
       pdfEndpoint: '/api/v1/bank-accounts/businesses/${widget.businessId}/bank-accounts/export/pdf',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.bankAccountsTable,
       reportModuleKey: 'bank_accounts',
       reportSubtype: 'list',
       getExportParams: () => {'business_id': widget.businessId},

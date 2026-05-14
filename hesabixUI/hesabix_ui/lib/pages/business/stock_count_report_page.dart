@@ -6,6 +6,7 @@ import '../../models/warehouse_document_model.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/api_client.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class StockCountReportPage extends StatefulWidget {
   final int businessId;
@@ -95,6 +96,8 @@ class _StockCountReportPageState extends State<StockCountReportPage> {
         fromJson: (m) => WarehouseDocument.fromJson(m),
         config: DataTableConfig<WarehouseDocument>(
           endpoint: '/api/v1/warehouse-docs/business/${widget.businessId}/search',
+          businessId: widget.businessId,
+          persistTableFiltersPageId: ListFilterPageIds.stockCountReportTable,
           title: 'گزارش انبار گردانی',
           showBackButton: true,
           onBack: () {

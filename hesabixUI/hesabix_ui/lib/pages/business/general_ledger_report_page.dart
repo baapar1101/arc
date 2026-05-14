@@ -9,6 +9,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
@@ -192,6 +193,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/businesses/${widget.businessId}/reports/general-ledger',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.generalLedgerReportTable,
       reportModuleKey: 'general_ledger',
       reportSubtype: 'list',
       title: t.reportsGeneralLedgerTitle,

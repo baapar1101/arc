@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/category/category_picker_field.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
@@ -104,6 +105,7 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/warehouse-reports/businesses/${widget.businessId}/inventory-valuation',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.inventoryValuationReportTable,
       reportModuleKey: 'inventory_valuation',
       reportSubtype: 'list',
       title: 'گزارش ارزش موجودی انبار',

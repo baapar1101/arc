@@ -13,6 +13,7 @@ import '../../widgets/banking/cash_register_form_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class CashRegistersPage extends StatefulWidget {
 	final int businessId;
@@ -116,6 +117,7 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 			excelEndpoint: '/api/v1/cash-registers/businesses/${widget.businessId}/cash-registers/export/excel',
 			pdfEndpoint: '/api/v1/cash-registers/businesses/${widget.businessId}/cash-registers/export/pdf',
 			businessId: widget.businessId,
+			persistTableFiltersPageId: ListFilterPageIds.cashRegistersTable,
 			reportModuleKey: 'cash_registers',
 			reportSubtype: 'list',
 			getExportParams: () => {'business_id': widget.businessId},

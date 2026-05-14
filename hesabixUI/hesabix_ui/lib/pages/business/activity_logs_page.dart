@@ -5,8 +5,8 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
-import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 
 class ActivityLogsPage extends StatefulWidget {
   final int businessId;
@@ -175,6 +175,7 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/activity-logs/business/${widget.businessId}/table',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.activityLogsTable,
       reportModuleKey: 'activity_logs',
       reportSubtype: 'list',
       title: 'گزارش فعالیت‌های کاربران',

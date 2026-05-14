@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
@@ -75,6 +76,7 @@ class _ProductMovementHistoryReportPageState extends State<ProductMovementHistor
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/warehouse-reports/businesses/${widget.businessId}/product-movement-history',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.productMovementHistoryReportTable,
       reportModuleKey: 'product_movement_history',
       reportSubtype: 'list',
       title: 'گزارش تاریخچه حرکات یک کالا',

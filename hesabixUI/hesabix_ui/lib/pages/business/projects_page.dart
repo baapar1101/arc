@@ -12,6 +12,7 @@ import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/widgets/project/project_form_dialog.dart';
 import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 
 /// صفحه لیست پروژه‌ها
 class ProjectsPage extends StatefulWidget {
@@ -207,6 +208,8 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
     return DataTableConfig<ProjectModel>(
       endpoint: '/api/v1/businesses/${widget.businessId}/projects',
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.projectsTable,
       additionalParams: params.isNotEmpty ? params : null,
       columns: [
         TextColumn(

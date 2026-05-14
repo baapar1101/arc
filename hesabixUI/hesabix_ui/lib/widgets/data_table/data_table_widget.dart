@@ -14,6 +14,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'data_table_config.dart';
 import 'data_table_search_dialog.dart';
 import 'column_settings_dialog.dart';
@@ -119,6 +120,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   // Search state
   final TextEditingController _searchCtrl = TextEditingController();
   Timer? _searchDebounce;
+  Timer? _persistTableFiltersDebounce;
 
   // Column search state
   final Map<String, String> _columnSearchValues = {};
@@ -190,7 +192,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           ..add(_SortSpec(by: _sortBy!, desc: _sortDesc));
       }
     }
-    _setupSearchListener();
+    _searchCtrl.addListener(_onSearchTextChanged);
     _loadDensityPreference();
     _loadExportCalendarPreference();
     if (widget.config.persistPageSize) {
@@ -242,11 +244,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     if (!mounted) return;
     await _loadPageSizePreference();
     if (!mounted) return;
+    await _loadPersistedTableFilters();
+    if (!mounted) return;
     await _fetchData();
   }
 
   Future<void> _bootstrapWithoutPersistedPageSize() async {
     await _loadColumnSettings();
+    if (!mounted) return;
+    await _loadPersistedTableFilters();
     if (!mounted) return;
     await _fetchData();
   }
@@ -287,6 +293,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     });
     _page = 1;
     _fetchData();
+    _scheduleSavePersistedTableFilters();
   }
 
   /// فیلتر سریع گروه اشخاص (نوار بالای لیست اشخاص) — با [personGroupId] برابر null یعنی بدون فیلتر (همه).
@@ -300,6 +307,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     });
     _page = 1;
     _fetchData();
+    _scheduleSavePersistedTableFilters();
   }
 
   // Public helpers for external widgets (via GlobalKey)
@@ -320,8 +328,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
   @override
   void dispose() {
+    _searchCtrl.removeListener(_onSearchTextChanged);
     _searchCtrl.dispose();
     _searchDebounce?.cancel();
+    _persistTableFiltersDebounce?.cancel();
     _horizontalScrollController.dispose();
     _tableFocusNode.dispose();
     _searchFocusNode.dispose();
@@ -331,15 +341,164 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     super.dispose();
   }
 
-  void _setupSearchListener() {
-    _searchCtrl.addListener(() {
-      _searchDebounce?.cancel();
-      _searchDebounce = Timer(widget.config.searchDebounce ?? const Duration(milliseconds: 500), () {
-        _page = 1;
-        _fetchData();
-      });
+  void _onSearchTextChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(widget.config.searchDebounce ?? const Duration(milliseconds: 500), () {
+      _page = 1;
+      _fetchData();
+      _scheduleSavePersistedTableFilters();
     });
   }
+
+  bool get _tableFiltersPersistenceEnabled {
+    final id = widget.config.persistTableFiltersPageId;
+    return widget.localRawItems == null &&
+        id != null &&
+        id.isNotEmpty &&
+        widget.config.businessId != null;
+  }
+
+  Map<String, dynamic> _serializeTableFiltersForPersist() {
+    final csv = Map<String, String>.from(_columnSearchValues);
+    final cst = Map<String, String>.from(_columnSearchTypes);
+    final cms = <String, dynamic>{};
+    for (final e in _columnMultiSelectValues.entries) {
+      cms[e.key] = List<String>.from(e.value);
+    }
+    final cdf = <String, dynamic>{};
+    final cdt = <String, dynamic>{};
+    for (final e in _columnDateFromValues.entries) {
+      cdf[e.key] = e.value?.toIso8601String();
+    }
+    for (final e in _columnDateToValues.entries) {
+      cdt[e.key] = e.value?.toIso8601String();
+    }
+    return <String, dynamic>{
+      'g_search': _searchCtrl.text,
+      'csv': csv,
+      'cst': cst,
+      'cms': cms,
+      'cdf': cdf,
+      'cdt': cdt,
+    };
+  }
+
+  bool _isSerializedTableFiltersEmpty(Map<String, dynamic> m) {
+    final gs = (m['g_search'] as String?)?.trim() ?? '';
+    if (gs.isNotEmpty) return false;
+    final csv = m['csv'];
+    if (csv is Map) {
+      for (final v in csv.values) {
+        if (v != null && v.toString().trim().isNotEmpty) return false;
+      }
+    }
+    final cms = m['cms'];
+    if (cms is Map && cms.isNotEmpty) return false;
+    final cdf = m['cdf'];
+    if (cdf is Map) {
+      for (final v in cdf.values) {
+        if (v != null && v.toString().isNotEmpty) return false;
+      }
+    }
+    final cdt = m['cdt'];
+    if (cdt is Map) {
+      for (final v in cdt.values) {
+        if (v != null && v.toString().isNotEmpty) return false;
+      }
+    }
+    return true;
+  }
+
+  void _scheduleSavePersistedTableFilters() {
+    if (!_tableFiltersPersistenceEnabled) return;
+    _persistTableFiltersDebounce?.cancel();
+    _persistTableFiltersDebounce = Timer(const Duration(milliseconds: 450), () async {
+      _persistTableFiltersDebounce = null;
+      if (!_tableFiltersPersistenceEnabled || !mounted) return;
+      final pid = widget.config.persistTableFiltersPageId!;
+      final bid = widget.config.businessId!;
+      final m = _serializeTableFiltersForPersist();
+      if (_isSerializedTableFiltersEmpty(m)) {
+        await ListFilterPreferencesService.clear(pid, bid);
+      } else {
+        await ListFilterPreferencesService.save(pid, bid, m);
+      }
+    });
+  }
+
+  void _applyLoadedTableFiltersMap(Map<String, dynamic> d) {
+    _columnSearchValues.clear();
+    final csv = d['csv'];
+    if (csv is Map) {
+      for (final e in csv.entries) {
+        final val = e.value?.toString() ?? '';
+        if (val.isNotEmpty) _columnSearchValues[e.key.toString()] = val;
+      }
+    }
+    _columnSearchTypes.clear();
+    final cst = d['cst'];
+    if (cst is Map) {
+      for (final e in cst.entries) {
+        _columnSearchTypes[e.key.toString()] = e.value?.toString() ?? '*';
+      }
+    }
+    _columnMultiSelectValues.clear();
+    final cms = d['cms'];
+    if (cms is Map) {
+      for (final e in cms.entries) {
+        final v = e.value;
+        if (v is List) {
+          _columnMultiSelectValues[e.key.toString()] =
+              v.map((x) => x.toString()).where((s) => s.isNotEmpty).toList();
+        }
+      }
+    }
+    _columnDateFromValues.clear();
+    _columnDateToValues.clear();
+    final cdf = d['cdf'];
+    if (cdf is Map) {
+      for (final e in cdf.entries) {
+        final raw = e.value?.toString();
+        if (raw == null || raw.isEmpty) continue;
+        final parsed = DateTime.tryParse(raw);
+        if (parsed != null) _columnDateFromValues[e.key.toString()] = parsed;
+      }
+    }
+    final cdt = d['cdt'];
+    if (cdt is Map) {
+      for (final e in cdt.entries) {
+        final raw = e.value?.toString();
+        if (raw == null || raw.isEmpty) continue;
+        final parsed = DateTime.tryParse(raw);
+        if (parsed != null) _columnDateToValues[e.key.toString()] = parsed;
+      }
+    }
+  }
+
+  Future<void> _loadPersistedTableFilters() async {
+    if (!_tableFiltersPersistenceEnabled) return;
+    _searchCtrl.removeListener(_onSearchTextChanged);
+    try {
+      final d = await ListFilterPreferencesService.load(
+        widget.config.persistTableFiltersPageId!,
+        widget.config.businessId!,
+      );
+      if (d == null || d.isEmpty || !mounted) return;
+      final gs = d['g_search']?.toString() ?? '';
+      _searchCtrl.text = gs;
+      if (!mounted) return;
+      setState(() {
+        _applyLoadedTableFiltersMap(d);
+      });
+    } catch (_) {
+      // ignore
+    } finally {
+      if (mounted) {
+        _searchCtrl.addListener(_onSearchTextChanged);
+      }
+    }
+  }
+
 
   Future<void> _loadDensityPreference() async {
     try {
@@ -980,6 +1139,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           });
           _page = 1;
           _fetchData();
+          _scheduleSavePersistedTableFilters();
         },
         onApplyMultiSelect: (values) {
           setState(() {
@@ -987,6 +1147,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           });
           _page = 1;
           _fetchData();
+          _scheduleSavePersistedTableFilters();
         },
         onApplyDateRange: (fromDate, toDate) {
           setState(() {
@@ -995,6 +1156,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           });
           _page = 1;
           _fetchData();
+          _scheduleSavePersistedTableFilters();
         },
         onApplyCategoryTree: (categoryIds) {
           setState(() {
@@ -1004,6 +1166,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           });
           _page = 1;
           _fetchData();
+          _scheduleSavePersistedTableFilters();
         },
         businessId: widget.config.businessId,
         onClear: () {
@@ -1022,6 +1185,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           });
           _page = 1;
           _fetchData();
+          _scheduleSavePersistedTableFilters();
         },
       ),
     );
@@ -1036,6 +1200,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   void _clearAllFilters() {
+    _persistTableFiltersDebounce?.cancel();
+    if (_tableFiltersPersistenceEnabled) {
+      unawaited(ListFilterPreferencesService.clear(
+        widget.config.persistTableFiltersPageId!,
+        widget.config.businessId!,
+      ));
+    }
     setState(() {
       _searchCtrl.clear();
       _sortBy = null;
@@ -1658,6 +1829,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   });
                   _page = 1;
                   _fetchData();
+                  _scheduleSavePersistedTableFilters();
                 },
                 onClearAll: _clearAllFilters,
               ),
@@ -1942,6 +2114,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
               case 'exportPdfSelected':
                 _exportData('pdf', true);
                 break;
+              case 'userGuide':
+                _showDataTableUserGuideDialog(t, theme);
+                break;
             }
           },
           itemBuilder: (context) => [
@@ -2076,9 +2251,96 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 ],
               ),
             ),
+            PopupMenuItem(
+              value: 'userGuide',
+              child: Row(
+                children: [
+                  Icon(Icons.help_outline, size: 20, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Text(t.dataTableHelpMenu),
+                ],
+              ),
+            ),
           ],
         ),
       ],
+    );
+  }
+
+  void _showDataTableUserGuideDialog(AppLocalizations t, ThemeData theme) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final screenH = MediaQuery.sizeOf(dialogContext).height;
+        final contentHeight = math.min(620.0, math.max(280.0, screenH * 0.72));
+        Widget section(String title, String body) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  body,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    height: 1.48,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return AlertDialog(
+          icon: Icon(
+            Icons.menu_book_outlined,
+            color: theme.colorScheme.primary,
+            size: 28,
+          ),
+          title: Text(t.dataTableHelpDialogTitle),
+          content: SizedBox(
+            width: 440,
+            height: contentHeight,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.dataTableHelpIntro,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      height: 1.42,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Divider(height: 24, color: theme.colorScheme.outlineVariant),
+                  section(t.dataTableHelpSectionSearchTitle, t.dataTableHelpSectionSearchBody),
+                  section(t.dataTableHelpSectionExportTitle, t.dataTableHelpSectionExportBody),
+                  section(t.dataTableHelpSectionSortTitle, t.dataTableHelpSectionSortBody),
+                  section(t.dataTableHelpSectionKeyboardTitle, t.dataTableHelpSectionKeyboardBody),
+                  section(t.dataTableHelpSectionScrollTitle, t.dataTableHelpSectionScrollBody),
+                  section(t.dataTableHelpSectionSelectionTitle, t.dataTableHelpSectionSelectionBody),
+                  section(t.dataTableHelpSectionOtherTitle, t.dataTableHelpSectionOtherBody),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton.tonal(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(t.close),
+            ),
+          ],
+        );
+      },
     );
   }
 

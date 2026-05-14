@@ -16,6 +16,7 @@ import '../../services/product_service.dart';
 import '../../models/product_model.dart';
 import '../../widgets/warranty/warranty_code_details_dialog.dart';
 import '../../widgets/warranty/generate_warranty_codes_dialog.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class WarrantyManagementPage extends StatefulWidget {
   final int businessId;
@@ -268,6 +269,8 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
 
     return DataTableConfig<WarrantyCode>(
       endpoint: endpoint,
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.warrantyCodesTable,
       httpMethod: 'GET',
       onRowTap: (code) => _showCodeDetails(context, code as WarrantyCode),
       enableRowSelection: true,

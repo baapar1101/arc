@@ -21,6 +21,7 @@ import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/petty_cash_combobox_widget.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 
 class TransfersPage extends StatefulWidget {
   final int businessId;
@@ -793,6 +794,7 @@ class _TransfersPageState extends State<TransfersPage> {
       excelEndpoint: '/businesses/${widget.businessId}/transfers/export/excel',
       pdfEndpoint: '/businesses/${widget.businessId}/transfers/export/pdf',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.transfersTable,
       reportModuleKey: 'transfers',
       reportSubtype: 'list',
       getExportParams: _transferTableExtraParams,

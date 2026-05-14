@@ -11,6 +11,7 @@ import '../../services/errors/api_error.dart';
 import '../../utils/number_formatters.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
+import '../../services/list_filter_preferences_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
@@ -782,6 +783,8 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                 key: _chargesTableKey,
                 config: DataTableConfig<Map<String, dynamic>>(
                   endpoint: '/api/v1/business/${widget.businessId}/document-monetization/charges/table',
+                  businessId: widget.businessId,
+                  persistTableFiltersPageId: ListFilterPageIds.documentMonetizationChargesTable,
                   showTableIcon: false,
                   showSearch: true,
                   showFilters: true,

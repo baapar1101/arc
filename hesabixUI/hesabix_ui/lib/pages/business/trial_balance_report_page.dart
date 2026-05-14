@@ -9,6 +9,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 
 class TrialBalanceReportPage extends StatefulWidget {
   final int businessId;
@@ -179,6 +180,7 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/businesses/${widget.businessId}/reports/trial-balance',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.trialBalanceReportTable,
       reportModuleKey: 'trial_balance',
       reportSubtype: 'list',
       title: t.reportsTrialBalanceTitle,

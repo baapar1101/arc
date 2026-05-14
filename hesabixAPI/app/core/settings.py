@@ -47,15 +47,9 @@ class Settings(BaseSettings):
 	# اگر خالی باشد، در endpoint بازنشانی از header Origin (درخواست مرورگر) استفاده می‌شود
 	app_public_url: str = ""
 
-	# CORS
-	# نکته: وقتی allow_credentials=True است، نمی‌توان از "*" استفاده کرد
-	# باید دامنه‌های خاص را مشخص کنید
-	cors_allowed_origins: list[str] = [
-		"https://arc.hesabix.ir",
-		"https://hsxn.hesabix.ir",
-		"http://localhost:3000",
-		"http://localhost:8080",
-	]
+	# CORS — پذیرش هر Origin (API باز برای کلاینت‌های وب/موبایل/ابزارها)
+	# نکته: با allow_origins=["*"] در Starlette باید allow_credentials=False بماند (در app/main.py).
+	cors_allowed_origins: list[str] = ["*"]
 
 	# Telegram Bot
 	telegram_bot_token: str | None = None

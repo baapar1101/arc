@@ -6,6 +6,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/cash_register_service.dart';
@@ -174,6 +175,7 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/cash-registers/businesses/${widget.businessId}/reports/cash-petty-turnover',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.cashPettyTurnoverReportTable,
       reportModuleKey: 'cash_petty_turnover',
       reportSubtype: 'list',
       title: t.reportsCashPettyTurnoverTitle,

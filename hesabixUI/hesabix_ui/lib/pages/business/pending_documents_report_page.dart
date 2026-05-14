@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 
@@ -51,6 +52,7 @@ class _PendingDocumentsReportPageState extends State<PendingDocumentsReportPage>
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/warehouse-reports/businesses/${widget.businessId}/pending-documents',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.pendingDocumentsReportTable,
       reportModuleKey: 'pending_documents',
       reportSubtype: 'list',
       title: 'گزارش حواله‌های در انتظار تایید',

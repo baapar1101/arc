@@ -375,10 +375,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
   }
 
+  /// `mobile_scanner` فقط اندروید/iOS (و در صورت پشتیبانی پلاگین، دسکتاپ) دارد؛ روی وب کانال بومی ندارد.
   bool get _supportsInlineCameraScan =>
-      kIsWeb ||
-      defaultTargetPlatform == TargetPlatform.android ||
-      defaultTargetPlatform == TargetPlatform.iOS;
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
 
   Future<void> _scanBarcodeWithCamera() async {
     if (!_supportsInlineCameraScan) return;

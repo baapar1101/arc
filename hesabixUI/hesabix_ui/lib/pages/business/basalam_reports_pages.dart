@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/basalam_integration_service.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
@@ -311,6 +312,8 @@ class _BasalamSyncedInvoicesReportPageState
       httpMethod: 'GET',
       pageSizeQueryParam: 'take',
       tableId: 'basalam_reports_synced_invoices',
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.basalamSyncedInvoicesReportTable,
       title: t.reportsBasalamSyncedInvoicesTitle,
       subtitle: t.basalamReportsSyncedInvoicesTableHint,
       showExportButtons: false,
@@ -443,6 +446,8 @@ class _BasalamDeadLetterReportPageState extends State<BasalamDeadLetterReportPag
       endpoint:
           '/api/v1/basalam/business/${widget.businessId}/reports/dead-letter-local',
       tableId: 'basalam_reports_dead_letter',
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.basalamDeadLetterReportTable,
       title: t.reportsBasalamDeadLetterTitle,
       subtitle: t.basalamReportsDeadLetterTableHint,
       showExportButtons: false,
@@ -574,6 +579,8 @@ class _BasalamProductConflictsReportPageState
       endpoint:
           '/api/v1/basalam/business/${widget.businessId}/reports/product-conflicts-local',
       tableId: 'basalam_reports_product_conflicts',
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.basalamProductConflictsReportTable,
       title: t.reportsBasalamProductConflictsTitle,
       subtitle: t.basalamReportsProductConflictsTableHint,
       showExportButtons: false,

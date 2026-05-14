@@ -7,6 +7,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 
 class InterWarehouseTransfersReportPage extends StatefulWidget {
   final int businessId;
@@ -60,6 +61,7 @@ class _InterWarehouseTransfersReportPageState extends State<InterWarehouseTransf
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/warehouse-reports/businesses/${widget.businessId}/inter-warehouse-transfers',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.interWarehouseTransfersReportTable,
       reportModuleKey: 'inter_warehouse_transfers',
       reportSubtype: 'list',
       title: 'گزارش انتقالات بین انبارها',

@@ -16,6 +16,7 @@ import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/error_extractor.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class WarehouseDocsPage extends StatefulWidget {
   final int businessId;
@@ -451,6 +452,8 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         config: DataTableConfig<WarehouseDocument>(
           endpoint: '/api/v1/warehouse-docs/business/${widget.businessId}/search',
           title: t.warehouseDocuments,
+          businessId: widget.businessId,
+          persistTableFiltersPageId: ListFilterPageIds.warehouseDocsTable,
           showBackButton: true,
           onBack: () {
             if (!mounted) return;

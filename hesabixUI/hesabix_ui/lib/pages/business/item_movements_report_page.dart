@@ -6,6 +6,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'package:hesabix_ui/services/category_service.dart';
@@ -166,6 +167,7 @@ class _ItemMovementsReportPageState extends State<ItemMovementsReportPage> {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/products/businesses/${widget.businessId}/reports/item-movements',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.itemMovementsReportTable,
       reportModuleKey: 'item_movements',
       reportSubtype: 'list',
       title: t.reportsItemMovementsTitle,

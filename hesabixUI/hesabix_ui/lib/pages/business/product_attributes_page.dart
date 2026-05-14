@@ -9,6 +9,7 @@ import '../../core/auth_store.dart';
 import '../../services/product_attribute_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class ProductAttributeItem {
   final int id;
@@ -170,6 +171,8 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
   DataTableConfig<ProductAttributeItem> _buildConfig(AppLocalizations t) {
     return DataTableConfig<ProductAttributeItem>(
       endpoint: '/api/v1/product-attributes/business/${widget.businessId}/search',
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.productAttributesTable,
       title: t.productAttributes,
       showBackButton: true,
       onBack: () {

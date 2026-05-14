@@ -6,6 +6,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
@@ -132,6 +133,7 @@ class _MaterialsConsumptionReportPageState extends State<MaterialsConsumptionRep
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/businesses/${widget.businessId}/reports/materials-consumption',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.materialsConsumptionReportTable,
       reportModuleKey: 'materials_consumption',
       reportSubtype: 'list',
       title: t.reportsMaterialsConsumptionTitle,

@@ -7,6 +7,7 @@ import '../../core/date_utils.dart';
 import '../../utils/number_formatters.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
+import '../../services/list_filter_preferences_service.dart';
 import '../../widgets/date_input_field.dart';
 import '../../services/check_service.dart';
 import '../../utils/error_extractor.dart';
@@ -230,6 +231,8 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         key: _checkSelectionTableKey,
         config: DataTableConfig<Map<String, dynamic>>(
           endpoint: '/api/v1/checks/businesses/${widget.businessId}/checks',
+          businessId: widget.businessId,
+          persistTableFiltersPageId: ListFilterPageIds.checkReconciliationSelectTable,
           title: '',
           showBackButton: false,
           showTableIcon: false,
@@ -829,6 +832,8 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
   DataTableConfig<Map<String, dynamic>> _buildHistoryConfig(AppLocalizations t, BuildContext context) {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/checks/businesses/${widget.businessId}/checks/reconciliations/list',
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.checkReconciliationHistoryTable,
       title: 'تاریخچه راس‌گیری',
       showBackButton: false,
       showTableIcon: false,

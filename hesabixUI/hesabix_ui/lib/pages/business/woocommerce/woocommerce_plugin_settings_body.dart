@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/auth_store.dart';
@@ -5,8 +7,10 @@ import '../../../l10n/app_localizations.dart';
 import '../../../services/woocommerce_integration_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import 'woocommerce_arcwoc_plugin_panel.dart';
+import 'woocommerce_l10n_format.dart';
 
-/// فرم تنظیمات پل ووکامرس (آدرس فروشگاه، توکن، تست اتصال).
+/// فرم تنظیمات پل ووکامرس + پنل تنظیمات کلی افزونهٔ ArcWOC.
 class WoocommercePluginSettingsBody extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
@@ -32,6 +36,9 @@ class _WoocommercePluginSettingsBodyState
   bool _loadingSettings = true;
   bool _saving = false;
   bool _testing = false;
+  bool _hasStoredBridgeToken = false;
+  bool _tokenObscured = true;
+  Map<String, dynamic>? _lastBridgeTest;
 
   bool _canWooCommerceView() {
     if (widget.authStore.currentBusiness?.isOwner == true) return true;
@@ -67,6 +74,7 @@ class _WoocommercePluginSettingsBodyState
       final m = await _svc.getSettings(businessId: widget.businessId);
       _storeUrlCtl.text = (m['store_base_url'] ?? '').toString();
       final tok = (m['bridge_token'] ?? '').toString();
+      _hasStoredBridgeToken = tok == '***' || tok.isNotEmpty;
       _tokenCtl.text = tok == '***' ? '' : tok;
     } catch (e) {
       if (mounted) {
@@ -89,11 +97,16 @@ class _WoocommercePluginSettingsBodyState
         businessId: widget.businessId,
         payload: <String, dynamic>{
           'store_base_url': _storeUrlCtl.text.trim(),
-          'bridge_token': _tokenCtl.text.trim().isEmpty ? '***' : _tokenCtl.text.trim(),
+          'bridge_token': _tokenCtl.text.trim().isEmpty
+              ? '***'
+              : _tokenCtl.text.trim(),
         },
       );
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: t.woocommerceSettingsSavedSnackbar);
+        SnackBarHelper.showSuccess(
+          context,
+          message: t.woocommerceSettingsSavedSnackbar,
+        );
       }
       await _loadSettings();
     } catch (e) {
@@ -111,11 +124,44 @@ class _WoocommercePluginSettingsBodyState
   Future<void> _testBridge() async {
     final t = AppLocalizations.of(context);
     if (!_canWooCommerceView()) return;
-    setState(() => _testing = true);
+    setState(() {
+      _testing = true;
+      _lastBridgeTest = null;
+    });
     try {
-      await _svc.testBridge(businessId: widget.businessId);
+      final data = await _svc.testBridge(businessId: widget.businessId);
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: t.woocommerceConnectionTestSuccess);
+        setState(() => _lastBridgeTest = Map<String, dynamic>.from(data));
+        SnackBarHelper.showSuccess(
+          context,
+          message: t.woocommerceConnectionTestSuccess,
+        );
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) {
+            final remote = data['remote'];
+            return AlertDialog(
+              title: Text(t.woocommerceConnectionTestDetailsTitle),
+              content: SingleChildScrollView(
+                child: SelectionArea(
+                  child: Text(
+                    remote == null ? '—' : _prettyJson(remote),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(MaterialLocalizations.of(ctx).closeButtonLabel),
+                ),
+              ],
+            );
+          },
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -129,6 +175,15 @@ class _WoocommercePluginSettingsBodyState
     }
   }
 
+  String _prettyJson(Object? value) {
+    try {
+      const encoder = JsonEncoder.withIndent('  ');
+      return encoder.convert(value);
+    } catch (_) {
+      return '$value';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -137,7 +192,10 @@ class _WoocommercePluginSettingsBodyState
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(t.woocommercePermissionDeniedBody, textAlign: TextAlign.center),
+          child: Text(
+            t.woocommercePermissionDeniedBody,
+            textAlign: TextAlign.center,
+          ),
         ),
       );
     }
@@ -148,10 +206,41 @@ class _WoocommercePluginSettingsBodyState
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(t.woocommerceSettingsBridgeIntroTitle, style: theme.textTheme.titleMedium),
+        Text(
+          t.woocommerceSettingsPageSubtitle,
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          t.woocommerceSettingsBridgeIntroTitle,
+          style: theme.textTheme.titleMedium,
+        ),
         const SizedBox(height: 8),
-        Text(t.woocommerceSettingsBridgeIntroBody, style: theme.textTheme.bodyMedium),
-        const SizedBox(height: 20),
+        Text(
+          t.woocommerceSettingsBridgeIntroBody,
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: Chip(
+            avatar: Icon(
+              _hasStoredBridgeToken
+                  ? Icons.verified_outlined
+                  : Icons.warning_amber_outlined,
+              size: 18,
+              color: _hasStoredBridgeToken
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.error,
+            ),
+            label: Text(
+              _hasStoredBridgeToken
+                  ? t.woocommerceBridgeTokenStored
+                  : t.woocommerceBridgeTokenMissing,
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
         if (!canManage)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -177,14 +266,27 @@ class _WoocommercePluginSettingsBodyState
           decoration: InputDecoration(
             labelText: t.woocommerceBridgeTokenLabel,
             border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              tooltip: _tokenObscured
+                  ? t.woocommerceShowTokenTooltip
+                  : t.woocommerceHideTokenTooltip,
+              onPressed: () => setState(() => _tokenObscured = !_tokenObscured),
+              icon: Icon(
+                _tokenObscured
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+            ),
           ),
-          obscureText: true,
+          obscureText: _tokenObscured,
           textDirection: TextDirection.ltr,
         ),
         const SizedBox(height: 8),
         Text(
           t.woocommerceBridgeTokenHelp,
-          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.outline,
+          ),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -215,7 +317,62 @@ class _WoocommercePluginSettingsBodyState
             ),
           ],
         ),
+        if (_lastBridgeTest != null && _lastBridgeTest!['remote'] != null) ...[
+          const SizedBox(height: 16),
+          Card.outlined(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    t.woocommerceConnectionHealthTitle,
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  ..._bridgeHealthLines(context, t, _lastBridgeTest!['remote']),
+                ],
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 28),
+        const Divider(),
+        const SizedBox(height: 8),
+        WooArcwocPluginSettingsPanel(
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+        ),
       ],
     );
+  }
+
+  List<Widget> _bridgeHealthLines(
+    BuildContext context,
+    AppLocalizations t,
+    Object? remote,
+  ) {
+    if (remote is! Map) {
+      return [Text('$remote')];
+    }
+    final m = Map<String, dynamic>.from(remote);
+    final out = <Widget>[];
+    for (final e in m.entries) {
+      final title = wooBridgeFieldTitle(t, e.key);
+      final val = wooBridgeFieldDisplayValue(t, e.key, e.value);
+      out.add(Text('$title: $val', textDirection: TextDirection.ltr));
+      out.add(const SizedBox(height: 4));
+    }
+    if (out.isEmpty) {
+      out.add(
+        SelectionArea(
+          child: Text(
+            _prettyJson(m),
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+          ),
+        ),
+      );
+    }
+    return out;
   }
 }

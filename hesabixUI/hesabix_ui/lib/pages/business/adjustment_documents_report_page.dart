@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 
 class AdjustmentDocumentsReportPage extends StatefulWidget {
@@ -55,6 +56,7 @@ class _AdjustmentDocumentsReportPageState extends State<AdjustmentDocumentsRepor
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/warehouse-reports/businesses/${widget.businessId}/adjustment-documents',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.adjustmentDocumentsReportTable,
       reportModuleKey: 'adjustment_documents',
       reportSubtype: 'list',
       title: 'گزارش حواله‌های تعدیل',

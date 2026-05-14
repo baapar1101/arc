@@ -16,6 +16,7 @@ import 'check_form_page.dart';
 import 'check_details_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../services/list_filter_preferences_service.dart';
 
 class ChecksPage extends StatefulWidget {
   final int businessId;
@@ -103,6 +104,8 @@ class _ChecksPageState extends State<ChecksPage> {
 
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/checks/businesses/${widget.businessId}/checks',
+      businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.checksTable,
       title: (t.localeName == 'fa') ? 'چک‌ها' : 'Checks',
       excelEndpoint: '/api/v1/checks/businesses/${widget.businessId}/checks/export/excel',
       pdfEndpoint: '/api/v1/checks/businesses/${widget.businessId}/checks/export/pdf',

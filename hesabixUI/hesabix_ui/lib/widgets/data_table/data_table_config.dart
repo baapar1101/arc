@@ -308,6 +308,10 @@ class DataTableConfig<T> {
 
   /// وقتی کاربر «پاک کردن فیلترها» را می‌زند (هم‌گام با نوار فیلتر سریع مثل دسته در صفحهٔ کالاها)
   final VoidCallback? onAllFiltersCleared;
+
+  /// اگر با [businessId] تنظیم شود، وضعیت فیلترهای داخل جدول (جستجوی سراسری، فیلتر ستون‌ها، چندانتخابی، بازهٔ تاریخ ستون)
+  /// در [ListFilterPreferencesService] ذخیره و پس از بازگشت به صفحه بازگردانده می‌شود.
+  final String? persistTableFiltersPageId;
   
   // Auto-fit configuration
   final bool autoFitColumnsOnFirstLoad;
@@ -412,6 +416,7 @@ class DataTableConfig<T> {
     this.onRefresh,
     this.onTableDataChanged,
     this.onAllFiltersCleared,
+    this.persistTableFiltersPageId,
     this.autoFitColumnsOnFirstLoad = true,
     this.autoFitSampleRows = 50,
     this.autoFillAvailableWidth = true,

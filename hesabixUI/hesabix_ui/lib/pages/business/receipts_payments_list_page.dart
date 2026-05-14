@@ -11,6 +11,8 @@ import 'package:hesabix_ui/services/receipt_payment_list_service.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/services/receipt_payment_service.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -92,6 +94,97 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   List<FilterOption> _projectFilterOptions = [];
   bool _loadingProjects = false;
 
+  Timer? _receiptsFilterPrefsDebounce;
+
+  Map<String, dynamic> _serializeReceiptsFilters() {
+    return <String, dynamic>{
+      if (_selectedDocumentType != null && _selectedDocumentType!.isNotEmpty)
+        'document_type': _selectedDocumentType,
+      if (_fromDate != null) 'from_date': _fromDate!.toIso8601String(),
+      if (_toDate != null) 'to_date': _toDate!.toIso8601String(),
+      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+      if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
+    };
+  }
+
+  void _schedulePersistReceiptsFilters() {
+    _receiptsFilterPrefsDebounce?.cancel();
+    _receiptsFilterPrefsDebounce = Timer(const Duration(milliseconds: 400), () {
+      _receiptsFilterPrefsDebounce = null;
+      if (!mounted) return;
+      ListFilterPreferencesService.save(
+        ListFilterPageIds.receiptsPayments,
+        widget.businessId,
+        _serializeReceiptsFilters(),
+      );
+    });
+  }
+
+  /// در صورت وجود [person_id] در ذخیره، شناسه را برمی‌گرداند تا بعد از [setState] هیدرات شود.
+  int? _applyReceiptsSavedFiltersMap(Map<String, dynamic> s) {
+    final dt = s['document_type']?.toString();
+    if (dt == 'receipt' || dt == 'payment') {
+      _selectedDocumentType = dt;
+    }
+    final from = s['from_date']?.toString();
+    if (from != null && from.isNotEmpty) {
+      _fromDate = DateTime.tryParse(from);
+    }
+    final to = s['to_date']?.toString();
+    if (to != null && to.isNotEmpty) {
+      _toDate = DateTime.tryParse(to);
+    }
+    final pid = s['project_id'];
+    if (pid is int) {
+      _selectedProjectId = pid;
+    } else if (pid != null) {
+      _selectedProjectId = int.tryParse('$pid');
+    }
+    final fy = s['fiscal_year_id'];
+    int? fyId;
+    if (fy is int) {
+      fyId = fy;
+    } else if (fy != null) {
+      fyId = int.tryParse('$fy');
+    }
+    if (fyId != null && _fiscalYears.any((e) => e['id'] == fyId)) {
+      _selectedFiscalYearId = fyId;
+    }
+    final fp = s['person_id'];
+    int? personId;
+    if (fp is int) {
+      personId = fp;
+    } else if (fp != null) {
+      personId = int.tryParse('$fp');
+    }
+    if (personId != null) {
+      _filterPerson = null;
+    }
+    return personId;
+  }
+
+  Future<void> _hydrateReceiptsFilterPerson(int personId) async {
+    try {
+      final svc = PersonService(apiClient: widget.apiClient);
+      final p = await svc.getPerson(personId);
+      if (!mounted) return;
+      setState(() => _filterPerson = p);
+    } catch (_) {
+      if (mounted) setState(() => _filterPerson = null);
+    }
+  }
+
+  void _touchReceiptsFilters(VoidCallback fn) {
+    setState(fn);
+    _schedulePersistReceiptsFilters();
+  }
+
+  void _onReceiptsDataTableAllFiltersCleared() {
+    _receiptsFilterPrefsDebounce?.cancel();
+    unawaited(_clearExternalFilters());
+  }
+
   @override
   void initState() {
     super.initState();
@@ -103,9 +196,18 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   }
 
   Future<void> _loadFiscalYears() async {
+    Map<String, dynamic>? savedFilters;
+    try {
+      savedFilters = await ListFilterPreferencesService.load(
+        ListFilterPageIds.receiptsPayments,
+        widget.businessId,
+      );
+    } catch (_) {}
+
     try {
       final items = await _dashboardService.listFiscalYears(widget.businessId);
       if (!mounted) return;
+      int? personIdToHydrate;
       setState(() {
         _fiscalYears = items;
         if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
@@ -115,17 +217,27 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           );
           _selectedFiscalYearId = current['id'] as int?;
         }
+        if (savedFilters != null && savedFilters.isNotEmpty) {
+          personIdToHydrate = _applyReceiptsSavedFiltersMap(savedFilters);
+        }
         _fiscalYearsResolved = true;
       });
+      final pidHydrate = personIdToHydrate;
+      if (pidHydrate != null) {
+        unawaited(_hydrateReceiptsFilterPerson(pidHydrate));
+      }
     } catch (_) {
       if (mounted) {
-        setState(() => _fiscalYearsResolved = true);
+        setState(() {
+          _fiscalYearsResolved = true;
+        });
       }
     }
   }
   
   @override
   void dispose() {
+    _receiptsFilterPrefsDebounce?.cancel();
     // Clean up the page state when disposed
     ReceiptsPaymentsListPage._pageStates.remove(widget.businessId);
     super.dispose();
@@ -312,7 +424,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
             if (_hasExternalFiltersActive()) ...[
               const SizedBox(width: 8),
               IconButton(
-                onPressed: _clearExternalFilters,
+                onPressed: () => unawaited(_clearExternalFilters()),
                 icon: const Icon(Icons.clear_all),
                 tooltip: t.clear,
               ),
@@ -351,7 +463,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
               if (_hasExternalFiltersActive()) ...[
                 const SizedBox(width: 8),
                 IconButton(
-                  onPressed: _clearExternalFilters,
+                  onPressed: () => unawaited(_clearExternalFilters()),
                   icon: const Icon(Icons.clear_all),
                   tooltip: t.clear,
                 ),
@@ -370,25 +482,25 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
               fromDate: _fromDate,
               toDate: _toDate,
               onDocumentTypeChanged: (v) {
-                setState(() => _selectedDocumentType = v);
+                _touchReceiptsFilters(() => _selectedDocumentType = v);
               },
               onFiscalYearChanged: (v) {
-                setState(() => _selectedFiscalYearId = v);
+                _touchReceiptsFilters(() => _selectedFiscalYearId = v);
               },
               onProjectChanged: (v) {
-                setState(() => _selectedProjectId = v);
+                _touchReceiptsFilters(() => _selectedProjectId = v);
               },
               onPersonChanged: (v) {
-                setState(() => _filterPerson = v);
+                _touchReceiptsFilters(() => _filterPerson = v);
               },
               onFromDateChanged: (v) {
-                setState(() => _fromDate = v);
+                _touchReceiptsFilters(() => _fromDate = v);
               },
               onToDateChanged: (v) {
-                setState(() => _toDate = v);
+                _touchReceiptsFilters(() => _toDate = v);
               },
               onClearDateRange: () {
-                setState(() {
+                _touchReceiptsFilters(() {
                   _fromDate = null;
                   _toDate = null;
                 });
@@ -409,7 +521,13 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         _filterPerson != null;
   }
 
-  void _clearExternalFilters() {
+  Future<void> _clearExternalFilters() async {
+    _receiptsFilterPrefsDebounce?.cancel();
+    await ListFilterPreferencesService.clear(
+      ListFilterPageIds.receiptsPayments,
+      widget.businessId,
+    );
+    if (!mounted) return;
     setState(() {
       _selectedDocumentType = null;
       _fromDate = null;
@@ -417,6 +535,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       _selectedProjectId = null;
       _filterPerson = null;
     });
+    _refreshData();
   }
 
   List<Widget> _buildExternalFilterChips(AppLocalizations t) {
@@ -604,6 +723,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
         _fromDate = fromDate;
         _toDate = toDate;
       });
+      _schedulePersistReceiptsFilters();
     }
   }
 
@@ -799,6 +919,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       excelEndpoint: '/businesses/${widget.businessId}/receipts-payments/export/excel',
       pdfEndpoint: '/businesses/${widget.businessId}/receipts-payments/export/pdf',
       businessId: widget.businessId,
+      persistTableFiltersPageId: ListFilterPageIds.receiptsPaymentsTable,
       reportModuleKey: 'receipts_payments',
       reportSubtype: 'list',
       // دکمه حذف گروهی در هدر جدول
@@ -969,6 +1090,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       loadingMessage: 'در حال بارگذاری اسناد...',
       errorMessage: 'خطا در بارگذاری اسناد',
       expandBodyHeightToFitRows: true,
+      onAllFiltersCleared: _onReceiptsDataTableAllFiltersCleared,
     );
   }
 
