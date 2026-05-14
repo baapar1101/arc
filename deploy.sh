@@ -359,17 +359,24 @@ detect_postgresql_major_version_for_config() {
 restart_postgresql_after_config_change() {
   local pgv="${1:-}"
   local meta_svc="${2:-}"
+  local ctl_out=""
   [[ -z "${pgv}" ]] && return 0
   systemctl daemon-reload 2>/dev/null || true
-  if [[ -n "${meta_svc}" ]]; then
+  systemctl enable "postgresql@${pgv}-main" 2>/dev/null || true
+  if [[ -n "${meta_svc}" ]] && [[ "${meta_svc}" != "postgresql@${pgv}-main" ]]; then
     systemctl restart "${meta_svc}" 2>/dev/null || true
   fi
   if systemctl restart "postgresql@${pgv}-main" 2>/dev/null; then
-    sleep 2
+    sleep 3
     return 0
   fi
+  log_warning "systemctl restart postgresql@${pgv}-main ناموفق بود؛ تلاش با pg_ctlcluster..."
+  if command -v pg_ctlcluster >/dev/null 2>&1; then
+    ctl_out=$(pg_ctlcluster "${pgv}" main start 2>&1) || true
+    [[ -n "${ctl_out}" ]] && log_info "${ctl_out}"
+  fi
   systemctl restart postgresql 2>/dev/null || true
-  sleep 2
+  sleep 3
 }
 
 # Validate domain format
@@ -394,10 +401,14 @@ check_service() {
 
 # Wait for PostgreSQL to be ready
 wait_for_db() {
-  local max_attempts=30
+  local max_attempts=45
   local attempt=0
   log_info "Waiting for PostgreSQL to be ready..."
   while [ $attempt -lt $max_attempts ]; do
+    if command -v pg_isready >/dev/null 2>&1 && pg_isready -q 2>/dev/null; then
+      log_success "PostgreSQL is ready (pg_isready)"
+      return 0
+    fi
     if sudo -u postgres psql -c "SELECT 1" >/dev/null 2>&1; then
       log_success "PostgreSQL is ready"
       return 0
@@ -406,6 +417,7 @@ wait_for_db() {
     sleep 2
   done
   log_error "Database not ready after $max_attempts attempts"
+  log_error "جزئیات: journalctl -xeu postgresql@*-main.service --no-pager | tail -100"
   return 1
 }
 
@@ -1252,21 +1264,15 @@ setup_db() {
   # PostgreSQL service may be named 'postgresql' or 'postgresql@VERSION-main'
   local pg_service_found=false
   local pg_service=""
-  
-  # Try to find PostgreSQL service
-  if systemctl list-unit-files 2>/dev/null | grep -qE "^postgresql\.service"; then
+  local unit_files=""
+  unit_files=$(systemctl list-unit-files --no-pager --no-legend 2>/dev/null || true)
+  # list-units یونیت‌های inactive را نشان نمی‌دهد؛ list-unit-files همیشه واحدهای نصب‌شده را دارد
+  if echo "${unit_files}" | grep -qE '^postgresql@[0-9]+-main\.service[[:space:]]'; then
+    pg_service=$(echo "${unit_files}" | awk '/^postgresql@[0-9]+-main\.service[[:space:]]/ { sub(/\.service$/, "", $1); print $1; exit }')
+    pg_service_found=true
+  elif echo "${unit_files}" | grep -qE '^postgresql\.service[[:space:]]'; then
     pg_service="postgresql"
     pg_service_found=true
-  elif systemctl list-units --type=service 2>/dev/null | grep -qE "postgresql@"; then
-    # Try to find specific version service (e.g., postgresql@16-main)
-    pg_service=$(systemctl list-units --type=service --state=inactive,active,failed 2>/dev/null | grep -oE "postgresql@[0-9]+-main" | head -1 || echo "")
-    if [[ -z "${pg_service}" ]]; then
-      # Try listing all postgresql services
-      pg_service=$(systemctl list-unit-files 2>/dev/null | grep -oE "postgresql@[0-9]+-main\.service" | head -1 | sed 's/\.service$//' || echo "")
-    fi
-    if [[ -n "${pg_service}" ]]; then
-      pg_service_found=true
-    fi
   fi
   
   if [[ "${pg_service_found}" == "true" ]]; then
@@ -1283,23 +1289,40 @@ setup_db() {
       exit 1
     fi
     
-    # If service not found, try to start postgresql anyway (might work)
-    log_warning "PostgreSQL service unit not found in systemd. Attempting to start postgresql service..."
+    log_warning "یونیت systemd برای PostgreSQL در list-unit-files پیدا نشد. تلاش با سرویس meta و pg_ctlcluster..."
     systemctl daemon-reload 2>/dev/null || true
     systemctl enable postgresql 2>/dev/null || true
     systemctl start postgresql 2>/dev/null || true
     
-    # Also try pg_ctlcluster if available (Debian/Ubuntu specific)
     if command -v pg_ctlcluster >/dev/null 2>&1; then
-      local pg_version
-      pg_version=$(pg_lsclusters 2>/dev/null | tail -1 | awk '{print $1}' || echo "")
-      if [[ -n "${pg_version}" ]]; then
-        log_info "Starting PostgreSQL cluster ${pg_version} using pg_ctlcluster..."
-        pg_ctlcluster "${pg_version}" main start 2>/dev/null || true
+      local pg_clust_ver=""
+      pg_clust_ver="${pg_ver_early:-}"
+      if [[ -z "${pg_clust_ver}" ]]; then
+        pg_clust_ver=$(pg_lsclusters 2>/dev/null | awk 'NR>1 && $1 ~ /^[0-9]+$/ {print $1; exit}')
+      fi
+      if [[ -n "${pg_clust_ver}" ]]; then
+        log_info "Starting PostgreSQL cluster ${pg_clust_ver}/main via pg_ctlcluster..."
+        local pg_start_out=""
+        pg_start_out=$(pg_ctlcluster "${pg_clust_ver}" main start 2>&1) || true
+        [[ -n "${pg_start_out}" ]] && log_info "${pg_start_out}"
       fi
     fi
     
     sleep 2
+  fi
+  
+  # اگر نسخه را داریم ولی هنوز بالا نیست، یک بار دیگر enable/start صریح (کلاستر غیرفعال در list-units دیده نمی‌شد)
+  if [[ -n "${pg_ver_early}" ]] && [[ "${pg_ver_early}" =~ ^[0-9]+$ ]]; then
+    systemctl enable "postgresql@${pg_ver_early}-main" 2>/dev/null || true
+    systemctl start "postgresql@${pg_ver_early}-main" 2>/dev/null || true
+    if command -v pg_ctlcluster >/dev/null 2>&1; then
+      if command -v pg_isready >/dev/null 2>&1 && ! pg_isready -q 2>/dev/null; then
+        local pg_boot_out=""
+        pg_boot_out=$(pg_ctlcluster "${pg_ver_early}" main start 2>&1) || true
+        [[ -n "${pg_boot_out}" ]] && log_info "${pg_boot_out}"
+      fi
+    fi
+    sleep 1
   fi
   
   # Wait for database to be ready
