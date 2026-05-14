@@ -244,6 +244,75 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
+	 * خلاصهٔ نگاشت حسابیکس از جدول wp_hesabix_v2 (در صورت پیکربندی نشدن business_id خالی برمی‌گردد).
+	 *
+	 * @param string   $entity_type   product|customer|order|variation|category
+	 * @param int      $wc_id
+	 * @param int|null $wc_parent_id
+	 * @return array<string, mixed>
+	 */
+	private static function hesabix_mapping_summary($entity_type, $wc_id, $wc_parent_id = null)
+	{
+		global $wpdb;
+
+		$empty = array(
+			'hesabix_id'    => null,
+			'sync_status'   => null,
+			'last_sync_at'  => null,
+			'error_message' => null,
+		);
+
+		$business_id = (int) get_option('hesabix_v2_business_id', 0);
+		$wc_id       = (int) $wc_id;
+		if ($business_id < 1 || $wc_id < 1) {
+			return $empty;
+		}
+
+		$table = $wpdb->prefix . 'hesabix_v2';
+		if (null !== $wc_parent_id && (int) $wc_parent_id > 0) {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT hesabix_id, sync_status, last_sync_at, error_message FROM {$table}
+					WHERE entity_type = %s AND wc_id = %d AND wc_parent_id = %d AND business_id = %d
+					LIMIT 1",
+					$entity_type,
+					$wc_id,
+					(int) $wc_parent_id,
+					$business_id
+				),
+				ARRAY_A
+			);
+		} else {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT hesabix_id, sync_status, last_sync_at, error_message FROM {$table}
+					WHERE entity_type = %s AND wc_id = %d AND wc_parent_id IS NULL AND business_id = %d
+					LIMIT 1",
+					$entity_type,
+					$wc_id,
+					$business_id
+				),
+				ARRAY_A
+			);
+		}
+
+		if (!is_array($row)) {
+			return $empty;
+		}
+
+		$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
+
+		return array(
+			'hesabix_id'    => $hid > 0 ? $hid : null,
+			'sync_status'   => isset($row['sync_status']) ? (string) $row['sync_status'] : null,
+			'last_sync_at'  => isset($row['last_sync_at']) ? (string) $row['last_sync_at'] : null,
+			'error_message' => isset($row['error_message']) && (string) $row['error_message'] !== ''
+				? (string) $row['error_message']
+				: null,
+		);
+	}
+
+	/**
 	 * @param WP_REST_Request $request
 	 * @return true|WP_Error
 	 */
@@ -482,9 +551,12 @@ class Hesabix_V2_Bridge_Rest
 	 */
 	private static function map_order_summary($order)
 	{
+		$map = self::hesabix_mapping_summary('order', (int) $order->get_id(), null);
+
 		return array(
 			'id'            => $order->get_id(),
 			'number'        => $order->get_order_number(),
+			'type'          => (string) $order->get_type(),
 			'status'        => $order->get_status(),
 			'currency'      => $order->get_currency(),
 			'total'         => (float) $order->get_total(),
@@ -493,6 +565,10 @@ class Hesabix_V2_Bridge_Rest
 			'billing_name'  => trim($order->get_formatted_billing_full_name()),
 			'billing_email' => (string) $order->get_billing_email(),
 			'line_count'    => count($order->get_items()),
+			'hesabix_id'    => $map['hesabix_id'],
+			'sync_status'   => $map['sync_status'],
+			'hesabix_last_sync_at' => $map['last_sync_at'],
+			'hesabix_error_message' => $map['error_message'],
 		);
 	}
 
@@ -559,6 +635,7 @@ class Hesabix_V2_Bridge_Rest
 	private static function map_product_summary($p)
 	{
 		$type = $p->get_type();
+		$map  = self::hesabix_mapping_summary('product', (int) $p->get_id(), null);
 		$row = array(
 			'id'         => $p->get_id(),
 			'name'       => $p->get_name(),
@@ -569,6 +646,10 @@ class Hesabix_V2_Bridge_Rest
 			'sale_price' => (float) $p->get_sale_price(),
 			'stock_quantity' => $p->managing_stock() ? $p->get_stock_quantity() : null,
 			'permalink'  => $p->get_permalink(),
+			'hesabix_id' => $map['hesabix_id'],
+			'sync_status' => $map['sync_status'],
+			'hesabix_last_sync_at' => $map['last_sync_at'],
+			'hesabix_error_message' => $map['error_message'],
 		);
 		if ($type === 'variable') {
 			/** @var WC_Product_Variable $p */
@@ -611,6 +692,7 @@ class Hesabix_V2_Bridge_Rest
 				continue;
 			}
 			$c = new WC_Customer($uid);
+			$map = self::hesabix_mapping_summary('customer', $uid, null);
 			$items[] = array(
 				'id'         => $uid,
 				'email'      => (string) $c->get_email(),
@@ -618,6 +700,10 @@ class Hesabix_V2_Bridge_Rest
 				'last_name'  => (string) $c->get_last_name(),
 				'username'   => (string) $c->get_username(),
 				'date_created' => $c->get_date_created() ? $c->get_date_created()->date('c') : null,
+				'hesabix_id' => $map['hesabix_id'],
+				'sync_status' => $map['sync_status'],
+				'hesabix_last_sync_at' => $map['last_sync_at'],
+				'hesabix_error_message' => $map['error_message'],
 			);
 		}
 

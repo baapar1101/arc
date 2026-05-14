@@ -1151,8 +1151,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sync': t.localeName.startsWith('fa') ? 'همگام‌سازی و انتشار باسلام' : 'Basalam sync & publish',
       },
       'woocommerce': {
-        'view': t.localeName.startsWith('fa') ? 'مشاهدهٔ ووکامرس' : 'View WooCommerce',
-        'manage': t.localeName.startsWith('fa') ? 'مدیریت تنظیمات ووکامرس' : 'Manage WooCommerce',
+        'view': t.permissionWooCommerceView,
+        'manage': t.permissionWooCommerceManage,
       },
     };
   }
@@ -1758,7 +1758,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'basalam':
         return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
       case 'woocommerce':
-        return t.localeName.startsWith('fa') ? 'ووکامرس' : 'WooCommerce';
+        return t.permissionSectionWooCommerce;
       case 'crm':
         return t.workflowCategoryCrm;
       case 'crm_web_chat':

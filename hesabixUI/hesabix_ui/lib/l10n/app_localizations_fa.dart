@@ -12179,6 +12179,133 @@ class AppLocalizationsFa extends AppLocalizations {
   String get wooBridgeFieldGenericSubtitle => 'مقدار خام پاسخ پل.';
 
   @override
+  String get reportsWooRefreshTooltip => 'به‌روزرسانی';
+
+  @override
+  String get reportsWooOrderStorageHpos =>
+      'ذخیرهٔ سفارش با جداول اختصاصی (HPOS)';
+
+  @override
+  String get reportsWooOrderStoragePosts =>
+      'ذخیرهٔ سفارش کلاسیک (جدول نوشته‌ها)';
+
+  @override
+  String reportsWooOrderStorageUnknown(String code) {
+    return '$code';
+  }
+
+  @override
+  String get wooBridgeFieldSiteUrl => 'آدرس سایت فروشگاه';
+
+  @override
+  String get wooBridgeFieldBridgeEnabled => 'پل REST فعال است';
+
+  @override
+  String get wooBridgeValueTrue => 'بله';
+
+  @override
+  String get wooBridgeValueFalse => 'خیر';
+
+  @override
+  String get permissionSectionWooCommerce => 'ووکامرس';
+
+  @override
+  String get permissionWooCommerceView => 'مشاهدهٔ ووکامرس';
+
+  @override
+  String get permissionWooCommerceManage => 'مدیریت تنظیمات ووکامرس';
+
+  @override
+  String get woocommerceColumnOrderType => 'نوع سفارش';
+
+  @override
+  String get woocommerceColumnHesabixId => 'شناسه در حسابیکس';
+
+  @override
+  String get woocommerceColumnSyncStatus => 'وضعیت همگام‌سازی';
+
+  @override
+  String get woocommerceSyncStatusSynced => 'همگام شده';
+
+  @override
+  String get woocommerceSyncStatusPending => 'در انتظار';
+
+  @override
+  String get woocommerceSyncStatusError => 'خطا';
+
+  @override
+  String get woocommerceSyncStatusNone => 'بدون نگاشت';
+
+  @override
+  String get woocommerceOrderTypeShopOrder => 'سفارش فروشگاه';
+
+  @override
+  String get woocommerceOrderTypeShopOrderRefund => 'سفارش برگشت وجه';
+
+  @override
+  String woocommerceOrderTypeUnknown(String type) {
+    return '$type';
+  }
+
+  @override
+  String get woocommerceOrderStatusPending => 'در انتظار پرداخت';
+
+  @override
+  String get woocommerceOrderStatusProcessing => 'در حال انجام';
+
+  @override
+  String get woocommerceOrderStatusOnHold => 'معلق';
+
+  @override
+  String get woocommerceOrderStatusCompleted => 'تکمیل شده';
+
+  @override
+  String get woocommerceOrderStatusCancelled => 'لغو شده';
+
+  @override
+  String get woocommerceOrderStatusRefunded => 'بازپرداخت شده';
+
+  @override
+  String get woocommerceOrderStatusFailed => 'ناموفق';
+
+  @override
+  String get woocommerceOrderStatusDraft => 'پیش‌نویس';
+
+  @override
+  String get woocommerceOrderStatusTrash => 'زباله‌دان';
+
+  @override
+  String get woocommerceOrderStatusAutoDraft => 'پیش‌نویس خودکار';
+
+  @override
+  String get woocommerceOrderStatusCheckoutDraft => 'پیش‌نویس تسویه';
+
+  @override
+  String woocommerceOrderStatusUnknown(String status) {
+    return '$status';
+  }
+
+  @override
+  String get woocommerceProductTypeSimple => 'محصول ساده';
+
+  @override
+  String get woocommerceProductTypeGrouped => 'محصول گروهی';
+
+  @override
+  String get woocommerceProductTypeExternal => 'محصول بیرونی';
+
+  @override
+  String get woocommerceProductTypeVariable => 'محصول متغیر';
+
+  @override
+  String get woocommerceProductTypeVariation => 'تنوع';
+
+  @override
+  String woocommerceProductTypeUnknown(String type) {
+    return '$type';
+  }
+
+  @override
   String get woocommerceSettingsPageTitle => 'تنظیمات پل ووکامرس';
 
   @override
@@ -12305,7 +12432,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get woocommerceNoData => 'داده‌ای نیست';
 
   @override
-  String woocommercePagerLine(int page, int pages, int total) {
+  String woocommercePagerLine(String page, String pages, String total) {
     return 'صفحه $page از $pages (مجموع $total)';
   }
 

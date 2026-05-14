@@ -22790,6 +22790,240 @@ abstract class AppLocalizations {
   /// **'Raw value from the bridge response.'**
   String get wooBridgeFieldGenericSubtitle;
 
+  /// No description provided for @reportsWooRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get reportsWooRefreshTooltip;
+
+  /// No description provided for @reportsWooOrderStorageHpos.
+  ///
+  /// In en, this message translates to:
+  /// **'High-performance order storage (HPOS)'**
+  String get reportsWooOrderStorageHpos;
+
+  /// No description provided for @reportsWooOrderStoragePosts.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic storage (posts table)'**
+  String get reportsWooOrderStoragePosts;
+
+  /// No description provided for @reportsWooOrderStorageUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{code}'**
+  String reportsWooOrderStorageUnknown(String code);
+
+  /// No description provided for @wooBridgeFieldSiteUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Store site URL'**
+  String get wooBridgeFieldSiteUrl;
+
+  /// No description provided for @wooBridgeFieldBridgeEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Bridge REST enabled'**
+  String get wooBridgeFieldBridgeEnabled;
+
+  /// No description provided for @wooBridgeValueTrue.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes'**
+  String get wooBridgeValueTrue;
+
+  /// No description provided for @wooBridgeValueFalse.
+  ///
+  /// In en, this message translates to:
+  /// **'No'**
+  String get wooBridgeValueFalse;
+
+  /// No description provided for @permissionSectionWooCommerce.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce'**
+  String get permissionSectionWooCommerce;
+
+  /// No description provided for @permissionWooCommerceView.
+  ///
+  /// In en, this message translates to:
+  /// **'View WooCommerce'**
+  String get permissionWooCommerceView;
+
+  /// No description provided for @permissionWooCommerceManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage WooCommerce settings'**
+  String get permissionWooCommerceManage;
+
+  /// No description provided for @woocommerceColumnOrderType.
+  ///
+  /// In en, this message translates to:
+  /// **'Order type'**
+  String get woocommerceColumnOrderType;
+
+  /// No description provided for @woocommerceColumnHesabixId.
+  ///
+  /// In en, this message translates to:
+  /// **'Hesabix ID'**
+  String get woocommerceColumnHesabixId;
+
+  /// No description provided for @woocommerceColumnSyncStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync status'**
+  String get woocommerceColumnSyncStatus;
+
+  /// No description provided for @woocommerceSyncStatusSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced'**
+  String get woocommerceSyncStatusSynced;
+
+  /// No description provided for @woocommerceSyncStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get woocommerceSyncStatusPending;
+
+  /// No description provided for @woocommerceSyncStatusError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get woocommerceSyncStatusError;
+
+  /// No description provided for @woocommerceSyncStatusNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Not linked'**
+  String get woocommerceSyncStatusNone;
+
+  /// No description provided for @woocommerceOrderTypeShopOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Order'**
+  String get woocommerceOrderTypeShopOrder;
+
+  /// No description provided for @woocommerceOrderTypeShopOrderRefund.
+  ///
+  /// In en, this message translates to:
+  /// **'Refund'**
+  String get woocommerceOrderTypeShopOrderRefund;
+
+  /// No description provided for @woocommerceOrderTypeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{type}'**
+  String woocommerceOrderTypeUnknown(String type);
+
+  /// No description provided for @woocommerceOrderStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending payment'**
+  String get woocommerceOrderStatusPending;
+
+  /// No description provided for @woocommerceOrderStatusProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing'**
+  String get woocommerceOrderStatusProcessing;
+
+  /// No description provided for @woocommerceOrderStatusOnHold.
+  ///
+  /// In en, this message translates to:
+  /// **'On hold'**
+  String get woocommerceOrderStatusOnHold;
+
+  /// No description provided for @woocommerceOrderStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get woocommerceOrderStatusCompleted;
+
+  /// No description provided for @woocommerceOrderStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get woocommerceOrderStatusCancelled;
+
+  /// No description provided for @woocommerceOrderStatusRefunded.
+  ///
+  /// In en, this message translates to:
+  /// **'Refunded'**
+  String get woocommerceOrderStatusRefunded;
+
+  /// No description provided for @woocommerceOrderStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get woocommerceOrderStatusFailed;
+
+  /// No description provided for @woocommerceOrderStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get woocommerceOrderStatusDraft;
+
+  /// No description provided for @woocommerceOrderStatusTrash.
+  ///
+  /// In en, this message translates to:
+  /// **'Trash'**
+  String get woocommerceOrderStatusTrash;
+
+  /// No description provided for @woocommerceOrderStatusAutoDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto draft'**
+  String get woocommerceOrderStatusAutoDraft;
+
+  /// No description provided for @woocommerceOrderStatusCheckoutDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Checkout draft'**
+  String get woocommerceOrderStatusCheckoutDraft;
+
+  /// No description provided for @woocommerceOrderStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{status}'**
+  String woocommerceOrderStatusUnknown(String status);
+
+  /// No description provided for @woocommerceProductTypeSimple.
+  ///
+  /// In en, this message translates to:
+  /// **'Simple product'**
+  String get woocommerceProductTypeSimple;
+
+  /// No description provided for @woocommerceProductTypeGrouped.
+  ///
+  /// In en, this message translates to:
+  /// **'Grouped product'**
+  String get woocommerceProductTypeGrouped;
+
+  /// No description provided for @woocommerceProductTypeExternal.
+  ///
+  /// In en, this message translates to:
+  /// **'External product'**
+  String get woocommerceProductTypeExternal;
+
+  /// No description provided for @woocommerceProductTypeVariable.
+  ///
+  /// In en, this message translates to:
+  /// **'Variable product'**
+  String get woocommerceProductTypeVariable;
+
+  /// No description provided for @woocommerceProductTypeVariation.
+  ///
+  /// In en, this message translates to:
+  /// **'Variation'**
+  String get woocommerceProductTypeVariation;
+
+  /// No description provided for @woocommerceProductTypeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'{type}'**
+  String woocommerceProductTypeUnknown(String type);
+
   /// No description provided for @woocommerceSettingsPageTitle.
   ///
   /// In en, this message translates to:
@@ -23034,7 +23268,7 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Page {page} of {pages} (total {total})'**
-  String woocommercePagerLine(int page, int pages, int total);
+  String woocommercePagerLine(String page, String pages, String total);
 
   /// No description provided for @woocommerceColumnOrderId.
   ///

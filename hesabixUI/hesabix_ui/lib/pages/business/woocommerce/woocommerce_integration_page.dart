@@ -8,6 +8,7 @@ import '../../../services/woocommerce_integration_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../pages/business/woocommerce/woocommerce_l10n_format.dart';
 
 class WoocommerceIntegrationPage extends StatefulWidget {
   final int businessId;
@@ -447,21 +448,31 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
           columns: [
             DataColumn(label: Text(t.woocommerceColumnOrderId)),
             DataColumn(label: Text(t.woocommerceColumnOrderNumber)),
+            DataColumn(label: Text(t.woocommerceColumnOrderType)),
             DataColumn(label: Text(t.woocommerceColumnOrderStatus)),
             DataColumn(label: Text(t.woocommerceColumnOrderTotal)),
             DataColumn(label: Text(t.woocommerceColumnBillingEmail)),
+            DataColumn(label: Text(t.woocommerceColumnHesabixId)),
+            DataColumn(label: Text(t.woocommerceColumnSyncStatus)),
           ],
           rows: _rows
               .map(
-                (r) => DataRow(
-                  cells: [
-                    DataCell(Text('${r['id'] ?? ''}')),
-                    DataCell(Text('${r['number'] ?? ''}')),
-                    DataCell(Text('${r['status'] ?? ''}')),
-                    DataCell(Text('${r['total'] ?? ''}')),
-                    DataCell(Text('${r['billing_email'] ?? ''}')),
-                  ],
-                ),
+                (r) {
+                  final err = '${r['hesabix_error_message'] ?? ''}'.trim();
+                  final syncLabel = wooSyncStatusLabel(t, r['sync_status'] as String?);
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(formatWooInteger(context, r['id']))),
+                      DataCell(Text('${r['number'] ?? ''}')),
+                      DataCell(Text(wooOrderTypeLabel(t, r['type'] as String?))),
+                      DataCell(Text(wooOrderStatusLabel(t, r['status'] as String?))),
+                      DataCell(Text(formatOrderTotalDisplay(context, r))),
+                      DataCell(Text('${r['billing_email'] ?? ''}')),
+                      DataCell(Text(_hesabixIdCell(context, r['hesabix_id']))),
+                      DataCell(err.isEmpty ? Text(syncLabel) : Tooltip(message: err, child: Text(syncLabel))),
+                    ],
+                  );
+                },
               )
               .toList(),
         ),
@@ -477,18 +488,26 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
             DataColumn(label: Text(t.woocommerceColumnSku)),
             DataColumn(label: Text(t.woocommerceColumnProductType)),
             DataColumn(label: Text(t.woocommerceColumnPrice)),
+            DataColumn(label: Text(t.woocommerceColumnHesabixId)),
+            DataColumn(label: Text(t.woocommerceColumnSyncStatus)),
           ],
           rows: _rows
               .map(
-                (r) => DataRow(
-                  cells: [
-                    DataCell(Text('${r['id'] ?? ''}')),
-                    DataCell(Text('${r['name'] ?? ''}')),
-                    DataCell(Text('${r['sku'] ?? ''}')),
-                    DataCell(Text('${r['type'] ?? ''}')),
-                    DataCell(Text('${r['price'] ?? ''}')),
-                  ],
-                ),
+                (r) {
+                  final err = '${r['hesabix_error_message'] ?? ''}'.trim();
+                  final syncLabel = wooSyncStatusLabel(t, r['sync_status'] as String?);
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(formatWooInteger(context, r['id']))),
+                      DataCell(Text('${r['name'] ?? ''}')),
+                      DataCell(Text('${r['sku'] ?? ''}')),
+                      DataCell(Text(wooProductTypeLabel(t, r['type'] as String?))),
+                      DataCell(Text(formatProductPriceDisplay(context, r))),
+                      DataCell(Text(_hesabixIdCell(context, r['hesabix_id']))),
+                      DataCell(err.isEmpty ? Text(syncLabel) : Tooltip(message: err, child: Text(syncLabel))),
+                    ],
+                  );
+                },
               )
               .toList(),
         ),
@@ -502,50 +521,69 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
           DataColumn(label: Text(t.woocommerceColumnCustomerEmail)),
           DataColumn(label: Text(t.woocommerceColumnCustomerName)),
           DataColumn(label: Text(t.woocommerceColumnUsername)),
+          DataColumn(label: Text(t.woocommerceColumnHesabixId)),
+          DataColumn(label: Text(t.woocommerceColumnSyncStatus)),
         ],
         rows: _rows
             .map(
-              (r) => DataRow(
-                cells: [
-                  DataCell(Text('${r['id'] ?? ''}')),
-                  DataCell(Text('${r['email'] ?? ''}')),
-                  DataCell(Text('${r['first_name'] ?? ''} ${r['last_name'] ?? ''}')),
-                  DataCell(Text('${r['username'] ?? ''}')),
-                ],
-              ),
+              (r) {
+                final err = '${r['hesabix_error_message'] ?? ''}'.trim();
+                final syncLabel = wooSyncStatusLabel(t, r['sync_status'] as String?);
+                return DataRow(
+                  cells: [
+                    DataCell(Text(formatWooInteger(context, r['id']))),
+                    DataCell(Text('${r['email'] ?? ''}')),
+                    DataCell(Text('${r['first_name'] ?? ''} ${r['last_name'] ?? ''}')),
+                    DataCell(Text('${r['username'] ?? ''}')),
+                    DataCell(Text(_hesabixIdCell(context, r['hesabix_id']))),
+                    DataCell(err.isEmpty ? Text(syncLabel) : Tooltip(message: err, child: Text(syncLabel))),
+                  ],
+                );
+              },
             )
             .toList(),
       ),
     );
   }
 
+  String _hesabixIdCell(BuildContext context, Object? v) {
+    if (v == null) return '-';
+    return formatWooInteger(context, v);
+  }
+
   Widget _buildPager(BuildContext context, AppLocalizations t) {
-    final pages = (_total / _perPage).ceil().clamp(1, 999999);
+    final pages = ((_total / _perPage).ceil()).clamp(1, 999999).toInt();
+    final pageStr = formatWooInteger(context, _listPage);
+    final pagesStr = formatWooInteger(context, pages);
+    final totalStr = formatWooInteger(context, _total);
     return Padding(
       padding: const EdgeInsets.all(8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            onPressed: _listPage <= 1 || _loadingList
-                ? null
-                : () {
-                    _listPage--;
-                    _refreshList();
-                  },
-            icon: const Icon(Icons.chevron_right),
-          ),
-          Text(t.woocommercePagerLine(_listPage, pages, _total)),
-          IconButton(
-            onPressed: _listPage >= pages || _loadingList
-                ? null
-                : () {
-                    _listPage++;
-                    _refreshList();
-                  },
-            icon: const Icon(Icons.chevron_left),
-          ),
-        ],
+      child: Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              onPressed: _listPage <= 1 || _loadingList
+                  ? null
+                  : () {
+                      _listPage--;
+                      _refreshList();
+                    },
+              icon: const Icon(Icons.navigate_before),
+            ),
+            Text(t.woocommercePagerLine(pageStr, pagesStr, totalStr)),
+            IconButton(
+              onPressed: _listPage >= pages || _loadingList
+                  ? null
+                  : () {
+                      _listPage++;
+                      _refreshList();
+                    },
+              icon: const Icon(Icons.navigate_next),
+            ),
+          ],
+        ),
       ),
     );
   }

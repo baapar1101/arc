@@ -12249,6 +12249,132 @@ class AppLocalizationsEn extends AppLocalizations {
       'Raw value from the bridge response.';
 
   @override
+  String get reportsWooRefreshTooltip => 'Refresh';
+
+  @override
+  String get reportsWooOrderStorageHpos =>
+      'High-performance order storage (HPOS)';
+
+  @override
+  String get reportsWooOrderStoragePosts => 'Classic storage (posts table)';
+
+  @override
+  String reportsWooOrderStorageUnknown(String code) {
+    return '$code';
+  }
+
+  @override
+  String get wooBridgeFieldSiteUrl => 'Store site URL';
+
+  @override
+  String get wooBridgeFieldBridgeEnabled => 'Bridge REST enabled';
+
+  @override
+  String get wooBridgeValueTrue => 'Yes';
+
+  @override
+  String get wooBridgeValueFalse => 'No';
+
+  @override
+  String get permissionSectionWooCommerce => 'WooCommerce';
+
+  @override
+  String get permissionWooCommerceView => 'View WooCommerce';
+
+  @override
+  String get permissionWooCommerceManage => 'Manage WooCommerce settings';
+
+  @override
+  String get woocommerceColumnOrderType => 'Order type';
+
+  @override
+  String get woocommerceColumnHesabixId => 'Hesabix ID';
+
+  @override
+  String get woocommerceColumnSyncStatus => 'Sync status';
+
+  @override
+  String get woocommerceSyncStatusSynced => 'Synced';
+
+  @override
+  String get woocommerceSyncStatusPending => 'Pending';
+
+  @override
+  String get woocommerceSyncStatusError => 'Error';
+
+  @override
+  String get woocommerceSyncStatusNone => 'Not linked';
+
+  @override
+  String get woocommerceOrderTypeShopOrder => 'Order';
+
+  @override
+  String get woocommerceOrderTypeShopOrderRefund => 'Refund';
+
+  @override
+  String woocommerceOrderTypeUnknown(String type) {
+    return '$type';
+  }
+
+  @override
+  String get woocommerceOrderStatusPending => 'Pending payment';
+
+  @override
+  String get woocommerceOrderStatusProcessing => 'Processing';
+
+  @override
+  String get woocommerceOrderStatusOnHold => 'On hold';
+
+  @override
+  String get woocommerceOrderStatusCompleted => 'Completed';
+
+  @override
+  String get woocommerceOrderStatusCancelled => 'Cancelled';
+
+  @override
+  String get woocommerceOrderStatusRefunded => 'Refunded';
+
+  @override
+  String get woocommerceOrderStatusFailed => 'Failed';
+
+  @override
+  String get woocommerceOrderStatusDraft => 'Draft';
+
+  @override
+  String get woocommerceOrderStatusTrash => 'Trash';
+
+  @override
+  String get woocommerceOrderStatusAutoDraft => 'Auto draft';
+
+  @override
+  String get woocommerceOrderStatusCheckoutDraft => 'Checkout draft';
+
+  @override
+  String woocommerceOrderStatusUnknown(String status) {
+    return '$status';
+  }
+
+  @override
+  String get woocommerceProductTypeSimple => 'Simple product';
+
+  @override
+  String get woocommerceProductTypeGrouped => 'Grouped product';
+
+  @override
+  String get woocommerceProductTypeExternal => 'External product';
+
+  @override
+  String get woocommerceProductTypeVariable => 'Variable product';
+
+  @override
+  String get woocommerceProductTypeVariation => 'Variation';
+
+  @override
+  String woocommerceProductTypeUnknown(String type) {
+    return '$type';
+  }
+
+  @override
   String get woocommerceSettingsPageTitle => 'WooCommerce bridge settings';
 
   @override
@@ -12376,7 +12502,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get woocommerceNoData => 'No data';
 
   @override
-  String woocommercePagerLine(int page, int pages, int total) {
+  String woocommercePagerLine(String page, String pages, String total) {
     return 'Page $page of $pages (total $total)';
   }
 

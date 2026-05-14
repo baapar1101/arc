@@ -4,24 +4,23 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/business_nav.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/pages/business/woocommerce/woocommerce_l10n_format.dart';
 import 'package:hesabix_ui/services/woocommerce_integration_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 
-String _wooBridgeFieldTitle(AppLocalizations t, String key) {
-  switch (key) {
-    case 'bridge_version':
-      return t.wooBridgeFieldBridgeVersion;
-    case 'wc_version':
-      return t.wooBridgeFieldWcVersion;
-    case 'wp_version':
-      return t.wooBridgeFieldWpVersion;
-    case 'plugin_version':
-      return t.wooBridgeFieldPluginVersion;
-    default:
-      return t.wooBridgeFieldGenericTitle(key);
-  }
+Widget _wooReportSyncStatusCell(AppLocalizations t, dynamic item) {
+  if (item is! Map<String, dynamic>) return const SizedBox.shrink();
+  final err = '${item['hesabix_error_message'] ?? ''}'.trim();
+  final label = wooSyncStatusLabel(t, item['sync_status'] as String?);
+  final textWidget = Text(label, maxLines: 2, overflow: TextOverflow.ellipsis);
+  if (err.isEmpty) return textWidget;
+  return Tooltip(
+    message: err,
+    waitDuration: const Duration(milliseconds: 400),
+    child: textWidget,
+  );
 }
 
 Widget _reportsWooSettingsPromoCard(BuildContext context, int businessId) {
@@ -57,7 +56,11 @@ List<Widget> _reportsWooAppBarActions(
             context.businessPanelUrl(businessId, 'settings/woocommerce'),
           ),
     ),
-    IconButton(onPressed: onRefresh, icon: const Icon(Icons.refresh)),
+    IconButton(
+      tooltip: t.reportsWooRefreshTooltip,
+      onPressed: onRefresh,
+      icon: const Icon(Icons.refresh),
+    ),
   ];
 }
 
@@ -160,12 +163,12 @@ class _WooCommerceReportsOverviewPageState extends State<WooCommerceReportsOverv
             runSpacing: 12,
             children: [
               _infoCard(theme, t.reportsWooRecentOrdersTitle, Icons.shopping_bag_outlined,
-                  '${s['orders_total'] ?? 0}'),
+                  formatWooInteger(context, s['orders_total'] ?? 0)),
               _infoCard(theme, t.reportsWooCatalogTitle, Icons.inventory_2_outlined,
-                  '${s['products_total'] ?? 0}'),
-              _infoCard(theme, t.reportsWooStatCustomers, Icons.people_outline, '${s['customers_total'] ?? 0}'),
-              _infoCard(theme, t.reportsWooStatOrders7d, Icons.trending_up, '${s['orders_last_7_days'] ?? 0}'),
-              _infoCard(theme, t.reportsWooStatOrderStorage, Icons.storage, '${s['orders_storage'] ?? '-'}'),
+                  formatWooInteger(context, s['products_total'] ?? 0)),
+              _infoCard(theme, t.reportsWooStatCustomers, Icons.people_outline, formatWooInteger(context, s['customers_total'] ?? 0)),
+              _infoCard(theme, t.reportsWooStatOrders7d, Icons.trending_up, formatWooInteger(context, s['orders_last_7_days'] ?? 0)),
+              _infoCard(theme, t.reportsWooStatOrderStorage, Icons.storage, wooOrderStorageLabel(t, s['orders_storage'])),
             ],
           ),
           if (remote.isNotEmpty) ...[
@@ -224,8 +227,8 @@ class _WooCommerceReportsOverviewPageState extends State<WooCommerceReportsOverv
                         return ListTile(
                           dense: true,
                           leading: Icon(Icons.circle, size: 12, color: _chartColor(theme, i)),
-                          title: Text(e.key, style: const TextStyle(fontSize: 13)),
-                          trailing: Text('${e.value}'),
+                          title: Text(wooOrderStatusLabel(t, e.key), style: const TextStyle(fontSize: 13)),
+                          trailing: Text(formatWooInteger(context, e.value)),
                         );
                       },
                     ),
@@ -325,7 +328,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
     }
   }
 
-  DataTableConfig<Map<String, dynamic>> _tableConfig(AppLocalizations t) {
+  DataTableConfig<Map<String, dynamic>> _tableConfig(BuildContext context, AppLocalizations t) {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/_local/woocommerce/recent-orders',
       tableId: 'woo_report_recent_orders',
@@ -334,11 +337,45 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
       columns: [
         TextColumn('id', t.woocommerceColumnOrderId),
         TextColumn('number', t.woocommerceColumnOrderNumber),
-        TextColumn('status', t.woocommerceColumnOrderStatus),
-        TextColumn('total', t.woocommerceColumnOrderTotal),
+        TextColumn(
+          'type',
+          t.woocommerceColumnOrderType,
+          sortable: false,
+          formatter: (item) => item is Map<String, dynamic> ? wooOrderTypeLabel(t, item['type'] as String?) : null,
+        ),
+        TextColumn(
+          'status',
+          t.woocommerceColumnOrderStatus,
+          formatter: (item) => item is Map<String, dynamic> ? wooOrderStatusLabel(t, item['status'] as String?) : null,
+        ),
+        NumberColumn(
+          'total',
+          t.woocommerceColumnOrderTotal,
+          sortable: false,
+          textAlign: TextAlign.end,
+          formatter: (item) => item is Map<String, dynamic> ? formatOrderTotalDisplay(context, item) : null,
+        ),
         TextColumn('billing_email', t.woocommerceColumnBillingEmail),
+        TextColumn(
+          'hesabix_id',
+          t.woocommerceColumnHesabixId,
+          sortable: false,
+          formatter: (item) {
+            if (item is! Map<String, dynamic>) return null;
+            final v = item['hesabix_id'];
+            if (v == null) return '-';
+            return formatWooInteger(context, v);
+          },
+        ),
+        CustomColumn(
+          'sync_status',
+          t.woocommerceColumnSyncStatus,
+          sortable: false,
+          searchable: true,
+          builder: (item, index) => _wooReportSyncStatusCell(t, item),
+        ),
       ],
-      searchFields: const ['id', 'number', 'status', 'billing_email', 'total'],
+      searchFields: const ['id', 'number', 'type', 'status', 'billing_email', 'hesabix_id', 'sync_status'],
       showFilters: false,
       showPagination: true,
       showRefreshButton: false,
@@ -348,7 +385,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
       enableColumnSettings: true,
       showColumnSearch: false,
       emptyStateMessage: t.reportsSearchNoResults,
-      minTableWidth: 640,
+      minTableWidth: 980,
     );
   }
 
@@ -386,7 +423,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
                           padding: const EdgeInsets.all(8),
                           child: DataTableWidget<Map<String, dynamic>>(
                             key: ValueKey(_dataEpoch),
-                            config: _tableConfig(t),
+                            config: _tableConfig(context, t),
                             fromJson: (json) => Map<String, dynamic>.from(json as Map),
                             calendarController: widget.calendarController,
                             localRawItems: _rows,
@@ -453,7 +490,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
     }
   }
 
-  DataTableConfig<Map<String, dynamic>> _tableConfig(AppLocalizations t) {
+  DataTableConfig<Map<String, dynamic>> _tableConfig(BuildContext context, AppLocalizations t) {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/_local/woocommerce/catalog',
       tableId: 'woo_report_catalog',
@@ -463,10 +500,38 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
         TextColumn('id', t.woocommerceColumnProductId),
         TextColumn('name', t.woocommerceColumnProductName),
         TextColumn('sku', t.woocommerceColumnSku),
-        TextColumn('type', t.woocommerceColumnProductType),
-        TextColumn('price', t.woocommerceColumnPrice),
+        TextColumn(
+          'type',
+          t.woocommerceColumnProductType,
+          formatter: (item) => item is Map<String, dynamic> ? wooProductTypeLabel(t, item['type'] as String?) : null,
+        ),
+        NumberColumn(
+          'price',
+          t.woocommerceColumnPrice,
+          sortable: false,
+          textAlign: TextAlign.end,
+          formatter: (item) => item is Map<String, dynamic> ? formatProductPriceDisplay(context, item) : null,
+        ),
+        TextColumn(
+          'hesabix_id',
+          t.woocommerceColumnHesabixId,
+          sortable: false,
+          formatter: (item) {
+            if (item is! Map<String, dynamic>) return null;
+            final v = item['hesabix_id'];
+            if (v == null) return '-';
+            return formatWooInteger(context, v);
+          },
+        ),
+        CustomColumn(
+          'sync_status',
+          t.woocommerceColumnSyncStatus,
+          sortable: false,
+          searchable: true,
+          builder: (item, index) => _wooReportSyncStatusCell(t, item),
+        ),
       ],
-      searchFields: const ['id', 'name', 'sku', 'type', 'price'],
+      searchFields: const ['id', 'name', 'sku', 'type', 'price', 'hesabix_id', 'sync_status'],
       showFilters: false,
       showPagination: true,
       showRefreshButton: false,
@@ -476,7 +541,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
       enableColumnSettings: true,
       showColumnSearch: false,
       emptyStateMessage: t.reportsSearchNoResults,
-      minTableWidth: 640,
+      minTableWidth: 900,
     );
   }
 
@@ -514,7 +579,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
                           padding: const EdgeInsets.all(8),
                           child: DataTableWidget<Map<String, dynamic>>(
                             key: ValueKey(_dataEpoch),
-                            config: _tableConfig(t),
+                            config: _tableConfig(context, t),
                             fromJson: (json) => Map<String, dynamic>.from(json as Map),
                             calendarController: widget.calendarController,
                             localRawItems: _rows,
@@ -603,9 +668,9 @@ class _WooCommerceBridgeHealthReportPageState extends State<WooCommerceBridgeHea
                         Card(
                           margin: const EdgeInsets.only(bottom: 8),
                           child: ListTile(
-                            title: Text(_wooBridgeFieldTitle(t, k)),
+                            title: Text(wooBridgeFieldTitle(t, k)),
                             subtitle: SelectableText(
-                              '${_remote![k]}',
+                              wooBridgeFieldDisplayValue(t, k, _remote![k]),
                               style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'monospace'),
                             ),
                           ),

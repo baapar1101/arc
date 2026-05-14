@@ -35,6 +35,7 @@ IFS=$'\n\t'
 #
 # Notes:
 # - Designed for Ubuntu 22.04+/Debian 12+
+# - حداقل RAM نصب: حدود ۵٫۵ گیگابایت (GiB) — تابع check_minimum_ram
 # - Nginx: بعد از SSL، برای عوض کردن فقط دامنه‌ها از scripts/update_nginx_domains.sh استفاده کنید؛
 #   این اسکریپت listen 443 و مسیرهای /p/ و /i/ را با گواهی Let's Encrypt (یا SSL_LETSENCRYPT_LIVE در .deploy_env) می‌سازد.
 # - آدرس API در بیلد وب: به‌صورت خودکار http یا https از روی وجود گواهی در
@@ -192,6 +193,141 @@ calculate_db_pool_settings() {
   fi
   
   echo "${pool_size}:${max_overflow}"
+}
+
+# MemTotal از /proc/meminfo (کیلوبایت)
+get_mem_total_kb() {
+  if [[ -r /proc/meminfo ]]; then
+    awk '/^MemTotal:/ {print int($2); exit}' /proc/meminfo 2>/dev/null || echo "0"
+  else
+    echo "0"
+  fi
+}
+
+# حداقل ۵٫۵ گیگابایت RAM (GiB) برای نصب Hesabix
+check_minimum_ram() {
+  local mem_kb min_kb mem_mb min_mb
+  mem_kb=$(get_mem_total_kb)
+  if [[ ! "${mem_kb}" =~ ^[0-9]+$ ]] || [[ "${mem_kb}" -eq 0 ]]; then
+    log_error "خواندن مقدار RAM از /proc/meminfo ممکن نیست. نصب متوقف شد."
+    exit 1
+  fi
+  # 5.5 GiB = 5.5 * 1024 * 1024 kB
+  min_kb=$(( (11 * 1024 * 1024) / 2 ))
+  mem_mb=$((mem_kb / 1024))
+  min_mb=$((min_kb / 1024))
+  if [[ "${mem_kb}" -lt "${min_kb}" ]]; then
+    log_error "برای نصب Hesabix حداقل ${min_mb} مگابایت RAM (حدود ۵٫۵ گیگابایت) لازم است. MemTotal فعلی: حدود ${mem_mb} مگابایت."
+    log_error "سرور را ارتقا دهید یا swap/RAM کافی فراهم کنید و دوباره اجرا کنید."
+    exit 1
+  fi
+  log_success "بررسی RAM: حدود ${mem_mb} مگابایت (حداقل مورد نیاز: ${min_mb} مگابایت)"
+}
+
+# متغیرهای پروفایل PostgreSQL را بر اساس MemTotal (kB) تنظیم می‌کند
+assign_pg_memory_profile_from_mem_kb() {
+  local mem_kb="${1:-0}"
+  if [[ ! "${mem_kb}" =~ ^[0-9]+$ ]]; then
+    mem_kb=0
+  fi
+  # آستانه‌ها بر حسب kB: 8GiB=8388608، 16GiB=16777216، 32GiB=33554432
+  if [[ "${mem_kb}" -ge 33554432 ]]; then
+    PG_SHARED_BUFFERS="8GB"
+    PG_EFFECTIVE_CACHE_SIZE="24GB"
+    PG_WORK_MEM="16MB"
+    PG_MAINTENANCE_WORK_MEM="512MB"
+    PG_MAX_CONN_CAP=800
+  elif [[ "${mem_kb}" -ge 16777216 ]]; then
+    PG_SHARED_BUFFERS="4GB"
+    PG_EFFECTIVE_CACHE_SIZE="12GB"
+    PG_WORK_MEM="12MB"
+    PG_MAINTENANCE_WORK_MEM="256MB"
+    PG_MAX_CONN_CAP=500
+  elif [[ "${mem_kb}" -ge 8388608 ]]; then
+    PG_SHARED_BUFFERS="1GB"
+    PG_EFFECTIVE_CACHE_SIZE="6GB"
+    PG_WORK_MEM="8MB"
+    PG_MAINTENANCE_WORK_MEM="128MB"
+    PG_MAX_CONN_CAP=280
+  else
+    PG_SHARED_BUFFERS="512MB"
+    PG_EFFECTIVE_CACHE_SIZE="3GB"
+    PG_WORK_MEM="4MB"
+    PG_MAINTENANCE_WORK_MEM="64MB"
+    PG_MAX_CONN_CAP=200
+  fi
+}
+
+# کاهش workers و در صورت نیاز pool تا مجموع اتصال موردنیاز از سقف منطقی RAM عبور نکند
+tune_deployment_for_system_ram() {
+  local mem_kb need pool_settings cap
+  mem_kb=$(get_mem_total_kb)
+  if [[ ! "${mem_kb}" =~ ^[0-9]+$ ]] || [[ "${mem_kb}" -eq 0 ]]; then
+    log_warning "RAM خوانده نشد؛ تنظیم خودکار worker/pool رد شد."
+    return 0
+  fi
+  assign_pg_memory_profile_from_mem_kb "${mem_kb}"
+  cap="${PG_MAX_CONN_CAP}"
+  need=$(( UVICORN_WORKERS * (DB_POOL_SIZE + DB_MAX_OVERFLOW) + 100 ))
+  while [[ "${need}" -gt "${cap}" ]] && [[ "${UVICORN_WORKERS}" -gt 1 ]]; do
+    UVICORN_WORKERS=$((UVICORN_WORKERS - 1))
+    pool_settings=$(calculate_db_pool_settings "${UVICORN_WORKERS}")
+    DB_POOL_SIZE=$(echo "${pool_settings}" | cut -d: -f1)
+    DB_MAX_OVERFLOW=$(echo "${pool_settings}" | cut -d: -f2)
+    need=$(( UVICORN_WORKERS * (DB_POOL_SIZE + DB_MAX_OVERFLOW) + 100 ))
+    log_warning "کاهش UVICORN_WORKERS به ${UVICORN_WORKERS} برای هم‌خوانی با سقف اتصال PostgreSQL (~${cap}) بر اساس RAM."
+  done
+  while [[ "${need}" -gt "${cap}" ]]; do
+    if [[ "${DB_POOL_SIZE}" -gt 20 ]]; then
+      DB_POOL_SIZE=$((DB_POOL_SIZE - 10))
+    elif [[ "${DB_MAX_OVERFLOW}" -gt 30 ]]; then
+      DB_MAX_OVERFLOW=$((DB_MAX_OVERFLOW - 10))
+    else
+      log_warning "حداکثر اتصال موردنیاز (${need}) از سقف پیشنهادی (${cap}) بیشتر است؛ max_connections در PostgreSQL بالاتر از cap تنظیم می‌شود."
+      break
+    fi
+    need=$(( UVICORN_WORKERS * (DB_POOL_SIZE + DB_MAX_OVERFLOW) + 100 ))
+    log_warning "کاهش DB_POOL_SIZE/DB_MAX_OVERFLOW برای جا شدن در محدوده RAM (نیاز اتصال تقریبی: ${need})."
+  done
+  log_info "تنظیم نهایی بر اساس RAM: workers=${UVICORN_WORKERS}, pool_size=${DB_POOL_SIZE}, max_overflow=${DB_MAX_OVERFLOW}, سقف اتصال پیشنهادی PG≈${cap}"
+}
+
+# نوشتن conf.d/hesabix-optimization.conf بر اساس RAM و بار محاسبه‌شده
+write_postgresql_hesabix_optimization_conf() {
+  local pg_version="$1"
+  local mem_kb max_conn pg_conf_dest tmpf workers pool ov
+  mem_kb=$(get_mem_total_kb)
+  assign_pg_memory_profile_from_mem_kb "${mem_kb}"
+  workers="${UVICORN_WORKERS:-1}"
+  pool="${DB_POOL_SIZE:-20}"
+  ov="${DB_MAX_OVERFLOW:-30}"
+  max_conn=$(( workers * (pool + ov) + 100 ))
+  if [[ "${max_conn}" -lt 100 ]]; then
+    max_conn=100
+  fi
+  if [[ "${max_conn}" -lt $((pool + ov + 20)) ]]; then
+    max_conn=$((pool + ov + 20))
+  fi
+  pg_conf_dest="/etc/postgresql/${pg_version}/main/conf.d/hesabix-optimization.conf"
+  sudo mkdir -p "/etc/postgresql/${pg_version}/main/conf.d"
+  tmpf="$(mktemp)"
+  {
+    echo "# Generated by Hesabix deploy.sh — do not edit by hand (re-run deploy or adjust deploy.sh)."
+    echo "# MemTotal ~ $((mem_kb / 1024)) MB — profile shared_buffers=${PG_SHARED_BUFFERS}"
+    echo ""
+    echo "# Hesabix app: uvicorn workers × (pool_size + max_overflow) + headroom"
+    echo "max_connections = ${max_conn}"
+    echo ""
+    echo "shared_buffers = ${PG_SHARED_BUFFERS}"
+    echo "effective_cache_size = ${PG_EFFECTIVE_CACHE_SIZE}"
+    echo "work_mem = ${PG_WORK_MEM}"
+    echo "maintenance_work_mem = ${PG_MAINTENANCE_WORK_MEM}"
+    echo ""
+    echo "random_page_cost = 1.1"
+  } > "${tmpf}"
+  sudo install -o postgres -g postgres -m 0644 "${tmpf}" "${pg_conf_dest}"
+  rm -f "${tmpf}"
+  log_success "فایل بهینه‌سازی PostgreSQL نوشته شد: ${pg_conf_dest}"
 }
 
 # Validate domain format
@@ -779,6 +915,7 @@ prompt_vars() {
   DB_MAX_OVERFLOW=$(echo "${pool_settings}" | cut -d: -f2)
   
   log_info "Auto-calculated database pool settings: pool_size=${DB_POOL_SIZE}, max_overflow=${DB_MAX_OVERFLOW}"
+  tune_deployment_for_system_ram
   
   if [[ -z "${API_DOMAIN}" ]]; then
     read -rp "API domain (e.g., api.example.com): " API_DOMAIN
@@ -1167,17 +1304,14 @@ setup_db() {
     log_warning "Connection test failed, but database may still be accessible. Continuing..."
   fi
 
-  # Apply PostgreSQL optimization config (max_connections=300, shared_buffers, work_mem, etc.)
-  local pg_conf_source="${APP_ROOT}/app/config/postgresql-hesabix.conf"
-  local pg_conf_dest="/etc/postgresql/${pg_version}/main/conf.d/hesabix-optimization.conf"
-  if [[ -f "${pg_conf_source}" ]]; then
-    log_info "Applying PostgreSQL optimization config..."
-    sudo cp "${pg_conf_source}" "${pg_conf_dest}" 2>/dev/null && \
-      sudo chown postgres:postgres "${pg_conf_dest}" && \
-      sudo chmod 644 "${pg_conf_dest}" && \
-      log_success "PostgreSQL optimization config applied. Restarting PostgreSQL..." && \
-      systemctl daemon-reload 2>/dev/null || true && \
-      systemctl restart "${pg_service:-postgresql}" 2>/dev/null || systemctl restart postgresql 2>/dev/null || true
+  # بهینه‌سازی PostgreSQL بر اساس RAM سرور و workers/pool (نه فایل ثابت ۳۲GB)
+  log_info "اعمال تنظیمات PostgreSQL متناسب با RAM و بار Hesabix..."
+  write_postgresql_hesabix_optimization_conf "${pg_version}"
+  systemctl daemon-reload 2>/dev/null || true
+  if [[ -n "${pg_service:-}" ]]; then
+    systemctl restart "${pg_service}" 2>/dev/null || systemctl restart "postgresql@${pg_version}-main" 2>/dev/null || systemctl restart postgresql 2>/dev/null || true
+  else
+    systemctl restart "postgresql@${pg_version}-main" 2>/dev/null || systemctl restart postgresql 2>/dev/null || true
   fi
 }
 
@@ -2705,6 +2839,9 @@ main() {
   
   # Check OS compatibility (must be Debian/Ubuntu)
   check_os_compatibility
+  
+  # حداقل RAM برای نصب (قبل از لایسنس تا وقت کاربر هدر نرود)
+  check_minimum_ram
   
   # Show license information
   show_license_info
