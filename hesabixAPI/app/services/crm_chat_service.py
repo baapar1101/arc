@@ -229,6 +229,19 @@ def _message_to_dict_enriched(db: Session, m: CrmChatMessage) -> Dict[str, Any]:
 	return d
 
 
+def _message_dict_for_realtime_ws(db: Session, m: CrmChatMessage) -> Dict[str, Any]:
+	"""همان enriched اما زمان‌ها به صورت ISO با آفست منطقهٔ نمایش سیستم (برای WebSocket)."""
+	from app.services.system_settings_service import datetime_to_system_tz_iso_string
+
+	d = _message_to_dict_enriched(db, m)
+	out = dict(d)
+	for k in ("created_at", "edited_at", "read_at", "deleted_at"):
+		v = out.get(k)
+		if isinstance(v, datetime):
+			out[k] = datetime_to_system_tz_iso_string(v)
+	return out
+
+
 def get_or_create_crm_settings(db: Session, business_id: int) -> BusinessCrmSettings:
 	row = db.get(BusinessCrmSettings, business_id)
 	if not row:
@@ -539,7 +552,7 @@ async def post_visitor_message(
 	db.commit()
 	db.refresh(msg)
 
-	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_to_dict_enriched(db, msg)}
+	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_dict_for_realtime_ws(db, msg)}
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
 
@@ -673,7 +686,7 @@ async def post_visitor_file(
 	db.commit()
 	db.refresh(msg)
 
-	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_to_dict_enriched(db, msg)}
+	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_dict_for_realtime_ws(db, msg)}
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
 
@@ -739,7 +752,7 @@ async def post_agent_message(
 	db.commit()
 	db.refresh(msg)
 
-	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_to_dict_enriched(db, msg)}
+	payload = {"type": "crm_chat.event", "event": "message.created", "message": _message_dict_for_realtime_ws(db, msg)}
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
 
@@ -929,7 +942,7 @@ async def patch_agent_message(
 	m.edited_at = datetime.utcnow()
 	db.commit()
 	db.refresh(m)
-	payload = {"type": "crm_chat.event", "event": "message.updated", "message": _message_to_dict_enriched(db, m)}
+	payload = {"type": "crm_chat.event", "event": "message.updated", "message": _message_dict_for_realtime_ws(db, m)}
 	await crm_chat_realtime_manager.broadcast_conversation(c.id, payload)
 	await crm_chat_realtime_manager.broadcast_business(c.business_id, {**payload, "conversation_id": c.id})
 	return _message_to_dict_enriched(db, m)

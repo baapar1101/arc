@@ -26,6 +26,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   String _appVersion = '';
   String _defaultLanguage = 'fa';
   String _defaultTheme = 'system';
+  String _defaultDisplayTimezone = 'Asia/Tehran';
   bool _enableRegistration = true;
   bool _enableEmailVerification = true;
   bool _enableMaintenanceMode = false;
@@ -144,6 +145,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _appVersion = data['app_version']?.toString() ?? '1.0.23';
           _defaultLanguage = data['default_language']?.toString() ?? 'fa';
           _defaultTheme = data['default_theme']?.toString() ?? 'system';
+          final tzRaw = data['default_timezone']?.toString().trim();
+          _defaultDisplayTimezone = (tzRaw != null && tzRaw.isNotEmpty) ? tzRaw : 'Asia/Tehran';
           _enableRegistration = data['enable_registration'] as bool? ?? true;
           _enableEmailVerification = data['enable_email_verification'] as bool? ?? true;
           _enableMaintenanceMode = data['enable_maintenance_mode'] as bool? ?? false;
@@ -389,6 +392,20 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                         DropdownMenuItem(value: 'dark', child: Text(t.dark)),
                       ],
                       onChanged: (value) => setState(() => _defaultTheme = value!),
+                    ),
+                    _buildTextField(
+                      label: 'منطقهٔ زمانی نمایش (IANA)',
+                      value: _defaultDisplayTimezone,
+                      onChanged: (value) => setState(() => _defaultDisplayTimezone = value),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        'مثال: Asia/Tehran، UTC، Europe/Berlin. همهٔ تاریخ/زمان‌های ارسالی API بر اساس این منطقه نمایش داده می‌شوند.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -1040,6 +1057,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'app_version': _appVersion.trim(),
         'default_language': _defaultLanguage,
         'default_theme': _defaultTheme,
+        'default_timezone': _defaultDisplayTimezone.trim(),
         'enable_registration': _enableRegistration,
         'enable_email_verification': _enableEmailVerification,
         'enable_maintenance_mode': _enableMaintenanceMode,

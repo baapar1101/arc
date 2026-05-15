@@ -709,16 +709,56 @@
 		}
 		try {
 			var d = new Date( iso );
+			if ( isNaN( d.getTime() ) ) {
+				return String( iso );
+			}
+			var tz = state.serverDisplayTimezone;
+			if ( tz && typeof Intl !== 'undefined' ) {
+				return d.toLocaleString( undefined, { timeZone: tz } );
+			}
 			return d.toLocaleString();
 		} catch ( e ) {
 			return String( iso );
 		}
 	}
 
+	function fetchWidgetDisplayTimezone() {
+		if ( state.serverDisplayTimezone ) {
+			return Promise.resolve();
+		}
+		var base = ( cfg.apiBase || '' ).replace( /\/$/, '' );
+		if ( ! base || ! cfg.publicKey ) {
+			return Promise.resolve();
+		}
+		var url = base + '/api/v1/public/crm-chat/widget-options?public_key=' + encodeURIComponent( cfg.publicKey );
+		return fetch( url, { method: 'GET', credentials: 'omit' } )
+			.then( function ( res ) {
+				return res.text().then( function ( t ) {
+					return { ok: res.ok, t: t };
+				} );
+			} )
+			.then( function ( pack ) {
+				var j = parseJsonSafe( pack.t );
+				if ( ! pack.ok || ! j ) {
+					return;
+				}
+				var wrapD = j.data !== undefined && j.data !== null ? j.data : j;
+				if ( ! wrapD ) {
+					return;
+				}
+				var dtz = wrapD.display_timezone ? String( wrapD.display_timezone ).trim() : '';
+				if ( dtz ) {
+					state.serverDisplayTimezone = dtz;
+				}
+			} )
+			.catch( function () {} );
+	}
+
 	var state = {
 		open: false,
 		session: null,
 		messages: [],
+		serverDisplayTimezone: null,
 		localCannedAfterVisitor: [],
 		agentSoundPrimed: false,
 		lastAgentMsgNotifiedId: 0,
@@ -1421,6 +1461,12 @@
 				}
 				state.visitorOpts.allowFile = !! wrapD.allow_file_upload;
 				state.visitorOpts.allowVoice = !! wrapD.allow_voice;
+				try {
+					var dtz = wrapD.display_timezone ? String( wrapD.display_timezone ).trim() : '';
+					state.serverDisplayTimezone = dtz || null;
+				} catch ( eTz ) {
+					state.serverDisplayTimezone = null;
+				}
 				var effFile = !!( wantsFileUi && state.visitorOpts.allowFile );
 				var effVoice = !!( wantsVoiceUi && state.visitorOpts.allowVoice );
 				if ( effFile ) {
@@ -2418,10 +2464,12 @@
 	function afterSessionReady( skipRealtime ) {
 		enterChatMode();
 		installVisitorPageUrlTracking();
-		return refreshMessages().then( function () {
-			if ( ! skipRealtime && state.open ) {
-				bindRealtime();
-			}
+		return fetchWidgetDisplayTimezone().then( function () {
+			return refreshMessages().then( function () {
+				if ( ! skipRealtime && state.open ) {
+					bindRealtime();
+				}
+			} );
 		} );
 	}
 

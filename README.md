@@ -169,7 +169,11 @@ systemctl status nginx
 
 ### Upgrading
 
-To upgrade to the latest version:
+You can upgrade in either of the following ways.
+
+#### Re-run the installer (full deploy script)
+
+To upgrade by downloading and running the deployment script again:
 
 ```bash
 cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
@@ -178,6 +182,31 @@ cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' >
 The script is idempotent and safe to re-run. It will update the code and restart services.
 
 > **HTTP/2 issue**: If you encounter an HTTP/2-related error, use the same command with the `--http1.1` flag or refer to the [Troubleshooting HTTP/2](#troubleshooting-http2-when-downloading-install-script) section.
+
+#### Update on the server with `hesabix -update`
+
+After a standard installation, a small CLI is available at `/usr/local/bin/hesabix`. For an in-place upgrade from the configured Git repository (without re-downloading the installer), run as **root**:
+
+```bash
+sudo hesabix -update
+```
+
+This runs `update.sh` in the deployed app directory. It typically: pulls the latest code from the saved remote and branch, applies database migrations, restarts Hesabix systemd units (API, RQ worker, notification moderation—and pgAdmin4 if installed), rebuilds the Flutter web frontend, and reloads Nginx. Progress and errors are also written to `/opt/hesabix/update.log`.
+
+Optional overrides (useful for forks or testing a branch):
+
+```bash
+sudo hesabix -update -source https://source.hesabix.ir/hesabix/arc.git
+sudo hesabix -update -branch main
+sudo hesabix -update -source https://example.com/your/repo.git -branch develop
+```
+
+Other `hesabix` commands:
+
+- `sudo hesabix -services {start|stop|restart|status}` — control Hesabix-related systemd units without updating code.
+- `sudo hesabix -cli reload` — refresh `/usr/local/bin/hesabix` from the repo if the CLI script was updated.
+
+`hesabix -update` requires a completed prior deploy (`/opt/hesabix/.deploy_env`, app clone under `/opt/hesabix/app`, and `/opt/hesabix/app/update.sh`). If those are missing, use the installer method above.
 
 ## Configuration
 

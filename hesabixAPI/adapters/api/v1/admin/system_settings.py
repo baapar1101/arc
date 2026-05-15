@@ -342,6 +342,11 @@ class SystemConfigurationPayload(BaseModel):
 	app_version: str | None = None
 	default_language: str | None = None
 	default_theme: str | None = None
+	default_timezone: str | None = Field(
+		default=None,
+		description="نام منطقهٔ زمانی IANA برای نمایش تاریخ/زمان در کل سیستم (مثال Asia/Tehran)",
+		max_length=80,
+	)
 	enable_registration: bool | None = None
 	enable_email_verification: bool | None = None
 	enable_maintenance_mode: bool | None = None
@@ -426,6 +431,7 @@ def set_system_configuration_endpoint(
 		app_version=payload.app_version,
 		default_language=payload.default_language,
 		default_theme=payload.default_theme,
+		default_timezone=payload.default_timezone,
 		enable_registration=payload.enable_registration,
 		enable_email_verification=payload.enable_email_verification,
 		enable_maintenance_mode=payload.enable_maintenance_mode,

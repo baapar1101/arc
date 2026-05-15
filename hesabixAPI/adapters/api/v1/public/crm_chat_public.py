@@ -20,6 +20,7 @@ from app.core.i18n import get_request_translator
 from app.core.rate_limiter import get_client_ip
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services import crm_chat_service as chat_svc
+from app.services.system_settings_service import get_system_display_timezone_cached
 
 router = APIRouter(tags=["عمومی — چت وب CRM"])
 
@@ -84,7 +85,11 @@ async def public_widget_options(
 	allow_f = chat_svc.visitor_file_upload_effective_for_widget(db, w)
 	allow_v = chat_svc.visitor_voice_effective_for_widget(db, w)
 	return success_response(
-		data={"allow_file_upload": allow_f, "allow_voice": allow_v},
+		data={
+			"allow_file_upload": allow_f,
+			"allow_voice": allow_v,
+			"display_timezone": get_system_display_timezone_cached(),
+		},
 		request=request,
 		message="",
 	)

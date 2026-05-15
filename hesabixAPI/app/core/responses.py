@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from typing import Any
-from datetime import datetime, date
+from datetime import datetime, date, timezone as dt_timezone
 
 from fastapi import HTTPException, status, Request
-from .calendar import CalendarConverter, CalendarType
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from .calendar import CalendarConverter
 
 
 def success_response(data: Any, request: Request = None, message: str = None, **kwargs) -> dict[str, Any]:
@@ -34,22 +36,47 @@ def success_response(data: Any, request: Request = None, message: str = None, **
 	return response
 
 
+def _localize_assumed_utc_naive_for_display(dt: datetime, tz_name: str) -> datetime:
+	"""
+	قرارداد: datetime بدون tz در DB به‌عنوان UTC ذخیره شده است.
+	خروجی: همان لحظه به‌صورت «ساعت دیوار» در منطقهٔ نمایش سیستم (naive برای تبدیل تقویم).
+	"""
+	name = (tz_name or "Asia/Tehran").strip() or "Asia/Tehran"
+	try:
+		tz = ZoneInfo(name)
+	except ZoneInfoNotFoundError:
+		tz = ZoneInfo("Asia/Tehran")
+	if dt.tzinfo is None:
+		utc_dt = dt.replace(tzinfo=dt_timezone.utc)
+	else:
+		utc_dt = dt.astimezone(dt_timezone.utc)
+	return utc_dt.astimezone(tz).replace(tzinfo=None)
+
+
 def format_datetime_fields(data: Any, request: Request) -> Any:
-	"""Recursively format datetime fields based on calendar type"""
+	"""Recursively format datetime fields based on calendar type and system display timezone."""
 	if not request or not hasattr(request.state, 'calendar_type'):
 		return data
-	
+
+	from app.services.system_settings_service import get_system_display_timezone_cached
+
+	tz_name = get_system_display_timezone_cached()
+	return _format_datetime_fields_impl(data, request, tz_name)
+
+
+def _format_datetime_fields_impl(data: Any, request: Request, tz_name: str) -> Any:
 	calendar_type = request.state.calendar_type
-	
+
 	# Fields that should show only date (no time) and return as string (not object)
 	DATE_ONLY_FIELDS = {'issue_date', 'due_date', 'start_date', 'end_date', 'document_date', 'occurs_on'}
-	
+
 	if isinstance(data, dict):
 		formatted_data = {}
 		for key, value in data.items():
 			if value is None:
 				formatted_data[key] = None
 			elif isinstance(value, datetime):
+				value = _localize_assumed_utc_naive_for_display(value, tz_name)
 				# For date-only fields (like issue_date, due_date), use date_only format
 				is_date_only = key in DATE_ONLY_FIELDS
 				if is_date_only:
@@ -82,6 +109,7 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 			elif isinstance(value, date):
 				# Convert date to datetime for processing
 				dt_value = datetime.combine(value, datetime.min.time())
+				dt_value = _localize_assumed_utc_naive_for_display(dt_value, tz_name)
 				# Check if this is a date-only field
 				is_date_only = key in DATE_ONLY_FIELDS
 				
@@ -89,7 +117,7 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 				if calendar_type == "jalali":
 					formatted_data[key] = CalendarConverter.to_jalali(dt_value)["date_only"]
 				else:
-					formatted_data[key] = value.isoformat()
+					formatted_data[key] = dt_value.date().isoformat()
 				
 				# Add formatted and raw fields for all date fields (including DATE_ONLY_FIELDS)
 				# This allows frontend to properly parse dates in both formats
@@ -97,17 +125,17 @@ def format_datetime_fields(data: Any, request: Request) -> Any:
 				# Raw date should always be in ISO format (Gregorian) for parsing
 				# This allows frontend to use DateTime.tryParse() or similar methods
 				if is_date_only:
-					formatted_data[f"{key}_raw"] = value.isoformat()
+					formatted_data[f"{key}_raw"] = dt_value.date().isoformat()
 				else:
 					formatted_data[f"{key}_raw"] = dt_value.isoformat()
 			elif isinstance(value, (dict, list)):
-				formatted_data[key] = format_datetime_fields(value, request)
+				formatted_data[key] = _format_datetime_fields_impl(value, request, tz_name)
 			else:
 				formatted_data[key] = value
 		return formatted_data
 	
 	elif isinstance(data, list):
-		return [format_datetime_fields(item, request) for item in data]
+		return [_format_datetime_fields_impl(item, request, tz_name) for item in data]
 	
 	else:
 		return data
@@ -145,5 +173,4 @@ class ApiError(HTTPException):
 				"error": error_payload,
 			},
 		)
-
 

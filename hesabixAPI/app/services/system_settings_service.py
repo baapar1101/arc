@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Optional, Dict, Any, List
+from datetime import datetime
 import json
 from urllib.parse import urlparse
 
@@ -55,6 +56,8 @@ SYSTEM_CONFIG_APP_NAME = "system_config_app_name"
 SYSTEM_CONFIG_APP_VERSION = "system_config_app_version"
 SYSTEM_CONFIG_DEFAULT_LANGUAGE = "system_config_default_language"
 SYSTEM_CONFIG_DEFAULT_THEME = "system_config_default_theme"
+# منطقهٔ زمانی IANA برای نمایش تاریخ/زمان در API (قرارداد: مقادیر naive در DB = UTC)
+SYSTEM_CONFIG_DEFAULT_TIMEZONE = "system_config_default_timezone"
 SYSTEM_CONFIG_ENABLE_REGISTRATION = "system_config_enable_registration"
 SYSTEM_CONFIG_ENABLE_EMAIL_VERIFICATION = "system_config_enable_email_verification"
 SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE = "system_config_enable_maintenance_mode"
@@ -707,6 +710,64 @@ def get_default_theme(db: Session) -> str:
 	return (default_theme.value_string if default_theme and default_theme.value_string else "system")
 
 
+def validate_iana_timezone_name(name: str) -> str:
+	"""نام IANA را اعتبارسنجی می‌کند؛ در صورت نامعتبر بودن Asia/Tehran برمی‌گرداند."""
+	from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+	n = (name or "").strip()
+	if not n:
+		return "Asia/Tehran"
+	try:
+		ZoneInfo(n)
+		return n
+	except ZoneInfoNotFoundError:
+		return "Asia/Tehran"
+
+
+def resolve_system_display_timezone_string(db: Session) -> str:
+	"""مقدار ذخیره‌شده در DB را می‌خواند و به نام IANA معتبر نرمال می‌کند."""
+	row = _get_setting(db, SYSTEM_CONFIG_DEFAULT_TIMEZONE)
+	raw = (row.value_string if row and row.value_string else "").strip()
+	if not raw:
+		return "Asia/Tehran"
+	return validate_iana_timezone_name(raw)
+
+
+def get_system_display_timezone_cached() -> str:
+	"""منطقهٔ زمانی نمایش برای سریالایزر پاسخ‌ها (با کش کوتاه)."""
+	cache = get_cache()
+	cache_key = "system:display_timezone"
+	cached = cache.get(cache_key)
+	if cached is not None:
+		return str(cached)
+	try:
+		from adapters.db.session import get_db_session
+
+		with get_db_session() as db:
+			tz = resolve_system_display_timezone_string(db)
+	except Exception:
+		tz = "Asia/Tehran"
+	cache.set(cache_key, tz, ttl=300)
+	return tz
+
+
+def datetime_to_system_tz_iso_string(dt: datetime) -> str:
+	"""برای WebSocket/JSON: لحظهٔ naive UTC را به ISO با آفست منطقهٔ نمایش سیستم تبدیل می‌کند."""
+	from datetime import timezone as dt_timezone
+	from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+	tz_name = get_system_display_timezone_cached()
+	try:
+		tz = ZoneInfo(tz_name.strip() or "Asia/Tehran")
+	except ZoneInfoNotFoundError:
+		tz = ZoneInfo("Asia/Tehran")
+	if dt.tzinfo is None:
+		utc_dt = dt.replace(tzinfo=dt_timezone.utc)
+	else:
+		utc_dt = dt.astimezone(dt_timezone.utc)
+	return utc_dt.astimezone(tz).isoformat()
+
+
 def get_captcha_auth_security_effective(db: Session) -> Dict[str, Any]:
 	"""
 	مقادیر مؤثر امنیت کپچا و محدودیت نرخ (DB + env).
@@ -792,6 +853,7 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"app_version": (app_version.value_string if app_version and app_version.value_string else env.app_version),
 		"default_language": (default_language.value_string if default_language and default_language.value_string else "fa"),
 		"default_theme": (default_theme.value_string if default_theme and default_theme.value_string else "system"),
+		"default_timezone": resolve_system_display_timezone_string(db),
 		"enable_registration": (enable_registration if enable_registration is not None else True),
 		"enable_email_verification": (enable_email_verification if enable_email_verification is not None else True),
 		"enable_maintenance_mode": (enable_maintenance_mode if enable_maintenance_mode is not None else False),
@@ -839,6 +901,7 @@ def set_system_configuration(
 	app_version: str | None = None,
 	default_language: str | None = None,
 	default_theme: str | None = None,
+	default_timezone: str | None = None,
 	enable_registration: bool | None = None,
 	enable_email_verification: bool | None = None,
 	enable_maintenance_mode: bool | None = None,
@@ -907,6 +970,23 @@ def set_system_configuration(
 		if default_theme not in {"system", "light", "dark"}:
 			raise ApiError("INVALID_THEME", "تم باید system، light یا dark باشد", http_status=400)
 		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_THEME, default_theme)
+
+	if default_timezone is not None:
+		from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+		raw_tz = str(default_timezone).strip()
+		if not raw_tz:
+			raise ApiError("INVALID_TIMEZONE", "نام منطقهٔ زمانی (IANA) نمی‌تواند خالی باشد", http_status=400)
+		try:
+			ZoneInfo(raw_tz)
+		except ZoneInfoNotFoundError:
+			raise ApiError(
+				"INVALID_TIMEZONE",
+				f"نام منطقهٔ زمانی معتبر نیست (مثال: Asia/Tehran): {raw_tz}",
+				http_status=400,
+			)
+		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_TIMEZONE, raw_tz)
+		cache.delete("system:display_timezone")
 	
 	if enable_registration is not None:
 		_upsert_setting_bool(db, SYSTEM_CONFIG_ENABLE_REGISTRATION, enable_registration)
