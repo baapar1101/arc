@@ -15,6 +15,7 @@ import '../../utils/number_formatters.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../widgets/inputs/frequent_description_text_field.dart';
 
 class CheckFormDialog extends StatefulWidget {
   final int businessId;
@@ -582,7 +583,8 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                                     )
                                   : const SizedBox.shrink(),
                               const SizedBox(height: 12),
-                              TextFormField(
+                              FrequentDescriptionTextField(
+                                businessId: widget.businessId,
                                 controller: _docDescCtrl,
                                 decoration: const InputDecoration(labelText: 'شرح سند', border: OutlineInputBorder()),
                               ),
@@ -604,7 +606,8 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: TextFormField(
+                                child: FrequentDescriptionTextField(
+                                  businessId: widget.businessId,
                                   controller: _docDescCtrl,
                                   decoration: const InputDecoration(labelText: 'شرح سند', border: OutlineInputBorder()),
                                 ),

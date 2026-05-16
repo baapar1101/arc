@@ -15,6 +15,7 @@ from .email_verification import EmailVerificationToken  # noqa: F401
 from .mobile_verification import MobileVerificationToken  # noqa: F401
 from .otp_login_session import OtpLoginSession  # noqa: F401
 from .business import Business  # noqa: F401
+from .business_frequent_description import BusinessFrequentDescription  # noqa: F401
 from .business_dashboard_layout import (  # noqa: F401
 	BusinessUserDashboardLayout,
 	BusinessDashboardDefaultLayout,

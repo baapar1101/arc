@@ -15,15 +15,22 @@ from adapters.db.models.business import Business
 from adapters.db.models.document import Document
 from adapters.db.models.document_share_link import DocumentShareLink
 from adapters.db.models.person_share_link import PersonShareLink
+from adapters.db.models.payment_gateway import BusinessPaymentGateway, PaymentGateway
 from app.core.responses import ApiError
 from app.core.settings import get_settings
-from app.services.invoice_service import SUPPORTED_INVOICE_TYPES, invoice_document_to_dict
+from app.services.invoice_service import SUPPORTED_INVOICE_TYPES, invoice_document_to_dict, calculate_invoice_remaining
+from app.services.system_settings_service import get_share_link_invoice_gateway_fee_percent
 from app.services.system_settings_service import resolve_share_url_http_origin
 
 logger = logging.getLogger(__name__)
 
 BASE62_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 DEFAULT_CODE_LENGTH = 9
+
+
+def _link_options(link: DocumentShareLink) -> Dict[str, Any]:
+    raw = getattr(link, "options", None)
+    return raw if isinstance(raw, dict) else {}
 
 
 def _settings():
@@ -133,6 +140,8 @@ def serialize_document_share_link(
         "is_expired": link.is_expired,
         "status": status,
         "remaining_hours": remaining_hours,
+        "online_payment_enabled": bool((link.options or {}).get("online_payment_enabled")),
+        "online_payment_gateway_id": (link.options or {}).get("online_payment_gateway_id"),
     }
 
 
@@ -376,6 +385,21 @@ def build_public_payload(
     _enrich_public_invoice_adjustments(db, public_invoice)
     installments = _build_public_installments(public_invoice.get("extra_info") or {})
 
+    opts = _link_options(link)
+    online_payment: Dict[str, Any] = {
+        "enabled": bool(opts.get("online_payment_enabled")),
+        "gateway_configured": bool(opts.get("online_payment_gateway_id")),
+        "fee_percent": float(get_share_link_invoice_gateway_fee_percent(db)),
+        "remaining": None,
+        "currency_id": int(document.currency_id) if document.currency_id else None,
+    }
+    try:
+        if document.document_type == "invoice_sales" and not getattr(document, "is_proforma", False):
+            rem = calculate_invoice_remaining(db, int(link.business_id), int(document.id))
+            online_payment["remaining"] = float(rem.get("remaining") or 0)
+    except Exception:
+        logger.exception("public invoice online_payment remaining failed")
+
     return {
         "share_link": serialize_document_share_link(link, db=db),
         "business": {
@@ -388,6 +412,7 @@ def build_public_payload(
         },
         "invoice": public_invoice,
         "installments": installments,
+        "online_payment": online_payment,
         "authenticity": {
             "verified": True,
             "message_fa": "این فاکتور در سامانه حسابیکس (Hesabix) ثبت شده است.",
@@ -444,6 +469,8 @@ def create_share_link(
     max_view_count: Optional[int],
     replace_existing: bool = True,
     unlimited_expiry: bool = False,
+    online_payment_enabled: Optional[bool] = None,
+    online_payment_gateway_id: Optional[int] = None,
 ) -> DocumentShareLink:
     document = (
         db.query(Document)
@@ -458,6 +485,8 @@ def create_share_link(
             "فقط برای اسناد فاکتور می‌توان لینک ایجاد کرد",
             http_status=400,
         )
+    if online_payment_gateway_id:
+        _assert_gateway_allowed_for_business(db, business_id, int(online_payment_gateway_id))
     if unlimited_expiry:
         expires_at = None
         normalized_max_view = None
@@ -483,6 +512,16 @@ def create_share_link(
                 existing.revoked_by_user_id = user_id
                 db.add(existing)
         code = _generate_code(db)
+        options: Optional[Dict[str, Any]] = None
+        if online_payment_enabled is not None or online_payment_gateway_id is not None:
+            options = {}
+            if online_payment_enabled is not None:
+                options["online_payment_enabled"] = bool(online_payment_enabled)
+            if online_payment_gateway_id is not None:
+                try:
+                    options["online_payment_gateway_id"] = int(online_payment_gateway_id)
+                except Exception:
+                    options["online_payment_gateway_id"] = None
         link = DocumentShareLink(
             business_id=business_id,
             document_id=document_id,
@@ -492,6 +531,7 @@ def create_share_link(
             expires_at=expires_at,
             view_count=0,
             max_view_count=normalized_max_view,
+            options=options,
         )
         db.add(link)
         db.commit()
@@ -508,6 +548,63 @@ def create_share_link(
             "ایجاد لینک اشتراک ممکن نشد",
             http_status=500,
         )
+
+
+def _assert_gateway_allowed_for_business(db: Session, business_id: int, gateway_id: int) -> None:
+    gw = (
+        db.query(PaymentGateway)
+        .filter(PaymentGateway.id == int(gateway_id), PaymentGateway.is_active == True)  # noqa: E712
+        .first()
+    )
+    if not gw:
+        raise ApiError("GATEWAY_NOT_FOUND", "درگاه پرداخت یافت نشد یا غیرفعال است", http_status=404)
+    links = (
+        db.query(BusinessPaymentGateway)
+        .filter(
+            BusinessPaymentGateway.business_id == int(business_id),
+            BusinessPaymentGateway.is_active == True,  # noqa: E712
+        )
+        .all()
+    )
+    if links:
+        allowed = {int(lg.gateway_id) for lg in links}
+        if int(gateway_id) not in allowed:
+            raise ApiError(
+                "GATEWAY_NOT_LINKED",
+                "این درگاه برای این کسب‌وکار فعال نیست",
+                http_status=400,
+            )
+
+
+def update_document_share_link_payment_options(
+    db: Session,
+    *,
+    business_id: int,
+    document_id: int,
+    user_id: int,
+    patch: Dict[str, Any],
+) -> DocumentShareLink:
+    """به‌روزرسانی تنظیمات پرداخت آنلاین روی لینک فعال فاکتور (فقط فیلدهای ارسال‌شده)."""
+    _ = user_id
+    link = get_active_share_link_for_document(db, business_id, document_id)
+    if not link:
+        raise ApiError("SHARE_LINK_NOT_FOUND", "لینک فعالی برای این فاکتور وجود ندارد", http_status=404)
+    opts: Dict[str, Any] = dict(_link_options(link))
+    if "online_payment_enabled" in patch:
+        opts["online_payment_enabled"] = bool(patch.get("online_payment_enabled"))
+    if "online_payment_gateway_id" in patch:
+        v = patch.get("online_payment_gateway_id")
+        if v in (None, "", 0, "0"):
+            opts.pop("online_payment_gateway_id", None)
+        else:
+            gid = int(v)
+            _assert_gateway_allowed_for_business(db, business_id, gid)
+            opts["online_payment_gateway_id"] = gid
+    link.options = opts or None
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+    return link
 
 
 def get_or_create_link_for_print(

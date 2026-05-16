@@ -202,6 +202,8 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_orders_unsync_batch', $plugin_admin, 'ajax_orders_unsync_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_orders_set_pause', $plugin_admin, 'ajax_orders_set_pause');
 		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_accounts', $plugin_admin, 'ajax_opening_inventory_accounts');
+		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_preview', $plugin_admin, 'ajax_opening_inventory_preview');
+		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_cancel', $plugin_admin, 'ajax_opening_inventory_cancel');
 		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_prepare', $plugin_admin, 'ajax_opening_inventory_prepare');
 		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_batch', $plugin_admin, 'ajax_opening_inventory_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_finalize', $plugin_admin, 'ajax_opening_inventory_finalize');

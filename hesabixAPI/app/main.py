@@ -78,6 +78,7 @@ from adapters.api.v1.wallet import router as wallet_router
 from adapters.api.v1.zohal import router as zohal_router
 from adapters.api.v1.wallet_webhook import router as wallet_webhook_router
 from adapters.api.v1.credit import router as credit_router
+from adapters.api.v1.business_frequent_descriptions import router as business_frequent_descriptions_router
 from adapters.api.v1.document_numbering import router as document_numbering_router
 from adapters.api.v1.marketplace import router as marketplace_router
 from adapters.api.v1.warranty import router as warranty_router
@@ -1022,6 +1023,7 @@ def create_app() -> FastAPI:
     application.include_router(zohal_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_webhook_router, prefix=settings.api_v1_prefix)
     application.include_router(credit_router, prefix=settings.api_v1_prefix)
+    application.include_router(business_frequent_descriptions_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.quick_sales import router as quick_sales_router
     application.include_router(quick_sales_router, prefix=settings.api_v1_prefix)
     application.include_router(document_numbering_router, prefix=settings.api_v1_prefix)

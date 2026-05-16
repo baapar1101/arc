@@ -5,7 +5,8 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Body
+from pydantic import BaseModel, Field
 from fastapi.responses import RedirectResponse
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
@@ -29,6 +30,9 @@ from app.services.share_link_logo_service import (
 	business_logo_file_id_for_person_share,
 )
 from app.services.system_settings_service import get_share_link_settings
+from decimal import Decimal
+
+from app.services.public_invoice_share_payment_service import start_public_invoice_share_payment
 
 
 router = APIRouter(tags=["public-share-links"])
@@ -159,6 +163,35 @@ async def get_public_invoice_document_link(
 		data=payload,
 		request=request,
 		message="اطلاعات فاکتور دریافت شد",
+	)
+
+
+class PublicInvoicePayStartBody(BaseModel):
+	amount: float = Field(..., gt=0, description="مبلغ پرداخت به ریال")
+
+
+@router.post(
+	"/api/v1/public/invoice-links/{code}/pay/start",
+	summary="شروع پرداخت آنلاین از لینک عمومی فاکتور",
+)
+async def post_public_invoice_pay_start(
+	code: str,
+	request: Request,
+	body: PublicInvoicePayStartBody,
+	db: Session = Depends(get_db),
+):
+	try:
+		data = start_public_invoice_share_payment(
+			db,
+			share_code=code,
+			amount=Decimal(str(body.amount)),
+		)
+	except ApiError as exc:
+		raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+	return success_response(
+		data=data,
+		request=request,
+		message="PUBLIC_INVOICE_PAYMENT_STARTED",
 	)
 
 

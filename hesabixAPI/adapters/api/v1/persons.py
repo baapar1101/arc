@@ -859,7 +859,7 @@ async def download_persons_import_template(
     headers = [
         'code','alias_name','first_name','last_name','person_type','person_types','company_name','name_prefix','legal_entity_type','payment_id',
         'national_id','registration_number','economic_id','country','province','city','address','postal_code',
-        'phone','mobile','fax','email','website','share_count','commission_sale_percent','commission_sales_return_percent',
+        'phone','mobile','mobile_2','mobile_3','fax','email','website','share_count','commission_sale_percent','commission_sales_return_percent',
         'commission_sales_amount','commission_sales_return_amount'
     ]
     for col, header in enumerate(headers, 1):
@@ -871,7 +871,7 @@ async def download_persons_import_template(
     sample = [
         '', 'نمونه نام مستعار', 'علی', 'احمدی', 'مشتری', 'مشتری, فروشنده', 'نمونه شرکت', 'آقای', 'natural', 'PID123',
         '0012345678', '12345', 'ECO-1', 'ایران', 'تهران', 'تهران', 'خیابان مثال ۱', '1234567890',
-        '02112345678', '09120000000', '', 'test@example.com', 'example.com', '', '5', '0', '0', '0'
+        '02112345678', '09120000000', '', '', '', 'test@example.com', 'example.com', '', '5', '0', '0', '0'
     ]
     for col, val in enumerate(sample, 1):
         ws.cell(row=2, column=col, value=val)

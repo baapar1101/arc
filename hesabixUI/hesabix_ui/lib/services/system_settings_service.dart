@@ -24,10 +24,16 @@ class SystemSettingsService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
-  Future<Map<String, dynamic>> updateShareLinkSettings(String publicAppUrl) async {
+  Future<Map<String, dynamic>> updateShareLinkSettings(
+    String publicAppUrl, {
+    double? invoiceGatewayFeePercent,
+  }) async {
     final res = await _api.put<Map<String, dynamic>>(
       '/admin/system-settings/share-links',
-      data: {'public_app_url': publicAppUrl},
+      data: {
+        'public_app_url': publicAppUrl,
+        if (invoiceGatewayFeePercent != null) 'invoice_gateway_fee_percent': invoiceGatewayFeePercent,
+      },
     );
     final body = res.data as Map<String, dynamic>;
     return Map<String, dynamic>.from(body['data'] as Map);

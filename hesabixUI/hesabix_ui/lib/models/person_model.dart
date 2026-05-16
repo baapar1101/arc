@@ -209,6 +209,8 @@ class Person {
   final String? postalCode;
   final String? phone;
   final String? mobile;
+  final String? mobile2;
+  final String? mobile3;
   final String? fax;
   final String? email;
   final String? website;
@@ -257,6 +259,8 @@ class Person {
     this.postalCode,
     this.phone,
     this.mobile,
+    this.mobile2,
+    this.mobile3,
     this.fax,
     this.email,
     this.website,
@@ -308,6 +312,8 @@ class Person {
       postalCode: json['postal_code'],
       phone: json['phone'],
       mobile: json['mobile'],
+      mobile2: json['mobile_2'] as String?,
+      mobile3: json['mobile_3'] as String?,
       fax: json['fax'],
       email: json['email'],
       website: json['website'],
@@ -359,6 +365,8 @@ class Person {
       'postal_code': postalCode,
       'phone': phone,
       'mobile': mobile,
+      'mobile_2': mobile2,
+      'mobile_3': mobile3,
       'fax': fax,
       'email': email,
       'website': website,
@@ -403,6 +411,8 @@ class Person {
     String? postalCode,
     String? phone,
     String? mobile,
+    String? mobile2,
+    String? mobile3,
     String? fax,
     String? email,
     String? website,
@@ -435,6 +445,8 @@ class Person {
       postalCode: postalCode ?? this.postalCode,
       phone: phone ?? this.phone,
       mobile: mobile ?? this.mobile,
+      mobile2: mobile2 ?? this.mobile2,
+      mobile3: mobile3 ?? this.mobile3,
       fax: fax ?? this.fax,
       email: email ?? this.email,
       website: website ?? this.website,
@@ -494,6 +506,8 @@ class PersonCreateRequest {
   final String? postalCode;
   final String? phone;
   final String? mobile;
+  final String? mobile2;
+  final String? mobile3;
   final String? fax;
   final String? email;
   final String? website;
@@ -529,6 +543,8 @@ class PersonCreateRequest {
     this.postalCode,
     this.phone,
     this.mobile,
+    this.mobile2,
+    this.mobile3,
     this.fax,
     this.email,
     this.website,
@@ -581,6 +597,8 @@ class PersonCreateRequest {
       'postal_code': postalCode,
       'phone': phone,
       'mobile': mobile,
+      'mobile_2': mobile2,
+      'mobile_3': mobile3,
       'fax': fax,
       'email': email,
       'website': website,
@@ -628,6 +646,8 @@ class PersonUpdateRequest {
   final String? postalCode;
   final String? phone;
   final String? mobile;
+  final String? mobile2;
+  final String? mobile3;
   final String? fax;
   final String? email;
   final String? website;
@@ -664,6 +684,8 @@ class PersonUpdateRequest {
     this.postalCode,
     this.phone,
     this.mobile,
+    this.mobile2,
+    this.mobile3,
     this.fax,
     this.email,
     this.website,
@@ -707,6 +729,8 @@ class PersonUpdateRequest {
       'postal_code': postalCode,
       'phone': phone,
       'mobile': mobile,
+      'mobile_2': mobile2,
+      'mobile_3': mobile3,
       'fax': fax,
       'email': email,
       'website': website,

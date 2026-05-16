@@ -536,6 +536,8 @@ def build_public_payload(
             "alias_name": person.alias_name,
             "company_name": person.company_name,
             "mobile": person.mobile,
+            "mobile_2": person.mobile_2,
+            "mobile_3": person.mobile_3,
             "phone": person.phone,
             "email": person.email,
             "city": person.city,

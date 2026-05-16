@@ -301,6 +301,76 @@ class Hesabix_V2_Bridge_Rest
 				'permission_callback' => array(__CLASS__, 'permission_with_token'),
 			)
 		);
+
+		register_rest_route(
+			self::NS,
+			'/control/opening-inventory/status',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array(__CLASS__, 'route_control_opening_inventory_status'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/opening-inventory/accounts',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array(__CLASS__, 'route_control_opening_inventory_accounts'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/opening-inventory/preview',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array(__CLASS__, 'route_control_opening_inventory_preview'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/opening-inventory/prepare',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array(__CLASS__, 'route_control_opening_inventory_prepare'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/opening-inventory/batch',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array(__CLASS__, 'route_control_opening_inventory_batch'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/opening-inventory/finalize',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array(__CLASS__, 'route_control_opening_inventory_finalize'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/opening-inventory/cancel',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array(__CLASS__, 'route_control_opening_inventory_cancel'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
 	}
 
 	/**
@@ -1511,5 +1581,280 @@ class Hesabix_V2_Bridge_Rest
 			),
 			200
 		);
+	}
+
+	/**
+	 * @return int
+	 */
+	private static function opening_inventory_bridge_user_id()
+	{
+		return Hesabix_V2_Opening_Inventory_Service::BRIDGE_JOB_USER_ID;
+	}
+
+	/**
+	 * @param string $message
+	 * @return WP_REST_Response
+	 */
+	private static function opening_inventory_rest_fail($message)
+	{
+		return new WP_REST_Response(
+			array(
+				'success' => false,
+				'message' => (string) $message,
+			),
+			200
+		);
+	}
+
+	/**
+	 * @param array<string,mixed> $data
+	 * @return WP_REST_Response
+	 */
+	private static function opening_inventory_rest_ok(array $data)
+	{
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'data'    => $data,
+			),
+			200
+		);
+	}
+
+	/**
+	 * @param array<string,mixed> $params
+	 * @return array<string,mixed>
+	 */
+	private static function opening_inventory_prepare_options_from_params(array $params)
+	{
+		$cost = isset($params['cost_basis']) ? sanitize_key((string) $params['cost_basis']) : 'regular';
+		if (!in_array($cost, array('regular', 'sale', 'zero'), true)) {
+			$cost = 'regular';
+		}
+		return array(
+			'include_tax'            => !empty($params['include_tax']),
+			'cost_basis'             => $cost,
+			'auto_balance_to_equity' => !empty($params['auto_balance_to_equity']),
+			'do_post'                => !empty($params['do_post']),
+			'inventory_account_id'   => isset($params['inventory_account_id']) ? absint($params['inventory_account_id']) : 0,
+			'equity_account_id'      => isset($params['equity_account_id']) ? absint($params['equity_account_id']) : 0,
+			'batch_size'             => isset($params['batch_size']) ? absint($params['batch_size']) : 12,
+			'warehouse_id'           => isset($params['warehouse_id']) ? absint($params['warehouse_id']) : 0,
+		);
+	}
+
+	/**
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_opening_inventory_status($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+
+		$uid     = self::opening_inventory_bridge_user_id();
+		$pending = Hesabix_V2_Opening_Inventory_Service::get_pending_job_summary_for_user($uid);
+		$ui      = Hesabix_V2_Opening_Inventory_Service::get_connection_prereq_for_ui();
+
+		return self::opening_inventory_rest_ok(
+			array(
+				'opening_inventory_completed' => (bool) get_option('hesabix_v2_opening_inventory_completed'),
+				'pending_job'                   => $pending,
+				'prereq'                        => $ui['prereq'],
+				'checklist'                     => $ui['checklist'],
+				'post_confirm_phrase'           => Hesabix_V2_Opening_Inventory_Service::post_confirm_phrase(),
+			)
+		);
+	}
+
+	/**
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_opening_inventory_accounts($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+
+		$api = new Hesabix_V2_Api();
+		Hesabix_V2_Opening_Inventory_Service::sync_and_get_stored_fiscal_year_id($api);
+
+		$res   = $api->get_accounts_flat();
+		$items = array();
+		$data  = Hesabix_V2_Opening_Inventory_Service::get_api_data_array($res);
+		$ids_with_children = array();
+		if (is_array($data) && isset($data['items']) && is_array($data['items'])) {
+			foreach ($data['items'] as $row) {
+				if (!is_array($row)) {
+					continue;
+				}
+				$pp = isset($row['parent_id']) ? (int) $row['parent_id'] : 0;
+				if ($pp > 0) {
+					$ids_with_children[ $pp ] = true;
+				}
+			}
+			foreach ($data['items'] as $row) {
+				if (!is_array($row) || empty($row['id'])) {
+					continue;
+				}
+				$id = (int) $row['id'];
+				if (!empty($ids_with_children[ $id ])) {
+					continue;
+				}
+				$code     = isset($row['code']) ? (string) $row['code'] : '';
+				$name     = isset($row['name']) ? (string) $row['name'] : '';
+				$acc_type = isset($row['account_type']) ? (string) $row['account_type'] : '';
+				$items[]  = array(
+					'id'             => $id,
+					'code'           => $code,
+					'name'           => $name,
+					'account_type'   => $acc_type,
+					'label'          => trim($code . ' — ' . $name),
+				);
+			}
+		}
+
+		Hesabix_V2_Opening_Inventory_Service::invalidate_connection_prereq_ui_cache();
+		$ui_snap = Hesabix_V2_Opening_Inventory_Service::get_connection_prereq_for_ui();
+
+		return self::opening_inventory_rest_ok(
+			array(
+				'accounts'  => $items,
+				'prereq'    => $ui_snap['prereq'],
+				'checklist' => $ui_snap['checklist'],
+				'message'   => empty($items) ? __('حسابی برنگشت؛ دسترسی chart_of_accounts.view و اتصال را بررسی کنید.', 'hesabix-v2') : '',
+			)
+		);
+	}
+
+	/**
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_opening_inventory_preview($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+
+		$params = self::read_json_body($request);
+		$cost   = isset($params['cost_basis']) ? sanitize_key((string) $params['cost_basis']) : 'regular';
+		if (!in_array($cost, array('regular', 'sale', 'zero'), true)) {
+			$cost = 'regular';
+		}
+		$post_like = array(
+			'include_tax'    => !empty($params['include_tax']),
+			'cost_basis'     => $cost,
+			'batch_size'     => isset($params['batch_size']) ? absint($params['batch_size']) : 12,
+			'warehouse_id'   => isset($params['warehouse_id']) ? absint($params['warehouse_id']) : 0,
+		);
+
+		$res = Hesabix_V2_Opening_Inventory_Service::build_preview_payload($post_like);
+		if (empty($res['success'])) {
+			return self::opening_inventory_rest_fail($res['message'] ?? __('پیش‌نمایش ناموفق', 'hesabix-v2'));
+		}
+		unset($res['success']);
+		return self::opening_inventory_rest_ok($res);
+	}
+
+	/**
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_opening_inventory_prepare($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+
+		$params   = self::read_json_body($request);
+		$options  = self::opening_inventory_prepare_options_from_params($params);
+		$uid      = self::opening_inventory_bridge_user_id();
+		$response = Hesabix_V2_Opening_Inventory_Service::job_prepare($uid, $options);
+		if (empty($response['success'])) {
+			return self::opening_inventory_rest_fail($response['message'] ?? __('آماده‌سازی ناموفق', 'hesabix-v2'));
+		}
+		unset($response['success']);
+		return self::opening_inventory_rest_ok($response);
+	}
+
+	/**
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_opening_inventory_batch($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+
+		$params = self::read_json_body($request);
+		$job_id = isset($params['job_id']) ? sanitize_key((string) $params['job_id']) : '';
+		$uid    = self::opening_inventory_bridge_user_id();
+		$res    = Hesabix_V2_Opening_Inventory_Service::job_run_batch($job_id, $uid);
+		if (empty($res['success'])) {
+			return self::opening_inventory_rest_fail($res['message'] ?? __('اجرای دسته ناموفق', 'hesabix-v2'));
+		}
+		return self::opening_inventory_rest_ok($res);
+	}
+
+	/**
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_opening_inventory_finalize($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+
+		$params = self::read_json_body($request);
+		$job_id = isset($params['job_id']) ? sanitize_key((string) $params['job_id']) : '';
+		$uid    = self::opening_inventory_bridge_user_id();
+		$job    = Hesabix_V2_Opening_Inventory_Service::get_job($job_id, $uid);
+		if (!$job) {
+			return self::opening_inventory_rest_fail(__('نشست کار نامعتبر است.', 'hesabix-v2'));
+		}
+		$opts = isset($job['options']) && is_array($job['options']) ? $job['options'] : array();
+		if (!empty($opts['do_post'])) {
+			$typed = isset($params['confirm_post_phrase']) ? trim((string) $params['confirm_post_phrase']) : '';
+			if ($typed !== Hesabix_V2_Opening_Inventory_Service::post_confirm_phrase()) {
+				return self::opening_inventory_rest_fail(
+					__(
+						'برای نهایی‌سازی سند، فیلد JSON confirm_post_phrase باید دقیقاً برابر مقدار post_confirm_phrase از پاسخ status باشد.',
+						'hesabix-v2'
+					)
+				);
+			}
+		}
+
+		$res = Hesabix_V2_Opening_Inventory_Service::job_finalize($job_id, $uid);
+		if (empty($res['success'])) {
+			return self::opening_inventory_rest_fail($res['message'] ?? __('نهایی‌سازی ناموفق', 'hesabix-v2'));
+		}
+		return self::opening_inventory_rest_ok($res);
+	}
+
+	/**
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_opening_inventory_cancel($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+
+		$params = self::read_json_body($request);
+		$job_id = isset($params['job_id']) ? sanitize_key((string) $params['job_id']) : '';
+		$uid    = self::opening_inventory_bridge_user_id();
+		$res    = Hesabix_V2_Opening_Inventory_Service::mark_job_cancel_requested($job_id, $uid);
+		if (empty($res['success'])) {
+			return self::opening_inventory_rest_fail($res['message'] ?? __('درخواست توقف ناموفق', 'hesabix-v2'));
+		}
+		unset($res['success']);
+		return self::opening_inventory_rest_ok($res);
 	}
 }

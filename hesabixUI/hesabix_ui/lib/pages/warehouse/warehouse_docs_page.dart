@@ -454,6 +454,9 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           title: t.warehouseDocuments,
           businessId: widget.businessId,
           persistTableFiltersPageId: ListFilterPageIds.warehouseDocsTable,
+          excelEndpoint:
+              '/api/v1/warehouse-docs/business/${widget.businessId}/export/excel',
+          showExportButtons: true,
           showBackButton: true,
           onBack: () {
             if (!mounted) return;
@@ -655,6 +658,18 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
               },
               showTime: false,
               width: ColumnWidth.small,
+            ),
+            TextColumn(
+              'created_by_name',
+              t.creatorColumnTitle,
+              sortable: false,
+              searchable: false,
+              formatter: (item) {
+                final d = item as WarehouseDocument;
+                final n = d.createdByName?.trim();
+                return (n == null || n.isEmpty) ? '—' : n;
+              },
+              width: ColumnWidth.medium,
             ),
             NumberColumn(
               'total_quantity',

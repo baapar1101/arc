@@ -30,6 +30,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   Map<String, dynamic>? _payload;
   /// نمایش عمومی: پیش‌فرض شمسی
   bool _useJalaliCalendar = true;
+  bool _payBusy = false;
 
   @override
   void initState() {
@@ -287,6 +288,10 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
               ],
               const SizedBox(height: 16),
               _buildTotalsCard(theme, totals, curSuffix, adjustments: adjustments),
+              if (_showOnlinePayment(data)) ...[
+                const SizedBox(height: 16),
+                _buildOnlinePaymentCard(theme, data, curSuffix),
+              ],
               if ((installments?['has_installments'] == true)) ...[
                 const SizedBox(height: 16),
                 _buildInstallmentsCard(theme, installments!, curSuffix),
@@ -1119,6 +1124,129 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
       case 'pending':
       default:
         return 'در انتظار';
+    }
+  }
+
+  bool _showOnlinePayment(Map<String, dynamic> data) {
+    final op = data['online_payment'];
+    if (op is! Map) return false;
+    if (op['enabled'] != true) return false;
+    if (op['gateway_configured'] != true) return false;
+    final rem = (_asNum(op['remaining']) ?? 0).toDouble();
+    return rem > 0.009;
+  }
+
+  Widget _buildOnlinePaymentCard(ThemeData theme, Map<String, dynamic> data, String? curSuffix) {
+    final op = Map<String, dynamic>.from(data['online_payment'] as Map? ?? {});
+    final rem = (_asNum(op['remaining']) ?? 0).toDouble();
+    final feePct = (_asNum(op['fee_percent']) ?? 0).toDouble();
+    final s = _suffix(curSuffix);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'پرداخت آنلاین',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text('مانده قابل پرداخت: ${_formatInt(rem)} $s', style: theme.textTheme.bodyLarge),
+            if (feePct > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'کارمزد درگاه (ثبت در سند دریافت): ${feePct.toStringAsFixed(feePct.truncateToDouble() == feePct ? 0 : 2)}٪',
+                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                ),
+              ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _payBusy ? null : () => _onOnlinePay(rem),
+              icon: _payBusy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.payment),
+              label: Text(_payBusy ? 'در حال اتصال...' : 'پرداخت آنلاین'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _onOnlinePay(double maxRemaining) async {
+    if (maxRemaining <= 0 || !mounted) return;
+    final ctrl = TextEditingController(text: maxRemaining.toStringAsFixed(0));
+    double? amount;
+    try {
+      amount = await showDialog<double>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('مبلغ پرداخت (ریال)'),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: false),
+            decoration: InputDecoration(
+              hintText: 'حداکثر ${_formatInt(maxRemaining)}',
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+            FilledButton(
+              onPressed: () {
+                final v = double.tryParse(ctrl.text.replaceAll(',', ''));
+                if (v == null || v <= 0) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('مبلغ معتبر وارد کنید')),
+                  );
+                  return;
+                }
+                if (v - maxRemaining > 0.01) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    SnackBar(content: Text('مبلغ نمی‌تواند از مانده (${_formatInt(maxRemaining)}) بیشتر باشد')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, v);
+              },
+              child: const Text('ادامه به درگاه'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      ctrl.dispose();
+    }
+    if (amount == null || !mounted) return;
+    setState(() => _payBusy = true);
+    try {
+      final res = await _service.startOnlinePayment(widget.code, amount);
+      final url = res['payment_url']?.toString();
+      if (url == null || url.isEmpty) {
+        throw Exception('لینک درگاه دریافت نشد');
+      }
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('امکان باز کردن لینک درگاه وجود ندارد');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorExtractor.userMessage(e)),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _payBusy = false);
     }
   }
 

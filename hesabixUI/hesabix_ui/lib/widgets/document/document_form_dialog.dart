@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -13,6 +12,7 @@ import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 
 /// دیالوگ ایجاد یا ویرایش سند حسابداری دستی
 class DocumentFormDialog extends StatefulWidget {
@@ -518,7 +518,8 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
             const SizedBox(height: 16),
 
             // توضیحات سند
-            TextFormField(
+            FrequentDescriptionTextField(
+              businessId: widget.businessId,
               controller: _descriptionController,
               decoration: const InputDecoration(
                 labelText: 'توضیحات سند',

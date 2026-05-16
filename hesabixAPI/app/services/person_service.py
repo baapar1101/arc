@@ -178,6 +178,8 @@ def create_person(
         postal_code=person_data.postal_code,
         phone=person_data.phone,
         mobile=person_data.mobile,
+        mobile_2=person_data.mobile_2,
+        mobile_3=person_data.mobile_3,
         fax=person_data.fax,
         email=person_data.email,
         website=person_data.website,
@@ -359,7 +361,13 @@ def get_persons_by_business(
             elif field == 'company_name':
                 search_conditions.append(Person.company_name.ilike(search_term))
             elif field == 'mobile':
-                search_conditions.append(Person.mobile.ilike(search_term))
+                search_conditions.append(
+                    or_(
+                        Person.mobile.ilike(search_term),
+                        Person.mobile_2.ilike(search_term),
+                        Person.mobile_3.ilike(search_term),
+                    )
+                )
             elif field == 'email':
                 search_conditions.append(Person.email.ilike(search_term))
             elif field == 'national_id':
@@ -410,6 +418,8 @@ def get_persons_by_business(
         'name_prefix': Person.name_prefix,
         'legal_entity_type': Person.legal_entity_type,
         'mobile': Person.mobile,
+        'mobile_2': Person.mobile_2,
+        'mobile_3': Person.mobile_3,
         'phone': Person.phone,
         'fax': Person.fax,
         'email': Person.email,
@@ -930,6 +940,8 @@ def _person_to_dict(person: Person) -> Dict[str, Any]:
         'postal_code': person.postal_code,
         'phone': person.phone,
         'mobile': person.mobile,
+        'mobile_2': person.mobile_2,
+        'mobile_3': person.mobile_3,
         'fax': person.fax,
         'email': person.email,
         'website': person.website,
@@ -982,7 +994,11 @@ def search_persons(db: Session, business_id: int, search_query: Optional[str] = 
             Person.last_name.ilike(f"%{search_query}%"),
             Person.company_name.ilike(f"%{search_query}%"),
             Person.phone.ilike(f"%{search_query}%"),
-            Person.mobile.ilike(f"%{search_query}%"),
+            or_(
+                Person.mobile.ilike(f"%{search_query}%"),
+                Person.mobile_2.ilike(f"%{search_query}%"),
+                Person.mobile_3.ilike(f"%{search_query}%"),
+            ),
             Person.email.ilike(f"%{search_query}%"),
             Person.code == int(search_query) if search_query.isdigit() else False
         )
@@ -1008,7 +1024,11 @@ def count_persons(db: Session, business_id: int, search_query: Optional[str] = N
             Person.last_name.ilike(f"%{search_query}%"),
             Person.company_name.ilike(f"%{search_query}%"),
             Person.phone.ilike(f"%{search_query}%"),
-            Person.mobile.ilike(f"%{search_query}%"),
+            or_(
+                Person.mobile.ilike(f"%{search_query}%"),
+                Person.mobile_2.ilike(f"%{search_query}%"),
+                Person.mobile_3.ilike(f"%{search_query}%"),
+            ),
             Person.email.ilike(f"%{search_query}%"),
             Person.code == int(search_query) if search_query.isdigit() else False
         )

@@ -790,7 +790,17 @@ def confirm_top_up(db: Session, tx_id: int, success: bool, external_ref: str | N
 	"""
 	logger.info("confirm_top_up_start", tx_id=tx_id, success=success, external_ref=external_ref, user_id=user_id)
 	tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
-	if not tx or tx.type != "top_up":
+	if not tx:
+		logger.error("confirm_top_up_tx_not_found", tx_id=tx_id)
+		raise ApiError("TX_NOT_FOUND", "تراکنش افزایش اعتبار یافت نشد", http_status=404)
+	# پرداخت آنلاین از لینک عمومی فاکتور (سند دریافت؛ بدون تغییر کیف‌پول SaaS)
+	if (tx.type or "") == "public_invoice_share_pay":
+		from app.services.public_invoice_share_payment_service import confirm_public_invoice_share_payment
+
+		return confirm_public_invoice_share_payment(
+			db, tx, success=success, external_ref=external_ref, user_id=user_id
+		)
+	if tx.type != "top_up":
 		logger.error("confirm_top_up_tx_not_found", tx_id=tx_id)
 		raise ApiError("TX_NOT_FOUND", "تراکنش افزایش اعتبار یافت نشد", http_status=404)
 	

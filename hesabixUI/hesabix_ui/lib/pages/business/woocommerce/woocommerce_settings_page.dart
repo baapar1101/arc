@@ -23,6 +23,8 @@ class WoocommerceSettingsPage extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final canView = authStore.hasBusinessPermission('woocommerce', 'view') ||
         authStore.currentBusiness?.isOwner == true;
+    final canManage = authStore.hasBusinessPermission('woocommerce', 'manage') ||
+        authStore.currentBusiness?.isOwner == true;
 
     if (!canView) {
       return Scaffold(
@@ -53,6 +55,17 @@ class WoocommerceSettingsPage extends StatelessWidget {
                 ),
             icon: const Icon(Icons.shopping_cart_outlined),
           ),
+          if (canManage)
+            IconButton(
+              tooltip: t.woocommerceOpenOpeningInventoryTooltip,
+              icon: const Icon(Icons.inventory_2_outlined),
+              onPressed: () => context.push(
+                context.businessPanelUrl(
+                  businessId,
+                  'woocommerce/opening-inventory',
+                ),
+              ),
+            ),
         ],
       ),
       body: WoocommercePluginSettingsBody(

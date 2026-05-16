@@ -21,6 +21,7 @@ import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 
 int _expenseIncomeStableRowIdSeq = 0;
 
@@ -337,7 +338,8 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
                             labelText: 'پروژه',
                           ),
                           const SizedBox(height: 8),
-                          TextField(
+                          FrequentDescriptionTextField(
+                            businessId: widget.businessId,
                             controller: _descriptionController,
                             decoration: const InputDecoration(
                               labelText: 'توضیحات کلی سند',
@@ -566,7 +568,8 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
                             ),
                             Padding(
                               padding: EdgeInsets.fromLTRB(0, 0, 0, padding * 0.45),
-                              child: TextField(
+                              child: FrequentDescriptionTextField(
+                                businessId: widget.businessId,
                                 controller: _descriptionController,
                                 decoration: const InputDecoration(
                                   labelText: 'توضیحات کلی سند',
@@ -574,7 +577,6 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
                                   border: OutlineInputBorder(),
                                   isDense: true,
                                 ),
-                                minLines: 1,
                                 maxLines: 2,
                               ),
                             ),
@@ -1088,7 +1090,8 @@ class _ItemLineTileState extends State<_ItemLineTile> {
           },
         ),
         const SizedBox(height: 7),
-        TextFormField(
+        FrequentDescriptionTextField(
+          businessId: widget.businessId,
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
@@ -1188,7 +1191,8 @@ class _ItemLineTileState extends State<_ItemLineTile> {
           ],
         ),
         const SizedBox(height: 6),
-        TextFormField(
+        FrequentDescriptionTextField(
+          businessId: widget.businessId,
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
@@ -1425,7 +1429,8 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
         const SizedBox(height: 7),
         _buildTransactionTypeFields(),
         const SizedBox(height: 7),
-        TextFormField(
+        FrequentDescriptionTextField(
+          businessId: widget.businessId,
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
@@ -1515,7 +1520,8 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
         const SizedBox(height: 6),
         _buildTransactionTypeFields(),
         const SizedBox(height: 6),
-        TextFormField(
+        FrequentDescriptionTextField(
+          businessId: widget.businessId,
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,

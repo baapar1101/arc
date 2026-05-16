@@ -762,6 +762,17 @@ class _DocumentsPageState extends State<DocumentsPage> {
           filterOptions: _projectFilterOptions,
         ),
 
+        // ایجاد کننده
+        TextColumn(
+          'created_by_name',
+          t.creatorColumnTitle,
+          width: ColumnWidth.medium,
+          formatter: (item) {
+            final n = item.createdByName?.trim();
+            return (n == null || n.isEmpty) ? '-' : n;
+          },
+        ),
+
         // عملیات
         ActionColumn(
           'actions',

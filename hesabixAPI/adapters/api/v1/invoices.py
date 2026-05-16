@@ -76,8 +76,9 @@ from app.services.document_share_link_service import (
     revoke_share_link as revoke_document_share_link,
     serialize_document_share_link,
     build_invoice_share_i_url,
+    update_document_share_link_payment_options,
 )
-from adapters.api.v1.schema_models.invoice import InvoiceShareLinkCreateRequest
+from adapters.api.v1.schema_models.invoice import InvoiceShareLinkCreateRequest, InvoiceShareLinkPaymentPatchRequest
 from app.services.document_list_sort import apply_invoice_search_ordering, apply_invoice_search_ordering_from_body
 from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
@@ -276,6 +277,8 @@ def create_invoice_share_link_endpoint(
         expires_in_hours=payload.expires_in_hours,
         max_view_count=payload.max_view_count,
         replace_existing=payload.replace_existing,
+        online_payment_enabled=payload.online_payment_enabled,
+        online_payment_gateway_id=payload.online_payment_gateway_id,
     )
     return success_response(
         data=serialize_document_share_link(
@@ -309,6 +312,41 @@ def delete_invoice_share_link_endpoint(
     if not ok:
         raise HTTPException(status_code=404, detail="لینک فعالی برای لغو وجود ندارد")
     return success_response(data=None, request=request, message="INVOICE_SHARE_LINK_REVOKED")
+
+
+@router.patch(
+    "/business/{business_id}/{invoice_id}/share-link/payment",
+    summary="تنظیم پرداخت آنلاین روی لینک عمومی فاکتور",
+    description="فعال/غیرفعال کردن پرداخت آنلاین و انتخاب درگاه برای لینک فعال.",
+)
+@require_business_access("business_id")
+def patch_invoice_share_link_payment_endpoint(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    payload: InvoiceShareLinkPaymentPatchRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("invoices", "edit", Document, "invoice_id")),
+):
+    try:
+        patch = payload.model_dump(exclude_unset=True)
+        link = update_document_share_link_payment_options(
+            db,
+            business_id=business_id,
+            document_id=invoice_id,
+            user_id=ctx.get_user_id(),
+            patch=patch,
+        )
+    except ApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+    return success_response(
+        data=serialize_document_share_link(
+            link, str(request.base_url), db=db
+        ),
+        request=request,
+        message="INVOICE_SHARE_LINK_PAYMENT_UPDATED",
+    )
 
 
 @router.post(

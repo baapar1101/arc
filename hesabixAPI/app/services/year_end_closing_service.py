@@ -15,7 +15,8 @@ from decimal import Decimal
 import calendar
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, or_, inspect, text
+from sqlalchemy import and_, func, or_, inspect, text, update, cast, select
+from sqlalchemy.types import Date as SQLADate
 from fastapi import HTTPException, UploadFile
 
 from adapters.db.repositories.document_repository import DocumentRepository
@@ -28,6 +29,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse import Warehouse
+from adapters.db.models.warehouse_document import WarehouseDocument
 from app.core.responses import ApiError
 from app.services.opening_balance_service import post_opening_balance, upsert_opening_balance
 from app.services.invoice_service import _compute_available_stock, _iter_product_movements
@@ -56,6 +58,55 @@ def _gregorian_same_calendar_day_next_year(d: date) -> date:
 def _fiscal_year_end_inclusive_from_start_gregorian(start: date) -> date:
     """پایان سال مالی شامل: سالگرد میلادی یک سال بعد منهای یک روز."""
     return _gregorian_same_calendar_day_next_year(start) - timedelta(days=1)
+
+
+def _normalize_relocation_basis(document_relocation_basis: str) -> str:
+    b = (document_relocation_basis or "document_date").strip().lower()
+    if b not in ("document_date", "registered_at"):
+        return "document_date"
+    return b
+
+
+def _resolve_closing_period_end(
+    fiscal_year: FiscalYear,
+    closing_fiscal_end_date: Optional[date],
+) -> Tuple[date, date]:
+    """
+    original_end: پایان تقویمی ذخیره‌شده روی رکورد سال مالی
+    effective_end: پایان دورهٔ بستن (شامل) — برای تقطیع سال، زودتر از original_end
+    """
+    original_end = fiscal_year.end_date
+    if closing_fiscal_end_date is None:
+        return original_end, original_end
+    if closing_fiscal_end_date < fiscal_year.start_date:
+        raise ApiError(
+            "INVALID_CLOSING_END_DATE",
+            "تاریخ پایان دورهٔ بستن نمی‌تواند قبل از تاریخ شروع سال مالی باشد",
+            http_status=400,
+        )
+    if closing_fiscal_end_date > original_end:
+        raise ApiError(
+            "INVALID_CLOSING_END_DATE",
+            "تاریخ پایان دورهٔ بستن نمی‌تواند بعد از پایان تقویمی سال مالی جاری باشد",
+            http_status=400,
+        )
+    return original_end, closing_fiscal_end_date
+
+
+def _post_cutoff_document_predicate(effective_end: date, document_relocation_basis: str):
+    """شرط «سند بعد از پایان دورهٔ بستن» برای انتقال به سال جدید."""
+    basis = _normalize_relocation_basis(document_relocation_basis)
+    if basis == "registered_at":
+        return cast(Document.registered_at, SQLADate) > effective_end
+    return Document.document_date > effective_end
+
+
+def _post_cutoff_warehouse_document_predicate(effective_end: date, document_relocation_basis: str):
+    """همان سیاست تاریخ، برای حواله/رسید انبار (تاریخ سند انبار / روز ثبت)."""
+    basis = _normalize_relocation_basis(document_relocation_basis)
+    if basis == "registered_at":
+        return cast(WarehouseDocument.created_at, SQLADate) > effective_end
+    return WarehouseDocument.document_date > effective_end
 
 
 def _discover_scoped_tables(db: Session) -> Dict[str, Dict[str, Any]]:
@@ -368,6 +419,8 @@ def preview_year_end_closing(
     db: Session,
     business_id: int,
     fiscal_year_id: int,
+    closing_fiscal_end_date: Optional[date] = None,
+    document_relocation_basis: str = "document_date",
 ) -> Dict[str, Any]:
     """
     پیش‌نمایش بستن سال مالی
@@ -385,8 +438,40 @@ def preview_year_end_closing(
     
     if not fiscal_year.is_last:
         raise ApiError("FISCAL_YEAR_NOT_CURRENT", "این سال مالی سال جاری نیست", http_status=400)
-    
-    # بررسی اینکه آیا قبلاً بسته شده یا نه
+
+    original_fy_end, effective_end = _resolve_closing_period_end(fiscal_year, closing_fiscal_end_date)
+    basis = _normalize_relocation_basis(document_relocation_basis)
+    post_cutoff_pred = _post_cutoff_document_predicate(effective_end, basis)
+    documents_to_relocate = int(
+        db.query(func.count(Document.id))
+        .filter(
+            Document.business_id == business_id,
+            Document.fiscal_year_id == fiscal_year_id,
+            post_cutoff_pred,
+        )
+        .scalar()
+        or 0
+    )
+
+    doc_ids_pending_move = select(Document.id).where(
+        Document.business_id == business_id,
+        Document.fiscal_year_id == fiscal_year_id,
+        post_cutoff_pred,
+    )
+    wh_post = _post_cutoff_warehouse_document_predicate(effective_end, basis)
+    warehouse_docs_to_relocate = int(
+        db.query(func.count(WarehouseDocument.id))
+        .filter(
+            WarehouseDocument.business_id == business_id,
+            WarehouseDocument.fiscal_year_id == fiscal_year_id,
+            or_(
+                WarehouseDocument.source_document_id.in_(doc_ids_pending_move),
+                wh_post,
+            ),
+        )
+        .scalar()
+        or 0
+    )
     existing_closing = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
@@ -414,7 +499,7 @@ def preview_year_end_closing(
     
     for account in revenue_accounts:
         balance_info = _calculate_account_balance(
-            db, business_id, account.id, fiscal_year_id, fiscal_year.end_date
+            db, business_id, account.id, fiscal_year_id, effective_end
         )
         closing_balance = balance_info['closing_balance']
         
@@ -443,7 +528,7 @@ def preview_year_end_closing(
     
     for account in expense_accounts:
         balance_info = _calculate_account_balance(
-            db, business_id, account.id, fiscal_year_id, fiscal_year.end_date
+            db, business_id, account.id, fiscal_year_id, effective_end
         )
         closing_balance = balance_info['closing_balance']
         
@@ -472,7 +557,7 @@ def preview_year_end_closing(
     # محاسبه مانده حساب سود یا زیان انباشته
     retained_earnings_account = _get_fixed_account_by_code(db, "30106")
     retained_earnings_balance = _calculate_account_balance(
-        db, business_id, retained_earnings_account.id, fiscal_year_id, fiscal_year.end_date
+        db, business_id, retained_earnings_account.id, fiscal_year_id, effective_end
     )
     
     # مانده ابتدای سال = مانده از تراز افتتاحیه + گردش دوره تا قبل از بستن
@@ -490,7 +575,17 @@ def preview_year_end_closing(
             'id': fiscal_year.id,
             'title': fiscal_year.title,
             'start_date': fiscal_year.start_date,  # date object برای format_datetime_fields
-            'end_date': fiscal_year.end_date,  # date object برای format_datetime_fields
+            # پایان دوره‌ای که بسته می‌شود (برای تقطیع، زودتر از پایان تقویمی ذخیره‌شده است)
+            'end_date': effective_end,
+            'calendar_period_end_date': original_fy_end,
+        },
+        'closing_options': {
+            'calendar_period_end_date': original_fy_end,
+            'closing_period_end_date': effective_end,
+            'is_period_shortened': effective_end < original_fy_end,
+            'document_relocation_basis': basis,
+            'post_cutoff_documents_to_relocate': documents_to_relocate,
+            'post_cutoff_warehouse_documents_to_relocate': warehouse_docs_to_relocate,
         },
         'revenue_accounts': revenue_items,
         'expense_accounts': expense_items,
@@ -534,6 +629,10 @@ async def close_fiscal_year(
     inventory_valuation_method: str = "FIFO",
     # تقسیم سود بین سهامداران
     shareholder_distributions: Optional[List[Dict[str, Any]]] = None,
+    # تقطیع / پایان دورهٔ بستن و انتقال اسناد به سال جدید
+    closing_fiscal_end_date: Optional[date] = None,
+    document_relocation_basis: str = "document_date",
+    move_post_cutoff_documents_to_new_fiscal_year: bool = True,
 ) -> Dict[str, Any]:
     """
     بستن سال مالی
@@ -559,23 +658,33 @@ async def close_fiscal_year(
     
     backup_id = backup_result.get("backup_id")
     backup_filename = backup_result.get("filename", "")
-    
-    # اعتبارسنجی اولیه
-    preview_data = preview_year_end_closing(db, business_id, fiscal_year_id)
-    
+
     fy_repo = FiscalYearRepository(db)
     fiscal_year = fy_repo.get_by_id(fiscal_year_id)
-    
+
     if not fiscal_year:
         raise ApiError("FISCAL_YEAR_NOT_FOUND", "سال مالی یافت نشد", http_status=404)
-    
+
+    if int(fiscal_year.business_id) != int(business_id):
+        raise ApiError("FISCAL_YEAR_NOT_FOUND", "سال مالی متعلق به این کسب‌وکار نیست", http_status=404)
+
+    original_fy_calendar_end, effective_end = _resolve_closing_period_end(fiscal_year, closing_fiscal_end_date)
+
+    preview_data = preview_year_end_closing(
+        db,
+        business_id,
+        fiscal_year_id,
+        closing_fiscal_end_date=closing_fiscal_end_date,
+        document_relocation_basis=document_relocation_basis,
+    )
+
     # دریافت حساب‌های لازم
     summary_account = _get_fixed_account_by_code(db, "80301")  # خلاصه سود و زیان
     retained_earnings_account = _get_fixed_account_by_code(db, "30106")  # سود یا زیان انباشته
     
     # بررسی مانده سود یا زیان انباشته قبل از بستن
     retained_earnings_balance_check = _calculate_account_balance(
-        db, business_id, retained_earnings_account.id, fiscal_year_id, fiscal_year.end_date
+        db, business_id, retained_earnings_account.id, fiscal_year_id, effective_end
     )
     retained_earnings_current = (
         retained_earnings_balance_check['opening_debit'] - retained_earnings_balance_check['opening_credit']
@@ -756,7 +865,7 @@ async def close_fiscal_year(
     # هشدار در صورت زیان زیاد (اگر زیان انباشته از سرمایه بیشتر شود)
     capital_account = _get_fixed_account_by_code(db, "30101")  # سرمایه اولیه
     capital_balance = _calculate_account_balance(
-        db, business_id, capital_account.id, fiscal_year_id, fiscal_year.end_date
+        db, business_id, capital_account.id, fiscal_year_id, effective_end
     )
     capital_amount = (
         capital_balance['opening_debit'] - capital_balance['opening_credit']
@@ -877,7 +986,7 @@ async def close_fiscal_year(
         'fiscal_year_id': fiscal_year_id,
         'currency_id': currency_id,
         'created_by_user_id': user_id,
-        'document_date': fiscal_year.end_date,
+        'document_date': effective_end,
         'document_type': 'year_end_closing',
         'is_proforma': False,
         'description': f'بستن سال مالی {fiscal_year.title}',
@@ -896,7 +1005,7 @@ async def close_fiscal_year(
                 fiscal_year_id=fiscal_year_id,
                 user_id=user_id,
                 currency_id=currency_id,
-                fiscal_year_end_date=fiscal_year.end_date,
+                fiscal_year_end_date=effective_end,
             )
         except Exception as e:
             # در صورت خطا، فقط log می‌کنیم و ادامه می‌دهیم
@@ -910,14 +1019,15 @@ async def close_fiscal_year(
         # بررسی اعتبار تاریخ‌ها
         if new_start_date >= new_end_date:
             raise ApiError("INVALID_DATE_RANGE", "تاریخ شروع باید قبل از تاریخ پایان باشد", http_status=400)
-        if new_start_date <= fiscal_year.end_date:
-            raise ApiError("INVALID_START_DATE", "تاریخ شروع سال مالی جدید باید بعد از تاریخ پایان سال مالی فعلی باشد", http_status=400)
+        if new_start_date <= effective_end:
+            raise ApiError("INVALID_START_DATE", "تاریخ شروع سال مالی جدید باید بعد از تاریخ پایان دورهٔ بسته‌شده باشد", http_status=400)
     else:
         # استفاده از منطق خودکار در صورت عدم ارسال تاریخ
-        new_start_date = fiscal_year.end_date + timedelta(days=1)
+        new_start_date = effective_end + timedelta(days=1)
         new_end_date = _fiscal_year_end_inclusive_from_start_gregorian(new_start_date)
     
-    # تغییر is_last سال قبلی به False
+    # به‌روزرسانی پایان تقویمی سال جاری به پایان دورهٔ بستن؛ سپس غیرفعال کردن به‌عنوان سال جاری
+    fiscal_year.end_date = effective_end
     fiscal_year.is_last = False
     db.commit()
     db.refresh(fiscal_year)
@@ -983,7 +1093,60 @@ async def close_fiscal_year(
                 f"ایجاد تراز افتتاحیه سال جدید ناموفق بود: {str(e)}",
                 http_status=500,
             ) from e
-    
+
+    moved_documents = 0
+    moved_warehouse_documents = 0
+    if move_post_cutoff_documents_to_new_fiscal_year:
+        pred = _post_cutoff_document_predicate(effective_end, document_relocation_basis)
+        ids_to_move = [
+            int(row[0])
+            for row in db.query(Document.id)
+            .filter(
+                Document.business_id == business_id,
+                Document.fiscal_year_id == fiscal_year_id,
+                pred,
+            )
+            .all()
+        ]
+        res = db.execute(
+            update(Document)
+            .where(
+                Document.business_id == business_id,
+                Document.fiscal_year_id == fiscal_year_id,
+                pred,
+            )
+            .values(fiscal_year_id=new_fiscal_year.id)
+        )
+        rc = getattr(res, "rowcount", None)
+        moved_documents = int(rc) if rc is not None and int(rc) >= 0 else len(ids_to_move)
+
+        wh_post = _post_cutoff_warehouse_document_predicate(effective_end, document_relocation_basis)
+        wh_conds = [wh_post]
+        if ids_to_move:
+            wh_conds.append(WarehouseDocument.source_document_id.in_(ids_to_move))
+        wh_res = db.execute(
+            update(WarehouseDocument)
+            .where(
+                WarehouseDocument.business_id == business_id,
+                WarehouseDocument.fiscal_year_id == fiscal_year_id,
+                or_(*wh_conds),
+            )
+            .values(fiscal_year_id=new_fiscal_year.id)
+        )
+        wh_rc = getattr(wh_res, "rowcount", None)
+        moved_warehouse_documents = int(wh_rc) if wh_rc is not None and int(wh_rc) >= 0 else 0
+
+        db.commit()
+
+    result["document_relocation"] = {
+        "moved_documents_count": moved_documents,
+        "moved_warehouse_documents_count": moved_warehouse_documents,
+        "effective_closing_end_date": effective_end.isoformat(),
+        "original_calendar_end_date": original_fy_calendar_end.isoformat(),
+        "basis": _normalize_relocation_basis(document_relocation_basis),
+        "performed": bool(move_post_cutoff_documents_to_new_fiscal_year),
+    }
+
     return result
 
 

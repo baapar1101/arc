@@ -382,31 +382,13 @@ class Hesabix_V2_Admin
 				wp_localize_script(
 					'hesabix-v2-opening-inventory',
 					'hesabix_v2_ob_inv',
-					array(
-						'ajax_url' => admin_url('admin-ajax.php'),
-						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
-						'completed' => (bool) get_option('hesabix_v2_opening_inventory_completed'),
-						'strings' => array(
-							'loadAccounts' => __('در حال بارگذاری حساب‌ها…', 'hesabix-v2'),
-							'accountsError' => __('خطا در دریافت حساب‌ها از حسابیکس.', 'hesabix-v2'),
-							'confirmTitle' => __('تأیید قبل از ثبت موجودی افتتاحیه', 'hesabix-v2'),
-							'confirmIntro' => __('پس از اتمام موفق، این بخش دیگر در دسترس نخواهد بود. موارد زیر را بررسی کنید:', 'hesabix-v2'),
-							'running' => __('در حال پردازش دسته‌ها…', 'hesabix-v2'),
-							'finalizing' => __('در حال نهایی‌سازی…', 'hesabix-v2'),
-							'needInventoryAccount' => __('حساب موجودی (کالا) را انتخاب کنید.', 'hesabix-v2'),
-							'needEquity' => __('حساب حقوق صاحبان سهام را انتخاب کنید.', 'hesabix-v2'),
-							'needWarehouse' => __('انبار پیش‌فرض در تب فاکتور یا شناسه انبار در همین صفحه لازم است.', 'hesabix-v2'),
-							'genericFail' => __('عملیات ناموفق بود.', 'hesabix-v2'),
-							'requestFail' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
-							'taxYes' => __('بله — مالیات بر ارزش افزوده در بهای واحد لحاظ شود', 'hesabix-v2'),
-							'taxNo' => __('خیر — بهای واحد بدون مالیات (خالص)', 'hesabix-v2'),
-							'postYes' => __('بله، سند تراز افتتاحیه در حسابیکس نهایی شود', 'hesabix-v2'),
-							'postNo' => __('خیر، فقط ذخیره شود (نهایی‌سازی بعداً در حسابیکس)', 'hesabix-v2'),
-							'autoBalYes' => __('بله، اختلاف تراز به حساب حقوق صاحبان سهام بسته شود', 'hesabix-v2'),
-							'autoBalNo' => __('خیر، بستن خودکار غیرفعال', 'hesabix-v2'),
-							'done' => __('انجام شد.', 'hesabix-v2'),
-							'resumedHint' => __('ادامهٔ نشست', 'hesabix-v2'),
+					array_merge(
+						array(
+							'ajax_url' => admin_url('admin-ajax.php'),
+							'nonce' => wp_create_nonce('hesabix_v2_nonce'),
+							'completed' => (bool) get_option('hesabix_v2_opening_inventory_completed'),
 						),
+						$this->get_opening_inventory_script_payload()
 					)
 				);
 			}
@@ -1567,31 +1549,109 @@ class Hesabix_V2_Admin
 		}
 
 		$api = new Hesabix_V2_Api();
+		Hesabix_V2_Opening_Inventory_Service::sync_and_get_stored_fiscal_year_id($api);
+
 		$res = $api->get_accounts_flat();
 		$items = array();
 		$data = Hesabix_V2_Opening_Inventory_Service::get_api_data_array($res);
+		$ids_with_children = array();
 		if (is_array($data) && isset($data['items']) && is_array($data['items'])) {
+			foreach ($data['items'] as $row) {
+				if (!is_array($row)) {
+					continue;
+				}
+				$pp = isset($row['parent_id']) ? (int) $row['parent_id'] : 0;
+				if ($pp > 0) {
+					$ids_with_children[ $pp ] = true;
+				}
+			}
 			foreach ($data['items'] as $row) {
 				if (!is_array($row) || empty($row['id'])) {
 					continue;
 				}
+				$id = (int) $row['id'];
+				if (!empty($ids_with_children[ $id ])) {
+					continue;
+				}
 				$code = isset($row['code']) ? (string) $row['code'] : '';
 				$name = isset($row['name']) ? (string) $row['name'] : '';
+				$acc_type = isset($row['account_type']) ? (string) $row['account_type'] : '';
 				$items[] = array(
-					'id' => (int) $row['id'],
+					'id' => $id,
 					'code' => $code,
 					'name' => $name,
+					'account_type' => $acc_type,
 					'label' => trim($code . ' — ' . $name),
 				);
 			}
 		}
 
+		Hesabix_V2_Opening_Inventory_Service::invalidate_connection_prereq_ui_cache();
+		$ui_snap = Hesabix_V2_Opening_Inventory_Service::get_connection_prereq_for_ui();
+
 		wp_send_json_success(
 			array(
 				'accounts' => $items,
+				'prereq' => $ui_snap['prereq'],
+				'checklist' => $ui_snap['checklist'],
 				'message' => empty($items) ? __('حسابی برنگشت؛ دسترسی chart_of_accounts.view و اتصال را بررسی کنید.', 'hesabix-v2') : '',
 			)
 		);
+	}
+
+	/**
+	 * AJAX: پیش‌نمایش اقلام و تخمین دسته‌ها (بدون ایجاد نشست).
+	 *
+	 * @return void
+	 */
+	public function ajax_opening_inventory_preview()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$cost = isset($_POST['cost_basis']) ? sanitize_key(wp_unslash($_POST['cost_basis'])) : 'regular';
+		if (!in_array($cost, array('regular', 'sale', 'zero'), true)) {
+			$cost = 'regular';
+		}
+
+		$post_like = array(
+			'include_tax' => !empty($_POST['include_tax']),
+			'cost_basis' => $cost,
+			'batch_size' => isset($_POST['batch_size']) ? absint(wp_unslash($_POST['batch_size'])) : 12,
+			'warehouse_id' => isset($_POST['warehouse_id']) ? absint(wp_unslash($_POST['warehouse_id'])) : 0,
+		);
+
+		$res = Hesabix_V2_Opening_Inventory_Service::build_preview_payload($post_like);
+		if (empty($res['success'])) {
+			wp_send_json_error(array('message' => $res['message'] ?? __('پیش‌نمایش ناموفق', 'hesabix-v2')));
+		}
+
+		unset($res['success']);
+		wp_send_json_success($res);
+	}
+
+	/**
+	 * AJAX: درخواست توقف پردازش دسته‌ای پس از اتمام دستهٔ جاری.
+	 *
+	 * @return void
+	 */
+	public function ajax_opening_inventory_cancel()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه غیرفعال است.', 'hesabix-v2')));
+		}
+		$job_id = isset($_POST['job_id']) ? sanitize_key(wp_unslash((string) $_POST['job_id'])) : '';
+		$res = Hesabix_V2_Opening_Inventory_Service::mark_job_cancel_requested($job_id, get_current_user_id());
+		if (empty($res['success'])) {
+			wp_send_json_error(array('message' => $res['message'] ?? __('درخواست توقف ناموفق', 'hesabix-v2')));
+		}
+		unset($res['success']);
+		wp_send_json_success($res);
 	}
 
 	/**
@@ -1886,11 +1946,101 @@ class Hesabix_V2_Admin
 					}
 				}
 				$conn['fiscal_year'] = $f ?: null;
+				if (!empty($f['id'])) {
+					$this->persist_fiscal_year_option_from_hesabix((int) $f['id']);
+				}
 			}
 			$result['connection'] = $conn;
 		}
 
 		return $result;
+	}
+
+	/**
+	 * ذخیرهٔ شناسهٔ سال مالی جاری برای هدرهای API و عملیات تراز افتتاحیه.
+	 *
+	 * @param int $fiscal_year_id
+	 * @return void
+	 */
+	private function persist_fiscal_year_option_from_hesabix($fiscal_year_id)
+	{
+		$fiscal_year_id = (int) $fiscal_year_id;
+		if ($fiscal_year_id < 1) {
+			return;
+		}
+		update_option('hesabix_v2_fiscal_year_id', $fiscal_year_id);
+		if (class_exists('Hesabix_V2_Opening_Inventory_Service', false)) {
+			Hesabix_V2_Opening_Inventory_Service::invalidate_connection_prereq_ui_cache();
+		}
+		if (class_exists('Hesabix_V2_Order_Fiscal_Service', false)) {
+			Hesabix_V2_Order_Fiscal_Service::invalidate_bounds_cache();
+		}
+	}
+
+	/**
+	 * دادهٔ اسکریپت تب موجودی افتتاحیه (پیش‌نیاز، چک‌لیست، رشته‌ها).
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function get_opening_inventory_script_payload()
+	{
+		$ui = Hesabix_V2_Opening_Inventory_Service::get_connection_prereq_for_ui();
+		return array(
+			'post_confirm_phrase' => Hesabix_V2_Opening_Inventory_Service::post_confirm_phrase(),
+			'prereq' => $ui['prereq'],
+			'checklist' => $ui['checklist'],
+			'pending_job' => Hesabix_V2_Opening_Inventory_Service::get_pending_job_summary_for_user(get_current_user_id()),
+			'strings' => array(
+				'loadAccounts' => __('در حال بارگذاری حساب‌ها…', 'hesabix-v2'),
+				'accountsError' => __('خطا در دریافت حساب‌ها از حسابیکس.', 'hesabix-v2'),
+				'confirmTitle' => __('تأیید قبل از ثبت موجودی افتتاحیه', 'hesabix-v2'),
+				'confirmIntro' => __('پس از اتمام موفق، این بخش دیگر در دسترس نخواهد بود. موارد زیر را بررسی کنید:', 'hesabix-v2'),
+				'running' => __('در حال پردازش دسته‌ها…', 'hesabix-v2'),
+				'finalizing' => __('در حال نهایی‌سازی…', 'hesabix-v2'),
+				'needInventoryAccount' => __('حساب موجودی (کالا) را انتخاب کنید.', 'hesabix-v2'),
+				'needEquity' => __('حساب حقوق صاحبان سهام را انتخاب کنید.', 'hesabix-v2'),
+				'needWarehouse' => __('انبار پیش‌فرض در تب فاکتور یا شناسه انبار در همین صفحه لازم است.', 'hesabix-v2'),
+				'needFiscalYear' => __('سال مالی جاری در حسابیکس برای این کسب‌وکار در دسترس نیست. تب اتصال را باز کنید یا «بارگذاری حساب‌ها از حسابیکس» را بزنید؛ در صورت نیاز مجوز سال مالی را به کلید API بدهید.', 'hesabix-v2'),
+				'needCurrency' => __('ارز فاکتور/سند را در تب فاکتور تنظیم کنید.', 'hesabix-v2'),
+				'genericFail' => __('عملیات ناموفق بود.', 'hesabix-v2'),
+				'requestFail' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
+				'taxYes' => __('بله — مالیات بر ارزش افزوده در بهای واحد لحاظ شود', 'hesabix-v2'),
+				'taxNo' => __('خیر — بهای واحد بدون مالیات (خالص)', 'hesabix-v2'),
+				'postYes' => __('بله، سند تراز افتتاحیه در حسابیکس نهایی شود', 'hesabix-v2'),
+				'postNo' => __('خیر، فقط ذخیره شود (نهایی‌سازی بعداً در حسابیکس)', 'hesabix-v2'),
+				'autoBalYes' => __('بله، اختلاف تراز به حساب حقوق صاحبان سهام بسته شود', 'hesabix-v2'),
+				'autoBalNo' => __('خیر، بستن خودکار غیرفعال', 'hesabix-v2'),
+				'done' => __('انجام شد.', 'hesabix-v2'),
+				'resumedHint' => __('ادامهٔ نشست', 'hesabix-v2'),
+				'previewLoading' => __('در حال محاسبهٔ پیش‌نمایش…', 'hesabix-v2'),
+				'previewTitle' => __('پیش‌نمایش اقلام', 'hesabix-v2'),
+				'previewTotal' => __('تعداد اقلام قابل ثبت', 'hesabix-v2'),
+				'previewBatches' => __('تخمین تعداد دسته با اندازهٔ فعلی', 'hesabix-v2'),
+				'previewPostedWarn' => __('تراز افتتاحیهٔ این سال در حسابیکس قبلاً نهایی شده؛ ویرایش ممکن نیست.', 'hesabix-v2'),
+				'previewColProduct' => __('کالا', 'hesabix-v2'),
+				'previewColQty' => __('موجودی', 'hesabix-v2'),
+				'previewColCost' => __('بهای واحد', 'hesabix-v2'),
+				'previewColKind' => __('نوع', 'hesabix-v2'),
+				'copyLog' => __('کپی لاگ', 'hesabix-v2'),
+				'copyLogDone' => __('متن لاگ در حافظه کپی شد.', 'hesabix-v2'),
+				'copyLogEmpty' => __('لاگی برای کپی وجود ندارد.', 'hesabix-v2'),
+				'confirmPostDanger' => __('گزینهٔ «نهایی‌سازی سند» فعال است؛ سند تراز افتتاحیه در حسابیکس قفل می‌شود. برای ادامه، عبارت زیر را دقیقاً در پنجرهٔ بعدی وارد کنید:', 'hesabix-v2'),
+				'confirmPostMismatch' => __('عبارت واردشده با مورد نیاز یکسان نیست؛ اجرا لغو شد.', 'hesabix-v2'),
+				'chkEnabled' => __('افزونهٔ حسابیکس فعال است', 'hesabix-v2'),
+				'chkApiKey' => __('کلید API ذخیره شده است', 'hesabix-v2'),
+				'chkBusiness' => __('کسب‌وکار متصل است', 'hesabix-v2'),
+				'chkFiscalYear' => __('سال مالی جاری برای افزونه در دسترس است', 'hesabix-v2'),
+				'chkWarehouse' => __('انبار: پیش‌فرض تب فاکتور یا شناسهٔ انبار در همین فرم', 'hesabix-v2'),
+				'chkCurrency' => __('ارز سند (از تب فاکتور / حسابیکس) قابل تشخیص است', 'hesabix-v2'),
+				'pendingBatch' => __('نشست نیمه‌تمام: %1$d از %2$d قلم پردازش شده؛ با «شروع ثبت…» ادامه دهید.', 'hesabix-v2'),
+				'pendingFinalize' => __('نشست نیمه‌تمام: دسته‌ها ذخیره شده‌اند؛ فقط نهایی‌سازی مانده. با «شروع ثبت…» ادامه دهید.', 'hesabix-v2'),
+				'cancelRun' => __('توقف امن پس از دستهٔ جاری', 'hesabix-v2'),
+				'cancelRunHint' => __('پردازش بعد از اتمام دستهٔ در حال اجرا قطع می‌شود؛ نشست ذخیره می‌ماند.', 'hesabix-v2'),
+				'cancelRequestSent' => __('درخواست توقف ثبت شد؛ تا پایان دستهٔ جاری صبر کنید.', 'hesabix-v2'),
+				'cancelRunFail' => __('ثبت درخواست توقف ناموفق بود.', 'hesabix-v2'),
+				'stoppedBetweenBatches' => __('پردازش متوقف شد؛ بعداً با «شروع ثبت» می‌توانید ادامه دهید.', 'hesabix-v2'),
+			),
+		);
 	}
 
 	/**
@@ -2341,7 +2491,7 @@ class Hesabix_V2_Admin
 
 	/**
 	 * AJAX: Setup wizard - save API key, business and complete
-	 * سال مالی ارسال نمی‌شود - حسابیکس به‌صورت خودکار اسناد را به سال مالی جاری ارجاع می‌دهد.
+	 * سال مالی جاری از API خوانده و در option ذخیره می‌شود (برای هدر API و تراز افتتاحیه).
 	 *
 	 * @since    2.0.0
 	 */
@@ -2362,7 +2512,8 @@ class Hesabix_V2_Admin
 
 		update_option('hesabix_v2_api_key', $api_key);
 		update_option('hesabix_v2_business_id', $business_id);
-		update_option('hesabix_v2_fiscal_year_id', 0);
+		$api = new Hesabix_V2_Api();
+		Hesabix_V2_Opening_Inventory_Service::sync_and_get_stored_fiscal_year_id($api);
 		if (class_exists('Hesabix_V2_Order_Fiscal_Service')) {
 			Hesabix_V2_Order_Fiscal_Service::invalidate_bounds_cache();
 		}

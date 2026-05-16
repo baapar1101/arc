@@ -56,7 +56,7 @@ if (!defined('WPINC')) {
 		<!-- Step 2: Select Business -->
 		<div class="wizard-step" id="step-2" style="display: none;">
 			<h2><?php _e('مرحله 2: انتخاب کسب‌وکار', 'hesabix-v2'); ?></h2>
-			<p><?php _e('کسب‌وکار مورد نظر را انتخاب کنید. حسابیکس به‌صورت خودکار اسناد را به سال مالی جاری ارجاع می‌دهد.', 'hesabix-v2'); ?></p>
+			<p><?php esc_html_e('کسب‌وکار مورد نظر را انتخاب کنید. پس از اتمام راه‌اندازی، شناسهٔ سال مالی جاری از حسابیکس خوانده و در افزونه ذخیره می‌شود تا درخواست‌های API (از جمله تراز افتتاحیه) با هدر سال مالی درست ارسال شوند. برای این کار کلید API باید به سال مالی کسب‌وکار دسترسی مشاهده داشته باشد.', 'hesabix-v2'); ?></p>
 			
 			<div id="businesses-list"></div>
 			
@@ -70,7 +70,7 @@ if (!defined('WPINC')) {
 		<!-- Step 3: Complete -->
 		<div class="wizard-step" id="step-3" style="display: none;">
 			<h2><?php _e('راه‌اندازی تکمیل شد!', 'hesabix-v2'); ?></h2>
-			<p><?php _e('افزونه با موفقیت راه‌اندازی شد.', 'hesabix-v2'); ?></p>
+			<p><?php esc_html_e('افزونه با موفقیت راه‌اندازی شد. در صورت نیاز سال مالی ذخیره‌شده را در تنظیمات حسابیکس، تب «اتصال» (جزئیات اتصال یا تست اتصال) بررسی کنید.', 'hesabix-v2'); ?></p>
 			
 			<p>
 				<a href="<?php echo admin_url('admin.php?page=hesabix-v2'); ?>" class="button button-primary">

@@ -1,5 +1,5 @@
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, Depends, Request, Body
+from fastapi import APIRouter, Depends, Request, Body, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field, validator
 from datetime import date
@@ -54,6 +54,20 @@ class YearEndClosingRequest(BaseModel):
     
     # تقسیم سود بین سهامداران (اختیاری - اگر نباشد بر اساس درصد سهام محاسبه می‌شود)
     shareholder_distributions: Optional[List[ShareholderDistributionItem]] = Field(None, description="لیست توزیع سود بین سهامداران")
+
+    # تقطیع سال مالی: پایان دورهٔ بستن و انتقال اسناد به سال جدید
+    closing_fiscal_end_date: Optional[date] = Field(
+        None,
+        description="تاریخ پایان دورهٔ بستن (شامل). در صورت ارسال و زودتر بودن از پایان تقویمی سال، دوره تقطیع می‌شود.",
+    )
+    document_relocation_basis: str = Field(
+        default="document_date",
+        description="معیار «بعد از پایان دوره» برای انتقال سند به سال جدید: document_date یا registered_at",
+    )
+    move_post_cutoff_documents_to_new_fiscal_year: bool = Field(
+        default=True,
+        description="اگر true باشد، اسناد بعد از پایان دورهٔ بستن به سال مالی جدید منتقل می‌شوند",
+    )
     
     @validator('tax_percentage', 'tax_amount')
     def validate_tax(cls, v, values):
@@ -78,6 +92,14 @@ class YearEndClosingRequest(BaseModel):
         if v not in valid_methods:
             raise ValueError(f'روش ارزیابی انبار باید یکی از {valid_methods} باشد')
         return v
+
+    @validator('document_relocation_basis')
+    def validate_document_relocation_basis(cls, v):
+        allowed = {'document_date', 'registered_at'}
+        vv = (v or 'document_date').strip().lower()
+        if vv not in allowed:
+            raise ValueError(f'document_relocation_basis باید یکی از {allowed} باشد')
+        return vv
 
 
 @router.get("/{business_id}/fiscal-years")
@@ -151,13 +173,27 @@ def preview_year_end_closing_endpoint(
     request: Request,
     business_id: int,
     fiscal_year_id: int,
+    closing_fiscal_end_date: Optional[date] = Query(
+        None,
+        description="تاریخ پایان دورهٔ بستن (شامل) برای پیش‌نمایش تقطیع؛ خالی = پایان تقویمی سال",
+    ),
+    document_relocation_basis: str = Query(
+        "document_date",
+        description="document_date یا registered_at",
+    ),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("fiscal_years", "view")),
 ) -> Dict[str, Any]:
     """پیش‌نمایش بستن سال مالی"""
     try:
-        preview_data = preview_year_end_closing(db, business_id, fiscal_year_id)
+        preview_data = preview_year_end_closing(
+            db,
+            business_id,
+            fiscal_year_id,
+            closing_fiscal_end_date=closing_fiscal_end_date,
+            document_relocation_basis=document_relocation_basis,
+        )
         return success_response(
             data=format_datetime_fields(preview_data, request),
             request=request,
@@ -209,7 +245,13 @@ async def close_fiscal_year_endpoint(
                 {"person_id": item.person_id, "profit_amount": item.profit_amount}
                 for item in payload.shareholder_distributions
             ] if payload.shareholder_distributions else None,
+            closing_fiscal_end_date=payload.closing_fiscal_end_date,
+            document_relocation_basis=payload.document_relocation_basis,
+            move_post_cutoff_documents_to_new_fiscal_year=payload.move_post_cutoff_documents_to_new_fiscal_year,
         )
+        cache = get_cache()
+        if cache.enabled:
+            cache.delete(f"fiscal_years:{business_id}")
         return success_response(
             data=format_datetime_fields(result, request),
             request=request,

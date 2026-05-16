@@ -12,6 +12,7 @@ import '../../widgets/banking/currency_picker_widget.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../inputs/frequent_description_text_field.dart';
 
 class TransferFormDialog extends StatefulWidget {
   final int businessId;
@@ -470,6 +471,77 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     );
   }
 
+  Widget _buildDescriptionWithFrequent() {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        color: theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: FrequentDescriptionTextField(
+          businessId: widget.businessId,
+          controller: _descriptionController,
+          maxLines: 3,
+          decoration: InputDecoration(
+            labelText: 'توضیحات',
+            labelStyle: TextStyle(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+              fontSize: 14,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: theme.primaryColor,
+                width: 2,
+              ),
+            ),
+            prefixIcon: Container(
+              margin: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: theme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                Icons.description,
+                color: theme.primaryColor,
+                size: 18,
+              ),
+            ),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          ),
+          style: TextStyle(
+            color: theme.colorScheme.onSurface,
+            fontSize: 16,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDateField() {
     return Container(
       decoration: BoxDecoration(
@@ -772,14 +844,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                   ),
                                   const SizedBox(width: 32),
                                   Expanded(
-                                    child: _buildInputField(
-                                      controller: _descriptionController,
-                                      labelText: 'توضیحات',
-                                      icon: Icons.description,
-                                      maxLines: 3,
-                                      // اختیاری: بدون اعتبارسنجی اجباری
-                                      validator: (value) => null,
-                                    ),
+                                    child: _buildDescriptionWithFrequent(),
                                   ),
                                 ],
                               ),
@@ -906,13 +971,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                               const SizedBox(height: 24),
                               
                               // توضیحات
-                              _buildInputField(
-                                controller: _descriptionController,
-                                labelText: 'توضیحات',
-                                icon: Icons.description,
-                                maxLines: 3,
-                                validator: (value) => null,
-                              ),
+                              _buildDescriptionWithFrequent(),
                             ],
                           ),
                         ),

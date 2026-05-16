@@ -572,6 +572,7 @@
   "conversation": "Conversation",
   "ticketInfo": "Ticket Information",
   "createdBy": "Created by",
+  "creatorColumnTitle": "Creator",
   "assignedTo": "Assigned to",
   "lastUpdated": "Last updated",
   "messageCount": "{count} messages",
@@ -777,6 +778,45 @@
   "chartOfAccounts": "Chart of Accounts",
   "openingBalance": "Opening Balance",
   "yearEndClosing": "Year End Closing",
+  "yearEndSplitSectionTitle": "Fiscal period split",
+  "yearEndSplitSectionDescription": "You can close the books on an end date earlier than the fiscal calendar end. Documents after that date (by the rule below) move to the new fiscal year after it is created.",
+  "yearEndSplitDifferentEndToggle": "Closing end date differs from calendar fiscal year end",
+  "yearEndSplitClosingEndDateLabel": "Closing period end date (inclusive)",
+  "yearEndSplitRelocationBasisLabel": "Criterion for \"after period end\" when moving documents",
+  "yearEndSplitBasisDocumentDate": "Document date",
+  "yearEndSplitBasisRegisteredAt": "Registration date (day)",
+  "yearEndSplitMoveDocumentsToggle": "Automatically move post-period documents to the new fiscal year",
+  "yearEndSplitMoveDocumentsSubtitle": "If off, fiscal_year_id is not updated (not recommended).",
+  "yearEndSplitCalendarEndNote": "Calendar end of current fiscal year: {date}",
+  "@yearEndSplitCalendarEndNote": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "yearEndSplitRelocatePreviewLine": "{docCount} accounting document(s) and {whCount} warehouse document(s) are scheduled to move.",
+  "@yearEndSplitRelocatePreviewLine": {
+    "placeholders": {
+      "docCount": {
+        "type": "int"
+      },
+      "whCount": {
+        "type": "int"
+      }
+    }
+  },
+  "yearEndClosingDoneRelocationLine": "Moved {docCount} document(s) and {whCount} warehouse slip(s) to the new fiscal year.",
+  "@yearEndClosingDoneRelocationLine": {
+    "placeholders": {
+      "docCount": {
+        "type": "int"
+      },
+      "whCount": {
+        "type": "int"
+      }
+    }
+  },
   "currencyRevaluation": "FX rates & revaluation",
   "reports": "Reports",
   "accountingSettings": "Settings",
@@ -1269,6 +1309,8 @@
   "personPostalCode": "Postal Code",
   "personPhone": "Phone",
   "personMobile": "Mobile",
+  "personMobile2": "Mobile 2",
+  "personMobile3": "Mobile 3",
   "personFax": "Fax",
   "personEmail": "Email",
   "personWebsite": "Website",
@@ -4741,6 +4783,10 @@
   },
   "woocommerceHubBulkBatchSizeLabel": "Batch size (per request)",
   "woocommerceHubBulkSyncCurrentPage": "This table page",
+  "woocommerceHubBulkSyncSelected": "Selected rows",
+  "woocommerceHubBulkConfirmSelected": "Sync {count} selected row(s) from the table?",
+  "@woocommerceHubBulkConfirmSelected": {"placeholders": {"count": {"type": "String"}}},
+  "woocommerceHubBulkEmptySelection": "Select one or more rows using the checkboxes, then tap sync selected.",
   "woocommerceHubBulkSyncAllFiltered": "All with current filters",
   "woocommerceHubBulkConfirmCurrentPage": "Sync {count} item(s) on the current page?",
   "@woocommerceHubBulkConfirmCurrentPage": {"placeholders": {"count": {"type": "String"}}},
@@ -4755,6 +4801,46 @@
     }
   },
   "woocommerceHubBulkProgressLabel": "Request batch",
+  "woocommerceOpeningInvBridgeTitle": "Opening inventory (bridge)",
+  "woocommerceOpeningInvBridgeSubtitle": "Run the same opening-balance job as the WooCommerce plugin, via the Hesabix store bridge. Use after products are synced and accounts/warehouse are configured on the store.",
+  "woocommerceOpeningInvRefreshStatus": "Refresh status",
+  "woocommerceOpeningInvLoadAccounts": "Load accounts",
+  "woocommerceOpeningInvPreview": "Preview",
+  "woocommerceOpeningInvPrepare": "Prepare only",
+  "woocommerceOpeningInvRunAllToEnd": "Run all batches to completion",
+  "woocommerceOpeningInvFinalizeOnly": "Finalize",
+  "woocommerceOpeningInvNeedActiveJob": "Create a job with “Prepare only” first, or refresh status to restore a pending job.",
+  "woocommerceOpeningInvRunBatches": "One batch step",
+  "woocommerceOpeningInvFinalize": "Finalize document",
+  "woocommerceOpeningInvCancelJob": "Cancel after current batch",
+  "woocommerceOpeningInvClearLog": "Clear log",
+  "woocommerceOpeningInvInventoryAccountLabel": "Inventory (goods) account",
+  "woocommerceOpeningInvEquityAccountLabel": "Equity account (auto-balance)",
+  "woocommerceOpeningInvBatchSizeLabel": "Batch size (3–40)",
+  "woocommerceOpeningInvWarehouseOverrideLabel": "Warehouse ID (0 = plugin default)",
+  "woocommerceOpeningInvIncludeTaxLabel": "Include VAT in unit cost",
+  "woocommerceOpeningInvAutoBalanceLabel": "Auto-balance to equity",
+  "woocommerceOpeningInvDoPostLabel": "Post (lock) opening balance in Hesabix",
+  "woocommerceOpeningInvCostBasisLabel": "Cost basis",
+  "woocommerceOpeningInvCostBasisRegular": "Regular price",
+  "woocommerceOpeningInvCostBasisSale": "Sale price",
+  "woocommerceOpeningInvCostBasisZero": "Zero cost",
+  "woocommerceOpeningInvPendingProgress": "{cursor} / {total}",
+  "@woocommerceOpeningInvPendingProgress": {
+    "placeholders": {
+      "cursor": {},
+      "total": {}
+    }
+  },
+  "woocommerceOpeningInvJobIdLabel": "Job ID",
+  "woocommerceOpeningInvCompletedBanner": "This store already completed opening inventory in the plugin.",
+  "woocommerceOpeningInvPhraseHint": "To post the document, type exactly:",
+  "woocommerceOpeningInvPhrasePromptTitle": "Confirm posting phrase",
+  "woocommerceOpeningInvPhraseMismatch": "Phrase does not match; finalize cancelled.",
+  "woocommerceOpeningInvLogTitle": "Log",
+  "woocommerceOpeningInvPickInventoryHint": "Choose an inventory account.",
+  "woocommerceOpeningInvPickEquityHint": "Choose an equity account or turn off auto-balance.",
+  "woocommerceOpeningInvOpenFromHub": "Opening inventory (bridge)",
   "woocommerceSyncDone": "Sync completed",
   "woocommerceControlQueueTitle": "Background sync queue",
   "woocommerceControlQueueBatchHint": "Max rows per run (from plugin settings): {n}",
@@ -4825,6 +4911,9 @@
   "reportsWooSettingsPromoTitle": "Bridge settings",
   "reportsWooSettingsPromoSubtitle": "If numbers or lists look wrong, update the store URL or bridge token here, then refresh this report.",
   "woocommerceOpenReportsOverviewTooltip": "WooCommerce reports overview",
+  "woocommerceOpenOpeningInventoryTooltip": "Opening inventory (bridge)",
+  "woocommerceSettingsOpeningInventoryLinkTitle": "Opening inventory via bridge",
+  "woocommerceSettingsOpeningInventoryLinkSubtitle": "Create the job and run batches from Hesabix without wp-admin.",
   "settingsWooCommerceTitle": "WooCommerce bridge",
   "settingsWooCommerceSubtitle": "Bridge, health, ArcWOC, queue & logs",
   "invoiceGlobalDiscountSection": "Invoice-level discount",
@@ -5209,5 +5298,15 @@
   "dataTableHelpSectionSelectionTitle": "Row selection and copying",
   "dataTableHelpSectionSelectionBody": "• Use the checkboxes in the first column when selection is enabled.\n• With multi-select, hold Shift and click another row to select everything between the last selection and that row.\n• Long-press (or right-click where supported) on a cell value to copy it to the clipboard.",
   "dataTableHelpSectionOtherTitle": "Other controls",
-  "dataTableHelpSectionOtherBody": "• Refresh in the ⋮ menu reloads data from the server.\n• Compact mode toggles denser row height; your choice may be remembered for this table.\n• Use pagination at the bottom to change page size and move between pages."
+  "dataTableHelpSectionOtherBody": "• Refresh in the ⋮ menu reloads data from the server.\n• Compact mode toggles denser row height; your choice may be remembered for this table.\n• Use pagination at the bottom to change page size and move between pages.",
+  "frequentDescriptionsPickHint": "Focus this field to see your saved frequent descriptions.",
+  "frequentDescriptionsManage": "Manage frequent descriptions",
+  "frequentDescriptionsAdd": "Add",
+  "frequentDescriptionsEmpty": "No frequent descriptions yet.",
+  "frequentDescriptionsLoadError": "Could not load the list.",
+  "frequentDescriptionsNewLabel": "New description",
+  "frequentDescriptionsDeleteTitle": "Remove description",
+  "frequentDescriptionsDeleteConfirm": "Remove this text from your frequent descriptions list?",
+  "frequentDescriptionsSaved": "Saved",
+  "frequentDescriptionsLimitReached": "Maximum number of frequent descriptions for this business has been reached."
 }

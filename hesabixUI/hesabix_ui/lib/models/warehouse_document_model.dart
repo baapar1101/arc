@@ -20,6 +20,8 @@ class WarehouseDocument {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final double? totalQuantity;
+  final int? createdByUserId;
+  final String? createdByName;
   // فیلدهای ارسال
   final String? description;
   final String? deliveryMethod;
@@ -50,6 +52,8 @@ class WarehouseDocument {
     this.createdAt,
     this.updatedAt,
     this.totalQuantity,
+    this.createdByUserId,
+    this.createdByName,
     this.description,
     this.deliveryMethod,
     this.carrierName,
@@ -96,6 +100,8 @@ class WarehouseDocument {
       totalQuantity: json['total_quantity'] != null
           ? (json['total_quantity'] as num).toDouble()
           : null,
+      createdByUserId: json['created_by_user_id'] as int?,
+      createdByName: json['created_by_name'] as String?,
       description: getField('description'),
       deliveryMethod: getField('delivery_method'),
       carrierName: getField('carrier_name'),
@@ -128,6 +134,8 @@ class WarehouseDocument {
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'total_quantity': totalQuantity,
+      'created_by_user_id': createdByUserId,
+      'created_by_name': createdByName,
       'description': description,
       'delivery_method': deliveryMethod,
       'carrier_name': carrierName,

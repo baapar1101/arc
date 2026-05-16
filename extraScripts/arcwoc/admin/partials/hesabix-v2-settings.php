@@ -1102,13 +1102,70 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			<?php elseif (!get_option('hesabix_v2_enabled')) : ?>
 				<div class="notice notice-warning inline"><p><?php esc_html_e('ابتدا افزونه را فعال و متصل کنید.', 'hesabix-v2'); ?></p></div>
 			<?php else : ?>
+				<?php
+				$ob_inv_ui = Hesabix_V2_Opening_Inventory_Service::get_connection_prereq_for_ui();
+				$ob_chk = $ob_inv_ui['checklist'];
+				$ob_pending = Hesabix_V2_Opening_Inventory_Service::get_pending_job_summary_for_user(get_current_user_id());
+				?>
+				<style>
+					.hesabix-v2-obinv-checklist { margin: 12px 0 16px; max-width: 46rem; }
+					.hesabix-v2-obinv-checklist h3 { margin: 0 0 8px; font-size: 14px; }
+					.hesabix-v2-obinv-checklist ul { list-style: none; margin: 0; padding: 0; }
+					.hesabix-v2-obinv-checklist li { padding: 6px 10px; margin: 4px 0; border-radius: 4px; border: 1px solid #c3c4c7; }
+					.hesabix-v2-obinv-checklist li.is-ok { background: #edfaef; border-color: #46b450; }
+					.hesabix-v2-obinv-checklist li.is-bad { background: #fcf0f1; border-color: #d63638; }
+					.hesabix-v2-obinv-preview table { width: 100%; max-width: 50rem; border-collapse: collapse; margin-top: 8px; }
+					.hesabix-v2-obinv-preview th, .hesabix-v2-obinv-preview td { border: 1px solid #ccd0d4; padding: 6px 8px; font-size: 12px; }
+					#hesabix_v2_obinv_progress_wrap progress { width: min(420px, 100%); height: 18px; vertical-align: middle; margin-inline-start: 8px; }
+				</style>
 				<p class="description" style="max-width:50rem;">
-					<?php esc_html_e('کالاهای منتشرشده با مدیریت موجودی و تعداد › ۰ به‌صورت دسته‌ای در حسابیکس همگام، سپس در «تراز افتتاحیه» سال مالی جاری ادغام می‌شوند. قبل از اجرا گزینه‌ها را ذخیره کنید و دسترسی API به opening_balance و chart_of_accounts را بررسی کنید.', 'hesabix-v2'); ?>
+					<?php esc_html_e('کالاهای منتشرشده با مدیریت موجودی و تعداد › ۰ به‌صورت دسته‌ای در حسابیکس همگام، سپس در تراز افتتاحیهٔ همان سال مالی که از حسابیکس برای افزونه خوانده و ذخیره شده ادغام می‌شوند. در صورت خالی بودن سال مالی، با «بارگذاری حساب‌ها از حسابیکس» یا باز کردن تب اتصال دوباره همگام می‌شود. قبل از اجرا گزینه‌ها را ذخیره کنید و دسترسی API به opening_balance و chart_of_accounts را بررسی کنید.', 'hesabix-v2'); ?>
 				</p>
+				<p class="description" style="max-width:50rem;">
+					<?php esc_html_e('توجه: سیاست تاریخ سفارش و سال مالی در تب «همگام‌سازی» فقط روی همگام‌سازی فاکتور سفارش اثر دارد؛ موجودی افتتاحیه جداگانه بر اساس سال مالی ذخیره‌شده در افزونه و API تراز افتتاحیه عمل می‌کند.', 'hesabix-v2'); ?>
+				</p>
+				<?php if ($ob_pending) : ?>
+					<div class="notice notice-info inline" id="hesabix_v2_obinv_pending_notice"><p>
+						<?php
+						if (!empty($ob_pending['needs_finalize'])) {
+							esc_html_e('نشست قبلی ذخیره شده و فقط مرحلهٔ نهایی‌سازی مانده است. با همان دکمهٔ «شروع ثبت موجودی اولیه (گروهی)» ادامه دهید (گزینه‌ها باید با آن اجرا هم‌خوان باشند).', 'hesabix-v2');
+						} else {
+							echo esc_html(
+								sprintf(
+									/* translators: 1: processed line count, 2: total line items */
+									__('نشست نیمه‌تمام: %1$d از %2$d قلم پردازش شده است؛ با «شروع ثبت موجودی اولیه (گروهی)» ادامه دهید.', 'hesabix-v2'),
+									(int) $ob_pending['cursor'],
+									(int) $ob_pending['total']
+								)
+							);
+						}
+						?>
+					</p></div>
+				<?php endif; ?>
+				<div class="hesabix-v2-obinv-checklist" id="hesabix_v2_obinv_checklist_wrap">
+					<h3><?php esc_html_e('پیش‌نیازها', 'hesabix-v2'); ?></h3>
+					<ul id="hesabix_v2_obinv_checklist" aria-label="<?php esc_attr_e('وضعیت پیش‌نیازهای اتصال و فاکتور', 'hesabix-v2'); ?>">
+						<li data-key="enabled" class="<?php echo !empty($ob_chk['enabled']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('افزونهٔ حسابیکس فعال است', 'hesabix-v2'); ?></li>
+						<li data-key="api_key" class="<?php echo !empty($ob_chk['api_key']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('کلید API ذخیره شده است', 'hesabix-v2'); ?></li>
+						<li data-key="business" class="<?php echo !empty($ob_chk['business']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('کسب‌وکار متصل است', 'hesabix-v2'); ?></li>
+						<li data-key="fiscal_year" class="<?php echo !empty($ob_chk['fiscal_year']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('سال مالی جاری برای افزونه در دسترس است', 'hesabix-v2'); ?></li>
+						<li data-key="warehouse" class="<?php echo !empty($ob_chk['warehouse']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('انبار: پیش‌فرض تب فاکتور یا شناسهٔ انبار در همین فرم', 'hesabix-v2'); ?></li>
+						<li data-key="currency" class="<?php echo !empty($ob_chk['currency']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('ارز سند (از تب فاکتور / حسابیکس) قابل تشخیص است', 'hesabix-v2'); ?></li>
+					</ul>
+				</div>
 				<div id="hesabix-v2-obinv-initial" hidden
 					data-inventory-id="<?php echo esc_attr((string) (int) $ob_inv_prefs['inventory_account_id']); ?>"
 					data-equity-id="<?php echo esc_attr((string) (int) $ob_inv_prefs['equity_account_id']); ?>"></div>
 				<table class="form-table" id="hesabix-v2-opening-inv-form">
+					<tr>
+						<th scope="row"><?php esc_html_e('جستجوی حساب', 'hesabix-v2'); ?></th>
+						<td>
+							<label class="screen-reader-text" for="hesabix_v2_obinv_account_search"><?php esc_html_e('فیلتر فهرست حساب‌های موجودی و حقوق صاحبان سهام', 'hesabix-v2'); ?></label>
+							<input type="search" id="hesabix_v2_obinv_account_search" class="regular-text" autocomplete="off"
+								placeholder="<?php esc_attr_e('کد یا نام حساب…', 'hesabix-v2'); ?>">
+							<p class="description"><?php esc_html_e('فقط حساب‌های بدون زیرمجموعه (برگ) در فهرست نمایش داده می‌شوند؛ با این فیلد می‌توانید فهرست را محدود کنید.', 'hesabix-v2'); ?></p>
+						</td>
+					</tr>
 					<tr>
 						<th scope="row"><?php esc_html_e('مالیات در بهای واحد', 'hesabix-v2'); ?></th>
 						<td>
@@ -1181,10 +1238,25 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					</tr>
 				</table>
 				<p>
+					<button type="button" class="button" id="hesabix_v2_obinv_preview"><?php esc_html_e('پیش‌نمایش اقلام و تخمین دسته‌ها', 'hesabix-v2'); ?></button>
+				</p>
+				<div id="hesabix_v2_obinv_preview_box" class="hesabix-v2-obinv-preview" hidden></div>
+				<div id="hesabix_v2_obinv_progress_wrap" style="display:none;margin:10px 0;">
+					<span id="hesabix_v2_obinv_progress_label" class="description"></span>
+					<progress id="hesabix_v2_obinv_progress" max="100" value="0"></progress>
+				</div>
+				<p>
 					<button type="button" class="button button-primary" id="hesabix_v2_obinv_run" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
 						<?php esc_html_e('شروع ثبت موجودی اولیه (گروهی)', 'hesabix-v2'); ?>
 					</button>
-					<span id="hesabix_v2_obinv_status" class="description" style="margin-right:12px;" aria-live="polite"></span>
+					<button type="button" class="button" id="hesabix_v2_obinv_cancel" style="display:none;margin-inline-start:8px;" title="<?php echo esc_attr(__('پردازش بعد از اتمام دستهٔ جاری قطع می‌شود.', 'hesabix-v2')); ?>">
+						<?php esc_html_e('توقف امن پس از دسته', 'hesabix-v2'); ?>
+					</button>
+					<span id="hesabix_v2_obinv_status" class="description" style="margin-right:12px;" role="status" aria-live="polite"></span>
+				</p>
+				<p class="description" id="hesabix_v2_obinv_cancel_hint" style="display:none;"><?php esc_html_e('توقف امن: دستهٔ در حال اجرا کامل می‌شود، سپس پردازش قطع می‌شود و می‌توانید بعداً ادامه دهید.', 'hesabix-v2'); ?></p>
+				<p>
+					<button type="button" class="button" id="hesabix_v2_obinv_copy_log"><?php esc_html_e('کپی لاگ', 'hesabix-v2'); ?></button>
 				</p>
 				<pre id="hesabix_v2_obinv_log" style="max-height:220px;overflow:auto;background:#f6f7f7;padding:10px;font-size:12px;display:none;"></pre>
 			<?php endif; ?>

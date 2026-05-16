@@ -426,6 +426,7 @@ def export_documents_excel(
             "بستانکار",
             "وضعیت",
             "توضیحات",
+            "ایجاد کننده",
             "تاریخ ثبت",
         ]
         
@@ -449,7 +450,8 @@ def export_documents_excel(
             ws.cell(row=row_num, column=7, value=doc.get("total_credit", 0))
             ws.cell(row=row_num, column=8, value="پیش‌فاکتور" if doc.get("is_proforma") else "قطعی")
             ws.cell(row=row_num, column=9, value=doc.get("description", ""))
-            ws.cell(row=row_num, column=10, value=str(doc.get("created_at")))
+            ws.cell(row=row_num, column=10, value=doc.get("created_by_name") or "")
+            ws.cell(row=row_num, column=11, value=str(doc.get("created_at")))
         
         # تنظیم عرض ستون‌ها
         ws.column_dimensions["A"].width = 15
@@ -461,7 +463,8 @@ def export_documents_excel(
         ws.column_dimensions["G"].width = 15
         ws.column_dimensions["H"].width = 12
         ws.column_dimensions["I"].width = 30
-        ws.column_dimensions["J"].width = 20
+        ws.column_dimensions["J"].width = 22
+        ws.column_dimensions["K"].width = 20
         
         # ذخیره در حافظه
         output = io.BytesIO()

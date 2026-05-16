@@ -74,4 +74,41 @@ class PublicInvoiceShareService {
       );
     }
   }
+
+  /// بدون احراز هویت — شروع پرداخت آنلاین (بازگشت لینک درگاه)
+  Future<Map<String, dynamic>> startOnlinePayment(String code, double amount) async {
+    try {
+      final response = await _apiClient.post<Map<String, dynamic>>(
+        '/api/v1/public/invoice-links/${Uri.encodeComponent(code)}/pay/start',
+        data: {'amount': amount},
+      );
+      final body = response.data;
+      if (body is Map<String, dynamic>) {
+        if (body['success'] == true) {
+          final data = body['data'];
+          if (data is Map<String, dynamic>) {
+            return data;
+          }
+        }
+        final error = body['error'];
+        throw DioException(
+          requestOptions: response.requestOptions,
+          error: error ?? {'message': 'خطا در شروع پرداخت'},
+          response: response,
+        );
+      }
+      throw DioException(
+        requestOptions: response.requestOptions,
+        error: {'message': 'پاسخ نامعتبر'},
+        response: response,
+      );
+    } on DioException {
+      rethrow;
+    } catch (e) {
+      throw DioException(
+        requestOptions: RequestOptions(path: '/api/v1/public/invoice-links/$code/pay/start'),
+        error: e,
+      );
+    }
+  }
 }

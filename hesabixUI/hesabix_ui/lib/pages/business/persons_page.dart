@@ -345,6 +345,18 @@ class _PersonsPageState extends State<PersonsPage> {
           formatter: (person) => person.mobile ?? '-',
         ),
         TextColumn(
+          'mobile_2',
+          t.personMobile2,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.mobile2 ?? '-',
+        ),
+        TextColumn(
+          'mobile_3',
+          t.personMobile3,
+          width: ColumnWidth.medium,
+          formatter: (person) => person.mobile3 ?? '-',
+        ),
+        TextColumn(
           'email',
           t.personEmail,
           width: ColumnWidth.large,

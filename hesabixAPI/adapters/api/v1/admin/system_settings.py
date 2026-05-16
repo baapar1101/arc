@@ -119,6 +119,12 @@ def get_notifications_settings_endpoint(
 
 class ShareLinkSettingsPayload(BaseModel):
 	public_app_url: str
+	invoice_gateway_fee_percent: Optional[float] = Field(
+		default=None,
+		ge=0,
+		le=100,
+		description="درصد کارمزد درگاه برای پرداخت آنلاین از لینک فاکتور (۰ تا ۱۰۰). خالی = بدون تغییر",
+	)
 
 
 @router.get(
@@ -150,7 +156,11 @@ def set_share_link_settings_endpoint(
 ) -> dict:
 	if not ctx.has_any_permission("system_settings", "superadmin"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
-	data = set_share_link_settings(db, public_app_url=payload.public_app_url)
+	data = set_share_link_settings(
+		db,
+		public_app_url=payload.public_app_url,
+		invoice_gateway_fee_percent=payload.invoice_gateway_fee_percent,
+	)
 	return success_response(data, request, message="SHARE_LINK_PUBLIC_APP_URL_UPDATED")
 
 

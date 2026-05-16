@@ -221,4 +221,19 @@ class InvoiceShareLinkCreateRequest(BaseModel):
         default=True,
         description="در صورت وجود لینک فعال، ابتدا لغو و لینک جدید",
     )
+    online_payment_enabled: Optional[bool] = Field(
+        default=None,
+        description="فعال‌سازی پرداخت آنلاین از لینک عمومی (فقط فاکتور فروش قطعی)",
+    )
+    online_payment_gateway_id: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="شناسه درگاه پرداخت متصل به کسب‌وکار",
+    )
+
+
+class InvoiceShareLinkPaymentPatchRequest(BaseModel):
+    """به‌روزرسانی پرداخت آنلاین روی لینک فعال"""
+    online_payment_enabled: Optional[bool] = None
+    online_payment_gateway_id: Optional[int] = Field(default=None, description="خالی یا ۰ برای حذف درگاه")
 

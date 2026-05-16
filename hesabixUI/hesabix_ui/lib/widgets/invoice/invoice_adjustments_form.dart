@@ -8,6 +8,7 @@ import '../../utils/invoice_adjustments_account_filter.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/number_formatters.dart';
 import 'account_tree_combobox_widget.dart';
+import '../inputs/frequent_description_text_field.dart';
 
 /// ردیف فرم اضافات/کسورات فاکتور (فروش یا خرید) — هم‌خوان با `extra_info.invoice_adjustments` در API.
 class InvoiceAdjustmentFormRow {
@@ -346,7 +347,8 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
                             ],
                             onChanged: (_) => onChanged(),
                           );
-                          final descField = TextField(
+                          final descField = FrequentDescriptionTextField(
+                            businessId: businessId,
                             controller: r.descriptionController,
                             decoration: const InputDecoration(
                               labelText: 'شرح (اختیاری)',

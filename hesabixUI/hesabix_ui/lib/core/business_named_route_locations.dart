@@ -96,6 +96,7 @@ abstract final class BusinessNamedRoutes {
     'business_reports_woocommerce_bridge_health': 'reports/woocommerce/bridge-health',
     'business_basalam': 'basalam',
     'business_woocommerce': 'woocommerce',
+    'business_woocommerce_opening_inventory': 'woocommerce/opening-inventory',
     'business_settings': 'settings',
     'business_settings_backup': 'settings/backup',
     'business_settings_ftp_backup': 'settings/ftp-backup',

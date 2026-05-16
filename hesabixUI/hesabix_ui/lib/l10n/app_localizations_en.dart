@@ -1621,6 +1621,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createdBy => 'Created by';
 
   @override
+  String get creatorColumnTitle => 'Creator';
+
+  @override
   String get lastUpdated => 'Last updated';
 
   @override
@@ -2182,6 +2185,54 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get yearEndClosing => 'Year End Closing';
+
+  @override
+  String get yearEndSplitSectionTitle => 'Fiscal period split';
+
+  @override
+  String get yearEndSplitSectionDescription =>
+      'You can close the books on an end date earlier than the fiscal calendar end. Documents after that date (by the rule below) move to the new fiscal year after it is created.';
+
+  @override
+  String get yearEndSplitDifferentEndToggle =>
+      'Closing end date differs from calendar fiscal year end';
+
+  @override
+  String get yearEndSplitClosingEndDateLabel =>
+      'Closing period end date (inclusive)';
+
+  @override
+  String get yearEndSplitRelocationBasisLabel =>
+      'Criterion for \"after period end\" when moving documents';
+
+  @override
+  String get yearEndSplitBasisDocumentDate => 'Document date';
+
+  @override
+  String get yearEndSplitBasisRegisteredAt => 'Registration date (day)';
+
+  @override
+  String get yearEndSplitMoveDocumentsToggle =>
+      'Automatically move post-period documents to the new fiscal year';
+
+  @override
+  String get yearEndSplitMoveDocumentsSubtitle =>
+      'If off, fiscal_year_id is not updated (not recommended).';
+
+  @override
+  String yearEndSplitCalendarEndNote(String date) {
+    return 'Calendar end of current fiscal year: $date';
+  }
+
+  @override
+  String yearEndSplitRelocatePreviewLine(int docCount, int whCount) {
+    return '$docCount accounting document(s) and $whCount warehouse document(s) are scheduled to move.';
+  }
+
+  @override
+  String yearEndClosingDoneRelocationLine(int docCount, int whCount) {
+    return 'Moved $docCount document(s) and $whCount warehouse slip(s) to the new fiscal year.';
+  }
 
   @override
   String get currencyRevaluation => 'FX rates & revaluation';
@@ -3452,6 +3503,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get personMobile => 'Mobile';
+
+  @override
+  String get personMobile2 => 'Mobile 2';
+
+  @override
+  String get personMobile3 => 'Mobile 3';
 
   @override
   String get personFax => 'Fax';
@@ -12634,6 +12691,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get woocommerceHubBulkSyncCurrentPage => 'This table page';
 
   @override
+  String get woocommerceHubBulkSyncSelected => 'Selected rows';
+
+  @override
+  String woocommerceHubBulkConfirmSelected(String count) {
+    return 'Sync $count selected row(s) from the table?';
+  }
+
+  @override
+  String get woocommerceHubBulkEmptySelection =>
+      'Select one or more rows using the checkboxes, then tap sync selected.';
+
+  @override
   String get woocommerceHubBulkSyncAllFiltered => 'All with current filters';
 
   @override
@@ -12656,6 +12725,122 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceHubBulkProgressLabel => 'Request batch';
+
+  @override
+  String get woocommerceOpeningInvBridgeTitle => 'Opening inventory (bridge)';
+
+  @override
+  String get woocommerceOpeningInvBridgeSubtitle =>
+      'Run the same opening-balance job as the WooCommerce plugin, via the Hesabix store bridge. Use after products are synced and accounts/warehouse are configured on the store.';
+
+  @override
+  String get woocommerceOpeningInvRefreshStatus => 'Refresh status';
+
+  @override
+  String get woocommerceOpeningInvLoadAccounts => 'Load accounts';
+
+  @override
+  String get woocommerceOpeningInvPreview => 'Preview';
+
+  @override
+  String get woocommerceOpeningInvPrepare => 'Prepare only';
+
+  @override
+  String get woocommerceOpeningInvRunAllToEnd =>
+      'Run all batches to completion';
+
+  @override
+  String get woocommerceOpeningInvFinalizeOnly => 'Finalize';
+
+  @override
+  String get woocommerceOpeningInvNeedActiveJob =>
+      'Create a job with “Prepare only” first, or refresh status to restore a pending job.';
+
+  @override
+  String get woocommerceOpeningInvRunBatches => 'One batch step';
+
+  @override
+  String get woocommerceOpeningInvFinalize => 'Finalize document';
+
+  @override
+  String get woocommerceOpeningInvCancelJob => 'Cancel after current batch';
+
+  @override
+  String get woocommerceOpeningInvClearLog => 'Clear log';
+
+  @override
+  String get woocommerceOpeningInvInventoryAccountLabel =>
+      'Inventory (goods) account';
+
+  @override
+  String get woocommerceOpeningInvEquityAccountLabel =>
+      'Equity account (auto-balance)';
+
+  @override
+  String get woocommerceOpeningInvBatchSizeLabel => 'Batch size (3–40)';
+
+  @override
+  String get woocommerceOpeningInvWarehouseOverrideLabel =>
+      'Warehouse ID (0 = plugin default)';
+
+  @override
+  String get woocommerceOpeningInvIncludeTaxLabel => 'Include VAT in unit cost';
+
+  @override
+  String get woocommerceOpeningInvAutoBalanceLabel => 'Auto-balance to equity';
+
+  @override
+  String get woocommerceOpeningInvDoPostLabel =>
+      'Post (lock) opening balance in Hesabix';
+
+  @override
+  String get woocommerceOpeningInvCostBasisLabel => 'Cost basis';
+
+  @override
+  String get woocommerceOpeningInvCostBasisRegular => 'Regular price';
+
+  @override
+  String get woocommerceOpeningInvCostBasisSale => 'Sale price';
+
+  @override
+  String get woocommerceOpeningInvCostBasisZero => 'Zero cost';
+
+  @override
+  String woocommerceOpeningInvPendingProgress(Object cursor, Object total) {
+    return '$cursor / $total';
+  }
+
+  @override
+  String get woocommerceOpeningInvJobIdLabel => 'Job ID';
+
+  @override
+  String get woocommerceOpeningInvCompletedBanner =>
+      'This store already completed opening inventory in the plugin.';
+
+  @override
+  String get woocommerceOpeningInvPhraseHint =>
+      'To post the document, type exactly:';
+
+  @override
+  String get woocommerceOpeningInvPhrasePromptTitle => 'Confirm posting phrase';
+
+  @override
+  String get woocommerceOpeningInvPhraseMismatch =>
+      'Phrase does not match; finalize cancelled.';
+
+  @override
+  String get woocommerceOpeningInvLogTitle => 'Log';
+
+  @override
+  String get woocommerceOpeningInvPickInventoryHint =>
+      'Choose an inventory account.';
+
+  @override
+  String get woocommerceOpeningInvPickEquityHint =>
+      'Choose an equity account or turn off auto-balance.';
+
+  @override
+  String get woocommerceOpeningInvOpenFromHub => 'Opening inventory (bridge)';
 
   @override
   String get woocommerceSyncDone => 'Sync completed';
@@ -12872,6 +13057,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get woocommerceOpenReportsOverviewTooltip =>
       'WooCommerce reports overview';
+
+  @override
+  String get woocommerceOpenOpeningInventoryTooltip =>
+      'Opening inventory (bridge)';
+
+  @override
+  String get woocommerceSettingsOpeningInventoryLinkTitle =>
+      'Opening inventory via bridge';
+
+  @override
+  String get woocommerceSettingsOpeningInventoryLinkSubtitle =>
+      'Create the job and run batches from Hesabix without wp-admin.';
 
   @override
   String get settingsWooCommerceTitle => 'WooCommerce bridge';
@@ -13849,4 +14046,37 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dataTableHelpSectionOtherBody =>
       '• Refresh in the ⋮ menu reloads data from the server.\n• Compact mode toggles denser row height; your choice may be remembered for this table.\n• Use pagination at the bottom to change page size and move between pages.';
+
+  @override
+  String get frequentDescriptionsPickHint =>
+      'Focus this field to see your saved frequent descriptions.';
+
+  @override
+  String get frequentDescriptionsManage => 'Manage frequent descriptions';
+
+  @override
+  String get frequentDescriptionsAdd => 'Add';
+
+  @override
+  String get frequentDescriptionsEmpty => 'No frequent descriptions yet.';
+
+  @override
+  String get frequentDescriptionsLoadError => 'Could not load the list.';
+
+  @override
+  String get frequentDescriptionsNewLabel => 'New description';
+
+  @override
+  String get frequentDescriptionsDeleteTitle => 'Remove description';
+
+  @override
+  String get frequentDescriptionsDeleteConfirm =>
+      'Remove this text from your frequent descriptions list?';
+
+  @override
+  String get frequentDescriptionsSaved => 'Saved';
+
+  @override
+  String get frequentDescriptionsLimitReached =>
+      'Maximum number of frequent descriptions for this business has been reached.';
 }

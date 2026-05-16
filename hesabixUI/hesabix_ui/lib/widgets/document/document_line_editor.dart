@@ -5,6 +5,7 @@ import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/widgets/document/detail_selector_widget.dart';
+import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import '../../utils/snackbar_helper.dart';
 
@@ -437,8 +438,9 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               ],
             ),
             const SizedBox(height: 10),
-            TextFormField(
+            FrequentDescriptionTextField(
               key: ValueKey('desc_${line.uid}'),
+              businessId: widget.businessId,
               controller: c.descCtrl,
               decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'توضیحات', hintText: 'اختیاری'),
               maxLines: 2,
@@ -628,8 +630,9 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
           // توضیحات
           Expanded(
             flex: 2,
-            child: TextFormField(
+            child: FrequentDescriptionTextField(
               key: ValueKey('desc_${line.uid}'),
+              businessId: widget.businessId,
               controller: c.descCtrl,
               decoration: const InputDecoration(
                 border: OutlineInputBorder(),

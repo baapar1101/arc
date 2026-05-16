@@ -33,6 +33,7 @@ import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/currency_display_utils.dart';
@@ -1813,7 +1814,8 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
                             labelText: 'پروژه',
                           ),
                           const SizedBox(height: 8),
-                          TextField(
+                          FrequentDescriptionTextField(
+                            businessId: widget.businessId,
                             controller: _descriptionController,
                             decoration: const InputDecoration(
                               labelText: 'توضیحات کلی سند',
@@ -2046,7 +2048,8 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
               ),
               Padding(
                 padding: EdgeInsets.fromLTRB(padding, 0, padding, padding * 0.45),
-                child: TextField(
+                child: FrequentDescriptionTextField(
+                  businessId: widget.businessId,
                   controller: _descriptionController,
                   decoration: const InputDecoration(
                     labelText: 'توضیحات کلی سند',
@@ -3606,15 +3609,14 @@ class _PersonLineTileState extends State<_PersonLineTile> {
               ],
             ),
             const SizedBox(height: 8),
-            TextFormField(
+            FrequentDescriptionTextField(
+              businessId: widget.businessId,
               controller: _descController,
               focusNode: _descFocusNode,
               decoration: InputDecoration(
                 labelText: t.description,
                 isDense: true,
               ),
-              // IMPORTANT: اینجا trim نکن تا هر keypress باعث sync مجدد controller و reset شدن کرسر نشود.
-              // trim را موقع ذخیره‌سازی/ارسال به API انجام می‌دهیم.
               onChanged: (v) => widget.onChanged(widget.line.copyWith(description: v.trim().isEmpty ? null : v)),
             ),
             const SizedBox(height: 8),

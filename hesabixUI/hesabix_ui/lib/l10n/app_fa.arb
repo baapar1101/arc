@@ -686,6 +686,7 @@
   "conversation": "مکالمه",
   "ticketInfo": "اطلاعات تیکت",
   "createdBy": "ایجاد شده توسط",
+  "creatorColumnTitle": "ایجاد کننده",
   "assignedTo": "تخصیص یافته به",
   "lastUpdated": "آخرین بروزرسانی",
   "messageCount": "{count} پیام",
@@ -876,6 +877,45 @@
   "chartOfAccounts": "جدول حساب",
   "openingBalance": "تراز افتتاحیه",
   "yearEndClosing": "بستن سال مالی",
+  "yearEndSplitSectionTitle": "تقطیع / پایان دورهٔ بستن",
+  "yearEndSplitSectionDescription": "می‌توانید پایان دورهٔ مالی که بسته می‌شود را زودتر از «پایان تقویمی» سال جاری انتخاب کنید؛ اسناد بعد از آن تاریخ (طبق معیار زیر) پس از ایجاد سال جدید به سال جدید منتقل می‌شوند.",
+  "yearEndSplitDifferentEndToggle": "پایان دورهٔ بستن متفاوت از پایان تقویمی سال",
+  "yearEndSplitClosingEndDateLabel": "تاریخ پایان دورهٔ بستن (شامل)",
+  "yearEndSplitRelocationBasisLabel": "معیار «بعد از پایان دوره» برای انتقال سند",
+  "yearEndSplitBasisDocumentDate": "تاریخ سند",
+  "yearEndSplitBasisRegisteredAt": "تاریخ ثبت (روز)",
+  "yearEndSplitMoveDocumentsToggle": "انتقال خودکار اسناد بعد از پایان دوره به سال جدید",
+  "yearEndSplitMoveDocumentsSubtitle": "در صورت خاموش بودن، fiscal_year_id اسناد عوض نمی‌شود (معمولاً توصیه نمی‌شود).",
+  "yearEndSplitCalendarEndNote": "پایان تقویمی سال جاری: {date}",
+  "@yearEndSplitCalendarEndNote": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "yearEndSplitRelocatePreviewLine": "پیش‌بینی انتقال: {docCount} سند حسابداری و {whCount} سند انبار به سال جدید.",
+  "@yearEndSplitRelocatePreviewLine": {
+    "placeholders": {
+      "docCount": {
+        "type": "int"
+      },
+      "whCount": {
+        "type": "int"
+      }
+    }
+  },
+  "yearEndClosingDoneRelocationLine": "به سال جدید منتقل شد: {docCount} سند حسابداری و {whCount} سند انبار.",
+  "@yearEndClosingDoneRelocationLine": {
+    "placeholders": {
+      "docCount": {
+        "type": "int"
+      },
+      "whCount": {
+        "type": "int"
+      }
+    }
+  },
   "currencyRevaluation": "تسعیر و نرخ ارز",
   "reports": "گزارشات",
   "accountingSettings": "تنظیمات",
@@ -1368,6 +1408,8 @@
   "personPostalCode": "کد پستی",
   "personPhone": "تلفن",
   "personMobile": "موبایل",
+  "personMobile2": "موبایل ۲",
+  "personMobile3": "موبایل ۳",
   "personFax": "فکس",
   "personEmail": "پست الکترونیکی",
   "personWebsite": "وب‌سایت",
@@ -4783,6 +4825,10 @@
   },
   "woocommerceHubBulkBatchSizeLabel": "اندازهٔ دسته در هر درخواست",
   "woocommerceHubBulkSyncCurrentPage": "همگام این صفحهٔ جدول",
+  "woocommerceHubBulkSyncSelected": "همگام ردیف‌های انتخاب‌شده",
+  "woocommerceHubBulkConfirmSelected": "همگام‌سازی {count} ردیف انتخاب‌شده در جدول؟",
+  "@woocommerceHubBulkConfirmSelected": {"placeholders": {"count": {"type": "String"}}},
+  "woocommerceHubBulkEmptySelection": "با چک‌باکس، یک یا چند ردیف در جدول انتخاب کنید؛ سپس دکمهٔ همگام ردیف‌های انتخاب‌شده را بزنید.",
   "woocommerceHubBulkSyncAllFiltered": "همگام همه با فیلتر فعلی",
   "woocommerceHubBulkConfirmCurrentPage": "همگام‌سازی {count} مورد در صفحهٔ فعلی جدول؟",
   "@woocommerceHubBulkConfirmCurrentPage": {"placeholders": {"count": {"type": "String"}}},
@@ -4797,6 +4843,46 @@
     }
   },
   "woocommerceHubBulkProgressLabel": "دستهٔ درخواست",
+  "woocommerceOpeningInvBridgeTitle": "موجودی افتتاحیه (پل)",
+  "woocommerceOpeningInvBridgeSubtitle": "همان کار موجودی اولیهٔ افزونه روی فروشگاه، از طریق پل حسابیکس. پس از همگام کالاها و تنظیم انبار/حساب‌ها در وردپرس استفاده کنید.",
+  "woocommerceOpeningInvRefreshStatus": "به‌روزرسانی وضعیت",
+  "woocommerceOpeningInvLoadAccounts": "بارگذاری حساب‌ها",
+  "woocommerceOpeningInvPreview": "پیش‌نمایش",
+  "woocommerceOpeningInvPrepare": "فقط آماده‌سازی",
+  "woocommerceOpeningInvRunAllToEnd": "اجرای همهٔ دسته‌ها تا پایان",
+  "woocommerceOpeningInvFinalizeOnly": "نهایی‌سازی",
+  "woocommerceOpeningInvNeedActiveJob": "ابتدا با «فقط آماده‌سازی» نشست بسازید یا با به‌روزرسانی وضعیت، نشست معلق را بازیابی کنید.",
+  "woocommerceOpeningInvRunBatches": "یک دسته",
+  "woocommerceOpeningInvFinalize": "نهایی‌سازی سند",
+  "woocommerceOpeningInvCancelJob": "توقف امن پس از دسته",
+  "woocommerceOpeningInvClearLog": "پاک کردن لاگ",
+  "woocommerceOpeningInvInventoryAccountLabel": "حساب موجودی (کالا)",
+  "woocommerceOpeningInvEquityAccountLabel": "حساب حقوق صاحبان سهام (بستن تراز)",
+  "woocommerceOpeningInvBatchSizeLabel": "اندازهٔ دسته (۳ تا ۴۰)",
+  "woocommerceOpeningInvWarehouseOverrideLabel": "شناسهٔ انبار (۰ = پیش‌فرض افزونه)",
+  "woocommerceOpeningInvIncludeTaxLabel": "مالیات در بهای واحد",
+  "woocommerceOpeningInvAutoBalanceLabel": "بستن خودکار تراز به حقوق صاحبان سهام",
+  "woocommerceOpeningInvDoPostLabel": "نهایی‌سازی سند در حسابیکس (قفل)",
+  "woocommerceOpeningInvCostBasisLabel": "مبنای بهای تمام‌شده",
+  "woocommerceOpeningInvCostBasisRegular": "قیمت عادی",
+  "woocommerceOpeningInvCostBasisSale": "قیمت فروش ویژه",
+  "woocommerceOpeningInvCostBasisZero": "بهای صفر",
+  "woocommerceOpeningInvPendingProgress": "{cursor} / {total}",
+  "@woocommerceOpeningInvPendingProgress": {
+    "placeholders": {
+      "cursor": {},
+      "total": {}
+    }
+  },
+  "woocommerceOpeningInvJobIdLabel": "شناسهٔ نشست",
+  "woocommerceOpeningInvCompletedBanner": "موجودی افتتاحیه روی این فروشگاه قبلاً در افزونه تکمیل شده است.",
+  "woocommerceOpeningInvPhraseHint": "برای نهایی‌سازی سند، دقیقاً این عبارت را وارد کنید:",
+  "woocommerceOpeningInvPhrasePromptTitle": "تأیید عبارت نهایی‌سازی",
+  "woocommerceOpeningInvPhraseMismatch": "عبارت یکسان نیست؛ نهایی‌سازی لغو شد.",
+  "woocommerceOpeningInvLogTitle": "لاگ",
+  "woocommerceOpeningInvPickInventoryHint": "حساب موجودی را انتخاب کنید.",
+  "woocommerceOpeningInvPickEquityHint": "حساب حقوق صاحبان سهام را انتخاب کنید یا بستن خودکار را خاموش کنید.",
+  "woocommerceOpeningInvOpenFromHub": "موجودی افتتاحیه از پل",
   "woocommerceSyncDone": "همگام‌سازی انجام شد",
   "woocommerceControlQueueTitle": "صف همگام‌سازی پس‌زمینه",
   "woocommerceControlQueueBatchHint": "حداکثر ردیف در هر اجرا (از تنظیمات افزونه): {n}",
@@ -4867,6 +4953,9 @@
   "reportsWooSettingsPromoTitle": "تنظیمات پل",
   "reportsWooSettingsPromoSubtitle": "اگر اعداد یا لیست‌ها درست نیستند، آدرس فروشگاه یا توکن پل را اینجا به‌روز کنید و گزارش را رفرش کنید.",
   "woocommerceOpenReportsOverviewTooltip": "خلاصهٔ گزارش‌های ووکامرس",
+  "woocommerceOpenOpeningInventoryTooltip": "موجودی افتتاحیه از پل",
+  "woocommerceSettingsOpeningInventoryLinkTitle": "موجودی افتتاحیه از طریق پل",
+  "woocommerceSettingsOpeningInventoryLinkSubtitle": "ایجاد نشست و اجرای دسته‌ها از حسابیکس، بدون ورود به وردپرس.",
   "settingsWooCommerceTitle": "پل ووکامرس",
   "settingsWooCommerceSubtitle": "پل، سلامت فروشگاه، ArcWOC، صف و لاگ",
   "invoiceGlobalDiscountSection": "تخفیف کلی فاکتور",
@@ -5251,7 +5340,17 @@
   "dataTableHelpSectionSelectionTitle": "انتخاب ردیف و کپی",
   "dataTableHelpSectionSelectionBody": "• وقتی ستون چک‌باکس هست، از آن برای انتخاب ردیف استفاده کنید.\n• در حالت انتخاب چندگانه، Shift را نگه دارید و روی ردیف دیگر کلیک کنید تا بازه بین آخرین انتخاب و آن ردیف انتخاب شود.\n• برای کپی مقدار یک سلول، روی متن آن نگه دارید (لانگ‌پرس)؛ در جاهایی که سیستم‌عامل اجازه دهد راست‌کلیک هم ممکن است همان کار را انجام دهد.",
   "dataTableHelpSectionOtherTitle": "سایر امکانات",
-  "dataTableHelpSectionOtherBody": "• «به‌روزرسانی» در منوی ⋮ داده را دوباره از سرور می‌گیرد.\n• «حالت فشرده» ارتفاع ردیف‌ها را کمتر می‌کند؛ ممکن است برای همین جدول به خاطر سپرده شود.\n• از بخش صفحه‌بندی پایین برای اندازهٔ صفحه و رفتن به صفحهٔ بعد/قبل استفاده کنید."
+  "dataTableHelpSectionOtherBody": "• «به‌روزرسانی» در منوی ⋮ داده را دوباره از سرور می‌گیرد.\n• «حالت فشرده» ارتفاع ردیف‌ها را کمتر می‌کند؛ ممکن است برای همین جدول به خاطر سپرده شود.\n• از بخش صفحه‌بندی پایین برای اندازهٔ صفحه و رفتن به صفحهٔ بعد/قبل استفاده کنید.",
+  "frequentDescriptionsPickHint": "با فوکوس روی این فیلد، لیست شرح‌های پرتکرار نمایش داده می‌شود.",
+  "frequentDescriptionsManage": "مدیریت شرح‌های پرتکرار",
+  "frequentDescriptionsAdd": "افزودن",
+  "frequentDescriptionsEmpty": "هنوز شرح پرتکراری ثبت نشده است.",
+  "frequentDescriptionsLoadError": "بارگذاری لیست ناموفق بود.",
+  "frequentDescriptionsNewLabel": "شرح جدید",
+  "frequentDescriptionsDeleteTitle": "حذف شرح",
+  "frequentDescriptionsDeleteConfirm": "این شرح از لیست پرتکرار حذف شود؟",
+  "frequentDescriptionsSaved": "ذخیره شد",
+  "frequentDescriptionsLimitReached": "حداکثر تعداد شرح پرتکرار برای این کسب‌وکار پر است."
 }
 
 

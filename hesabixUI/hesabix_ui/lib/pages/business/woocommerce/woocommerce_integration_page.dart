@@ -70,6 +70,9 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
   int _hubBulkProgressIndex = 0;
   int _hubBulkProgressTotal = 0;
 
+  /// ایندکس ردیف‌های انتخاب‌شده در **صفحهٔ جاری** جدول مرکز عملیات (همگام با [DataTableWidget]).
+  Set<int> _hubTableSelectedIndices = {};
+
   bool _canWooCommerceManage() {
     if (widget.authStore.currentBusiness?.isOwner == true) return true;
     return widget.authStore.hasBusinessPermission('woocommerce', 'manage');
@@ -400,6 +403,41 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     return out;
   }
 
+  List<int> _hubTableIdsFromSelection() {
+    final sorted = _hubTableSelectedIndices.toList()..sort();
+    final out = <int>[];
+    for (final i in sorted) {
+      if (i < 0 || i >= _rows.length) continue;
+      final id = int.tryParse('${_rows[i]['id'] ?? ''}') ?? 0;
+      if (id > 0) out.add(id);
+    }
+    return out;
+  }
+
+  Future<void> _onHubBulkSyncSelected(
+    BuildContext context,
+    AppLocalizations t,
+    String kind,
+  ) async {
+    if (!_canWooCommerceManage()) return;
+    final ids = _hubTableIdsFromSelection();
+    if (ids.isEmpty) {
+      SnackBarHelper.showError(
+        context,
+        message: t.woocommerceHubBulkEmptySelection,
+      );
+      return;
+    }
+    final ok = await _confirmSyncAction(
+      context,
+      t,
+      title: t.woocommerceHubBulkSyncSelected,
+      body: t.woocommerceHubBulkConfirmSelected('${ids.length}'),
+    );
+    if (!ok || !context.mounted) return;
+    await _runHubBulkSync(context, t, kind, ids);
+  }
+
   Future<List<int>> _collectAllIds(String kind) async {
     const fetchSize = 50;
     final seen = <int>{};
@@ -646,6 +684,15 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                   icon: const Icon(Icons.sync_alt, size: 20),
                   label: Text(t.woocommerceHubBulkSyncCurrentPage),
                 ),
+                OutlinedButton.icon(
+                  onPressed: (_loadingList ||
+                          _hubBulkRunning ||
+                          _hubTableSelectedIndices.isEmpty)
+                      ? null
+                      : () => _onHubBulkSyncSelected(context, t, kind),
+                  icon: const Icon(Icons.checklist_rtl, size: 20),
+                  label: Text(t.woocommerceHubBulkSyncSelected),
+                ),
                 FilledButton.icon(
                   onPressed: (_loadingList || _hubBulkRunning)
                       ? null
@@ -782,7 +829,10 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             child: Card(
-              child: ListTile(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
                 leading: Icon(
                   Icons.tune,
                   color: Theme.of(context).colorScheme.primary,
@@ -799,6 +849,25 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                   child: Text(t.woocommerceHubOpenWooSettingsButton),
                 ),
                 isThreeLine: true,
+                  ),
+                  if (_canWooCommerceManage())
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: TextButton.icon(
+                          onPressed: () => context.push(
+                            context.businessPanelUrl(
+                              widget.businessId,
+                              'woocommerce/opening-inventory',
+                            ),
+                          ),
+                          icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                          label: Text(t.woocommerceOpeningInvOpenFromHub),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -1308,6 +1377,16 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       minTableWidth: 980,
       expandBodyHeightToFitRows: true,
       deferVerticalScrollToParent: true,
+      enableRowSelection: _canWooCommerceManage(),
+      enableMultiRowSelection: _canWooCommerceManage(),
+      onRowSelectionChanged: (s) {
+        if (!mounted) return;
+        setState(() => _hubTableSelectedIndices = Set<int>.from(s));
+      },
+      onTableDataChanged: (_) {
+        if (!mounted) return;
+        setState(() => _hubTableSelectedIndices.clear());
+      },
     );
   }
 
@@ -1420,6 +1499,16 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       minTableWidth: 900,
       expandBodyHeightToFitRows: true,
       deferVerticalScrollToParent: true,
+      enableRowSelection: _canWooCommerceManage(),
+      enableMultiRowSelection: _canWooCommerceManage(),
+      onRowSelectionChanged: (s) {
+        if (!mounted) return;
+        setState(() => _hubTableSelectedIndices = Set<int>.from(s));
+      },
+      onTableDataChanged: (_) {
+        if (!mounted) return;
+        setState(() => _hubTableSelectedIndices.clear());
+      },
     );
   }
 
@@ -1526,6 +1615,16 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       minTableWidth: 800,
       expandBodyHeightToFitRows: true,
       deferVerticalScrollToParent: true,
+      enableRowSelection: _canWooCommerceManage(),
+      enableMultiRowSelection: _canWooCommerceManage(),
+      onRowSelectionChanged: (s) {
+        if (!mounted) return;
+        setState(() => _hubTableSelectedIndices = Set<int>.from(s));
+      },
+      onTableDataChanged: (_) {
+        if (!mounted) return;
+        setState(() => _hubTableSelectedIndices.clear());
+      },
     );
   }
 }

@@ -136,6 +136,8 @@ def prepare_person_import_item(item: Dict[str, Any]) -> Tuple[Dict[str, Any], Li
         "postal_code",
         "phone",
         "mobile",
+        "mobile_2",
+        "mobile_3",
         "fax",
         "email",
         "website",

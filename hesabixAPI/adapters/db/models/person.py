@@ -81,6 +81,8 @@ class Person(Base):
     postal_code: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="کد پستی")
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="تلفن")
     mobile: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="موبایل")
+    mobile_2: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="موبایل ۲")
+    mobile_3: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="موبایل ۳")
     fax: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="فکس")
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="پست الکترونیکی")
     website: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="وب‌سایت")

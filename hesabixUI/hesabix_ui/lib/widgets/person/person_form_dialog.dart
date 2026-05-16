@@ -69,6 +69,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   final _postalCodeController = TextEditingController();
   final _phoneController = TextEditingController();
   final _mobileController = TextEditingController();
+  final _mobile2Controller = TextEditingController();
+  final _mobile3Controller = TextEditingController();
   final _faxController = TextEditingController();
   final _emailController = TextEditingController();
   final _websiteController = TextEditingController();
@@ -153,6 +155,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _postalCodeController.text = person.postalCode ?? '';
       _phoneController.text = person.phone ?? '';
       _mobileController.text = person.mobile ?? '';
+      _mobile2Controller.text = person.mobile2 ?? '';
+      _mobile3Controller.text = person.mobile3 ?? '';
       _faxController.text = person.fax ?? '';
       _emailController.text = person.email ?? '';
       _websiteController.text = person.website ?? '';
@@ -309,6 +313,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     setStr(_postalCodeController, 'postal_code');
     setStr(_phoneController, 'phone');
     setStr(_mobileController, 'mobile');
+    setStr(_mobile2Controller, 'mobile_2');
+    setStr(_mobile3Controller, 'mobile_3');
     setStr(_faxController, 'fax');
     setStr(_emailController, 'email');
     setStr(_websiteController, 'website');
@@ -389,6 +395,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     _postalCodeController.dispose();
     _phoneController.dispose();
     _mobileController.dispose();
+    _mobile2Controller.dispose();
+    _mobile3Controller.dispose();
     _faxController.dispose();
     _emailController.dispose();
     _websiteController.dispose();
@@ -445,6 +453,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           postalCode: _postalCodeController.text.trim().isEmpty ? null : _postalCodeController.text.trim(),
           phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
           mobile: _mobileController.text.trim().isEmpty ? null : _mobileController.text.trim(),
+          mobile2: _mobile2Controller.text.trim().isEmpty ? null : _mobile2Controller.text.trim(),
+          mobile3: _mobile3Controller.text.trim().isEmpty ? null : _mobile3Controller.text.trim(),
           fax: _faxController.text.trim().isEmpty ? null : _faxController.text.trim(),
           email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
           website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
@@ -518,6 +528,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           postalCode: _postalCodeController.text.trim().isEmpty ? null : _postalCodeController.text.trim(),
           phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
           mobile: _mobileController.text.trim().isEmpty ? null : _mobileController.text.trim(),
+          mobile2: _mobile2Controller.text.trim().isEmpty ? null : _mobile2Controller.text.trim(),
+          mobile3: _mobile3Controller.text.trim().isEmpty ? null : _mobile3Controller.text.trim(),
           fax: _faxController.text.trim().isEmpty ? null : _faxController.text.trim(),
           email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
           website: _websiteController.text.trim().isEmpty ? null : _websiteController.text.trim(),
@@ -1776,6 +1788,55 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     labelText: t.personMobile,
                     hintText: t.personMobile,
                   ),
+                ),
+              ),
+            ],
+          ),
+        SizedBox(height: spacing),
+        if (isMobile)
+          Column(
+            children: [
+              TextFormField(
+                controller: _mobile2Controller,
+                decoration: InputDecoration(
+                  labelText: t.personMobile2,
+                  hintText: t.personMobile2,
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              SizedBox(height: spacing),
+              TextFormField(
+                controller: _mobile3Controller,
+                decoration: InputDecoration(
+                  labelText: t.personMobile3,
+                  hintText: t.personMobile3,
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+            ],
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _mobile2Controller,
+                  decoration: InputDecoration(
+                    labelText: t.personMobile2,
+                    hintText: t.personMobile2,
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+              ),
+              SizedBox(width: spacing),
+              Expanded(
+                child: TextFormField(
+                  controller: _mobile3Controller,
+                  decoration: InputDecoration(
+                    labelText: t.personMobile3,
+                    hintText: t.personMobile3,
+                  ),
+                  keyboardType: TextInputType.phone,
                 ),
               ),
             ],

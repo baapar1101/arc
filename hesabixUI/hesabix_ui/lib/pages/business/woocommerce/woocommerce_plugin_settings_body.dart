@@ -1,8 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth_store.dart';
+import '../../../core/business_nav.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/woocommerce_integration_service.dart';
 import '../../../utils/error_extractor.dart';
@@ -332,6 +334,23 @@ class _WoocommercePluginSettingsBodyState
                   const SizedBox(height: 8),
                   ..._bridgeHealthLines(context, t, _lastBridgeTest!['remote']),
                 ],
+              ),
+            ),
+          ),
+        ],
+        if (canManage) ...[
+          const SizedBox(height: 20),
+          Card.outlined(
+            child: ListTile(
+              leading: const Icon(Icons.inventory_2_outlined),
+              title: Text(t.woocommerceSettingsOpeningInventoryLinkTitle),
+              subtitle: Text(t.woocommerceSettingsOpeningInventoryLinkSubtitle),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push(
+                context.businessPanelUrl(
+                  widget.businessId,
+                  'woocommerce/opening-inventory',
+                ),
               ),
             ),
           ),

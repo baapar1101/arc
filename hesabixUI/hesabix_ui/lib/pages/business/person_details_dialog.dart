@@ -31,6 +31,15 @@ import 'package:share_plus/share_plus.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 
+String? _firstNonEmptyPersonMobile(Person? p) {
+  if (p == null) return null;
+  for (final s in <String?>[p.mobile, p.mobile2, p.mobile3]) {
+    final t = s?.trim();
+    if (t != null && t.isNotEmpty) return t;
+  }
+  return null;
+}
+
 class PersonDetailsDialog extends StatefulWidget {
   final int businessId;
   final Person person;
@@ -367,7 +376,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     final t = AppLocalizations.of(context);
     final personId = _person?.id;
     final link = _shareLink?.shortUrl;
-    final mobileFromPerson = _person?.mobile?.trim();
+    final mobileFromPerson = _firstNonEmptyPersonMobile(_person);
     final mobileOverride = _smsRecipientController.text.trim();
     final effectiveMobile = mobileOverride.isNotEmpty ? mobileOverride : mobileFromPerson;
 
@@ -711,7 +720,9 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           const SizedBox(height: 24),
           _buildSectionHeader('اطلاعات تماس'),
           _buildInfoGrid([
-            _InfoRow('موبایل', person.mobile),
+            _InfoRow(t.personMobile, person.mobile),
+            _InfoRow(t.personMobile2, person.mobile2),
+            _InfoRow(t.personMobile3, person.mobile3),
             _InfoRow('تلفن ثابت', person.phone),
             _InfoRow('ایمیل', person.email),
             _InfoRow('وب‌سایت', person.website),
@@ -1670,7 +1681,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   label: Text(t.personShareCopyAndSendLink),
                 ),
                 OutlinedButton.icon(
-                  onPressed: ((_person?.mobile?.trim().isNotEmpty == true ||
+                  onPressed: (((_firstNonEmptyPersonMobile(_person)?.isNotEmpty == true) ||
                               _smsRecipientController.text.trim().isNotEmpty) &&
                           widget.authStore.hasBusinessPermission('notifications', 'send') &&
                           !_sendingLinkSms)

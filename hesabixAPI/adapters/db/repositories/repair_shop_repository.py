@@ -196,6 +196,8 @@ class RepairOrderRepository:
                         self.model_class.product_serial.like(search_term),
                         Person.name.like(search_term),
                         Person.mobile.like(search_term),
+                        Person.mobile_2.like(search_term),
+                        Person.mobile_3.like(search_term),
                         Person.phone.like(search_term),
                         Person.email.like(search_term)
                     )

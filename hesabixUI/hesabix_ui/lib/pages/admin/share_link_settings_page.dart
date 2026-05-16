@@ -14,6 +14,7 @@ class ShareLinkSettingsPage extends StatefulWidget {
 class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
   final _formKey = GlobalKey<FormState>();
   final _urlController = TextEditingController();
+  final _feePercentController = TextEditingController();
   late final SystemSettingsService _service;
 
   bool _loading = true;
@@ -35,6 +36,12 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
     try {
       final data = await _service.getShareLinkSettings();
       _urlController.text = (data['public_app_url'] ?? '').toString();
+      final fee = data['invoice_gateway_fee_percent'];
+      if (fee != null) {
+        _feePercentController.text = fee.toString();
+      } else {
+        _feePercentController.text = '0';
+      }
     } catch (e) {
       if (mounted) {
         _error = ErrorExtractor.forContext(e, context);
@@ -50,10 +57,23 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _saving = true);
     try {
-      await _service.updateShareLinkSettings(_urlController.text.trim());
+      final feeText = _feePercentController.text.trim();
+      double? feeVal;
+      if (feeText.isEmpty) {
+        feeVal = 0;
+      } else {
+        feeVal = double.tryParse(feeText.replaceAll(',', '.'));
+        if (feeVal == null) {
+          throw Exception('درصد کارمزد نامعتبر است');
+        }
+      }
+      await _service.updateShareLinkSettings(
+        _urlController.text.trim(),
+        invoiceGatewayFeePercent: feeVal,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('آدرس با موفقیت ذخیره شد'), backgroundColor: Colors.green),
+          const SnackBar(content: Text('تنظیمات با موفقیت ذخیره شد'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -77,6 +97,7 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
   @override
   void dispose() {
     _urlController.dispose();
+    _feePercentController.dispose();
     super.dispose();
   }
 
@@ -145,6 +166,34 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
                             if (lower.endsWith('/public')) {
                               return 'نیازی به درج /public نیست؛ سیستم خودکار اضافه می‌کند';
                             }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 28),
+                        const Text(
+                          'پرداخت آنلاین از لینک فاکتور',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'درصد کارمزد درگاه برای ثبت سند دریافت (خط کیف‌پول/نزد پرداخت‌یار) هنگام پرداخت مشتری از لینک عمومی فاکتور. مقدار ۰ یعنی بدون خط کارمزد جدا.',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _feePercentController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          decoration: const InputDecoration(
+                            labelText: 'درصد کارمزد (۰ تا ۱۰۰)',
+                            prefixIcon: Icon(Icons.percent),
+                            border: OutlineInputBorder(),
+                          ),
+                          validator: (value) {
+                            final text = (value ?? '').trim();
+                            if (text.isEmpty) return null;
+                            final v = double.tryParse(text.replaceAll(',', '.'));
+                            if (v == null) return 'عدد معتبر وارد کنید';
+                            if (v < 0 || v > 100) return 'مقدار باید بین ۰ و ۱۰۰ باشد';
                             return null;
                           },
                         ),

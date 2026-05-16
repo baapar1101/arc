@@ -618,6 +618,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
 
   Widget _buildCard(DocumentModel doc) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final selected = _selectedIds.contains(doc.id);
     final currency = doc.currencyCode ?? 'ریال';
 
@@ -738,6 +739,13 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                     overflow: TextOverflow.ellipsis,
                   ),
               ],
+              const SizedBox(height: 8),
+              Text(
+                '${t.creatorColumnTitle}: ${((doc.createdByName ?? '').trim().isEmpty) ? '—' : (doc.createdByName ?? '').trim()}',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
           ),
         ),

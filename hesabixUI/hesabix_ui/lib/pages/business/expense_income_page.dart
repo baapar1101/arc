@@ -17,6 +17,7 @@ import '../../utils/number_normalizer.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../utils/error_extractor.dart';
 
 class ExpenseIncomePage extends StatefulWidget {
@@ -140,7 +141,8 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: TextField(
+              child: FrequentDescriptionTextField(
+                businessId: widget.businessId,
                 controller: _descriptionController,
                 decoration: const InputDecoration(
                   labelText: 'توضیحات کلی سند',

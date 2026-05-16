@@ -17,9 +17,32 @@ class Hesabix_V2_Opening_Inventory_Service
 	const TRANSIENT_TTL = 86400;
 
 	/**
+	 * کش یک‌بار در هر درخواست برای پیش‌نیازهای UI (کاهش تماس تکراری به API).
+	 *
+	 * @var array<string,mixed>|null
+	 */
+	private static $connection_prereq_ui_cache = null;
+
+	/**
 	 * اشاره‌گر نشست فعال هر کاربر (برای ادامهٔ ایمن پس از خطا / تازه‌سازی صفحه).
 	 */
 	const PTR_PREFIX = 'hesabix_v2_obinv_ptr_';
+
+	/**
+	 * شناسهٔ کاربر ساختگی برای نشست موجودی افتتاحیهٔ فراخوانی‌شده از پل REST (جدای از مدیر wp-admin).
+	 * نباید با شناسهٔ کاربر واقعی وردپرس یکی باشد.
+	 */
+	const BRIDGE_JOB_USER_ID = 919199100;
+
+	/**
+	 * عبارت لازم برای تأیید نهایی‌سازی سند وقتی do_post فعال است (پل و رابط ادمین).
+	 *
+	 * @return string
+	 */
+	public static function post_confirm_phrase()
+	{
+		return 'تایید نهایی سند';
+	}
 
 	/**
 	 * @param int $user_id
@@ -80,6 +103,311 @@ class Hesabix_V2_Opening_Inventory_Service
 		}
 		$d = $api_result['data'] ?? null;
 		return is_array($d) ? $d : null;
+	}
+
+	/**
+	 * اگر سال مالی در وردپرس ذخیره نشده، سال جاری را از حسابیکس می‌گیرد و در option ذخیره می‌کند.
+	 *
+	 * @param Hesabix_V2_Api $api کلاینت با کلید و کسب‌وکار ذخیره‌شده.
+	 * @return int شناسهٔ سال مالی یا ۰ در صورت عدم دسترسی / نبود سال جاری.
+	 */
+	public static function sync_and_get_stored_fiscal_year_id(Hesabix_V2_Api $api)
+	{
+		$fy = (int) get_option('hesabix_v2_fiscal_year_id');
+		if ($fy > 0) {
+			return $fy;
+		}
+		$bid = (int) get_option('hesabix_v2_business_id');
+		if ($bid < 1) {
+			return 0;
+		}
+		$res = $api->get_current_fiscal_year($bid);
+		if (empty($res['success']) || empty($res['data']) || !is_array($res['data'])) {
+			return 0;
+		}
+		$data = $res['data'];
+		$id = isset($data['id']) ? (int) $data['id'] : 0;
+		if ($id < 1) {
+			return 0;
+		}
+		update_option('hesabix_v2_fiscal_year_id', $id);
+		self::$connection_prereq_ui_cache = null;
+		if (class_exists('Hesabix_V2_Order_Fiscal_Service', false)) {
+			Hesabix_V2_Order_Fiscal_Service::invalidate_bounds_cache();
+		}
+		return $id;
+	}
+
+	/**
+	 * پیش‌نیازهای اتصال برای تب موجودی افتتاحیه (چک‌لیست + مقادیر اعتبارسنجی JS).
+	 *
+	 * @return array{prereq: array{fiscal_year_id:int, currency_id:int}, checklist: array<string,bool>}
+	 */
+	public static function get_connection_prereq_for_ui()
+	{
+		if (is_array(self::$connection_prereq_ui_cache)) {
+			return self::$connection_prereq_ui_cache;
+		}
+
+		$enabled = (bool) get_option('hesabix_v2_enabled');
+		$api_key = (bool) get_option('hesabix_v2_api_key');
+		$biz_ok = (int) get_option('hesabix_v2_business_id') > 0;
+		$wh_ok = (int) get_option('hesabix_v2_default_warehouse_id') > 0;
+		if (!$wh_ok) {
+			$obp = get_option('hesabix_v2_opening_inventory_prefs', array());
+			if (is_array($obp) && !empty($obp['warehouse_override']) && (int) $obp['warehouse_override'] > 0) {
+				$wh_ok = true;
+			}
+		}
+
+		$fy = (int) get_option('hesabix_v2_fiscal_year_id');
+		$currency_resolved = 0;
+
+		if ($enabled && $api_key && $biz_ok) {
+			$api = new Hesabix_V2_Api();
+			if ($fy < 1) {
+				$fy = self::sync_and_get_stored_fiscal_year_id($api);
+			}
+			$currency_resolved = (int) Hesabix_V2_Currency_Service::resolve_invoice_currency_id($api);
+		}
+
+		$out = array(
+			'prereq' => array(
+				'fiscal_year_id' => $fy,
+				'currency_id' => $currency_resolved,
+			),
+			'checklist' => array(
+				'enabled' => $enabled,
+				'api_key' => $api_key,
+				'business' => $biz_ok,
+				'fiscal_year' => $fy > 0,
+				'warehouse' => $wh_ok,
+				'currency' => $currency_resolved > 0,
+			),
+		);
+
+		self::$connection_prereq_ui_cache = $out;
+		return $out;
+	}
+
+	/**
+	 * خالی کردن کش پیش‌نیاز UI (مثلاً پس از تغییر سال مالی در option).
+	 *
+	 * @return void
+	 */
+	public static function invalidate_connection_prereq_ui_cache()
+	{
+		self::$connection_prereq_ui_cache = null;
+	}
+
+	/**
+	 * خلاصهٔ نشست نیمه‌تمام کاربر (در صورت وجود).
+	 *
+	 * @param int $user_id
+	 * @return array{job_id:string, cursor:int, total:int, needs_finalize?:bool}|null
+	 */
+	public static function get_pending_job_summary_for_user($user_id)
+	{
+		$user_id = (int) $user_id;
+		if ($user_id < 1 || get_option('hesabix_v2_opening_inventory_completed')) {
+			return null;
+		}
+		$ptr_key = self::PTR_PREFIX . $user_id;
+		$jid = get_transient($ptr_key);
+		if (!is_string($jid) || $jid === '') {
+			return null;
+		}
+		$job = self::get_job($jid, $user_id);
+		if (!$job) {
+			delete_transient($ptr_key);
+			return null;
+		}
+		$items = isset($job['items']) && is_array($job['items']) ? $job['items'] : array();
+		$total = count($items);
+		$cursor = (int) ($job['cursor'] ?? 0);
+		if ($total < 1) {
+			return null;
+		}
+		if ($cursor < $total) {
+			return array(
+				'job_id' => $jid,
+				'cursor' => $cursor,
+				'total' => $total,
+				'needs_finalize' => false,
+			);
+		}
+		$opts = isset($job['options']) && is_array($job['options']) ? $job['options'] : array();
+		if (!empty($opts['do_post'])) {
+			return array(
+				'job_id' => $jid,
+				'cursor' => $cursor,
+				'total' => $total,
+				'needs_finalize' => true,
+			);
+		}
+		return null;
+	}
+
+	/**
+	 * کنترل سمت سرور: حساب‌های انتخابی باید برگ دفترکل باشند (بدون زیرمجموعه در لیست تخت).
+	 *
+	 * @param Hesabix_V2_Api $api
+	 * @param int            $inventory_account_id
+	 * @param int            $equity_account_id
+	 * @param bool           $require_equity
+	 * @return array{0:bool, 1:?string} [ok, message]
+	 */
+	public static function validate_leaf_account_selection(Hesabix_V2_Api $api, $inventory_account_id, $equity_account_id, $require_equity)
+	{
+		$inventory_account_id = (int) $inventory_account_id;
+		$equity_account_id = (int) $equity_account_id;
+		$to_check = array($inventory_account_id);
+		if ($require_equity && $equity_account_id > 0) {
+			$to_check[] = $equity_account_id;
+		}
+		$res = $api->get_accounts_flat();
+		$data = self::get_api_data_array($res);
+		if (!is_array($data) || empty($data['items']) || !is_array($data['items'])) {
+			return array(false, __('فهرست حساب‌ها برای کنترل انتخاب برنگشت.', 'hesabix-v2'));
+		}
+		$has_children = array();
+		$known = array();
+		foreach ($data['items'] as $row) {
+			if (!is_array($row) || empty($row['id'])) {
+				continue;
+			}
+			$known[ (int) $row['id'] ] = true;
+			$pp = isset($row['parent_id']) ? (int) $row['parent_id'] : 0;
+			if ($pp > 0) {
+				$has_children[ $pp ] = true;
+			}
+		}
+		foreach ($to_check as $aid) {
+			if ($aid < 1) {
+				continue;
+			}
+			if (empty($known[ $aid ])) {
+				return array(
+					false,
+					sprintf(
+						/* translators: %d: account id */
+						__('شناسهٔ حساب %d در فهرست دفترکل این کسب‌وکار دیده نشد.', 'hesabix-v2'),
+						$aid
+					),
+				);
+			}
+			if (!empty($has_children[ $aid ])) {
+				return array(
+					false,
+					sprintf(
+						/* translators: %d: account id */
+						__('حساب %d دارای زیرحساب است؛ فقط حساب برگ (بدون زیرمجموعه) قابل انتخاب است.', 'hesabix-v2'),
+						$aid
+					),
+				);
+			}
+		}
+		return array(true, null);
+	}
+
+	/**
+	 * پیش‌نمایش اقلام و تخمین دسته‌ها (بدون ایجاد job).
+	 *
+	 * @param array<string,mixed> $post_like همان کلیدهای نزدیک collectPayload.
+	 * @return array<string,mixed>
+	 */
+	public static function build_preview_payload(array $post_like)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return array('success' => false, 'message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'));
+		}
+
+		$api = new Hesabix_V2_Api();
+		$fy = self::sync_and_get_stored_fiscal_year_id($api);
+		if ($fy < 1) {
+			return array(
+				'success' => false,
+				'message' => __(
+					'سال مالی جاری از حسابیکس خوانده نشد. تب اتصال را باز کنید یا مجوز سال مالی را بررسی کنید.',
+					'hesabix-v2'
+				),
+			);
+		}
+
+		$cur = Hesabix_V2_Currency_Service::resolve_invoice_currency_id($api);
+		if ($cur < 1) {
+			return array('success' => false, 'message' => __('ارز فاکتور / سند در تنظیمات مشخص نشده است.', 'hesabix-v2'));
+		}
+
+		$warehouse_id = isset($post_like['warehouse_id']) ? (int) $post_like['warehouse_id'] : 0;
+		if ($warehouse_id < 1) {
+			$warehouse_id = (int) get_option('hesabix_v2_default_warehouse_id');
+		}
+		if ($warehouse_id < 1) {
+			return array('success' => false, 'message' => __('انبار پیش‌فرض را در تب فاکتور انتخاب کنید.', 'hesabix-v2'));
+		}
+
+		$targets = self::collect_wc_stock_targets();
+		if (empty($targets)) {
+			return array('success' => false, 'message' => __('هیچ کالای منتشرشده‌ای با موجودی مدیریت‌شده و شمارش > 0 یافت نشد.', 'hesabix-v2'));
+		}
+
+		$cost_basis = isset($post_like['cost_basis']) ? (string) $post_like['cost_basis'] : 'regular';
+		if (!in_array($cost_basis, array('regular', 'sale', 'zero'), true)) {
+			$cost_basis = 'regular';
+		}
+		$opt_preview = array(
+			'include_tax' => !empty($post_like['include_tax']),
+			'cost_basis' => $cost_basis,
+		);
+
+		$batch_size = isset($post_like['batch_size']) ? max(3, min(40, (int) $post_like['batch_size'])) : 12;
+		$total = count($targets);
+		$batches_est = (int) max(1, (int) ceil($total / $batch_size));
+
+		$samples = array();
+		$slice = array_slice($targets, 0, 12);
+		foreach ($slice as $t) {
+			if (!function_exists('wc_get_product')) {
+				break;
+			}
+			$p = wc_get_product((int) $t['product_id']);
+			if (!$p) {
+				continue;
+			}
+			$cost = self::resolve_unit_cost_for_opening($p, $opt_preview, $api);
+			$samples[] = array(
+				'wc_id' => (int) $t['product_id'],
+				'name' => (string) $p->get_name(),
+				'qty' => (float) $p->get_stock_quantity(),
+				'unit_cost' => $cost,
+				'kind' => isset($t['kind']) ? (string) $t['kind'] : '',
+			);
+		}
+
+		$ob = self::get_api_data_array($api->get_opening_balance($fy));
+		$posted = false;
+		if (is_array($ob)) {
+			$ei = isset($ob['extra_info']) && is_array($ob['extra_info']) ? $ob['extra_info'] : array();
+			$posted = !empty($ei['posted']);
+		}
+
+		self::$connection_prereq_ui_cache = null;
+		$ui = self::get_connection_prereq_for_ui();
+
+		return array(
+			'success' => true,
+			'total' => $total,
+			'batch_size' => $batch_size,
+			'batches_est' => $batches_est,
+			'samples' => $samples,
+			'opening_balance_posted' => $posted,
+			'prereq' => array(
+				'fiscal_year_id' => $fy,
+				'currency_id' => $cur,
+			),
+			'checklist' => $ui['checklist'],
+		);
 	}
 
 	/**
@@ -390,9 +718,15 @@ class Hesabix_V2_Opening_Inventory_Service
 		}
 
 		$api = new Hesabix_V2_Api();
-		$fy = (int) get_option('hesabix_v2_fiscal_year_id');
+		$fy = self::sync_and_get_stored_fiscal_year_id($api);
 		if ($fy < 1) {
-			return array('success' => false, 'message' => __('سال مالی در تنظیمات افزونه مشخص نیست.', 'hesabix-v2'));
+			return array(
+				'success' => false,
+				'message' => __(
+					'سال مالی جاری از حسابیکس خوانده نشد. اتصال و مجوز مشاهدهٔ سال مالی (fiscal_years.view) را بررسی کنید؛ سپس در تب اتصال یک‌بار «تست اتصال» بزنید یا صفحه را تازه کنید.',
+					'hesabix-v2'
+				),
+			);
 		}
 
 		$cur = Hesabix_V2_Currency_Service::resolve_invoice_currency_id($api);
@@ -417,6 +751,14 @@ class Hesabix_V2_Opening_Inventory_Service
 		$eq_acc = isset($options['equity_account_id']) ? (int) $options['equity_account_id'] : 0;
 		if ($auto_eq && $eq_acc < 1) {
 			return array('success' => false, 'message' => __('برای بستن خودکار تراز، حساب حقوق صاحبان سهام را انتخاب کنید.', 'hesabix-v2'));
+		}
+
+		list($leaf_ok, $leaf_msg) = self::validate_leaf_account_selection($api, $inv_acc, $eq_acc, $auto_eq);
+		if (!$leaf_ok) {
+			return array(
+				'success' => false,
+				'message' => $leaf_msg ? $leaf_msg : __('حساب انتخاب‌شده برای تراز افتتاحیه مجاز نیست.', 'hesabix-v2'),
+			);
 		}
 
 		$cost_basis = isset($options['cost_basis']) ? (string) $options['cost_basis'] : 'regular';
@@ -509,6 +851,16 @@ class Hesabix_V2_Opening_Inventory_Service
 		set_transient(self::TRANSIENT_PREFIX . $job_id, $payload, self::TRANSIENT_TTL);
 		set_transient($ptr_key, $job_id, self::TRANSIENT_TTL);
 
+		Hesabix_V2_Log_Service::info(
+			'Opening inventory job prepared',
+			array(
+				'job_id' => $job_id,
+				'user_id' => $user_id,
+				'total_items' => count($targets),
+				'fiscal_year_id' => $fy,
+			)
+		);
+
 		return array(
 			'success' => true,
 			'job_id' => $job_id,
@@ -548,11 +900,42 @@ class Hesabix_V2_Opening_Inventory_Service
 	}
 
 	/**
+	 * ثبت درخواست توقف: دستهٔ در حال اجرا تمام می‌شود؛ فراخوانی بعدی {@see job_run_batch} بدون پردازش برمی‌گردد.
+	 *
+	 * @param string $job_id
+	 * @param int    $user_id
+	 * @return array{success:bool, message?:string}
+	 */
+	public static function mark_job_cancel_requested($job_id, $user_id)
+	{
+		$job_id = sanitize_key((string) $job_id);
+		if ($job_id === '') {
+			return array(
+				'success' => false,
+				'message' => __('نشست کار نامعتبر است.', 'hesabix-v2'),
+			);
+		}
+		$job = self::get_job($job_id, $user_id);
+		if (!$job) {
+			return array(
+				'success' => false,
+				'message' => __('نشست کار یافت نشد.', 'hesabix-v2'),
+			);
+		}
+		$job['cancel_requested'] = true;
+		set_transient(self::TRANSIENT_PREFIX . $job_id, $job, self::TRANSIENT_TTL);
+		return array(
+			'success' => true,
+			'message' => __('توقف پس از اتمام دستهٔ جاری ثبت شد.', 'hesabix-v2'),
+		);
+	}
+
+	/**
 	 * اجرای یک دسته.
 	 *
 	 * @param string $job_id
 	 * @param int    $user_id
-	 * @return array{success:bool, message?:string, cursor?:int, total?:int, done?:bool, detail?:array}
+	 * @return array{success:bool, message?:string, cursor?:int, total?:int, done?:bool, cancelled?:bool, detail?:array}
 	 */
 	public static function job_run_batch($job_id, $user_id)
 	{
@@ -571,6 +954,20 @@ class Hesabix_V2_Opening_Inventory_Service
 		$items = isset($job['items']) && is_array($job['items']) ? $job['items'] : array();
 		$cursor = (int) ($job['cursor'] ?? 0);
 		$total = count($items);
+
+		if (!empty($job['cancel_requested'])) {
+			unset($job['cancel_requested']);
+			set_transient(self::TRANSIENT_PREFIX . sanitize_key((string) $job_id), $job, self::TRANSIENT_TTL);
+			return array(
+				'success' => true,
+				'cancelled' => true,
+				'cursor' => $cursor,
+				'total' => $total,
+				'done' => false,
+				'detail' => array(),
+				'message' => __('پردازش طبق درخواست توقف متوقف شد. نشست ذخیره مانده؛ بعداً با «شروع ثبت…» ادامه دهید.', 'hesabix-v2'),
+			);
+		}
 
 		$slice = array_slice($items, $cursor, $batch_size);
 		if (empty($slice)) {
@@ -741,10 +1138,15 @@ class Hesabix_V2_Opening_Inventory_Service
 		delete_transient($ptr_k);
 		self::delete_job($job_id);
 
-		Hesabix_V2_Log_Service::info('WooCommerce opening inventory pushed to Hesabix opening balance', array(
-			'entity_type' => 'opening_balance',
-			'posted' => !empty($opts['do_post']),
-		));
+		Hesabix_V2_Log_Service::info(
+			'WooCommerce opening inventory pushed to Hesabix opening balance',
+			array(
+				'entity_type' => 'opening_balance',
+				'posted' => !empty($opts['do_post']),
+				'job_id' => $job_id,
+				'items' => count($items),
+			)
+		);
 
 		return array(
 			'success' => true,

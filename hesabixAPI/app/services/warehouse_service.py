@@ -46,6 +46,250 @@ _SOURCE_TYPE_LABELS_FA = {
 	"api": "API",
 }
 
+_WH_DOC_TYPE_EXPORT_FA = {
+	"receipt": "ورود",
+	"issue": "خروج",
+	"transfer": "انتقال بین انبار",
+	"adjustment": "تعدیل موجودی",
+	"production_in": "ورود تولید",
+	"production_out": "خروج تولید",
+}
+
+_WH_STATUS_EXPORT_FA = {
+	"draft": "پیش‌نویس",
+	"posted": "قطعی",
+	"cancelled": "لغو شده",
+}
+
+
+def warehouse_documents_filtered_query(db: Session, business_id: int, body: Dict[str, Any]):
+	"""همان فیلترهای جستجوی حواله انبار (بدون مرتب‌سازی و صفحه‌بندی)."""
+	from app.services.transfer_service import _parse_iso_date as _parse_date
+
+	doc_type = body.get("doc_type")
+	if isinstance(doc_type, list) and doc_type:
+		doc_type = doc_type[0]
+	elif not isinstance(doc_type, str):
+		doc_type = None
+
+	status = body.get("status")
+	if isinstance(status, list) and status:
+		status = status[0]
+	elif not isinstance(status, str):
+		status = None
+
+	warehouse_id = body.get("warehouse_id")
+	warehouse_ids = body.get("warehouse_ids")
+	if not warehouse_id and isinstance(warehouse_ids, list) and warehouse_ids:
+		warehouse_id = warehouse_ids[0]
+
+	q = db.query(WarehouseDocument).filter(WarehouseDocument.business_id == business_id)
+
+	filters_list = body.get("filters") if isinstance(body.get("filters"), list) else []
+	ms_doc_types: List[str] = []
+	ms_statuses: List[str] = []
+	ms_source_types: List[str] = []
+	for f in filters_list:
+		if not isinstance(f, dict):
+			continue
+		prop = f.get("property")
+		op = f.get("operator")
+		val = f.get("value")
+		if prop == "doc_type" and op == "in" and isinstance(val, list):
+			ms_doc_types = [str(x) for x in val if x]
+		elif prop == "status" and op == "in" and isinstance(val, list):
+			ms_statuses = [str(x) for x in val if x]
+		elif prop == "source_type" and op == "in" and isinstance(val, list):
+			ms_source_types = [str(x) for x in val if x]
+
+	if ms_doc_types:
+		q = q.filter(WarehouseDocument.doc_type.in_(ms_doc_types))
+	elif isinstance(doc_type, str) and doc_type:
+		q = q.filter(WarehouseDocument.doc_type == doc_type)
+	elif isinstance(body.get("doc_type"), list):
+		doc_type_list = body.get("doc_type")
+		if doc_type_list:
+			q = q.filter(WarehouseDocument.doc_type.in_(doc_type_list))
+
+	if ms_statuses:
+		q = q.filter(WarehouseDocument.status.in_(ms_statuses))
+	elif isinstance(status, str) and status:
+		q = q.filter(WarehouseDocument.status == status)
+	elif isinstance(body.get("status"), list):
+		status_list = body.get("status")
+		if status_list:
+			q = q.filter(WarehouseDocument.status.in_(status_list))
+
+	source_document_id = body.get("source_document_id")
+	if isinstance(source_document_id, int):
+		q = q.filter(WarehouseDocument.source_document_id == source_document_id)
+
+	source_type = body.get("source_type")
+	if ms_source_types:
+		q = q.filter(WarehouseDocument.source_type.in_(ms_source_types))
+	elif isinstance(source_type, str) and source_type:
+		q = q.filter(WarehouseDocument.source_type == source_type)
+
+	from_date = body.get("from_date")
+	to_date = body.get("to_date")
+	try:
+		if isinstance(from_date, str) and from_date:
+			q = q.filter(WarehouseDocument.document_date >= _parse_date(from_date))
+		if isinstance(to_date, str) and to_date:
+			q = q.filter(WarehouseDocument.document_date <= _parse_date(to_date))
+	except Exception:
+		pass
+
+	if warehouse_id:
+		q = q.filter(
+			or_(
+				WarehouseDocument.warehouse_id_from == int(warehouse_id),
+				WarehouseDocument.warehouse_id_to == int(warehouse_id),
+			)
+		)
+	elif isinstance(warehouse_ids, list) and warehouse_ids:
+		wh_ids = [int(w) for w in warehouse_ids if w]
+		if wh_ids:
+			q = q.filter(
+				or_(
+					WarehouseDocument.warehouse_id_from.in_(wh_ids),
+					WarehouseDocument.warehouse_id_to.in_(wh_ids),
+				)
+			)
+
+	search = body.get("search")
+	if isinstance(search, str) and search.strip():
+		search_term = f"%{search.strip()}%"
+		invoice_ids_matching = [
+			r[0]
+			for r in db.query(Document.id)
+			.filter(and_(Document.business_id == business_id, Document.code.like(search_term)))
+			.limit(500)
+			.all()
+		]
+		if invoice_ids_matching:
+			q = q.filter(
+				or_(
+					WarehouseDocument.code.like(search_term),
+					and_(
+						WarehouseDocument.source_type == "invoice",
+						WarehouseDocument.source_document_id.in_(invoice_ids_matching),
+					),
+				)
+			)
+		else:
+			q = q.filter(WarehouseDocument.code.like(search_term))
+
+	return q
+
+
+def apply_warehouse_documents_sort(q, body: Dict[str, Any]):
+	"""همان مرتب‌سازی جستجوی حواله انبار."""
+	from app.services.sort_resolution import effective_sort_specs
+
+	_wh_sort_allowed = frozenset({"code", "doc_type", "status", "created_at", "document_date"})
+
+	def _wh_sort_col(name: str):
+		if name == "code":
+			return WarehouseDocument.code
+		if name == "doc_type":
+			return WarehouseDocument.doc_type
+		if name == "status":
+			return WarehouseDocument.status
+		if name == "created_at":
+			return WarehouseDocument.created_at
+		return WarehouseDocument.document_date
+
+	_qi = QueryInfo.model_validate({
+		"take": int(body.get("take", 20) or 20),
+		"skip": int(body.get("skip", 0) or 0),
+		"sort_by": body.get("sort_by"),
+		"sort_desc": bool(body.get("sort_desc", True)),
+		"sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
+	})
+	_specs = effective_sort_specs(_qi, allowed=_wh_sort_allowed, default_when_empty=("document_date", True))
+	_order_parts = []
+	for _n, _d in _specs:
+		_c = _wh_sort_col(_n)
+		_order_parts.append(_c.desc() if _d else _c.asc())
+	_order_parts.append(WarehouseDocument.id.desc())
+	return q.order_by(*_order_parts)
+
+
+def export_warehouse_documents_excel(db: Session, business_id: int, body: Dict[str, Any]) -> bytes:
+	"""خروجی Excel لیست حواله‌های انبار (حداکثر ۱۰٬۰۰۰ ردیف)، با همان فیلترهای جستجو."""
+	try:
+		import io
+		from openpyxl import Workbook
+		from openpyxl.styles import Font, Alignment, PatternFill
+
+		q = warehouse_documents_filtered_query(db, business_id, body)
+		q = apply_warehouse_documents_sort(q, body)
+		items = q.limit(10000).all()
+
+		wb = Workbook()
+		ws = wb.active
+		ws.title = "WarehouseDocs"
+		ws.sheet_view.rightToLeft = True
+
+		headers = [
+			"کد حواله",
+			"نوع",
+			"وضعیت",
+			"تاریخ سند",
+			"منشأ",
+			"انبار مبدأ",
+			"انبار مقصد",
+			"جمع مقدار",
+			"ایجاد کننده",
+			"کد سند مرتبط",
+			"توضیحات",
+		]
+		header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+		header_font = Font(bold=True, color="FFFFFF", size=12)
+		for col_num, header in enumerate(headers, 1):
+			cell = ws.cell(row=1, column=col_num, value=header)
+			cell.fill = header_fill
+			cell.font = header_font
+			cell.alignment = Alignment(horizontal="center", vertical="center")
+
+		for row_num, wh in enumerate(items, 2):
+			r = warehouse_document_to_dict(db, wh)
+			dt = r.get("doc_type") or ""
+			st = r.get("status") or ""
+			ws.cell(row=row_num, column=1, value=r.get("code"))
+			ws.cell(row=row_num, column=2, value=_WH_DOC_TYPE_EXPORT_FA.get(str(dt), str(dt)))
+			ws.cell(row=row_num, column=3, value=_WH_STATUS_EXPORT_FA.get(str(st), str(st)))
+			ws.cell(row=row_num, column=4, value=str(r.get("document_date") or ""))
+			src = r.get("source_type_label_fa") or r.get("source_type") or ""
+			ws.cell(row=row_num, column=5, value=src)
+			ws.cell(row=row_num, column=6, value=r.get("warehouse_name_from") or "")
+			ws.cell(row=row_num, column=7, value=r.get("warehouse_name_to") or "")
+			ws.cell(row=row_num, column=8, value=r.get("total_quantity"))
+			ws.cell(row=row_num, column=9, value=r.get("created_by_name") or "")
+			ws.cell(row=row_num, column=10, value=r.get("source_document_code") or "")
+			ws.cell(row=row_num, column=11, value=r.get("description") or "")
+
+		for col_letter, width in zip(
+			["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K"],
+			[14, 18, 12, 14, 12, 18, 18, 12, 22, 16, 28],
+		):
+			ws.column_dimensions[col_letter].width = width
+
+		output = io.BytesIO()
+		wb.save(output)
+		output.seek(0)
+		return output.read()
+	except ImportError:
+		raise ApiError(
+			"OPENPYXL_NOT_INSTALLED",
+			"openpyxl library is not installed",
+			http_status=500,
+		) from None
+	except Exception as e:
+		logger.exception("export_warehouse_documents_excel failed")
+		raise ApiError("EXPORT_FAILED", str(e), http_status=500) from e
+
 
 def _person_display_name_invoice_party(p: Person) -> str:
 	if getattr(p, "company_name", None) and str(p.company_name).strip():

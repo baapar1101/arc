@@ -9,9 +9,19 @@ class YearEndClosingService {
   Future<Map<String, dynamic>> preview({
     required int businessId,
     required int fiscalYearId,
+    DateTime? closingFiscalEndDate,
+    String documentRelocationBasis = 'document_date',
   }) async {
+    final query = <String, dynamic>{
+      'document_relocation_basis': documentRelocationBasis,
+    };
+    if (closingFiscalEndDate != null) {
+      query['closing_fiscal_end_date'] =
+          closingFiscalEndDate.toIso8601String().split('T').first;
+    }
     final resp = await _apiClient.get(
       '/api/v1/business/$businessId/fiscal-years/$fiscalYearId/closing/preview',
+      query: query,
     );
     if (resp.statusCode == 200) {
       return (resp.data?['data'] as Map<String, dynamic>?) ?? {};
@@ -42,6 +52,9 @@ class YearEndClosingService {
     String inventoryValuationMethod = 'FIFO',
     // تقسیم سود بین سهامداران
     List<Map<String, dynamic>>? shareholderDistributions,
+    DateTime? closingFiscalEndDate,
+    String documentRelocationBasis = 'document_date',
+    bool movePostCutoffDocumentsToNewFiscalYear = true,
   }) async {
     final data = <String, dynamic>{
       'new_fiscal_year_title': newFiscalYearTitle,
@@ -91,7 +104,15 @@ class YearEndClosingService {
         'profit_amount': dist['profit_amount'],
       }).toList();
     }
-    
+
+    if (closingFiscalEndDate != null) {
+      data['closing_fiscal_end_date'] =
+          closingFiscalEndDate.toIso8601String().split('T').first;
+    }
+    data['document_relocation_basis'] = documentRelocationBasis;
+    data['move_post_cutoff_documents_to_new_fiscal_year'] =
+        movePostCutoffDocumentsToNewFiscalYear;
+
     final resp = await _apiClient.post(
       '/api/v1/business/$businessId/fiscal-years/$fiscalYearId/close',
       data: data,

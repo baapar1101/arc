@@ -21,6 +21,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/invoice_line_preferences.dart';
 import '../money/amount_field_words_tooltip.dart';
+import '../inputs/frequent_description_text_field.dart';
 
 void _invoiceLineAttrsLog(String message) {
   if (kDebugMode) {
@@ -81,6 +82,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   String _secondaryAddRowShortcut = 'f2';
   /// فوکوس به‌ازای [InvoiceLineItem.lineKey]؛ با جابه‌جایی ردیف نیازی به بازچین‌شدن نیست
   final Map<String, Map<String, FocusNode>> _focusNodesByLineKey = {};
+  /// متن شرح ردیف برای [FrequentDescriptionTextField]؛ با lineKey پایدار
+  final Map<String, TextEditingController> _descriptionControllersByLineKey = {};
 
   bool get _allowManualInvoiceUnitPrice =>
       widget.authStore?.canChangeInvoiceUnitPrice() ?? true;
@@ -300,6 +303,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
         node.dispose();
       }
     }
+    _descriptionControllersByLineKey.remove(lineKey)?.dispose();
   }
   
   /// پاک کردن همه FocusNode ها
@@ -311,6 +315,37 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       }
     }
     _focusNodesByLineKey.clear();
+    for (final c in _descriptionControllersByLineKey.values) {
+      c.dispose();
+    }
+    _descriptionControllersByLineKey.clear();
+  }
+
+  void _syncDescriptionControllerFromModel(String lineKey, String? description) {
+    final want = description ?? '';
+    final existing = _descriptionControllersByLineKey[lineKey];
+    if (existing == null) {
+      _descriptionControllersByLineKey[lineKey] = TextEditingController(text: want);
+      return;
+    }
+    if (existing.text == want) return;
+    existing.value = TextEditingValue(
+      text: want,
+      selection: TextSelection.collapsed(offset: want.length),
+    );
+  }
+
+  void _syncAllDescriptionControllersFromRows() {
+    for (final r in _rows) {
+      _syncDescriptionControllerFromModel(r.lineKey, r.description);
+    }
+  }
+
+  TextEditingController _descriptionControllerForLine(InvoiceLineItem item) {
+    return _descriptionControllersByLineKey.putIfAbsent(
+      item.lineKey,
+      () => TextEditingController(text: item.description ?? ''),
+    );
   }
   
   /// حرکت به فیلد بعدی
@@ -561,6 +596,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     setState(() {
       _rows[index] = updated;
     });
+    _syncDescriptionControllerFromModel(updated.lineKey, updated.description);
     _notify();
   }
 
@@ -730,7 +766,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       await _loadProductInfo(pid, force: true);
     }
     await _coerceRowsIfUnitPriceLocked();
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _syncAllDescriptionControllersFromRows();
+    }
     _invoiceLineAttrsLog('loadProductInfosForInitialRows done');
   }
 
@@ -785,6 +824,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     if (oldWidget.invoiceType != widget.invoiceType) {
       if (_applyInvoiceTypeDescriptionAdjustments()) {
         setState(() {});
+        _syncAllDescriptionControllersFromRows();
         _notify();
       }
     }
@@ -1386,6 +1426,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                             final changed = item.copyWith(selectedUnit: unit);
                             final priced = await _resolveUnitPrice(changed, preferManual: item.unitPriceSource == 'manual' && _allowManualInvoiceUnitPrice);
                             setState(() => _rows[index] = priced);
+                            _syncDescriptionControllerFromModel(priced.lineKey, priced.description);
                             _notify();
                           },
                           focusNode: _focusNodesForLine(item.lineKey)?['quantity'],
@@ -1488,21 +1529,19 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               style: theme.textTheme.labelMedium,
             ),
             const SizedBox(height: 4),
-            SizedBox(
-              height: fieldHeight,
-              child: TextFormField(
-                key: _lineDescriptionFormKey(item),
-                focusNode: _focusNodesForLine(item.lineKey)?['description'],
-                initialValue: item.description ?? '',
-                onChanged: (v) {
-                  _updateRow(index, item.copyWith(description: v));
-                },
-                onFieldSubmitted: (_) => _moveToNextField(index, 'description'),
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(),
-                  contentPadding: _getFieldPadding(context),
-                  hintText: t.descriptionOptional,
-                ),
+            FrequentDescriptionTextField(
+              key: _lineDescriptionFormKey(item),
+              businessId: widget.businessId,
+              controller: _descriptionControllerForLine(item),
+              focusNode: _focusNodesForLine(item.lineKey)?['description'],
+              onChanged: (v) {
+                _updateRow(index, item.copyWith(description: v));
+              },
+              onSubmitted: (_) => _moveToNextField(index, 'description'),
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                contentPadding: _getFieldPadding(context),
+                hintText: t.descriptionOptional,
               ),
             ),
             const SizedBox(height: 12),
@@ -1673,6 +1712,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                       final changed = item.copyWith(selectedUnit: unit);
                       final priced = await _resolveUnitPrice(changed, preferManual: item.unitPriceSource == 'manual' && _allowManualInvoiceUnitPrice);
                       setState(() => _rows[index] = priced);
+                      _syncDescriptionControllerFromModel(priced.lineKey, priced.description);
                       _notify();
                     },
                     focusNode: _focusNodesForLine(item.lineKey)?['quantity'],
@@ -1772,21 +1812,19 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               const SizedBox(width: 48),
               // شرح
               Expanded(
-                child: SizedBox(
-                  height: fieldHeight,
-                  child: TextFormField(
-                    key: _lineDescriptionFormKey(item),
-                    focusNode: _focusNodesForLine(item.lineKey)?['description'],
-                    initialValue: item.description ?? '',
-                    onChanged: (v) {
-                      _updateRow(index, item.copyWith(description: v));
-                    },
-                    onFieldSubmitted: (_) => _moveToNextField(index, 'description'),
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      contentPadding: _getFieldPadding(context),
-                      hintText: t.descriptionOptional,
-                    ),
+                child: FrequentDescriptionTextField(
+                  key: _lineDescriptionFormKey(item),
+                  businessId: widget.businessId,
+                  controller: _descriptionControllerForLine(item),
+                  focusNode: _focusNodesForLine(item.lineKey)?['description'],
+                  onChanged: (v) {
+                    _updateRow(index, item.copyWith(description: v));
+                  },
+                  onSubmitted: (_) => _moveToNextField(index, 'description'),
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    contentPadding: _getFieldPadding(context),
+                    hintText: t.descriptionOptional,
                   ),
                 ),
               ),
@@ -1986,6 +2024,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     );
     final priced = await _resolveUnitPrice(updated, preferManual: false);
     setState(() => _rows[index] = priced);
+    _syncDescriptionControllerFromModel(priced.lineKey, priced.description);
     _notify();
     if (productId != null) {
       final cached = _productCache[productId];

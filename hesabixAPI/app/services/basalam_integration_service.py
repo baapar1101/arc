@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -600,7 +601,10 @@ def _find_or_create_person(
 
     mobile = _normalize_mobile(customer.get("mobile") or customer.get("phone"))
     if mobile:
-        hit = db.query(Person).filter(Person.business_id == int(business_id), Person.mobile == mobile).first()
+        hit = db.query(Person).filter(
+            Person.business_id == int(business_id),
+            or_(Person.mobile == mobile, Person.mobile_2 == mobile, Person.mobile_3 == mobile),
+        ).first()
         if hit:
             return int(hit.id)
     name = _extract_person_name(customer)

@@ -13,6 +13,7 @@ import '../../services/expense_income_service.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../../widgets/inputs/frequent_description_text_field.dart';
 
 class ExpenseIncomeDialog extends StatefulWidget {
   final int businessId;
@@ -188,7 +189,8 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: TextField(
+                child: FrequentDescriptionTextField(
+                  businessId: widget.businessId,
                   controller: _descCtrl,
                   decoration: const InputDecoration(labelText: 'توضیحات کلی سند', border: OutlineInputBorder()),
                   maxLines: 2,
@@ -438,7 +440,8 @@ class _ItemTileState extends State<_ItemTile> {
               ],
             ),
             const SizedBox(height: 8),
-            TextFormField(
+            FrequentDescriptionTextField(
+              businessId: widget.businessId,
               controller: _descCtrl,
               decoration: const InputDecoration(labelText: 'توضیحات'),
               onChanged: (v) => widget.onChanged(widget.line.copyWith(description: v.trim().isEmpty ? null : v.trim())),

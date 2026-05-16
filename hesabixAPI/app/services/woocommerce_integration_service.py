@@ -634,6 +634,67 @@ def post_control_settings_patch(db: Session, business_id: int, payload: Dict[str
 	)
 
 
+def control_opening_inventory_status(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/opening-inventory/status", {}),
+		business_id=business_id,
+		path="/control/opening-inventory/status",
+	)
+
+
+def control_opening_inventory_accounts(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/opening-inventory/accounts", {}),
+		business_id=business_id,
+		path="/control/opening-inventory/accounts",
+	)
+
+
+def post_control_opening_inventory_preview(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	body = payload if isinstance(payload, dict) else {}
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/opening-inventory/preview", body, timeout_sec=120.0),
+		business_id=business_id,
+		path="/control/opening-inventory/preview",
+	)
+
+
+def post_control_opening_inventory_prepare(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	body = payload if isinstance(payload, dict) else {}
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/opening-inventory/prepare", body, timeout_sec=180.0),
+		business_id=business_id,
+		path="/control/opening-inventory/prepare",
+	)
+
+
+def post_control_opening_inventory_batch(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	body = payload if isinstance(payload, dict) else {}
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/opening-inventory/batch", body, timeout_sec=300.0),
+		business_id=business_id,
+		path="/control/opening-inventory/batch",
+	)
+
+
+def post_control_opening_inventory_finalize(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	body = payload if isinstance(payload, dict) else {}
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/opening-inventory/finalize", body, timeout_sec=300.0),
+		business_id=business_id,
+		path="/control/opening-inventory/finalize",
+	)
+
+
+def post_control_opening_inventory_cancel(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	body = payload if isinstance(payload, dict) else {}
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/opening-inventory/cancel", body, timeout_sec=60.0),
+		business_id=business_id,
+		path="/control/opening-inventory/cancel",
+	)
+
+
 def migrate_plaintext_woocommerce_bridge_tokens(db: Session) -> Dict[str, Any]:
 	"""
 	تمام ردیف‌های BusinessPlugin مربوط به افزونهٔ ووکامرس را اسکن می‌کند و

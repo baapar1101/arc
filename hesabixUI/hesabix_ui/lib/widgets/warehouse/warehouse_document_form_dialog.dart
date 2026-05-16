@@ -17,6 +17,7 @@ import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../inputs/frequent_description_text_field.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../core/date_utils.dart';
@@ -77,6 +78,7 @@ class _WarehouseDocumentFormDialogState
   bool _saving = false;
   // فیلدهای ارسال
   String? _description;
+  final TextEditingController _descriptionCtrl = TextEditingController();
   String? _deliveryMethod;
   String? _carrierName;
   String? _recipientName;
@@ -459,6 +461,12 @@ class _WarehouseDocumentFormDialogState
     }
   }
 
+  @override
+  void dispose() {
+    _descriptionCtrl.dispose();
+    super.dispose();
+  }
+
   /// بارگذاری اطلاعات کامل کالاها برای خطوط اولیه
   Future<void> _loadInitialLinesProductInfo() async {
     for (var i = 0; i < _lines.length; i++) {
@@ -705,6 +713,7 @@ class _WarehouseDocumentFormDialogState
 
       if (mounted) {
         setState(() {
+          _descriptionCtrl.text = _description ?? '';
           _loadingDocument = false;
         });
       }
@@ -1035,8 +1044,9 @@ class _WarehouseDocumentFormDialogState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextFormField(
-          initialValue: _description,
+        FrequentDescriptionTextField(
+          businessId: widget.businessId,
+          controller: _descriptionCtrl,
           decoration: const InputDecoration(
             labelText: 'شرح/توضیحات',
             border: OutlineInputBorder(),

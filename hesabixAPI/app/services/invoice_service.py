@@ -9048,11 +9048,16 @@ def calculate_invoice_remaining(
                 # account_lines خطوطی هستند که bank_account_id, cash_register_id, petty_cash_id یا check_id دارند
                 for line in doc.lines:
                     # بررسی اینکه آیا این خط مربوط به حساب است (نه person)
-                    if line.person_id is None and (line.bank_account_id is not None or 
-                                                   line.cash_register_id is not None or 
-                                                   line.petty_cash_id is not None or 
-                                                   line.check_id is not None):
-                        line_extra = line.extra_info or {}
+                    line_extra = line.extra_info or {}
+                    tt = str(line_extra.get("transaction_type") or "").strip().lower()
+                    is_wallet_line = line.person_id is None and tt == "wallet"
+                    if line.person_id is None and (
+                        line.bank_account_id is not None
+                        or line.cash_register_id is not None
+                        or line.petty_cash_id is not None
+                        or line.check_id is not None
+                        or is_wallet_line
+                    ):
                         if not line_extra.get('is_commission_line'):
                             # amount = debit + credit (همیشه یکی از آنها 0 است)
                             line_amount = Decimal(str(line.debit)) + Decimal(str(line.credit))
@@ -9121,11 +9126,16 @@ def calculate_invoice_remaining(
                                 # مجموع account_lines (بدون کارمزد)
                                 # account_lines خطوطی هستند که bank_account_id, cash_register_id, petty_cash_id یا check_id دارند
                                 for acc_line in doc.lines:
-                                    if acc_line.person_id is None and (acc_line.bank_account_id is not None or 
-                                                                       acc_line.cash_register_id is not None or 
-                                                                       acc_line.petty_cash_id is not None or 
-                                                                       acc_line.check_id is not None):
-                                        acc_extra = acc_line.extra_info or {}
+                                    acc_extra = acc_line.extra_info or {}
+                                    tt = str(acc_extra.get("transaction_type") or "").strip().lower()
+                                    is_wallet_line = acc_line.person_id is None and tt == "wallet"
+                                    if acc_line.person_id is None and (
+                                        acc_line.bank_account_id is not None
+                                        or acc_line.cash_register_id is not None
+                                        or acc_line.petty_cash_id is not None
+                                        or acc_line.check_id is not None
+                                        or is_wallet_line
+                                    ):
                                         if not acc_extra.get('is_commission_line'):
                                             # amount = debit + credit (همیشه یکی از آنها 0 است)
                                             acc_line_amount = Decimal(str(acc_line.debit)) + Decimal(str(acc_line.credit))

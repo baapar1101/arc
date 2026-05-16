@@ -21,6 +21,8 @@ ALLOWED_PROFILE_DEFAULT_KEYS = frozenset({
     "postal_code",
     "phone",
     "mobile",
+    "mobile_2",
+    "mobile_3",
     "fax",
     "email",
     "website",

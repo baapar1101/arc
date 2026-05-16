@@ -1612,6 +1612,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get createdBy => 'ایجاد شده توسط';
 
   @override
+  String get creatorColumnTitle => 'ایجاد کننده';
+
+  @override
   String get lastUpdated => 'آخرین بروزرسانی';
 
   @override
@@ -2167,6 +2170,53 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get yearEndClosing => 'بستن سال مالی';
+
+  @override
+  String get yearEndSplitSectionTitle => 'تقطیع / پایان دورهٔ بستن';
+
+  @override
+  String get yearEndSplitSectionDescription =>
+      'می‌توانید پایان دورهٔ مالی که بسته می‌شود را زودتر از «پایان تقویمی» سال جاری انتخاب کنید؛ اسناد بعد از آن تاریخ (طبق معیار زیر) پس از ایجاد سال جدید به سال جدید منتقل می‌شوند.';
+
+  @override
+  String get yearEndSplitDifferentEndToggle =>
+      'پایان دورهٔ بستن متفاوت از پایان تقویمی سال';
+
+  @override
+  String get yearEndSplitClosingEndDateLabel => 'تاریخ پایان دورهٔ بستن (شامل)';
+
+  @override
+  String get yearEndSplitRelocationBasisLabel =>
+      'معیار «بعد از پایان دوره» برای انتقال سند';
+
+  @override
+  String get yearEndSplitBasisDocumentDate => 'تاریخ سند';
+
+  @override
+  String get yearEndSplitBasisRegisteredAt => 'تاریخ ثبت (روز)';
+
+  @override
+  String get yearEndSplitMoveDocumentsToggle =>
+      'انتقال خودکار اسناد بعد از پایان دوره به سال جدید';
+
+  @override
+  String get yearEndSplitMoveDocumentsSubtitle =>
+      'در صورت خاموش بودن، fiscal_year_id اسناد عوض نمی‌شود (معمولاً توصیه نمی‌شود).';
+
+  @override
+  String yearEndSplitCalendarEndNote(String date) {
+    return 'پایان تقویمی سال جاری: $date';
+  }
+
+  @override
+  String yearEndSplitRelocatePreviewLine(int docCount, int whCount) {
+    return 'پیش‌بینی انتقال: $docCount سند حسابداری و $whCount سند انبار به سال جدید.';
+  }
+
+  @override
+  String yearEndClosingDoneRelocationLine(int docCount, int whCount) {
+    return 'به سال جدید منتقل شد: $docCount سند حسابداری و $whCount سند انبار.';
+  }
 
   @override
   String get currencyRevaluation => 'تسعیر و نرخ ارز';
@@ -3433,6 +3483,12 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get personMobile => 'موبایل';
+
+  @override
+  String get personMobile2 => 'موبایل ۲';
+
+  @override
+  String get personMobile3 => 'موبایل ۳';
 
   @override
   String get personFax => 'فکس';
@@ -12565,6 +12621,18 @@ class AppLocalizationsFa extends AppLocalizations {
   String get woocommerceHubBulkSyncCurrentPage => 'همگام این صفحهٔ جدول';
 
   @override
+  String get woocommerceHubBulkSyncSelected => 'همگام ردیف‌های انتخاب‌شده';
+
+  @override
+  String woocommerceHubBulkConfirmSelected(String count) {
+    return 'همگام‌سازی $count ردیف انتخاب‌شده در جدول؟';
+  }
+
+  @override
+  String get woocommerceHubBulkEmptySelection =>
+      'با چک‌باکس، یک یا چند ردیف در جدول انتخاب کنید؛ سپس دکمهٔ همگام ردیف‌های انتخاب‌شده را بزنید.';
+
+  @override
   String get woocommerceHubBulkSyncAllFiltered => 'همگام همه با فیلتر فعلی';
 
   @override
@@ -12588,6 +12656,121 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceHubBulkProgressLabel => 'دستهٔ درخواست';
+
+  @override
+  String get woocommerceOpeningInvBridgeTitle => 'موجودی افتتاحیه (پل)';
+
+  @override
+  String get woocommerceOpeningInvBridgeSubtitle =>
+      'همان کار موجودی اولیهٔ افزونه روی فروشگاه، از طریق پل حسابیکس. پس از همگام کالاها و تنظیم انبار/حساب‌ها در وردپرس استفاده کنید.';
+
+  @override
+  String get woocommerceOpeningInvRefreshStatus => 'به‌روزرسانی وضعیت';
+
+  @override
+  String get woocommerceOpeningInvLoadAccounts => 'بارگذاری حساب‌ها';
+
+  @override
+  String get woocommerceOpeningInvPreview => 'پیش‌نمایش';
+
+  @override
+  String get woocommerceOpeningInvPrepare => 'فقط آماده‌سازی';
+
+  @override
+  String get woocommerceOpeningInvRunAllToEnd => 'اجرای همهٔ دسته‌ها تا پایان';
+
+  @override
+  String get woocommerceOpeningInvFinalizeOnly => 'نهایی‌سازی';
+
+  @override
+  String get woocommerceOpeningInvNeedActiveJob =>
+      'ابتدا با «فقط آماده‌سازی» نشست بسازید یا با به‌روزرسانی وضعیت، نشست معلق را بازیابی کنید.';
+
+  @override
+  String get woocommerceOpeningInvRunBatches => 'یک دسته';
+
+  @override
+  String get woocommerceOpeningInvFinalize => 'نهایی‌سازی سند';
+
+  @override
+  String get woocommerceOpeningInvCancelJob => 'توقف امن پس از دسته';
+
+  @override
+  String get woocommerceOpeningInvClearLog => 'پاک کردن لاگ';
+
+  @override
+  String get woocommerceOpeningInvInventoryAccountLabel => 'حساب موجودی (کالا)';
+
+  @override
+  String get woocommerceOpeningInvEquityAccountLabel =>
+      'حساب حقوق صاحبان سهام (بستن تراز)';
+
+  @override
+  String get woocommerceOpeningInvBatchSizeLabel => 'اندازهٔ دسته (۳ تا ۴۰)';
+
+  @override
+  String get woocommerceOpeningInvWarehouseOverrideLabel =>
+      'شناسهٔ انبار (۰ = پیش‌فرض افزونه)';
+
+  @override
+  String get woocommerceOpeningInvIncludeTaxLabel => 'مالیات در بهای واحد';
+
+  @override
+  String get woocommerceOpeningInvAutoBalanceLabel =>
+      'بستن خودکار تراز به حقوق صاحبان سهام';
+
+  @override
+  String get woocommerceOpeningInvDoPostLabel =>
+      'نهایی‌سازی سند در حسابیکس (قفل)';
+
+  @override
+  String get woocommerceOpeningInvCostBasisLabel => 'مبنای بهای تمام‌شده';
+
+  @override
+  String get woocommerceOpeningInvCostBasisRegular => 'قیمت عادی';
+
+  @override
+  String get woocommerceOpeningInvCostBasisSale => 'قیمت فروش ویژه';
+
+  @override
+  String get woocommerceOpeningInvCostBasisZero => 'بهای صفر';
+
+  @override
+  String woocommerceOpeningInvPendingProgress(Object cursor, Object total) {
+    return '$cursor / $total';
+  }
+
+  @override
+  String get woocommerceOpeningInvJobIdLabel => 'شناسهٔ نشست';
+
+  @override
+  String get woocommerceOpeningInvCompletedBanner =>
+      'موجودی افتتاحیه روی این فروشگاه قبلاً در افزونه تکمیل شده است.';
+
+  @override
+  String get woocommerceOpeningInvPhraseHint =>
+      'برای نهایی‌سازی سند، دقیقاً این عبارت را وارد کنید:';
+
+  @override
+  String get woocommerceOpeningInvPhrasePromptTitle => 'تأیید عبارت نهایی‌سازی';
+
+  @override
+  String get woocommerceOpeningInvPhraseMismatch =>
+      'عبارت یکسان نیست؛ نهایی‌سازی لغو شد.';
+
+  @override
+  String get woocommerceOpeningInvLogTitle => 'لاگ';
+
+  @override
+  String get woocommerceOpeningInvPickInventoryHint =>
+      'حساب موجودی را انتخاب کنید.';
+
+  @override
+  String get woocommerceOpeningInvPickEquityHint =>
+      'حساب حقوق صاحبان سهام را انتخاب کنید یا بستن خودکار را خاموش کنید.';
+
+  @override
+  String get woocommerceOpeningInvOpenFromHub => 'موجودی افتتاحیه از پل';
 
   @override
   String get woocommerceSyncDone => 'همگام‌سازی انجام شد';
@@ -12802,6 +12985,17 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get woocommerceOpenReportsOverviewTooltip =>
       'خلاصهٔ گزارش‌های ووکامرس';
+
+  @override
+  String get woocommerceOpenOpeningInventoryTooltip => 'موجودی افتتاحیه از پل';
+
+  @override
+  String get woocommerceSettingsOpeningInventoryLinkTitle =>
+      'موجودی افتتاحیه از طریق پل';
+
+  @override
+  String get woocommerceSettingsOpeningInventoryLinkSubtitle =>
+      'ایجاد نشست و اجرای دسته‌ها از حسابیکس، بدون ورود به وردپرس.';
 
   @override
   String get settingsWooCommerceTitle => 'پل ووکامرس';
@@ -13771,4 +13965,37 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get dataTableHelpSectionOtherBody =>
       '• «به‌روزرسانی» در منوی ⋮ داده را دوباره از سرور می‌گیرد.\n• «حالت فشرده» ارتفاع ردیف‌ها را کمتر می‌کند؛ ممکن است برای همین جدول به خاطر سپرده شود.\n• از بخش صفحه‌بندی پایین برای اندازهٔ صفحه و رفتن به صفحهٔ بعد/قبل استفاده کنید.';
+
+  @override
+  String get frequentDescriptionsPickHint =>
+      'با فوکوس روی این فیلد، لیست شرح‌های پرتکرار نمایش داده می‌شود.';
+
+  @override
+  String get frequentDescriptionsManage => 'مدیریت شرح‌های پرتکرار';
+
+  @override
+  String get frequentDescriptionsAdd => 'افزودن';
+
+  @override
+  String get frequentDescriptionsEmpty => 'هنوز شرح پرتکراری ثبت نشده است.';
+
+  @override
+  String get frequentDescriptionsLoadError => 'بارگذاری لیست ناموفق بود.';
+
+  @override
+  String get frequentDescriptionsNewLabel => 'شرح جدید';
+
+  @override
+  String get frequentDescriptionsDeleteTitle => 'حذف شرح';
+
+  @override
+  String get frequentDescriptionsDeleteConfirm =>
+      'این شرح از لیست پرتکرار حذف شود؟';
+
+  @override
+  String get frequentDescriptionsSaved => 'ذخیره شد';
+
+  @override
+  String get frequentDescriptionsLimitReached =>
+      'حداکثر تعداد شرح پرتکرار برای این کسب‌وکار پر است.';
 }

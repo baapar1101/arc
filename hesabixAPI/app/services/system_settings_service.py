@@ -37,6 +37,7 @@ NOTIFY_INAPP_READ_RETENTION_ENABLED = "inapp_read_retention_enabled"
 NOTIFY_INAPP_READ_RETENTION_DAYS = "inapp_read_retention_days"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
 SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
+SHARE_LINK_INVOICE_GATEWAY_FEE_PERCENT_KEY = "share_link_invoice_gateway_fee_percent"
 
 # SMS destination rate limit (optional DB overrides; base values from Settings / env)
 SMS_DESTINATION_RATE_ENABLED_KEY = "sms_destination_rate_enabled"
@@ -418,16 +419,48 @@ def get_sms_destination_rate_effective(db: Session) -> tuple[bool, int, int]:
 	return enabled, max_sends, window_minutes
 
 
+def get_share_link_invoice_gateway_fee_percent(db: Session) -> float:
+	"""درصد کارمزد درگاه برای پرداخت آنلاین از لینک عمومی فاکتور (۰ تا ۱۰۰)."""
+	obj = _get_setting(db, SHARE_LINK_INVOICE_GATEWAY_FEE_PERCENT_KEY)
+	if not obj or obj.value_string is None or str(obj.value_string).strip() == "":
+		return 0.0
+	try:
+		v = float(str(obj.value_string).strip().replace(",", "."))
+	except Exception:
+		return 0.0
+	if v < 0:
+		return 0.0
+	if v > 100:
+		return 100.0
+	return v
+
+
+def set_share_link_invoice_gateway_fee_percent(db: Session, percent: float) -> None:
+	try:
+		p = float(percent)
+	except Exception:
+		raise ApiError("INVALID_FEE_PERCENT", "درصد کارمزد نامعتبر است", http_status=400)
+	if p < 0 or p > 100:
+		raise ApiError("INVALID_FEE_PERCENT", "درصد کارمزد باید بین ۰ و ۱۰۰ باشد", http_status=400)
+	_upsert_setting_string(db, SHARE_LINK_INVOICE_GATEWAY_FEE_PERCENT_KEY, str(p))
+
+
 def get_share_link_settings(db: Session) -> Dict[str, Any]:
 	default_url = _default_share_link_base_url()
 	obj = _get_setting(db, SHARE_LINK_PUBLIC_APP_URL_KEY)
 	value = (obj.value_string or "").strip() if obj and obj.value_string else default_url
 	return {
 		"public_app_url": value or default_url,
+		"invoice_gateway_fee_percent": get_share_link_invoice_gateway_fee_percent(db),
 	}
 
 
-def set_share_link_settings(db: Session, *, public_app_url: str) -> Dict[str, Any]:
+def set_share_link_settings(
+	db: Session,
+	*,
+	public_app_url: str,
+	invoice_gateway_fee_percent: float | None = None,
+) -> Dict[str, Any]:
 	url = (public_app_url or "").strip()
 	if not url:
 		raise ApiError("PUBLIC_APP_URL_REQUIRED", "آدرس مقصد لینک اشتراک الزامی است", http_status=400)
@@ -438,6 +471,8 @@ def set_share_link_settings(db: Session, *, public_app_url: str) -> Dict[str, An
 	if normalized.lower().endswith("/public"):
 		normalized = normalized[:-len("/public")].rstrip("/")
 	_upsert_setting_string(db, SHARE_LINK_PUBLIC_APP_URL_KEY, normalized or url)
+	if invoice_gateway_fee_percent is not None:
+		set_share_link_invoice_gateway_fee_percent(db, float(invoice_gateway_fee_percent))
 	db.commit()
 	return get_share_link_settings(db)
 

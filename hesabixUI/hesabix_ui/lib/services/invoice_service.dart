@@ -290,6 +290,8 @@ class InvoiceService {
     int? expiresInHours,
     int? maxViewCount,
     bool replaceExisting = true,
+    bool? onlinePaymentEnabled,
+    int? onlinePaymentGatewayId,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/invoices/business/$businessId/$invoiceId/share-link',
@@ -297,7 +299,21 @@ class InvoiceService {
         if (expiresInHours != null) 'expires_in_hours': expiresInHours,
         if (maxViewCount != null) 'max_view_count': maxViewCount,
         'replace_existing': replaceExisting,
+        if (onlinePaymentEnabled != null) 'online_payment_enabled': onlinePaymentEnabled,
+        if (onlinePaymentGatewayId != null) 'online_payment_gateway_id': onlinePaymentGatewayId,
       },
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
+  }
+
+  Future<Map<String, dynamic>> patchInvoiceShareLinkPayment({
+    required int businessId,
+    required int invoiceId,
+    required Map<String, dynamic> patch,
+  }) async {
+    final res = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/invoices/business/$businessId/$invoiceId/share-link/payment',
+      data: patch,
     );
     return Map<String, dynamic>.from(res.data?['data'] as Map? ?? const {});
   }

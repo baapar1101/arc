@@ -960,6 +960,8 @@ def create_receipt_payment(
                     commission_account_code = "20202"  # اسناد پرداختنی
             elif normalized_transaction_type == "person":
                 commission_account_code = "20201"  # حساب‌های پرداختنی
+            elif normalized_transaction_type == "wallet":
+                commission_account_code = "10204"  # کیف‌پول / نزد پرداخت‌یار
             
             if commission_account_code:
                 commission_account = _get_fixed_account_by_code(db, commission_account_code)

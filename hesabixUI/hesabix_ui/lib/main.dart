@@ -124,6 +124,7 @@ import 'pages/business/distribution/distribution_main_page.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
 import 'pages/business/basalam/basalam_settings_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
+import 'pages/business/woocommerce/woocommerce_opening_inventory_bridge_page.dart';
 import 'pages/business/woocommerce/woocommerce_settings_page.dart';
 import 'pages/business/notification_templates_page.dart';
 import 'pages/business/notification_template_form_page.dart';
@@ -2056,6 +2057,24 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return hesabixNoTransitionPage(state, WoocommerceIntegrationPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'woocommerce/opening-inventory',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final canWoo = _authStore!.hasBusinessPermission('woocommerce', 'view') ||
+                    _authStore!.currentBusiness?.isOwner == true;
+                if (!canWoo) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  WoocommerceOpeningInventoryBridgePage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

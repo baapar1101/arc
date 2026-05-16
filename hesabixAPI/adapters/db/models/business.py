@@ -221,3 +221,8 @@ class Business(Base):
     crm_leads = relationship("Lead", back_populates="business", cascade="all, delete-orphan")
     crm_deals = relationship("Deal", back_populates="business", cascade="all, delete-orphan")
     crm_activities = relationship("CrmActivity", back_populates="business", cascade="all, delete-orphan")
+    frequent_descriptions = relationship(
+        "BusinessFrequentDescription",
+        back_populates="business",
+        cascade="all, delete-orphan",
+    )

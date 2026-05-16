@@ -16,6 +16,7 @@ import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class YearEndClosingPage extends StatefulWidget {
   final int businessId;
@@ -66,7 +67,13 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
   DateTime? _newFiscalYearStartDate;
   DateTime? _newFiscalYearEndDate;
   String _inventoryValuationMethod = 'FIFO';
-  
+
+  /// تقطیع سال: پایان دورهٔ بستن زودتر از پایان تقویمی سال
+  bool _useCustomClosingEndDate = false;
+  DateTime? _closingPeriodEndDate;
+  String _documentRelocationBasis = 'document_date';
+  bool _movePostCutoffDocuments = true;
+
   // سهامداران
   List<Person> _shareholders = [];
   Map<int, double> _shareholderDistributions = {}; // person_id -> profit_amount
@@ -234,6 +241,9 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
       final preview = await _service.preview(
         businessId: widget.businessId,
         fiscalYearId: _currentFiscalYearId!,
+        closingFiscalEndDate:
+            _useCustomClosingEndDate ? _closingPeriodEndDate : null,
+        documentRelocationBasis: _documentRelocationBasis,
       );
       
       if (mounted) {
@@ -416,6 +426,10 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
         inventoryValuationMethod: _inventoryValuationMethod,
         // تقسیم سود بین سهامداران
         shareholderDistributions: shareholderDistributions,
+        closingFiscalEndDate:
+            _useCustomClosingEndDate ? _closingPeriodEndDate : null,
+        documentRelocationBasis: _documentRelocationBasis,
+        movePostCutoffDocumentsToNewFiscalYear: _movePostCutoffDocuments,
       );
 
       if (mounted) {
@@ -448,7 +462,12 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
         if (mounted) {
           final openingBalanceNote = result['opening_balance_note']?.toString() ?? '';
           final openingBalanceCreated = result['opening_balance_created'] as bool? ?? false;
-          
+          final reloc = result['document_relocation'] as Map<String, dynamic>?;
+          final relocPerformed = reloc?['performed'] == true;
+          final relocDoc = (reloc?['moved_documents_count'] as num?)?.toInt() ?? 0;
+          final relocWh =
+              (reloc?['moved_warehouse_documents_count'] as num?)?.toInt() ?? 0;
+
           final leave = await showDialog<bool>(
             context: context,
             barrierDismissible: false,
@@ -535,6 +554,18 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+                    if (relocPerformed && (relocDoc > 0 || relocWh > 0)) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        AppLocalizations.of(dialogContext)
+                            .yearEndClosingDoneRelocationLine(relocDoc, relocWh),
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(dialogContext).colorScheme.primary,
                         ),
                       ),
                     ],
@@ -753,7 +784,9 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                             // اطلاعات سال مالی جاری
                             if (_previewData != null) ...[
                               _buildFiscalYearInfo(_previewData!['fiscal_year']),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 16),
+                              _buildSplitYearOptionsCard(),
+                              const SizedBox(height: 16),
                               
                               // خلاصه سود و زیان
                               _buildSummaryCard(_previewData!['summary']),
@@ -851,6 +884,136 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                           ],
                         ),
                       ),
+    );
+  }
+
+  DateTime? _parseApiDateOnly(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is String) {
+      return DateTime.tryParse(raw);
+    }
+    return DateTime.tryParse(raw.toString());
+  }
+
+  Widget _buildSplitYearOptionsCard() {
+    final cal = _calendarController;
+    final t = AppLocalizations.of(context);
+    if (cal == null || _previewData == null) {
+      return const SizedBox.shrink();
+    }
+    final fiscal = _previewData!['fiscal_year'] as Map<String, dynamic>?;
+    final closingOpts = _previewData!['closing_options'] as Map<String, dynamic>?;
+    final start = _parseApiDateOnly(fiscal?['start_date']);
+    final calendarEnd = _parseApiDateOnly(
+          closingOpts?['calendar_period_end_date']) ??
+        _parseApiDateOnly(fiscal?['calendar_period_end_date']) ??
+        _parseApiDateOnly(fiscal?['end_date']);
+    final docToMove = (closingOpts?['post_cutoff_documents_to_relocate'] as num?)?.toInt() ?? 0;
+    final whToMove =
+        (closingOpts?['post_cutoff_warehouse_documents_to_relocate'] as num?)?.toInt() ?? 0;
+    final calendarEndLabel = calendarEnd != null
+        ? HesabixDateUtils.formatForDisplay(calendarEnd, cal.isJalali)
+        : '—';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.call_split, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  t.yearEndSplitSectionTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              t.yearEndSplitSectionDescription,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.yearEndSplitDifferentEndToggle),
+              value: _useCustomClosingEndDate,
+              onChanged: (v) async {
+                setState(() {
+                  _useCustomClosingEndDate = v;
+                  if (v) {
+                    _closingPeriodEndDate ??= calendarEnd;
+                  }
+                });
+                await _loadPreview();
+              },
+            ),
+            if (_useCustomClosingEndDate) ...[
+              DateInputField(
+                labelText: t.yearEndSplitClosingEndDateLabel,
+                value: _closingPeriodEndDate,
+                calendarController: cal,
+                firstDate: start,
+                lastDate: calendarEnd,
+                onChanged: (d) async {
+                  setState(() => _closingPeriodEndDate = d);
+                  await _loadPreview();
+                },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                decoration: InputDecoration(
+                  labelText: t.yearEndSplitRelocationBasisLabel,
+                  border: const OutlineInputBorder(),
+                ),
+                value: _documentRelocationBasis,
+                items: [
+                  DropdownMenuItem(
+                    value: 'document_date',
+                    child: Text(t.yearEndSplitBasisDocumentDate),
+                  ),
+                  DropdownMenuItem(
+                    value: 'registered_at',
+                    child: Text(t.yearEndSplitBasisRegisteredAt),
+                  ),
+                ],
+                onChanged: (v) async {
+                  if (v == null) return;
+                  setState(() => _documentRelocationBasis = v);
+                  await _loadPreview();
+                },
+              ),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(t.yearEndSplitMoveDocumentsToggle),
+                subtitle: Text(t.yearEndSplitMoveDocumentsSubtitle),
+                value: _movePostCutoffDocuments,
+                onChanged: (v) => setState(() => _movePostCutoffDocuments = v),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Text(
+              t.yearEndSplitCalendarEndNote(calendarEndLabel),
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (_useCustomClosingEndDate) ...[
+              const SizedBox(height: 4),
+              Text(
+                t.yearEndSplitRelocatePreviewLine(docToMove, whToMove),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 

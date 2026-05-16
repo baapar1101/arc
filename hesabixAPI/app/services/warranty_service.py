@@ -145,6 +145,10 @@ def _find_person_by_phone(db: Session, business_id: int, phone: str) -> Optional
             or_(
                 Person.mobile == phone,
                 Person.mobile == normalized_phone,
+                Person.mobile_2 == phone,
+                Person.mobile_2 == normalized_phone,
+                Person.mobile_3 == phone,
+                Person.mobile_3 == normalized_phone,
                 Person.phone == phone,
                 Person.phone == normalized_phone,
             )

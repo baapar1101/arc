@@ -63,6 +63,8 @@ class _PersonGroupFormDialogState extends State<PersonGroupFormDialog> {
     'postal_code': TextEditingController(),
     'phone': TextEditingController(),
     'mobile': TextEditingController(),
+    'mobile_2': TextEditingController(),
+    'mobile_3': TextEditingController(),
     'fax': TextEditingController(),
     'email': TextEditingController(),
     'website': TextEditingController(),
@@ -323,6 +325,8 @@ class _PersonGroupFormDialogState extends State<PersonGroupFormDialog> {
                     'postal_code': t.personPostalCode,
                     'phone': t.personPhone,
                     'mobile': t.personMobile,
+                    'mobile_2': t.personMobile2,
+                    'mobile_3': t.personMobile3,
                     'fax': t.personFax,
                     'email': t.personEmail,
                     'website': t.personWebsite,
@@ -338,9 +342,11 @@ class _PersonGroupFormDialogState extends State<PersonGroupFormDialog> {
                     child: TextFormField(
                       controller: e.value,
                       decoration: InputDecoration(labelText: labels[e.key] ?? e.key),
-                      keyboardType: e.key.contains('commission') || e.key == 'credit_limit'
-                          ? const TextInputType.numberWithOptions(decimal: true)
-                          : TextInputType.text,
+                      keyboardType: e.key == 'phone' || e.key == 'mobile' || e.key == 'mobile_2' || e.key == 'mobile_3'
+                          ? TextInputType.phone
+                          : e.key.contains('commission') || e.key == 'credit_limit'
+                              ? const TextInputType.numberWithOptions(decimal: true)
+                              : TextInputType.text,
                     ),
                   );
                 }),

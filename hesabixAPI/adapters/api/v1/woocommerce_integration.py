@@ -396,3 +396,113 @@ def post_woocommerce_bridge_control_settings_patch(
 	_ensure_plugin(db, business_id)
 	data = wc_svc.post_control_settings_patch(db, business_id, payload or {})
 	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/bridge/control/opening-inventory/status")
+def get_woocommerce_bridge_control_opening_inventory_status(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.control_opening_inventory_status(db, business_id)
+	return success_response(data, request)
+
+
+@router.get("/business/{business_id}/bridge/control/opening-inventory/accounts")
+def get_woocommerce_bridge_control_opening_inventory_accounts(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "view")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.control_opening_inventory_accounts(db, business_id)
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/opening-inventory/preview")
+def post_woocommerce_bridge_control_opening_inventory_preview(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.post_control_opening_inventory_preview(db, business_id, payload or {})
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/opening-inventory/prepare")
+def post_woocommerce_bridge_control_opening_inventory_prepare(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.post_control_opening_inventory_prepare(db, business_id, payload or {})
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/opening-inventory/batch")
+def post_woocommerce_bridge_control_opening_inventory_batch(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.post_control_opening_inventory_batch(db, business_id, payload or {})
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/opening-inventory/finalize")
+def post_woocommerce_bridge_control_opening_inventory_finalize(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.post_control_opening_inventory_finalize(db, business_id, payload or {})
+	return success_response(data, request)
+
+
+@router.post("/business/{business_id}/bridge/control/opening-inventory/cancel")
+def post_woocommerce_bridge_control_opening_inventory_cancel(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	payload: Dict[str, Any] = Body(default_factory=dict),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_business_permission_dep("woocommerce", "manage")),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	data = wc_svc.post_control_opening_inventory_cancel(db, business_id, payload or {})
+	return success_response(data, request)

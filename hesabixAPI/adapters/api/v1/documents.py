@@ -226,7 +226,7 @@ async def export_documents_pdf_endpoint(
             ("document_date", "تاریخ سند"),
             ("total_debit", "جمع بدهکار"),
             ("total_credit", "جمع بستانکار"),
-            ("created_by_name", "ایجادکننده"),
+            ("created_by_name", "ایجاد کننده"),
             ("registered_at", "تاریخ ثبت"),
         ]
         for key, label in default_columns:

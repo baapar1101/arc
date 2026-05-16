@@ -3104,6 +3104,12 @@ abstract class AppLocalizations {
   /// **'Created by'**
   String get createdBy;
 
+  /// No description provided for @creatorColumnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Creator'**
+  String get creatorColumnTitle;
+
   /// No description provided for @lastUpdated.
   ///
   /// In en, this message translates to:
@@ -4189,6 +4195,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Year End Closing'**
   String get yearEndClosing;
+
+  /// No description provided for @yearEndSplitSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal period split'**
+  String get yearEndSplitSectionTitle;
+
+  /// No description provided for @yearEndSplitSectionDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'You can close the books on an end date earlier than the fiscal calendar end. Documents after that date (by the rule below) move to the new fiscal year after it is created.'**
+  String get yearEndSplitSectionDescription;
+
+  /// No description provided for @yearEndSplitDifferentEndToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing end date differs from calendar fiscal year end'**
+  String get yearEndSplitDifferentEndToggle;
+
+  /// No description provided for @yearEndSplitClosingEndDateLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Closing period end date (inclusive)'**
+  String get yearEndSplitClosingEndDateLabel;
+
+  /// No description provided for @yearEndSplitRelocationBasisLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Criterion for \"after period end\" when moving documents'**
+  String get yearEndSplitRelocationBasisLabel;
+
+  /// No description provided for @yearEndSplitBasisDocumentDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Document date'**
+  String get yearEndSplitBasisDocumentDate;
+
+  /// No description provided for @yearEndSplitBasisRegisteredAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Registration date (day)'**
+  String get yearEndSplitBasisRegisteredAt;
+
+  /// No description provided for @yearEndSplitMoveDocumentsToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically move post-period documents to the new fiscal year'**
+  String get yearEndSplitMoveDocumentsToggle;
+
+  /// No description provided for @yearEndSplitMoveDocumentsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If off, fiscal_year_id is not updated (not recommended).'**
+  String get yearEndSplitMoveDocumentsSubtitle;
+
+  /// No description provided for @yearEndSplitCalendarEndNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Calendar end of current fiscal year: {date}'**
+  String yearEndSplitCalendarEndNote(String date);
+
+  /// No description provided for @yearEndSplitRelocatePreviewLine.
+  ///
+  /// In en, this message translates to:
+  /// **'{docCount} accounting document(s) and {whCount} warehouse document(s) are scheduled to move.'**
+  String yearEndSplitRelocatePreviewLine(int docCount, int whCount);
+
+  /// No description provided for @yearEndClosingDoneRelocationLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Moved {docCount} document(s) and {whCount} warehouse slip(s) to the new fiscal year.'**
+  String yearEndClosingDoneRelocationLine(int docCount, int whCount);
 
   /// No description provided for @currencyRevaluation.
   ///
@@ -6583,6 +6661,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Mobile'**
   String get personMobile;
+
+  /// No description provided for @personMobile2.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile 2'**
+  String get personMobile2;
+
+  /// No description provided for @personMobile3.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile 3'**
+  String get personMobile3;
 
   /// No description provided for @personFax.
   ///
@@ -23490,6 +23580,24 @@ abstract class AppLocalizations {
   /// **'This table page'**
   String get woocommerceHubBulkSyncCurrentPage;
 
+  /// No description provided for @woocommerceHubBulkSyncSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected rows'**
+  String get woocommerceHubBulkSyncSelected;
+
+  /// No description provided for @woocommerceHubBulkConfirmSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync {count} selected row(s) from the table?'**
+  String woocommerceHubBulkConfirmSelected(String count);
+
+  /// No description provided for @woocommerceHubBulkEmptySelection.
+  ///
+  /// In en, this message translates to:
+  /// **'Select one or more rows using the checkboxes, then tap sync selected.'**
+  String get woocommerceHubBulkEmptySelection;
+
   /// No description provided for @woocommerceHubBulkSyncAllFiltered.
   ///
   /// In en, this message translates to:
@@ -23525,6 +23633,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Request batch'**
   String get woocommerceHubBulkProgressLabel;
+
+  /// No description provided for @woocommerceOpeningInvBridgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening inventory (bridge)'**
+  String get woocommerceOpeningInvBridgeTitle;
+
+  /// No description provided for @woocommerceOpeningInvBridgeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Run the same opening-balance job as the WooCommerce plugin, via the Hesabix store bridge. Use after products are synced and accounts/warehouse are configured on the store.'**
+  String get woocommerceOpeningInvBridgeSubtitle;
+
+  /// No description provided for @woocommerceOpeningInvRefreshStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh status'**
+  String get woocommerceOpeningInvRefreshStatus;
+
+  /// No description provided for @woocommerceOpeningInvLoadAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Load accounts'**
+  String get woocommerceOpeningInvLoadAccounts;
+
+  /// No description provided for @woocommerceOpeningInvPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get woocommerceOpeningInvPreview;
+
+  /// No description provided for @woocommerceOpeningInvPrepare.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare only'**
+  String get woocommerceOpeningInvPrepare;
+
+  /// No description provided for @woocommerceOpeningInvRunAllToEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'Run all batches to completion'**
+  String get woocommerceOpeningInvRunAllToEnd;
+
+  /// No description provided for @woocommerceOpeningInvFinalizeOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalize'**
+  String get woocommerceOpeningInvFinalizeOnly;
+
+  /// No description provided for @woocommerceOpeningInvNeedActiveJob.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a job with “Prepare only” first, or refresh status to restore a pending job.'**
+  String get woocommerceOpeningInvNeedActiveJob;
+
+  /// No description provided for @woocommerceOpeningInvRunBatches.
+  ///
+  /// In en, this message translates to:
+  /// **'One batch step'**
+  String get woocommerceOpeningInvRunBatches;
+
+  /// No description provided for @woocommerceOpeningInvFinalize.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalize document'**
+  String get woocommerceOpeningInvFinalize;
+
+  /// No description provided for @woocommerceOpeningInvCancelJob.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel after current batch'**
+  String get woocommerceOpeningInvCancelJob;
+
+  /// No description provided for @woocommerceOpeningInvClearLog.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear log'**
+  String get woocommerceOpeningInvClearLog;
+
+  /// No description provided for @woocommerceOpeningInvInventoryAccountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory (goods) account'**
+  String get woocommerceOpeningInvInventoryAccountLabel;
+
+  /// No description provided for @woocommerceOpeningInvEquityAccountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Equity account (auto-balance)'**
+  String get woocommerceOpeningInvEquityAccountLabel;
+
+  /// No description provided for @woocommerceOpeningInvBatchSizeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Batch size (3–40)'**
+  String get woocommerceOpeningInvBatchSizeLabel;
+
+  /// No description provided for @woocommerceOpeningInvWarehouseOverrideLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse ID (0 = plugin default)'**
+  String get woocommerceOpeningInvWarehouseOverrideLabel;
+
+  /// No description provided for @woocommerceOpeningInvIncludeTaxLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Include VAT in unit cost'**
+  String get woocommerceOpeningInvIncludeTaxLabel;
+
+  /// No description provided for @woocommerceOpeningInvAutoBalanceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-balance to equity'**
+  String get woocommerceOpeningInvAutoBalanceLabel;
+
+  /// No description provided for @woocommerceOpeningInvDoPostLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Post (lock) opening balance in Hesabix'**
+  String get woocommerceOpeningInvDoPostLabel;
+
+  /// No description provided for @woocommerceOpeningInvCostBasisLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cost basis'**
+  String get woocommerceOpeningInvCostBasisLabel;
+
+  /// No description provided for @woocommerceOpeningInvCostBasisRegular.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular price'**
+  String get woocommerceOpeningInvCostBasisRegular;
+
+  /// No description provided for @woocommerceOpeningInvCostBasisSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale price'**
+  String get woocommerceOpeningInvCostBasisSale;
+
+  /// No description provided for @woocommerceOpeningInvCostBasisZero.
+  ///
+  /// In en, this message translates to:
+  /// **'Zero cost'**
+  String get woocommerceOpeningInvCostBasisZero;
+
+  /// No description provided for @woocommerceOpeningInvPendingProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{cursor} / {total}'**
+  String woocommerceOpeningInvPendingProgress(Object cursor, Object total);
+
+  /// No description provided for @woocommerceOpeningInvJobIdLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Job ID'**
+  String get woocommerceOpeningInvJobIdLabel;
+
+  /// No description provided for @woocommerceOpeningInvCompletedBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'This store already completed opening inventory in the plugin.'**
+  String get woocommerceOpeningInvCompletedBanner;
+
+  /// No description provided for @woocommerceOpeningInvPhraseHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To post the document, type exactly:'**
+  String get woocommerceOpeningInvPhraseHint;
+
+  /// No description provided for @woocommerceOpeningInvPhrasePromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm posting phrase'**
+  String get woocommerceOpeningInvPhrasePromptTitle;
+
+  /// No description provided for @woocommerceOpeningInvPhraseMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Phrase does not match; finalize cancelled.'**
+  String get woocommerceOpeningInvPhraseMismatch;
+
+  /// No description provided for @woocommerceOpeningInvLogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Log'**
+  String get woocommerceOpeningInvLogTitle;
+
+  /// No description provided for @woocommerceOpeningInvPickInventoryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an inventory account.'**
+  String get woocommerceOpeningInvPickInventoryHint;
+
+  /// No description provided for @woocommerceOpeningInvPickEquityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose an equity account or turn off auto-balance.'**
+  String get woocommerceOpeningInvPickEquityHint;
+
+  /// No description provided for @woocommerceOpeningInvOpenFromHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening inventory (bridge)'**
+  String get woocommerceOpeningInvOpenFromHub;
 
   /// No description provided for @woocommerceSyncDone.
   ///
@@ -23921,6 +24233,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'WooCommerce reports overview'**
   String get woocommerceOpenReportsOverviewTooltip;
+
+  /// No description provided for @woocommerceOpenOpeningInventoryTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening inventory (bridge)'**
+  String get woocommerceOpenOpeningInventoryTooltip;
+
+  /// No description provided for @woocommerceSettingsOpeningInventoryLinkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening inventory via bridge'**
+  String get woocommerceSettingsOpeningInventoryLinkTitle;
+
+  /// No description provided for @woocommerceSettingsOpeningInventoryLinkSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the job and run batches from Hesabix without wp-admin.'**
+  String get woocommerceSettingsOpeningInventoryLinkSubtitle;
 
   /// No description provided for @settingsWooCommerceTitle.
   ///
@@ -25583,6 +25913,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'• Refresh in the ⋮ menu reloads data from the server.\n• Compact mode toggles denser row height; your choice may be remembered for this table.\n• Use pagination at the bottom to change page size and move between pages.'**
   String get dataTableHelpSectionOtherBody;
+
+  /// No description provided for @frequentDescriptionsPickHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Focus this field to see your saved frequent descriptions.'**
+  String get frequentDescriptionsPickHint;
+
+  /// No description provided for @frequentDescriptionsManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage frequent descriptions'**
+  String get frequentDescriptionsManage;
+
+  /// No description provided for @frequentDescriptionsAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get frequentDescriptionsAdd;
+
+  /// No description provided for @frequentDescriptionsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No frequent descriptions yet.'**
+  String get frequentDescriptionsEmpty;
+
+  /// No description provided for @frequentDescriptionsLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the list.'**
+  String get frequentDescriptionsLoadError;
+
+  /// No description provided for @frequentDescriptionsNewLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New description'**
+  String get frequentDescriptionsNewLabel;
+
+  /// No description provided for @frequentDescriptionsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove description'**
+  String get frequentDescriptionsDeleteTitle;
+
+  /// No description provided for @frequentDescriptionsDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this text from your frequent descriptions list?'**
+  String get frequentDescriptionsDeleteConfirm;
+
+  /// No description provided for @frequentDescriptionsSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get frequentDescriptionsSaved;
+
+  /// No description provided for @frequentDescriptionsLimitReached.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum number of frequent descriptions for this business has been reached.'**
+  String get frequentDescriptionsLimitReached;
 }
 
 class _AppLocalizationsDelegate

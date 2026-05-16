@@ -40,6 +40,7 @@ import 'package:hesabix_ui/utils/number_normalizer.dart'
 import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
+import 'package:hesabix_ui/services/payment_gateway_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_print_options_bottom_sheet.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_pdf_print_flow.dart';
@@ -142,6 +143,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// مقدار `hours` برای ایجاد لینک: 168، 336، 720 یا null = پیش‌فرض سرور
   int? _invoiceShareExpiryChoiceHours = 168;
   final TextEditingController _invoiceShareMaxViewsController = TextEditingController();
+  final PaymentGatewayService _paymentGatewayService = PaymentGatewayService(ApiClient());
+  List<Map<String, dynamic>> _invoiceShareGateways = const [];
+  bool _loadingInvoiceShareGateways = false;
+  bool _invoiceOnlinePayEnabled = false;
+  int? _invoiceOnlinePayGatewayId;
+  bool _savingInvoiceOnlinePayment = false;
   
   // تراکنش‌های پرداخت
   final _receiptPaymentService = ReceiptPaymentService(ApiClient());
@@ -407,10 +414,106 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       setState(() {
         _invoicePublicShareLink = link;
         _loadingInvoiceShareLink = false;
+        _applyInvoiceShareOnlinePaymentFromLink(link);
       });
+      if (doc.documentType == 'invoice_sales' && !doc.isProforma) {
+        await _loadInvoiceShareGateways(doc.businessId);
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _loadingInvoiceShareLink = false);
+      }
+      if (doc.documentType == 'invoice_sales' && !doc.isProforma) {
+        await _loadInvoiceShareGateways(doc.businessId);
+      }
+    }
+  }
+
+  void _applyInvoiceShareOnlinePaymentFromLink(Map<String, dynamic>? link) {
+    if (link == null) {
+      _invoiceOnlinePayEnabled = false;
+      _invoiceOnlinePayGatewayId = null;
+      return;
+    }
+    _invoiceOnlinePayEnabled = link['online_payment_enabled'] == true;
+    final g = link['online_payment_gateway_id'];
+    if (g == null) {
+      _invoiceOnlinePayGatewayId = null;
+    } else if (g is int) {
+      _invoiceOnlinePayGatewayId = g;
+    } else if (g is num) {
+      _invoiceOnlinePayGatewayId = g.toInt();
+    } else {
+      _invoiceOnlinePayGatewayId = int.tryParse(g.toString());
+    }
+  }
+
+  Future<void> _loadInvoiceShareGateways(int businessId) async {
+    setState(() => _loadingInvoiceShareGateways = true);
+    try {
+      final list = await _paymentGatewayService.listBusinessGateways(businessId);
+      if (!mounted) return;
+      setState(() {
+        _invoiceShareGateways = list;
+        _loadingInvoiceShareGateways = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _invoiceShareGateways = const [];
+          _loadingInvoiceShareGateways = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _saveInvoiceOnlinePaymentSettings() async {
+    final d = _document;
+    final link = _invoicePublicShareLink;
+    if (d == null || link == null || link['is_active'] != true) return;
+    if (d.documentType != 'invoice_sales' || d.isProforma) return;
+
+    if (_invoiceOnlinePayEnabled) {
+      if (_invoiceShareGateways.isEmpty) {
+        if (!mounted) return;
+        SnackBarHelper.showError(
+          context,
+          message: 'برای این کسب‌وکار درگاه پرداخت فعالی وجود ندارد. از مسیر کیف‌پول یا مدیر سیستم درگاه اضافه کنید.',
+        );
+        return;
+      }
+      if (_invoiceOnlinePayGatewayId == null) {
+        if (!mounted) return;
+        SnackBarHelper.showError(context, message: 'انتخاب درگاه پرداخت الزامی است.');
+        return;
+      }
+    }
+
+    setState(() => _savingInvoiceOnlinePayment = true);
+    try {
+      final patch = <String, dynamic>{
+        'online_payment_enabled': _invoiceOnlinePayEnabled,
+        'online_payment_gateway_id': _invoiceOnlinePayEnabled ? _invoiceOnlinePayGatewayId : null,
+      };
+      final updated = await _invoiceService.patchInvoiceShareLinkPayment(
+        businessId: d.businessId,
+        invoiceId: d.id,
+        patch: patch,
+      );
+      if (!mounted) return;
+      setState(() {
+        _invoicePublicShareLink = updated;
+        _savingInvoiceOnlinePayment = false;
+        _applyInvoiceShareOnlinePaymentFromLink(updated);
+      });
+      SnackBarHelper.showSuccess(context, message: 'تنظیمات پرداخت آنلاین ذخیره شد');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _savingInvoiceOnlinePayment = false);
+        SnackBarHelper.showError(
+          context,
+          message: 'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -432,14 +535,26 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (mv.isNotEmpty) {
         maxV = int.tryParse(mv.replaceAll(',', ''));
       }
-      final created = await _invoiceService.createInvoiceShareLink(
-        businessId: d.businessId,
-        invoiceId: d.id,
-        expiresInHours: _invoiceShareExpiryChoiceHours,
-        maxViewCount: maxV,
-      );
+      final created = d.documentType == 'invoice_sales' && !d.isProforma
+          ? await _invoiceService.createInvoiceShareLink(
+              businessId: d.businessId,
+              invoiceId: d.id,
+              expiresInHours: _invoiceShareExpiryChoiceHours,
+              maxViewCount: maxV,
+              onlinePaymentEnabled: _invoiceOnlinePayEnabled,
+              onlinePaymentGatewayId: _invoiceOnlinePayEnabled ? _invoiceOnlinePayGatewayId : null,
+            )
+          : await _invoiceService.createInvoiceShareLink(
+              businessId: d.businessId,
+              invoiceId: d.id,
+              expiresInHours: _invoiceShareExpiryChoiceHours,
+              maxViewCount: maxV,
+            );
       if (!mounted) return;
-      setState(() => _invoicePublicShareLink = created);
+      setState(() {
+        _invoicePublicShareLink = created;
+        _applyInvoiceShareOnlinePaymentFromLink(created);
+      });
       SnackBarHelper.showSuccess(context, message: 'لینک نمایش عمومی فاکتور ایجاد شد');
     } catch (e) {
       if (mounted) {
@@ -464,6 +579,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       setState(() {
         _invoicePublicShareLink = null;
         _revokingInvoiceShareLink = false;
+        _applyInvoiceShareOnlinePaymentFromLink(null);
       });
       SnackBarHelper.showSuccess(context, message: 'لینک لغو شد');
       await _loadInvoiceShareLinkInfo(d);
@@ -1106,6 +1222,110 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
+  Widget _invoiceOnlinePaymentSection(
+    ThemeData theme,
+    bool canEdit, {
+    required bool showSaveButton,
+  }) {
+    final d = _document;
+    if (d == null || d.documentType != 'invoice_sales') {
+      return const SizedBox.shrink();
+    }
+    if (d.isProforma) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          'پرداخت آنلاین از لینک پس از قطعی شدن فاکتور فعال می‌شود.',
+          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+        ),
+      );
+    }
+
+    final gatewayIds = _invoiceShareGateways
+        .map((g) => (g['id'] as num?)?.toInt())
+        .whereType<int>()
+        .toSet();
+    final dropdownValue =
+        _invoiceOnlinePayGatewayId != null && gatewayIds.contains(_invoiceOnlinePayGatewayId)
+            ? _invoiceOnlinePayGatewayId
+            : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 28),
+        Text(
+          'پرداخت آنلاین (صفحهٔ عمومی فاکتور)',
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('امکان پرداخت آنلاین برای مشتری'),
+          subtitle: const Text('مشتری از صفحهٔ عمومی به درگاه پرداخت کسب‌وکار هدایت می‌شود.'),
+          value: _invoiceOnlinePayEnabled,
+          onChanged: canEdit && !_savingInvoiceOnlinePayment
+              ? (v) {
+                  setState(() {
+                    _invoiceOnlinePayEnabled = v;
+                    if (!v) {
+                      _invoiceOnlinePayGatewayId = null;
+                    }
+                  });
+                }
+              : null,
+        ),
+        if (_loadingInvoiceShareGateways)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: LinearProgressIndicator(),
+          )
+        else if (_invoiceShareGateways.isEmpty)
+          Text(
+            'درگاه پرداختی برای این کسب‌وکار تعریف نشده است.',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+          )
+        else ...[
+          const SizedBox(height: 4),
+          DropdownButtonFormField<int?>(
+            value: dropdownValue,
+            decoration: const InputDecoration(
+              labelText: 'درگاه پرداخت',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              for (final g in _invoiceShareGateways)
+                DropdownMenuItem<int?>(
+                  value: (g['id'] as num?)?.toInt(),
+                  child: Text(
+                    '${g['display_name'] ?? g['id']}${g['provider'] != null ? ' (${g['provider']})' : ''}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: canEdit &&
+                    !_savingInvoiceOnlinePayment &&
+                    _invoiceOnlinePayEnabled &&
+                    !_loadingInvoiceShareGateways
+                ? (v) => setState(() => _invoiceOnlinePayGatewayId = v)
+                : null,
+          ),
+        ],
+        if (showSaveButton) ...[
+          const SizedBox(height: 12),
+          FilledButton.tonalIcon(
+            onPressed: canEdit && !_savingInvoiceOnlinePayment ? _saveInvoiceOnlinePaymentSettings : null,
+            icon: _savingInvoiceOnlinePayment
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.save_outlined),
+            label: Text(_savingInvoiceOnlinePayment ? 'در حال ذخیره…' : 'ذخیره تنظیمات پرداخت'),
+          ),
+        ],
+      ],
+    );
+  }
+
   Widget _buildInvoiceShareTab(BuildContext context, ThemeData theme) {
     final canEditInvoices = ApiClient.getAuthStore()?.canWriteSection('invoices') ?? false;
     final cardPad = _documentDetailsCardInnerPadding(context);
@@ -1236,6 +1456,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         ),
                       ],
                     ),
+                    _invoiceOnlinePaymentSection(theme, canEditInvoices, showSaveButton: true),
                   ],
                 ),
               ),
@@ -1298,6 +1519,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     keyboardType: TextInputType.number,
                     enabled: canEditInvoices,
                   ),
+                  _invoiceOnlinePaymentSection(theme, canEditInvoices, showSaveButton: false),
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: canEditInvoices ? _createOrRefreshInvoicePublicLink : null,

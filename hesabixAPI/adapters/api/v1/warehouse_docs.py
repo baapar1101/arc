@@ -22,7 +22,23 @@ from app.services.invoice_service import (
 	INVOICE_PRODUCTION,
 	INVOICE_WASTE,
 )
-from app.services.warehouse_service import create_from_invoice, post_warehouse_document, warehouse_document_to_dict, create_manual_warehouse_document, update_warehouse_document, update_warehouse_document_line, delete_warehouse_document, cancel_warehouse_document, bulk_delete_warehouse_documents, start_stock_count, calculate_stock_count_differences, create_stock_count_adjustment
+from app.services.warehouse_service import (
+	apply_warehouse_documents_sort,
+	bulk_delete_warehouse_documents,
+	cancel_warehouse_document,
+	calculate_stock_count_differences,
+	create_from_invoice,
+	create_manual_warehouse_document,
+	create_stock_count_adjustment,
+	delete_warehouse_document,
+	export_warehouse_documents_excel,
+	post_warehouse_document,
+	start_stock_count,
+	update_warehouse_document,
+	update_warehouse_document_line,
+	warehouse_document_to_dict,
+	warehouse_documents_filtered_query,
+)
 from app.services.invoice_warehouse_bulk_service import run_bulk_warehouse_invoice_operation
 
 
@@ -534,8 +550,6 @@ def search_warehouse_docs(
 	"""جستجو و فیلتر حواله‌ها."""
 	if not ctx.can_read_section("inventory"):
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
-	from app.services.transfer_service import _parse_iso_date as _parse_date
-	from sqlalchemy import or_
 	from app.core.cache import get_cache
 	
 	# استخراج پارامترهای فیلتر برای tag
@@ -582,142 +596,9 @@ def search_warehouse_docs(
 		if cached is not None:
 			return success_response(data=cached, request=request)
 	
-	q = db.query(WarehouseDocument).filter(WarehouseDocument.business_id == business_id)
+	q = warehouse_documents_filtered_query(db, business_id, body)
+	q = apply_warehouse_documents_sort(q, body)
 
-	# فیلترهای چندانتخابی جدول (QueryInfo.filters با operator=in)
-	filters_list = body.get("filters") if isinstance(body.get("filters"), list) else []
-	ms_doc_types: List[str] = []
-	ms_statuses: List[str] = []
-	ms_source_types: List[str] = []
-	for f in filters_list:
-		if not isinstance(f, dict):
-			continue
-		prop = f.get("property")
-		op = f.get("operator")
-		val = f.get("value")
-		if prop == "doc_type" and op == "in" and isinstance(val, list):
-			ms_doc_types = [str(x) for x in val if x]
-		elif prop == "status" and op == "in" and isinstance(val, list):
-			ms_statuses = [str(x) for x in val if x]
-		elif prop == "source_type" and op == "in" and isinstance(val, list):
-			ms_source_types = [str(x) for x in val if x]
-	
-	# فیلتر بر اساس نوع حواله
-	if ms_doc_types:
-		q = q.filter(WarehouseDocument.doc_type.in_(ms_doc_types))
-	elif isinstance(doc_type, str) and doc_type:
-		q = q.filter(WarehouseDocument.doc_type == doc_type)
-	elif isinstance(body.get("doc_type"), list):
-		doc_type_list = body.get("doc_type")
-		if doc_type_list:
-			q = q.filter(WarehouseDocument.doc_type.in_(doc_type_list))
-	
-	# فیلتر بر اساس وضعیت
-	if ms_statuses:
-		q = q.filter(WarehouseDocument.status.in_(ms_statuses))
-	elif isinstance(status, str) and status:
-		q = q.filter(WarehouseDocument.status == status)
-	elif isinstance(body.get("status"), list):
-		status_list = body.get("status")
-		if status_list:
-			q = q.filter(WarehouseDocument.status.in_(status_list))
-	
-	# فیلتر بر اساس source
-	source_document_id = body.get("source_document_id")
-	if isinstance(source_document_id, int):
-		q = q.filter(WarehouseDocument.source_document_id == source_document_id)
-	
-	source_type = body.get("source_type")
-	if ms_source_types:
-		q = q.filter(WarehouseDocument.source_type.in_(ms_source_types))
-	elif isinstance(source_type, str) and source_type:
-		q = q.filter(WarehouseDocument.source_type == source_type)
-	
-	# فیلتر بر اساس تاریخ
-	from_date = body.get("from_date")
-	to_date = body.get("to_date")
-	try:
-		if isinstance(from_date, str) and from_date:
-			q = q.filter(WarehouseDocument.document_date >= _parse_date(from_date))
-		if isinstance(to_date, str) and to_date:
-			q = q.filter(WarehouseDocument.document_date <= _parse_date(to_date))
-	except Exception:
-		pass
-	
-	# فیلتر بر اساس انبار
-	if warehouse_id:
-		q = q.filter(
-			or_(
-				WarehouseDocument.warehouse_id_from == int(warehouse_id),
-				WarehouseDocument.warehouse_id_to == int(warehouse_id),
-			)
-		)
-	elif isinstance(warehouse_ids, list) and warehouse_ids:
-		wh_ids = [int(w) for w in warehouse_ids if w]
-		if wh_ids:
-			q = q.filter(
-				or_(
-					WarehouseDocument.warehouse_id_from.in_(wh_ids),
-					WarehouseDocument.warehouse_id_to.in_(wh_ids),
-				)
-			)
-	
-	# جستجو در کد حواله یا کد فاکتور مرتبط
-	search = body.get("search")
-	if isinstance(search, str) and search.strip():
-		search_term = f"%{search.strip()}%"
-		invoice_ids_matching = [
-			r[0]
-			for r in db.query(Document.id)
-			.filter(and_(Document.business_id == business_id, Document.code.like(search_term)))
-			.limit(500)
-			.all()
-		]
-		if invoice_ids_matching:
-			q = q.filter(
-				or_(
-					WarehouseDocument.code.like(search_term),
-					and_(
-						WarehouseDocument.source_type == "invoice",
-						WarehouseDocument.source_document_id.in_(invoice_ids_matching),
-					),
-				)
-			)
-		else:
-			q = q.filter(WarehouseDocument.code.like(search_term))
-	
-	# مرتب‌سازی (چندستونه sort / تک‌ستونه sort_by)
-	from adapters.api.v1.schemas import QueryInfo
-	from app.services.sort_resolution import effective_sort_specs
-
-	_WH_SORT_ALLOWED = frozenset({"code", "doc_type", "status", "created_at", "document_date"})
-
-	def _wh_sort_col(name: str):
-		if name == "code":
-			return WarehouseDocument.code
-		if name == "doc_type":
-			return WarehouseDocument.doc_type
-		if name == "status":
-			return WarehouseDocument.status
-		if name == "created_at":
-			return WarehouseDocument.created_at
-		return WarehouseDocument.document_date
-
-	_qi = QueryInfo.model_validate({
-		"take": int(body.get("take", 20) or 20),
-		"skip": int(body.get("skip", 0) or 0),
-		"sort_by": body.get("sort_by"),
-		"sort_desc": bool(body.get("sort_desc", True)),
-		"sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
-	})
-	_specs = effective_sort_specs(_qi, allowed=_WH_SORT_ALLOWED, default_when_empty=("document_date", True))
-	_order_parts = []
-	for _n, _d in _specs:
-		_c = _wh_sort_col(_n)
-		_order_parts.append(_c.desc() if _d else _c.asc())
-	_order_parts.append(WarehouseDocument.id.desc())
-	q = q.order_by(*_order_parts)
-	
 	# Pagination
 	take = int(body.get("take") or 20)
 	skip = int(body.get("skip") or 0)
@@ -746,6 +627,29 @@ def search_warehouse_docs(
 		)
 	
 	return success_response(data=result, request=request)
+
+
+@router.post("/business/{business_id}/export/excel")
+@require_business_access("business_id")
+def export_warehouse_docs_excel_endpoint(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(default={}),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+) -> Response:
+	"""خروجی Excel لیست حواله‌های انبار با همان فیلترهای جستجو (حداکثر ۱۰٬۰۰۰ ردیف)."""
+	if not ctx.can_read_section("inventory"):
+		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
+	excel_data = export_warehouse_documents_excel(db, business_id, body)
+	return Response(
+		content=excel_data,
+		media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		headers={
+			"Content-Disposition": f"attachment; filename=warehouse_documents_{business_id}.xlsx",
+			"Access-Control-Expose-Headers": "Content-Disposition",
+		},
+	)
 
 
 @router.delete("/business/{business_id}/{wh_id}")

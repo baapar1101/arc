@@ -233,7 +233,9 @@ def build_warehouse_postal_label_context(
 		if src_person is not None:
 			receiver = {
 				"name": manual["name"] or _person_display_name(src_person),
-				"phone": manual["phone"] or (src_person.mobile or src_person.phone or "") or "",
+				"phone": manual["phone"]
+				or (src_person.mobile or src_person.mobile_2 or src_person.mobile_3 or src_person.phone or "")
+				or "",
 				"address": (src_person.address or "") or "",
 				"postal_code": (src_person.postal_code or "") or "",
 				"city": (src_person.city or "") or "",

@@ -35,6 +35,8 @@ import '../../models/customer_model.dart';
 import 'package:go_router/go_router.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/barcode/mobile_barcode_scan_screen.dart';
+import '../../widgets/inputs/frequent_description_text_field.dart';
+import '../../widgets/barcode/web_barcode_scan_screen.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -378,20 +380,34 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
   }
 
-  /// `mobile_scanner` فقط اندروید/iOS (و در صورت پشتیبانی پلاگین، دسکتاپ) دارد؛ روی وب کانال بومی ندارد.
-  bool get _supportsInlineCameraScan =>
+  /// اسکن با `mobile_scanner` فقط اندروید/iOS؛ روی وب از [WebBarcodeScanScreen] استفاده می‌شود.
+  bool get _supportsMobileNativeCameraScan =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
+  /// نمایش دکمهٔ دوربین: وب (Shape Detection + دوربین) یا موبایل native.
+  bool get _supportsCameraScanButton =>
+      kIsWeb || _supportsMobileNativeCameraScan;
+
   Future<void> _scanBarcodeWithCamera() async {
-    if (!_supportsInlineCameraScan) return;
-    final code = await Navigator.of(context).push<String>(
-      MaterialPageRoute<String>(
-        builder: (context) => const MobileBarcodeScanScreen(),
-        fullscreenDialog: true,
-      ),
-    );
+    final String? code;
+    if (kIsWeb) {
+      code = await Navigator.of(context).push<String>(
+        MaterialPageRoute<String>(
+          builder: (context) => const WebBarcodeScanScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+    } else {
+      if (!_supportsMobileNativeCameraScan) return;
+      code = await Navigator.of(context).push<String>(
+        MaterialPageRoute<String>(
+          builder: (context) => const MobileBarcodeScanScreen(),
+          fullscreenDialog: true,
+        ),
+      );
+    }
     if (!mounted || code == null || code.trim().isEmpty) return;
     final trimmed = code.trim();
     _barcodeController.text = trimmed;
@@ -1925,7 +1941,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     );
 
     // همان padding و فضای suffixIcon مثل DateInputField(isDense: true) برای یکسان بودن ارتفاع
-    final descWidget = TextField(
+    final descWidget = FrequentDescriptionTextField(
+      businessId: widget.businessId,
       controller: _documentDescriptionController,
       maxLines: 1,
       maxLength: 1000,
@@ -3057,7 +3074,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                   onPressed: () => _openAddProductDialog(),
                   visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
                 ),
-              if (_supportsInlineCameraScan)
+              if (_supportsCameraScanButton)
                 IconButton(
                   icon: const Icon(Icons.photo_camera_outlined),
                   tooltip: 'اسکن بارکد یا QR با دوربین',

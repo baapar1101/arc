@@ -252,4 +252,77 @@ class WoocommerceIntegrationService {
     );
     return _dataMap(res.data);
   }
+
+  Future<Map<String, dynamic>> controlOpeningInventoryStatus({
+    required int businessId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/opening-inventory/status',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> controlOpeningInventoryAccounts({
+    required int businessId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/opening-inventory/accounts',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlOpeningInventoryPreview({
+    required int businessId,
+    Map<String, dynamic>? payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/opening-inventory/preview',
+      data: payload ?? const <String, dynamic>{},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlOpeningInventoryPrepare({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/opening-inventory/prepare',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlOpeningInventoryBatch({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/opening-inventory/batch',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlOpeningInventoryFinalize({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/opening-inventory/finalize',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> postControlOpeningInventoryCancel({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/opening-inventory/cancel',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
 }
