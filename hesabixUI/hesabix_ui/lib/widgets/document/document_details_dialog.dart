@@ -411,6 +411,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         invoiceId: doc.id,
       );
       if (!mounted) return;
+      final active = link != null && link['is_active'] == true;
       setState(() {
         _invoicePublicShareLink = link;
         _loadingInvoiceShareLink = false;
@@ -419,14 +420,38 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (doc.documentType == 'invoice_sales' && !doc.isProforma) {
         await _loadInvoiceShareGateways(doc.businessId);
       }
+      if (!active && doc.documentType == 'invoice_sales' && !doc.isProforma) {
+        await _loadInvoiceShareBusinessDefaults(doc.businessId);
+      }
     } catch (_) {
       if (mounted) {
         setState(() => _loadingInvoiceShareLink = false);
       }
       if (doc.documentType == 'invoice_sales' && !doc.isProforma) {
         await _loadInvoiceShareGateways(doc.businessId);
+        await _loadInvoiceShareBusinessDefaults(doc.businessId);
       }
     }
+  }
+
+  Future<void> _loadInvoiceShareBusinessDefaults(int businessId) async {
+    try {
+      final s = await BusinessApiService.getInvoiceShareSettings(businessId);
+      if (!mounted) return;
+      setState(() {
+        _invoiceOnlinePayEnabled = s['default_online_payment_enabled'] == true;
+        final g = s['default_online_payment_gateway_id'];
+        if (g == null) {
+          _invoiceOnlinePayGatewayId = null;
+        } else if (g is int) {
+          _invoiceOnlinePayGatewayId = g;
+        } else if (g is num) {
+          _invoiceOnlinePayGatewayId = g.toInt();
+        } else {
+          _invoiceOnlinePayGatewayId = int.tryParse(g.toString());
+        }
+      });
+    } catch (_) {}
   }
 
   void _applyInvoiceShareOnlinePaymentFromLink(Map<String, dynamic>? link) {

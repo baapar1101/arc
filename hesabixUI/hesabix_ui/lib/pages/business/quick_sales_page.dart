@@ -35,6 +35,7 @@ import '../../models/customer_model.dart';
 import 'package:go_router/go_router.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/barcode/mobile_barcode_scan_screen.dart';
+import '../../constants/frequent_description_scope.dart';
 import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../widgets/barcode/web_barcode_scan_screen.dart';
 import '../../utils/general_barcode_utils.dart';
@@ -1943,6 +1944,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     // همان padding و فضای suffixIcon مثل DateInputField(isDense: true) برای یکسان بودن ارتفاع
     final descWidget = FrequentDescriptionTextField(
       businessId: widget.businessId,
+      scope: FrequentDescriptionScope.quickSales,
       controller: _documentDescriptionController,
       maxLines: 1,
       maxLength: 1000,

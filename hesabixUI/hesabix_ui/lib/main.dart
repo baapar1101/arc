@@ -155,6 +155,7 @@ import 'pages/business/quick_sales_settings_page.dart';
 import 'pages/business/quick_sales_page.dart';
 import 'pages/business/document_numbering_settings_page.dart';
 import 'pages/business/print_settings_page.dart';
+import 'pages/business/invoice_share_payment_settings_page.dart';
 import 'pages/business/tax_settings_page.dart';
 import 'pages/business/fiscal_year_settings_page.dart';
 import 'pages/business/installment_plans_page.dart';
@@ -906,6 +907,7 @@ class _MyAppState extends State<MyApp> {
           name: 'public_invoice_share_link',
           builder: (context, state) => PublicInvoiceShareLinkPage(
             code: state.pathParameters['code'] ?? '',
+            paymentReturnQuery: state.uri.queryParameters,
           ),
         ),
         GoRoute(
@@ -3125,6 +3127,20 @@ class _MyAppState extends State<MyApp> {
                   );
                 }
                 return hesabixNoTransitionPage(state, BusinessPrintSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'settings/invoice-share-payment',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  InvoiceSharePaymentSettingsPage(businessId: businessId),
                 );
               },
             ),

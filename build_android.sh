@@ -218,9 +218,13 @@ def mirrorRepos = { repoHandler ->
 }
 settingsEvaluated { settings ->
     settings.pluginManagement { repositories { mirrorRepos(delegate) } }
-    settings.dependencyResolutionManagement { repositories { mirrorRepos(delegate) } }
+    def sd = (settings.settingsDir ?: settings.rootDir).canonicalPath.replace('\\', '/')
+    if (sd.contains('flutter_tools/gradle')) {
+        settings.dependencyResolutionManagement.repositories.clear()
+        mirrorRepos(settings.dependencyResolutionManagement.repositories)
+    }
 }
-allprojects { repositories { mirrorRepos(delegate) } }
+// Do NOT use allprojects { repositories { ... } } here — breaks Flutter (flutter/flutter#174035).
 EOF
   }
 

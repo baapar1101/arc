@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from adapters.db.models.business_frequent_description import BusinessFrequentDescription
 
 _MAX_TEXT_LEN = 2000
-_MAX_ROWS = 500
+_MAX_ROWS_PER_SCOPE = 500
 
 
 def _normalize_text(text: str) -> str:
@@ -20,25 +20,48 @@ def _normalize_text(text: str) -> str:
 	return s
 
 
-def list_for_business(db: Session, business_id: int) -> list[BusinessFrequentDescription]:
+def _normalize_scope(scope: str | None) -> str:
+	s = (scope or "general").strip().lower()
+	if not s or len(s) > 64:
+		return "general"
+	for ch in s:
+		if not (ch.isascii() and (ch.isalnum() or ch == "_")):
+			return "general"
+	return s
+
+
+def list_for_business(db: Session, business_id: int, scope: str | None = None) -> list[BusinessFrequentDescription]:
+	sc = _normalize_scope(scope)
 	stmt = (
 		select(BusinessFrequentDescription)
 		.where(BusinessFrequentDescription.business_id == business_id)
+		.where(BusinessFrequentDescription.scope == sc)
 		.order_by(BusinessFrequentDescription.sort_order.asc(), BusinessFrequentDescription.id.asc())
 	)
 	return list(db.scalars(stmt).all())
 
 
-def create_row(db: Session, business_id: int, text: str, sort_order: int | None = None) -> BusinessFrequentDescription:
+def create_row(
+	db: Session,
+	business_id: int,
+	text: str,
+	sort_order: int | None = None,
+	scope: str | None = None,
+) -> BusinessFrequentDescription:
+	sc = _normalize_scope(scope)
 	count = db.scalar(
-		select(func.count()).select_from(BusinessFrequentDescription).where(BusinessFrequentDescription.business_id == business_id)
+		select(func.count())
+		.select_from(BusinessFrequentDescription)
+		.where(BusinessFrequentDescription.business_id == business_id)
+		.where(BusinessFrequentDescription.scope == sc)
 	) or 0
-	if int(count) >= _MAX_ROWS:
+	if int(count) >= _MAX_ROWS_PER_SCOPE:
 		raise ValueError("LIMIT_REACHED")
 	norm = _normalize_text(text)
 	now = datetime.utcnow()
 	row = BusinessFrequentDescription(
 		business_id=business_id,
+		scope=sc,
 		text=norm,
 		sort_order=int(sort_order) if sort_order is not None else 0,
 		created_at=now,
@@ -85,6 +108,8 @@ def to_dict(row: BusinessFrequentDescription) -> dict:
 
 	return {
 		"id": row.id,
+		"business_id": row.business_id,
+		"scope": row.scope,
 		"text": row.text,
 		"sort_order": row.sort_order,
 		"created_at": _iso(row.created_at),

@@ -51,7 +51,7 @@ fun pickNewestNdk(versions: List<String>): String? {
 
 val preferredNdk: String =
     (project.findProperty("android.ndkVersion") as String?)?.takeIf { it.isNotBlank() }
-        ?: "26.1.10909125"
+        ?: "27.0.12077973"
 
 val resolvedNdkVersion: String = run {
     val sdk = loadSdkDirFromLocalProperties()

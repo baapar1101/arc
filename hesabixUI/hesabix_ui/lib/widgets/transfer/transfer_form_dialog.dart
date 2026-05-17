@@ -12,6 +12,7 @@ import '../../widgets/banking/currency_picker_widget.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../constants/frequent_description_scope.dart';
 import '../inputs/frequent_description_text_field.dart';
 
 class TransferFormDialog extends StatefulWidget {
@@ -493,6 +494,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
         padding: const EdgeInsets.all(4),
         child: FrequentDescriptionTextField(
           businessId: widget.businessId,
+          scope: FrequentDescriptionScope.transfer,
           controller: _descriptionController,
           maxLines: 3,
           decoration: InputDecoration(

@@ -485,8 +485,38 @@ def create_share_link(
             "فقط برای اسناد فاکتور می‌توان لینک ایجاد کرد",
             http_status=400,
         )
-    if online_payment_gateway_id:
-        _assert_gateway_allowed_for_business(db, business_id, int(online_payment_gateway_id))
+
+    biz = db.query(Business).filter(Business.id == int(business_id)).first()
+    raw_settings: Dict[str, Any] = {}
+    if biz and isinstance(getattr(biz, "invoice_share_settings", None), dict):
+        raw_settings = biz.invoice_share_settings or {}
+
+    def _as_int_opt(val: Any) -> Optional[int]:
+        if val is None:
+            return None
+        try:
+            return int(val)
+        except Exception:
+            return None
+
+    eff_enabled = (
+        bool(online_payment_enabled)
+        if online_payment_enabled is not None
+        else bool(raw_settings.get("default_online_payment_enabled") or False)
+    )
+    eff_gateway = _as_int_opt(online_payment_gateway_id)
+    if eff_gateway is None and eff_enabled:
+        eff_gateway = _as_int_opt(raw_settings.get("default_online_payment_gateway_id"))
+
+    if eff_enabled:
+        if not eff_gateway:
+            raise ApiError(
+                "GATEWAY_NOT_CONFIGURED",
+                "برای فعال‌سازی پرداخت آنلاین، انتخاب درگاه الزامی است",
+                http_status=400,
+            )
+        _assert_gateway_allowed_for_business(db, business_id, int(eff_gateway))
+
     if unlimited_expiry:
         expires_at = None
         normalized_max_view = None
@@ -513,15 +543,13 @@ def create_share_link(
                 db.add(existing)
         code = _generate_code(db)
         options: Optional[Dict[str, Any]] = None
-        if online_payment_enabled is not None or online_payment_gateway_id is not None:
-            options = {}
-            if online_payment_enabled is not None:
-                options["online_payment_enabled"] = bool(online_payment_enabled)
-            if online_payment_gateway_id is not None:
-                try:
-                    options["online_payment_gateway_id"] = int(online_payment_gateway_id)
-                except Exception:
-                    options["online_payment_gateway_id"] = None
+        if eff_enabled and eff_gateway:
+            options = {
+                "online_payment_enabled": True,
+                "online_payment_gateway_id": int(eff_gateway),
+            }
+        elif online_payment_enabled is False:
+            options = {"online_payment_enabled": False}
         link = DocumentShareLink(
             business_id=business_id,
             document_id=document_id,

@@ -12,6 +12,7 @@ import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/constants/frequent_description_scope.dart';
 import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 
 /// دیالوگ ایجاد یا ویرایش سند حسابداری دستی
@@ -520,6 +521,7 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
             // توضیحات سند
             FrequentDescriptionTextField(
               businessId: widget.businessId,
+              scope: FrequentDescriptionScope.document,
               controller: _descriptionController,
               decoration: const InputDecoration(
                 labelText: 'توضیحات سند',

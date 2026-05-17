@@ -8,6 +8,7 @@ import json
 from adapters.db.session import get_db
 from app.core.responses import success_response
 from app.services.payment_service import verify_payment_callback
+from app.services.public_invoice_share_payment_service import maybe_redirect_public_invoice_share_payment_return
 from app.core.payment_response import (
     render_payment_success,
     render_payment_failed,
@@ -35,6 +36,10 @@ def zarinpal_callback(
 ):
 	params = {"tx_id": tx_id, "Authority": Authority, "Status": Status}
 	data = verify_payment_callback(db, "zarinpal", params)
+
+	redir = maybe_redirect_public_invoice_share_payment_return(db, tx_id=tx_id, verify_data=data)
+	if redir is not None:
+		return redir
 	
 	# تشخیص منبع درخواست
 	detected_source = detect_source(request, source)
@@ -110,6 +115,10 @@ def parsian_callback(
 ):
 	params = {"tx_id": tx_id, "Token": Token, "status": status}
 	data = verify_payment_callback(db, "parsian", params)
+
+	redir = maybe_redirect_public_invoice_share_payment_return(db, tx_id=tx_id, verify_data=data)
+	if redir is not None:
+		return redir
 	
 	# تشخیص منبع درخواست
 	detected_source = detect_source(request, source)
@@ -185,6 +194,10 @@ def bitpay_callback(
 ):
 	params = {"tx_id": tx_id, "trans_id": trans_id, "id_get": id_get}
 	data = verify_payment_callback(db, "bitpay", params)
+
+	redir = maybe_redirect_public_invoice_share_payment_return(db, tx_id=tx_id, verify_data=data)
+	if redir is not None:
+		return redir
 	
 	# تشخیص منبع درخواست
 	detected_source = detect_source(request, source)

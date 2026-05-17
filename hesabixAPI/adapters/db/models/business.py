@@ -193,6 +193,9 @@ class Business(Base):
     )
     # سیاست تسعیر ارز روی فاکتور/اسناد (کلیدها در app.services.invoice_fx_revaluation)
     fx_revaluation_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # پیش‌فرض‌های لینک اشتراک فاکتور (مثلاً default_online_payment_enabled / default_online_payment_gateway_id)
+    invoice_share_settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

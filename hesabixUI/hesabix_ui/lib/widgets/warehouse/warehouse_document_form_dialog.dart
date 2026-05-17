@@ -17,6 +17,7 @@ import 'product_instance_form_dialog.dart';
 import 'unique_product_selector_dialog.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../../constants/frequent_description_scope.dart';
 import '../inputs/frequent_description_text_field.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/api_client.dart';
@@ -1046,6 +1047,7 @@ class _WarehouseDocumentFormDialogState
       children: [
         FrequentDescriptionTextField(
           businessId: widget.businessId,
+          scope: FrequentDescriptionScope.warehouse,
           controller: _descriptionCtrl,
           decoration: const InputDecoration(
             labelText: 'شرح/توضیحات',

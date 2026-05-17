@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../constants/frequent_description_scope.dart';
 import '../../models/account_model.dart';
 import '../../utils/invoice_adjustments_account_filter.dart';
 import '../../utils/number_normalizer.dart';
@@ -349,6 +350,7 @@ class InvoiceAdjustmentsTabContent extends StatelessWidget {
                           );
                           final descField = FrequentDescriptionTextField(
                             businessId: businessId,
+                            scope: FrequentDescriptionScope.invoiceAdjustment,
                             controller: r.descriptionController,
                             decoration: const InputDecoration(
                               labelText: 'شرح (اختیاری)',

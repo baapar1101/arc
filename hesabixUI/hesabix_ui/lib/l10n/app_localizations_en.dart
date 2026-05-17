@@ -14078,5 +14078,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get frequentDescriptionsLimitReached =>
-      'Maximum number of frequent descriptions for this business has been reached.';
+      'Maximum number of frequent descriptions for this section has been reached (500 per scope).';
+
+  @override
+  String get frequentDescriptionsNoSearchMatch => 'No matching descriptions.';
+
+  @override
+  String get frequentDescriptionsSearchInList => 'Search in list';
+
+  @override
+  String get frequentDescriptionsUseInField => 'Insert into field';
 }

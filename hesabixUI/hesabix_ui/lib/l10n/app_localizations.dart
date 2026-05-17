@@ -25971,8 +25971,26 @@ abstract class AppLocalizations {
   /// No description provided for @frequentDescriptionsLimitReached.
   ///
   /// In en, this message translates to:
-  /// **'Maximum number of frequent descriptions for this business has been reached.'**
+  /// **'Maximum number of frequent descriptions for this section has been reached (500 per scope).'**
   String get frequentDescriptionsLimitReached;
+
+  /// No description provided for @frequentDescriptionsNoSearchMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching descriptions.'**
+  String get frequentDescriptionsNoSearchMatch;
+
+  /// No description provided for @frequentDescriptionsSearchInList.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in list'**
+  String get frequentDescriptionsSearchInList;
+
+  /// No description provided for @frequentDescriptionsUseInField.
+  ///
+  /// In en, this message translates to:
+  /// **'Insert into field'**
+  String get frequentDescriptionsUseInField;
 }
 
 class _AppLocalizationsDelegate

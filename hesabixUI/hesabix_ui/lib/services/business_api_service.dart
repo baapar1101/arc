@@ -258,6 +258,35 @@ class BusinessApiService {
     }
   }
 
+  /// پیش‌فرض پرداخت آنلاین برای لینک عمومی فاکتور
+  static Future<Map<String, dynamic>> getInvoiceShareSettings(int businessId) async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      '$_basePath/$businessId/invoice-share-settings',
+    );
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    } else {
+      throw Exception(data?['message'] ?? 'خطا در دریافت تنظیمات لینک فاکتور');
+    }
+  }
+
+  static Future<Map<String, dynamic>> updateInvoiceShareSettings(
+    int businessId,
+    Map<String, dynamic> payload,
+  ) async {
+    final response = await _apiClient.put<Map<String, dynamic>>(
+      '$_basePath/$businessId/invoice-share-settings',
+      data: payload,
+    );
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    } else {
+      throw Exception(data?['message'] ?? 'خطا در ذخیره تنظیمات لینک فاکتور');
+    }
+  }
+
   /// دریافت لیست تمام کسب و کارها (برای سوپر ادمین)
   static Future<Map<String, dynamic>> getAllBusinessesAdmin({
     int take = 10,

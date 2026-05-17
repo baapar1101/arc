@@ -33,6 +33,7 @@ import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/constants/frequent_description_scope.dart';
 import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
@@ -1816,6 +1817,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
                           const SizedBox(height: 8),
                           FrequentDescriptionTextField(
                             businessId: widget.businessId,
+                            scope: FrequentDescriptionScope.receiptPayment,
                             controller: _descriptionController,
                             decoration: const InputDecoration(
                               labelText: 'توضیحات کلی سند',
@@ -2050,6 +2052,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
                 padding: EdgeInsets.fromLTRB(padding, 0, padding, padding * 0.45),
                 child: FrequentDescriptionTextField(
                   businessId: widget.businessId,
+                  scope: FrequentDescriptionScope.receiptPayment,
                   controller: _descriptionController,
                   decoration: const InputDecoration(
                     labelText: 'توضیحات کلی سند',
@@ -3611,6 +3614,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             const SizedBox(height: 8),
             FrequentDescriptionTextField(
               businessId: widget.businessId,
+              scope: FrequentDescriptionScope.receiptPayment,
               controller: _descController,
               focusNode: _descFocusNode,
               decoration: InputDecoration(

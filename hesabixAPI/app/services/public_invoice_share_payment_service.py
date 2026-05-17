@@ -389,3 +389,42 @@ def confirm_public_invoice_share_payment(
 	tx.external_ref = external_ref
 	db.flush()
 	return {"transaction_id": tx.id, "status": tx.status, "receipt_document_id": receipt_id}
+
+
+def maybe_redirect_public_invoice_share_payment_return(
+	db: Session,
+	*,
+	tx_id: int,
+	verify_data: Dict[str, Any],
+):
+	"""
+	بازگشت کاربر از درگاه به صفحهٔ عمومی Flutter (به‌جای HTML بک‌اند).
+	اگر پایهٔ اپ عمومی تنظیم نشده باشد، None برمی‌گردد تا مسیر قبلی ادامه یابد.
+	"""
+	from urllib.parse import quote, urlencode
+
+	from fastapi.responses import RedirectResponse
+
+	from app.services.system_settings_service import resolve_public_app_base_url_for_public_links
+
+	tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+	if not tx or (tx.type or "").strip() != WALLET_TX_TYPE_PUBLIC_INVOICE_SHARE:
+		return None
+	ex = _parse_extra(tx)
+	code = (ex.get("share_link_code") or "").strip()
+	if not code:
+		return None
+	base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
+	if not base:
+		return None
+	success = bool(verify_data.get("success"))
+	ref = verify_data.get("external_ref") or ""
+	q = urlencode(
+		{
+			"payment_status": "success" if success else "failed",
+			"tx_id": str(tx_id),
+			"ref": str(ref),
+		}
+	)
+	enc = quote(code, safe="")
+	return RedirectResponse(url=f"{base}/public/invoice-link/{enc}?{q}", status_code=302)

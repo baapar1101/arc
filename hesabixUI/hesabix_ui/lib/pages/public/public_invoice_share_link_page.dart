@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,12 +12,19 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/services/public_invoice_share_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 class PublicInvoiceShareLinkPage extends StatefulWidget {
   final String code;
+  /// پارامترهای بازگشت از درگاه (?payment_status=...)
+  final Map<String, String> paymentReturnQuery;
 
-  const PublicInvoiceShareLinkPage({super.key, required this.code});
+  const PublicInvoiceShareLinkPage({
+    super.key,
+    required this.code,
+    this.paymentReturnQuery = const {},
+  });
 
   @override
   State<PublicInvoiceShareLinkPage> createState() => _PublicInvoiceShareLinkPageState();
@@ -35,7 +43,29 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   @override
   void initState() {
     super.initState();
-    _fetch();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await _fetch();
+    await _handlePaymentReturnIfNeeded();
+  }
+
+  Future<void> _handlePaymentReturnIfNeeded() async {
+    final ps = widget.paymentReturnQuery['payment_status'];
+    if (ps != 'success' && ps != 'failed') return;
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (ps == 'success') {
+        SnackBarHelper.showSuccess(context, message: 'پرداخت با موفقیت ثبت شد.');
+      } else {
+        SnackBarHelper.showError(context, message: 'پرداخت ناموفق بود یا توسط بانک تأیید نشد.');
+      }
+      if (!mounted) return;
+      final clean = '/public/invoice-link/${Uri.encodeComponent(widget.code)}';
+      context.go(clean);
+    });
   }
 
   @override

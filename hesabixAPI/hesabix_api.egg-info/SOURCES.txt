@@ -14,6 +14,7 @@ adapters/api/v1/business_backups.py
 adapters/api/v1/business_currency_rates.py
 adapters/api/v1/business_dashboard.py
 adapters/api/v1/business_data_table_settings.py
+adapters/api/v1/business_frequent_descriptions.py
 adapters/api/v1/business_ftp_backup.py
 adapters/api/v1/business_notifications.py
 adapters/api/v1/business_users.py
@@ -175,6 +176,7 @@ adapters/db/models/business.py
 adapters/db/models/business_crm_settings.py
 adapters/db/models/business_currency_rate.py
 adapters/db/models/business_dashboard_layout.py
+adapters/db/models/business_frequent_description.py
 adapters/db/models/business_ftp_backup_setting.py
 adapters/db/models/business_notification.py
 adapters/db/models/business_permission.py
@@ -313,6 +315,7 @@ app/core/__init__.py
 app/core/auth_dependency.py
 app/core/basalam_plugin_dependency.py
 app/core/batch_operations.py
+app/core/business_membership.py
 app/core/cache.py
 app/core/calendar.py
 app/core/calendar_middleware.py
@@ -376,9 +379,11 @@ app/services/bulk_product_prices_sheet_service.py
 app/services/business_background_jobs.py
 app/services/business_currency_rate_service.py
 app/services/business_dashboard_service.py
+app/services/business_frequent_description_service.py
 app/services/business_ftp_access.py
 app/services/business_ftp_queue_jobs.py
 app/services/business_ftp_service.py
+app/services/business_membership_background_jobs.py
 app/services/business_menu_preferences_service.py
 app/services/business_notification_service.py
 app/services/business_quick_links_service.py
@@ -424,6 +429,7 @@ app/services/invoice_adjustments_service.py
 app/services/invoice_bulk_upsert_service.py
 app/services/invoice_fx_revaluation.py
 app/services/invoice_global_discount_service.py
+app/services/invoice_line_unit_price_guard.py
 app/services/invoice_product_price_sync_service.py
 app/services/invoice_profit_ledger_service.py
 app/services/invoice_service.py
@@ -460,6 +466,7 @@ app/services/product_general_barcode_service.py
 app/services/product_service.py
 app/services/profile_dashboard_widgets_service.py
 app/services/project_service.py
+app/services/public_invoice_share_payment_service.py
 app/services/query_service.py
 app/services/quick_sales_service.py
 app/services/realtime.py
@@ -678,6 +685,9 @@ migrations/versions/20260613_000002_received_loan_facility_tables.py
 migrations/versions/20260614_000001_business_invoice_missing_line_warehouse_policy.py
 migrations/versions/20260614_000002_seed_marketplace_plugins.py
 migrations/versions/20260615_000001_seed_woocommerce_hesabix_marketplace.py
+migrations/versions/20260615_000002_business_permission_membership_expires_at.py
+migrations/versions/20260616_000001_person_mobile_2_3.py
+migrations/versions/20260617_000001_business_frequent_descriptions.py
 tests/__init__.py
 tests/test_basalam_currency.py
 tests/test_basalam_dlq.py

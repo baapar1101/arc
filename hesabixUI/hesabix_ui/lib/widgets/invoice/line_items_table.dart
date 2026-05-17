@@ -21,6 +21,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/invoice_line_preferences.dart';
 import '../money/amount_field_words_tooltip.dart';
+import '../../constants/frequent_description_scope.dart';
 import '../inputs/frequent_description_text_field.dart';
 
 void _invoiceLineAttrsLog(String message) {
@@ -1532,6 +1533,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             FrequentDescriptionTextField(
               key: _lineDescriptionFormKey(item),
               businessId: widget.businessId,
+              scope: FrequentDescriptionScope.invoiceLine,
               controller: _descriptionControllerForLine(item),
               focusNode: _focusNodesForLine(item.lineKey)?['description'],
               onChanged: (v) {
@@ -1815,6 +1817,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 child: FrequentDescriptionTextField(
                   key: _lineDescriptionFormKey(item),
                   businessId: widget.businessId,
+                  scope: FrequentDescriptionScope.invoiceLine,
                   controller: _descriptionControllerForLine(item),
                   focusNode: _focusNodesForLine(item.lineKey)?['description'],
                   onChanged: (v) {

@@ -24,6 +24,7 @@ import '../../utils/responsive_helper.dart';
 import '../../utils/currency_display_utils.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/money/amount_field_words_tooltip.dart';
+import '../../constants/frequent_description_scope.dart';
 import '../../widgets/inputs/frequent_description_text_field.dart';
 
 class ReceiptsPaymentsPage extends StatefulWidget {
@@ -649,6 +650,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
         padding: padding,
         child: FrequentDescriptionTextField(
           businessId: widget.businessId,
+          scope: FrequentDescriptionScope.receiptPayment,
           controller: _descriptionController,
           decoration: const InputDecoration(
             labelText: 'توضیحات کلی سند',
@@ -1437,6 +1439,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             const SizedBox(height: 8),
             FrequentDescriptionTextField(
               businessId: widget.businessId,
+              scope: FrequentDescriptionScope.receiptPayment,
               controller: _descController,
               decoration: InputDecoration(
                 labelText: t.description,

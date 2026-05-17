@@ -1463,3 +1463,78 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         data["currencies"] = []
 
     return data
+
+
+def get_business_invoice_share_settings(db: Session, business_id: int) -> Dict[str, Any]:
+    business = db.query(Business).filter(Business.id == int(business_id)).first()
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    raw = (
+        business.invoice_share_settings
+        if isinstance(getattr(business, "invoice_share_settings", None), dict)
+        else {}
+    )
+    gw = raw.get("default_online_payment_gateway_id")
+    try:
+        gw_int = int(gw) if gw is not None else None
+    except Exception:
+        gw_int = None
+    return {
+        "default_online_payment_enabled": bool(raw.get("default_online_payment_enabled") or False),
+        "default_online_payment_gateway_id": gw_int,
+    }
+
+
+def update_business_invoice_share_settings(
+    db: Session,
+    business_id: int,
+    payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    from app.services.document_share_link_service import _assert_gateway_allowed_for_business
+
+    business = db.query(Business).filter(Business.id == int(business_id)).first()
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    body = payload or {}
+    raw: Dict[str, Any] = {}
+    if isinstance(getattr(business, "invoice_share_settings", None), dict):
+        raw = dict(business.invoice_share_settings or {})
+
+    if "default_online_payment_enabled" in body:
+        raw["default_online_payment_enabled"] = bool(body.get("default_online_payment_enabled"))
+
+    if "default_online_payment_gateway_id" in body:
+        gw_val = body.get("default_online_payment_gateway_id")
+        if gw_val in (None, "", 0, "0"):
+            raw.pop("default_online_payment_gateway_id", None)
+        else:
+            try:
+                raw["default_online_payment_gateway_id"] = int(gw_val)
+            except Exception as exc:
+                raise ApiError(
+                    "INVALID_GATEWAY_ID",
+                    "شناسه درگاه نامعتبر است",
+                    http_status=400,
+                ) from exc
+
+    eff_en = bool(raw.get("default_online_payment_enabled") or False)
+    eff_gw = raw.get("default_online_payment_gateway_id")
+    try:
+        eff_gw_int = int(eff_gw) if eff_gw is not None else None
+    except Exception:
+        eff_gw_int = None
+
+    if eff_en:
+        if not eff_gw_int:
+            raise ApiError(
+                "GATEWAY_NOT_CONFIGURED",
+                "برای فعال بودن پرداخت آنلاین، انتخاب درگاه الزامی است",
+                http_status=400,
+            )
+        _assert_gateway_allowed_for_business(db, int(business_id), int(eff_gw_int))
+
+    business.invoice_share_settings = raw if raw else None
+    db.add(business)
+    db.commit()
+    db.refresh(business)
+    return get_business_invoice_share_settings(db, business_id)

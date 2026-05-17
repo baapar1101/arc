@@ -406,6 +406,13 @@ class _SettingsPageState extends State<SettingsPage> {
                                   icon: Icons.print,
                                   onTap: () => context.push('/business/${widget.businessId}/settings/print'),
                                 ),
+                                _buildSettingItem(
+                                  context,
+                                  title: 'پرداخت آنلاین لینک فاکتور',
+                                  subtitle: 'پیش‌فرض درگاه و فعال‌سازی برای لینک اشتراک عمومی',
+                                  icon: Icons.payment_outlined,
+                                  onTap: () => context.push('/business/${widget.businessId}/settings/invoice-share-payment'),
+                                ),
                                 // Report Builder - Templates access
                                 _buildSettingItem(
                                   context,
@@ -738,6 +745,13 @@ class _SettingsPageState extends State<SettingsPage> {
                             subtitle: t.printDocumentsDescription,
                             icon: Icons.print,
                             onTap: () => context.push('/business/${widget.businessId}/settings/print'),
+                          ),
+                          _buildSettingItem(
+                            context,
+                            title: 'پرداخت آنلاین لینک فاکتور',
+                            subtitle: 'پیش‌فرض درگاه و فعال‌سازی برای لینک اشتراک عمومی',
+                            icon: Icons.payment_outlined,
+                            onTap: () => context.push('/business/${widget.businessId}/settings/invoice-share-payment'),
                           ),
                           // Report Builder - Templates access
                           _buildSettingItem(

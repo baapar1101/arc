@@ -5308,5 +5308,8 @@
   "frequentDescriptionsDeleteTitle": "Remove description",
   "frequentDescriptionsDeleteConfirm": "Remove this text from your frequent descriptions list?",
   "frequentDescriptionsSaved": "Saved",
-  "frequentDescriptionsLimitReached": "Maximum number of frequent descriptions for this business has been reached."
+  "frequentDescriptionsLimitReached": "Maximum number of frequent descriptions for this section has been reached (500 per scope).",
+  "frequentDescriptionsNoSearchMatch": "No matching descriptions.",
+  "frequentDescriptionsSearchInList": "Search in list",
+  "frequentDescriptionsUseInField": "Insert into field"
 }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -21,7 +21,7 @@ def _map_validation(err: ValueError) -> None:
 	if code == "TEXT_EMPTY":
 		raise ApiError("TEXT_EMPTY", "متن شرح نمی‌تواند خالی باشد.", http_status=400)
 	if code == "LIMIT_REACHED":
-		raise ApiError("LIMIT_REACHED", "حداکثر ۵۰۰ شرح پرتکرار برای هر کسب‌وکار مجاز است.", http_status=400)
+		raise ApiError("LIMIT_REACHED", "حداکثر ۵۰۰ شرح پرتکرار برای هر بخش (اسکوپ) مجاز است.", http_status=400)
 	raise ApiError("VALIDATION_ERROR", str(err), http_status=400)
 
 
@@ -32,11 +32,12 @@ def _map_validation(err: ValueError) -> None:
 def list_frequent_descriptions(
 	request: Request,
 	business_id: int,
+	scope: str = Query("general", description="بخش تفکیک‌شدهٔ لیست (مثلاً receipt_payment، expense_income)"),
 	_: None = Depends(require_business_access_dep),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	rows = svc.list_for_business(db, business_id)
+	rows = svc.list_for_business(db, business_id, scope=scope)
 	return success_response({"items": [svc.to_dict(r) for r in rows]}, request)
 
 
@@ -55,10 +56,13 @@ def create_frequent_description(
 	text = payload.get("text")
 	if not isinstance(text, str):
 		raise ApiError("INVALID_PAYLOAD", "فیلد text الزامی است.", http_status=400)
+	scope = payload.get("scope", "general")
+	if scope is not None and not isinstance(scope, str):
+		raise ApiError("INVALID_PAYLOAD", "فیلد scope باید رشته باشد.", http_status=400)
 	sort_order = payload.get("sort_order")
 	so = int(sort_order) if sort_order is not None and str(sort_order).strip() != "" else None
 	try:
-		row = svc.create_row(db, business_id, text, sort_order=so)
+		row = svc.create_row(db, business_id, text, sort_order=so, scope=scope if isinstance(scope, str) else None)
 	except ValueError as e:
 		_map_validation(e)
 	db.commit()

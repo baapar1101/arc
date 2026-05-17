@@ -13,6 +13,8 @@ import '../../widgets/date_input_field.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/invoice_tags_field.dart';
+import '../../constants/frequent_description_scope.dart';
+import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../utils/number_formatters.dart';
@@ -85,6 +87,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   int? _selectedProjectId;
   List<int> _selectedTagIds = [];
   String? _invoiceTitle;
+  final TextEditingController _invoiceTitleController = TextEditingController();
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
@@ -362,6 +365,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     _adjustmentRows = [];
     _tabController.dispose();
     _globalDiscountValueController.dispose();
+    _invoiceTitleController.dispose();
     super.dispose();
   }
 
@@ -581,6 +585,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       await _reloadFxRates();
       if (mounted) {
         setState(() {
+          _invoiceTitleController.text = _invoiceTitle ?? '';
           _loading = false;
         });
       }
@@ -984,8 +989,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                           onChanged: (v) => setState(() => _manualFxRateId = v),
                         ),
                         const SizedBox(height: 16),
-                        TextFormField(
-                          initialValue: _invoiceTitle,
+                        FrequentDescriptionTextField(
+                          businessId: widget.businessId,
+                          scope: FrequentDescriptionScope.invoice,
+                          controller: _invoiceTitleController,
                           onChanged: (value) {
                             setState(() {
                               _invoiceTitle = value.trim().isEmpty ? null : value.trim();
@@ -997,6 +1004,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                             border: OutlineInputBorder(),
                           ),
                           textInputAction: TextInputAction.next,
+                          maxLines: 2,
                         ),
                       ],
                     );
@@ -1139,8 +1147,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                           ),
                         ],
                         const SizedBox(height: 16),
-                        TextFormField(
-                          initialValue: _invoiceTitle,
+                        FrequentDescriptionTextField(
+                          businessId: widget.businessId,
+                          scope: FrequentDescriptionScope.invoice,
+                          controller: _invoiceTitleController,
                           onChanged: (value) {
                             setState(() {
                               _invoiceTitle = value.trim().isEmpty ? null : value.trim();

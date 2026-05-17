@@ -17,9 +17,9 @@ class FrequentDescriptionApiService {
     return null;
   }
 
-  static Future<List<FrequentDescriptionItem>> list(int businessId) async {
+  static Future<List<FrequentDescriptionItem>> list(int businessId, {required String scope}) async {
     try {
-      final resp = await _api.get(_base(businessId));
+      final resp = await _api.get(_base(businessId), query: {'scope': scope});
       if (resp.data['success'] == true) {
         final raw = resp.data['data']?['items'];
         if (raw is! List) return const [];
@@ -48,9 +48,9 @@ class FrequentDescriptionApiService {
     }
   }
 
-  static Future<FrequentDescriptionItem> create(int businessId, String text) async {
+  static Future<FrequentDescriptionItem> create(int businessId, String text, {required String scope}) async {
     try {
-      final resp = await _api.post(_base(businessId), data: {'text': text});
+      final resp = await _api.post(_base(businessId), data: {'text': text, 'scope': scope});
       if (resp.data['success'] == true) {
         return FrequentDescriptionItem.fromJson(Map<String, dynamic>.from(resp.data['data'] as Map));
       }

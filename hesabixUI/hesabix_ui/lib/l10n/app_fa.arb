@@ -5350,7 +5350,10 @@
   "frequentDescriptionsDeleteTitle": "حذف شرح",
   "frequentDescriptionsDeleteConfirm": "این شرح از لیست پرتکرار حذف شود؟",
   "frequentDescriptionsSaved": "ذخیره شد",
-  "frequentDescriptionsLimitReached": "حداکثر تعداد شرح پرتکرار برای این کسب‌وکار پر است."
+  "frequentDescriptionsLimitReached": "حداکثر ۵۰۰ شرح پرتکرار برای همین بخش مجاز است.",
+  "frequentDescriptionsNoSearchMatch": "موردی با این جست‌وجو یافت نشد.",
+  "frequentDescriptionsSearchInList": "جست‌وجو در لیست",
+  "frequentDescriptionsUseInField": "درج در فیلد شرح"
 }
 
 

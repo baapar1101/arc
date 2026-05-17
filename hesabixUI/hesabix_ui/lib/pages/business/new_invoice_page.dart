@@ -23,6 +23,8 @@ import '../../widgets/invoice/invoice_tags_field.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
+import '../../constants/frequent_description_scope.dart';
+import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/bom_explosion_widget.dart';
@@ -117,6 +119,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   List<int> _selectedTagIds = [];
   String? _invoiceTitle;
   String? _invoiceReference;
+  final TextEditingController _invoiceTitleController = TextEditingController();
   // جمع‌های محاسباتی ردیف‌ها
   num _sumSubtotal = 0;
   num _sumDiscount = 0;
@@ -702,6 +705,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             item['description']?.toString().trim().isNotEmpty == true
                 ? item['description'].toString()
                 : null;
+        _invoiceTitleController.text = _invoiceTitle ?? '';
 
         _invoiceWarehouseReleaseMode = warehouseMode;
         final wid = ei['warehouse_id'];
@@ -1931,6 +1935,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     _adjustmentRows = [];
     _tabController.dispose();
     _globalDiscountValueController.dispose();
+    _invoiceTitleController.dispose();
     // Dispose کردن Controller های اقساطی
     _numInstallmentsController.dispose();
     _downPaymentController.dispose();
@@ -2355,8 +2360,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         ],
                         
                         // عنوان فاکتور
-                        TextFormField(
-                          initialValue: _invoiceTitle,
+                        FrequentDescriptionTextField(
+                          businessId: widget.businessId,
+                          scope: FrequentDescriptionScope.invoice,
+                          controller: _invoiceTitleController,
                           onChanged: (value) {
                             setState(() {
                               _invoiceTitle = value.trim().isEmpty ? null : value.trim();
@@ -2368,6 +2375,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             border: OutlineInputBorder(),
                           ),
                           textInputAction: TextInputAction.next,
+                          maxLines: 2,
                         ),
                         const SizedBox(height: 16),
                         
@@ -2554,8 +2562,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: TextFormField(
-                                initialValue: _invoiceTitle,
+                              child: FrequentDescriptionTextField(
+                                businessId: widget.businessId,
+                                scope: FrequentDescriptionScope.invoice,
+                                controller: _invoiceTitleController,
                                 onChanged: (value) {
                                   setState(() {
                                     _invoiceTitle = value.trim().isEmpty ? null : value.trim();
@@ -2567,6 +2577,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                   border: OutlineInputBorder(),
                                 ),
                                 textInputAction: TextInputAction.next,
+                                maxLines: 3,
                               ),
                             ),
                             const SizedBox(width: 12),

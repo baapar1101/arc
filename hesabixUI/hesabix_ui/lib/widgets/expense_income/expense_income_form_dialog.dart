@@ -21,6 +21,7 @@ import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/constants/frequent_description_scope.dart';
 import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 
 int _expenseIncomeStableRowIdSeq = 0;
@@ -340,6 +341,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
                           const SizedBox(height: 8),
                           FrequentDescriptionTextField(
                             businessId: widget.businessId,
+                            scope: FrequentDescriptionScope.expenseIncome,
                             controller: _descriptionController,
                             decoration: const InputDecoration(
                               labelText: 'توضیحات کلی سند',
@@ -570,6 +572,7 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
                               padding: EdgeInsets.fromLTRB(0, 0, 0, padding * 0.45),
                               child: FrequentDescriptionTextField(
                                 businessId: widget.businessId,
+                                scope: FrequentDescriptionScope.expenseIncome,
                                 controller: _descriptionController,
                                 decoration: const InputDecoration(
                                   labelText: 'توضیحات کلی سند',
@@ -1092,6 +1095,7 @@ class _ItemLineTileState extends State<_ItemLineTile> {
         const SizedBox(height: 7),
         FrequentDescriptionTextField(
           businessId: widget.businessId,
+          scope: FrequentDescriptionScope.expenseIncome,
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
@@ -1193,6 +1197,7 @@ class _ItemLineTileState extends State<_ItemLineTile> {
         const SizedBox(height: 6),
         FrequentDescriptionTextField(
           businessId: widget.businessId,
+          scope: FrequentDescriptionScope.expenseIncome,
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
@@ -1431,6 +1436,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
         const SizedBox(height: 7),
         FrequentDescriptionTextField(
           businessId: widget.businessId,
+          scope: FrequentDescriptionScope.expenseIncome,
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,
@@ -1522,6 +1528,7 @@ class _CounterpartyLineTileState extends State<_CounterpartyLineTile> {
         const SizedBox(height: 6),
         FrequentDescriptionTextField(
           businessId: widget.businessId,
+          scope: FrequentDescriptionScope.expenseIncome,
           controller: _descController,
           decoration: InputDecoration(
             labelText: t.description,

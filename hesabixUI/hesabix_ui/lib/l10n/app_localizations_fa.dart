@@ -13997,5 +13997,15 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get frequentDescriptionsLimitReached =>
-      'حداکثر تعداد شرح پرتکرار برای این کسب‌وکار پر است.';
+      'حداکثر ۵۰۰ شرح پرتکرار برای همین بخش مجاز است.';
+
+  @override
+  String get frequentDescriptionsNoSearchMatch =>
+      'موردی با این جست‌وجو یافت نشد.';
+
+  @override
+  String get frequentDescriptionsSearchInList => 'جست‌وجو در لیست';
+
+  @override
+  String get frequentDescriptionsUseInField => 'درج در فیلد شرح';
 }

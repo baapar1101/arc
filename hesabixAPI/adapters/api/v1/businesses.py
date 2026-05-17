@@ -20,7 +20,12 @@ from adapters.api.v1.schemas import (
 )
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_management, require_business_access, require_business_permission_dep
+from app.core.permissions import (
+    require_business_management,
+    require_business_access,
+    require_business_permission_dep,
+    require_business_access_dep,
+)
 from app.core.cache import get_cache
 from app.services.business_service import (
     create_business,
@@ -35,6 +40,8 @@ from app.services.business_service import (
     get_business_summary,
     get_business_print_settings,
     update_business_print_settings,
+    get_business_invoice_share_settings,
+    update_business_invoice_share_settings,
     add_business_currency,
     remove_business_currency,
     check_currency_usage_in_documents,
@@ -593,6 +600,47 @@ async def update_business_print_settings_endpoint(
 
     updated = update_business_print_settings(db, business_id, payload or {})
     return success_response(updated, request, "تنظیمات چاپ با موفقیت ذخیره شد")
+
+
+@router.get(
+    "/{business_id}/invoice-share-settings",
+    summary="تنظیمات پیش‌فرض پرداخت آنلاین لینک عمومی فاکتور",
+    description="مقادیر پیش‌فرض برای فعال‌سازی پرداخت آنلاین هنگام ایجاد لینک اشتراک فاکتور جدید.",
+    response_model=SuccessResponse,
+)
+async def get_business_invoice_share_settings_endpoint(
+    request: Request,
+    business_id: int,
+    _ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_access_dep),
+) -> dict:
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    data = get_business_invoice_share_settings(db, business_id)
+    return success_response(data, request)
+
+
+@router.put(
+    "/{business_id}/invoice-share-settings",
+    summary="ذخیرهٔ تنظیمات پیش‌فرض پرداخت آنلاین لینک عمومی فاکتور",
+    description="به‌روزرسانی پیش‌فرض‌های پرداخت آنلاین برای لینک‌های اشتراک فاکتور.",
+    response_model=SuccessResponse,
+)
+async def update_business_invoice_share_settings_endpoint(
+    request: Request,
+    business_id: int,
+    payload: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("settings", "business")),
+) -> dict:
+    business = db.query(Business).filter(Business.id == business_id).first()
+    if not business:
+        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
+    updated = update_business_invoice_share_settings(db, business_id, payload or {})
+    return success_response(updated, request, message="INVOICE_SHARE_SETTINGS_UPDATED")
 
 
 @router.get("/{business_id}", 
