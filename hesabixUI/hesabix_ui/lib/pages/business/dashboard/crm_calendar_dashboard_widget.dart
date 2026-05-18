@@ -6,6 +6,12 @@ import 'package:shamsi_date/shamsi_date.dart';
 const _jalaliWeekdayShort = ['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'];
 const _gregorianWeekdayShortMonFirst = ['د', 'س', 'چ', 'پ', 'ج', 'ش', 'ی'];
 
+/// اگر `dashboardColSpan` از داشبورد پاس داده شود و کمتر از این باشد، نمای فشرده (دو هفته اول) فعال می‌شود.
+const int kCrmCalendarMiniColSpanThreshold = 6;
+
+/// حداکثر سلول‌های شبکه در حالت مینی (دو ردیف × ۷).
+const int kCrmCalendarMiniMaxCells = 14;
+
 String _jalaliMonthName(int m) {
   const months = [
     '',
@@ -214,11 +220,15 @@ class CrmCalendarDashboardWidget extends StatefulWidget {
   final bool isJalali;
   final void Function(int year, int month) onMonthChanged;
 
+  /// اگر از داشبورد ست شود: با `colSpan < 6` نمای مینی (دو هفته) به‌صورت خودکار فعال می‌شود.
+  final int? dashboardColSpan;
+
   const CrmCalendarDashboardWidget({
     super.key,
     required this.data,
     required this.isJalali,
     required this.onMonthChanged,
+    this.dashboardColSpan,
   });
 
   @override
@@ -228,16 +238,255 @@ class CrmCalendarDashboardWidget extends StatefulWidget {
 class _CrmCalendarDashboardWidgetState extends State<CrmCalendarDashboardWidget> {
   int? _selectedDay;
 
+  bool get _miniLayout {
+    final s = widget.dashboardColSpan;
+    if (s == null) return false;
+    return s < kCrmCalendarMiniColSpanThreshold;
+  }
+
   @override
   void didUpdateWidget(covariant CrmCalendarDashboardWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.data != widget.data) {
       _selectedDay = null;
     }
+    if (oldWidget.dashboardColSpan != widget.dashboardColSpan) {
+      _selectedDay = null;
+    }
   }
 
   void _showDaySheet(BuildContext context, String dayKey, List<Map<String, dynamic>> items) {
     _showDayEventsSheet(context, dayKey, items);
+  }
+
+  void _showFullMonthBottomSheet({
+    required BuildContext context,
+    required ThemeData theme,
+    required String monthTitle,
+    required bool isJalali,
+    required int dy,
+    required int dm,
+    required int monthLength,
+    required int leadingBlanks,
+    required List<String> weekdayLabels,
+    required Map<String, List<Map<String, dynamic>>> itemsByDay,
+    required Jalali todayJ,
+    required DateTime todayG,
+  }) {
+    final screenH = MediaQuery.sizeOf(context).height;
+    final sheetH = (screenH * 0.58).clamp(320.0, 560.0);
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SizedBox(
+          height: sheetH,
+          child: Material(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '$monthTitle — ماه کامل',
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'بستن',
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return _buildMonthGrid(
+                          context: context,
+                          theme: theme,
+                          gridW: constraints.maxWidth,
+                          dy: dy,
+                          dm: dm,
+                          isJalali: isJalali,
+                          monthLength: monthLength,
+                          leadingBlanks: leadingBlanks,
+                          weekdayLabels: weekdayLabels,
+                          itemsByDay: itemsByDay,
+                          todayJ: todayJ,
+                          todayG: todayG,
+                          maxCells: null,
+                          showWeekdayHeader: true,
+                          forceMiniSizing: false,
+                          onDayTap: (day, dayKey, dayItems) {
+                            setState(() => _selectedDay = day);
+                            _showDaySheet(context, dayKey, dayItems);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMonthGrid({
+    required BuildContext context,
+    required ThemeData theme,
+    required double gridW,
+    required int dy,
+    required int dm,
+    required bool isJalali,
+    required int monthLength,
+    required int leadingBlanks,
+    required List<String> weekdayLabels,
+    required Map<String, List<Map<String, dynamic>>> itemsByDay,
+    required Jalali todayJ,
+    required DateTime todayG,
+    required int? maxCells,
+    required bool showWeekdayHeader,
+    required bool forceMiniSizing,
+    required void Function(int day, String dayKey, List<Map<String, dynamic>> items) onDayTap,
+  }) {
+    const crossCount = 7;
+    const mainSpacing = 3.0;
+    const crossSpacing = 3.0;
+    final mq = MediaQuery.of(context);
+    final ultraCompact = gridW < 360 || forceMiniSizing;
+    final isCompact = mq.size.width < 600 || forceMiniSizing;
+    final totalCrossGaps = crossSpacing * (crossCount - 1);
+    final cellW = math.max(8.0, (gridW - totalCrossGaps) / crossCount);
+    final minCellH = isCompact ? (ultraCompact ? 36.0 : 40.0) : 34.0;
+    final maxCellH = forceMiniSizing
+        ? 44.0
+        : (isCompact ? (ultraCompact ? 50.0 : 52.0) : 50.0);
+    final idealH = ultraCompact ? cellW / 1.45 : cellW / 1.75;
+    final cellH = idealH.clamp(minCellH, maxCellH);
+    final aspectRatio = cellW / cellH;
+
+    final totalCells = leadingBlanks + monthLength;
+    final cellCount = maxCells == null ? totalCells : math.min(totalCells, maxCells);
+
+    final weekdayStyle = theme.textTheme.labelSmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      fontSize: isCompact ? (ultraCompact ? 10.5 : 11.5) : null,
+    );
+    final dayNumStyle = theme.textTheme.labelLarge?.copyWith(
+      fontSize: isCompact ? (ultraCompact ? 12.0 : 14.0) : null,
+    );
+
+    final grid = GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossCount,
+        mainAxisSpacing: mainSpacing,
+        crossAxisSpacing: crossSpacing,
+        childAspectRatio: aspectRatio,
+      ),
+      itemCount: cellCount,
+      itemBuilder: (context, index) {
+        if (index < leadingBlanks) {
+          return const SizedBox.shrink();
+        }
+        final day = index - leadingBlanks + 1;
+        if (day < 1 || day > monthLength) {
+          return const SizedBox.shrink();
+        }
+        late final String dayKey;
+        var isToday = false;
+        if (isJalali) {
+          final j = Jalali(dy, dm, day);
+          final dt = j.toDateTime();
+          dayKey = _isoDate(dt);
+          isToday = j.year == todayJ.year && j.month == todayJ.month && j.day == todayJ.day;
+        } else {
+          final dt = DateTime(dy, dm, day);
+          dayKey = _isoDate(dt);
+          isToday = dt.year == todayG.year && dt.month == todayG.month && dt.day == todayG.day;
+        }
+
+        final n = itemsByDay[dayKey]?.length ?? 0;
+        final sel = _selectedDay == day;
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => onDayTap(day, dayKey, itemsByDay[dayKey] ?? const []),
+            borderRadius: BorderRadius.circular(8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: sel
+                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.65)
+                    : isToday
+                        ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.35)
+                        : null,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '$day',
+                    style: dayNumStyle?.copyWith(
+                      fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                    ),
+                  ),
+                  _buildEventIndicator(
+                    count: n,
+                    theme: theme,
+                    ultraCompact: ultraCompact || forceMiniSizing,
+                    compact: isCompact,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!showWeekdayHeader) return grid;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            for (final w in weekdayLabels)
+              Expanded(
+                child: Text(
+                  w,
+                  textAlign: TextAlign.center,
+                  style: weekdayStyle,
+                ),
+              ),
+          ],
+        ),
+        SizedBox(height: isCompact ? 5 : 4),
+        grid,
+      ],
+    );
   }
 
   @override
@@ -300,33 +549,24 @@ class _CrmCalendarDashboardWidgetState extends State<CrmCalendarDashboardWidget>
     final todayG = DateTime.now();
     final mq = MediaQuery.of(context);
     final isCompact = mq.size.width < 600;
+    final mini = _miniLayout;
+    final totalCells = leadingBlanks + monthLength;
+    final maxCells = mini ? math.min(totalCells, kCrmCalendarMiniMaxCells) : null;
+    final showFullMonthCta = mini && totalCells > (maxCells ?? 0);
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        const crossCount = 7;
-        const mainSpacing = 3.0;
-        const crossSpacing = 3.0;
         final gridW = constraints.maxWidth;
-        final ultraCompact = gridW < 360;
-        final totalCrossGaps = crossSpacing * (crossCount - 1);
-        final cellW = math.max(8.0, (gridW - totalCrossGaps) / crossCount);
-        final minCellH = isCompact ? (ultraCompact ? 42.0 : 46.0) : 40.0;
-        final idealH = ultraCompact ? cellW / 1.35 : cellW / 1.2;
-        final cellH = math.max(idealH, minCellH);
-        final aspectRatio = cellW / cellH;
+        final titleStyle = mini
+            ? theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)
+            : (isCompact
+                ? theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)
+                : theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600));
 
-        final titleStyle = isCompact
-            ? theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)
-            : theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600);
-        final weekdayStyle = theme.textTheme.labelSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          fontSize: isCompact ? (ultraCompact ? 11.0 : 12.0) : null,
-        );
-        final dayNumStyle = theme.textTheme.labelLarge?.copyWith(
-          fontSize: isCompact
-              ? (ultraCompact ? 13.0 : 15.0)
-              : null,
-        );
+        void onDayTap(int day, String dayKey, List<Map<String, dynamic>> items) {
+          setState(() => _selectedDay = day);
+          _showDaySheet(context, dayKey, items);
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -335,10 +575,11 @@ class _CrmCalendarDashboardWidgetState extends State<CrmCalendarDashboardWidget>
               children: [
                 IconButton(
                   tooltip: 'ماه قبل',
-                  constraints: isCompact
-                      ? const BoxConstraints(minWidth: 44, minHeight: 44)
+                  constraints: mini || isCompact
+                      ? const BoxConstraints(minWidth: 40, minHeight: 40)
                       : null,
-                  padding: isCompact ? EdgeInsets.zero : null,
+                  padding: (mini || isCompact) ? EdgeInsets.zero : null,
+                  iconSize: mini ? 22 : 24,
                   onPressed: () {
                     if (dm <= 1) {
                       widget.onMonthChanged(dy - 1, 12);
@@ -359,10 +600,11 @@ class _CrmCalendarDashboardWidgetState extends State<CrmCalendarDashboardWidget>
                 ),
                 IconButton(
                   tooltip: 'ماه بعد',
-                  constraints: isCompact
-                      ? const BoxConstraints(minWidth: 44, minHeight: 44)
+                  constraints: mini || isCompact
+                      ? const BoxConstraints(minWidth: 40, minHeight: 40)
                       : null,
-                  padding: isCompact ? EdgeInsets.zero : null,
+                  padding: (mini || isCompact) ? EdgeInsets.zero : null,
+                  iconSize: mini ? 22 : 24,
                   onPressed: () {
                     if (dm >= 12) {
                       widget.onMonthChanged(dy + 1, 1);
@@ -375,99 +617,58 @@ class _CrmCalendarDashboardWidgetState extends State<CrmCalendarDashboardWidget>
               ],
             ),
             Text(
-              isJalali ? 'تقویم شمسی' : 'تقویم میلادی',
+              mini
+                  ? (isJalali ? 'نمای فشرده · تقویم شمسی' : 'نمای فشرده · تقویم میلادی')
+                  : (isJalali ? 'تقویم شمسی' : 'تقویم میلادی'),
               textAlign: TextAlign.center,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.outline,
-                fontSize: isCompact ? 11 : null,
+                fontSize: isCompact || mini ? 11 : null,
               ),
             ),
-            SizedBox(height: isCompact ? 8 : 6),
-            Row(
-              children: [
-                for (final w in weekdayLabels)
-                  Expanded(
-                    child: Text(
-                      w,
-                      textAlign: TextAlign.center,
-                      style: weekdayStyle,
-                    ),
-                  ),
-              ],
+            SizedBox(height: isCompact || mini ? 6 : 6),
+            _buildMonthGrid(
+              context: context,
+              theme: theme,
+              gridW: gridW,
+              dy: dy,
+              dm: dm,
+              isJalali: isJalali,
+              monthLength: monthLength,
+              leadingBlanks: leadingBlanks,
+              weekdayLabels: weekdayLabels,
+              itemsByDay: itemsByDay,
+              todayJ: todayJ,
+              todayG: todayG,
+              maxCells: maxCells,
+              showWeekdayHeader: true,
+              forceMiniSizing: mini,
+              onDayTap: onDayTap,
             ),
-            SizedBox(height: isCompact ? 6 : 4),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossCount,
-                mainAxisSpacing: mainSpacing,
-                crossAxisSpacing: crossSpacing,
-                childAspectRatio: aspectRatio,
+            if (showFullMonthCta) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.center,
+                child: TextButton.icon(
+                  onPressed: () => _showFullMonthBottomSheet(
+                    context: context,
+                    theme: theme,
+                    monthTitle: monthTitle,
+                    isJalali: isJalali,
+                    dy: dy,
+                    dm: dm,
+                    monthLength: monthLength,
+                    leadingBlanks: leadingBlanks,
+                    weekdayLabels: weekdayLabels,
+                    itemsByDay: itemsByDay,
+                    todayJ: todayJ,
+                    todayG: todayG,
+                  ),
+                  icon: const Icon(Icons.calendar_view_month_outlined, size: 20),
+                  label: const Text('مشاهدهٔ ماه کامل'),
+                ),
               ),
-              itemCount: leadingBlanks + monthLength,
-              itemBuilder: (context, index) {
-                if (index < leadingBlanks) {
-                  return const SizedBox.shrink();
-                }
-                final day = index - leadingBlanks + 1;
-                late final String dayKey;
-                var isToday = false;
-                if (isJalali) {
-                  final j = Jalali(dy, dm, day);
-                  final dt = j.toDateTime();
-                  dayKey = _isoDate(dt);
-                  isToday = j.year == todayJ.year && j.month == todayJ.month && j.day == todayJ.day;
-                } else {
-                  final dt = DateTime(dy, dm, day);
-                  dayKey = _isoDate(dt);
-                  isToday = dt.year == todayG.year && dt.month == todayG.month && dt.day == todayG.day;
-                }
-
-                final n = itemsByDay[dayKey]?.length ?? 0;
-                final sel = _selectedDay == day;
-                return Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () {
-                      setState(() => _selectedDay = day);
-                      _showDaySheet(context, dayKey, itemsByDay[dayKey] ?? const []);
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: sel
-                            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.65)
-                            : isToday
-                                ? theme.colorScheme.secondaryContainer.withValues(alpha: 0.35)
-                                : null,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '$day',
-                            style: dayNumStyle?.copyWith(
-                              fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
-                            ),
-                          ),
-                          _buildEventIndicator(
-                            count: n,
-                            theme: theme,
-                            ultraCompact: ultraCompact,
-                            compact: isCompact,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+            ],
           ],
         );
       },

@@ -4943,6 +4943,8 @@
   "editInvoiceTitle": "Edit invoice",
   "saveChangesTooltip": "Save changes",
   "invoiceInfoTab": "Invoice info",
+  "invoiceHeaderDescriptionLabel": "Invoice description",
+  "invoiceHeaderDescriptionHint": "e.g. product sale or a short note for this invoice",
   "invoiceProductsTab": "Products & services",
   "invoiceTransactionsTab": "Transactions",
   "invoiceInstallmentsTab": "Installments",

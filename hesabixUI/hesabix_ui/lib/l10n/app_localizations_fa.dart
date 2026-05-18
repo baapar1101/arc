@@ -13093,6 +13093,13 @@ class AppLocalizationsFa extends AppLocalizations {
   String get saveChangesTooltip => 'ذخیره تغییرات';
 
   @override
+  String get invoiceHeaderDescriptionLabel => 'شرح فاکتور';
+
+  @override
+  String get invoiceHeaderDescriptionHint =>
+      'مثال: فروش محصولات یا توضیح کوتاه برای این فاکتور';
+
+  @override
   String get invoiceProductsTab => 'کالاها و خدمات';
 
   @override

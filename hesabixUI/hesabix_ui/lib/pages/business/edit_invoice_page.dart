@@ -928,6 +928,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
+                  final t = AppLocalizations.of(context);
                   final isMobile = ResponsiveHelper.isMobile(context);
                   if (isMobile) {
                     // موبایل: Column layout
@@ -998,13 +999,13 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                               _invoiceTitle = value.trim().isEmpty ? null : value.trim();
                             });
                           },
-                          decoration: const InputDecoration(
-                            labelText: 'عنوان فاکتور',
-                            hintText: 'مثال: فروش محصولات',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: t.invoiceHeaderDescriptionLabel,
+                            hintText: t.invoiceHeaderDescriptionHint,
+                            border: const OutlineInputBorder(),
                           ),
                           textInputAction: TextInputAction.next,
-                          maxLines: 2,
+                          maxLines: 3,
                         ),
                       ],
                     );
@@ -1156,10 +1157,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                               _invoiceTitle = value.trim().isEmpty ? null : value.trim();
                             });
                           },
-                          decoration: const InputDecoration(
-                            labelText: 'عنوان فاکتور',
-                            hintText: 'مثال: فروش محصولات',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: t.invoiceHeaderDescriptionLabel,
+                            hintText: t.invoiceHeaderDescriptionHint,
+                            border: const OutlineInputBorder(),
                           ),
                           textInputAction: TextInputAction.next,
                           maxLines: 3,

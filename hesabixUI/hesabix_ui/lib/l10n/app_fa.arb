@@ -4985,6 +4985,8 @@
   "editInvoiceTitle": "ویرایش فاکتور",
   "saveChangesTooltip": "ذخیره تغییرات",
   "invoiceInfoTab": "اطلاعات فاکتور",
+  "invoiceHeaderDescriptionLabel": "شرح فاکتور",
+  "invoiceHeaderDescriptionHint": "مثال: فروش محصولات یا توضیح کوتاه برای این فاکتور",
   "invoiceProductsTab": "کالاها و خدمات",
   "invoiceTransactionsTab": "تراکنش‌ها",
   "invoiceInstallmentsTab": "اقساط",

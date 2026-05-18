@@ -62,7 +62,6 @@ class QuickSalesPage extends StatefulWidget {
 }
 
 class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProviderStateMixin {
-  static const double _mobileBreakpoint = 700.0;
   /// نمایشگرهای خیلی باریک (مثلاً آیفون ۶ ~۳۷۵pt، SE قدیمی ~۳۲۰pt)
   static const double _compactBreakpoint = 400.0;
   final QuickSalesService _quickSalesService = QuickSalesService();
@@ -1448,7 +1447,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     return ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 
-  bool get _isDesktopLike => MediaQuery.sizeOf(context).width >= _mobileBreakpoint;
+  bool get _isDesktopLike => MediaQuery.sizeOf(context).width >= ResponsiveHelper.shellPersistentNavMinWidth;
 
   void _onBarcodeFocusChanged() {
     if (!mounted || !_isDesktopLike) return;
@@ -2133,7 +2132,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final isMobile = screenWidth < _mobileBreakpoint;
+    final isMobile = screenWidth < ResponsiveHelper.shellPersistentNavMinWidth;
     final isCompactHeader = screenWidth < _compactBreakpoint;
     
     if (_loading) {
@@ -2306,10 +2305,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          // دسکتاپ: فقط جستجوی کالا در ستون اصلی تا ارتفاع بیشتری برای سبد بماند؛
+                          // مشتری و تاریخ/شرح در ستون کناری (_buildDesktopCheckoutPanel).
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
                               if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
                                 IconButton(
                                   icon: _loadingStocks
@@ -2323,28 +2323,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                   tooltip: 'به‌روزرسانی موجودی',
                                 ),
                               Expanded(child: _buildBarcodeSearchField(compact: false)),
-                              const SizedBox(width: 8),
-                              // جستجوی مشتری
-                              SizedBox(
-                                width: 200,
-                                child: CustomerComboboxWidget(
-                                  selectedCustomer: _selectedCustomer,
-                                  onCustomerChanged: (customer) {
-                                    setState(() {
-                                      _selectedCustomer = customer ?? _anonymousCustomer;
-                                    });
-                                  },
-                                  businessId: widget.businessId,
-                                  authStore: widget.authStore,
-                                  isRequired: false,
-                                  label: 'مشتری',
-                                  hintText: 'مشتری ناشناس',
-                                ),
-                              ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          _buildDocumentDateAndDescription(isMobile: false),
                         ],
                       ),
               ),
@@ -3189,7 +3169,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   
   void _showCategoryFilter(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final isMobile = screenWidth < _mobileBreakpoint;
+    final isMobile = screenWidth < ResponsiveHelper.shellPersistentNavMinWidth;
     
     if (isMobile) {
       // موبایل: bottom sheet
@@ -3303,11 +3283,45 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       width: 350,
       color: cs.surfaceContainerHighest,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildInvoiceSummarySection(cs),
-          const Divider(),
-          _buildPaymentSection(cs),
-          const Spacer(),
+          Expanded(
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: CustomerComboboxWidget(
+                        selectedCustomer: _selectedCustomer,
+                        onCustomerChanged: (customer) {
+                          setState(() {
+                            _selectedCustomer = customer ?? _anonymousCustomer;
+                          });
+                        },
+                        businessId: widget.businessId,
+                        authStore: widget.authStore,
+                        isRequired: false,
+                        label: 'مشتری',
+                        hintText: 'مشتری ناشناس',
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: _buildDocumentDateAndDescription(isMobile: true, compact: false),
+                    ),
+                    const Divider(height: 24),
+                    _buildInvoiceSummarySection(cs),
+                    const Divider(),
+                    _buildPaymentSection(cs),
+                  ],
+                ),
+              ),
+            ),
+          ),
           _buildCheckoutButtons(cs),
         ],
       ),
@@ -3913,7 +3927,7 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                     Builder(
                       builder: (context) {
                         final stackedDiscount =
-                            MediaQuery.sizeOf(context).width < _QuickSalesPageState._mobileBreakpoint;
+                            MediaQuery.sizeOf(context).width < ResponsiveHelper.shellPersistentNavMinWidth;
                         final discountDropdown = DropdownButtonFormField<String>(
                           value: _discountType,
                           decoration: InputDecoration(

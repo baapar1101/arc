@@ -13166,6 +13166,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get saveChangesTooltip => 'Save changes';
 
   @override
+  String get invoiceHeaderDescriptionLabel => 'Invoice description';
+
+  @override
+  String get invoiceHeaderDescriptionHint =>
+      'e.g. product sale or a short note for this invoice';
+
+  @override
   String get invoiceProductsTab => 'Products & services';
 
   @override

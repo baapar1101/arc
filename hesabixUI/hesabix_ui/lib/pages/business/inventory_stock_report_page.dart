@@ -16,6 +16,7 @@ import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/category/category_picker_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/utils/responsive_helper.dart';
 
 class InventoryStockReportPage extends StatefulWidget {
   final int businessId;
@@ -1464,10 +1465,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final mediaQuery = MediaQuery.of(context);
-    final isMobile = mediaQuery.size.width < 600;
-    final isTablet = mediaQuery.size.width >= 600 && mediaQuery.size.width < 1200;
-    
+    final isMobile = ResponsiveHelper.isMobile(context);
     final activeFiltersCount = _getActiveFiltersCount();
 
     return Scaffold(

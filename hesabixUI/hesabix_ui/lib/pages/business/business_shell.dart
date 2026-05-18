@@ -37,6 +37,7 @@ import '../../widgets/calculator/calculator_dialog.dart';
 import '../../widgets/business/business_shell_glyphs.dart';
 import '../../core/date_utils.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
 import 'check_form_page.dart';
 import 'bank_accounts_page.dart';
@@ -1161,9 +1162,8 @@ class _BusinessShellState extends State<BusinessShell> {
       );
     }
 
-    final width = MediaQuery.of(context).size.width;
-    final bool useRail = width >= 700;
-    final bool railExtended = width >= 1100;
+    final bool useRail = ResponsiveHelper.useShellPersistentNavigation(context);
+    final bool railExtended = ResponsiveHelper.shellNavigationRailExtended(context);
     final ColorScheme scheme = Theme.of(context).colorScheme;
     String location = _bu('dashboard'); // default location
     try {
@@ -2174,7 +2174,7 @@ class _BusinessShellState extends State<BusinessShell> {
     );
 
     // نوار دوم: تب‌ها یا نام کسب‌وکار / تاریخ
-    final bool isMobile = width < 700;
+    final bool isMobile = ResponsiveHelper.isShellCompactWidth(context);
     final String businessName = currentBusiness?.name ?? '';
     final bool isJalali = widget.calendarController?.isJalali ?? true;
     final String dateTimeStr = HesabixDateUtils.formatDateTimeWithWeekday(

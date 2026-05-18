@@ -2080,6 +2080,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
               // فیلدهای اصلی - responsive layout
               LayoutBuilder(
                 builder: (context, constraints) {
+                  final t = AppLocalizations.of(context);
                   final isMobile = ResponsiveHelper.isMobile(context);
                   // اگر عرض صفحه کمتر از 768 پیکسل باشد، تک ستونه
                   if (isMobile) {
@@ -2359,26 +2360,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                           const SizedBox(height: 16),
                         ],
                         
-                        // عنوان فاکتور
-                        FrequentDescriptionTextField(
-                          businessId: widget.businessId,
-                          scope: FrequentDescriptionScope.invoice,
-                          controller: _invoiceTitleController,
-                          onChanged: (value) {
-                            setState(() {
-                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            labelText: 'عنوان فاکتور',
-                            hintText: 'مثال: فروش محصولات',
-                            border: OutlineInputBorder(),
-                          ),
-                          textInputAction: TextInputAction.next,
-                          maxLines: 2,
-                        ),
-                        const SizedBox(height: 16),
-                        
                         // ارجاع
                         TextFormField(
                           initialValue: _invoiceReference,
@@ -2393,6 +2374,24 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                             border: OutlineInputBorder(),
                           ),
                           textInputAction: TextInputAction.next,
+                        ),
+                        const SizedBox(height: 16),
+                        FrequentDescriptionTextField(
+                          businessId: widget.businessId,
+                          scope: FrequentDescriptionScope.invoice,
+                          controller: _invoiceTitleController,
+                          onChanged: (value) {
+                            setState(() {
+                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
+                            });
+                          },
+                          decoration: InputDecoration(
+                            labelText: t.invoiceHeaderDescriptionLabel,
+                            hintText: t.invoiceHeaderDescriptionHint,
+                            border: const OutlineInputBorder(),
+                          ),
+                          textInputAction: TextInputAction.next,
+                          maxLines: 3,
                         ),
                       ],
                     );
@@ -2540,7 +2539,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         ),
                         const SizedBox(height: 24),
 
-                        // ردیف دوم: ارز، عنوان فاکتور، ارجاع
+                        // ردیف دوم: ارز، ارجاع، پروژه، نرخ ارز
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -2558,26 +2557,6 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 },
                                 label: 'ارز فاکتور',
                                 hintText: 'انتخاب ارز فاکتور',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FrequentDescriptionTextField(
-                                businessId: widget.businessId,
-                                scope: FrequentDescriptionScope.invoice,
-                                controller: _invoiceTitleController,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _invoiceTitle = value.trim().isEmpty ? null : value.trim();
-                                  });
-                                },
-                                decoration: const InputDecoration(
-                                  labelText: 'عنوان فاکتور',
-                                  hintText: 'مثال: فروش محصولات',
-                                  border: OutlineInputBorder(),
-                                ),
-                                textInputAction: TextInputAction.next,
-                                maxLines: 3,
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -2736,10 +2715,28 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 const Expanded(child: SizedBox()),
                                 const SizedBox(width: 12),
                               ],
-                              const Expanded(child: SizedBox()), // جای خالی
+                                const Expanded(child: SizedBox()), // جای خالی
                             ],
                           ),
                         ],
+                        const SizedBox(height: 16),
+                        FrequentDescriptionTextField(
+                          businessId: widget.businessId,
+                          scope: FrequentDescriptionScope.invoice,
+                          controller: _invoiceTitleController,
+                          onChanged: (value) {
+                            setState(() {
+                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
+                            });
+                          },
+                          decoration: InputDecoration(
+                            labelText: t.invoiceHeaderDescriptionLabel,
+                            hintText: t.invoiceHeaderDescriptionHint,
+                            border: const OutlineInputBorder(),
+                          ),
+                          textInputAction: TextInputAction.next,
+                          maxLines: 3,
+                        ),
                       ],
                     );
                   }

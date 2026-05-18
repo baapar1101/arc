@@ -2787,7 +2787,7 @@ class _WarehouseDocumentFormDialogState
     final screenWidth = media.size.width;
     final screenHeight = media.size.height;
     final isMobile = ResponsiveHelper.isMobile(context);
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isTablet = ResponsiveHelper.isTablet(context);
 
     final dialogWidth = isMobile
         ? screenWidth * 0.95

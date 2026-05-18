@@ -1,20 +1,14 @@
 import 'package:flutter/material.dart';
 
-/// Utility class برای مدیریت اندازه‌های responsive در workflow editor
+import 'responsive_helper.dart';
+
+/// اندازه‌های workflow editor؛ آستانه‌ها از [ResponsiveHelper] خوانده می‌شوند.
 class WorkflowResponsive {
-  /// تشخیص نوع صفحه
-  static bool isMobile(BuildContext context) {
-    return MediaQuery.of(context).size.width < 600;
-  }
+  static bool isMobile(BuildContext context) => ResponsiveHelper.isMobile(context);
 
-  static bool isTablet(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    return width >= 600 && width < 1024;
-  }
+  static bool isTablet(BuildContext context) => ResponsiveHelper.isTablet(context);
 
-  static bool isDesktop(BuildContext context) {
-    return MediaQuery.of(context).size.width >= 1024;
-  }
+  static bool isDesktop(BuildContext context) => ResponsiveHelper.isDesktop(context);
 
   /// اندازه نود
   static Size getNodeSize(BuildContext context) {

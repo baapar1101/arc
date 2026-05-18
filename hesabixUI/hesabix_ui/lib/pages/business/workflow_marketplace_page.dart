@@ -10,6 +10,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/workflow_marketplace_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 
 /// مخزن ورک‌فلو: مرور، نصب و مدیریت انتشار
 class WorkflowMarketplacePage extends StatefulWidget {
@@ -481,11 +482,11 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
                       )
                     else
                       SliverPadding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                         sliver: SliverLayoutBuilder(
                           builder: (context, constraints) {
                             final w = constraints.crossAxisExtent;
-                            final crossAxisCount = w >= 1100
+                            final crossAxisCount = w >= ResponsiveHelper.shellNavigationRailExtendedMinWidth
                                 ? 3
                                 : w >= 720
                                     ? 2
@@ -494,7 +495,7 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
                               return SliverList(
                                 delegate: SliverChildBuilderDelegate(
                                   (c, i) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 12),
+                                    padding: EdgeInsets.only(bottom: i < _items.length - 1 ? 12 : 0),
                                     child: _WorkflowMarketCard(
                                       item: _items[i],
                                       calendarController: widget.calendarController,
@@ -506,21 +507,37 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
                                 ),
                               );
                             }
-                            return SliverGrid(
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                mainAxisSpacing: 14,
-                                crossAxisSpacing: 14,
-                                childAspectRatio: crossAxisCount >= 3 ? 0.72 : 0.78,
-                              ),
+                            // ردیف‌به‌ردیف به‌جای Grid با aspect ثابت تا کارت‌ها فقط به اندازهٔ محتوا بلند شوند
+                            const double rowGap = 14;
+                            final cellW = (w - rowGap * (crossAxisCount - 1)) / crossAxisCount;
+                            final rowCount = (_items.length + crossAxisCount - 1) ~/ crossAxisCount;
+                            return SliverList(
                               delegate: SliverChildBuilderDelegate(
-                                (c, i) => _WorkflowMarketCard(
-                                  item: _items[i],
-                                  calendarController: widget.calendarController,
-                                  onOpen: () => _openDetail(_items[i]),
-                                  showPrivateBadge: !_isBrowseTab,
-                                ),
-                                childCount: _items.length,
+                                (c, row) {
+                                  return Padding(
+                                    padding: EdgeInsets.only(bottom: row < rowCount - 1 ? rowGap : 0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        for (int col = 0; col < crossAxisCount; col++) ...[
+                                          if (col > 0) const SizedBox(width: rowGap),
+                                          SizedBox(
+                                            width: cellW,
+                                            child: row * crossAxisCount + col >= _items.length
+                                                ? const SizedBox.shrink()
+                                                : _WorkflowMarketCard(
+                                                    item: _items[row * crossAxisCount + col],
+                                                    calendarController: widget.calendarController,
+                                                    onOpen: () => _openDetail(_items[row * crossAxisCount + col]),
+                                                    showPrivateBadge: !_isBrowseTab,
+                                                  ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  );
+                                },
+                                childCount: rowCount,
                               ),
                             );
                           },
@@ -554,7 +571,7 @@ class _MarketplaceHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = theme.colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(20),
@@ -649,11 +666,13 @@ class _WorkflowMarketCard extends StatelessWidget {
     final isHidden = statusStr == 'hidden';
 
     return Material(
-      color: cs.surfaceContainerLowest,
+      color: cs.surfaceContainerLow,
       elevation: 0,
+      surfaceTintColor: cs.surfaceTint.withValues(alpha: 0.08),
+      shadowColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.65)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -661,23 +680,26 @@ class _WorkflowMarketCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   CircleAvatar(
-                    backgroundColor: cs.primaryContainer.withValues(alpha: 0.75),
+                    radius: 22,
+                    backgroundColor: cs.primaryContainer.withValues(alpha: 0.85),
                     child: Icon(Icons.account_tree_outlined, color: cs.onPrimaryContainer, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
                           item['title']?.toString() ?? '',
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.25),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -704,7 +726,7 @@ class _WorkflowMarketCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  Icon(Icons.chevron_left, color: cs.outline),
+                  Icon(Icons.chevron_left, color: cs.outline, size: 22),
                 ],
               ),
               if (item['short_description'] != null &&
@@ -714,7 +736,7 @@ class _WorkflowMarketCard extends StatelessWidget {
                   item['short_description'].toString(),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant, height: 1.35),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
                 ),
               ],
               const SizedBox(height: 12),
@@ -734,7 +756,7 @@ class _WorkflowMarketCard extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   '${t.workflowMarketplacePublisher}: ${item['publisher_display_name'] ?? '-'}',
-                  style: theme.textTheme.labelSmall?.copyWith(color: cs.outline),
+                  style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -754,16 +776,15 @@ class _WorkflowMarketCard extends StatelessWidget {
                       )
                       .toList(),
                 ),
-              ] else
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '${t.workflowMarketplacePublisher}: ${item['publisher_display_name'] ?? '-'}',
-                    style: theme.textTheme.labelSmall?.copyWith(color: cs.outline),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+              ] else ...[
+                const SizedBox(height: 8),
+                Text(
+                  '${t.workflowMarketplacePublisher}: ${item['publisher_display_name'] ?? '-'}',
+                  style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ],
             ],
           ),
         ),

@@ -281,12 +281,13 @@ DEFAULT_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
         "icon": "calendar_month",
         "version": 1,
         "permissions_required": ["crm.view"],
+        # پیش‌فرض نیم‌عرض تا داشبورد شلوغ نشود؛ کاربر می‌تواند عرض را زیاد کند.
         "defaults": {
-            "xs": {"colSpan": 4, "rowSpan": 4},
-            "sm": {"colSpan": 6, "rowSpan": 4},
-            "md": {"colSpan": 8, "rowSpan": 4},
-            "lg": {"colSpan": 12, "rowSpan": 4},
-            "xl": {"colSpan": 12, "rowSpan": 4},
+            "xs": {"colSpan": 4, "rowSpan": 3},
+            "sm": {"colSpan": 6, "rowSpan": 3},
+            "md": {"colSpan": 4, "rowSpan": 3},
+            "lg": {"colSpan": 6, "rowSpan": 3},
+            "xl": {"colSpan": 6, "rowSpan": 3},
         },
         "cache_ttl": 30,
     },

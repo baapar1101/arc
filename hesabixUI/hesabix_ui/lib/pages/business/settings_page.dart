@@ -12,6 +12,7 @@ import '../../models/business_user_model.dart';
 import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/responsive_helper.dart';
 import '../../widgets/calendar_switcher.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/theme_mode_switcher.dart';
@@ -291,7 +292,7 @@ class _SettingsPageState extends State<SettingsPage> {
       body: LayoutBuilder(
         builder: (context, constraints) {
           final isWide = constraints.maxWidth >= 900;
-          final showSideAppearancePanel = constraints.maxWidth >= 1100;
+          final showSideAppearancePanel = constraints.maxWidth >= ResponsiveHelper.shellNavigationRailExtendedMinWidth;
           final horizontalPadding = isWide ? 24.0 : 16.0;
 
           return SingleChildScrollView(

@@ -16,6 +16,7 @@ import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
 import '../../core/date_utils.dart';
 import '../../widgets/jalali_date_picker.dart';
+import '../../utils/responsive_helper.dart';
 
 String _rowKey(int? productId, int? warehouseId) => '${productId ?? 0}:${warehouseId ?? 0}';
 
@@ -74,7 +75,6 @@ class _StockCountPageState extends State<StockCountPage> {
   Map<String, dynamic>? _summary;
   String _stockCountCode = '';
   bool _onlyDifferences = false;
-  static const double _mobileBreakpoint = 700.0;
 
   Timer? _draftAutoSaveTimer;
   String? _lastDraftSnapshot;
@@ -602,7 +602,7 @@ class _StockCountPageState extends State<StockCountPage> {
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
-      minTableWidth: 1100,
+      minTableWidth: ResponsiveHelper.wideFormDialogMaxWidth,
       columns: [
         TextColumn(
           'product_code',
@@ -912,7 +912,7 @@ class _StockCountPageState extends State<StockCountPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < _mobileBreakpoint;
+    final isMobile = MediaQuery.of(context).size.width < ResponsiveHelper.shellPersistentNavMinWidth;
     return Scaffold(
       appBar: AppBar(
         title: const Text('انبار گردانی'),

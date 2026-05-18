@@ -127,16 +127,20 @@ def datetime_to_moadian_format(dt: datetime) -> int:
 
 def calculate_vat_rate(tax_percentage: float) -> int:
     """
-    تبدیل درصد مالیات به فرمت سامانه مودیان
-    سامانه نرخ را × 100 می‌خواهد (مثلا 9% = 900)
-    
-    Args:
-        tax_percentage: درصد مالیات (مثلا 9.0)
-    
-    Returns:
-        نرخ × 100 (مثلا 900)
+    تبدیل درصد مالیات به فرمت سامانه مودیان (درصد × ۱۰۰، مثلاً ۹٪ → ۹۰۰).
+
+    ورودی می‌تواند به‌صورت «۹» (۹٪) یا «۰.۰۹» (کسر اعشاری نمایندهٔ ۹٪) باشد.
     """
-    return int(tax_percentage * 100)
+    try:
+        tf = float(tax_percentage)
+    except (TypeError, ValueError):
+        return 0
+    if tf <= 0:
+        return 0
+    # فقط اعداد کسر واقعی (مثلاً ۰.۰۹ برای ۹٪)؛ مقدار ۱ به‌عنوان ۱٪ حفظ می‌شود
+    if 0 < tf < 1.0:
+        tf = tf * 100.0
+    return int(round(tf * 100.0))
 
 
 def validate_economic_code(code: Optional[str]) -> bool:
@@ -266,17 +270,12 @@ def map_invoice_type_to_moadian(document_type: str, is_return: bool = False) -> 
 
 def map_payment_pattern(is_cash: bool = True, is_credit: bool = False) -> int:
     """
-    تبدیل الگوی پرداخت به کد سامانه
-    
-    Args:
-        is_cash: آیا نقدی است؟
-        is_credit: آیا نسیه است؟
-    
-    Returns:
-        کد الگوی پرداخت:
-        - 1: نقدی
-        - 2: نسیه
-        - 3: نقدی/نسیه
+    روش تسویه (setm) در هدر صورت‌حساب مودیان.
+
+    مطابق الگوی رایج SDKها و moadian-full:
+    - 1: نقدی
+    - 2: نسیه
+    - 3: نقد و نسیه
     """
     if is_cash and is_credit:
         return 3
@@ -284,6 +283,21 @@ def map_payment_pattern(is_cash: bool = True, is_credit: bool = False) -> int:
         return 2
     else:
         return 1
+
+
+def map_invoice_pattern(is_return: bool, is_cancel: bool = False) -> int:
+    """
+    الگوی صورت‌حساب (inp): فروش / برگشت از فروش / ابطال.
+
+    - 1: فروش
+    - 2: برگشت از فروش
+    - 3: ابطال
+    """
+    if is_cancel:
+        return 3
+    if is_return:
+        return 2
+    return 1
 
 
 def map_invoice_subject(document_type: str) -> int:

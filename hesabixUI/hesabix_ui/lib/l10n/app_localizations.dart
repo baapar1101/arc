@@ -24402,6 +24402,18 @@ abstract class AppLocalizations {
   /// **'Save changes'**
   String get saveChangesTooltip;
 
+  /// No description provided for @invoiceHeaderDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice description'**
+  String get invoiceHeaderDescriptionLabel;
+
+  /// No description provided for @invoiceHeaderDescriptionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. product sale or a short note for this invoice'**
+  String get invoiceHeaderDescriptionHint;
+
   /// No description provided for @invoiceProductsTab.
   ///
   /// In en, this message translates to:

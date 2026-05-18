@@ -1228,6 +1228,20 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             return (it.counterparty == null || it.counterparty!.trim().isEmpty) ? t.unknown : it.counterparty!;
           },
         ),
+        // شرح فاکتور
+        TextColumn(
+          'description',
+          t.invoiceHeaderDescriptionLabel,
+          width: ColumnWidth.large,
+          sortable: false,
+          formatter: (item) {
+            final it = item as InvoiceListItem;
+            final d = (it.description ?? '').trim();
+            return d.isEmpty ? '-' : d;
+          },
+          maxLines: 2,
+          overflow: true,
+        ),
         // تاریخ سند
         DateColumn(
           'document_date',

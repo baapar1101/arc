@@ -14,6 +14,7 @@ import '../../widgets/theme_mode_switcher.dart';
 import '../../widgets/logout_button.dart';
 import '../../widgets/notification/notification_bell_button.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../utils/responsive_helper.dart';
 
 class ProfileShell extends StatefulWidget {
   final Widget child;
@@ -77,9 +78,8 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bool useRail = width >= 700;
-    final bool railExtended = width >= 1100;
+    final bool useRail = ResponsiveHelper.useShellPersistentNavigation(context);
+    final bool railExtended = ResponsiveHelper.shellNavigationRailExtended(context);
     final ColorScheme scheme = Theme.of(context).colorScheme;
     String location = '/user/profile/dashboard'; // default location
     try {

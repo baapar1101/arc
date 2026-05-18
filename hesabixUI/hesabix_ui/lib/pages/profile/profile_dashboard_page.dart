@@ -15,6 +15,7 @@ import '../../core/mobile_launcher_prefs.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/responsive_helper.dart';
 
 class ProfileDashboardPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -93,18 +94,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     } catch (_) {}
   }
 
-  String _currentBreakpoint(double width) {
-    if (width < 600) return 'xs';
-    if (width < 904) return 'sm';
-    if (width < 1240) return 'md';
-    if (width < 1600) return 'lg';
-    return 'xl';
-  }
-
-  // Helper methods for responsive values
   double _getPadding(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     switch (bp) {
       case 'xs':
         return 8.0; // موبایل
@@ -123,7 +115,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 
   double _getGridSpacing(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     switch (bp) {
       case 'xs':
         return 8.0;
@@ -142,7 +134,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 
   double _getMinTileUnit(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     switch (bp) {
       case 'xs':
         return 140.0; // موبایل
@@ -161,7 +153,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 
   TextStyle? _getHeaderTextStyle(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     final theme = Theme.of(context);
     switch (bp) {
       case 'xs':
@@ -175,7 +167,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 
   bool _isMobile(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    return _currentBreakpoint(width) == 'xs';
+    return ResponsiveHelper.breakpointFromWidth(width) == 'xs';
   }
 
   Future<void> _openBusinessFromDashboard(int businessId) async {
@@ -247,7 +239,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       final defs = await _service.getWidgetDefinitions();
       if (!context.mounted) return;
       final ctx = context;
-      final bp = _currentBreakpoint(MediaQuery.of(ctx).size.width);
+      final bp = ResponsiveHelper.breakpointFromWidth(MediaQuery.of(ctx).size.width);
       var layout = await _service.getLayoutProfile(breakpoint: bp);
       // اطمینان از حضور ویجت‌های جدید پیش‌فرض در چیدمان
       final existingKeys = layout.items.map((e) => e.key).toSet();

@@ -809,7 +809,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
           insetPadding: const EdgeInsets.all(16),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: isWide ? 1100 : constraints.maxWidth,
+              maxWidth: isWide ? ResponsiveHelper.wideFormDialogMaxWidth : constraints.maxWidth,
               maxHeight: maxH,
             ),
             child: Form(

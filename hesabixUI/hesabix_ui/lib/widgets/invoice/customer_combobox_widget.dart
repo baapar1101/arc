@@ -8,6 +8,7 @@ import '../../core/api_client.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/person/person_financial_balance_banner.dart';
 import '../../models/person_model.dart';
+import '../../utils/responsive_helper.dart';
 
 class _CustomerPickerState {
   final List<Customer> customers;
@@ -137,7 +138,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     super.dispose();
   }
 
-  bool get _isMobile => MediaQuery.sizeOf(context).width < 700;
+  bool get _isMobile => ResponsiveHelper.isShellCompactWidth(context);
 
   void _onDesktopFocusChanged() {
     if (!mounted || _isMobile) return;

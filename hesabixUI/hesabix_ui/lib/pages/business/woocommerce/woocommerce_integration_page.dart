@@ -826,51 +826,23 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-            child: Card(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                leading: Icon(
-                  Icons.tune,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                title: Text(t.woocommerceHubArcwocSettingsBannerTitle),
-                subtitle: Text(t.woocommerceHubArcwocSettingsBannerSubtitle),
-                trailing: FilledButton.tonal(
+          if (_canWooCommerceManage())
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
                   onPressed: () => context.push(
                     context.businessPanelUrl(
                       widget.businessId,
-                      'settings/woocommerce',
+                      'woocommerce/opening-inventory',
                     ),
                   ),
-                  child: Text(t.woocommerceHubOpenWooSettingsButton),
+                  icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                  label: Text(t.woocommerceOpeningInvOpenFromHub),
                 ),
-                isThreeLine: true,
-                  ),
-                  if (_canWooCommerceManage())
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        child: TextButton.icon(
-                          onPressed: () => context.push(
-                            context.businessPanelUrl(
-                              widget.businessId,
-                              'woocommerce/opening-inventory',
-                            ),
-                          ),
-                          icon: const Icon(Icons.inventory_2_outlined, size: 20),
-                          label: Text(t.woocommerceOpeningInvOpenFromHub),
-                        ),
-                      ),
-                    ),
-                ],
               ),
             ),
-          ),
           Expanded(
             child: TabBarView(
               controller: _tabs,

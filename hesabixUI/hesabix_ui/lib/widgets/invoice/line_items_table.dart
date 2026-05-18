@@ -1392,13 +1392,15 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     : null,
                 onChanged: (p) async {
                   await _handleProductChange(index, item, p);
-                  // بعد از انتخاب کالا، فوکوس به تعداد
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    final nodes = _focusNodesForLine(item.lineKey);
-                    if (nodes != null && mounted) {
-                      nodes['quantity']?.requestFocus();
-                    }
-                  });
+                  // فقط پس از انتخاب قطعی کالا (نه هنگام onChanged(null) برای جستجو/ویرایش متن)
+                  if (p != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      final nodes = _focusNodesForLine(item.lineKey);
+                      if (nodes != null && mounted) {
+                        nodes['quantity']?.requestFocus();
+                      }
+                    });
+                  }
                 },
               ),
             ),
@@ -1688,13 +1690,14 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                         : null,
                     onChanged: (p) async {
                       await _handleProductChange(index, item, p);
-                      // بعد از انتخاب کالا، فوکوس به تعداد
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        final nodes = _focusNodesForLine(item.lineKey);
-                        if (nodes != null && mounted) {
-                          nodes['quantity']?.requestFocus();
-                        }
-                      });
+                      if (p != null) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          final nodes = _focusNodesForLine(item.lineKey);
+                          if (nodes != null && mounted) {
+                            nodes['quantity']?.requestFocus();
+                          }
+                        });
+                      }
                     },
                   ),
                 ),

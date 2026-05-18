@@ -20,15 +20,15 @@ class InvoiceHeaderDto:
     indatim: int  # تاریخ و زمان صدور (Unix timestamp milliseconds)
     indati2m: int  # زمان صدور فاکتور (Unix timestamp milliseconds)
     inno: str  # شماره سریال فاکتور (normalized)
-    inty: int  # نوع فاکتور: 1=عادی، 2=ساده، 3=ابطالی
-    inp: int  # الگوی پرداخت: 1=نقدی، 2=نسیه، 3=نقدی/نسیه
+    inty: int  # نوع صورت‌حساب (طبق مستند سامانه؛ مثلاً ۱ عادی، ۲ ساده)
+    inp: int  # الگوی صورت‌حساب: ۱ فروش، ۲ برگشت از فروش، ۳ ابطال
     ins: int  # موضوع فاکتور: 1=فروش، 2=فروش ارزی، 3=خرید، 4=...
     tins: str  # شماره اقتصادی فروشنده
     
     # اختیاری
     irtaxid: Optional[str] = None  # شماره یکتای مالیاتی مرجع (برای برگشت)
     billid: Optional[str] = None  # شماره قبض / سریال سفارش
-    tob: Optional[int] = None  # نوع کسب و کار فروشنده
+    tob: Optional[int] = None  # نوع خریدار: ۱ حقوقی، ۲ حقیقی، ۳ اتباع، ۴ گذرنامه
     bid: Optional[str] = None  # شماره اشتراک / پروانه
     tinb: Optional[str] = None  # شماره اقتصادی خریدار
     sbc: Optional[str] = None  # شناسه یکتای ثبت قرارداد
@@ -40,6 +40,19 @@ class InvoiceHeaderDto:
     ft: Optional[int] = None  # نوع پرواز (برای بلیط هواپیما)
     cdcn: Optional[str] = None  # شماره صورت حساب مرجع
     cdcd: Optional[str] = None  # تاریخ صورت حساب مرجع
+
+    # جمع‌های سطح هدر (برای تطابق با کارپوشه / الگوی moadian-full)
+    tprdis: Optional[int] = None  # جمع مبلغ قبل از تخفیف
+    tdis: Optional[int] = None  # جمع تخفیفات
+    tadis: Optional[int] = None  # جمع مبلغ پس از تخفیف
+    tvam: Optional[int] = None  # جمع مالیات و عوارض
+    todam: Optional[int] = None  # جمع سایر مالیات و عوارض
+    tbill: Optional[int] = None  # جمع صورت‌حساب
+    setm: Optional[int] = None  # روش تسویه: ۱ نقد، ۲ نسیه، ۳ نقد و نسیه
+    cap: Optional[int] = None  # مبلغ پرداختی نقدی
+    insp: Optional[int] = None  # مبلغ نسیه
+    tvop: Optional[int] = None  # مجموع سهم مالیات و عوارض از پرداخت
+    tax17: Optional[int] = None  # مالیات ماده ۱۷
 
     def to_dict(self) -> Dict[str, Any]:
         """تبدیل به dictionary با حذف مقادیر None"""
@@ -61,10 +74,10 @@ class InvoiceBodyDto:
     mu: str  # واحد اندازه‌گیری (کد استاندارد)
     am: int  # تعداد / مقدار
     fee: int  # مبلغ واحد (بدون اعشار)
-    prdis: int  # مبلغ تخفیف (بدون اعشار)
-    dis: int  # مبلغ تخفیف روی جمع قبل از مالیات (بدون اعشار)
-    adis: int  # مبلغ تخفیف پس از مالیات (بدون اعشار)
-    vra: int  # نرخ مالیات و عوارض (به درصد × 100، مثلا 900 = 9%)
+    prdis: int  # جمع مبلغ قبل از تخفیف (مثلاً تعداد × فی)
+    dis: int  # مبلغ تخفیف
+    adis: int  # مبلغ پس از تخفیف (پایه مالیات)
+    vra: int  # نرخ مالیات و عوارض (درصد × ۱۰۰، مثلاً ۹۰۰ = ۹٪)
     vam: int  # مبلغ مالیات و عوارض (بدون اعشار)
     tsstam: int  # مبلغ کل پس از تخفیف و مالیات (بدون اعشار)
     
@@ -72,6 +85,7 @@ class InvoiceBodyDto:
     odt: Optional[int] = None  # تاریخ تولید (yyyyMMdd)
     odr: Optional[int] = None  # تاریخ انقضا (yyyyMMdd)
     ssrv: Optional[int] = None  # نوع کالا: 0=کالا، 1=خدمت
+    vop: Optional[int] = None  # سهم مالیات و عوارض (معمولاً برابر vam)
     consfee: Optional[int] = None  # حق العمل / کارمزد (بدون اعشار)
     spro: Optional[int] = None  # مالیات سایر مشمولین
     bros: Optional[int] = None  # کمیسیون / کارمزد واسطه‌گری

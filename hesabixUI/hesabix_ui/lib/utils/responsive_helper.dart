@@ -1,18 +1,32 @@
 import 'package:flutter/material.dart';
 
-/// Helper class for responsive design
-/// Provides utilities for breakpoint detection and responsive values
+/// آستانه‌های واکنش‌گرا و اسکلهٔ ناوبری اپ — همه از این کلاس استفاده کنند تا تغییرات بعدی یکجا اعمال شود.
 class ResponsiveHelper {
-  /// Breakpoint values based on Material Design 3
+  /// موبایل (کلاس compact در Material)
   static const double mobileBreakpoint = 600;
+
+  /// مرز تبلت کوچک / بزرگ (Material window size classes)
   static const double tabletSmallBreakpoint = 904;
-  static const double tabletLargeBreakpoint = 1240;
+
+  /// بالاتر از این عرض دیگر «تبلت» برای چیدمان عمومی نیست (دسکتاپ از اینجا).
+  /// مقدار ۱۰۲۴ برای جلوگیری از افتادن لپتاپ/مانیتور با مقیاس نمایش در بازهٔ تبلت انتخاب شده است.
+  static const double tabletLargeBreakpoint = 1024;
+
   static const double desktopSmallBreakpoint = 1600;
 
-  /// Get current breakpoint based on screen width
-  /// Returns: 'xs' (mobile), 'sm' (small tablet), 'md' (large tablet), 'lg' (small desktop), 'xl' (large desktop)
-  static String breakpoint(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
+  /// زیر این عرض در shellها منوی کشویی؛ از این عرض به بالا rail کناری.
+  static const double shellPersistentNavMinWidth = 700;
+
+  /// از این عرض به بالا rail کناری با برچسب کامل (حالت extended).
+  static const double shellNavigationRailExtendedMinWidth = 1024;
+
+  /// حداکثر عرض رایج برای دیالوگ/فرم چندستونه روی دسکتاپ
+  static const double wideFormDialogMaxWidth = 1100;
+
+  static double widthOf(BuildContext context) => MediaQuery.sizeOf(context).width;
+
+  /// `xs` موبایل، `sm`/`md` تبلت، `lg`/`xl` دسکتاپ
+  static String breakpointFromWidth(double width) {
     if (width < mobileBreakpoint) return 'xs';
     if (width < tabletSmallBreakpoint) return 'sm';
     if (width < tabletLargeBreakpoint) return 'md';
@@ -20,27 +34,30 @@ class ResponsiveHelper {
     return 'xl';
   }
 
-  /// Check if current screen is mobile
-  static bool isMobile(BuildContext context) {
-    return breakpoint(context) == 'xs';
-  }
+  static String breakpoint(BuildContext context) => breakpointFromWidth(widthOf(context));
 
-  /// Check if current screen is tablet (small or large)
+  static bool isMobile(BuildContext context) => breakpoint(context) == 'xs';
+
   static bool isTablet(BuildContext context) {
     final bp = breakpoint(context);
     return bp == 'sm' || bp == 'md';
   }
 
-  /// Check if current screen is desktop (small or large)
   static bool isDesktop(BuildContext context) {
     final bp = breakpoint(context);
     return bp == 'lg' || bp == 'xl';
   }
 
-  /// Get responsive value based on breakpoint
-  /// mobile: value for mobile screens
-  /// tablet: value for tablet screens (defaults to mobile * 1.5 if not provided)
-  /// desktop: value for desktop screens (defaults to mobile * 2 if not provided)
+  static bool useShellPersistentNavigation(BuildContext context) =>
+      widthOf(context) >= shellPersistentNavMinWidth;
+
+  static bool shellNavigationRailExtended(BuildContext context) =>
+      widthOf(context) >= shellNavigationRailExtendedMinWidth;
+
+  /// همان منطق قبلی عرض کمتر از ۷۰۰ برای AppBar فشرده و برخی comboboxها.
+  static bool isShellCompactWidth(BuildContext context) =>
+      widthOf(context) < shellPersistentNavMinWidth;
+
   static double responsiveValue(
     BuildContext context, {
     required double mobile,
@@ -52,26 +69,24 @@ class ResponsiveHelper {
     return desktop ?? mobile * 2;
   }
 
-  /// Get responsive padding based on breakpoint
   static double getPadding(BuildContext context) {
     final bp = breakpoint(context);
     switch (bp) {
       case 'xs':
-        return 8.0; // موبایل
+        return 8.0;
       case 'sm':
-        return 12.0; // تبلت کوچک
+        return 12.0;
       case 'md':
-        return 16.0; // تبلت بزرگ
+        return 16.0;
       case 'lg':
-        return 20.0; // دسکتاپ کوچک
+        return 20.0;
       case 'xl':
-        return 24.0; // دسکتاپ بزرگ
+        return 24.0;
       default:
         return 16.0;
     }
   }
 
-  /// Get responsive spacing for grids
   static double getGridSpacing(BuildContext context) {
     final bp = breakpoint(context);
     switch (bp) {
@@ -90,15 +105,13 @@ class ResponsiveHelper {
     }
   }
 
-  /// Get responsive dialog padding
   static EdgeInsets getDialogPadding(BuildContext context) {
     if (isMobile(context)) {
-      return EdgeInsets.zero; // Fullscreen on mobile
+      return EdgeInsets.zero;
     }
     return const EdgeInsets.all(24.0);
   }
 
-  /// Get responsive dialog constraints
   static BoxConstraints getDialogConstraints(BuildContext context) {
     if (isMobile(context)) {
       return BoxConstraints(
@@ -115,7 +128,6 @@ class ResponsiveHelper {
     );
   }
 
-  /// Get responsive card max width
   static double getCardMaxWidth(BuildContext context) {
     if (isMobile(context)) {
       return double.infinity;
@@ -135,8 +147,8 @@ class ResponsiveHelper {
     }
   }
 
-  /// Get responsive grid cross axis count
-  static int getGridCrossAxisCount(BuildContext context, {
+  static int getGridCrossAxisCount(
+    BuildContext context, {
     int mobile = 1,
     int tablet = 2,
     int desktop = 3,
@@ -146,8 +158,8 @@ class ResponsiveHelper {
     return desktop;
   }
 
-  /// Get responsive grid max cross axis extent
-  static double getGridMaxCrossAxisExtent(BuildContext context, {
+  static double getGridMaxCrossAxisExtent(
+    BuildContext context, {
     double mobile = double.infinity,
     double? tablet,
     double? desktop,
@@ -157,4 +169,3 @@ class ResponsiveHelper {
     return desktop ?? 300;
   }
 }
-

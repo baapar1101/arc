@@ -29,6 +29,7 @@ import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../utils/error_extractor.dart';
+import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/workflow/workflow_publish_to_marketplace_dialog.dart';
 import 'business_shell_side_nav_scope.dart';
@@ -258,9 +259,10 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
 
     // تشخیص اندازه صفحه برای responsive design
     final screenSize = MediaQuery.of(context).size;
-    final isMobile = screenSize.width < 600;
-    final isTablet = screenSize.width < 1024;
-    final drawerWidth = isMobile ? screenSize.width * 0.85 : (isTablet ? 350.0 : 300.0);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final drawerWidth = isMobile
+        ? screenSize.width * 0.85
+        : (ResponsiveHelper.isTablet(context) ? 350.0 : 300.0);
 
     return PopScope(
       canPop: false,

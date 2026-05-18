@@ -19,6 +19,7 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/currency_service.dart';
 import '../../../utils/error_extractor.dart';
+import '../../../utils/responsive_helper.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/document/document_details_dialog.dart';
 import 'quick_links_dashboard_widget.dart';
@@ -49,6 +50,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   bool _editMode = false;
   Timer? _saveDebounce;
   double _columnUnitPx = 0;
+  /// جمع حرکت resize برای اینکه با کشیدن‌های کوتاه هم colSpan عوض شود.
+  double _resizeDragAccumDx = 0;
   String _salesChartType = 'bar'; // bar | line
   String _salesChartGroup = 'day'; // day | week | month
   int? _crmCalendarYear;
@@ -100,18 +103,10 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     await _loadAll();
   }
 
-  String _currentBreakpoint(double width) {
-    if (width < 600) return 'xs';
-    if (width < 904) return 'sm';
-    if (width < 1240) return 'md';
-    if (width < 1600) return 'lg';
-    return 'xl';
-  }
-
   // Helper methods for responsive values
   double _getPadding(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     switch (bp) {
       case 'xs':
         return 8.0; // موبایل
@@ -130,7 +125,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
 
   double _getGridSpacing(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     switch (bp) {
       case 'xs':
         return 8.0;
@@ -149,7 +144,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
 
   double _getMinTileUnit(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     switch (bp) {
       case 'xs':
         return 140.0; // موبایل
@@ -168,7 +163,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
 
   TextStyle? _getHeaderTextStyle(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     final theme = Theme.of(context);
     switch (bp) {
       case 'xs':
@@ -182,12 +177,12 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
 
   bool _isMobile(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    return _currentBreakpoint(width) == 'xs';
+    return ResponsiveHelper.breakpointFromWidth(width) == 'xs';
   }
 
   double _getChartHeight(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     switch (bp) {
       case 'xs':
         return 200.0; // موبایل
@@ -241,7 +236,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       final defs = await _definitionsOrLoad();
       if (!context.mounted) return;
       final ctx = context;
-      final bp = _currentBreakpoint(MediaQuery.of(ctx).size.width);
+      final bp = ResponsiveHelper.breakpointFromWidth(MediaQuery.of(ctx).size.width);
       var layout = await _service.getLayoutProfile(businessId: widget.businessId, breakpoint: bp);
       // اطمینان از حضور ویجت‌های جدید پیش‌فرض (مثل نمودار فروش) در چیدمان
       final existingKeys = layout.items.map((e) => e.key).toSet();
@@ -483,11 +478,17 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final crossAxisCount = layout.columns;
     final padding = _getPadding(context);
 
-    return Padding(
-      padding: EdgeInsets.all(padding),
-      child: Column(
-        children: [
-          _buildHeaderRow(t),
+    final dashBg = Theme.of(context).brightness == Brightness.dark
+        ? Theme.of(context).colorScheme.surface
+        : const Color(0xFFEFF6FF); // آبی خیلی ملایم پس‌زمینه
+
+    return Container(
+      color: dashBg,
+      child: Padding(
+        padding: EdgeInsets.all(padding),
+        child: Column(
+          children: [
+            _buildHeaderRow(t),
           SizedBox(height: _isMobile(context) ? 12 : 16),
           if (!_editMode)
             Expanded(
@@ -607,6 +608,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
           ],
         ],
       ),
+      ),
     );
   }
 
@@ -698,15 +700,20 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
               if (v == 'down') _moveItemDown(item);
               if (v == 'hide') _hideItem(item, hidden: true);
             },
-            itemBuilder: (context) => [
-              PopupMenuItem(value: 'w+1', child: Row(children: const [Icon(Icons.open_in_full, size: 18), SizedBox(width: 8), Text('افزایش عرض')],)),
-              PopupMenuItem(value: 'w-1', child: Row(children: const [Icon(Icons.close_fullscreen, size: 18), SizedBox(width: 8), Text('کاهش عرض')],)),
+            itemBuilder: (context) {
+              final maxSpan = _layout?.columns ?? item.colSpan;
+              return [
+              if (item.colSpan < maxSpan)
+                PopupMenuItem(value: 'w+1', child: Row(children: const [Icon(Icons.open_in_full, size: 18), SizedBox(width: 8), Text('افزایش عرض')],)),
+              if (item.colSpan > 1)
+                PopupMenuItem(value: 'w-1', child: Row(children: const [Icon(Icons.close_fullscreen, size: 18), SizedBox(width: 8), Text('کاهش عرض')],)),
               const PopupMenuDivider(),
               PopupMenuItem(value: 'up', child: Row(children: const [Icon(Icons.arrow_upward, size: 18), SizedBox(width: 8), Text('بالا')],)),
               PopupMenuItem(value: 'down', child: Row(children: const [Icon(Icons.arrow_downward, size: 18), SizedBox(width: 8), Text('پایین')],)),
               const PopupMenuDivider(),
               PopupMenuItem(value: 'hide', child: Row(children: const [Icon(Icons.visibility_off, size: 18), SizedBox(width: 8), Text('پنهان کردن')],)),
-            ],
+            ];
+            },
             icon: const Icon(Icons.tune),
           )
         : IconButton(
@@ -763,6 +770,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
                 onHorizontalDragUpdate: (details) => _resizeItemByDx(item, details.delta.dx),
+                onHorizontalDragEnd: (_) => _resizeDragAccumDx = 0,
+                onHorizontalDragCancel: () => _resizeDragAccumDx = 0,
                 child: Container(
                   width: 10,
                   height: double.infinity,
@@ -975,16 +984,20 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
 
   Widget _crmCalendarWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
     final isJalali = widget.calendarController?.isJalali ?? true;
-    return CrmCalendarDashboardWidget(
-      data: data,
-      isJalali: isJalali,
-      onMonthChanged: (y, m) {
-        setState(() {
-          _crmCalendarYear = y;
-          _crmCalendarMonth = m;
-        });
-        _reloadDataOnly();
-      },
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+      child: CrmCalendarDashboardWidget(
+        data: data,
+        isJalali: isJalali,
+        dashboardColSpan: item.colSpan,
+        onMonthChanged: (y, m) {
+          setState(() {
+            _crmCalendarYear = y;
+            _crmCalendarMonth = m;
+          });
+          _reloadDataOnly();
+        },
+      ),
     );
   }
 
@@ -2009,28 +2022,49 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   }
 
   Widget _buildCard({required String title, Widget? trailing, required Widget child}) {
+    final theme = Theme.of(context);
+    const headerBlue = Color(0xFF0D47A1);
+    final onHeader = Colors.white.withValues(alpha: 0.95);
+    final titleStyle = theme.textTheme.titleMedium?.copyWith(
+      color: onHeader,
+      fontWeight: FontWeight.w600,
+    );
+    final bodyTint = theme.brightness == Brightness.dark
+        ? theme.colorScheme.surfaceContainerLow
+        : const Color(0xFFFFFBF5); // کرم خیلی ملایم برای حس گرم‌تر
+
     return Card(
       clipBehavior: Clip.antiAlias,
+      elevation: 1.5,
+      shadowColor: headerBlue.withValues(alpha: 0.18),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.08)),
-              ),
+            decoration: const BoxDecoration(
+              color: headerBlue,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
             ),
-            child: Row(
-              children: [
-                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
-                if (trailing != null) trailing,
-              ],
+            child: IconTheme.merge(
+              data: IconThemeData(color: onHeader, size: 22),
+              child: DefaultTextStyle.merge(
+                style: TextStyle(color: onHeader),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(title, style: titleStyle)),
+                    if (trailing != null) trailing,
+                  ],
+                ),
+              ),
             ),
           ),
           // در محیط Wrap/Flow نباید از Expanded استفاده کنیم
-          child,
+          DecoratedBox(
+            decoration: BoxDecoration(color: bodyTint),
+            child: child,
+          ),
         ],
       ),
     );
@@ -2438,9 +2472,10 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     // هر ستون موثر: unit + spacing به جز آخرین ستون
     final spacing = _getGridSpacing(context);
     final colPixel = _columnUnitPx + spacing;
-    // برآورد تعداد ستون‌های جدید بر اساس جابجایی
-    final deltaCols = (dx / colPixel).round();
+    _resizeDragAccumDx += dx;
+    final deltaCols = _resizeDragAccumDx ~/ colPixel;
     if (deltaCols == 0) return;
+    _resizeDragAccumDx -= deltaCols * colPixel;
     _changeItemWidth(item, deltaCols);
   }
 }
@@ -2501,23 +2536,14 @@ class _TopSellingProductsWidgetContentState extends State<_TopSellingProductsWid
   List<Map<String, dynamic>> _currencies = [];
   late CurrencyService _currencyService;
 
-  // Helper methods for responsive values
-  String _currentBreakpoint(double width) {
-    if (width < 600) return 'xs';
-    if (width < 904) return 'sm';
-    if (width < 1240) return 'md';
-    if (width < 1600) return 'lg';
-    return 'xl';
-  }
-
   bool _isMobile(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    return _currentBreakpoint(width) == 'xs';
+    return ResponsiveHelper.breakpointFromWidth(width) == 'xs';
   }
 
   double _getChartHeight(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bp = _currentBreakpoint(width);
+    final bp = ResponsiveHelper.breakpointFromWidth(width);
     switch (bp) {
       case 'xs':
         return 220.0; // موبایل

@@ -6,6 +6,7 @@ import '../../models/person_model.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/person/person_financial_balance_banner.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
 
 class _PersonPickerState {
@@ -145,7 +146,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     super.dispose();
   }
 
-  bool get _isMobile => MediaQuery.sizeOf(context).width < 700;
+  bool get _isMobile => ResponsiveHelper.isShellCompactWidth(context);
 
   void _onDesktopFocusChanged() {
     if (!mounted || _isMobile) return;

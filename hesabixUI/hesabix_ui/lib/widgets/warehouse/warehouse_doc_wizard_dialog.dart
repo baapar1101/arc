@@ -4,6 +4,7 @@ import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../models/warehouse_invoice_source.dart';
 import '../../utils/number_formatters.dart';
+import '../../utils/responsive_helper.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 
@@ -226,9 +227,8 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
   Widget _buildSourceStep({required bool singleColumnCards}) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final screenWidth = MediaQuery.sizeOf(context).width;
-        final isMobile = screenWidth < 600;
-        final isTablet = screenWidth >= 600 && screenWidth < 1024;
+        final isMobile = ResponsiveHelper.isMobile(context);
+        final isTablet = ResponsiveHelper.isTablet(context);
         final cardWidth = singleColumnCards
             ? constraints.maxWidth
             : isMobile
@@ -513,8 +513,8 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
     final media = MediaQuery.of(context);
     final screenWidth = media.size.width;
     final screenHeight = media.size.height;
-    final isMobile = screenWidth < 600;
-    final isTablet = screenWidth >= 600 && screenWidth < 1024;
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final isTablet = ResponsiveHelper.isTablet(context);
 
     final dialogWidth =
         (isMobile
