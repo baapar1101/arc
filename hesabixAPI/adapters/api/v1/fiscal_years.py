@@ -11,7 +11,6 @@ from app.core.responses import success_response, ApiError, format_datetime_field
 from app.core.i18n import apply_format, get_request_translator
 from app.core.cache import get_cache
 from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
-from adapters.db.models.fiscal_year import FiscalYear
 from app.services.year_end_closing_service import preview_year_end_closing, close_fiscal_year
 from app.services.fiscal_year_rollback_service import (
     preview_current_fiscal_year_rollback,
@@ -20,6 +19,11 @@ from app.services.fiscal_year_rollback_service import (
 
 
 router = APIRouter(prefix="/business", tags=["سال مالی", "حسابداری"])
+
+
+def _date_ranges_overlap(a_start: date, a_end: date, b_start: date, b_end: date) -> bool:
+	"""بازه‌های شامل [start, end]؛ همپوشانی واقعی یا تماس مرزی یک‌روزه."""
+	return a_start <= b_end and a_end >= b_start
 
 
 class ShareholderDistributionItem(BaseModel):
@@ -355,10 +359,35 @@ def update_current_fiscal_year(
     # بررسی اعتبار تاریخ‌ها
     if payload.start_date >= payload.end_date:
         raise ApiError("INVALID_DATE_RANGE", "تاریخ شروع باید قبل از تاریخ پایان باشد", http_status=400)
-    
+
+    all_fiscal = repo.list_by_business(business_id)
+    exclude_id: Optional[int] = None
+
     # دریافت سال مالی جاری
     fiscal_year = repo.get_current_for_business(business_id)
-    
+
+    if fiscal_year:
+        exclude_id = int(fiscal_year.id)
+    for fy in all_fiscal:
+        if exclude_id is not None and int(fy.id) == exclude_id:
+            continue
+        if _date_ranges_overlap(
+            payload.start_date,
+            payload.end_date,
+            fy.start_date,
+            fy.end_date,
+        ):
+            raise ApiError(
+                "FISCAL_YEAR_RANGE_OVERLAP",
+                f"بازهٔ انتخاب‌شده با سال مالی «{fy.title}» همپوشانی دارد.",
+                http_status=400,
+                details={
+                    "conflicting_fiscal_year_id": fy.id,
+                    "conflicting_start_date": fy.start_date.isoformat(),
+                    "conflicting_end_date": fy.end_date.isoformat(),
+                },
+            )
+
     if fiscal_year:
         # اگر سال مالی جاری وجود داشت: به‌روزرسانی می‌کنیم
         # بررسی اینکه سال مالی متعلق به این کسب و کار است
@@ -384,6 +413,10 @@ def update_current_fiscal_year(
             is_last=True,  # سال مالی جدید به عنوان سال مالی جاری ایجاد می‌شود
         )
         message = "FISCAL_YEAR_CREATED_SUCCESSFULLY"
+
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"fiscal_years:{business_id}")
     
     data = {
         "id": fiscal_year.id,

@@ -10,10 +10,11 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
-from adapters.db.models.wallet import WalletAccount
+from adapters.db.models.wallet import WalletAccount, WalletPayout
 from app.services.wallet_service import (
 	refund_transaction,
 	settle_payout,
+	approve_payout_request,
 	list_wallet_payouts_admin,
 	get_wallet_payout_admin,
 	get_wallet_payouts_stats_admin,
@@ -143,7 +144,6 @@ def list_wallet_payouts_admin_table_endpoint(
 	
 	# Compute total
 	try:
-		from adapters.db.models.wallet import WalletPayout
 		q = db.query(WalletPayout)
 		if statuses:
 			q = q.filter(WalletPayout.status.in_(statuses))
@@ -183,6 +183,22 @@ def get_wallet_payout_admin_endpoint(
 
 
 @router.put(
+	"/payouts/{payout_id}/approve",
+	summary="تایید درخواست تسویه (مدیریتی)",
+)
+def approve_payout_admin(
+	request: Request,
+	payout_id: int = Path(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = approve_payout_request(db, payout_id, ctx.get_user_id())
+	return success_response(data, request, message="PAYOUT_APPROVED")
+
+
+@router.put(
 	"/payouts/{payout_id}/settle",
 	summary="تسویه درخواست Payout (مدیریتی)",
 )
@@ -212,6 +228,7 @@ def settle_payout_admin(
 		bank_tracking_code=track_code,
 		fee_amount=Decimal(str(fee_amount)) if fee_amount is not None else None,
 		note=note,
+		auto_approve_if_requested=True,
 	)
 	return success_response(data, request, message="PAYOUT_SETTLED")
 

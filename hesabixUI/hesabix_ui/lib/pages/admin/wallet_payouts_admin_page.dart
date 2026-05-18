@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../core/business_named_route_locations.dart';
@@ -123,6 +121,28 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
     }
   }
 
+  bool _canShowAdminSettle(String? status) {
+    final s = (status ?? '').toLowerCase();
+    return s == 'requested' || s == 'approved' || s == 'processing';
+  }
+
+  Future<void> _adminApprovePayout(int payoutId, BuildContext sheetContext) async {
+    final t = AppLocalizations.of(context);
+    try {
+      await _service.approvePayout(payoutId: payoutId);
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: t.walletPayoutsAdminApproveSuccess);
+      if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+      await _loadStats();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
   int _calculatePendingDays(String? createdAt) {
     if (createdAt == null) return 0;
     try {
@@ -138,19 +158,19 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
     try {
       final payout = await _service.getById(payoutId);
       if (!mounted) return;
+      final st = payout['status']?.toString().toLowerCase() ?? '';
       await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
-        builder: (ctx) => _PayoutDetailSheet(
+        builder: (sheetCtx) => _PayoutDetailSheet(
           payout: payout,
           statusLabelBuilder: (value) => _statusLabel(value, AppLocalizations.of(context)),
           statusColorBuilder: (value) => _statusColor(value, Theme.of(context)),
-          onSettle: payout['status'] == 'settled'
-              ? null
-              : () => _showSettleDialog(payout),
+          onSettle: _canShowAdminSettle(st) ? () => _showSettleDialog(payout) : null,
+          onAdminApprove: st == 'requested' ? () => _adminApprovePayout(payout['id'] as int, sheetCtx) : null,
           onRefresh: () {
             _loadStats();
-            Navigator.of(ctx).pop();
+            Navigator.of(sheetCtx).pop();
           },
           calendarController: _calendarCtrl,
         ),
@@ -818,6 +838,7 @@ class _PayoutDetailSheet extends StatelessWidget {
   final String Function(String) statusLabelBuilder;
   final Color Function(String) statusColorBuilder;
   final Future<void> Function()? onSettle;
+  final Future<void> Function()? onAdminApprove;
   final VoidCallback? onRefresh;
   final CalendarController? calendarController;
 
@@ -826,6 +847,7 @@ class _PayoutDetailSheet extends StatelessWidget {
     required this.statusLabelBuilder,
     required this.statusColorBuilder,
     this.onSettle,
+    this.onAdminApprove,
     this.onRefresh,
     this.calendarController,
   });
@@ -923,11 +945,29 @@ class _PayoutDetailSheet extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (onSettle != null)
-                      FilledButton.icon(
-                        onPressed: onSettle,
-                        icon: const Icon(Icons.check_circle_outline),
-                        label: Text(t.walletPayoutsAdminSettleAction),
+                    if (onAdminApprove != null || onSettle != null)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          if (onAdminApprove != null)
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                await onAdminApprove!();
+                              },
+                              icon: const Icon(Icons.verified_outlined),
+                              label: Text(t.walletPayoutsAdminApproveRequest),
+                            ),
+                          if (onSettle != null)
+                            FilledButton.icon(
+                              onPressed: () async {
+                                await onSettle!();
+                              },
+                              icon: const Icon(Icons.check_circle_outline),
+                              label: Text(t.walletPayoutsAdminSettleAction),
+                            ),
+                        ],
                       ),
                   ],
                 ),

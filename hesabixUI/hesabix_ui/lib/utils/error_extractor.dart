@@ -59,6 +59,8 @@ class ErrorExtractor {
 
       case 'NO_FISCAL_YEAR':
         return t.apiErrorNoFiscalYearForDate;
+      case 'FISCAL_YEAR_RANGE_OVERLAP':
+        return t.apiErrorFiscalYearRangeOverlap;
       case 'FISCAL_YEAR_LOCKED':
         return t.apiErrorFiscalYearLockedForPosting;
       case 'DOCUMENT_CODE_RACE':

@@ -3782,6 +3782,156 @@ abstract class AppLocalizations {
   /// **'Manage users, roles and permissions'**
   String get userManagementDescription;
 
+  /// No description provided for @settingsSystemReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get settingsSystemReports;
+
+  /// No description provided for @settingsSystemReportsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'System dashboards and user analytics in one place'**
+  String get settingsSystemReportsDescription;
+
+  /// No description provided for @systemReportsHubIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a report. To add a new one, register it in SystemReportRegistry and add a matching GoRoute.'**
+  String get systemReportsHubIntro;
+
+  /// No description provided for @systemReportActiveUsersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Active & online users'**
+  String get systemReportActiveUsersTitle;
+
+  /// No description provided for @systemReportActiveUsersDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary of all users plus recently active users based on app heartbeat (approximate, not live socket count).'**
+  String get systemReportActiveUsersDescription;
+
+  /// No description provided for @systemReportSignupsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Signups over time'**
+  String get systemReportSignupsTitle;
+
+  /// No description provided for @systemReportSignupsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'New user registrations aggregated by day, week, or month for the selected date range (UTC midnight boundaries).'**
+  String get systemReportSignupsDescription;
+
+  /// No description provided for @systemReportSignupsPickRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Select date range'**
+  String get systemReportSignupsPickRange;
+
+  /// No description provided for @systemReportSignupsEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No registrations in this range for the chosen granularity.'**
+  String get systemReportSignupsEmptyHint;
+
+  /// No description provided for @systemReportRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get systemReportRefresh;
+
+  /// No description provided for @systemReportActiveWindowLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent activity window (minutes)'**
+  String get systemReportActiveWindowLabel;
+
+  /// No description provided for @systemReportSummaryTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total users'**
+  String get systemReportSummaryTotal;
+
+  /// No description provided for @systemReportSummaryActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active accounts'**
+  String get systemReportSummaryActive;
+
+  /// No description provided for @systemReportSummaryInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive accounts'**
+  String get systemReportSummaryInactive;
+
+  /// No description provided for @systemReportSummaryActivePct.
+  ///
+  /// In en, this message translates to:
+  /// **'Active share'**
+  String get systemReportSummaryActivePct;
+
+  /// No description provided for @systemReportOnlineApprox.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently active (approx.)'**
+  String get systemReportOnlineApprox;
+
+  /// No description provided for @systemReportOnlineNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Online count uses last_activity_at from the mobile/web app heartbeat; widen the window if you need a looser signal.'**
+  String get systemReportOnlineNote;
+
+  /// No description provided for @systemReportGranularityLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Granularity'**
+  String get systemReportGranularityLabel;
+
+  /// No description provided for @systemReportGranularityDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get systemReportGranularityDay;
+
+  /// No description provided for @systemReportGranularityWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get systemReportGranularityWeek;
+
+  /// No description provided for @systemReportGranularityMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get systemReportGranularityMonth;
+
+  /// No description provided for @systemReportApplyRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Run report'**
+  String get systemReportApplyRange;
+
+  /// No description provided for @systemReportPeriodColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Period'**
+  String get systemReportPeriodColumn;
+
+  /// No description provided for @systemReportCountColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signups'**
+  String get systemReportCountColumn;
+
+  /// No description provided for @systemReportTotalInRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Total in range'**
+  String get systemReportTotalInRange;
+
   /// No description provided for @systemLogs.
   ///
   /// In en, this message translates to:
@@ -6241,6 +6391,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No fiscal year covers this date.'**
   String get apiErrorNoFiscalYearForDate;
+
+  /// No description provided for @apiErrorFiscalYearRangeOverlap.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected date range overlaps another fiscal year.'**
+  String get apiErrorFiscalYearRangeOverlap;
 
   /// No description provided for @apiErrorFiscalYearLockedForPosting.
   ///
@@ -11743,6 +11899,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'If the bank charged a fee, enter the amount here'**
   String get walletPayoutsAdminFeeHint;
+
+  /// No description provided for @walletPayoutsAdminApproveRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve payout request'**
+  String get walletPayoutsAdminApproveRequest;
+
+  /// No description provided for @walletPayoutsAdminApproveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout request approved.'**
+  String get walletPayoutsAdminApproveSuccess;
+
+  /// No description provided for @walletPayoutOpenRequestsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Open payout requests'**
+  String get walletPayoutOpenRequestsSection;
+
+  /// No description provided for @walletPayoutApproveForPayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve for bank transfer'**
+  String get walletPayoutApproveForPayout;
+
+  /// No description provided for @walletPayoutCancelRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel payout request'**
+  String get walletPayoutCancelRequest;
+
+  /// No description provided for @walletPayoutApproveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Request approved. Settlement will be completed after the transfer is processed.'**
+  String get walletPayoutApproveSuccess;
+
+  /// No description provided for @walletPayoutCancelSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payout request canceled.'**
+  String get walletPayoutCancelSuccess;
+
+  /// No description provided for @walletPayoutCancelConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this payout request and return the amount to your available balance?'**
+  String get walletPayoutCancelConfirm;
 
   /// No description provided for @bankTrackingCode.
   ///

@@ -6,7 +6,6 @@ import '../../core/api_client.dart';
 import '../../services/wallet_service.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
-import 'package:go_router/go_router.dart';
 import '../../core/business_named_route_locations.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
@@ -42,6 +41,7 @@ class _WalletPageState extends State<WalletPage> {
   DateTime? _fromDate;
   DateTime? _toDate;
   CalendarController? _calendarCtrl;
+  List<Map<String, dynamic>> _openPayouts = const [];
 
   String _typeLabel(String? t) {
     final l = AppLocalizations.of(context);
@@ -128,20 +128,32 @@ class _WalletPageState extends State<WalletPage> {
         fromDate: _fromDate, 
         toDate: _toDate,
       );
+
+      List<Map<String, dynamic>> openPayouts = const [];
+      try {
+        final pr = await _service.listPayouts(businessId: widget.businessId, limit: 40);
+        final items = pr['items'];
+        if (items is List) {
+          final buf = <Map<String, dynamic>>[];
+          for (final raw in items) {
+            final row = Map<String, dynamic>.from(raw as Map);
+            final st = (row['status'] ?? '').toString().toLowerCase();
+            if (st == 'requested' || st == 'approved' || st == 'processing') {
+              buf.add(row);
+            }
+          }
+          openPayouts = buf;
+        }
+      } catch (e) {
+        debugPrint('wallet listPayouts: $e');
+      }
       
       if (!mounted) return;
-      
-      // اعتبارسنجی داده‌های دریافتی
-      if (res is! Map<String, dynamic>) {
-        throw Exception('پاسخ نامعتبر از سرور: overview باید Map باشد');
-      }
-      if (m is! Map<String, dynamic>) {
-        throw Exception('پاسخ نامعتبر از سرور: metrics باید Map باشد');
-      }
       
       setState(() {
         _overview = res;
         _metrics = m;
+        _openPayouts = openPayouts;
         _error = null;
       });
     } catch (e, stackTrace) {
@@ -155,6 +167,7 @@ class _WalletPageState extends State<WalletPage> {
             'خطا در بارگذاری اطلاعات: ${ErrorExtractor.forContext(e, context)}';
         _overview = null;
         _metrics = null;
+        _openPayouts = const [];
       });
     } finally {
       if (!mounted) return;
@@ -243,6 +256,63 @@ class _WalletPageState extends State<WalletPage> {
     }
   }
 
+  String _payoutRequestStatusLabel(String? status, AppLocalizations l) {
+    switch ((status ?? '').toLowerCase()) {
+      case 'requested':
+        return l.pending;
+      case 'approved':
+        return l.statusApproved;
+      case 'processing':
+        return l.statusProcessing;
+      default:
+        return l.unknown;
+    }
+  }
+
+  Future<void> _approveBusinessPayout(int payoutId) async {
+    final t = AppLocalizations.of(context);
+    try {
+      await _service.approvePayout(businessId: widget.businessId, payoutId: payoutId);
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: t.walletPayoutApproveSuccess);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  Future<void> _cancelBusinessPayout(int payoutId) async {
+    final t = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.walletPayoutCancelRequest),
+        content: Text(t.walletPayoutCancelConfirm),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.confirm)),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await _service.cancelPayout(businessId: widget.businessId, payoutId: payoutId);
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: t.walletPayoutCancelSuccess);
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
   Future<void> _openTopUpDialog() async {
     if (!context.mounted) return;
     // دریافت واحد ارز از overview - استفاده از symbol ارز پیش‌فرض
@@ -260,6 +330,42 @@ class _WalletPageState extends State<WalletPage> {
       onError: (error) {
         // خطا در ویجت مدیریت می‌شود
       },
+    );
+  }
+
+  Widget _buildOpenPayoutTile(AppLocalizations t, Map<String, dynamic> p) {
+    final id = p['id'];
+    final pid = id is int ? id : int.tryParse('$id') ?? 0;
+    final st = (p['status'] ?? '').toString().toLowerCase();
+    final gross = (p['gross_amount'] ?? 0) is num
+        ? (p['gross_amount'] as num).toDouble()
+        : double.tryParse('${p['gross_amount']}') ?? 0.0;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text('${t.walletPayoutRequestTitle} #$pid'),
+      subtitle: Text(
+        '${_payoutRequestStatusLabel(st, t)} · ${formatWithThousands(gross)}',
+      ),
+      trailing: Wrap(
+        spacing: 4,
+        alignment: WrapAlignment.end,
+        children: [
+          if (st == 'requested') ...[
+            TextButton(
+              onPressed: pid > 0 ? () => _approveBusinessPayout(pid) : null,
+              child: Text(t.walletPayoutApproveForPayout),
+            ),
+            TextButton(
+              onPressed: pid > 0 ? () => _cancelBusinessPayout(pid) : null,
+              child: Text(t.walletPayoutCancelRequest),
+            ),
+          ] else if (st == 'approved')
+            TextButton(
+              onPressed: pid > 0 ? () => _cancelBusinessPayout(pid) : null,
+              child: Text(t.walletPayoutCancelRequest),
+            ),
+        ],
+      ),
     );
   }
 
@@ -381,6 +487,22 @@ class _WalletPageState extends State<WalletPage> {
                                 ),
                               ),
                             ),
+                          if (_openPayouts.isNotEmpty) ...[
+                            const SizedBox(height: 16),
+                            Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(t.walletPayoutOpenRequestsSection, style: theme.textTheme.titleMedium),
+                                    const SizedBox(height: 8),
+                                    for (final p in _openPayouts) _buildOpenPayoutTile(t, p),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 16),
                           // دکمه‌های خروجی CSV در پایین جدول موجود هستند؛ این بخش حذف شد تا فیلتر تاریخ از طریق جدول انجام شود
                           const SizedBox(height: 16),

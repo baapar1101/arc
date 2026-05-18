@@ -1,5 +1,5 @@
 from functools import lru_cache
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,8 +20,11 @@ class Settings(BaseSettings):
 	db_name: str = "hesabix"
 	sqlalchemy_echo: bool = False
 
-	# Logging
-	log_level: str = "INFO"
+	# Logging — پیش‌فرض پروداکشن: حداقل خروجی
+	log_level: str = Field(
+		default="WARNING",
+		description="DEBUG | INFO | WARNING | ERROR | CRITICAL",
+	)
 
 	# Captcha / Security
 	captcha_length: int = 5

@@ -26,7 +26,8 @@ from app.services.auth_service import (
 )
 from app.core.settings import get_settings
 from secrets import token_urlsafe
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date, time
+from typing import Literal
 from uuid import UUID
 from starlette.responses import StreamingResponse
 
@@ -995,7 +996,7 @@ def get_user(
 	- **active_percentage**: درصد کاربران فعال (با 2 رقم اعشار)
 	
 	### نکات:
-	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- نیاز به سوپرادمین یا مجوز `system_settings` یا `user_management` (همان باز کردن پنل مدیریت کاربران در UI)
 	
 	### مثال cURL:
 	```bash
@@ -1066,10 +1067,9 @@ def get_user(
 		}
 	}
 )
-@require_user_management()
 def get_users_summary(
 	request: Request,
-	ctx: AuthContext = Depends(get_current_user),
+	_: AuthContext = Depends(verify_user_management_page_access),
 	db: Session = Depends(get_db)
 ):
 	"""دریافت آمار کلی کاربران"""
@@ -1124,6 +1124,51 @@ def get_users_online_stats(
 		},
 		request,
 	)
+
+
+@router.get(
+	"/stats/signups-timeline",
+	summary="گزارش عضویت کاربران در بازهٔ تاریخی",
+	description="""
+تعداد کاربران ثبت‌شده به‌ازای هر روز / هفته / ماه در بازهٔ مشخص (تاریخ‌ها به‌صورت UTC نیمه‌شب).
+
+مجوز مانند `GET /users/stats/online`: سوپرادمین، `system_settings` یا `user_management`.
+""",
+	response_model=SuccessResponse,
+)
+def get_users_signups_timeline(
+	request: Request,
+	start_date: date = Query(..., description="شروع بازه (شمولی)، YYYY-MM-DD"),
+	end_date: date = Query(..., description="پایان بازه (شمولی)، YYYY-MM-DD"),
+	granularity: Literal["day", "week", "month"] = Query("day", description="تجمیع روزانه، هفتگی یا ماهانه"),
+	_: AuthContext = Depends(verify_user_management_page_access),
+	db: Session = Depends(get_db),
+):
+	if end_date < start_date:
+		raise ApiError("VALIDATION_ERROR", "تاریخ پایان نمی‌تواند قبل از تاریخ شروع باشد", http_status=422)
+	start_utc = datetime.combine(start_date, time.min)
+	end_exclusive = datetime.combine(end_date + timedelta(days=1), time.min)
+	span_days = (end_exclusive - start_utc).days
+	if span_days <= 0:
+		raise ApiError("VALIDATION_ERROR", "بازهٔ تاریخ نامعتبر است", http_status=422)
+	if granularity == "day" and span_days > 400:
+		raise ApiError("VALIDATION_ERROR", "برای تجمیع روزانه حداکثر ۴۰۰ روز مجاز است", http_status=422)
+	if granularity == "week" and span_days > 800:
+		raise ApiError("VALIDATION_ERROR", "برای تجمیع هفتگی حداکثر ۸۰۰ روز مجاز است", http_status=422)
+	if granularity == "month" and span_days > 3660:
+		raise ApiError("VALIDATION_ERROR", "برای تجمیع ماهانه حداکثر ۱۰ سال مجاز است", http_status=422)
+
+	repo = UserRepository(db)
+	rows = repo.get_signups_timeline_buckets(start_utc, end_exclusive, granularity)
+	buckets = [{"period_start": dt, "count": cnt} for dt, cnt in rows]
+	payload = {
+		"granularity": granularity,
+		"start_date": start_date.isoformat(),
+		"end_date": end_date.isoformat(),
+		"buckets": buckets,
+		"total_in_range": sum(b["count"] for b in buckets),
+	}
+	return success_response(format_datetime_fields(payload, request), request)
 
 
 @router.post("/bulk-activate",

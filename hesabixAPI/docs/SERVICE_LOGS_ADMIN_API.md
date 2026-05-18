@@ -59,6 +59,10 @@ The user inside the container should be allowed to read the journal (often: add 
 
 These routes are protected by the **`system_settings`** app permission. They can leak operational detail and can disrupt services; restrict who has that permission and harden the host as above.
 
+## API logging diagnostics (`GET .../logging-diagnostics`)
+
+Returns the **effective** log configuration for the **current API worker process** (root level, `uvicorn.access`, SQLAlchemy, etc.) and lists valid `LOG_LEVEL` names. Changing `LOG_LEVEL` in the service environment requires a **process restart** to apply everywhere (especially with multiple Uvicorn workers).
+
 ## See also
 
 - Worker deployment and moderation service (includes the same REST examples): [`NOTIFICATION_MODERATION_WORKER_DEPLOYMENT.md`](./NOTIFICATION_MODERATION_WORKER_DEPLOYMENT.md)

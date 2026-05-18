@@ -61,6 +61,43 @@ class WalletService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  Future<Map<String, dynamic>> listPayouts({
+    required int businessId,
+    int skip = 0,
+    int limit = 50,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/businesses/$businessId/wallet/payouts',
+      query: {'skip': '$skip', 'limit': '$limit'},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> approvePayout({
+    required int businessId,
+    required int payoutId,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/businesses/$businessId/wallet/payouts/$payoutId/approve',
+      data: const <String, dynamic>{},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> cancelPayout({
+    required int businessId,
+    required int payoutId,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/businesses/$businessId/wallet/payouts/$payoutId/cancel',
+      data: const <String, dynamic>{},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
   Future<Map<String, dynamic>> topUp({
     required int businessId,
     required double amount,

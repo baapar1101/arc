@@ -27,7 +27,7 @@ Environment="PYTHONHASHSEED=0"  # استفاده از hash randomization برا�
 TimeoutStartSec=300
 ExecStartPre=!/var/www/arc/hesabixAPI/deployment/systemd/hesabix-api-prestart.sh
 ExecStartPre=/var/www/arc/hesabixAPI/.venv/bin/python -m alembic -c /var/www/arc/hesabixAPI/alembic.ini upgrade head
-ExecStart=/var/www/arc/hesabixAPI/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 24
+ExecStart=/var/www/arc/hesabixAPI/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 24 --log-level warning
 
 # Restart settings
 Restart=always
@@ -35,7 +35,9 @@ RestartSec=10
 StartLimitInterval=5min
 StartLimitBurst=3
 
-# Logging
+# Logging (حداقل خروجی؛ برای دیباگ موقت LOG_LEVEL=DEBUG و --log-level debug)
+Environment="LOG_LEVEL=WARNING"
+Environment="LOG_FORMAT=json"
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=hesabix-api

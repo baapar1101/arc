@@ -47,6 +47,15 @@ class AdminWalletPayoutsService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  Future<Map<String, dynamic>> approvePayout({required int payoutId}) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/admin/wallets/payouts/$payoutId/approve',
+      data: const <String, dynamic>{},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
   Future<Map<String, dynamic>> settle({
     required int payoutId,
     required DateTime settlementDate,

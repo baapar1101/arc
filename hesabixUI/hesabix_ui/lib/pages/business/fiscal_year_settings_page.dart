@@ -24,6 +24,8 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
   String? _error;
 
   Map<String, dynamic>? _currentFiscalYear;
+  /// برای محدودهٔ عریض تقویم و کنترل همپوشانی قبل از ذخیره
+  List<Map<String, dynamic>> _fiscalYearsForBounds = const [];
 
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
@@ -85,13 +87,20 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
       _error = null;
     });
     try {
+      List<Map<String, dynamic>> years = const [];
+      try {
+        years = await _dashboardService.listFiscalYears(widget.businessId);
+      } catch (_) {
+        years = const [];
+      }
+
       final current = await _dashboardService.getCurrentFiscalYear(widget.businessId);
 
       if (mounted) {
         if (current == null || current.isEmpty) {
-          // اگر سال مالی جاری وجود نداشت، فرم خالی نمایش می‌دهیم
           setState(() {
             _currentFiscalYear = null;
+            _fiscalYearsForBounds = years;
             _titleController.text = '';
             _startDate = null;
             _endDate = null;
@@ -132,6 +141,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
 
         setState(() {
           _currentFiscalYear = current;
+          _fiscalYearsForBounds = years;
           _titleController.text = current['title'] as String? ?? '';
           _startDate = parsedStartDate;
           _endDate = parsedEndDate;
@@ -238,6 +248,73 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
     }
   }
 
+  DateTime? _tryParseIsoDateOnly(dynamic value) {
+    if (value == null) return null;
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  DateTime? _dateFromFiscalRow(Map<String, dynamic> row, String fieldPrefix) {
+    final raw = row['${fieldPrefix}_raw'];
+    final fromRaw = _tryParseIsoDateOnly(raw);
+    if (fromRaw != null) return fromRaw;
+    return _parseDate(row[fieldPrefix]);
+  }
+
+  bool _rangesOverlap(DateTime aStart, DateTime aEnd, DateTime bStart, DateTime bEnd) {
+    return !aStart.isAfter(bEnd) && !aEnd.isBefore(bStart);
+  }
+
+  String? _overlapErrorFor(DateTime start, DateTime end) {
+    final s = HesabixDateUtils.toDateOnlyLocal(start);
+    final e = HesabixDateUtils.toDateOnlyLocal(end);
+    final sid = _currentFiscalYear?['id'];
+    final currentId = sid is int ? sid : int.tryParse('$sid');
+    for (final row in _fiscalYearsForBounds) {
+      final idVal = row['id'];
+      final oid = idVal is int ? idVal : int.tryParse('$idVal');
+      if (currentId != null && oid != null && oid == currentId) {
+        continue;
+      }
+      final os = _dateFromFiscalRow(row, 'start_date');
+      final oe = _dateFromFiscalRow(row, 'end_date');
+      if (os == null || oe == null) continue;
+      final os0 = HesabixDateUtils.toDateOnlyLocal(os);
+      final oe0 = HesabixDateUtils.toDateOnlyLocal(oe);
+      if (!_rangesOverlap(s, e, os0, oe0)) continue;
+      final title = row['title']?.toString() ?? 'سال مالی دیگر';
+      return 'بازهٔ انتخاب‌شده با سال مالی «$title» همپوشانی دارد.';
+    }
+    return null;
+  }
+
+  ({DateTime first, DateTime last}) _pickerBounds() {
+    const marginDays = 365 * 8;
+    final now = DateTime.now();
+    final seeds = <DateTime>[
+      DateTime(now.year - 30, 1, 1),
+      DateTime(now.year + 30, 12, 31),
+    ];
+    for (final row in _fiscalYearsForBounds) {
+      final s = _dateFromFiscalRow(row, 'start_date');
+      final e = _dateFromFiscalRow(row, 'end_date');
+      if (s != null) seeds.add(HesabixDateUtils.toDateOnlyLocal(s));
+      if (e != null) seeds.add(HesabixDateUtils.toDateOnlyLocal(e));
+    }
+    if (_startDate != null) {
+      seeds.add(HesabixDateUtils.toDateOnlyLocal(_startDate!));
+    }
+    if (_endDate != null) {
+      seeds.add(HesabixDateUtils.toDateOnlyLocal(_endDate!));
+    }
+    var lo = seeds.reduce((a, b) => a.isBefore(b) ? a : b);
+    var hi = seeds.reduce((a, b) => a.isAfter(b) ? a : b);
+    lo = lo.subtract(const Duration(days: marginDays));
+    hi = hi.add(const Duration(days: marginDays));
+    return (first: lo, last: hi);
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -250,6 +327,12 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
 
     if (_startDate!.isAfter(_endDate!) || _startDate!.isAtSameMomentAs(_endDate!)) {
       SnackBarHelper.show(context, message: 'تاریخ شروع باید قبل از تاریخ پایان باشد', isError: true);
+      return;
+    }
+
+    final overlapMsg = _overlapErrorFor(_startDate!, _endDate!);
+    if (overlapMsg != null) {
+      SnackBarHelper.show(context, message: overlapMsg, isError: true);
       return;
     }
 
@@ -309,6 +392,8 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
+
+    final picker = _pickerBounds();
 
     return Scaffold(
       appBar: AppBar(
@@ -413,20 +498,24 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                                     child: DateInputField(
                                       value: _startDate,
                                       labelText: 'تاریخ شروع *',
-                                      lastDate: _endDate,
+                                      firstDate: picker.first,
+                                      lastDate: picker.last,
                                       calendarController: _calendarController!,
                                       onChanged: (d) {
                                         setState(() {
                                           _startDate = d;
                                           if (_startDate != null) {
-                                            // تنظیم خودکار تاریخ پایان (سالگرد یک سال بعد منهای یک روز)
-                                            _endDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+                                            final suggestedEnd =
+                                                HesabixDateUtils.fiscalYearInclusiveEndFromStart(
                                               _startDate!,
                                               _calendarController!.isJalali,
                                             );
-                                            // تولید خودکار عنوان
+                                            if (_endDate == null ||
+                                                !_endDate!.isAfter(_startDate!)) {
+                                              _endDate = suggestedEnd;
+                                            }
                                             const autoPrefix = 'سال مالی منتهی به';
-                                            if (_titleController.text.trim().isEmpty || 
+                                            if (_titleController.text.trim().isEmpty ||
                                                 _titleController.text.trim().startsWith(autoPrefix)) {
                                               _titleController.text = _autoTitle();
                                             }
@@ -440,14 +529,14 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                                     child: DateInputField(
                                       value: _endDate,
                                       labelText: 'تاریخ پایان *',
-                                      firstDate: _startDate,
+                                      firstDate: picker.first,
+                                      lastDate: picker.last,
                                       calendarController: _calendarController!,
                                       onChanged: (d) {
                                         setState(() {
                                           _endDate = d;
-                                          // تولید خودکار عنوان اگر خالی باشد یا قبلاً خودکار بوده
                                           const autoPrefix = 'سال مالی منتهی به';
-                                          if (_titleController.text.trim().isEmpty || 
+                                          if (_titleController.text.trim().isEmpty ||
                                               _titleController.text.trim().startsWith(autoPrefix)) {
                                             _titleController.text = _autoTitle();
                                           }

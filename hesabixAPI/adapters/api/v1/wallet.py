@@ -21,6 +21,7 @@ from app.services.wallet_service import (
 	get_business_wallet_settings,
 	update_business_wallet_settings,
 	run_auto_settlement,
+	list_wallet_payouts_admin,
 )
 from adapters.db.models.wallet import WalletPayout
 from fastapi import Query
@@ -247,6 +248,24 @@ def create_payout_request_endpoint(
 ) -> dict:
 	data = create_payout_request(db, business_id, ctx.get_user_id(), payload)
 	return success_response(data, request, message="PAYOUT_REQUESTED")
+
+
+@router.get(
+	"/payouts",
+	summary="لیست درخواست‌های تسویه کسب‌وکار",
+	description="درخواست‌های تسویه به‌ترتیب نزولی شناسه",
+)
+def list_business_wallet_payouts_endpoint(
+	request: Request,
+	business_id: int,
+	skip: int = Query(0, ge=0),
+	limit: int = Query(50, ge=1, le=100),
+	_: None = Depends(require_business_access_dep),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	data = list_wallet_payouts_admin(db, business_id=business_id, skip=skip, limit=limit)
+	return success_response(data, request)
 
 
 @router.get(

@@ -30,6 +30,8 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
 from app.core.permissions import require_app_permission
+from app.core.logging import get_logging_diagnostics
+from app.core.settings import get_settings
 
 router = APIRouter(
 	prefix="/admin/system-services",
@@ -416,6 +418,25 @@ def _get_service_status(service_name: str) -> Dict[str, Any]:
 	except Exception as e:
 		logger.error(f"Error getting service status: {e}", exc_info=True)
 		raise ApiError("INTERNAL_ERROR", f"خطا در دریافت وضعیت سرویس: {str(e)}", http_status=500)
+
+
+@router.get(
+	"/logging-diagnostics",
+	summary="وضعیت پیکربندی لاگ API",
+	description=(
+		"سطح لاگ مؤثر، لاگرهای اصلی (uvicorn/sqlalchemy/…) و راهنمای فعال‌سازی DEBUG. "
+		"تغییر LOG_LEVEL نیازمند ری‌استارت سرویس است (به‌ویژه با چند worker)."
+	),
+)
+@require_app_permission("system_settings")
+def get_logging_diagnostics_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+	data = get_logging_diagnostics()
+	data["app_environment"] = get_settings().environment
+	return success_response(data, request)
 
 
 @router.get(

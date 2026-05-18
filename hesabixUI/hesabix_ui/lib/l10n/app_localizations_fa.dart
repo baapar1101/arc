@@ -1961,6 +1961,87 @@ class AppLocalizationsFa extends AppLocalizations {
   String get userManagementDescription => 'مدیریت کاربران، نقش‌ها و مجوزها';
 
   @override
+  String get settingsSystemReports => 'گزارشات';
+
+  @override
+  String get settingsSystemReportsDescription =>
+      'داشبوردها و آمار کاربران در یک نقطه';
+
+  @override
+  String get systemReportsHubIntro =>
+      'یک گزارش را انتخاب کنید. برای افزودن گزارش جدید، آن را در SystemReportRegistry ثبت کرده و مسیر GoRouter متناظر را اضافه کنید.';
+
+  @override
+  String get systemReportActiveUsersTitle => 'کاربران فعال و آنلاین (تقریبی)';
+
+  @override
+  String get systemReportActiveUsersDescription =>
+      'خلاصهٔ همهٔ کاربران به‌همراه شمار کاربران با فعالیت اخیر بر اساس ضربان اپ (تقریبی؛ شمار سوکت زنده نیست).';
+
+  @override
+  String get systemReportSignupsTitle => 'عضویت در بازهٔ زمانی';
+
+  @override
+  String get systemReportSignupsDescription =>
+      'تعداد ثبت‌نام کاربران جدید به‌صورت روزانه، هفتگی یا ماهانه در بازهٔ انتخاب‌شده (مرز تاریخ‌ها نیمه‌شب UTC).';
+
+  @override
+  String get systemReportSignupsPickRange => 'انتخاب بازهٔ تاریخ';
+
+  @override
+  String get systemReportSignupsEmptyHint =>
+      'در این بازه و با این تجمیع، ثبت‌نامی وجود ندارد.';
+
+  @override
+  String get systemReportRefresh => 'به‌روزرسانی';
+
+  @override
+  String get systemReportActiveWindowLabel => 'پنجرهٔ فعالیت اخیر (دقیقه)';
+
+  @override
+  String get systemReportSummaryTotal => 'کل کاربران';
+
+  @override
+  String get systemReportSummaryActive => 'حساب فعال';
+
+  @override
+  String get systemReportSummaryInactive => 'حساب غیرفعال';
+
+  @override
+  String get systemReportSummaryActivePct => 'سهم فعال';
+
+  @override
+  String get systemReportOnlineApprox => 'فعالیت اخیر (تقریبی)';
+
+  @override
+  String get systemReportOnlineNote =>
+      'شمار آنلاین از فیلد last_activity_at و ضربان اپ است؛ برای سیگنال سست‌تر، پنجرهٔ دقیقه را بزرگ‌تر کنید.';
+
+  @override
+  String get systemReportGranularityLabel => 'تجمیع';
+
+  @override
+  String get systemReportGranularityDay => 'روزانه';
+
+  @override
+  String get systemReportGranularityWeek => 'هفتگی';
+
+  @override
+  String get systemReportGranularityMonth => 'ماهانه';
+
+  @override
+  String get systemReportApplyRange => 'اجرای گزارش';
+
+  @override
+  String get systemReportPeriodColumn => 'دوره';
+
+  @override
+  String get systemReportCountColumn => 'تعداد عضویت';
+
+  @override
+  String get systemReportTotalInRange => 'جمع در بازه';
+
+  @override
   String get systemLogs => 'گزارش‌های سیستم';
 
   @override
@@ -3265,6 +3346,10 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get apiErrorNoFiscalYearForDate =>
       'سال مالی‌ای برای این تاریخ تعریف نشده است.';
+
+  @override
+  String get apiErrorFiscalYearRangeOverlap =>
+      'بازهٔ انتخاب‌شده با سال مالی دیگری همپوشانی دارد.';
 
   @override
   String get apiErrorFiscalYearLockedForPosting =>
@@ -6201,6 +6286,32 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get walletPayoutsAdminFeeHint =>
       'در صورت وجود کارمزد انتقال، آن را وارد کنید';
+
+  @override
+  String get walletPayoutsAdminApproveRequest => 'تایید درخواست تسویه';
+
+  @override
+  String get walletPayoutsAdminApproveSuccess => 'درخواست تسویه تایید شد.';
+
+  @override
+  String get walletPayoutOpenRequestsSection => 'درخواست‌های تسویه باز';
+
+  @override
+  String get walletPayoutApproveForPayout => 'تایید برای واریز بانکی';
+
+  @override
+  String get walletPayoutCancelRequest => 'لغو درخواست تسویه';
+
+  @override
+  String get walletPayoutApproveSuccess =>
+      'درخواست تایید شد. پس از واریز توسط تیم مالی، تسویه نهایی ثبت می‌شود.';
+
+  @override
+  String get walletPayoutCancelSuccess => 'درخواست تسویه لغو شد.';
+
+  @override
+  String get walletPayoutCancelConfirm =>
+      'درخواست تسویه لغو شود و مبلغ به مانده قابل برداشت برگردد؟';
 
   @override
   String get bankTrackingCode => 'کد پیگیری بانک';

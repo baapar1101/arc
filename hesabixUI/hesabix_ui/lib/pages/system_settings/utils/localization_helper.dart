@@ -14,6 +14,8 @@ class LocalizationHelper {
         return t.systemConfiguration;
       case 'userManagement':
         return t.userManagement;
+      case 'settingsSystemReports':
+        return t.settingsSystemReports;
       case 'emailSettings':
         return t.emailSettings;
       case 'settingsShareLinks':
@@ -84,6 +86,8 @@ class LocalizationHelper {
         return t.systemConfigurationDescription;
       case 'userManagementDescription':
         return t.userManagementDescription;
+      case 'settingsSystemReportsDescription':
+        return t.settingsSystemReportsDescription;
       case 'emailSettingsDescription':
         return t.emailSettingsDescription;
       case 'settingsShareLinksDescription':

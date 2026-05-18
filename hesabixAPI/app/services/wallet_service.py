@@ -336,6 +336,7 @@ def settle_payout(
 	bank_tracking_code: str | None = None,
 	fee_amount: Decimal | None = None,
 	note: str | None = None,
+	auto_approve_if_requested: bool = False,
 ) -> Dict[str, Any]:
 	def _to_datetime(value: date | datetime | None) -> datetime | None:
 		if value is None:
@@ -352,6 +353,9 @@ def settle_payout(
 	payout = db.query(WalletPayout).filter(WalletPayout.id == int(payout_id)).first()
 	if not payout:
 		raise ApiError("PAYOUT_NOT_FOUND", "درخواست تسویه یافت نشد", http_status=404)
+	if payout.status == "requested" and auto_approve_if_requested:
+		approve_payout_request(db, payout_id, user_id)
+		db.refresh(payout)
 	if payout.status not in ("approved", "processing"):
 		raise ApiError("INVALID_STATE", "تسویه تنها پس از تایید/در حال پردازش مجاز است", http_status=400)
 

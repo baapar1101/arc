@@ -176,6 +176,16 @@ class SettingsCategorizationService {
         order: 4,
         items: [
           SettingsItem(
+            id: 'system_reports',
+            title: 'settingsSystemReports',
+            description: 'settingsSystemReportsDescription',
+            icon: Icons.assessment_outlined,
+            color: const Color(0xFF455A64),
+            route: '/user/profile/system-settings/reports',
+            categoryId: 'users_businesses',
+            order: 1,
+          ),
+          SettingsItem(
             id: 'user_management',
             title: 'userManagement',
             description: 'userManagementDescription',
@@ -183,7 +193,7 @@ class SettingsCategorizationService {
             color: const Color(0xFFFF9800),
             route: '/user/profile/system-settings/users',
             categoryId: 'users_businesses',
-            order: 1,
+            order: 2,
           ),
           SettingsItem(
             id: 'businesses_management',
@@ -193,7 +203,7 @@ class SettingsCategorizationService {
             color: const Color(0xFF1976D2),
             route: '/user/profile/system-settings/businesses',
             categoryId: 'users_businesses',
-            order: 2,
+            order: 3,
           ),
           SettingsItem(
             id: 'support_operators',
@@ -203,7 +213,7 @@ class SettingsCategorizationService {
             color: const Color(0xFFE91E63),
             route: '/user/profile/system-settings/support-operators',
             categoryId: 'users_businesses',
-            order: 3,
+            order: 4,
           ),
         ],
       ),

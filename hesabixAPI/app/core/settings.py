@@ -1,6 +1,6 @@
 from functools import lru_cache
 from urllib.parse import quote_plus
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,8 +30,11 @@ class Settings(BaseSettings):
 	db_pool_timeout: int = 30  # Timeout برای Pool (30 ثانیه)
 	db_pool_recycle: int = 1800  # Recycle اتصالات هر 30 دقیقه - بهینه برای جلوگیری از connection leak و بهبود performance
 
-	# Logging
-	log_level: str = "INFO"
+	# Logging — پیش‌فرض پروداکشن: حداقل خروجی (از env با نام LOG_LEVEL هم خوانده می‌شود)
+	log_level: str = Field(
+		default="WARNING",
+		description="DEBUG | INFO | WARNING | ERROR | CRITICAL — برای دیباگ موقت LOG_LEVEL=DEBUG و ری‌استارت",
+	)
 
 	# Captcha / Security
 	captcha_length: int = 5

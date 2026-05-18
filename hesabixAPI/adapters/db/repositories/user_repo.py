@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime, timedelta
 
 from sqlalchemy import select, func, and_, or_, update
@@ -22,6 +22,36 @@ class UserRepository(BaseRepository[User]):
 	def get_by_mobile(self, mobile: str) -> Optional[User]:
 		stmt = select(User).where(User.mobile == mobile)
 		return self.db.execute(stmt).scalars().first()
+
+	def get_signups_timeline_buckets(
+		self,
+		start_utc: datetime,
+		end_utc: datetime,
+		granularity: Literal["day", "week", "month"],
+	) -> List[tuple[datetime, int]]:
+		"""تعداد ثبت‌نام کاربران به‌ازای هر بازهٔ زمانی (PostgreSQL date_trunc)."""
+		if start_utc >= end_utc:
+			return []
+		if granularity == "day":
+			bucket = func.date_trunc("day", User.created_at)
+		elif granularity == "week":
+			bucket = func.date_trunc("week", User.created_at)
+		else:
+			bucket = func.date_trunc("month", User.created_at)
+		stmt = (
+			select(bucket.label("bucket"), func.count().label("cnt"))
+			.where(User.created_at >= start_utc, User.created_at < end_utc)
+			.group_by(bucket)
+			.order_by(bucket)
+		)
+		rows = self.db.execute(stmt).all()
+		out: List[tuple[datetime, int]] = []
+		for row in rows:
+			b = row.bucket
+			if b is None:
+				continue
+			out.append((b, int(row.cnt or 0)))
+		return out
 
 	def count_recently_active_users(self, within_minutes: int = 5) -> int:
 		"""تعداد کاربران فعالی که ضربان فعالیت در بازهٔ اخیر داشته‌اند (برآورد «کاربر آنلاین»)."""

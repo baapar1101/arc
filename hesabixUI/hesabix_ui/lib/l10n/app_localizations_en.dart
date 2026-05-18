@@ -1976,6 +1976,88 @@ class AppLocalizationsEn extends AppLocalizations {
   String get userManagementDescription => 'Manage users, roles and permissions';
 
   @override
+  String get settingsSystemReports => 'Reports';
+
+  @override
+  String get settingsSystemReportsDescription =>
+      'System dashboards and user analytics in one place';
+
+  @override
+  String get systemReportsHubIntro =>
+      'Choose a report. To add a new one, register it in SystemReportRegistry and add a matching GoRoute.';
+
+  @override
+  String get systemReportActiveUsersTitle => 'Active & online users';
+
+  @override
+  String get systemReportActiveUsersDescription =>
+      'Summary of all users plus recently active users based on app heartbeat (approximate, not live socket count).';
+
+  @override
+  String get systemReportSignupsTitle => 'Signups over time';
+
+  @override
+  String get systemReportSignupsDescription =>
+      'New user registrations aggregated by day, week, or month for the selected date range (UTC midnight boundaries).';
+
+  @override
+  String get systemReportSignupsPickRange => 'Select date range';
+
+  @override
+  String get systemReportSignupsEmptyHint =>
+      'No registrations in this range for the chosen granularity.';
+
+  @override
+  String get systemReportRefresh => 'Refresh';
+
+  @override
+  String get systemReportActiveWindowLabel =>
+      'Recent activity window (minutes)';
+
+  @override
+  String get systemReportSummaryTotal => 'Total users';
+
+  @override
+  String get systemReportSummaryActive => 'Active accounts';
+
+  @override
+  String get systemReportSummaryInactive => 'Inactive accounts';
+
+  @override
+  String get systemReportSummaryActivePct => 'Active share';
+
+  @override
+  String get systemReportOnlineApprox => 'Recently active (approx.)';
+
+  @override
+  String get systemReportOnlineNote =>
+      'Online count uses last_activity_at from the mobile/web app heartbeat; widen the window if you need a looser signal.';
+
+  @override
+  String get systemReportGranularityLabel => 'Granularity';
+
+  @override
+  String get systemReportGranularityDay => 'Daily';
+
+  @override
+  String get systemReportGranularityWeek => 'Weekly';
+
+  @override
+  String get systemReportGranularityMonth => 'Monthly';
+
+  @override
+  String get systemReportApplyRange => 'Run report';
+
+  @override
+  String get systemReportPeriodColumn => 'Period';
+
+  @override
+  String get systemReportCountColumn => 'Signups';
+
+  @override
+  String get systemReportTotalInRange => 'Total in range';
+
+  @override
   String get systemLogs => 'System Logs';
 
   @override
@@ -3285,6 +3367,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get apiErrorNoFiscalYearForDate => 'No fiscal year covers this date.';
+
+  @override
+  String get apiErrorFiscalYearRangeOverlap =>
+      'The selected date range overlaps another fiscal year.';
 
   @override
   String get apiErrorFiscalYearLockedForPosting =>
@@ -6241,6 +6327,32 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get walletPayoutsAdminFeeHint =>
       'If the bank charged a fee, enter the amount here';
+
+  @override
+  String get walletPayoutsAdminApproveRequest => 'Approve payout request';
+
+  @override
+  String get walletPayoutsAdminApproveSuccess => 'Payout request approved.';
+
+  @override
+  String get walletPayoutOpenRequestsSection => 'Open payout requests';
+
+  @override
+  String get walletPayoutApproveForPayout => 'Approve for bank transfer';
+
+  @override
+  String get walletPayoutCancelRequest => 'Cancel payout request';
+
+  @override
+  String get walletPayoutApproveSuccess =>
+      'Request approved. Settlement will be completed after the transfer is processed.';
+
+  @override
+  String get walletPayoutCancelSuccess => 'Payout request canceled.';
+
+  @override
+  String get walletPayoutCancelConfirm =>
+      'Cancel this payout request and return the amount to your available balance?';
 
   @override
   String get bankTrackingCode => 'Bank tracking code';

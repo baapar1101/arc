@@ -31,6 +31,9 @@ import 'pages/system_settings_page.dart';
 import 'pages/admin/storage_management_page.dart';
 import 'pages/admin/system_configuration_page.dart';
 import 'pages/admin/user_management_page.dart';
+import 'pages/admin/system_reports/system_reports_hub_page.dart';
+import 'pages/admin/system_reports/active_users_stats_report_page.dart';
+import 'pages/admin/system_reports/signups_timeline_report_page.dart';
 import 'pages/admin/email_settings_page.dart';
 import 'pages/admin/redis_settings_page.dart';
 import 'pages/admin/firewall_admin_page.dart';
@@ -402,6 +405,9 @@ class _MyAppState extends State<MyApp> {
       const SystemConfigurationPage();
       const ShareLinkSettingsPage();
       const UserManagementPage();
+      const SystemReportsHubPage();
+      const ActiveUsersStatsReportPage();
+      const SignupsTimelineReportPage();
       const EmailSettingsPage();
       const AISettingsPage();
       const AIPlansAdminPage();
@@ -1369,6 +1375,54 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const UserManagementPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'reports',
+                  name: 'system_settings_reports',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings') ||
+                        _authStore!.hasAppPermission('user_management');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const SystemReportsHubPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-active-users',
+                  name: 'system_settings_reports_active_users',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings') ||
+                        _authStore!.hasAppPermission('user_management');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const ActiveUsersStatsReportPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'reports-signups-timeline',
+                  name: 'system_settings_reports_signups_timeline',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings') ||
+                        _authStore!.hasAppPermission('user_management');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const SignupsTimelineReportPage();
                   },
                 ),
                 GoRoute(
