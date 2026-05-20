@@ -1,5 +1,6 @@
 # include داخل server { } — gradle.mirror.hesabix.ir
 # Runflare (mirror-maven): distributions، android/maven2، maven2، gradle-plugins
+# ۵۰۲: upstream یا شبکه؛ ۴۰۲ Payment Required: سهمیه/اشتراک Runflare — hesabix.ir پنل Runflare.
 # هدر X-Forwarded-For/X-Real-IP به upstream نفرست.
 # همان ریسک لینک مطلق PyPI اینجا کمتر است؛ Maven metadata پاسخ‌ها عمدتاً نسبی/بدون دامنهٔ runflare بوده‌اند.
 
@@ -17,6 +18,12 @@
         return 200 "ok\n";
     }
     location = /gradle-plugins {
+        default_type text/plain; charset utf-8;
+        return 200 "ok\n";
+    }
+
+    # همان الگوی /maven2: پروب سلامت بدون تماس با upstream (curl/مانیتورینگ)
+    location = /android/maven2 {
         default_type text/plain; charset utf-8;
         return 200 "ok\n";
     }

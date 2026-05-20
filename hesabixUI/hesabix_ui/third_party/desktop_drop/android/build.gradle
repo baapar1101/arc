@@ -1,0 +1,69 @@
+group 'com.example.desktop_drop'
+version '1.0-SNAPSHOT'
+
+// همان آینهٔ ریشهٔ اپ (hesabix_ui/android/gradle.properties) — نسخهٔ pub upstream فقط google() دارد.
+def hesabixMirrorProps = new Properties()
+def hesabixPropsFile = rootProject.file("gradle.properties")
+if (hesabixPropsFile.exists()) {
+    hesabixPropsFile.withReader("UTF-8") { hesabixMirrorProps.load(it) }
+}
+def hesabixGradleMirror = (hesabixMirrorProps["hesabix.gradle.mirror"] ?: "https://gradle.mirror.hesabix.ir").toString().trim().replaceAll(/\/+$/, "")
+
+buildscript {
+    ext.kotlin_version = '1.9.10'
+    repositories {
+        maven { url "${hesabixGradleMirror}/android/maven2/" }
+        maven { url "${hesabixGradleMirror}/maven2/" }
+        maven { url "${hesabixGradleMirror}/gradle-plugins/" }
+        mavenCentral()
+        google()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.4.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        maven { url "${hesabixGradleMirror}/android/maven2/" }
+        maven { url "${hesabixGradleMirror}/maven2/" }
+        maven { url "${hesabixGradleMirror}/gradle-plugins/" }
+        mavenCentral()
+        google()
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    // Conditional for compatibility with AGP <4.2.
+    if (project.android.hasProperty("namespace")) {
+        namespace 'one.mixin.desktop.drop'
+    }
+
+    compileSdk 33
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        minSdkVersion 16
+    }
+}
+
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+}

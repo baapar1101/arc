@@ -76,6 +76,7 @@ ln -sf "$DST_AVAILABLE" "$DST_ENABLED"
 if nginx -t; then
   systemctl reload nginx
   echo "OK: $DST_ENABLED — nginx reload (HTTP+HTTPS)."
+  echo "تست سلامت (بدون upstream): curl -skI 'https://127.0.0.1/android/maven2' -H 'Host: gradle.mirror.hesabix.ir' | head -3"
   echo "تست زیپ: curl -skI -H 'Host: gradle.mirror.hesabix.ir' 'https://127.0.0.1/distributions/gradle-8.12-all.zip' | head -5"
 else
   echo "nginx -t ناموفق" >&2

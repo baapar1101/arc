@@ -5,6 +5,8 @@ set -euo pipefail
 # Build script for Flutter Android in this repo.
 # Creates Android App Bundle (AAB) and APK files for release.
 #
+# پس از pull اگر pubspec.lock یا third_party/desktop_drop عوض شد: cd hesabixUI/hesabix_ui && flutter pub get
+#
 # Mirrors & defaults align with deploy.sh:
 #   - Pub / engine artifacts: f.mirror.hesabix.ir (override with PUB_HOSTED_URL, FLUTTER_STORAGE_BASE_URL)
 #   - Flutter Linux SDK tarball: shell.hesabix.ir (override with FLUTTER_SDK_TARBALL_URL)
@@ -66,6 +68,8 @@ Environment (optional overrides; defaults match deploy.sh Hesabix mirrors):
   FLUTTER_SDK_TARBALL_URL     Linux SDK tarball URL (default: $DEFAULT_FLUTTER_SDK_TARBALL_URL)
   FLUTTER_SDK_INSTALL_DIR     Where to extract/clone SDK if missing (default: /opt/flutter as root, else REPO_ROOT/.flutter_sdk)
   FLUTTER_SDK_GIT_URL         Preferred git mirror if GitHub clone fails
+  HESABIX_SKIP_MIRROR_TRUSTSTORE
+                     Skip auto-building a JVM truststore for self-signed Gradle mirror TLS.
 
 Usage examples:
   ./build_android.sh
@@ -241,15 +245,18 @@ EOF
 
 check_gradle_mirror_health() {
   local base="${HESABIX_GRADLE_MIRROR:-https://gradle.mirror.hesabix.ir}"
+  base="${base%/}"
+  # مسیرهای بدون اسلش نهایی با location = در nginx پاسخ 200 محلی می‌دهند؛
+  # مسیرهای با اسلش به upstream پروکسی می‌شوند و HEAD ممکن است کاذب خطا بدهد.
   local urls=(
-    "$base/gradle-plugins/"
-    "$base/maven2/"
-    "$base/android/maven2/"
+    "$base/gradle-plugins"
+    "$base/maven2"
+    "$base/android/maven2"
   )
   local u
   for u in "${urls[@]}"; do
-    if ! curl -kfsS --connect-timeout 5 --max-time 12 -o /dev/null -I "$u" 2>/dev/null \
-      && ! curl -fsS --connect-timeout 5 --max-time 12 -o /dev/null -I "$u" 2>/dev/null; then
+    if ! curl -kfsS --connect-timeout 5 --max-time 12 -o /dev/null "$u" 2>/dev/null \
+      && ! curl -fsS --connect-timeout 5 --max-time 12 -o /dev/null "$u" 2>/dev/null; then
       warn "Gradle mirror endpoint not reachable: $u"
     fi
   done
@@ -274,6 +281,118 @@ prepare_gradle_user_home() {
   if [ "$(id -u)" -eq 0 ] && [ -n "$invoke_user" ]; then
     chown -R "$invoke_user":"$invoke_user" "$gradle_home" 2>/dev/null || true
   fi
+}
+
+# JDK cacerts (برای کپی و افزودن گواهی آینهٔ Gradle در صورت self-signed)
+resolve_jdk_cacerts_path() {
+  [ -n "${JAVA_HOME:-}" ] || return 1
+  local p
+  for p in "$JAVA_HOME/lib/security/cacerts" "$JAVA_HOME/jre/lib/security/cacerts"; do
+    if [ -f "$p" ] && [ -r "$p" ]; then
+      printf '%s' "$p"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# اگر آینهٔ Gradle با TLS قابل اعتماد برای JVM نیست (مثلاً گواهی self-signed روی nginx)،
+# یک truststore در GRADLE_USER_HOME می‌سازیم و JAVA_TOOL_OPTIONS را ست می‌کنیم.
+ensure_jvm_trusts_hesabix_gradle_mirror() {
+  [ "${HESABIX_SKIP_MIRROR_TRUSTSTORE:-}" = "1" ] && return 0
+  [ -n "${JAVA_HOME:-}" ] || return 0
+
+  local jdk_cacerts=""
+  jdk_cacerts="$(resolve_jdk_cacerts_path 2>/dev/null || true)"
+  [ -n "$jdk_cacerts" ] || return 0
+
+  local base="${HESABIX_GRADLE_MIRROR:-https://gradle.mirror.hesabix.ir}"
+  base="${base%/}"
+  [ -n "$base" ] || return 0
+
+  # TLS از دید curl سیستم OK است — معمولاً JVM هم بدون کار اضافه OK است.
+  if curl -fsS --connect-timeout 5 --max-time 15 -o /dev/null "$base/maven2" 2>/dev/null; then
+    return 0
+  fi
+  # آینه در دسترس نیست — truststore نمی‌سازیم
+  if ! curl -kfsS --connect-timeout 5 --max-time 15 -o /dev/null "$base/maven2" 2>/dev/null; then
+    return 0
+  fi
+
+  local mirror_host="${base#https://}"
+  mirror_host="${mirror_host#http://}"
+  mirror_host="${mirror_host%%/*}"
+  [ -n "$mirror_host" ] || return 0
+  case "$base" in
+    http://*) return 0 ;;
+  esac
+
+  if ! cmd_exists openssl || ! cmd_exists keytool; then
+    warn "TLS به آینهٔ Gradle برای curl نامعتبر است؛ برای ساخت truststore به openssl و keytool نیاز است."
+    return 0
+  fi
+
+  local invoke_user=""
+  invoke_user="$(resolve_invoking_user 2>/dev/null || true)"
+  local ts_home="${HOME:-}"
+  if [ "$(id -u)" -eq 0 ] && [ -n "$invoke_user" ]; then
+    ts_home="$(resolve_user_home "$invoke_user" 2>/dev/null || echo "$ts_home")"
+  fi
+  local ts_dir="${GRADLE_USER_HOME:-$ts_home/.gradle}"
+  mkdir -p "$ts_dir" 2>/dev/null || true
+
+  local ts="$ts_dir/hesabix-gradle-mirror-truststore.jks"
+  local pem
+  pem="$(mktemp "${TMPDIR:-/tmp}/hesabix-mirror.XXXXXX.pem")"
+  local ssl_out
+  ssl_out="$(mktemp "${TMPDIR:-/tmp}/hesabix-sclient.XXXXXX.pem")"
+  if cmd_exists timeout; then
+    printf 'Q\n' | timeout 25 openssl s_client -connect "${mirror_host}:443" -servername "$mirror_host" \
+      -showcerts 2>/dev/null >"$ssl_out" || true
+  else
+    printf 'Q\n' | openssl s_client -connect "${mirror_host}:443" -servername "$mirror_host" \
+      -showcerts 2>/dev/null >"$ssl_out" || true
+  fi
+  if ! openssl x509 -in "$ssl_out" -outform PEM >"$pem" 2>/dev/null; then
+    rm -f "$pem" "$ssl_out"
+    warn "Could not fetch TLS certificate from $mirror_host (openssl)."
+    return 0
+  fi
+  rm -f "$ssl_out"
+  if ! grep -q "BEGIN CERTIFICATE" "$pem" 2>/dev/null; then
+    rm -f "$pem"
+    warn "OpenSSL did not yield a PEM certificate for $mirror_host."
+    return 0
+  fi
+
+  if ! cp -f "$jdk_cacerts" "$ts" 2>/dev/null; then
+    rm -f "$pem"
+    warn "Could not copy JDK cacerts to $ts"
+    return 0
+  fi
+  chmod u+w "$ts" 2>/dev/null || true
+
+  keytool -delete -alias hesabix-gradle-mirror -keystore "$ts" -storepass changeit >/dev/null 2>&1 || true
+  if ! keytool -importcert -noprompt -trustcacerts -alias hesabix-gradle-mirror \
+      -file "$pem" -keystore "$ts" -storepass changeit >/dev/null 2>&1; then
+    rm -f "$pem"
+    warn "keytool could not import mirror certificate into $ts"
+    return 0
+  fi
+  rm -f "$pem"
+
+  if [ "$(id -u)" -eq 0 ] && [ -n "$invoke_user" ]; then
+    chown "$invoke_user":"$invoke_user" "$ts" 2>/dev/null || true
+  fi
+
+  local add="-Djavax.net.ssl.trustStore=$ts -Djavax.net.ssl.trustStorePassword=changeit"
+  if [ -n "${JAVA_TOOL_OPTIONS:-}" ]; then
+    JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS} ${add}"
+  else
+    JAVA_TOOL_OPTIONS="$add"
+  fi
+  export JAVA_TOOL_OPTIONS
+  echo "✓ JVM truststore for Gradle mirror: $ts (JAVA_TOOL_OPTIONS updated)"
 }
 
 set_flutter_mirror_env() {
@@ -629,12 +748,12 @@ flutter_run() {
 
   if [ "$(id -u)" -eq 0 ] && [ -n "$invoke_user" ]; then
     if cmd_exists runuser; then
-      runuser -u "$invoke_user" -- env HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" PATH="$PATH" PUB_HOSTED_URL="$PUB_HOSTED_URL" FLUTTER_STORAGE_BASE_URL="$FLUTTER_STORAGE_BASE_URL" ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-}" ANDROID_HOME="${ANDROID_HOME:-}" JAVA_HOME="${JAVA_HOME:-}" "$flutter_bin" "$@"
+      runuser -u "$invoke_user" -- env HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" PATH="$PATH" PUB_HOSTED_URL="$PUB_HOSTED_URL" FLUTTER_STORAGE_BASE_URL="$FLUTTER_STORAGE_BASE_URL" ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-}" ANDROID_HOME="${ANDROID_HOME:-}" JAVA_HOME="${JAVA_HOME:-}" JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}" "$flutter_bin" "$@"
     else
-      sudo -u "$invoke_user" --preserve-env=PATH,PUB_HOSTED_URL,FLUTTER_STORAGE_BASE_URL,ANDROID_SDK_ROOT,ANDROID_HOME,JAVA_HOME,HOME,GRADLE_USER_HOME HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" "$flutter_bin" "$@"
+      sudo -u "$invoke_user" --preserve-env=PATH,PUB_HOSTED_URL,FLUTTER_STORAGE_BASE_URL,ANDROID_SDK_ROOT,ANDROID_HOME,JAVA_HOME,JAVA_TOOL_OPTIONS,HOME,GRADLE_USER_HOME HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" "$flutter_bin" "$@"
     fi
   else
-    HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" "$flutter_bin" "$@"
+    HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}" "$flutter_bin" "$@"
   fi
 }
 
@@ -656,6 +775,7 @@ setup_android_env
 setup_gradle_mirror_init
 check_gradle_mirror_health
 prepare_gradle_user_home
+ensure_jvm_trusts_hesabix_gradle_mirror
 if ! ensure_android_prerequisites; then
   die "Android prerequisites not satisfied. Use --auto-setup-android or install SDK/Java manually."
 fi

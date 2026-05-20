@@ -4,11 +4,14 @@ val hesabixGradleMirror: String =
         .get()
         .trimEnd('/')
 
+// مخازن: اول آینهٔ داخلی؛ در صورت ۴۰۲/۵۰۲ Runflare، Maven Central و google به‌عنوان fallback.
 allprojects {
     repositories {
         maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
         maven { url = uri("${hesabixGradleMirror}/maven2/") }
         maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
+        mavenCentral()
+        google()
     }
 }
 
@@ -28,6 +31,8 @@ subprojects {
                 maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
                 maven { url = uri("${hesabixGradleMirror}/maven2/") }
                 maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
+                mavenCentral()
+                google()
             }
         }
     }
@@ -40,6 +45,8 @@ subprojects {
             maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
             maven { url = uri("${hesabixGradleMirror}/maven2/") }
             maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
+            mavenCentral()
+            google()
         }
     }
 }
