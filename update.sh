@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Hesabix update script: pull from repo, migrate backend, restart services, rebuild frontend, reload nginx.
 # pip: Hesabix mirror only (https://p.mirror.hesabix.ir/simple) — configure_pip_hesabix_mirror before backend pip install. Nginx نصب: scripts/install_pip_mirror_nginx.sh
-# Flutter: فقط f.mirror.hesabix.ir (pub + gcs) — hesabixAPI/f.mirror.hesabix.ir.conf
+# Flutter: فقط f.mirror.hesabix.ir (pub + gcs؛ upstream pub-azs.ir) — hesabixAPI/f.mirror.hesabix.ir.conf
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 # آدرس API در بیلد وب: https اگر /etc/letsencrypt/live/<API_DOMAIN> وجود داشته باشد؛ وگرنه http مگر API_PUBLIC_SCHEME در محیط ست شود (TLS سفارشی).

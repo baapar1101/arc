@@ -1,20 +1,41 @@
+import org.gradle.api.artifacts.repositories.MavenArtifactRepository
+
 group 'com.example.desktop_drop'
 version '1.0-SNAPSHOT'
 
-// همان آینهٔ ریشهٔ اپ (hesabix_ui/android/gradle.properties) — نسخهٔ pub upstream فقط google() دارد.
-def hesabixMirrorProps = new Properties()
-def hesabixPropsFile = rootProject.file("gradle.properties")
-if (hesabixPropsFile.exists()) {
-    hesabixPropsFile.withReader("UTF-8") { hesabixMirrorProps.load(it) }
-}
-def hesabixGradleMirror = (hesabixMirrorProps["hesabix.gradle.mirror"] ?: "https://gradle.mirror.hesabix.ir").toString().trim().replaceAll(/\/+$/, "")
+// داخل maven { } delegate = MavenArtifactRepository؛ شناسه‌های بدون واسطه (حتی rootProject) روی delegate resolve می‌شوند.
+// از project صریح در allprojects و از project در buildscript برای رسیدن به gradle.properties ریشه استفاده می‌شود.
 
 buildscript {
     ext.kotlin_version = '1.9.10'
     repositories {
-        maven { url "${hesabixGradleMirror}/android/maven2/" }
-        maven { url "${hesabixGradleMirror}/maven2/" }
-        maven { url "${hesabixGradleMirror}/gradle-plugins/" }
+        maven { MavenArtifactRepository repo ->
+            def p = new Properties()
+            def gf = project.rootProject.file('gradle.properties')
+            if (gf.exists()) {
+                gf.withReader('UTF-8') { Reader r -> p.load(r) }
+            }
+            def base = (p.getProperty('hesabix.gradle.mirror') ?: 'https://gradle.mirror.hesabix.ir').toString().trim().replaceAll(/\/+$/, '')
+            repo.url = base + '/android/maven2/'
+        }
+        maven { MavenArtifactRepository repo ->
+            def p = new Properties()
+            def gf = project.rootProject.file('gradle.properties')
+            if (gf.exists()) {
+                gf.withReader('UTF-8') { Reader r -> p.load(r) }
+            }
+            def base = (p.getProperty('hesabix.gradle.mirror') ?: 'https://gradle.mirror.hesabix.ir').toString().trim().replaceAll(/\/+$/, '')
+            repo.url = base + '/maven2/'
+        }
+        maven { MavenArtifactRepository repo ->
+            def p = new Properties()
+            def gf = project.rootProject.file('gradle.properties')
+            if (gf.exists()) {
+                gf.withReader('UTF-8') { Reader r -> p.load(r) }
+            }
+            def base = (p.getProperty('hesabix.gradle.mirror') ?: 'https://gradle.mirror.hesabix.ir').toString().trim().replaceAll(/\/+$/, '')
+            repo.url = base + '/gradle-plugins/'
+        }
         mavenCentral()
         google()
     }
@@ -25,11 +46,35 @@ buildscript {
     }
 }
 
-rootProject.allprojects {
+rootProject.allprojects { proj ->
     repositories {
-        maven { url "${hesabixGradleMirror}/android/maven2/" }
-        maven { url "${hesabixGradleMirror}/maven2/" }
-        maven { url "${hesabixGradleMirror}/gradle-plugins/" }
+        maven { MavenArtifactRepository repo ->
+            def p = new Properties()
+            def gf = proj.rootProject.file('gradle.properties')
+            if (gf.exists()) {
+                gf.withReader('UTF-8') { Reader r -> p.load(r) }
+            }
+            def base = (p.getProperty('hesabix.gradle.mirror') ?: 'https://gradle.mirror.hesabix.ir').toString().trim().replaceAll(/\/+$/, '')
+            repo.url = base + '/android/maven2/'
+        }
+        maven { MavenArtifactRepository repo ->
+            def p = new Properties()
+            def gf = proj.rootProject.file('gradle.properties')
+            if (gf.exists()) {
+                gf.withReader('UTF-8') { Reader r -> p.load(r) }
+            }
+            def base = (p.getProperty('hesabix.gradle.mirror') ?: 'https://gradle.mirror.hesabix.ir').toString().trim().replaceAll(/\/+$/, '')
+            repo.url = base + '/maven2/'
+        }
+        maven { MavenArtifactRepository repo ->
+            def p = new Properties()
+            def gf = proj.rootProject.file('gradle.properties')
+            if (gf.exists()) {
+                gf.withReader('UTF-8') { Reader r -> p.load(r) }
+            }
+            def base = (p.getProperty('hesabix.gradle.mirror') ?: 'https://gradle.mirror.hesabix.ir').toString().trim().replaceAll(/\/+$/, '')
+            repo.url = base + '/gradle-plugins/'
+        }
         mavenCentral()
         google()
     }

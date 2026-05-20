@@ -1376,6 +1376,8 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         # تنظیمات اعتبار
         "default_credit_limit": float(business.default_credit_limit) if getattr(business, "default_credit_limit", None) is not None else None,
         "check_credit_enabled_by_default": bool(getattr(business, "check_credit_enabled_by_default", False)),
+        "public_catalog_show_contact": bool(getattr(business, "public_catalog_show_contact", False)),
+        "public_catalog_show_base_sales_price": bool(getattr(business, "public_catalog_show_base_sales_price", True)),
         # تنظیمات محاسبه سود فاکتور
         "invoice_profit_calculation_method": getattr(business, "invoice_profit_calculation_method", None),
         "invoice_profit_calculation_basis": getattr(business, "invoice_profit_calculation_basis", None),

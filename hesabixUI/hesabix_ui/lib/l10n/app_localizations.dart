@@ -26207,6 +26207,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Insert into field'**
   String get frequentDescriptionsUseInField;
+
+  /// No description provided for @productPublicCatalogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Public product catalog'**
+  String get productPublicCatalogTitle;
+
+  /// No description provided for @productPublicCatalogSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, product name/description and contact info (if allowed in business settings) are exposed via the public catalog API.'**
+  String get productPublicCatalogSubtitle;
+
+  /// No description provided for @publicCatalogShowContactTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show phone numbers in public catalog'**
+  String get publicCatalogShowContactTitle;
+
+  /// No description provided for @publicCatalogShowContactSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, this business landline and mobile are returned by the public catalog API.'**
+  String get publicCatalogShowContactSubtitle;
+
+  /// No description provided for @publicCatalogShowBaseSalesPriceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show base sales price in public catalog'**
+  String get publicCatalogShowBaseSalesPriceTitle;
+
+  /// No description provided for @publicCatalogShowBaseSalesPriceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When disabled, base sales price is omitted from the public catalog API for published items.'**
+  String get publicCatalogShowBaseSalesPriceSubtitle;
 }
 
 class _AppLocalizationsDelegate

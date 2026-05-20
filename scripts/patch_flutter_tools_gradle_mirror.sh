@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # پچ repositories در SDK فلاتر: packages/flutter_tools/gradle/settings.gradle.kts
-# (همان سه مخزن آینهٔ Hesabix — Runflare از طریق nginx)
+# (همان سه مخزن آینهٔ Hesabix — upstream از طریق nginx، مثلاً Maven مایکت)
 #
 # اجرا از روت مخزن:
 #   bash scripts/patch_flutter_tools_gradle_mirror.sh

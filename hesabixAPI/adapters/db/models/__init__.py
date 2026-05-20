@@ -56,6 +56,7 @@ from .account import Account  # noqa: F401
 from .category import BusinessCategory  # noqa: F401
 from .product_attribute import ProductAttribute  # noqa: F401
 from .product import Product  # noqa: F401
+from .public_catalog_contact_message import PublicCatalogContactMessage  # noqa: F401
 from .product_general_barcode_alias import ProductGeneralBarcodeAlias  # noqa: F401
 from .product_instance import ProductInstance  # noqa: F401
 from .price_list import PriceList, PriceItem  # noqa: F401

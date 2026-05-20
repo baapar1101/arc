@@ -52,6 +52,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _checkCreditEnabledByDefault = false;
   final _defaultCreditLimitController = TextEditingController();
 
+  /// نمایش شماره تماس در API عمومی کاتالوگ کالا
+  bool _publicCatalogShowContact = false;
+  /// نمایش قیمت فروش پایه در API عمومی کاتالوگ
+  bool _publicCatalogShowBaseSalesPrice = true;
+
   // تنظیمات محاسبه سود فاکتور
   String? _invoiceProfitCalculationMethod;
   String? _invoiceProfitCalculationBasis;
@@ -152,6 +157,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _businessField = _resolveBusinessField(resp.businessField);
       _checkCreditEnabledByDefault = resp.checkCreditEnabledByDefault;
       _defaultCreditLimitController.text = (resp.defaultCreditLimit ?? 0).toStringAsFixed(0);
+      _publicCatalogShowContact = resp.publicCatalogShowContact;
+      _publicCatalogShowBaseSalesPrice = resp.publicCatalogShowBaseSalesPrice;
       // تنظیمات محاسبه سود
       _invoiceProfitCalculationMethod = resp.invoiceProfitCalculationMethod ?? 'automatic';
       _invoiceProfitCalculationBasis = resp.invoiceProfitCalculationBasis ?? 'purchase_price';
@@ -279,6 +286,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (orig.checkCreditEnabledByDefault != _checkCreditEnabledByDefault) {
       payload['check_credit_enabled_by_default'] = _checkCreditEnabledByDefault;
+    }
+    if (orig.publicCatalogShowContact != _publicCatalogShowContact) {
+      payload['public_catalog_show_contact'] = _publicCatalogShowContact;
+    }
+    if (orig.publicCatalogShowBaseSalesPrice != _publicCatalogShowBaseSalesPrice) {
+      payload['public_catalog_show_base_sales_price'] = _publicCatalogShowBaseSalesPrice;
     }
     // تنظیمات محاسبه سود
     if (_invoiceProfitCalculationMethod != null && _invoiceProfitCalculationMethod != orig.invoiceProfitCalculationMethod) {
@@ -936,6 +949,25 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               ),
               const SizedBox(height: 12),
               _buildTextField(controller: _postalCodeController, label: t.postalCode),
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(t.publicCatalogShowContactTitle),
+                subtitle: Text(t.publicCatalogShowContactSubtitle),
+                value: _publicCatalogShowContact,
+                onChanged: (v) {
+                  setState(() => _publicCatalogShowContact = v);
+                },
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(t.publicCatalogShowBaseSalesPriceTitle),
+                subtitle: Text(t.publicCatalogShowBaseSalesPriceSubtitle),
+                value: _publicCatalogShowBaseSalesPrice,
+                onChanged: (v) {
+                  setState(() => _publicCatalogShowBaseSalesPrice = v);
+                },
+              ),
 
               const SizedBox(height: 24),
               _buildSectionTitle(t.businessLegalInfo, cs),

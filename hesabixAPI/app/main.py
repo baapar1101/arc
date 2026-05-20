@@ -97,6 +97,7 @@ from adapters.api.v1.notifications_ws import router as notifications_ws_router
 from adapters.api.v1.ai.voice_ws import router as ai_voice_ws_router
 from adapters.api.v1.public_share_links import router as public_share_links_router
 from adapters.api.v1.public_storage_file_shares import router as public_storage_file_shares_router
+from adapters.api.v1.public_product_catalog import router as public_product_catalog_router
 from adapters.api.v1.business_backups import router as business_backups_router
 from adapters.api.v1.business_ftp_backup import router as business_ftp_backup_router
 from adapters.api.v1.business.document_monetization import router as business_document_monetization_router
@@ -1070,6 +1071,7 @@ def create_app() -> FastAPI:
     # Public share links (no prefix to allow short /p/{code})
     application.include_router(public_share_links_router)
     application.include_router(public_storage_file_shares_router)
+    application.include_router(public_product_catalog_router)
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")

@@ -14126,4 +14126,26 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get frequentDescriptionsUseInField => 'درج در فیلد شرح';
+
+  @override
+  String get productPublicCatalogTitle => 'شبکهٔ انتشار کالا';
+
+  @override
+  String get productPublicCatalogSubtitle =>
+      'با فعال‌سازی، نام و توضیحات کالا و اطلاعات تماس (در صورت تنظیم) از طریق API عمومی در اختیار سایت‌های جانبی قرار می‌گیرد.';
+
+  @override
+  String get publicCatalogShowContactTitle => 'نمایش تماس در کاتالوگ عمومی';
+
+  @override
+  String get publicCatalogShowContactSubtitle =>
+      'در صورت فعال بودن، شمارهٔ تلفن و موبایل این کسب‌وکار در API عمومی کاتالوگ نمایش داده می‌شود.';
+
+  @override
+  String get publicCatalogShowBaseSalesPriceTitle =>
+      'نمایش قیمت فروش پایه در کاتالوگ عمومی';
+
+  @override
+  String get publicCatalogShowBaseSalesPriceSubtitle =>
+      'در صورت خاموش بودن، فیلد قیمت فروش پایه در API عمومی کاتالوگ برای کالاهای منتشرشده برگردانده نمی‌شود.';
 }

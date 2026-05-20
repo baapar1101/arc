@@ -59,6 +59,9 @@ class ProductFormData {
   // Warehouse
   int? defaultWarehouseId;
 
+  /// انتشار در API عمومی کاتالوگ (شبکهٔ انتشار کالا)
+  bool isPublicCatalog;
+
   ProductFormData({
     this.itemType = 'کالا',
     this.code,
@@ -92,6 +95,7 @@ class ProductFormData {
     this.imageFileId,
     this.imageUrl,
     this.defaultWarehouseId,
+    this.isPublicCatalog = false,
   }) : selectedAttributeIds = selectedAttributeIds ?? <int>{};
 
   ProductFormData copyWith({
@@ -127,6 +131,7 @@ class ProductFormData {
     Object? imageFileId = _kProductFormFieldUnset,
     Object? imageUrl = _kProductFormFieldUnset,
     Object? defaultWarehouseId = _kProductFormFieldUnset,
+    bool? isPublicCatalog,
   }) {
     return ProductFormData(
       itemType: itemType ?? this.itemType,
@@ -163,6 +168,7 @@ class ProductFormData {
       imageFileId: _nullableCopyField<String>(imageFileId, this.imageFileId),
       imageUrl: _nullableCopyField<String>(imageUrl, this.imageUrl),
       defaultWarehouseId: _nullableCopyField<int>(defaultWarehouseId, this.defaultWarehouseId),
+      isPublicCatalog: isPublicCatalog ?? this.isPublicCatalog,
     );
   }
 
@@ -210,6 +216,7 @@ class ProductFormData {
       'attribute_ids': selectedAttributeIds.toList(), // همیشه لیست ارسال می‌شود (حتی اگر خالی باشد) تا بک‌اند بتواند ویژگی‌ها را به‌روزرسانی کند
       'image_file_id': imageFileId,
       'default_warehouse_id': defaultWarehouseId,
+      'is_public_catalog': isPublicCatalog,
     };
     // Remove only nulls we intentionally kept nullable
     // اما default_warehouse_id و attribute_ids را همیشه نگه می‌داریم (حتی اگر null/خالی باشند) تا بک‌اند بتواند آن‌ها را به‌روزرسانی کند
@@ -255,6 +262,7 @@ class ProductFormData {
       imageFileId: product['image_file_id']?.toString(),
       imageUrl: product['image_url']?.toString(),
       defaultWarehouseId: _parseInt(product['default_warehouse_id']),
+      isPublicCatalog: product['is_public_catalog'] == true,
     );
   }
 

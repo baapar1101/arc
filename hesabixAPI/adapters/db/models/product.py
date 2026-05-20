@@ -102,6 +102,21 @@ class Product(Base):
     # وضعیت فعال/غیرفعال
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="آیا محصول فعال است؟")
 
+    # شبکهٔ انتشار کالا (کاتالوگ عمومی)
+    is_public_catalog: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        comment="انتشار در API عمومی کاتالوگ",
+    )
+    catalog_public_uuid: Mapped[str | None] = mapped_column(
+        String(36),
+        nullable=True,
+        unique=True,
+        index=True,
+        comment="شناسهٔ عمومی برای لینک کاتالوگ",
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

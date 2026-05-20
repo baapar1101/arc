@@ -138,7 +138,7 @@ packages:
     source: hosted
     version: "0.7.12"
   desktop_drop:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       path: "third_party/desktop_drop"
       relative: true

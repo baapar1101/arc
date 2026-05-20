@@ -10,6 +10,11 @@ set -euo pipefail
 # Mirrors & defaults align with deploy.sh:
 #   - Pub / engine artifacts: f.mirror.hesabix.ir (override with PUB_HOSTED_URL, FLUTTER_STORAGE_BASE_URL)
 #   - Flutter Linux SDK tarball: shell.hesabix.ir (override with FLUTTER_SDK_TARBALL_URL)
+#   - NDK (Side by side): در صورت نبود، از Myket به‌صورت ZIP نصب می‌شود (HESABIX_ANDROID_SDK_MIRROR_BASE)
+#   - ایندکس مخزن SDK (addons_list / repository2): با SDK_TEST_BASE_URL از HESABIX_ANDROID_SDK_REPO_MIRROR (پیش‌فرض maven.myket.ir/android/repository/)
+#   - در صورت نبود cmdline-tools، نصب از ZIP آینه (commandlinetools-linux-*_latest.zip) تا sdkmanager در دسترس باشد.
+#   - لایسنس SDK + نصب platform/build-tools با sdkmanager؛ اگر نصب شبکه‌ای نشد، ZIP از HESABIX_ANDROID_SDK_MIRROR_BASE (مثلاً build-tools_r35_linux.zip و platform-36_r01.zip روی Myket).
+#   - خطاهای 503 روی manifestهای sys-img/emulator معمولاً ربطی به بیلد APK ندارند.
 #   - Git fallbacks for SDK: FLUTTER_SDK_GIT_URL, then Tsinghua, then Gitee
 # Env FLUTTER_SDK_INSTALL_DIR: extract/clone SDK here when not root (default: REPO_ROOT/.flutter_sdk)
 
@@ -40,10 +45,35 @@ INSTALL_DEPS=false
 AUTO_SETUP_ANDROID=false
 BOOTSTRAP_ONLY=false
 BUILD_FAILED=false
+# جزئیات خروجی: 0=ساکت، 1=flutter -v (پیش‌فرض)، 2=flutter -vv
+BUILD_ANDROID_VERBOSE="${BUILD_ANDROID_VERBOSE:-1}"
+# اگر 1 باشد، حافظه/هسته و آرگومان‌های Gradle به‌صورت خودکار تنظیم می‌شود (غیرفعال: 0)
+BUILD_ANDROID_SMART_RESOURCES="${BUILD_ANDROID_SMART_RESOURCES:-1}"
+# نصب خودکار NDK از آینهٔ داخلی (Myket) وقتی پوشهٔ ndk/<نسخه> نیست — برای دور زدن تحریم/دانلود گوگل
+HESABIX_ANDROID_SDK_MIRROR_BASE="${HESABIX_ANDROID_SDK_MIRROR_BASE:-https://maven.myket.ir/android-sdk}"
+HESABIX_SKIP_NDK_MIRROR="${HESABIX_SKIP_NDK_MIRROR:-0}"
+# معادل dl.google.com/android/repository/ — برای sdkmanager و AGP (addons_list-6.xml و …)
+HESABIX_ANDROID_SDK_REPO_MIRROR="${HESABIX_ANDROID_SDK_REPO_MIRROR:-https://maven.myket.ir/android/repository/}"
+HESABIX_SKIP_ANDROID_REPO_MIRROR="${HESABIX_SKIP_ANDROID_REPO_MIRROR:-0}"
+# قبل از Gradle: نوشتن hash لایسنس‌های رایج + yes | sdkmanager --licenses و نصب پکیج‌ها (پیش‌فرض platform 36 و build-tools 35)
+HESABIX_SKIP_SDK_LICENSE_BOOTSTRAP="${HESABIX_SKIP_SDK_LICENSE_BOOTSTRAP:-0}"
+HESABIX_SKIP_SDKMANAGER_INSTALL="${HESABIX_SKIP_SDKMANAGER_INSTALL:-0}"
+HESABIX_SDKMANAGER_PACKAGES="${HESABIX_SDKMANAGER_PACKAGES:-platforms;android-36 build-tools;35.0.0}"
+# اگر sdkmanager/Gradle نتوانند build-tools یا platform را بگیرند، از ZIP آینه (نام فایل روی Myket با _linux است نه -linux)
+HESABIX_SKIP_SDK_ZIP_MIRROR="${HESABIX_SKIP_SDK_ZIP_MIRROR:-0}"
+HESABIX_BUILD_TOOLS_LINUX_ZIP="${HESABIX_BUILD_TOOLS_LINUX_ZIP:-build-tools_r35_linux.zip}"
+HESABIX_BUILD_TOOLS_LINUX_ZIP_SHA1="${HESABIX_BUILD_TOOLS_LINUX_ZIP_SHA1:-2cfaa0bbb2336e9ec18ed3ecea84fa2e2af607bc}"
+HESABIX_BUILD_TOOLS_REVISION="${HESABIX_BUILD_TOOLS_REVISION:-35.0.0}"
+HESABIX_PLATFORM_ZIP="${HESABIX_PLATFORM_ZIP:-platform-36_r01.zip}"
+HESABIX_PLATFORM_ZIP_SHA1="${HESABIX_PLATFORM_ZIP_SHA1:-feed7041652a3744582bb233506013969dbadb46}"
+HESABIX_ANDROID_PLATFORM_API="${HESABIX_ANDROID_PLATFORM_API:-36}"
+HESABIX_SKIP_CMDLINE_TOOLS_MIRROR="${HESABIX_SKIP_CMDLINE_TOOLS_MIRROR:-0}"
+HESABIX_CMDLINE_TOOLS_LINUX_ZIP="${HESABIX_CMDLINE_TOOLS_LINUX_ZIP:-commandlinetools-linux-11076708_latest.zip}"
+HESABIX_CMDLINE_TOOLS_LINUX_ZIP_SHA1="${HESABIX_CMDLINE_TOOLS_LINUX_ZIP_SHA1:-d313adb7aedccf6cf0cfca51ec180f0059f5f8f8}"
 
 print_usage() {
   cat <<EOF
-Usage: ./build_android.sh [--project <path>] [--mode <debug|profile|release>] [--api-base-url <url>] [--aab] [--no-aab] [--apk] [--no-apk] [--universal-apk] [--split-apk] [--clean] [--install-deps] [--auto-setup-android] [--bootstrap-only] [--help]
+Usage: ./build_android.sh [--project <path>] [--mode <debug|profile|release>] [--api-base-url <url>] [--aab] [--no-aab] [--apk] [--no-apk] [--universal-apk] [--split-apk] [--clean] [--install-deps] [--auto-setup-android] [--bootstrap-only] [--quiet] [--help]
 
 Options:
   --project PATH     Flutter project path (contains pubspec.yaml). If not specified, will be auto-detected.
@@ -60,6 +90,7 @@ Options:
   --auto-setup-android
                      Try automatic Android toolchain setup (Java + SDK packages) on Debian/Ubuntu.
   --bootstrap-only   Only setup/check prerequisites; skip pub get, clean, and build steps.
+  --quiet            خروجی کم‌حجم (معادل BUILD_ANDROID_VERBOSE=0).
   -h, --help         Show help.
 
 Environment (optional overrides; defaults match deploy.sh Hesabix mirrors):
@@ -70,9 +101,32 @@ Environment (optional overrides; defaults match deploy.sh Hesabix mirrors):
   FLUTTER_SDK_GIT_URL         Preferred git mirror if GitHub clone fails
   HESABIX_SKIP_MIRROR_TRUSTSTORE
                      Skip auto-building a JVM truststore for self-signed Gradle mirror TLS.
+  HESABIX_ANDROID_SDK_MIRROR_BASE
+                     پایهٔ URL آرشیوهای ZIP آینهٔ اندروید SDK/NDK (پیش‌فرض: Myket).
+  HESABIX_SKIP_NDK_MIRROR     اگر 1 باشد، نصب خودکار NDK از آینه غیرفعال می‌شود.
+  HESABIX_NDK_REVISION        اجبار نسخهٔ NDK (مثلاً 28.2.13676358)؛ در غیر این صورت از Flutter خوانده می‌شود.
+  HESABIX_ANDROID_SDK_REPO_MIRROR
+                     پایهٔ ایندکس رسمی مخزن (باید با / تمام شود؛ مثلاً …/android/repository/). روی فرایند Gradle به‌صورت SDK_TEST_BASE_URL اعمال می‌شود.
+  HESABIX_SKIP_ANDROID_REPO_MIRROR  اگر 1 باشد، جایگزینی dl.google.com برای ایندکس SDK غیرفعال می‌شود.
+  HESABIX_SKIP_SDK_LICENSE_BOOTSTRAP  اگر 1 باشد، مرحلهٔ خودکار لایسنس/نصب sdkmanager اجرا نمی‌شود.
+  HESABIX_SKIP_SDKMANAGER_INSTALL     اگر 1 باشد، فقط لایسنس‌ها (فایل + --licenses)؛ نصب پکیج با sdkmanager رد می‌شود.
+  HESABIX_SDKMANAGER_PACKAGES         فاصله‌جداشده؛ پیش‌فرض: platforms;android-36 build-tools;35.0.0
+  HESABIX_SKIP_SDK_ZIP_MIRROR         اگر 1 باشد، نصب تکمیلی build-tools/platform از ZIP آینه غیرفعال است.
+  HESABIX_BUILD_TOOLS_LINUX_ZIP       نام فایل ZIP build-tools روی آینه (پیش‌فرض: build-tools_r35_linux.zip).
+  HESABIX_BUILD_TOOLS_LINUX_ZIP_SHA1  SHA1 اختیاری برای همان فایل (پیش‌فرض برای ZIP فعلی Myket).
+  HESABIX_BUILD_TOOLS_REVISION        پوشهٔ نصب زیر build-tools/ (پیش‌فرض 35.0.0؛ باید با android.buildToolsVersion در gradle.properties یکی باشد).
+  HESABIX_PLATFORM_ZIP                ZIP پلتفرم SDK روی آینه (پیش‌فرض: platform-36_r01.zip).
+  HESABIX_PLATFORM_ZIP_SHA1           SHA1 اختیاری برای همان فایل.
+  HESABIX_ANDROID_PLATFORM_API        سطح API پوشهٔ platforms/android-<api> (پیش‌فرض 36).
+  HESABIX_SKIP_CMDLINE_TOOLS_MIRROR   اگر 1 باشد، نصب خودکار cmdline-tools از ZIP آینه غیرفعال است.
+  HESABIX_CMDLINE_TOOLS_LINUX_ZIP     نام فایل ZIP (پیش‌فرض: commandlinetools-linux-11076708_latest.zip).
+  HESABIX_CMDLINE_TOOLS_LINUX_ZIP_SHA1  SHA1 اختیاری؛ پیش‌فرض برای ZIP فعلی Myket.
+  BUILD_ANDROID_VERBOSE       0=quiet, 1=flutter -v (default), 2=flutter -vv (حداکثر جزئیات).
+  BUILD_ANDROID_SMART_RESOURCES 0=بدون تنظیم خودکار heap/workers برای Gradle، 1=فعال (پیش‌فرض).
 
 Usage examples:
   ./build_android.sh
+  ./scripts/fix_android_sdk_hesabix_mirror.sh
   ./build_android.sh --mode release --clean
   ./build_android.sh --project hesabixUI/hesabix_ui
   ./build_android.sh --api-base-url https://hsxn.hesabix.ir
@@ -243,20 +297,37 @@ EOF
   export HESABIX_GRADLE_MIRROR="${HESABIX_GRADLE_MIRROR:-https://gradle.mirror.hesabix.ir}"
 }
 
+# curl به آینهٔ hesabix: اول TLS با -k؛ در صورت شکست (مثلاً hairpin DNS) همان URL با --resolve به 127.0.0.1
+hesabix_mirror_curl_ok() {
+  local u="$1"
+  if curl -kfsS --connect-timeout 5 --max-time 25 -o /dev/null "$u" 2>/dev/null; then
+    return 0
+  fi
+  case "$u" in
+    https://*hesabix.ir/*)
+      local host="${u#https://}"
+      host="${host%%/*}"
+      local path="${u#https://${host}}"
+      if curl -kfsS --connect-timeout 5 --max-time 25 --resolve "${host}:443:127.0.0.1" -o /dev/null "https://${host}${path}" 2>/dev/null; then
+        return 0
+      fi
+      ;;
+  esac
+  return 1
+}
+
 check_gradle_mirror_health() {
   local base="${HESABIX_GRADLE_MIRROR:-https://gradle.mirror.hesabix.ir}"
   base="${base%/}"
-  # مسیرهای بدون اسلش نهایی با location = در nginx پاسخ 200 محلی می‌دهند؛
-  # مسیرهای با اسلش به upstream پروکسی می‌شوند و HEAD ممکن است کاذب خطا بدهد.
+  # نمونهٔ کوچک POM روی هر سه مسیر (پروکسی واقعی تا مایکت)
   local urls=(
-    "$base/gradle-plugins"
-    "$base/maven2"
-    "$base/android/maven2"
+    "$base/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom"
+    "$base/android/maven2/androidx/activity/activity/1.8.2/activity-1.8.2.pom"
+    "$base/gradle-plugins/org/gradle/kotlin/gradle-kotlin-dsl-plugins/4.3.0/gradle-kotlin-dsl-plugins-4.3.0.pom"
   )
   local u
   for u in "${urls[@]}"; do
-    if ! curl -kfsS --connect-timeout 5 --max-time 12 -o /dev/null "$u" 2>/dev/null \
-      && ! curl -fsS --connect-timeout 5 --max-time 12 -o /dev/null "$u" 2>/dev/null; then
+    if ! hesabix_mirror_curl_ok "$u"; then
       warn "Gradle mirror endpoint not reachable: $u"
     fi
   done
@@ -618,6 +689,8 @@ while [[ $# -gt 0 ]]; do
       AUTO_SETUP_ANDROID=true; shift ;;
     --bootstrap-only)
       BOOTSTRAP_ONLY=true; shift ;;
+    --quiet)
+      BUILD_ANDROID_VERBOSE=0; shift ;;
     -h|--help)
       print_usage; exit 0 ;;
     *)
@@ -677,6 +750,8 @@ setup_android_env() {
     export ANDROID_HOME="$android_sdk_path"
     export PATH="$PATH:$android_sdk_path/cmdline-tools/latest/bin:$android_sdk_path/platform-tools"
     echo "✓ Android SDK found: $ANDROID_SDK_ROOT"
+    echo "  NDK در صورت نبود، از آینهٔ داخلی نصب می‌شود (پیش‌فرض: $HESABIX_ANDROID_SDK_MIRROR_BASE). غیرفعال: HESABIX_SKIP_NDK_MIRROR=1"
+    hesabix_apply_android_sdk_repository_mirror
   else
     warn "Android SDK not found in common paths"
     warn "Please set ANDROID_SDK_ROOT or ANDROID_HOME environment variable"
@@ -686,7 +761,9 @@ setup_android_env() {
   local java_home="${JAVA_HOME:-}"
   if [ -z "$java_home" ]; then
     # Try to find Java 17 or newer
-    if [ -d "/usr/lib/jvm/java-17-openjdk-amd64" ]; then
+    if [ -d "/usr/lib/jvm/java-21-openjdk-amd64" ]; then
+      java_home="/usr/lib/jvm/java-21-openjdk-amd64"
+    elif [ -d "/usr/lib/jvm/java-17-openjdk-amd64" ]; then
       java_home="/usr/lib/jvm/java-17-openjdk-amd64"
     elif [ -d "/usr/lib/jvm/java-11-openjdk-amd64" ]; then
       java_home="/usr/lib/jvm/java-11-openjdk-amd64"
@@ -702,6 +779,501 @@ setup_android_env() {
     java -version 2>&1 | head -n 1 || true
   else
     warn "Java not found. Please install Java 11 or newer and set JAVA_HOME"
+  fi
+}
+
+# جلوگیری از dl.google.com/android/repository/ برای addons_list و repository2 (sdklib / AGP)
+hesabix_apply_android_sdk_repository_mirror() {
+  if [ "${HESABIX_SKIP_ANDROID_REPO_MIRROR:-0}" = "1" ]; then
+    unset SDK_TEST_BASE_URL 2>/dev/null || true
+    return 0
+  fi
+  local base="${HESABIX_ANDROID_SDK_REPO_MIRROR:-}"
+  [ -n "$base" ] || return 0
+  case "$base" in
+    */) ;;
+    *) base="${base}/" ;;
+  esac
+  export SDK_TEST_BASE_URL="$base"
+  echo "✓ Android SDK repository index mirror (SDK_TEST_BASE_URL): $SDK_TEST_BASE_URL"
+  echo "  اگر خطای 404 یا TLS بود، آدرس را با HESABIX_ANDROID_SDK_REPO_MIRROR اصلاح کنید (گاهی زیر android-sdk/ است نه android/repository/)."
+}
+
+hesabix_license_file_append_line_if_missing() {
+  local file="$1"
+  local line="$2"
+  [ -n "$line" ] || return 0
+  mkdir -p "$(dirname "$file")" 2>/dev/null || return 1
+  if [ ! -f "$file" ]; then
+    : >"$file" 2>/dev/null || return 1
+  fi
+  if grep -Fxq "$line" "$file" 2>/dev/null; then
+    return 0
+  fi
+  printf '\n%s\n' "$line" >>"$file" 2>/dev/null || return 1
+  return 0
+}
+
+# hashهای رایج android-sdk-license / preview برای CI و سرور بدون تعامل؛ در کنار sdkmanager --licenses
+hesabix_seed_android_sdk_license_files() {
+  local sdk="${1:-}"
+  [ -n "$sdk" ] && [ -d "$sdk" ] || return 0
+  local lic_dir="$sdk/licenses"
+  if ! mkdir -p "$lic_dir" 2>/dev/null; then
+    warn "نوشتن در $lic_dir ممکن نیست؛ برای پذیرش لایسنس root یا دسترسی نوشتن روی SDK لازم است."
+    return 1
+  fi
+  local f_stable="$lic_dir/android-sdk-license"
+  local f_preview="$lic_dir/android-sdk-preview-license"
+  local h
+  for h in \
+    24333f8a63b6825ea9c5514f83c2829b004d1fee \
+    8933bad161af4178b1185d1a37fbf41ea5269c55 \
+    d56f5187479451eabf01fb78af6dfcb131a6481e \
+    601085b94cd77f0b54ff86406957099ebe79c4d6 \
+    33b6a2b64607f11b759f320ef9dff4ae5c47d97a \
+    59dd11fc20c2cb68f389a776437dbcdbd9989783; do
+    hesabix_license_file_append_line_if_missing "$f_stable" "$h" || true
+  done
+  hesabix_license_file_append_line_if_missing "$f_preview" "84831b9409646a918e30573bab4c9c91346d8abd" || true
+  echo "✓ فایل‌های لایسنس SDK (در صورت امکان) به‌روز شدند: $lic_dir"
+}
+
+resolve_sdkmanager_bin() {
+  local sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  local sm=""
+  for sm in \
+    "${sdk:+$sdk/cmdline-tools/latest/bin/sdkmanager}" \
+    "${sdk:+$sdk/cmdline-tools/bin/sdkmanager}"; do
+    [ -n "$sm" ] && [ -x "$sm" ] && printf '%s' "$sm" && return 0
+  done
+  sm="$(command -v sdkmanager 2>/dev/null || true)"
+  if [ -n "$sm" ] && [ -x "$sm" ]; then
+    printf '%s' "$sm"
+    return 0
+  fi
+  return 1
+}
+
+# نصب Android SDK Command-line Tools از ZIP آینه (مسیر استاندارد: cmdline-tools/latest/bin/sdkmanager)
+hesabix_ensure_cmdline_tools_from_internal_mirror() {
+  [ "${HESABIX_SKIP_CMDLINE_TOOLS_MIRROR:-0}" != "1" ] || return 0
+  [ "$(uname -s 2>/dev/null || echo)" = "Linux" ] || return 0
+  local sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  [ -n "$sdk" ] && [ -d "$sdk" ] || return 0
+  if resolve_sdkmanager_bin >/dev/null 2>&1; then
+    echo "✓ sdkmanager از قبل در دسترس است."
+    return 0
+  fi
+  if ! cmd_exists unzip; then
+    warn "برای نصب cmdline-tools از ZIP، unzip لازم است."
+    return 0
+  fi
+  if ! cmd_exists sha1sum; then
+    warn "برای تأیید checksum cmdline-tools، sha1sum لازم است."
+    return 0
+  fi
+  if ! cmd_exists curl && ! cmd_exists wget; then
+    warn "برای دانلود cmdline-tools، curl یا wget لازم است."
+    return 0
+  fi
+
+  local base="${HESABIX_ANDROID_SDK_MIRROR_BASE%/}"
+  local zname="${HESABIX_CMDLINE_TOOLS_LINUX_ZIP:-commandlinetools-linux-11076708_latest.zip}"
+  local zsha="${HESABIX_CMDLINE_TOOLS_LINUX_ZIP_SHA1:-}"
+  local url="$base/$zname"
+  local tmp=""
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/hesabix-clt.XXXXXX")"
+  local zip_path="$tmp/$zname"
+
+  echo "در حال نصب Android cmdline-tools از آینهٔ ZIP…"
+  echo "  URL: $url"
+  local ok=1
+  if cmd_exists curl; then
+    curl -fL --connect-timeout 30 --retry 3 --retry-delay 2 -o "$zip_path" "$url" || ok=0
+  else
+    wget -q --timeout=30 -O "$zip_path" "$url" || ok=0
+  fi
+  if [ "$ok" != "1" ]; then
+    warn "دانلود cmdline-tools ZIP ناموفق بود."
+    rm -rf "$tmp"
+    return 0
+  fi
+  if [ -n "$zsha" ]; then
+    local got=""
+    got="$(sha1sum "$zip_path" | awk '{print $1}')"
+    if [ "$got" != "$zsha" ]; then
+      warn "SHA1 cmdline-tools ZIP با مقدار انتظار یکی نیست (انتظار: $zsha ، دریافت: $got)."
+      rm -rf "$tmp"
+      return 0
+    fi
+  fi
+  mkdir -p "$tmp/ex"
+  if ! unzip -q "$zip_path" -d "$tmp/ex"; then
+    warn "باز کردن ZIP cmdline-tools ناموفق بود."
+    rm -rf "$tmp"
+    return 0
+  fi
+  if [ ! -d "$tmp/ex/cmdline-tools" ] || [ ! -x "$tmp/ex/cmdline-tools/bin/sdkmanager" ]; then
+    warn "ساختار ZIP cmdline-tools نامعتبر بود."
+    rm -rf "$tmp"
+    return 0
+  fi
+  mkdir -p "$sdk/cmdline-tools"
+  rm -rf "$sdk/cmdline-tools/latest"
+  mv "$tmp/ex/cmdline-tools" "$sdk/cmdline-tools/latest"
+  rm -rf "$tmp"
+  if [ "$(id -u)" -eq 0 ]; then
+    local iu=""
+    iu="$(resolve_invoking_user 2>/dev/null || true)"
+    [ -n "$iu" ] && chown -R "$iu:$iu" "$sdk/cmdline-tools/latest" 2>/dev/null || true
+  fi
+  export PATH="$PATH:$sdk/cmdline-tools/latest/bin:$sdk/platform-tools"
+  echo "✓ cmdline-tools نصب شد: $sdk/cmdline-tools/latest"
+}
+
+# پذیرش لایسنس و نصب platform/build-tools قبل از Gradle (رفع خطای «licences have not been accepted»)
+hesabix_bootstrap_android_sdk_licenses_and_packages() {
+  [ "${HESABIX_SKIP_SDK_LICENSE_BOOTSTRAP:-0}" != "1" ] || return 0
+  local sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  [ -n "$sdk" ] && [ -d "$sdk" ] || return 0
+
+  hesabix_seed_android_sdk_license_files "$sdk" || true
+
+  local sm=""
+  sm="$(resolve_sdkmanager_bin 2>/dev/null || true)"
+  if [ -z "$sm" ]; then
+    warn "sdkmanager پیدا نشد (معمولاً android-sdk-cmdline-tools). فقط hash لایسنس نوشته شد؛ اگر بیلد باز هم لایسنس خواست، cmdline-tools را نصب کنید یا yes | sdkmanager --licenses را دستی اجرا کنید."
+    return 0
+  fi
+
+  echo "در حال پذیرش لایسنس‌های SDK با sdkmanager… ($sm)"
+  if ! yes 2>/dev/null | "$sm" --licenses >/dev/null 2>&1; then
+    warn "sdkmanager --licenses ناموفق بود (شاید آینهٔ repository موقتاً 503 بدهد). hashهای محلی همچنان اعمال شده‌اند."
+  fi
+
+  [ "${HESABIX_SKIP_SDKMANAGER_INSTALL:-0}" != "1" ] || return 0
+  local pkg_line="${HESABIX_SDKMANAGER_PACKAGES:-}"
+  [ -n "$pkg_line" ] || return 0
+  local -a pkgs=()
+  read -r -a pkgs <<<"$pkg_line"
+  [ "${#pkgs[@]}" -gt 0 ] || return 0
+
+  echo "در حال نصب پکیج‌های SDK (sdkmanager): ${pkgs[*]}"
+  if ! yes 2>/dev/null | "$sm" "${pkgs[@]}"; then
+    warn "نصب پکیج با sdkmanager ناموفق بود؛ Gradle ممکن است خودش دانلود کند اگر لایسنس‌ها پذیرفته شده باشند."
+  fi
+}
+
+# تکمیل build-tools و platform از ZIP آینه (وقتی sdkmanager/گوگل در دسترس نیستند؛ نام صحیح روی Myket: *_linux.zip)
+hesabix_ensure_sdk_components_from_internal_mirror() {
+  [ "${HESABIX_SKIP_SDK_ZIP_MIRROR:-0}" != "1" ] || return 0
+  [ "$(uname -s 2>/dev/null || echo)" = "Linux" ] || return 0
+  local sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  [ -n "$sdk" ] && [ -d "$sdk" ] || return 0
+
+  if ! cmd_exists unzip; then
+    warn "برای نصب build-tools/platform از ZIP، unzip لازم است."
+    return 0
+  fi
+  if ! cmd_exists sha1sum; then
+    warn "برای تأیید checksum ZIPهای SDK، sha1sum لازم است."
+    return 0
+  fi
+  if ! cmd_exists curl && ! cmd_exists wget; then
+    warn "برای دانلود ZIPهای SDK، curl یا wget لازم است."
+    return 0
+  fi
+
+  local base="${HESABIX_ANDROID_SDK_MIRROR_BASE%/}"
+
+  local bt_rev="${HESABIX_BUILD_TOOLS_REVISION:-35.0.0}"
+  local bt_home="$sdk/build-tools/$bt_rev"
+  if [ -x "$bt_home/aapt2" ] || [ -x "$bt_home/d8" ]; then
+    echo "✓ Android SDK Build-Tools از قبل نصب است: $bt_home"
+  else
+    local tmp_bt=""
+    tmp_bt="$(mktemp -d "${TMPDIR:-/tmp}/hesabix-btzip.XXXXXX")"
+    local bt_zip="${HESABIX_BUILD_TOOLS_LINUX_ZIP:-build-tools_r35_linux.zip}"
+    local bt_sha="${HESABIX_BUILD_TOOLS_LINUX_ZIP_SHA1:-}"
+    local bt_url="$base/$bt_zip"
+    local bt_path="$tmp_bt/$bt_zip"
+    echo "در حال نصب Build-Tools $bt_rev از آینهٔ ZIP…"
+    echo "  URL: $bt_url"
+    local dl_ok=1
+    if cmd_exists curl; then
+      curl -fL --connect-timeout 30 --retry 3 --retry-delay 2 -o "$bt_path" "$bt_url" || dl_ok=0
+    else
+      wget -q --timeout=30 -O "$bt_path" "$bt_url" || dl_ok=0
+    fi
+    if [ "$dl_ok" != "1" ]; then
+      warn "دانلود build-tools ZIP ناموفق بود؛ سراغ platform می‌رویم."
+    else
+      if [ -n "$bt_sha" ]; then
+        local got=""
+        got="$(sha1sum "$bt_path" | awk '{print $1}')"
+        if [ "$got" != "$bt_sha" ]; then
+          warn "SHA1 build-tools ZIP با مقدار انتظار یکی نیست (انتظار: $bt_sha ، دریافت: $got)."
+          dl_ok=0
+        fi
+      fi
+    fi
+    if [ "$dl_ok" = "1" ]; then
+      mkdir -p "$tmp_bt/bt-extract"
+      if unzip -q "$bt_path" -d "$tmp_bt/bt-extract"; then
+        local top=""
+        top="$(find "$tmp_bt/bt-extract" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+        if [ -n "$top" ] && [ -f "$top/source.properties" ]; then
+          local zip_rev=""
+          zip_rev="$(grep -E '^Pkg.Revision=' "$top/source.properties" 2>/dev/null | head -n 1 | cut -d= -f2- | tr -d '\r' | awk '{print $1}')"
+          if [ -n "$zip_rev" ] && [ "$zip_rev" = "$bt_rev" ]; then
+            mkdir -p "$sdk/build-tools"
+            rm -rf "$bt_home"
+            mv "$top" "$bt_home"
+            if [ "$(id -u)" -eq 0 ]; then
+              local _iu=""
+              _iu="$(resolve_invoking_user 2>/dev/null || true)"
+              [ -n "$_iu" ] && chown -R "$_iu:$_iu" "$bt_home" 2>/dev/null || true
+            fi
+            echo "✓ Build-Tools نصب شد: $bt_home"
+          else
+            warn "نسخهٔ داخل ZIP build-tools ($zip_rev) با HESABIX_BUILD_TOOLS_REVISION ($bt_rev) یکی نیست؛ نصب ZIP رد شد."
+          fi
+        else
+          warn "ساختار ZIP build-tools نامعتبر بود (source.properties نیست)."
+        fi
+      else
+        warn "باز کردن ZIP build-tools ناموفق بود."
+      fi
+    fi
+    rm -rf "$tmp_bt"
+  fi
+
+  local api="${HESABIX_ANDROID_PLATFORM_API:-36}"
+  local plat_home="$sdk/platforms/android-$api"
+  if [ -f "$plat_home/android.jar" ]; then
+    echo "✓ Android SDK Platform از قبل نصب است: $plat_home"
+  else
+    local tmp_pl=""
+    tmp_pl="$(mktemp -d "${TMPDIR:-/tmp}/hesabix-plzip.XXXXXX")"
+    local p_zip="${HESABIX_PLATFORM_ZIP:-platform-36_r01.zip}"
+    local p_sha="${HESABIX_PLATFORM_ZIP_SHA1:-}"
+    local p_url="$base/$p_zip"
+    local p_path="$tmp_pl/$p_zip"
+    echo "در حال نصب Platform android-$api از آینهٔ ZIP…"
+    echo "  URL: $p_url"
+    local pok=1
+    if cmd_exists curl; then
+      curl -fL --connect-timeout 30 --retry 3 --retry-delay 2 -o "$p_path" "$p_url" || pok=0
+    else
+      wget -q --timeout=30 -O "$p_path" "$p_url" || pok=0
+    fi
+    if [ "$pok" != "1" ]; then
+      warn "دانلود platform ZIP ناموفق بود."
+    else
+      if [ -n "$p_sha" ]; then
+        local pg=""
+        pg="$(sha1sum "$p_path" | awk '{print $1}')"
+        if [ "$pg" != "$p_sha" ]; then
+          warn "SHA1 platform ZIP با مقدار انتظار یکی نیست (انتظار: $p_sha ، دریافت: $pg)."
+          pok=0
+        fi
+      fi
+    fi
+    if [ "$pok" = "1" ]; then
+      mkdir -p "$tmp_pl/pl-extract"
+      if unzip -q "$p_path" -d "$tmp_pl/pl-extract"; then
+        local ptop=""
+        ptop="$(find "$tmp_pl/pl-extract" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+        if [ -n "$ptop" ] && [ -f "$ptop/android.jar" ]; then
+          local zip_api=""
+          zip_api="$(grep -E '^AndroidVersion.ApiLevel=' "$ptop/source.properties" 2>/dev/null | head -n 1 | cut -d= -f2 | tr -d '\r' | tr -d ' ')"
+          if [ -z "$zip_api" ] || [ "$zip_api" = "$api" ]; then
+            mkdir -p "$sdk/platforms"
+            rm -rf "$plat_home"
+            mv "$ptop" "$plat_home"
+            if [ "$(id -u)" -eq 0 ]; then
+              local _iu2=""
+              _iu2="$(resolve_invoking_user 2>/dev/null || true)"
+              [ -n "$_iu2" ] && chown -R "$_iu2:$_iu2" "$plat_home" 2>/dev/null || true
+            fi
+            echo "✓ Platform نصب شد: $plat_home"
+          else
+            warn "API داخل ZIP platform ($zip_api) با HESABIX_ANDROID_PLATFORM_API ($api) یکی نیست؛ نصب ZIP رد شد."
+          fi
+        else
+          warn "ساختار ZIP platform نامعتبر بود."
+        fi
+      else
+        warn "باز کردن ZIP platform ناموفق بود."
+      fi
+    fi
+    rm -rf "$tmp_pl"
+  fi
+}
+
+# نگاشت ndk;<revision> → فایل zip لینوکس Myket + sha1 (هم‌راستا با کاتالوگ maven.myket.ir/android-sdk)
+hesabix_ndk_mirror_zip_sha1() {
+  local rev="${1:-}"
+  case "$rev" in
+    30.0.14904198) echo "android-ndk-r30-beta1-linux.zip|26b746e5a1e7ac3371f2a862a2f52a7c0740aa8a" ;;
+    29.0.14206865) echo "android-ndk-r29-linux.zip|87e2bb7e9be5d6a1c6cdf5ec40dd4e0c6d07c30b" ;;
+    29.0.14033849) echo "android-ndk-r29-beta4-linux.zip|ecba553458e222a7c9b24945a3690e80a4730104" ;;
+    29.0.13846066) echo "android-ndk-r29-beta3-linux.zip|277ccc0f9c56b05dd88e0af39446cd9402b13b0c" ;;
+    29.0.13599879) echo "android-ndk-r29-beta2-linux.zip|06c29d6764526fb51407d08fcead41247ddd3b70" ;;
+    29.0.13113456) echo "android-ndk-r29-beta1-linux.zip|ec2d8801e42009edf66be853c1bab9ba216378f9" ;;
+    28.2.13676358) echo "android-ndk-r28c-linux.zip|a7b54a5de87fecd125a17d54f73c446199e72a64" ;;
+    28.1.13356709) echo "android-ndk-r28b-linux.zip|f574d3165405bd59ffc5edaadac02689075a729f" ;;
+    28.0.13004108) echo "android-ndk-r28-linux.zip|894f469c5192a116d21f412de27966140a530ebc" ;;
+    28.0.12916984) echo "android-ndk-r28-beta3-linux.zip|69348e24577122339b3996d2ef1ac4e6f7f5d627" ;;
+    28.0.12674087) echo "android-ndk-r28-beta2-linux.zip|4b901eeb50a76ba521e4eb1e611cb43658b54440" ;;
+    28.0.12433566) echo "android-ndk-r28-beta1-linux.zip|92dd6d941340624c4fc702ebc7e7cbd6faeb703d" ;;
+    27.3.13750724) echo "android-ndk-r27d-linux.zip|22105e410cf29afcf163760cc95522b9fb981121" ;;
+    27.2.12479018) echo "android-ndk-r27c-linux.zip|090e8083a715fdb1a3e402d0763c388abb03fb4e" ;;
+    27.1.12297006) echo "android-ndk-r27b-linux.zip|6fc476b2e57d7c01ac0c95817746b927035b9749" ;;
+    27.0.12077973) echo "android-ndk-r27-linux.zip|5e5cd517bdb98d7e0faf2c494a3041291e71bdcc" ;;
+    27.0.11902837) echo "android-ndk-r27-beta2-linux.zip|93103e182405b9d7757231a1d9dad58937a6374b" ;;
+    27.0.11718014) echo "android-ndk-r27-beta1-linux.zip|35a78f7544ccc72d8438d8ea2feb7f252a062abe" ;;
+    26.3.11579264) echo "android-ndk-r26d-linux.zip|fcdad75a765a46a9cf6560353f480db251d14765" ;;
+    26.2.11394342) echo "android-ndk-r26c-linux.zip|7faebe2ebd3590518f326c82992603170f07c96e" ;;
+    26.1.10909125) echo "android-ndk-r26b-linux.zip|fdf33d9f6c1b3f16e5459d53a82c7d2201edbcc4" ;;
+    26.0.10792818) echo "android-ndk-r26-linux.zip|d3bef08e0e43acd9e7815538df31818692d548bb" ;;
+    26.0.10636728) echo "android-ndk-r26-rc1-linux.zip|6ec8c08204409fea4853bf0317660caadabfc8b0" ;;
+    26.0.10404224) echo "android-ndk-r26-beta1-linux.zip|fb5e34313766764d9654b04603e69af813b18799" ;;
+    25.2.9519653) echo "android-ndk-r25c-linux.zip|53af80a1cce9144025b81c78c8cd556bff42bd0e" ;;
+    25.1.8937393) echo "android-ndk-r25b-linux.zip|e27dcb9c8bcaa77b78ff68c3f23abcf6867959eb" ;;
+    25.0.8775105) echo "android-ndk-r25-linux.zip|9fce956edb6abd5aca42acf6bbfb21a90a67f75b" ;;
+    24.0.8215888) echo "android-ndk-r24-linux.zip|eceb18f147282eb93615eff1ad84a9d3962fbb31" ;;
+    23.2.8568313) echo "android-ndk-r23c-linux.zip|e5053c126a47e84726d9f7173a04686a71f9a67a" ;;
+    23.1.7779620) echo "android-ndk-r23b-linux.zip|f47ec4c4badd11e9f593a8450180884a927c330d" ;;
+    23.0.7599858) echo "android-ndk-r23-linux.zip|9bad35f442caeda747780ba1dd92f2d98609d9cd" ;;
+    *) echo "" ;;
+  esac
+}
+
+detect_flutter_ndk_revision() {
+  local flutter_bin=""
+  flutter_bin="$(resolve_flutter_bin 2>/dev/null || true)"
+  [ -n "$flutter_bin" ] || return 1
+  local root=""
+  root="$(cd "$(dirname "$flutter_bin")/.." && pwd)"
+  local gu="$root/packages/flutter_tools/lib/src/android/gradle_utils.dart"
+  if [ ! -f "$gu" ]; then
+    return 1
+  fi
+  local line=""
+  line="$(grep -E "^\s*const ndkVersion = '" "$gu" 2>/dev/null | head -n 1 || true)"
+  if [ -z "$line" ]; then
+    return 1
+  fi
+  printf '%s' "$line" | sed -n "s/.*const ndkVersion = '\\([^']*\\)'.*/\\1/p"
+}
+
+hesabix_ensure_ndk_from_internal_mirror() {
+  [ "${HESABIX_SKIP_NDK_MIRROR:-0}" != "1" ] || return 0
+  [ "$(uname -s 2>/dev/null || echo)" = "Linux" ] || return 0
+  local sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  [ -n "$sdk" ] && [ -d "$sdk" ] || return 0
+
+  local rev=""
+  if [ -n "${HESABIX_NDK_REVISION:-}" ]; then
+    rev="$HESABIX_NDK_REVISION"
+  else
+    rev="$(detect_flutter_ndk_revision 2>/dev/null || true)"
+  fi
+  [ -n "$rev" ] || rev="28.2.13676358"
+
+  local ndk_home="$sdk/ndk/$rev"
+  if [ -f "$ndk_home/source.properties" ]; then
+    echo "✓ NDK از قبل نصب است: $ndk_home"
+    return 0
+  fi
+
+  local pair=""
+  pair="$(hesabix_ndk_mirror_zip_sha1 "$rev")"
+  if [ -z "$pair" ]; then
+    warn "NDK $rev در جدول آینهٔ اسکریپت نیست؛ HESABIX_NDK_REVISION یا HESABIX_SKIP_NDK_MIRROR=1 را تنظیم کنید یا نسخه را به hesabix_ndk_mirror_zip_sha1 اضافه کنید."
+    return 0
+  fi
+  local zip_name="${pair%%|*}"
+  local want_sha="${pair#*|}"
+  local base="${HESABIX_ANDROID_SDK_MIRROR_BASE%/}"
+  local url="$base/$zip_name"
+
+  if ! cmd_exists curl && ! cmd_exists wget; then
+    warn "برای دانلود NDK از آینه، curl یا wget لازم است."
+    return 0
+  fi
+  if ! cmd_exists unzip; then
+    warn "برای نصب NDK، unzip لازم است (نصب: apt install unzip)."
+    return 0
+  fi
+  if ! cmd_exists sha1sum; then
+    warn "برای تأیید checksum، sha1sum لازم است."
+    return 0
+  fi
+
+  echo "در حال نصب NDK $rev از آینهٔ داخلی (بدون گوگل)…"
+  echo "  URL: $url"
+
+  local tmp=""
+  tmp="$(mktemp -d "${TMPDIR:-/tmp}/hesabix-ndk.XXXXXX")"
+  local zip_path="$tmp/$zip_name"
+
+  if cmd_exists curl; then
+    if ! curl -fL --connect-timeout 30 --retry 3 --retry-delay 2 -o "$zip_path" "$url"; then
+      warn "دانلود NDK از آینه ناموفق بود."
+      rm -rf "$tmp"
+      return 0
+    fi
+  else
+    if ! wget -q --timeout=30 -O "$zip_path" "$url"; then
+      warn "دانلود NDK از آینه ناموفق بود."
+      rm -rf "$tmp"
+      return 0
+    fi
+  fi
+
+  local got_sha=""
+  got_sha="$(sha1sum "$zip_path" | awk '{print $1}')"
+  if [ "$got_sha" != "$want_sha" ]; then
+    warn "SHA1 فایل NDK با کاتالوگ آینه یکی نیست (انتظار: $want_sha ، دریافت: $got_sha). فایل حذف می‌شود."
+    rm -rf "$tmp"
+    return 0
+  fi
+
+  mkdir -p "$tmp/extract"
+  if ! unzip -q "$zip_path" -d "$tmp/extract"; then
+    warn "باز کردن ZIP ناموفق بود."
+    rm -rf "$tmp"
+    return 0
+  fi
+  local top=""
+  top="$(find "$tmp/extract" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  if [ -z "$top" ] || [ ! -d "$top" ]; then
+    warn "ساختار ZIP نامعتبر بود."
+    rm -rf "$tmp"
+    return 0
+  fi
+
+  mkdir -p "$sdk/ndk"
+  rm -rf "$ndk_home"
+  mv "$top" "$ndk_home"
+
+  if [ "$(id -u)" -eq 0 ]; then
+    local iu=""
+    iu="$(resolve_invoking_user 2>/dev/null || true)"
+    if [ -n "$iu" ]; then
+      chown -R "$iu:$iu" "$ndk_home" 2>/dev/null || true
+    fi
+  fi
+
+  rm -rf "$tmp"
+
+  if [ -f "$ndk_home/source.properties" ]; then
+    echo "✓ NDK نصب شد: $ndk_home"
+  else
+    warn "پوشهٔ NDK نصب شد اما source.properties پیدا نشد؛ بیلد را دوباره امتحان کنید."
   fi
 }
 
@@ -746,14 +1318,28 @@ flutter_run() {
   fi
   local target_gradle_home="${GRADLE_USER_HOME:-$target_home/.gradle}"
 
+  local flutter_args=()
+  if [[ "${1:-}" == "build" ]] && [[ "${BUILD_ANDROID_VERBOSE:-1}" != "0" ]]; then
+    if [[ "${BUILD_ANDROID_VERBOSE}" == "2" ]]; then
+      flutter_args+=(-vv)
+    else
+      flutter_args+=(-v)
+    fi
+  fi
+  flutter_args+=("$@")
+
+  local mk="${MAKEFLAGS:-}"
+  local cm="${CMAKE_BUILD_PARALLEL_LEVEL:-}"
+  local sdk_repo="${SDK_TEST_BASE_URL:-}"
+
   if [ "$(id -u)" -eq 0 ] && [ -n "$invoke_user" ]; then
     if cmd_exists runuser; then
-      runuser -u "$invoke_user" -- env HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" PATH="$PATH" PUB_HOSTED_URL="$PUB_HOSTED_URL" FLUTTER_STORAGE_BASE_URL="$FLUTTER_STORAGE_BASE_URL" ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-}" ANDROID_HOME="${ANDROID_HOME:-}" JAVA_HOME="${JAVA_HOME:-}" JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}" "$flutter_bin" "$@"
+      runuser -u "$invoke_user" -- env HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" PATH="$PATH" PUB_HOSTED_URL="$PUB_HOSTED_URL" FLUTTER_STORAGE_BASE_URL="$FLUTTER_STORAGE_BASE_URL" ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-}" ANDROID_HOME="${ANDROID_HOME:-}" JAVA_HOME="${JAVA_HOME:-}" JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}" SDK_TEST_BASE_URL="${sdk_repo}" MAKEFLAGS="$mk" CMAKE_BUILD_PARALLEL_LEVEL="$cm" "$flutter_bin" "${flutter_args[@]}"
     else
-      sudo -u "$invoke_user" --preserve-env=PATH,PUB_HOSTED_URL,FLUTTER_STORAGE_BASE_URL,ANDROID_SDK_ROOT,ANDROID_HOME,JAVA_HOME,JAVA_TOOL_OPTIONS,HOME,GRADLE_USER_HOME HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" "$flutter_bin" "$@"
+      sudo -u "$invoke_user" --preserve-env=PATH,PUB_HOSTED_URL,FLUTTER_STORAGE_BASE_URL,ANDROID_SDK_ROOT,ANDROID_HOME,JAVA_HOME,JAVA_TOOL_OPTIONS,HOME,GRADLE_USER_HOME,MAKEFLAGS,CMAKE_BUILD_PARALLEL_LEVEL,SDK_TEST_BASE_URL HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" MAKEFLAGS="$mk" CMAKE_BUILD_PARALLEL_LEVEL="$cm" SDK_TEST_BASE_URL="${sdk_repo}" "$flutter_bin" "${flutter_args[@]}"
     fi
   else
-    HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}" "$flutter_bin" "$@"
+    HOME="$target_home" GRADLE_USER_HOME="$target_gradle_home" JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-}" SDK_TEST_BASE_URL="${sdk_repo}" MAKEFLAGS="$mk" CMAKE_BUILD_PARALLEL_LEVEL="$cm" "$flutter_bin" "${flutter_args[@]}"
   fi
 }
 
@@ -772,6 +1358,9 @@ ensure_android_prerequisites() {
 
 auto_setup_android_toolchain
 setup_android_env
+hesabix_ensure_cmdline_tools_from_internal_mirror
+hesabix_bootstrap_android_sdk_licenses_and_packages
+hesabix_ensure_sdk_components_from_internal_mirror
 setup_gradle_mirror_init
 check_gradle_mirror_health
 prepare_gradle_user_home
@@ -779,6 +1368,8 @@ ensure_jvm_trusts_hesabix_gradle_mirror
 if ! ensure_android_prerequisites; then
   die "Android prerequisites not satisfied. Use --auto-setup-android or install SDK/Java manually."
 fi
+
+hesabix_ensure_ndk_from_internal_mirror
 
 if [ "$BOOTSTRAP_ONLY" = true ]; then
   echo ""
@@ -809,6 +1400,82 @@ if [ "$CLEAN_BUILD" = true ]; then
   echo "Cleaning build directory..."
   flutter_run clean
 fi
+
+# تنظیم موازی‌سازی و حافظه بر اساس CPU و RAM (برای Gradle از طریق flutter --android-project-arg)
+configure_build_resources() {
+  AVAILABLE_CORES=$(nproc 2>/dev/null || echo 1)
+  case "${AVAILABLE_CORES:-0}" in
+    ''|*[!0-9]*) AVAILABLE_CORES=1 ;;
+  esac
+  [ "${AVAILABLE_CORES:-0}" -lt 1 ] && AVAILABLE_CORES=1
+
+  local mem_kb=0
+  if [[ -r /proc/meminfo ]]; then
+    mem_kb=$(awk '/^MemAvailable:/{print $2; exit}' /proc/meminfo 2>/dev/null || echo 0)
+    case "${mem_kb:-0}" in
+      ''|*[!0-9]*) mem_kb=0 ;;
+    esac
+  fi
+  MEM_AVAIL_MB=$((mem_kb / 1024))
+
+  GRADLE_WORKERS=$AVAILABLE_CORES
+  PARALLEL_COMPILE_JOBS=$AVAILABLE_CORES
+  GRADLE_HEAP_MB=4096
+  GRADLE_METASPACE_MB=512
+  KOTLIN_DAEMON_HEAP_MB=1536
+
+  if [[ "${BUILD_ANDROID_SMART_RESOURCES:-1}" == "1" ]]; then
+    local mem_workers=1
+    if [[ "${MEM_AVAIL_MB:-0}" -ge 2000 ]]; then
+      mem_workers=$(( MEM_AVAIL_MB / 2000 ))
+    fi
+    [[ "$mem_workers" -lt 1 ]] && mem_workers=1
+    if [[ "$mem_workers" -lt "$AVAILABLE_CORES" ]]; then
+      GRADLE_WORKERS=$mem_workers
+    else
+      GRADLE_WORKERS=$AVAILABLE_CORES
+    fi
+    [[ "$GRADLE_WORKERS" -lt 1 ]] && GRADLE_WORKERS=1
+
+    PARALLEL_COMPILE_JOBS=$GRADLE_WORKERS
+    if [[ "${MEM_AVAIL_MB:-0}" -ge 1800 ]]; then
+      local p=$(( MEM_AVAIL_MB / 1800 ))
+      [[ "$p" -lt 1 ]] && p=1
+      if [[ "$p" -lt "$PARALLEL_COMPILE_JOBS" ]]; then
+        PARALLEL_COMPILE_JOBS=$p
+      fi
+    elif [[ "${MEM_AVAIL_MB:-0}" -gt 0 ]]; then
+      PARALLEL_COMPILE_JOBS=1
+    fi
+    [[ "$PARALLEL_COMPILE_JOBS" -lt 1 ]] && PARALLEL_COMPILE_JOBS=1
+    if [[ "$PARALLEL_COMPILE_JOBS" -gt "$AVAILABLE_CORES" ]]; then
+      PARALLEL_COMPILE_JOBS=$AVAILABLE_CORES
+    fi
+
+    if [[ "${MEM_AVAIL_MB:-0}" -gt 0 ]]; then
+      local max_heap=$(( MEM_AVAIL_MB * 45 / 100 ))
+      GRADLE_HEAP_MB=$(( MEM_AVAIL_MB * 40 / 100 ))
+      [[ "$GRADLE_HEAP_MB" -gt "$max_heap" ]] && GRADLE_HEAP_MB=$max_heap
+      [[ "$GRADLE_HEAP_MB" -lt 512 ]] && GRADLE_HEAP_MB=512
+      [[ "$GRADLE_HEAP_MB" -gt 24576 ]] && GRADLE_HEAP_MB=24576
+    fi
+    GRADLE_METASPACE_MB=$(( GRADLE_HEAP_MB / 10 ))
+    [[ "$GRADLE_METASPACE_MB" -lt 384 ]] && GRADLE_METASPACE_MB=384
+    [[ "$GRADLE_METASPACE_MB" -gt 1024 ]] && GRADLE_METASPACE_MB=1024
+
+    KOTLIN_DAEMON_HEAP_MB=$(( GRADLE_HEAP_MB / 4 ))
+    [[ "$KOTLIN_DAEMON_HEAP_MB" -lt 512 ]] && KOTLIN_DAEMON_HEAP_MB=512
+    [[ "$KOTLIN_DAEMON_HEAP_MB" -gt 8192 ]] && KOTLIN_DAEMON_HEAP_MB=8192
+  else
+    GRADLE_WORKERS=$(( AVAILABLE_CORES * 80 / 100 ))
+    [[ "$GRADLE_WORKERS" -lt 1 ]] && GRADLE_WORKERS=1
+    [[ "$GRADLE_WORKERS" -gt "$AVAILABLE_CORES" ]] && GRADLE_WORKERS=$AVAILABLE_CORES
+    PARALLEL_COMPILE_JOBS=$GRADLE_WORKERS
+  fi
+
+  export MAKEFLAGS="-j${PARALLEL_COMPILE_JOBS}"
+  export CMAKE_BUILD_PARALLEL_LEVEL="${PARALLEL_COMPILE_JOBS}"
+}
 
 # Check keystore for release builds
 check_keystore() {
@@ -864,22 +1531,38 @@ check_keystore() {
 
 check_keystore
 
+configure_build_resources
+
 # Build flags
 BUILD_FLAGS=("--$MODE")
 BUILD_FLAGS+=("--android-skip-build-dependency-validation")
 BUILD_FLAGS+=("--dart-define" "API_BASE_URL=$API_BASE_URL")
 
-# Configure CPU cores for parallel compilation
-AVAILABLE_CORES=$(nproc)
-BUILD_WORKERS=$((AVAILABLE_CORES * 80 / 100))
-[ "$BUILD_WORKERS" -lt 1 ] && BUILD_WORKERS=1
-[ "$BUILD_WORKERS" -gt 16 ] && BUILD_WORKERS=16
+if [[ "${BUILD_ANDROID_SMART_RESOURCES:-1}" == "1" ]]; then
+  BUILD_FLAGS+=(--android-project-arg "org.gradle.parallel=true")
+  BUILD_FLAGS+=(--android-project-arg "org.gradle.caching=true")
+  BUILD_FLAGS+=(--android-project-arg "org.gradle.workers.max=${GRADLE_WORKERS}")
+  BUILD_FLAGS+=(--android-project-arg "org.gradle.jvmargs=-Xmx${GRADLE_HEAP_MB}m -XX:MaxMetaspaceSize=${GRADLE_METASPACE_MB}m -XX:ReservedCodeCacheSize=512m -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8")
+  BUILD_FLAGS+=(--android-project-arg "kotlin.daemon.jvmargs=-Xmx${KOTLIN_DAEMON_HEAP_MB}m")
+fi
 
 echo ""
 echo "Build Configuration:"
 echo "  Mode: $MODE"
 echo "  API Base URL: $API_BASE_URL"
-echo "  CPU cores: $AVAILABLE_CORES (using $BUILD_WORKERS workers)"
+echo "  Log detail: BUILD_ANDROID_VERBOSE=${BUILD_ANDROID_VERBOSE} (0=quiet, 1=-v, 2=-vv)"
+echo "  Smart CPU/RAM: BUILD_ANDROID_SMART_RESOURCES=${BUILD_ANDROID_SMART_RESOURCES}"
+echo "  CPU cores (nproc): ${AVAILABLE_CORES}"
+if [[ -n "${MEM_AVAIL_MB:-}" ]] && [[ "${MEM_AVAIL_MB:-0}" -gt 0 ]]; then
+  echo "  تقریبی MemAvailable: ${MEM_AVAIL_MB} MiB"
+else
+  echo "  MemAvailable: (نامشخص — خارج لینوکس یا /proc در دسترس نیست)"
+fi
+echo "  Gradle org.gradle.workers.max: ${GRADLE_WORKERS}"
+echo "  موازی ساخت بومی (MAKEFLAGS/CMAKE): -j${PARALLEL_COMPILE_JOBS}"
+if [[ "${BUILD_ANDROID_SMART_RESOURCES:-1}" == "1" ]]; then
+  echo "  Gradle heap (-Xmx): ${GRADLE_HEAP_MB}m  |  Kotlin daemon: ${KOTLIN_DAEMON_HEAP_MB}m"
+fi
 echo ""
 
 # Build Android App Bundle

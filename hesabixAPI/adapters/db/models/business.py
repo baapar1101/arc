@@ -196,6 +196,22 @@ class Business(Base):
 
     # پیش‌فرض‌های لینک اشتراک فاکتور (مثلاً default_online_payment_enabled / default_online_payment_gateway_id)
     invoice_share_settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    # کاتالوگ عمومی (شبکهٔ انتشار کالا): نمایش شماره تماس در API عمومی
+    public_catalog_show_contact: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        server_default="0",
+        comment="نمایش تلفن/موبایل در API عمومی کاتالوگ",
+    )
+    public_catalog_show_base_sales_price: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        nullable=False,
+        server_default="1",
+        comment="نمایش قیمت فروش پایه در API عمومی کاتالوگ",
+    )
     
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

@@ -1,0 +1,42 @@
+# Copyright (C) 2026 Hesabix
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Shabake Tamin 1.3.0\n"
+"Report-Msgid-Bugs-To:\n"
+"POT-Creation-Date: 2026-05-20 12:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"X-Domain: shabake-tamin\n"
+
+#: includes/class-st-admin.php
+msgid "شبکه تأمین"
+msgstr ""
+
+#: includes/class-st-admin.php
+msgid "نمایش برای بازدیدکنندگان"
+msgstr ""
+
+#: includes/class-st-admin.php
+msgid "اگر «شناسهٔ کسب‌وکار پیش‌فرض» را خالی بگذارید و در شورت‌کد یا بلوک هم کسب‌وکار مشخص نکنید، کاتالوگ بدون فیلتر business_id به Hesabix فرستاده می‌شود؛ در نتیجه بازدیدکننده می‌تواند کالاهای عمومی همهٔ کسب‌وکارهایی که در Hesabix منتشر کرده‌اند را ببیند، نام تأمین‌کننده را روی کارت ببیند و با جستجو (و در صورت تنظیم، فیلتر استان/شهر/دسته) نتایج را محدود کند. محدودیت نرخ و کش روی سرور Hesabix و پراکسی وردپرس اعمال می‌شود."
+msgstr ""
+
+#: includes/class-st-rest.php
+msgid "تعداد درخواست بیش از حد؛ کمی بعد دوباره تلاش کنید."
+msgstr ""
+
+#: includes/class-st-frontend.php
+msgid "بارگذاری بیشتر"
+msgstr ""
+
+#: assets/js/block-editor.js
+msgid "کاتالوگ شبکه تأمین"
+msgstr ""
+
+#: assets/js/block-editor.js
+msgid "پیش‌نمایش در سایت و صفحهٔ اصلی دیده می‌شود."
+msgstr ""

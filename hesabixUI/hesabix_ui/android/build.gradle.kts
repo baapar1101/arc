@@ -4,7 +4,7 @@ val hesabixGradleMirror: String =
         .get()
         .trimEnd('/')
 
-// مخازن: اول آینهٔ داخلی؛ در صورت ۴۰۲/۵۰۲ Runflare، Maven Central و google به‌عنوان fallback.
+// مخازن: اول آینهٔ داخلی (upstream: Maven مایکت)؛ در صورت خطای شبکه، Maven Central و google به‌عنوان fallback.
 allprojects {
     repositories {
         maven { url = uri("${hesabixGradleMirror}/android/maven2/") }

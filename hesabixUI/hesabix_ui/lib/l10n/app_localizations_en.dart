@@ -14207,4 +14207,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get frequentDescriptionsUseInField => 'Insert into field';
+
+  @override
+  String get productPublicCatalogTitle => 'Public product catalog';
+
+  @override
+  String get productPublicCatalogSubtitle =>
+      'When enabled, product name/description and contact info (if allowed in business settings) are exposed via the public catalog API.';
+
+  @override
+  String get publicCatalogShowContactTitle =>
+      'Show phone numbers in public catalog';
+
+  @override
+  String get publicCatalogShowContactSubtitle =>
+      'When enabled, this business landline and mobile are returned by the public catalog API.';
+
+  @override
+  String get publicCatalogShowBaseSalesPriceTitle =>
+      'Show base sales price in public catalog';
+
+  @override
+  String get publicCatalogShowBaseSalesPriceSubtitle =>
+      'When disabled, base sales price is omitted from the public catalog API for published items.';
 }

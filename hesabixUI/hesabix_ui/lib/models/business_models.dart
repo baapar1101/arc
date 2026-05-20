@@ -358,6 +358,8 @@ class BusinessResponse {
   final String? stampFileId;
   final double? defaultCreditLimit;
   final bool checkCreditEnabledByDefault;
+  final bool publicCatalogShowContact;
+  final bool publicCatalogShowBaseSalesPrice;
   // تنظیمات محاسبه سود فاکتور
   final String? invoiceProfitCalculationMethod;
   final String? invoiceProfitCalculationBasis;
@@ -425,6 +427,8 @@ class BusinessResponse {
     this.stampFileId,
     this.defaultCreditLimit,
     this.checkCreditEnabledByDefault = false,
+    this.publicCatalogShowContact = false,
+    this.publicCatalogShowBaseSalesPrice = true,
     this.invoiceProfitCalculationMethod,
     this.invoiceProfitCalculationBasis,
     this.invoiceProfitIncludeOverhead = false,
@@ -496,6 +500,8 @@ class BusinessResponse {
       stampFileId: json['stamp_file_id'],
       defaultCreditLimit: (json['default_credit_limit'] as num?)?.toDouble(),
       checkCreditEnabledByDefault: (json['check_credit_enabled_by_default'] as bool?) ?? false,
+      publicCatalogShowContact: (json['public_catalog_show_contact'] as bool?) ?? false,
+      publicCatalogShowBaseSalesPrice: (json['public_catalog_show_base_sales_price'] as bool?) ?? true,
       invoiceProfitCalculationMethod: json['invoice_profit_calculation_method'] as String?,
       invoiceProfitCalculationBasis: json['invoice_profit_calculation_basis'] as String?,
       invoiceProfitIncludeOverhead: (json['invoice_profit_include_overhead'] as bool?) ?? false,

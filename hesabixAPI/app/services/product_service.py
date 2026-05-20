@@ -8,6 +8,7 @@ from sqlalchemy.types import Numeric
 from decimal import Decimal
 import logging
 import re
+import uuid as uuid_module
 
 from app.core.responses import ApiError
 from app.core.cache import get_cache
@@ -26,6 +27,7 @@ from app.services.product_general_barcode_service import (
     replace_general_barcode_aliases,
     split_raw_general_barcodes,
 )
+from app.services.public_catalog_service import invalidate_public_catalog_caches
 
 logger = logging.getLogger(__name__)
 
@@ -417,6 +419,8 @@ def create_product(
                 default_warehouse_id=payload.default_warehouse_id,
                 is_active=payload.is_active if payload.is_active is not None else True,  # پیش‌فرض True
                 general_barcodes=stored_gb_create,
+                is_public_catalog=bool(payload.is_public_catalog),
+                catalog_public_uuid=str(uuid_module.uuid4()) if payload.is_public_catalog else None,
             )
             logger.debug(f"[CREATE_PRODUCT] Adding product to session - code='{code}', name='{payload.name}'")
             db.add(obj)
@@ -452,6 +456,7 @@ def create_product(
                     business_id=business_id,
                     category_id=payload.category_id
                 )
+                invalidate_public_catalog_caches()
 
             logger.info(f"[CREATE_PRODUCT] ✅ Product created successfully - ID={obj.id}, code='{obj.code}', name='{obj.name}'")
             return {"message": "PRODUCT_CREATED", "data": data}
@@ -731,6 +736,10 @@ def update_product(
     if gb_handled:
         gb_kw["general_barcodes"] = general_barcodes_val
 
+    catalog_uuid_kw: Dict[str, Any] = {}
+    if "is_public_catalog" in fields_set and payload.is_public_catalog and not getattr(obj, "catalog_public_uuid", None):
+        catalog_uuid_kw["catalog_public_uuid"] = str(uuid_module.uuid4())
+
     updated = repo.update(
         product_id,
         commit=False,
@@ -762,6 +771,7 @@ def update_product(
         tax_unit_id=payload.tax_unit_id,
         image_file_id=payload.image_file_id if 'image_file_id' in fields_set else None,
         is_active=payload.is_active if 'is_active' in fields_set else None,
+        is_public_catalog=payload.is_public_catalog if 'is_public_catalog' in fields_set else None,
         default_warehouse_id=(
             None if item_type == ProductItemType.SERVICE.value
             else (
@@ -769,6 +779,7 @@ def update_product(
                 else obj.default_warehouse_id
             )
         ),
+        **catalog_uuid_kw,
         **gb_kw,
     )
     if not updated:
@@ -804,6 +815,7 @@ def update_product(
                 business_id=business_id,
                 category_id=new_category_id
             )
+        invalidate_public_catalog_caches()
 
     data = _to_dict(updated, db)
     return {"message": "PRODUCT_UPDATED", "data": data}
@@ -1144,6 +1156,8 @@ def delete_product(db: Session, product_id: int, business_id: int) -> tuple[bool
                 product_id=product_id,
                 category_id=category_id
             )
+            if getattr(obj, "is_public_catalog", False):
+                invalidate_public_catalog_caches()
             return True, None
         else:
             return False, "خطا در حذف کالا"
@@ -1211,6 +1225,8 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "general_barcodes": getattr(obj, "general_barcodes", None),
         "barcode": _legacy_barcode_field_from_general_csv(getattr(obj, "general_barcodes", None)),
         "is_active": obj.is_active if hasattr(obj, 'is_active') else True,  # مقدار پیش‌فرض True در صورت عدم وجود فیلد
+        "is_public_catalog": bool(getattr(obj, "is_public_catalog", False)),
+        "catalog_public_uuid": getattr(obj, "catalog_public_uuid", None),
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }

@@ -5389,7 +5389,13 @@
   "frequentDescriptionsLimitReached": "حداکثر ۵۰۰ شرح پرتکرار برای همین بخش مجاز است.",
   "frequentDescriptionsNoSearchMatch": "موردی با این جست‌وجو یافت نشد.",
   "frequentDescriptionsSearchInList": "جست‌وجو در لیست",
-  "frequentDescriptionsUseInField": "درج در فیلد شرح"
+  "frequentDescriptionsUseInField": "درج در فیلد شرح",
+  "productPublicCatalogTitle": "شبکهٔ انتشار کالا",
+  "productPublicCatalogSubtitle": "با فعال‌سازی، نام و توضیحات کالا و اطلاعات تماس (در صورت تنظیم) از طریق API عمومی در اختیار سایت‌های جانبی قرار می‌گیرد.",
+  "publicCatalogShowContactTitle": "نمایش تماس در کاتالوگ عمومی",
+  "publicCatalogShowContactSubtitle": "در صورت فعال بودن، شمارهٔ تلفن و موبایل این کسب‌وکار در API عمومی کاتالوگ نمایش داده می‌شود.",
+  "publicCatalogShowBaseSalesPriceTitle": "نمایش قیمت فروش پایه در کاتالوگ عمومی",
+  "publicCatalogShowBaseSalesPriceSubtitle": "در صورت خاموش بودن، فیلد قیمت فروش پایه در API عمومی کاتالوگ برای کالاهای منتشرشده برگردانده نمی‌شود."
 }
 
 

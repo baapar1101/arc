@@ -2,8 +2,7 @@
 <!--
   Maven CLI: کپی به ~/.m2/settings.xml یا ادغام با <mirrors> موجود.
   نصب nginx این آینه: scripts/install_maven_mirror_nginx.sh
-  برای Gradle/اندروید و چند مخزن (Google، پلاگین، توزیع) از hesabix.gradle.mirror و
-  gradle.mirror.hesabix.ir استفاده کنید — اسکریپت پچ flutter_tools: scripts/patch_flutter_tools_gradle_mirror.sh
+  برای Gradle/اندروید و چند مخزن از hesabix.gradle.mirror و gradle.mirror.hesabix.ir استفاده کنید — اسکریپت پچ flutter_tools: scripts/patch_flutter_tools_gradle_mirror.sh
 -->
 <settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -11,7 +10,7 @@
   <mirrors>
     <mirror>
       <id>hesabix-maven-mirror</id>
-      <name>Hesabix Maven Mirror (Runflare via nginx)</name>
+      <name>Hesabix Maven Mirror (Myket via nginx)</name>
       <url>https://maven.mirror.hesabix.ir/maven2</url>
       <mirrorOf>central</mirrorOf>
     </mirror>

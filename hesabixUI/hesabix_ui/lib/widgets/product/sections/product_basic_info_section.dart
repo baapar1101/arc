@@ -287,6 +287,14 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
           _buildUnitsSection(context),
         ],
         
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t.productPublicCatalogTitle),
+          subtitle: Text(t.productPublicCatalogSubtitle),
+          value: widget.formData.isPublicCatalog,
+          onChanged: (v) => _updateFormData(widget.formData.copyWith(isPublicCatalog: v)),
+        ),
+        
         if (widget.attributes.isNotEmpty) ...[
           SizedBox(height: spacing * 2),
           Text(t.productAttributes, style: Theme.of(context).textTheme.titleSmall),

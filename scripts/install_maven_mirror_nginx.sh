@@ -68,6 +68,10 @@ elif [[ ! -f "$SSL_KEY" || ! -f "$SSL_FULL" ]]; then
 fi
 
 install -m 0644 "$SNIPPET_SRC" "$SNIPPET_DST"
+if [[ -d "$CACHE_DIR" ]] && ls -A "$CACHE_DIR" >/dev/null 2>&1; then
+  rm -rf "${CACHE_DIR}/"*
+  echo "کش maven_cache خالی شد (پس از تغییر upstream یا نگاشت مسیر توصیه می‌شود)."
+fi
 cp -a "$SRC_BASE" "$DST_AVAILABLE"
 chmod 644 "$DST_AVAILABLE"
 ln -sf "$DST_AVAILABLE" "$DST_ENABLED"

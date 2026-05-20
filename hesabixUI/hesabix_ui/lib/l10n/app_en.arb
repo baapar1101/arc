@@ -5347,5 +5347,11 @@
   "frequentDescriptionsLimitReached": "Maximum number of frequent descriptions for this section has been reached (500 per scope).",
   "frequentDescriptionsNoSearchMatch": "No matching descriptions.",
   "frequentDescriptionsSearchInList": "Search in list",
-  "frequentDescriptionsUseInField": "Insert into field"
+  "frequentDescriptionsUseInField": "Insert into field",
+  "productPublicCatalogTitle": "Public product catalog",
+  "productPublicCatalogSubtitle": "When enabled, product name/description and contact info (if allowed in business settings) are exposed via the public catalog API.",
+  "publicCatalogShowContactTitle": "Show phone numbers in public catalog",
+  "publicCatalogShowContactSubtitle": "When enabled, this business landline and mobile are returned by the public catalog API.",
+  "publicCatalogShowBaseSalesPriceTitle": "Show base sales price in public catalog",
+  "publicCatalogShowBaseSalesPriceSubtitle": "When disabled, base sales price is omitted from the public catalog API for published items."
 }

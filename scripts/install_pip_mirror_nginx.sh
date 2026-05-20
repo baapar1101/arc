@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # نصب آینه PyPI — p.mirror.hesabix.ir (snippet + بلاک سرور؛ الگوی f/maven/gradle).
-# بدون ارسال IP به upstream؛ لینک‌های mirror-pypi.runflare.com در پاسخ به $host بازنویسی می‌شوند (بدون کش قدیمی sub_filter اعمال نشد).
+# بدون ارسال IP به upstream؛ URL مطلق package-mirror.liara.ir در پاسخ به $host بازنویسی می‌شود (پس از تغییر upstream کش خالی می‌شود).
 # اجرا: sudo bash scripts/install_pip_mirror_nginx.sh
 
 set -euo pipefail

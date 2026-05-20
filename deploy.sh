@@ -48,7 +48,7 @@ IFS=$'\n\t'
 # - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
 # - pip: only Hesabix PyPI mirror — https://p.mirror.hesabix.ir/simple (see configure_pip_hesabix_mirror, set_pip_mirror_env).
 #   If PIP_INDEX_URL is set in the environment before deploy, that value is used instead (advanced override).
-# - Flutter/Dart: همیشه آینهٔ داخلی f.mirror.hesabix.ir (pub + gcs). shell.hesabix.ir فقط برای tarball SDK است.
+# - Flutter/Dart: آینهٔ داخلی f.mirror.hesabix.ir (pub + gcs؛ upstream: pub-azs.ir). shell.hesabix.ir فقط برای tarball SDK است.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
 #   Large tarball (~2GB): download uses --progress-bar, resume (-C -), FLUTTER_SDK_CONNECT_TIMEOUT (default 120s),

@@ -60,7 +60,7 @@ install -m 0644 "$SNIPPET_SRC" "$SNIPPET_DST"
 
 if [[ -d "$CACHE_DIR" ]] && ls -A "$CACHE_DIR" >/dev/null 2>&1; then
   rm -rf "${CACHE_DIR}/"*
-  echo "کش flutter_cache خالی شد (JSON پاب لینک مطلق mirror-flutter را کش قدیمی برنمی‌دارد)."
+  echo "کش flutter_cache خالی شد (پس از تغییر upstream یا بدنهٔ JSON لینک‌های مطلق، کش قدیمی توصیه نمی‌شود)."
 fi
 
 cp -a "$SRC_BASE" "$DST_AVAILABLE"

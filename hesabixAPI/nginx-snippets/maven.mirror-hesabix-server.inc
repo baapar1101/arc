@@ -1,10 +1,11 @@
 # include داخل server { } — maven.mirror.hesabix.ir
-# Runflare: هدر X-Forwarded-For/X-Real-IP به upstream نفرست (ممکن است 402 شود).
-# متادیتا/پام معمولاً فقط نسخه می‌دهند و آرتifact از همان مسیر /maven2/... روی آینه کشیده می‌شود (لینک مطلق به runflare کمتر از PyPI/pub است).
+# upstream: https://maven.myket.ir — مسیر Central روی مایکت بدون پیشوند /maven2 است؛
+# درخواست کلاینت /maven2/com/... به com/... روی مایکت نگاشت می‌شود.
+# X-Forwarded-For/X-Real-IP عمداً خالی (هم‌راستا با سایر آینه‌های hesabix).
 
     location = / {
         default_type text/plain; charset utf-8;
-        return 200 "Maven Central proxy (Runflare). settings.xml: https://maven.mirror.hesabix.ir/maven2 — Gradle: hesabix.maven.mirror in gradle.properties\n";
+        return 200 "Maven proxy (Hesabix → Myket). settings.xml: https://maven.mirror.hesabix.ir/maven2 — Gradle: gradle.mirror.hesabix.ir + hesabix.gradle.mirror\n";
     }
 
     location = /maven2 {
@@ -13,16 +14,16 @@
     }
 
     location /maven2/ {
-        proxy_pass https://hesabix_runflare_maven/maven2/;
+        proxy_pass https://maven.myket.ir/;
 
-        proxy_set_header Host mirror-maven.runflare.com;
+        proxy_set_header Host maven.myket.ir;
         proxy_set_header X-Forwarded-For "";
         proxy_set_header X-Real-IP "";
         proxy_http_version 1.1;
         proxy_set_header Connection "";
 
         proxy_ssl_server_name on;
-        proxy_ssl_name mirror-maven.runflare.com;
+        proxy_ssl_name maven.myket.ir;
 
         proxy_connect_timeout 10s;
         proxy_send_timeout 600s;

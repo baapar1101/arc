@@ -1,12 +1,16 @@
 # include داخل server { } — gradle.mirror.hesabix.ir
-# Runflare (mirror-maven): distributions، android/maven2، maven2، gradle-plugins
-# ۵۰۲: upstream یا شبکه؛ ۴۰۲ Payment Required: سهمیه/اشتراک Runflare — hesabix.ir پنل Runflare.
-# هدر X-Forwarded-For/X-Real-IP به upstream نفرست.
-# همان ریسک لینک مطلق PyPI اینجا کمتر است؛ Maven metadata پاسخ‌ها عمدتاً نسبی/بدون دامنهٔ runflare بوده‌اند.
+# upstream: https://maven.myket.ir (Maven مایکت)
+# نگاشت مسیر نسبت به مایکت:
+#   /distributions/…     → /gradle/distributions/…
+#   /maven2/…            → /… (بدون پیشوند maven2، مثل Central روی مایکت)
+#   /android/maven2/…    → /… (androidx/com.google… بدون android/maven2)
+#   /gradle-plugins/…    → /… (پلاگین‌ها در ریشهٔ org/… روی مایکت)
+#
+# X-Forwarded-For/X-Real-IP خالی (هم‌راستا با سایر آینه‌های hesabix).
 
     location = / {
         default_type text/plain; charset utf-8;
-        return 200 "Gradle/Android mirror (Runflare). Base: https://gradle.mirror.hesabix.ir — distributions, android/maven2, maven2, gradle-plugins\n";
+        return 200 "Gradle/Android proxy (Hesabix → Myket). Base: https://gradle.mirror.hesabix.ir — distributions, android/maven2, maven2, gradle-plugins\n";
     }
 
     location = /distributions {
@@ -22,23 +26,22 @@
         return 200 "ok\n";
     }
 
-    # همان الگوی /maven2: پروب سلامت بدون تماس با upstream (curl/مانیتورینگ)
     location = /android/maven2 {
         default_type text/plain; charset utf-8;
         return 200 "ok\n";
     }
 
     location /distributions/ {
-        proxy_pass https://hesabix_runflare_gradle/distributions/;
+        proxy_pass https://maven.myket.ir/gradle/distributions/;
 
-        proxy_set_header Host mirror-maven.runflare.com;
+        proxy_set_header Host maven.myket.ir;
         proxy_set_header X-Forwarded-For "";
         proxy_set_header X-Real-IP "";
         proxy_http_version 1.1;
         proxy_set_header Connection "";
 
         proxy_ssl_server_name on;
-        proxy_ssl_name mirror-maven.runflare.com;
+        proxy_ssl_name maven.myket.ir;
 
         proxy_connect_timeout 30s;
         proxy_send_timeout 600s;
@@ -61,16 +64,16 @@
     }
 
     location /android/maven2/ {
-        proxy_pass https://hesabix_runflare_gradle/android/maven2/;
+        proxy_pass https://maven.myket.ir/;
 
-        proxy_set_header Host mirror-maven.runflare.com;
+        proxy_set_header Host maven.myket.ir;
         proxy_set_header X-Forwarded-For "";
         proxy_set_header X-Real-IP "";
         proxy_http_version 1.1;
         proxy_set_header Connection "";
 
         proxy_ssl_server_name on;
-        proxy_ssl_name mirror-maven.runflare.com;
+        proxy_ssl_name maven.myket.ir;
 
         proxy_connect_timeout 10s;
         proxy_send_timeout 600s;
@@ -93,16 +96,16 @@
     }
 
     location /maven2/ {
-        proxy_pass https://hesabix_runflare_gradle/maven2/;
+        proxy_pass https://maven.myket.ir/;
 
-        proxy_set_header Host mirror-maven.runflare.com;
+        proxy_set_header Host maven.myket.ir;
         proxy_set_header X-Forwarded-For "";
         proxy_set_header X-Real-IP "";
         proxy_http_version 1.1;
         proxy_set_header Connection "";
 
         proxy_ssl_server_name on;
-        proxy_ssl_name mirror-maven.runflare.com;
+        proxy_ssl_name maven.myket.ir;
 
         proxy_connect_timeout 10s;
         proxy_send_timeout 600s;
@@ -125,16 +128,16 @@
     }
 
     location /gradle-plugins/ {
-        proxy_pass https://hesabix_runflare_gradle/gradle-plugins/;
+        proxy_pass https://maven.myket.ir/;
 
-        proxy_set_header Host mirror-maven.runflare.com;
+        proxy_set_header Host maven.myket.ir;
         proxy_set_header X-Forwarded-For "";
         proxy_set_header X-Real-IP "";
         proxy_http_version 1.1;
         proxy_set_header Connection "";
 
         proxy_ssl_server_name on;
-        proxy_ssl_name mirror-maven.runflare.com;
+        proxy_ssl_name maven.myket.ir;
 
         proxy_connect_timeout 10s;
         proxy_send_timeout 600s;

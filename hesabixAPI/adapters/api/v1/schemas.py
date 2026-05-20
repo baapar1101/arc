@@ -662,6 +662,14 @@ class BusinessUpdateRequest(BaseModel):
 	# تنظیمات اعتبار مشتریان
 	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
 	check_credit_enabled_by_default: Optional[bool] = Field(default=None, description="بررسی اعتبار مشتریان به صورت پیشفرض")
+	public_catalog_show_contact: Optional[bool] = Field(
+		default=None,
+		description="نمایش تلفن/موبایل در API عمومی کاتالوگ (شبکهٔ انتشار کالا)",
+	)
+	public_catalog_show_base_sales_price: Optional[bool] = Field(
+		default=None,
+		description="نمایش قیمت فروش پایه در API عمومی کاتالوگ",
+	)
 	# تنظیمات محاسبه سود فاکتور
 	invoice_profit_calculation_method: Optional[str] = Field(default=None, description="روش محاسبه سود فاکتور: automatic, manual, disabled")
 	invoice_profit_calculation_basis: Optional[str] = Field(
@@ -923,6 +931,14 @@ class BusinessResponse(BaseModel):
 	# تنظیمات اعتبار مشتریان
 	default_credit_limit: Optional[float] = Field(default=None, description="سقف اعتبار پیشفرض اشخاص")
 	check_credit_enabled_by_default: bool = Field(default=False, description="بررسی اعتبار مشتریان به صورت پیشفرض")
+	public_catalog_show_contact: bool = Field(
+		default=False,
+		description="نمایش تلفن/موبایل در API عمومی کاتالوگ",
+	)
+	public_catalog_show_base_sales_price: bool = Field(
+		default=True,
+		description="نمایش قیمت فروش پایه در API عمومی کاتالوگ",
+	)
 	# تنظیمات محاسبه سود فاکتور
 	invoice_profit_calculation_method: Optional[str] = Field(default=None, description="روش محاسبه سود فاکتور")
 	invoice_profit_calculation_basis: Optional[str] = Field(default=None, description="مبنای محاسبه سود")

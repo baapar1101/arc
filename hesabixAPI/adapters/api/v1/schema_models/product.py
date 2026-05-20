@@ -209,6 +209,11 @@ class ProductCreateRequest(BaseModel):
         default=True,
         description="آیا محصول فعال است؟"
     )
+
+    is_public_catalog: bool = Field(
+        default=False,
+        description="انتشار عمومی در شبکهٔ کاتالوگ (API عمومی بدون احراز هویت)",
+    )
     
     class Config:
         json_schema_extra = {
@@ -272,6 +277,7 @@ class ProductUpdateRequest(BaseModel):
     barcode: Optional[str] = Field(None, max_length=50)
     general_barcodes: Optional[str] = Field(None, max_length=8192)
     is_active: Optional[bool] = None
+    is_public_catalog: Optional[bool] = None
 
 
 class BulkDefaultWarehouseApplyScope(str, Enum):
@@ -383,6 +389,12 @@ class ProductResponse(BaseModel):
     barcode: Optional[str] = None
     general_barcodes: Optional[str] = None
     is_active: bool
+    
+    is_public_catalog: bool = False
+    catalog_public_uuid: Optional[str] = Field(
+        None,
+        description="شناسهٔ عمومی برای لینک کاتالوگ (پس از فعال‌سازی انتشار)",
+    )
     
     # اطلاعات موجودی (اختیاری - بسته به درخواست)
     inventory: Optional[List[ProductInventoryInfo]] = Field(
