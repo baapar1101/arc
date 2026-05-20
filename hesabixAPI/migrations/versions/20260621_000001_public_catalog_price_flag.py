@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import true as sql_true
 
 revision = "20260621_000001_public_catalog_price_flag"
 down_revision = "20260620_000001_product_public_catalog"
@@ -22,7 +23,7 @@ def upgrade() -> None:
 			"public_catalog_show_base_sales_price",
 			sa.Boolean(),
 			nullable=False,
-			server_default=sa.text("true"),
+			server_default=sql_true(),
 			comment="نمایش قیمت فروش پایه در API عمومی کاتالوگ",
 		),
 	)
