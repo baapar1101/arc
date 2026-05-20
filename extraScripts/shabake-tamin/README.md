@@ -24,6 +24,7 @@
 1. پوشهٔ `shabake-tamin` را در `wp-content/plugins/` کپی کنید.
 2. از پنل وردپرس افزونه را فعال کنید.
 3. به **تنظیمات → شبکه تأمین** بروید و **آدرس پایهٔ API** را وارد کنید (مثلاً `https://api.example.com` بدون اسلش آخر).
+4. (اختیاری) **صفحهٔ عمومی کاتالوگ** را از همان صفحه فعال کنید؛ آدرس شبیه `https://example.com/tamin/` خواهد بود (اسلاگ را می‌توانید عوض کنید). پس از اولین فعال‌سازی یا تغییر اسلاگ، در صورت ۴۰۴ یک‌بار **تنظیمات → پیوندهای یکتا → ذخیره** بزنید.
 
 ## شورت‌کد
 
@@ -45,6 +46,7 @@
 | `location_filters` | `0` | اگر `1` باشد، فیلدهای استان/شهر برای بازدیدکننده و دکمهٔ «اعمال فیلتر مکان» نمایش داده می‌شود |
 | `province_suggest` | `1` | همراه با `location_filters=1`: پیشنهاد **۳۱ استان ایران** در فیلد استان (`datalist`، دادهٔ لوکال PHP)؛ با `0` غیرفعال |
 | `show_details` | `1` | دکمهٔ **جزئیات** روی کارت و مودال با `GET .../product/{uuid}` (پراکسی REST)؛ با `0` فقط تماس |
+| `page` | `0` | با `1` چیدمان **تمام‌عرض** (نوار خلاصهٔ نتایج + استایل صفحه) داخل همان برگه — برای تجربهٔ نزدیک‌تر به «ویترین» بدون rewrite |
 
 ```text
 [shabake_tamin business_id="12" columns="3" search="1"]
@@ -83,13 +85,15 @@ wp i18n make-pot . languages/shabake-tamin.pot --slug=shabake-tamin --domain=sha
 برای تغییر HTML کاتالوگ، فایل را در قالب خود کپی کنید:
 
 - مسیر در قالب فرزند/والد: `wp-content/themes/<your-theme>/shabake-tamin/catalog-wrapper.php`
-- نقطهٔ شروع پیش‌فرض: `templates/catalog-wrapper.php` داخل افزونه
+- صفحهٔ عمومی (rewrite): `.../shabake-tamin/catalog-public-page.php`
+- نقطهٔ شروع پیش‌فرض: `templates/catalog-wrapper.php` و `templates/catalog-public-page.php` داخل افزونه
 
 فیلترهای PHP:
 
 - `shabake_tamin_locate_template` — مسیر نهایی فایل قالب
 - `shabake_tamin_shortcode_config` — پیکربندی پس از پارس شورت‌کد
 - `shabake_tamin_catalog_config` — پیکربندی نهایی قبل از رندر (شورت‌کد، بلوک، ابزارک یا فراخوانی دستی)
+- `shabake_tamin_public_catalog_config` — فقط برای **صفحهٔ عمومی** rewrite؛ پیش از `shabake_tamin_catalog_config`
 - `shabake_tamin_widget_catalog_config` — فقط برای ابزارک، پیش از `shabake_tamin_catalog_config`
 - `shabake_tamin_iran_provinces` — آرایهٔ نام استان‌ها برای `datalist` (قبل از رندر قالب)
 

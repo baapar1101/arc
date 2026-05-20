@@ -17,6 +17,7 @@ require_once ST_PLUGIN_DIR . 'includes/class-st-frontend.php';
 require_once ST_PLUGIN_DIR . 'includes/class-st-shortcode.php';
 require_once ST_PLUGIN_DIR . 'includes/class-st-block.php';
 require_once ST_PLUGIN_DIR . 'includes/class-st-widget.php';
+require_once ST_PLUGIN_DIR . 'includes/class-st-public-catalog.php';
 
 /**
  * کلاس اصلی لودر.
@@ -48,6 +49,7 @@ final class Shabake_Tamin_Loader {
 		Shabake_Tamin_Shortcode::instance();
 		Shabake_Tamin_Block::instance();
 		Shabake_Tamin_Widget_Controller::instance();
+		Shabake_Tamin_Public_Catalog::instance();
 	}
 
 	/**

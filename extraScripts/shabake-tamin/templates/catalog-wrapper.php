@@ -23,6 +23,7 @@ $cfg = wp_parse_args(
 		'columns'               => 4,
 		'search'                => true,
 		'take'                  => 20,
+		'pageLayout'            => false,
 	)
 );
 
@@ -34,7 +35,8 @@ if ( false === $json ) {
 	$json = '{}';
 }
 
-$cols                   = (int) $cfg['columns'];
+$cols                    = (int) $cfg['columns'];
+$page_layout             = ! empty( $cfg['pageLayout'] );
 $show_search             = ! empty( $cfg['search'] );
 $show_loc_ui             = ! empty( $cfg['locationFilters'] );
 $show_toolbar            = $show_search || $show_loc_ui;
@@ -43,7 +45,7 @@ $city_val                = isset( $cfg['city'] ) && is_string( $cfg['city'] ) ? 
 $provinces_list_id       = $uid . '-provinces';
 $show_province_datalist  = $show_loc_ui && ! empty( $cfg['provinceSuggestions'] );
 ?>
-<div class="st-catalog-root" id="<?php echo esc_attr( $uid ); ?>" data-st-root="1" style="--st-columns: <?php echo esc_attr( (string) $cols ); ?>;">
+<div class="st-catalog-root<?php echo $page_layout ? ' st-page-layout' : ''; ?>" id="<?php echo esc_attr( $uid ); ?>" data-st-root="1" style="--st-columns: <?php echo esc_attr( (string) $cols ); ?>;">
 	<script type="application/json" class="st-json-config"><?php echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></script>
 	<?php if ( $show_toolbar ) : ?>
 		<div class="st-toolbar-stack">
@@ -77,6 +79,11 @@ $show_province_datalist  = $show_loc_ui && ! empty( $cfg['provinceSuggestions'] 
 					<?php endif; ?>
 				</div>
 			<?php endif; ?>
+		</div>
+	<?php endif; ?>
+	<?php if ( $page_layout ) : ?>
+		<div class="st-pub-meta" aria-live="polite">
+			<span class="st-pub-result-stats"></span>
 		</div>
 	<?php endif; ?>
 	<div class="st-catalog-status" hidden></div>

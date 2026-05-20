@@ -23,6 +23,11 @@ final class Shabake_Tamin_Frontend {
 	private static $assets_enqueued = false;
 
 	/**
+	 * @var bool
+	 */
+	private static $page_layout_styles_enqueued = false;
+
+	/**
 	 * @return self
 	 */
 	public static function instance() {
@@ -52,6 +57,12 @@ final class Shabake_Tamin_Frontend {
 			array(),
 			ST_VERSION,
 			true
+		);
+		wp_register_style(
+			'shabake-tamin-catalog-page',
+			ST_PLUGIN_URL . 'assets/css/catalog-page.css',
+			array( 'shabake-tamin-catalog' ),
+			ST_VERSION
 		);
 	}
 
@@ -101,8 +112,20 @@ final class Shabake_Tamin_Frontend {
 					'updatedLabel'   => __( 'به‌روزرسانی', 'shabake-tamin' ),
 					'phoneLabel'     => __( 'تلفن', 'shabake-tamin' ),
 					'mobileLabel'    => __( 'موبایل', 'shabake-tamin' ),
+					'resultCountTemplate' => __( '{shown} کالا از {total} نتیجه', 'shabake-tamin' ),
 				),
 			)
 		);
+	}
+
+	/**
+	 * استایل چیدمان تمام‌صفحه / صفحهٔ عمومی (یک‌بار).
+	 */
+	public static function enqueue_page_layout_styles() {
+		if ( self::$page_layout_styles_enqueued ) {
+			return;
+		}
+		self::$page_layout_styles_enqueued = true;
+		wp_enqueue_style( 'shabake-tamin-catalog-page' );
 	}
 }

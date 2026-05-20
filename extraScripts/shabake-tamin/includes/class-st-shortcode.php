@@ -50,6 +50,7 @@ final class Shabake_Tamin_Shortcode {
 				'columns'             => '4',
 				'search'              => '1',
 				'take'                => '20',
+				'page'                => '0',
 			),
 			$atts,
 			'shabake_tamin'
@@ -80,6 +81,7 @@ final class Shabake_Tamin_Shortcode {
 			'columns'               => (int) $atts['columns'],
 			'search'                => in_array( (string) $atts['search'], array( '1', 'true', 'yes' ), true ),
 			'take'                  => (int) $atts['take'],
+			'pageLayout'            => in_array( (string) $atts['page'], array( '1', 'true', 'yes' ), true ),
 		);
 
 		$config = apply_filters( 'shabake_tamin_shortcode_config', $config, $atts );

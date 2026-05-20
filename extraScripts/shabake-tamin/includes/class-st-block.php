@@ -107,6 +107,10 @@ final class Shabake_Tamin_Block {
 						'type'    => 'boolean',
 						'default' => true,
 					),
+					'pageLayout' => array(
+						'type'    => 'boolean',
+						'default' => false,
+					),
 				),
 			)
 		);
@@ -140,6 +144,7 @@ final class Shabake_Tamin_Block {
 			'locationFilters'       => array_key_exists( 'locationFilters', $atts ) ? (bool) $atts['locationFilters'] : false,
 			'provinceSuggestions'   => array_key_exists( 'provinceSuggestions', $atts ) ? (bool) $atts['provinceSuggestions'] : true,
 			'showProductDetails'    => array_key_exists( 'showProductDetails', $atts ) ? (bool) $atts['showProductDetails'] : true,
+			'pageLayout'            => array_key_exists( 'pageLayout', $atts ) ? (bool) $atts['pageLayout'] : false,
 		);
 
 		return Shabake_Tamin_Catalog::render_html( $config, 'block', $atts );

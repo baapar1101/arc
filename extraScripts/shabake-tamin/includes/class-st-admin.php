@@ -63,6 +63,62 @@ final class Shabake_Tamin_Admin {
 				'default'           => 0,
 			)
 		);
+		register_setting(
+			'shabake_tamin',
+			'st_public_catalog_enabled',
+			array(
+				'type'              => 'integer',
+				'sanitize_callback' => array( $this, 'sanitize_public_catalog_enabled' ),
+				'default'           => 0,
+			)
+		);
+		register_setting(
+			'shabake_tamin',
+			'st_public_catalog_slug',
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_public_catalog_slug' ),
+				'default'           => 'tamin',
+			)
+		);
+		register_setting(
+			'shabake_tamin',
+			'st_public_catalog_title',
+			array(
+				'type'              => 'string',
+				'sanitize_callback' => array( $this, 'sanitize_public_catalog_title' ),
+				'default'           => '',
+			)
+		);
+	}
+
+	/**
+	 * @param mixed $v مقدار خام.
+	 * @return int ۰ یا ۱
+	 */
+	public function sanitize_public_catalog_enabled( $v ) {
+		if ( is_array( $v ) ) {
+			$v = end( $v );
+		}
+		return filter_var( $v, FILTER_VALIDATE_BOOLEAN ) ? 1 : 0;
+	}
+
+	/**
+	 * @param mixed $slug اسلاگ URL.
+	 * @return string
+	 */
+	public function sanitize_public_catalog_slug( $slug ) {
+		$s = is_string( $slug ) ? sanitize_title( trim( $slug ) ) : '';
+		return '' === $s ? 'tamin' : $s;
+	}
+
+	/**
+	 * @param mixed $title عنوان صفحه.
+	 * @return string
+	 */
+	public function sanitize_public_catalog_title( $title ) {
+		$t = is_string( $title ) ? sanitize_text_field( trim( $title ) ) : '';
+		return mb_substr( $t, 0, 200 );
 	}
 
 	/**
@@ -152,13 +208,51 @@ final class Shabake_Tamin_Admin {
 							</p>
 						</td>
 					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'صفحهٔ عمومی کاتالوگ (آدرس اختصاصی)', 'shabake-tamin' ); ?></th>
+						<td>
+							<label>
+								<input type="hidden" name="st_public_catalog_enabled" value="0" />
+								<input name="st_public_catalog_enabled" type="checkbox" value="1"
+									<?php checked( (int) get_option( 'st_public_catalog_enabled', 0 ), 1 ); ?> />
+								<?php esc_html_e( 'فعال‌سازی آدرس مستقل برای بازدیدکنندگان (شبیه یک ویترین؛ بدون نیاز به برگهٔ وردپرس)', 'shabake-tamin' ); ?>
+							</label>
+							<p class="description">
+								<?php esc_html_e( 'پس از ذخیره، اگر پیوندهای یکتا روشن است، کاتالوگ در آدرس زیر در دسترس است:', 'shabake-tamin' ); ?>
+							</p>
+							<?php
+							$slug = class_exists( 'Shabake_Tamin_Public_Catalog', false )
+								? Shabake_Tamin_Public_Catalog::get_slug()
+								: ( sanitize_title( (string) get_option( 'st_public_catalog_slug', 'tamin' ) ) ?: 'tamin' );
+							$url  = home_url( '/' . $slug . '/' );
+							?>
+							<p><code dir="ltr" style="unicode-bidi: embed;"><?php echo esc_html( $url ); ?></code></p>
+							<p>
+								<label for="st_public_catalog_slug"><?php esc_html_e( 'اسلاگ مسیر (انگلیسی، بدون فاصله)', 'shabake-tamin' ); ?></label><br />
+								<input name="st_public_catalog_slug" id="st_public_catalog_slug" type="text" class="regular-text code" dir="ltr"
+									value="<?php echo esc_attr( (string) get_option( 'st_public_catalog_slug', 'tamin' ) ); ?>"
+									pattern="[a-z0-9\-]+"
+									autocomplete="off" />
+							</p>
+							<p>
+								<label for="st_public_catalog_title"><?php esc_html_e( 'عنوان هیرو (اختیاری؛ خالی = نام سایت)', 'shabake-tamin' ); ?></label><br />
+								<input name="st_public_catalog_title" id="st_public_catalog_title" type="text" class="regular-text"
+									value="<?php echo esc_attr( (string) get_option( 'st_public_catalog_title', '' ) ); ?>"
+									maxlength="200" />
+							</p>
+							<p class="description">
+								<?php esc_html_e( 'اگر بعد از تغییر اسلاگ یا فعال‌سازی، صفحه ۴۰۴ دیدید، یک‌بار از تنظیمات → پیوندهای یکتا «ذخیره» بزنید تا rewrite بازسازی شود.', 'shabake-tamin' ); ?>
+							</p>
+						</td>
+					</tr>
 				</table>
 				<?php submit_button(); ?>
 			</form>
 			<hr />
 			<h2><?php esc_html_e( 'شورت‌کد و بلوک', 'shabake-tamin' ); ?></h2>
 			<p><code>[shabake_tamin]</code> <?php esc_html_e( 'یا:', 'shabake-tamin' ); ?></p>
-			<pre class="code" style="direction:ltr;text-align:left;">[shabake_tamin business_id="123" category_id="5" province="تهران" city="" location_filters="1" province_suggest="1" show_details="1" columns="4" search="1" take="20"]</pre>
+			<pre class="code" style="direction:ltr;text-align:left;">[shabake_tamin business_id="123" category_id="5" province="تهران" city="" location_filters="1" province_suggest="1" show_details="1" columns="4" search="1" take="20" page="1"]</pre>
+			<p class="description"><?php esc_html_e( 'با page="1" همان چیدمان تمام‌عرض (هیرو + شمارندهٔ نتایج) داخل برگهٔ عادی هم قابل استفاده است.', 'shabake-tamin' ); ?></p>
 			<p class="description"><?php esc_html_e( 'در ظاهر → ابزارک‌ها، «کاتالوگ شبکه تأمین» را می‌توانید به سایدبار اضافه کنید. در ویرایشگر بلوک، بلوک هم‌نام را در دستهٔ ابزارک‌ها بیابید.', 'shabake-tamin' ); ?></p>
 			<p class="description">
 				<?php esc_html_e( 'برای سفارشی‌سازی ظاهر، فایل‌های PHP را در پوشهٔ shabake-tamin داخل قالب کپی کنید (مثلاً catalog-wrapper.php).', 'shabake-tamin' ); ?>

@@ -121,6 +121,17 @@
 								set( { showProductDetails: !! v } );
 							},
 							help: __( 'باز کردن مودال با توضیحات و تماس.', 'shabake-tamin' ),
+						} ),
+						el( ToggleControl, {
+							label: __( 'چیدمان صفحهٔ کامل (هیرو + شمارنده)', 'shabake-tamin' ),
+							checked: !! a.pageLayout,
+							onChange: function ( v ) {
+								set( { pageLayout: !! v } );
+							},
+							help: __(
+								'برای برگهٔ اختصاصی یا شورت‌کد با page=1؛ استایل تمام‌عرض و نوار خلاصهٔ نتایج.',
+								'shabake-tamin'
+							),
 						} )
 					)
 				),

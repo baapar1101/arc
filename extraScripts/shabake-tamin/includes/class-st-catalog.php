@@ -66,6 +66,12 @@ final class Shabake_Tamin_Catalog {
 			$config['showProductDetails'] = filter_var( $config['showProductDetails'], FILTER_VALIDATE_BOOLEAN );
 		}
 
+		if ( ! array_key_exists( 'pageLayout', $config ) ) {
+			$config['pageLayout'] = false;
+		} else {
+			$config['pageLayout'] = filter_var( $config['pageLayout'], FILTER_VALIDATE_BOOLEAN );
+		}
+
 		$bid = $config['businessId'] ?? null;
 		if ( is_string( $bid ) ) {
 			$bid = trim( $bid );
@@ -113,6 +119,9 @@ final class Shabake_Tamin_Catalog {
 		$config = apply_filters( 'shabake_tamin_catalog_config', $config, $context, $extra );
 
 		Shabake_Tamin_Frontend::enqueue_assets_once();
+		if ( ! empty( $config['pageLayout'] ) ) {
+			Shabake_Tamin_Frontend::enqueue_page_layout_styles();
+		}
 		ob_start();
 		Shabake_Tamin_Templates::load(
 			'catalog-wrapper.php',

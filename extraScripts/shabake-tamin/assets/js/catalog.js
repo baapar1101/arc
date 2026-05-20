@@ -49,6 +49,21 @@
 		}
 	}
 
+	function fmtCount(n) {
+		if (n === Infinity || n === 'Infinity') {
+			return '…';
+		}
+		var x = Number(n);
+		if (isNaN(x)) {
+			return String(n);
+		}
+		try {
+			return new Intl.NumberFormat('fa-IR').format(x);
+		} catch (e2) {
+			return String(x);
+		}
+	}
+
 	function errMsg(payload) {
 		if (!payload) return t('errorGeneric');
 		if (payload.error && typeof payload.error === 'string') return payload.error;
@@ -69,6 +84,7 @@
 		var loadBtn = root.querySelector('.st-loadmore');
 		var searchInp = root.querySelector('.st-search-input');
 		var searchBtn = root.querySelector('.st-search-btn');
+		var statsEl = root.querySelector('.st-pub-result-stats');
 
 		if (searchInp) searchInp.placeholder = t('search');
 
@@ -77,6 +93,13 @@
 		var total = Infinity;
 		var loading = false;
 		var q = '';
+
+		function updateResultStats() {
+			if (!statsEl) return;
+			var tpl = t('resultCountTemplate');
+			var totStr = total === Infinity ? '…' : fmtCount(total);
+			statsEl.textContent = tpl.replace('{shown}', fmtCount(skip)).replace('{total}', totStr);
+		}
 
 		function setStatus( msg, isErr, isInfo ) {
 			if (!statusEl) return;
@@ -519,6 +542,9 @@
 					}
 					if (reset && items.length === 0) {
 						setStatus(t('emptyResults'), false, true);
+					}
+					if (statsEl) {
+						updateResultStats();
 					}
 				})
 				.catch(function (e) {
