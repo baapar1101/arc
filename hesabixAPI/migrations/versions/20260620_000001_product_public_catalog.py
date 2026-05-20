@@ -22,7 +22,7 @@ def upgrade() -> None:
 			"is_public_catalog",
 			sa.Boolean(),
 			nullable=False,
-			server_default=sa.text("0"),
+			server_default=sa.text("false"),
 			comment="انتشار در API عمومی کاتالوگ",
 		),
 	)
@@ -54,7 +54,7 @@ def upgrade() -> None:
 			"public_catalog_show_contact",
 			sa.Boolean(),
 			nullable=False,
-			server_default=sa.text("0"),
+			server_default=sa.text("false"),
 			comment="نمایش تلفن/موبایل در API عمومی کاتالوگ",
 		),
 	)

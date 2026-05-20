@@ -54,6 +54,7 @@ adapters/api/v1/product_instances.py
 adapters/api/v1/products.py
 adapters/api/v1/profile_dashboard.py
 adapters/api/v1/projects.py
+adapters/api/v1/public_product_catalog.py
 adapters/api/v1/public_share_links.py
 adapters/api/v1/public_storage_file_shares.py
 adapters/api/v1/quick_sales.py
@@ -230,6 +231,7 @@ adapters/db/models/product_general_barcode_alias.py
 adapters/db/models/product_instance.py
 adapters/db/models/product_tax_code.py
 adapters/db/models/project.py
+adapters/db/models/public_catalog_contact_message.py
 adapters/db/models/quick_sales_settings.py
 adapters/db/models/received_loan_facility.py
 adapters/db/models/repair_shop.py
@@ -466,6 +468,8 @@ app/services/product_general_barcode_service.py
 app/services/product_service.py
 app/services/profile_dashboard_widgets_service.py
 app/services/project_service.py
+app/services/public_catalog_service.py
+app/services/public_catalog_utils.py
 app/services/public_invoice_share_payment_service.py
 app/services/query_service.py
 app/services/quick_sales_service.py
@@ -691,6 +695,8 @@ migrations/versions/20260616_000002_business_invoice_share_settings.py
 migrations/versions/20260617_000001_business_frequent_descriptions.py
 migrations/versions/20260617_000002_business_frequent_descriptions_scope.py
 migrations/versions/20260617_000003_merge_heads_invoice_share_and_frequent_descriptions_scope.py
+migrations/versions/20260620_000001_product_public_catalog.py
+migrations/versions/20260621_000001_public_catalog_price_flag.py
 tests/__init__.py
 tests/test_basalam_currency.py
 tests/test_basalam_dlq.py
@@ -702,3 +708,4 @@ tests/test_invoice_profit_costing.py
 tests/test_permissions.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
+tests/test_public_catalog_utils.py
