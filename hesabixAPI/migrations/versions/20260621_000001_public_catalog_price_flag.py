@@ -22,7 +22,7 @@ def upgrade() -> None:
 			"public_catalog_show_base_sales_price",
 			sa.Boolean(),
 			nullable=False,
-			server_default=sa.text("1"),
+			server_default=sa.text("true"),
 			comment="نمایش قیمت فروش پایه در API عمومی کاتالوگ",
 		),
 	)
