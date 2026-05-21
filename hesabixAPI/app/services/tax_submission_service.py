@@ -5,6 +5,8 @@ import logging
 import time
 from typing import Dict, Any, List
 
+from sqlalchemy import cast
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Session
 
 from adapters.db.models.document import Document
@@ -15,8 +17,71 @@ from app.integrations.moadian.client import MoadianClient
 from app.integrations.moadian.invoice_builder import build_invoice_for_moadian
 from app.services.invoice_service import invoice_document_to_dict
 from app.services.tax_validation_service import validate_document_for_tax
+from app.integrations.moadian.utils import extract_moadian_error_message
 
 logger = logging.getLogger(__name__)
+
+
+def _documents_by_tracking_codes(
+    db: Session,
+    business_id: int,
+    tracking_codes: List[str],
+) -> Dict[str, Document]:
+    """یافتن اسناد بر اساس کد رهگیری ذخیره‌شده در extra_info."""
+    codes = {str(c).strip() for c in tracking_codes if c and str(c).strip()}
+    if not codes:
+        return {}
+
+    _extra_info_jb = cast(Document.extra_info, JSONB)
+    docs = (
+        db.query(Document)
+        .filter(
+            Document.business_id == business_id,
+            _extra_info_jb["tax_tracking_code"].astext.in_(sorted(codes)),
+        )
+        .all()
+    )
+    mapping: Dict[str, Document] = {}
+    for doc in docs:
+        code = (doc.extra_info or {}).get("tax_tracking_code")
+        if code:
+            mapping[str(code)] = doc
+    return mapping
+
+
+def _extract_inquiry_error_message(item: Dict[str, Any]) -> str | None:
+    if item.get("error_message"):
+        return str(item["error_message"])
+    raw = item.get("raw_data")
+    if not isinstance(raw, dict):
+        return None
+    data = raw.get("data")
+    if not isinstance(data, dict):
+        return None
+    errors = data.get("error")
+    if isinstance(errors, list) and errors:
+        first = errors[0] if isinstance(errors[0], dict) else {}
+        return extract_moadian_error_message(first)
+    return None
+
+
+def _apply_inquiry_result_to_document(doc: Document, item: Dict[str, Any], *, now: str) -> None:
+    extra = dict(doc.extra_info or {})
+    mapped_status = _map_inquiry_status(item.get("status"))
+    if mapped_status:
+        extra["tax_status"] = mapped_status
+    error_message = _extract_inquiry_error_message(item)
+    status_norm = str(item.get("status") or "").lower()
+    if error_message:
+        extra["tax_error_message"] = error_message
+    elif status_norm in ("failed", "error"):
+        extra["tax_error_message"] = extra.get("tax_error_message") or "رد شده توسط سامانه مودیان"
+    elif mapped_status not in ("failed",):
+        extra.pop("tax_error_message", None)
+    extra["tax_last_inquiry_at"] = now
+    if item.get("raw_data"):
+        extra["tax_last_inquiry_response"] = item.get("raw_data")
+    doc.extra_info = extra
 
 
 def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, Any]:
@@ -114,20 +179,56 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
             retry_delay = initial_retry_delay * (2 ** attempt)  # exponential backoff
             try:
                 submission = client.send_invoice(invoice_dto)
-                # 6. ذخیره نتیجه
+                # 6. ذخیره نتیجه اولیه (صف async)
                 _apply_submission_result(document, submission, db)
+
+                # 6.5 استعلام فوری: «sent» یعنی پذیرش در صف، نه ثبت نهایی در کارپوشه مودیان
+                tracking_code = submission.get("tracking_code")
+                if tracking_code and submission.get("mode") == "live":
+                    try:
+                        inquiry = client.inquire_status([str(tracking_code)])
+                        for item in inquiry.get("results") or []:
+                            _apply_inquiry_result_to_document(
+                                document,
+                                item,
+                                now=datetime.datetime.utcnow().isoformat(),
+                            )
+                            db.add(document)
+                            db.flush()
+                            mapped = _map_inquiry_status(item.get("status"))
+                            if mapped == "failed":
+                                err = _extract_inquiry_error_message(item)
+                                submission["status"] = "failed"
+                                if err:
+                                    submission["error_message"] = err
+                                submission["inquiry"] = item
+                    except Exception as inquiry_exc:
+                        logger.warning(
+                            "Post-send tax inquiry failed for document %s: %s",
+                            document.id,
+                            inquiry_exc,
+                        )
                 
-                # ثبت لاگ موفقیت
+                final_status = (document.extra_info or {}).get("tax_status") or submission.get("status")
+                log_status = "failed" if final_status == "failed" else "completed"
                 from app.services.tax_logging import log_tax_operation
                 log_tax_operation(
                     operation="send_invoice",
                     business_id=document.business_id,
                     invoice_id=document.id,
-                    tracking_code=submission.get("tracking_code"),
-                    status="completed",
-                    details={"status": submission.get("status")},
+                    tracking_code=tracking_code,
+                    status=log_status,
+                    details={"status": final_status, "mode": submission.get("mode")},
+                    error=submission.get("error_message") if log_status == "failed" else None,
                 )
-                
+
+                # وضعیت failed در extra_info ذخیره شده؛ endpoint پس از commit خطا برمی‌گرداند
+                if final_status == "failed":
+                    submission["status"] = "failed"
+                    submission.setdefault(
+                        "error_message",
+                        "فاکتور توسط سامانه مودیان رد شد.",
+                    )
                 return submission
                 
             except ApiError as e:
@@ -263,22 +364,22 @@ def inquire_tax_status(
     if not invoice_ids and not tracking_codes:
         raise ApiError("INVALID_REQUEST", "لیست فاکتورها یا کد رهگیری لازم است.", http_status=400)
 
-    docs: List[Document] = []
+    doc_by_tracking: Dict[str, Document] = {}
     if invoice_ids:
         docs = (
             db.query(Document)
             .filter(Document.business_id == business_id, Document.id.in_(invoice_ids))
             .all()
         )
+        for doc in docs:
+            code = (doc.extra_info or {}).get("tax_tracking_code")
+            if code:
+                doc_by_tracking[str(code)] = doc
 
-    doc_by_tracking: Dict[str, Document] = {}
-    for doc in docs:
-        code = (doc.extra_info or {}).get("tax_tracking_code")
-        if code:
-            doc_by_tracking[str(code)] = doc
-
-    merged_codes = {str(code) for code in tracking_codes if code}
+    merged_codes = {str(code).strip() for code in tracking_codes if code and str(code).strip()}
     merged_codes.update(doc_by_tracking.keys())
+    if merged_codes:
+        doc_by_tracking.update(_documents_by_tracking_codes(db, business_id, sorted(merged_codes)))
 
     if not merged_codes:
         raise ApiError("TAX_TRACKING_CODE_MISSING", "هیچ کد رهگیری معتبری یافت نشد.", http_status=400)
@@ -301,7 +402,7 @@ def inquire_tax_status(
     finally:
         client.close()
 
-    results = response.get("results") or []
+    results = [_enrich_inquiry_result_item(item) for item in (response.get("results") or [])]
     now = datetime.datetime.utcnow().isoformat()
     for item in results:
         reference = item.get("reference_number") or item.get("tracking_code")
@@ -310,22 +411,27 @@ def inquire_tax_status(
         doc = doc_by_tracking.get(str(reference))
         if not doc:
             continue
-        extra = dict(doc.extra_info or {})
-        mapped_status = _map_inquiry_status(item.get("status"))
-        if mapped_status:
-            extra["tax_status"] = mapped_status
-        if item.get("error_message"):
-            extra["tax_error_message"] = item.get("error_message")
-        elif item.get("status") not in ("failed", "error"):
-            extra.pop("tax_error_message", None)
-        extra["tax_last_inquiry_at"] = now
-        doc.extra_info = extra
+        _apply_inquiry_result_to_document(doc, item, now=now)
         db.add(doc)
 
     return {
         "mode": response.get("mode"),
         "results": results,
     }
+
+
+def enrich_tax_timeline_event(event: Dict[str, Any], extra: dict | None) -> Dict[str, Any]:
+    """افزودن خطاها به رویدادهای تایم‌لاین."""
+    enriched = dict(event)
+    if event.get("event") in ("send_attempt", "status_inquiry", "failed"):
+        for err in extract_moadian_errors_from_extra(extra):
+            if err.get("message") and not enriched.get("error_message"):
+                enriched["error_message"] = err["message"]
+                break
+        errors = extract_moadian_errors_from_extra(extra)
+        if errors:
+            enriched["moadian_errors"] = errors
+    return enriched
 
 
 def _mark_document_pending(doc: Document, db: Session) -> None:
@@ -364,6 +470,102 @@ def _apply_submission_result(doc: Document, submission: Dict[str, Any], db: Sess
         extra.pop("tax_error_message", None)
     doc.extra_info = extra
     db.add(doc)
+
+
+def extract_moadian_errors_from_extra(extra: dict | None) -> List[Dict[str, Any]]:
+    """استخراج خطاهای سامانه از extra_info برای نمایش در API/UI."""
+    if not extra:
+        return []
+    seen: set[str] = set()
+    errors: List[Dict[str, Any]] = []
+
+    def _add(code: Any, message: Any) -> None:
+        msg = str(message or "").strip()
+        if not msg:
+            return
+        key = f"{code}|{msg}"
+        if key in seen:
+            return
+        seen.add(key)
+        errors.append({"code": str(code).strip() if code else None, "message": msg})
+
+    summary = extra.get("tax_error_message")
+    if summary:
+        _add(None, summary)
+
+    for source_key in ("tax_last_inquiry_response", "tax_last_response"):
+        raw = extra.get(source_key)
+        if not isinstance(raw, dict):
+            continue
+        data = raw.get("data")
+        if isinstance(data, dict):
+            err_list = data.get("error")
+            if isinstance(err_list, list):
+                for item in err_list:
+                    if isinstance(item, dict):
+                        _add(item.get("code"), item.get("message") or item.get("errorDetail"))
+        top_status = raw.get("status")
+        if str(top_status or "").upper() == "FAILED" and not errors:
+            _add(raw.get("errorCode"), raw.get("errorDetail"))
+
+    return errors
+
+
+def build_tax_status_fields_for_api(extra: dict | None) -> Dict[str, Any]:
+    """فیلدهای مالیاتی قابل نمایش در لیست/جزئیات."""
+    extra = extra or {}
+    fields: Dict[str, Any] = {
+        "tax_error_message": extra.get("tax_error_message"),
+        "tax_last_inquiry_at": extra.get("tax_last_inquiry_at"),
+    }
+    moadian_errors = extract_moadian_errors_from_extra(extra)
+    if moadian_errors:
+        fields["tax_moadian_errors"] = moadian_errors
+    return fields
+
+
+def build_tax_failure_details(
+    extra: dict | None,
+    submission: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """جزئیات خطای ارسال برای پاسخ API."""
+    extra = extra or {}
+    submission = submission or {}
+    details: Dict[str, Any] = {
+        "tax_status": extra.get("tax_status"),
+        "tax_tracking_code": extra.get("tax_tracking_code") or submission.get("tracking_code"),
+        "tax_error_message": extra.get("tax_error_message") or submission.get("error_message"),
+        "moadian_errors": extract_moadian_errors_from_extra(extra),
+    }
+    inquiry = submission.get("inquiry")
+    if isinstance(inquiry, dict):
+        details["inquiry"] = inquiry
+        if not details["moadian_errors"]:
+            err = _extract_inquiry_error_message(inquiry)
+            if err:
+                details["moadian_errors"] = [{"code": None, "message": err}]
+    raw_inquiry = extra.get("tax_last_inquiry_response")
+    if isinstance(raw_inquiry, dict):
+        details["inquiry_response"] = raw_inquiry
+    raw_send = extra.get("tax_last_response")
+    if isinstance(raw_send, dict):
+        details["send_response"] = raw_send
+    return details
+
+
+def _enrich_inquiry_result_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """تکمیل پیام خطا در هر آیتم استعلام."""
+    enriched = dict(item)
+    if not enriched.get("error_message"):
+        err = _extract_inquiry_error_message(enriched)
+        if err:
+            enriched["error_message"] = err
+    raw = enriched.get("raw_data")
+    if isinstance(raw, dict) and not enriched.get("moadian_errors"):
+        errors = extract_moadian_errors_from_extra({"tax_last_inquiry_response": raw})
+        if errors:
+            enriched["moadian_errors"] = errors
+    return enriched
 
 
 def _map_inquiry_status(status: Any) -> str | None:

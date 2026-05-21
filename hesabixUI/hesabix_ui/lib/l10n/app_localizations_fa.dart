@@ -6872,6 +6872,31 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxValidationIssuesLineNumber => 'ردیف';
 
   @override
+  String get taxSubmissionFailedTitle => 'ارسال به سامانه مودیان ناموفق بود';
+
+  @override
+  String get taxSubmissionFailedDescription =>
+      'سامانه مودیان فاکتور را نپذیرفته است. جزئیات خطا و پاسخ سامانه در زیر آمده است.';
+
+  @override
+  String get taxViewFailureDetails => 'مشاهده جزئیات خطا';
+
+  @override
+  String get taxErrorMessageColumn => 'پیام خطا';
+
+  @override
+  String get taxMoadianResponseTitle => 'پاسخ سامانه مودیان';
+
+  @override
+  String get taxTechnicalDetailsTitle => 'جزئیات فنی (پاسخ خام)';
+
+  @override
+  String get taxNoErrorDetails => 'جزئیات خطایی ثبت نشده است.';
+
+  @override
+  String get taxErrorCodeLabel => 'کد خطا';
+
+  @override
   String get taxAddToWorkspaceSingle => 'افزودن به کارپوشه مالیاتی';
 
   @override

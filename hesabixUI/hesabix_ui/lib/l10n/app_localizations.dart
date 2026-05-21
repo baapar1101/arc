@@ -12956,6 +12956,30 @@ abstract class AppLocalizations {
   /// **'Line'**
   String get taxValidationIssuesLineNumber;
 
+  /// No description provided for @taxSubmissionFailedTitle.
+  String get taxSubmissionFailedTitle;
+
+  /// No description provided for @taxSubmissionFailedDescription.
+  String get taxSubmissionFailedDescription;
+
+  /// No description provided for @taxViewFailureDetails.
+  String get taxViewFailureDetails;
+
+  /// No description provided for @taxErrorMessageColumn.
+  String get taxErrorMessageColumn;
+
+  /// No description provided for @taxMoadianResponseTitle.
+  String get taxMoadianResponseTitle;
+
+  /// No description provided for @taxTechnicalDetailsTitle.
+  String get taxTechnicalDetailsTitle;
+
+  /// No description provided for @taxNoErrorDetails.
+  String get taxNoErrorDetails;
+
+  /// No description provided for @taxErrorCodeLabel.
+  String get taxErrorCodeLabel;
+
   /// No description provided for @taxAddToWorkspaceSingle.
   ///
   /// In en, this message translates to:

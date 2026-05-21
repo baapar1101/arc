@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
@@ -568,6 +570,12 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                 return status != 'sent' && status != 'finalized';
               },
             ),
+            DataTableAction(
+              icon: Icons.info_outline,
+              label: t.taxViewFailureDetails,
+              onTap: (item) => _showTaxFailureFromRow(item as Map<String, dynamic>),
+              enabled: (item) => _rowHasTaxFailureDetails(item as Map<String, dynamic>),
+            ),
           ],
         ),
         TextColumn(
@@ -637,6 +645,17 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
             }
           },
           width: ColumnWidth.medium,
+        ),
+        TextColumn(
+          'tax_error_message',
+          t.taxErrorMessageColumn,
+          formatter: (item) {
+            final map = item as Map<String, dynamic>;
+            final msg = map['tax_error_message']?.toString() ?? '';
+            if (msg.isEmpty) return '-';
+            return msg.length > 80 ? '${msg.substring(0, 80)}…' : msg;
+          },
+          width: ColumnWidth.large,
         ),
         TextColumn(
           'tax_tracking_code',
@@ -1215,45 +1234,276 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
   }
 
-  bool _handleTaxSendError(Object error, {int? invoiceId}) {
-    ApiErrorDetails? apiError;
+  ApiErrorDetails? _parseApiError(Object error) {
     if (error is DioException && error.error is ApiErrorDetails) {
-      apiError = error.error as ApiErrorDetails;
-    } else if (error is ApiErrorDetails) {
-      apiError = error;
-    } else if (error is DioException) {
+      return error.error as ApiErrorDetails;
+    }
+    if (error is ApiErrorDetails) {
+      return error;
+    }
+    if (error is DioException) {
       final data = error.response?.data;
       if (data is Map<String, dynamic>) {
         final err = data['error'];
         if (err is Map<String, dynamic>) {
-          apiError = ApiErrorDetails(
+          return ApiErrorDetails(
             code: err['code']?.toString(),
             message: err['message']?.toString(),
-            details: err['details'],
+            details: err['details'] is Map<String, dynamic>
+                ? err['details'] as Map<String, dynamic>
+                : null,
           );
         }
       }
     }
+    return null;
+  }
+
+  int? _invoiceIdFromSendError(Object error, int? invoiceId) {
+    if (invoiceId != null) return invoiceId;
+    if (error is DioException) {
+      final requestPath = error.requestOptions.path;
+      final match = RegExp(
+        r'/invoices/business/\d+/(\d+)/tax-workspace/send-to-system',
+      ).firstMatch(requestPath);
+      if (match != null) {
+        return int.tryParse(match.group(1)!);
+      }
+    }
+    return null;
+  }
+
+  bool _rowHasTaxFailureDetails(Map<String, dynamic> row) {
+    final status = row['tax_status']?.toString() ?? '';
+    if (status == 'failed') return true;
+    final msg = row['tax_error_message']?.toString() ?? '';
+    if (msg.isNotEmpty) return true;
+    final errors = row['tax_moadian_errors'];
+    return errors is List && errors.isNotEmpty;
+  }
+
+  void _showTaxFailureFromRow(Map<String, dynamic> row) {
+    final details = <String, dynamic>{
+      'tax_status': row['tax_status'],
+      'tax_tracking_code': row['tax_tracking_code'],
+      'tax_error_message': row['tax_error_message'],
+      'moadian_errors': row['tax_moadian_errors'],
+    };
+    _showTaxFailureDialog(
+      title: AppLocalizations.of(context).taxSubmissionFailedTitle,
+      message: row['tax_error_message']?.toString(),
+      details: details,
+      invoiceId: row['id'] is int ? row['id'] as int : int.tryParse(row['id']?.toString() ?? ''),
+      errorCode: 'TAX_SUBMISSION_REJECTED',
+    );
+  }
+
+  void _showTaxFailureDialog({
+    required String title,
+    String? message,
+    Map<String, dynamic>? details,
+    int? invoiceId,
+    String? errorCode,
+  }) {
+    final t = AppLocalizations.of(context);
+    final resolvedDetails = details ?? const <String, dynamic>{};
+    final trackingCode = resolvedDetails['tax_tracking_code']?.toString()
+        ?? resolvedDetails['tracking_code']?.toString();
+    final moadianErrors = _normalizeMoadianErrors(
+      resolvedDetails['moadian_errors'],
+      resolvedDetails['tax_error_message']?.toString() ?? message,
+    );
+    final technicalJson = _pickTechnicalJson(resolvedDetails);
+
+    showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+              const SizedBox(width: 8),
+              Expanded(child: Text(title)),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    t.taxSubmissionFailedDescription,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (errorCode != null && errorCode.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      '${t.code}: $errorCode',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                  if (invoiceId != null) ...[
+                    const SizedBox(height: 8),
+                    Text('${t.taxInvoiceNumber(invoiceId)}'),
+                  ],
+                  if (trackingCode != null && trackingCode.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    SelectableText('${t.taxTrackingCode}: $trackingCode'),
+                  ],
+                  if (message != null && message.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(message),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Text(
+                    t.taxMoadianResponseTitle,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (moadianErrors.isEmpty)
+                    Text(t.taxNoErrorDetails)
+                  else
+                    ...moadianErrors.map((e) => _buildMoadianErrorTile(context, e, t)),
+                  if (technicalJson != null) ...[
+                    const SizedBox(height: 12),
+                    ExpansionTile(
+                      title: Text(t.taxTechnicalDetailsTitle),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: SelectableText(
+                            technicalJson,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(t.close),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  List<Map<String, dynamic>> _normalizeMoadianErrors(dynamic raw, String? fallbackMessage) {
+    final List<Map<String, dynamic>> out = [];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          out.add(item);
+        } else if (item is Map) {
+          out.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+    if (out.isEmpty && fallbackMessage != null && fallbackMessage.trim().isNotEmpty) {
+      out.add({'code': null, 'message': fallbackMessage.trim()});
+    }
+    return out;
+  }
+
+  String? _pickTechnicalJson(Map<String, dynamic> details) {
+    final candidates = [
+      details['inquiry_response'],
+      details['inquiry'],
+      details['send_response'],
+      details,
+    ];
+    for (final c in candidates) {
+      if (c is Map<String, dynamic> && c.isNotEmpty) {
+        return const JsonEncoder.withIndent('  ').convert(c);
+      }
+    }
+    return null;
+  }
+
+  Widget _buildMoadianErrorTile(BuildContext context, Map<String, dynamic> err, AppLocalizations t) {
+    final code = err['code']?.toString();
+    final message = err['message']?.toString() ?? '-';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber, size: 20, color: Colors.orange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(message),
+                if (code != null && code.isNotEmpty)
+                  Text(
+                    '${t.taxErrorCodeLabel}: $code',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _handleTaxSendError(Object error, {int? invoiceId}) {
+    final apiError = _parseApiError(error);
     if (apiError == null) {
       return false;
     }
     final code = (apiError.code ?? '').toUpperCase();
-    if (code != 'TAX_VALIDATION_FAILED') {
-      return false;
+    final finalInvoiceId = _invoiceIdFromSendError(error, invoiceId);
+
+    if (code == 'TAX_VALIDATION_FAILED') {
+      final issues = apiError.details?['issues'];
+      final List<dynamic> issueList = issues is List ? issues : const [];
+      _showValidationIssuesDialog(issueList, invoiceId: finalInvoiceId);
+      return true;
     }
-    final issues = apiError.details?['issues'];
-    final List<dynamic> issueList = issues is List ? issues : const [];
-    // استفاده از invoice_id پاس داده شده یا استخراج از request
-    int? finalInvoiceId = invoiceId;
-    if (finalInvoiceId == null && error is DioException) {
-      final requestPath = error.requestOptions.path;
-      final match = RegExp(r'/invoices/business/\d+/(\d+)/tax-workspace/send-to-system').firstMatch(requestPath);
-      if (match != null) {
-        finalInvoiceId = int.tryParse(match.group(1)!);
-      }
+
+    const failureCodes = {
+      'TAX_SUBMISSION_REJECTED',
+      'TAX_SUBMISSION_FAILED',
+      'TAX_NETWORK_ERROR',
+      'TAX_SETTINGS_NOT_CONFIGURED',
+      'TAX_SETTINGS_INCOMPLETE',
+      'RATE_LIMIT_EXCEEDED',
+    };
+    if (failureCodes.contains(code) || (apiError.details?.isNotEmpty ?? false)) {
+      _showTaxFailureDialog(
+        title: AppLocalizations.of(context).taxSubmissionFailedTitle,
+        message: apiError.message,
+        details: apiError.details,
+        invoiceId: finalInvoiceId,
+        errorCode: apiError.code,
+      );
+      _refreshData();
+      return true;
     }
-    _showValidationIssuesDialog(issueList, invoiceId: finalInvoiceId);
-    return true;
+    return false;
   }
 
   void _showBatchResultDialog(int successCount, List<dynamic> failedItems) {
@@ -1407,14 +1657,39 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
   Widget _buildErrorItem(Map<String, dynamic> item, AppLocalizations t) {
     final invoiceId = item['id'];
     final errorCode = item['error']?.toString() ?? '-';
-    final message = item['message']?.toString();
+    final message = item['message']?.toString() ?? item['tax_error_message']?.toString();
     final issues = item['issues'] as List<dynamic>?;
+    final moadianErrors = item['moadian_errors'] ?? (item['details'] is Map ? (item['details'] as Map)['moadian_errors'] : null);
+    final details = item['details'] is Map<String, dynamic>
+        ? item['details'] as Map<String, dynamic>
+        : (item['details'] is Map ? Map<String, dynamic>.from(item['details'] as Map) : null);
     
     return ExpansionTile(
       title: Text(t.taxInvoiceNumber(invoiceId)),
       subtitle: Text(message ?? errorCode),
       leading: const Icon(Icons.receipt_long, size: 20),
       children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () {
+              _showTaxFailureDialog(
+                title: t.taxSubmissionFailedTitle,
+                message: message,
+                details: {
+                  if (details != null) ...details,
+                  'tax_error_message': message,
+                  'tax_tracking_code': item['tax_tracking_code'],
+                  'moadian_errors': moadianErrors,
+                },
+                invoiceId: invoiceId is int ? invoiceId : int.tryParse('$invoiceId'),
+                errorCode: errorCode,
+              );
+            },
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: Text(t.taxViewFailureDetails),
+          ),
+        ),
         if (message != null && message.isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1423,6 +1698,12 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
+        ..._normalizeMoadianErrors(moadianErrors, message).map(
+          (e) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: _buildMoadianErrorTile(context, e, t),
+          ),
+        ),
         if (issues != null && issues.isNotEmpty)
           ...issues.map((issue) {
             final issueMap = issue is Map<String, dynamic> ? issue : <String, dynamic>{};
@@ -1774,6 +2055,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                       final status = map['status']?.toString();
                       final errorMessage = map['error_message']?.toString();
                       final inquiryAt = map['inquiry_at']?.toString();
+                      final statusNorm = status?.toLowerCase();
                       return ListTile(
                         dense: true,
                         leading: Icon(
@@ -1800,6 +2082,22 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                               ),
                           ],
                         ),
+                        onTap: (statusNorm == 'failed' || statusNorm == 'error' || (errorMessage?.isNotEmpty ?? false))
+                            ? () {
+                                Navigator.pop(context);
+                                _showTaxFailureDialog(
+                                  title: t.taxInquiryResultTitle,
+                                  message: errorMessage,
+                                  details: {
+                                    'tax_tracking_code': reference,
+                                    'moadian_errors': map['moadian_errors'],
+                                    'inquiry_response': map['raw_data'],
+                                    'inquiry': map,
+                                  },
+                                  errorCode: status,
+                                );
+                              }
+                            : null,
                       );
                     }).toList(),
                   ),

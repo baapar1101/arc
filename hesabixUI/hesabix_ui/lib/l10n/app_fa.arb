@@ -2588,6 +2588,15 @@
   "taxValidationIssuesEditInvoice": "ویرایش فاکتور",
   "taxValidationIssuesLineNumber": "ردیف",
 
+  "taxSubmissionFailedTitle": "ارسال به سامانه مودیان ناموفق بود",
+  "taxSubmissionFailedDescription": "سامانه مودیان فاکتور را نپذیرفته است. جزئیات خطا و پاسخ سامانه در زیر آمده است.",
+  "taxViewFailureDetails": "مشاهده جزئیات خطا",
+  "taxErrorMessageColumn": "پیام خطا",
+  "taxMoadianResponseTitle": "پاسخ سامانه مودیان",
+  "taxTechnicalDetailsTitle": "جزئیات فنی (پاسخ خام)",
+  "taxNoErrorDetails": "جزئیات خطایی ثبت نشده است.",
+  "taxErrorCodeLabel": "کد خطا",
+
   "taxAddToWorkspaceSingle": "افزودن به کارپوشه مالیاتی",
   "taxRemoveFromWorkspaceSingle": "حذف از کارپوشه مالیاتی",
 

@@ -62,7 +62,13 @@ from app.services.invoice_tag_service import (
     list_invoice_tags,
     update_invoice_tag,
 )
-from app.services.tax_submission_service import send_document_to_tax_system, inquire_tax_status
+from app.services.tax_submission_service import (
+    send_document_to_tax_system,
+    inquire_tax_status,
+    build_tax_status_fields_for_api,
+    build_tax_failure_details,
+    enrich_tax_timeline_event,
+)
 from app.services.pdf.template_renderer import render_template
 from app.core.calendar import CalendarConverter
 from adapters.db.models.person import Person
@@ -3109,6 +3115,7 @@ async def search_tax_workspace_endpoint(
         item["tax_status"] = tax_status
         item["tax_tracking_code"] = extra.get("tax_tracking_code")
         item["tax_last_send_at"] = extra.get("tax_last_send_at")
+        item.update(build_tax_status_fields_for_api(extra))
 
         # total_amount from totals.net or recomputed
         total_amount = None
@@ -3278,10 +3285,7 @@ def send_invoice_to_tax_system(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """
-    ارسال تکی فاکتور موجود در کارپوشه به سامانه مودیان.
-    (نسخه MVP: فقط بروزرسانی وضعیت و کد رهگیری آزمایشی)
-    """
+    """ارسال تکی فاکتور موجود در کارپوشه به سامانه مودیان."""
     doc = _get_invoice_for_business(db, business_id, invoice_id)
     _ensure_sales_or_return(doc)
 
@@ -3300,12 +3304,30 @@ def send_invoice_to_tax_system(
             http_status=409,
         )
 
-    send_document_to_tax_system(db, doc)
+    submission = send_document_to_tax_system(db, doc)
     db.commit()
     db.refresh(doc)
 
+    extra_after = doc.extra_info or {}
+    tax_status = extra_after.get("tax_status")
+    if tax_status == "failed" or submission.get("status") == "failed":
+        failure_details = build_tax_failure_details(extra_after, submission)
+        failure_details["id"] = doc.id
+        raise ApiError(
+            "TAX_SUBMISSION_REJECTED",
+            submission.get("error_message")
+            or extra_after.get("tax_error_message")
+            or "فاکتور توسط سامانه مودیان رد شد.",
+            http_status=400,
+            details=failure_details,
+        )
+
     return success_response(
-        data={"id": doc.id, "tax_status": (doc.extra_info or {}).get("tax_status")},
+        data={
+            "id": doc.id,
+            "tax_status": tax_status,
+            "tax_tracking_code": extra_after.get("tax_tracking_code"),
+        },
         request=request,
         message="INVOICE_SENT_TO_TAX_SYSTEM",
     )
@@ -3324,10 +3346,7 @@ def send_invoices_to_tax_system_batch(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """
-    ارسال گروهی فاکتورهای موجود در کارپوشه به سامانه مودیان.
-    (MVP: شبیه‌سازی ارسال و بروزرسانی وضعیت)
-    """
+    """ارسال گروهی فاکتورهای موجود در کارپوشه به سامانه مودیان."""
     ids = body.get("invoice_ids") or []
     if not isinstance(ids, list) or not ids:
         raise ApiError("INVALID_REQUEST", "invoice_ids must be a non-empty list", http_status=400)
@@ -3351,19 +3370,34 @@ def send_invoices_to_tax_system_batch(
             if status in ("sent", "finalized"):
                 raise ApiError("TAX_ALREADY_SENT", "Invoice has already been sent to tax system", http_status=409)
 
-            send_document_to_tax_system(db, doc)
+            submission = send_document_to_tax_system(db, doc)
+            extra_after = doc.extra_info or {}
+            if extra_after.get("tax_status") == "failed" or submission.get("status") == "failed":
+                raise ApiError(
+                    "TAX_SUBMISSION_REJECTED",
+                    submission.get("error_message")
+                    or extra_after.get("tax_error_message")
+                    or "فاکتور توسط سامانه مودیان رد شد.",
+                    http_status=400,
+                    details=build_tax_failure_details(extra_after, submission),
+                )
             succeeded.append(invoice_id)
         except ApiError as e:
             error_detail = getattr(e, "detail", {}) or {}
             error_info = error_detail.get("error") if isinstance(error_detail, dict) else {}
+            err_details = (error_info or {}).get("details") if isinstance(error_info, dict) else {}
+            if not isinstance(err_details, dict):
+                err_details = {}
             failed.append(
                 {
                     "id": invoice_id,
                     "error": (error_info or {}).get("code") or str(e),
                     "message": (error_info or {}).get("message"),
-                    "issues": (error_info or {}).get("details", {}).get("issues")
-                    if isinstance((error_info or {}).get("details"), dict)
-                    else None,
+                    "issues": err_details.get("issues") if isinstance(err_details.get("issues"), list) else None,
+                    "tax_error_message": err_details.get("tax_error_message"),
+                    "tax_tracking_code": err_details.get("tax_tracking_code") or err_details.get("tracking_code"),
+                    "moadian_errors": err_details.get("moadian_errors"),
+                    "details": err_details,
                 }
             )
         except Exception as e:
@@ -3544,20 +3578,31 @@ def get_invoice_tax_timeline(
     
     # تاریخچه از extra_info
     if extra.get("tax_last_send_at"):
-        timeline.append({
-            "event": "send_attempt",
-            "timestamp": extra.get("tax_last_send_at"),
-            "status": extra.get("tax_status"),
-            "tracking_code": extra.get("tax_tracking_code"),
-        })
+        timeline.append(
+            enrich_tax_timeline_event(
+                {
+                    "event": "send_attempt",
+                    "timestamp": extra.get("tax_last_send_at"),
+                    "status": extra.get("tax_status"),
+                    "tracking_code": extra.get("tax_tracking_code"),
+                    "error_message": extra.get("tax_error_message"),
+                },
+                extra,
+            )
+        )
     
     if extra.get("tax_last_inquiry_at"):
-        timeline.append({
-            "event": "status_inquiry",
-            "timestamp": extra.get("tax_last_inquiry_at"),
-            "status": extra.get("tax_status"),
-            "error_message": extra.get("tax_error_message"),
-        })
+        timeline.append(
+            enrich_tax_timeline_event(
+                {
+                    "event": "status_inquiry",
+                    "timestamp": extra.get("tax_last_inquiry_at"),
+                    "status": extra.get("tax_status"),
+                    "error_message": extra.get("tax_error_message"),
+                },
+                extra,
+            )
+        )
     
     # بررسی Dead Letter Queue
     from app.services.tax_dead_letter_queue import get_failed_invoices
@@ -3579,6 +3624,9 @@ def get_invoice_tax_timeline(
         data={
             "invoice_id": invoice_id,
             "current_status": extra.get("tax_status"),
+            "tax_error_message": extra.get("tax_error_message"),
+            "tax_tracking_code": extra.get("tax_tracking_code"),
+            "moadian_errors": build_tax_status_fields_for_api(extra).get("tax_moadian_errors"),
             "timeline": timeline,
         },
         request=request,
@@ -3729,15 +3777,15 @@ def tax_workspace_quick_actions(
     action = action.lower()
     
     # دریافت فاکتورها بر اساس وضعیت
-    from sqlalchemy import func
-    
-    # برای PostgreSQL از JSON operators استفاده می‌کنیم
     from sqlalchemy import cast, Boolean
+
+    # extra_info نوع JSON عمومی است؛ astext فقط روی JSONB (PostgreSQL)
+    _extra_info_jb = cast(Document.extra_info, JSONB)
     base_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type.in_(list(SUPPORTED_INVOICE_TYPES)),
-            cast(Document.extra_info['tax_workspace'], Boolean) == True,
+            cast(_extra_info_jb['tax_workspace'], Boolean) == True,
         )
     )
     
@@ -3746,7 +3794,7 @@ def tax_workspace_quick_actions(
     if action == "send_all_pending":
         # ارسال همه pending
         docs = base_query.filter(
-            Document.extra_info['tax_status'].astext == 'pending'
+            _extra_info_jb['tax_status'].astext == 'pending'
         ).all()
         invoice_ids = [doc.id for doc in docs]
         
@@ -3763,7 +3811,7 @@ def tax_workspace_quick_actions(
     elif action == "inquire_all_sent":
         # استعلام همه sent
         docs = base_query.filter(
-            Document.extra_info['tax_status'].astext == 'sent'
+            _extra_info_jb['tax_status'].astext == 'sent'
         ).all()
         
         tracking_codes: List[str] = []
@@ -3785,7 +3833,7 @@ def tax_workspace_quick_actions(
     elif action == "retry_all_failed":
         # Retry همه failed
         docs = base_query.filter(
-            Document.extra_info['tax_status'].astext == 'failed'
+            _extra_info_jb['tax_status'].astext == 'failed'
         ).all()
         invoice_ids = [doc.id for doc in docs]
         

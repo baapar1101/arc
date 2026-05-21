@@ -6916,6 +6916,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taxValidationIssuesLineNumber => 'Line';
 
   @override
+  String get taxSubmissionFailedTitle => 'Tax submission failed';
+
+  @override
+  String get taxSubmissionFailedDescription =>
+      'The tax authority rejected this invoice. Error details and the authority response are shown below.';
+
+  @override
+  String get taxViewFailureDetails => 'View error details';
+
+  @override
+  String get taxErrorMessageColumn => 'Error message';
+
+  @override
+  String get taxMoadianResponseTitle => 'Tax authority response';
+
+  @override
+  String get taxTechnicalDetailsTitle => 'Technical details (raw response)';
+
+  @override
+  String get taxNoErrorDetails => 'No error details recorded.';
+
+  @override
+  String get taxErrorCodeLabel => 'Error code';
+
+  @override
   String get taxAddToWorkspaceSingle => 'Add to tax workspace';
 
   @override

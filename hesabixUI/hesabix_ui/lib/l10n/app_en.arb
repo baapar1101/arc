@@ -2544,6 +2544,15 @@
   "taxValidationIssuesEditInvoice": "Edit Invoice",
   "taxValidationIssuesLineNumber": "Line",
 
+  "taxSubmissionFailedTitle": "Tax submission failed",
+  "taxSubmissionFailedDescription": "The tax authority rejected this invoice. Error details and the authority response are shown below.",
+  "taxViewFailureDetails": "View error details",
+  "taxErrorMessageColumn": "Error message",
+  "taxMoadianResponseTitle": "Tax authority response",
+  "taxTechnicalDetailsTitle": "Technical details (raw response)",
+  "taxNoErrorDetails": "No error details recorded.",
+  "taxErrorCodeLabel": "Error code",
+
   "taxAddToWorkspaceSingle": "Add to tax workspace",
   "taxRemoveFromWorkspaceSingle": "Remove from tax workspace",
 
