@@ -174,6 +174,7 @@ adapters/db/models/auth_security_event.py
 adapters/db/models/bale.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
+adapters/db/models/business_backup_import_log.py
 adapters/db/models/business_crm_settings.py
 adapters/db/models/business_currency_rate.py
 adapters/db/models/business_dashboard_layout.py
@@ -379,6 +380,9 @@ app/services/bom_service.py
 app/services/bulk_price_update_service.py
 app/services/bulk_product_prices_sheet_service.py
 app/services/business_background_jobs.py
+app/services/business_backup_financial_policy.py
+app/services/business_backup_orphan_cleanup_service.py
+app/services/business_backup_schema_compat.py
 app/services/business_currency_rate_service.py
 app/services/business_dashboard_service.py
 app/services/business_frequent_description_service.py
@@ -696,13 +700,18 @@ migrations/versions/20260617_000001_business_frequent_descriptions.py
 migrations/versions/20260617_000002_business_frequent_descriptions_scope.py
 migrations/versions/20260617_000003_merge_heads_invoice_share_and_frequent_descriptions_scope.py
 migrations/versions/20260620_000001_product_public_catalog.py
+migrations/versions/20260621_000001_business_backup_import_security.py
 migrations/versions/20260621_000001_public_catalog_price_flag.py
+migrations/versions/20260621_000002_merge_heads_backup_import_security_and_public_catalog_price_flag.py
 tests/__init__.py
 tests/test_basalam_currency.py
 tests/test_basalam_dlq.py
 tests/test_basalam_observability.py
 tests/test_basalam_openapi_contract.py
 tests/test_basalam_workflow_license_gate.py
+tests/test_business_backup_financial_policy.py
+tests/test_business_backup_orphan_cleanup.py
+tests/test_business_backup_schema_compat.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py
 tests/test_permissions.py
