@@ -3,14 +3,13 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from adapters.db.models.document import Document
 from adapters.db.models.tax_setting import TaxSetting
-from app.integrations.moadian.utils import generate_tax_id
+from app.integrations.moadian.utils import coerce_to_datetime, generate_tax_id
 
 
 TAX_SENT_STATUSES = frozenset({"sent", "finalized", "accepted"})
@@ -37,14 +36,7 @@ def compute_taxid_for_document(document: Document, tax_setting: TaxSetting) -> s
     if stored:
         return stored
 
-    doc_date = document.document_date
-    if doc_date is None:
-        doc_date = datetime.utcnow()
-    elif isinstance(doc_date, str):
-        try:
-            doc_date = datetime.fromisoformat(doc_date.replace("Z", "+00:00"))
-        except Exception:
-            doc_date = datetime.utcnow()
+    doc_date = coerce_to_datetime(document.document_date)
 
     client_id = tax_setting.tax_memory_id or tax_setting.economic_code or ""
     return generate_tax_id(

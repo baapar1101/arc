@@ -5,11 +5,32 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime
-from typing import Optional
+from datetime import date, datetime
+from typing import Optional, Union
+
+DateLike = Union[datetime, date, str, None]
 
 
-def generate_tax_id(client_id: str, timestamp: datetime, internal_id: int) -> str:
+def coerce_to_datetime(value: DateLike) -> datetime:
+    """تبدیل date/datetime/رشته ISO به datetime برای توابعی که به timestamp نیاز دارند."""
+    if value is None:
+        return datetime.utcnow()
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if isinstance(parsed, datetime):
+                return parsed
+            return datetime.combine(parsed, datetime.min.time())
+        except (TypeError, ValueError):
+            return datetime.utcnow()
+    return datetime.utcnow()
+
+
+def generate_tax_id(client_id: str, timestamp: DateLike, internal_id: int) -> str:
     """
     تولید شناسه یکتای مالیاتی (TAXID)
     مطابق الگوریتم InvoiceIdService در کتابخانه PHP:
@@ -23,6 +44,7 @@ def generate_tax_id(client_id: str, timestamp: datetime, internal_id: int) -> st
     Returns:
         شناسه یکتای مالیاتی (مثلا: A1B2C3000010000000001)
     """
+    timestamp = coerce_to_datetime(timestamp)
     from app.integrations.moadian.verhoeff import verhoeff_checksum
     
     # تبدیل clientId به عدد (مطابق clientIdToNumber در PHP)
@@ -99,7 +121,7 @@ def normalize_invoice_number(invoice_number: str | int, max_length: int = 20) ->
     return normalized
 
 
-def timestamp_to_unix_ms(dt: datetime) -> int:
+def timestamp_to_unix_ms(dt: DateLike) -> int:
     """
     تبدیل datetime به Unix timestamp به milliseconds
     
@@ -109,7 +131,7 @@ def timestamp_to_unix_ms(dt: datetime) -> int:
     Returns:
         Unix timestamp (milliseconds)
     """
-    return int(dt.timestamp() * 1000)
+    return int(coerce_to_datetime(dt).timestamp() * 1000)
 
 
 def datetime_to_moadian_format(dt: datetime) -> int:

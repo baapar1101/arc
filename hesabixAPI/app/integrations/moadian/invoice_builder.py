@@ -14,6 +14,7 @@ from app.integrations.moadian.dto import (
     InvoicePaymentDto,
 )
 from app.integrations.moadian.utils import (
+    coerce_to_datetime,
     generate_tax_id,
     normalize_invoice_number,
     timestamp_to_unix_ms,
@@ -167,11 +168,7 @@ class InvoiceBuilder:
     ) -> InvoiceHeaderDto:
         """ساخت Header فاکتور"""
 
-        doc_date_str = document.get("document_date")
-        if isinstance(doc_date_str, str):
-            doc_date = datetime.fromisoformat(doc_date_str.replace("Z", "+00:00"))
-        else:
-            doc_date = datetime.utcnow()
+        doc_date = coerce_to_datetime(document.get("document_date"))
 
         timestamp_ms = timestamp_to_unix_ms(doc_date)
 
