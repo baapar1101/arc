@@ -156,7 +156,18 @@ class ProductFormController extends ChangeNotifier {
         await _autoSave.clearFormData(businessId, null);
       } else if (product != null) {
         _editingProductId = product['id'] as int?;
-        _formData = ProductFormData.fromProduct(product);
+        Map<String, dynamic> productMap = product;
+        if (_editingProductId != null) {
+          // بارگذاری کامل از API (ردیف جدول/جستجو همهٔ فیلدها را ندارد، مثلاً is_public_catalog)
+          final full = await _productService.getProduct(
+            businessId: businessId,
+            productId: _editingProductId!,
+          );
+          if (full.isNotEmpty && full['id'] != null) {
+            productMap = full;
+          }
+        }
+        _formData = ProductFormData.fromProduct(productMap);
         // ذخیره inventory_mode اولیه برای تشخیص تغییر
         _originalInventoryMode = _formData.inventoryMode ?? 'bulk';
         if (_editingProductId != null) {

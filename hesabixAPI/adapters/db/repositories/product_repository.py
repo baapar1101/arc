@@ -374,6 +374,8 @@ class ProductRepository(BaseRepository[Product]):
                 "default_warehouse_name": (p.default_warehouse.name if hasattr(p.default_warehouse, 'name') else None) if p.default_warehouse else None,
                 "default_warehouse_code": (p.default_warehouse.code if hasattr(p.default_warehouse, 'code') else None) if p.default_warehouse else None,
                 "is_active": getattr(p, 'is_active', True),  # اضافه کردن فیلد is_active
+                "is_public_catalog": bool(getattr(p, "is_public_catalog", False)),
+                "catalog_public_uuid": getattr(p, "catalog_public_uuid", None),
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,
             }
@@ -433,9 +435,11 @@ class ProductRepository(BaseRepository[Product]):
             "base_purchase_price",
             "general_barcodes",
         }
+        # فیلدهای بولی باید مقدار False هم ذخیره شود (نه فقط True)
+        boolean_fields = {"is_public_catalog", "is_active", "track_inventory", "track_serial", "track_barcode", "is_sales_taxable", "is_purchase_taxable"}
         for k, v in data.items():
             if hasattr(obj, k):
-                if k in nullable_overrides:
+                if k in nullable_overrides or k in boolean_fields:
                     setattr(obj, k, v)
                 elif v is not None:
                     setattr(obj, k, v)
