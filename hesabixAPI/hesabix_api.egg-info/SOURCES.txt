@@ -331,6 +331,7 @@ app/core/firewall_middleware.py
 app/core/i18n.py
 app/core/i18n_catalog.py
 app/core/logging.py
+app/core/moadian_plugin_dependency.py
 app/core/monitoring.py
 app/core/pagination.py
 app/core/payment_response.py
@@ -445,6 +446,7 @@ app/services/job_manager.py
 app/services/journal_ledger_service.py
 app/services/kardex_service.py
 app/services/marketplace_service.py
+app/services/moadian_grandfather_service.py
 app/services/mobile_verification_service.py
 app/services/monitoring_background_jobs.py
 app/services/monitoring_realtime.py
@@ -510,6 +512,8 @@ app/services/tax_logging.py
 app/services/tax_payload_builder.py
 app/services/tax_product_code_service.py
 app/services/tax_rate_limiter.py
+app/services/tax_reference_service.py
+app/services/tax_setting_health_service.py
 app/services/tax_setting_service.py
 app/services/tax_submission_service.py
 app/services/tax_validation_service.py
@@ -714,6 +718,7 @@ tests/test_business_backup_orphan_cleanup.py
 tests/test_business_backup_schema_compat.py
 tests/test_health.py
 tests/test_invoice_profit_costing.py
+tests/test_moadian_plugin_license_gate.py
 tests/test_permissions.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py

@@ -108,7 +108,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   }
 
   void _openPluginMarketplaceAndRefresh() {
-    final wfId = widget.workflow['id']?.toString();
+    final wfId = widget.workflow?['id']?.toString();
     final returnTo = wfId != null ? 'workflows/$wfId/edit' : 'workflows';
     BusinessNamedRoutes.pushNamed<void>(
       context,

@@ -748,7 +748,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     try {
       final res = await api.get<Map<String, dynamic>>(
         '/invoices/business/${widget.businessId}/tax-workspace/reference-candidates',
-        queryParameters: const {'limit': 100},
+        query: const {'limit': 100},
       );
       final items = res.data?['data']?['items'];
       if (items is List) {
