@@ -2330,6 +2330,223 @@ class AppLocalizationsFa extends AppLocalizations {
   String get pluginMarketplace => 'بازار افزونه‌ها';
 
   @override
+  String get pluginMarketplaceSubtitle =>
+      'قابلیت‌های حسابیکس را با افزونه‌های یکپارچه‌سازی و تخصصی گسترش دهید. پرداخت از کیف‌پول کسب‌وکار.';
+
+  @override
+  String get pluginMarketplaceBrowseTab => 'کاتالوگ';
+
+  @override
+  String get pluginMarketplaceMyPluginsTab => 'افزونه‌های من';
+
+  @override
+  String get pluginMarketplaceSearchHint => 'جستجو در نام و توضیح…';
+
+  @override
+  String get pluginMarketplaceCategoryAll => 'همه';
+
+  @override
+  String get pluginMarketplaceCategoryIntegration => 'یکپارچه‌سازی';
+
+  @override
+  String get pluginMarketplaceCategoryOperations => 'عملیات';
+
+  @override
+  String get pluginMarketplaceCategoryProductManagement => 'محصولات';
+
+  @override
+  String get pluginMarketplaceCategorySales => 'فروش';
+
+  @override
+  String get pluginMarketplaceCategoryCrmMarketing => 'CRM و بازاریابی';
+
+  @override
+  String get pluginMarketplaceWalletBalance => 'موجودی قابل برداشت کیف‌پول';
+
+  @override
+  String get pluginMarketplaceWalletTopUp => 'شارژ کیف‌پول';
+
+  @override
+  String get pluginMarketplaceWalletLowBalance =>
+      'موجودی کمتر از ارزان‌ترین پلن است. قبل از خرید شارژ کنید.';
+
+  @override
+  String get pluginMarketplaceInvoicesLink => 'صورتحساب‌های بازار';
+
+  @override
+  String get pluginMarketplaceEmpty => 'در حال حاضر افزونه‌ای در دسترس نیست.';
+
+  @override
+  String get pluginMarketplaceMyEmpty =>
+      'هنوز افزونه‌ای برای این کسب‌وکار فعال نکرده‌اید.';
+
+  @override
+  String get pluginMarketplaceError => 'بارگذاری بازار افزونه‌ها ناموفق بود';
+
+  @override
+  String get pluginMarketplaceViewAndBuy => 'مشاهده و خرید';
+
+  @override
+  String get pluginMarketplaceReadMore => 'بیشتر بخوانید';
+
+  @override
+  String get pluginMarketplaceReadLess => 'بستن';
+
+  @override
+  String pluginMarketplaceFreeTrialDays(int days) {
+    return 'آزمایشی رایگان · $days روز';
+  }
+
+  @override
+  String get pluginMarketplaceStartTrial => 'شروع دوره آزمایشی';
+
+  @override
+  String get pluginMarketplacePlanMonthly => 'ماهانه';
+
+  @override
+  String get pluginMarketplacePlanYearly => 'سالانه';
+
+  @override
+  String get pluginMarketplacePlanLifetime => 'مادام‌العمر';
+
+  @override
+  String get pluginMarketplaceStatusActive => 'فعال';
+
+  @override
+  String get pluginMarketplaceStatusInactive => 'غیرفعال';
+
+  @override
+  String get pluginMarketplaceStatusExpired => 'منقضی شده';
+
+  @override
+  String pluginMarketplaceStatusTrialDays(int days) {
+    return 'آزمایشی · $days روز مانده';
+  }
+
+  @override
+  String get pluginMarketplaceStatusTrialExpired => 'دوره آزمایشی پایان یافته';
+
+  @override
+  String get pluginMarketplacePlanPurchased => 'خریداری شده';
+
+  @override
+  String get pluginMarketplacePlanCurrent => 'پلن فعلی';
+
+  @override
+  String get pluginMarketplacePopularPlan => 'پیشنهادی';
+
+  @override
+  String pluginMarketplaceEquivalentMonthly(String amount) {
+    return 'معادل ~$amount در ماه';
+  }
+
+  @override
+  String pluginMarketplaceSavingsPercent(int percent) {
+    return '$percent٪ صرفه‌جویی نسبت به ماهانه';
+  }
+
+  @override
+  String get pluginMarketplaceConfirmPurchaseTitle => 'تأیید خرید';
+
+  @override
+  String get pluginMarketplaceConfirmPurchasePlugin => 'افزونه';
+
+  @override
+  String get pluginMarketplaceConfirmPurchasePlan => 'پلن';
+
+  @override
+  String get pluginMarketplaceConfirmPurchaseAmount => 'مبلغ';
+
+  @override
+  String get pluginMarketplaceConfirmWalletBalance => 'موجودی کیف‌پول';
+
+  @override
+  String get pluginMarketplaceConfirmPay => 'تأیید و پرداخت';
+
+  @override
+  String get pluginMarketplaceInsufficientFundsTitle => 'موجودی کافی نیست';
+
+  @override
+  String pluginMarketplaceInsufficientFundsBody(
+    String required,
+    String available,
+    String shortfall,
+  ) {
+    return 'مورد نیاز: $required · موجودی: $available · کسری: $shortfall';
+  }
+
+  @override
+  String get pluginMarketplaceGoToWallet => 'رفتن به کیف‌پول';
+
+  @override
+  String get pluginMarketplacePurchaseSuccess => 'خرید با موفقیت انجام شد';
+
+  @override
+  String get pluginMarketplaceConfigurePlugin => 'رفتن به تنظیمات افزونه';
+
+  @override
+  String get pluginMarketplaceReturnToPrevious => 'بازگشت به صفحه قبل';
+
+  @override
+  String get pluginMarketplacePaymentFromWallet => 'پرداخت از کیف‌پول کسب‌وکار';
+
+  @override
+  String get pluginMarketplaceRetry => 'تلاش مجدد';
+
+  @override
+  String get pluginMarketplaceNoPermissionView =>
+      'دسترسی مشاهده بازار افزونه‌ها را ندارید.';
+
+  @override
+  String get pluginMarketplaceNoPermissionBuy => 'دسترسی خرید افزونه ندارید.';
+
+  @override
+  String get pluginMarketplaceNoPlansHidden =>
+      'برخی افزونه‌ها به‌دلیل نبود پلن فعال نمایش داده نمی‌شوند.';
+
+  @override
+  String pluginMarketplaceExpiresAt(String date) {
+    return 'انقضا: $date';
+  }
+
+  @override
+  String get pluginMarketplaceTrialProgress => 'پیشرفت دوره آزمایشی';
+
+  @override
+  String get pluginMarketplaceComparePlans => 'انتخاب پلن';
+
+  @override
+  String get pluginMarketplacePerMonth => '/ ماه';
+
+  @override
+  String pluginMarketplacePluginCodeSupport(String code) {
+    return 'کد پشتیبانی: $code';
+  }
+
+  @override
+  String get pluginMarketplaceRefresh => 'بروزرسانی';
+
+  @override
+  String get pluginMarketplaceTrialSuccess => 'دوره آزمایشی با موفقیت شروع شد';
+
+  @override
+  String get pluginMarketplaceDetailTitle => 'جزئیات افزونه';
+
+  @override
+  String pluginMarketplaceFromPrice(String price) {
+    return 'از $price';
+  }
+
+  @override
+  String get pluginMarketplaceBuyDisabledTooltip =>
+      'برای خرید به دسترسی marketplace.buy نیاز دارید';
+
+  @override
+  String pluginMarketplaceActiveCount(int count) {
+    return '$count فعال';
+  }
+
+  @override
   String get practicalTools => 'ابزارهای کاربردی';
 
   @override
@@ -6531,11 +6748,82 @@ class AppLocalizationsFa extends AppLocalizations {
       'فاکتورها را قبل از ارسال به سامانه مودیان بررسی و مدیریت کنید.';
 
   @override
+  String get taxTestConnectionButton => 'تست اتصال';
+
+  @override
+  String get taxTestConnectionResultTitle => 'نتیجه تست اتصال';
+
+  @override
+  String get taxTestConnectionDone => 'تست اتصال انجام شد';
+
+  @override
+  String get taxTestConnectionSuccess => 'اتصال به سامانه مودیان برقرار است';
+
+  @override
+  String get taxTestConnectionWithWarnings =>
+      'اتصال برقرار است اما هشدار پیکربندی وجود دارد';
+
+  @override
+  String get taxTestConnectionIdentityFailed =>
+      'احتمال ناهماهنگی کلید/گواهی با حافظه مودیان (خطای 4103)';
+
+  @override
+  String get taxTestConnectionJwtTitle => 'اطلاعات توکن مودیان';
+
+  @override
+  String get taxTestConnectionJwtSub => 'شناسه حافظه (sub)';
+
+  @override
+  String get taxTestConnectionJwtTaxpayer => 'شناسه مودی (taxpayerId)';
+
+  @override
+  String get taxTestConnectionMemoryMismatch =>
+      'شناسه حافظه توکن با تنظیمات مطابقت ندارد';
+
+  @override
+  String get taxTestConnectionEconomicMismatch =>
+      'کد اقتصادی توکن با تنظیمات مطابقت ندارد';
+
+  @override
+  String get taxConfigurationWarningsTitle => 'هشدارهای پیکربندی مودیان';
+
+  @override
+  String get taxIdentityCheckTitle => 'بررسی هویت امضا';
+
+  @override
+  String get taxSandboxModeActive => 'حالت Sandbox فعال است';
+
+  @override
   String get taxIntegrationTitle => 'سامانه مودیان مالیاتی';
 
   @override
   String get taxIntegrationSubtitle =>
       'اطلاعات اتصال و کلیدهای ارتباط با سامانه مودیان را مدیریت کنید.';
+
+  @override
+  String get moadianPluginInactiveTitle => 'افزونه مودیان فعال نیست';
+
+  @override
+  String get moadianPluginInactiveMessage =>
+      'برای استفاده از کارپوشه و ارسال صورت‌حساب به سامانه مودیان، افزونه «اتصال به سامانه مودیان» را از بازار افزونه‌ها فعال یا خریداری کنید.';
+
+  @override
+  String get moadianPluginGoToMarketplace => 'رفتن به بازار افزونه‌ها';
+
+  @override
+  String get moadianPermissionView => 'مشاهده کارپوشه مودیان';
+
+  @override
+  String get moadianPermissionOperate => 'ارسال و عملیات کارپوشه مودیان';
+
+  @override
+  String get moadianPermissionManageSettings => 'مدیریت تنظیمات اتصال مودیان';
+
+  @override
+  String get moadianPermissionExportReports => 'خروجی گزارش ارسال‌های مودیان';
+
+  @override
+  String get moadianMenuSection => 'سامانه مودیان';
 
   @override
   String get taxSettingsTabConnection => 'اتصال و اطلاعات پایه';
@@ -6895,6 +7183,55 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get taxErrorCodeLabel => 'کد خطا';
+
+  @override
+  String get taxCancelInModian => 'ابطال در مودیان';
+
+  @override
+  String get taxCancelInModianDialogTitle => 'ابطال در سامانه مودیان';
+
+  @override
+  String taxCancelInModianDialogMessage(String code) {
+    return 'فاکتور $code در سامانه مودیان ابطال شود؟';
+  }
+
+  @override
+  String get taxCancelInModianSuccess =>
+      'درخواست ابطال به سامانه مودیان ارسال شد.';
+
+  @override
+  String get taxSendCorrective => 'ارسال اصلاحی';
+
+  @override
+  String get taxSendCorrectiveDialogTitle => 'ارسال صورتحساب اصلاحی';
+
+  @override
+  String taxSendCorrectiveDialogMessage(String code) {
+    return 'صورتحساب اصلاحی برای فاکتور $code به مودیان ارسال شود؟';
+  }
+
+  @override
+  String get taxSendCorrectiveSuccess =>
+      'صورتحساب اصلاحی به سامانه مودیان ارسال شد.';
+
+  @override
+  String get taxLinkReference => 'اتصال فاکتور مرجع';
+
+  @override
+  String get taxLinkReferenceDialogTitle => 'انتخاب فاکتور فروش مرجع';
+
+  @override
+  String get taxLinkReferenceSuccess => 'فاکتور مرجع متصل شد.';
+
+  @override
+  String get taxLinkReferenceEmpty =>
+      'فاکتور فروش ارسال‌شده‌ای برای انتخاب یافت نشد.';
+
+  @override
+  String get taxReferenceInvoiceColumn => 'فاکتور مرجع';
+
+  @override
+  String get taxCancelledInModianBadge => 'ابطال‌شده در مودیان';
 
   @override
   String get taxAddToWorkspaceSingle => 'افزودن به کارپوشه مالیاتی';

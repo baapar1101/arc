@@ -2347,6 +2347,225 @@ class AppLocalizationsEn extends AppLocalizations {
   String get pluginMarketplace => 'Plugin Marketplace';
 
   @override
+  String get pluginMarketplaceSubtitle =>
+      'Extend Hesabix with integrations and industry add-ons. Pay from your business wallet.';
+
+  @override
+  String get pluginMarketplaceBrowseTab => 'Catalog';
+
+  @override
+  String get pluginMarketplaceMyPluginsTab => 'My add-ons';
+
+  @override
+  String get pluginMarketplaceSearchHint => 'Search by name or description…';
+
+  @override
+  String get pluginMarketplaceCategoryAll => 'All';
+
+  @override
+  String get pluginMarketplaceCategoryIntegration => 'Integrations';
+
+  @override
+  String get pluginMarketplaceCategoryOperations => 'Operations';
+
+  @override
+  String get pluginMarketplaceCategoryProductManagement => 'Products';
+
+  @override
+  String get pluginMarketplaceCategorySales => 'Sales';
+
+  @override
+  String get pluginMarketplaceCategoryCrmMarketing => 'CRM & marketing';
+
+  @override
+  String get pluginMarketplaceWalletBalance => 'Available wallet balance';
+
+  @override
+  String get pluginMarketplaceWalletTopUp => 'Top up wallet';
+
+  @override
+  String get pluginMarketplaceWalletLowBalance =>
+      'Balance is below the cheapest plan. Top up before purchasing.';
+
+  @override
+  String get pluginMarketplaceInvoicesLink => 'Marketplace invoices';
+
+  @override
+  String get pluginMarketplaceEmpty => 'No add-ons are available right now.';
+
+  @override
+  String get pluginMarketplaceMyEmpty =>
+      'You have not activated any add-ons yet.';
+
+  @override
+  String get pluginMarketplaceError => 'Could not load the marketplace';
+
+  @override
+  String get pluginMarketplaceViewAndBuy => 'View & purchase';
+
+  @override
+  String get pluginMarketplaceReadMore => 'Read more';
+
+  @override
+  String get pluginMarketplaceReadLess => 'Show less';
+
+  @override
+  String pluginMarketplaceFreeTrialDays(int days) {
+    return 'Free trial · $days days';
+  }
+
+  @override
+  String get pluginMarketplaceStartTrial => 'Start free trial';
+
+  @override
+  String get pluginMarketplacePlanMonthly => 'Monthly';
+
+  @override
+  String get pluginMarketplacePlanYearly => 'Yearly';
+
+  @override
+  String get pluginMarketplacePlanLifetime => 'Lifetime';
+
+  @override
+  String get pluginMarketplaceStatusActive => 'Active';
+
+  @override
+  String get pluginMarketplaceStatusInactive => 'Inactive';
+
+  @override
+  String get pluginMarketplaceStatusExpired => 'Expired';
+
+  @override
+  String pluginMarketplaceStatusTrialDays(int days) {
+    return 'Trial · $days days left';
+  }
+
+  @override
+  String get pluginMarketplaceStatusTrialExpired => 'Trial ended';
+
+  @override
+  String get pluginMarketplacePlanPurchased => 'Purchased';
+
+  @override
+  String get pluginMarketplacePlanCurrent => 'Current plan';
+
+  @override
+  String get pluginMarketplacePopularPlan => 'Popular';
+
+  @override
+  String pluginMarketplaceEquivalentMonthly(String amount) {
+    return '~$amount / month';
+  }
+
+  @override
+  String pluginMarketplaceSavingsPercent(int percent) {
+    return 'Save $percent% vs monthly';
+  }
+
+  @override
+  String get pluginMarketplaceConfirmPurchaseTitle => 'Confirm purchase';
+
+  @override
+  String get pluginMarketplaceConfirmPurchasePlugin => 'Add-on';
+
+  @override
+  String get pluginMarketplaceConfirmPurchasePlan => 'Plan';
+
+  @override
+  String get pluginMarketplaceConfirmPurchaseAmount => 'Amount';
+
+  @override
+  String get pluginMarketplaceConfirmWalletBalance => 'Wallet balance';
+
+  @override
+  String get pluginMarketplaceConfirmPay => 'Confirm & pay';
+
+  @override
+  String get pluginMarketplaceInsufficientFundsTitle => 'Insufficient balance';
+
+  @override
+  String pluginMarketplaceInsufficientFundsBody(
+    String required,
+    String available,
+    String shortfall,
+  ) {
+    return 'Required: $required · Available: $available · Shortfall: $shortfall';
+  }
+
+  @override
+  String get pluginMarketplaceGoToWallet => 'Go to wallet';
+
+  @override
+  String get pluginMarketplacePurchaseSuccess =>
+      'Purchase completed successfully';
+
+  @override
+  String get pluginMarketplaceConfigurePlugin => 'Open add-on settings';
+
+  @override
+  String get pluginMarketplaceReturnToPrevious => 'Back to previous page';
+
+  @override
+  String get pluginMarketplacePaymentFromWallet => 'Paid from business wallet';
+
+  @override
+  String get pluginMarketplaceRetry => 'Try again';
+
+  @override
+  String get pluginMarketplaceNoPermissionView =>
+      'You do not have permission to view the marketplace.';
+
+  @override
+  String get pluginMarketplaceNoPermissionBuy =>
+      'You do not have permission to purchase add-ons.';
+
+  @override
+  String get pluginMarketplaceNoPlansHidden =>
+      'Some add-ons are hidden because they have no active plans.';
+
+  @override
+  String pluginMarketplaceExpiresAt(String date) {
+    return 'Expires: $date';
+  }
+
+  @override
+  String get pluginMarketplaceTrialProgress => 'Trial progress';
+
+  @override
+  String get pluginMarketplaceComparePlans => 'Choose a plan';
+
+  @override
+  String get pluginMarketplacePerMonth => '/ month';
+
+  @override
+  String pluginMarketplacePluginCodeSupport(String code) {
+    return 'Support code: $code';
+  }
+
+  @override
+  String get pluginMarketplaceRefresh => 'Refresh';
+
+  @override
+  String get pluginMarketplaceTrialSuccess => 'Free trial started';
+
+  @override
+  String get pluginMarketplaceDetailTitle => 'Add-on details';
+
+  @override
+  String pluginMarketplaceFromPrice(String price) {
+    return 'From $price';
+  }
+
+  @override
+  String get pluginMarketplaceBuyDisabledTooltip =>
+      'You need marketplace purchase permission';
+
+  @override
+  String pluginMarketplaceActiveCount(int count) {
+    return '$count active';
+  }
+
+  @override
   String get practicalTools => 'Practical Tools';
 
   @override
@@ -6573,11 +6792,84 @@ class AppLocalizationsEn extends AppLocalizations {
       'Review invoices before sending them to the tax system.';
 
   @override
+  String get taxTestConnectionButton => 'Test connection';
+
+  @override
+  String get taxTestConnectionResultTitle => 'Connection test result';
+
+  @override
+  String get taxTestConnectionDone => 'Connection test completed';
+
+  @override
+  String get taxTestConnectionSuccess => 'Connected to Modian successfully';
+
+  @override
+  String get taxTestConnectionWithWarnings =>
+      'Connected, but configuration warnings exist';
+
+  @override
+  String get taxTestConnectionIdentityFailed =>
+      'Possible key/certificate mismatch with Modian memory (error 4103)';
+
+  @override
+  String get taxTestConnectionJwtTitle => 'Modian token claims';
+
+  @override
+  String get taxTestConnectionJwtSub => 'Memory ID (sub)';
+
+  @override
+  String get taxTestConnectionJwtTaxpayer => 'Taxpayer ID';
+
+  @override
+  String get taxTestConnectionMemoryMismatch =>
+      'Token memory ID does not match settings';
+
+  @override
+  String get taxTestConnectionEconomicMismatch =>
+      'Token taxpayer ID does not match economic code in settings';
+
+  @override
+  String get taxConfigurationWarningsTitle => 'Modian configuration warnings';
+
+  @override
+  String get taxIdentityCheckTitle => 'Signature identity check';
+
+  @override
+  String get taxSandboxModeActive => 'Sandbox mode is enabled';
+
+  @override
   String get taxIntegrationTitle => 'Tax system integration';
 
   @override
   String get taxIntegrationSubtitle =>
       'Manage credentials and keys required to connect to the national tax platform.';
+
+  @override
+  String get moadianPluginInactiveTitle => 'Modian add-on is not active';
+
+  @override
+  String get moadianPluginInactiveMessage =>
+      'To use the tax workspace and submit invoices to the national platform, activate or purchase the Modian integration add-on from the marketplace.';
+
+  @override
+  String get moadianPluginGoToMarketplace => 'Go to add-on marketplace';
+
+  @override
+  String get moadianPermissionView => 'View Modian workspace';
+
+  @override
+  String get moadianPermissionOperate => 'Send and operate Modian workspace';
+
+  @override
+  String get moadianPermissionManageSettings =>
+      'Manage Modian connection settings';
+
+  @override
+  String get moadianPermissionExportReports =>
+      'Export Modian submission reports';
+
+  @override
+  String get moadianMenuSection => 'Modian tax system';
 
   @override
   String get taxSettingsTabConnection => 'Connection & basics';
@@ -6939,6 +7231,53 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taxErrorCodeLabel => 'Error code';
+
+  @override
+  String get taxCancelInModian => 'Cancel in Modian';
+
+  @override
+  String get taxCancelInModianDialogTitle => 'Cancel in tax system';
+
+  @override
+  String taxCancelInModianDialogMessage(String code) {
+    return 'Cancel invoice $code in Modian?';
+  }
+
+  @override
+  String get taxCancelInModianSuccess => 'Cancellation request sent to Modian.';
+
+  @override
+  String get taxSendCorrective => 'Send corrective';
+
+  @override
+  String get taxSendCorrectiveDialogTitle => 'Send corrective invoice';
+
+  @override
+  String taxSendCorrectiveDialogMessage(String code) {
+    return 'Send corrective invoice for $code to Modian?';
+  }
+
+  @override
+  String get taxSendCorrectiveSuccess => 'Corrective invoice sent to Modian.';
+
+  @override
+  String get taxLinkReference => 'Link reference invoice';
+
+  @override
+  String get taxLinkReferenceDialogTitle => 'Select sales reference invoice';
+
+  @override
+  String get taxLinkReferenceSuccess => 'Reference invoice linked.';
+
+  @override
+  String get taxLinkReferenceEmpty =>
+      'No submitted sales invoice found to link.';
+
+  @override
+  String get taxReferenceInvoiceColumn => 'Reference invoice';
+
+  @override
+  String get taxCancelledInModianBadge => 'Cancelled in Modian';
 
   @override
   String get taxAddToWorkspaceSingle => 'Add to tax workspace';

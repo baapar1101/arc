@@ -13,6 +13,7 @@ import '../../services/tax_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/marketplace/moadian_plugin_gate.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 
 class TaxSettingsPage extends StatefulWidget {
@@ -184,66 +185,128 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       
       if (!mounted) return;
       
-      final status = result['status'] as String?;
-      final message = result['message'] as String?;
+      final status = result['status']?.toString() ?? '';
+      final message = result['message']?.toString();
       final sandboxMode = result['sandbox_mode'] as bool? ?? false;
-      
-      // نمایش dialog با نتیجه
+      final warnings = _parseWarningMaps(result['warnings']);
+      final identityCheck = result['identity_check'] is Map
+          ? Map<String, dynamic>.from(result['identity_check'] as Map)
+          : null;
+      final auth = result['auth'] is Map
+          ? Map<String, dynamic>.from(result['auth'] as Map)
+          : null;
+      final jwtClaims = auth?['jwt_claims'] is Map
+          ? Map<String, dynamic>.from(auth!['jwt_claims'] as Map)
+          : null;
+
+      final isOk = status == 'connected';
+      final isIdentityIssue = status == 'identity_mismatch';
+
       await showDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
           title: Row(
             children: [
               Icon(
-                status == 'connected' ? Icons.check_circle : Icons.error,
-                color: status == 'connected' ? Colors.green : Colors.red,
+                isOk
+                    ? Icons.check_circle
+                    : isIdentityIssue
+                        ? Icons.gpp_bad
+                        : Icons.warning_amber,
+                color: isOk
+                    ? Colors.green
+                    : isIdentityIssue
+                        ? Colors.red
+                        : Colors.orange,
               ),
               const SizedBox(width: 8),
-              const Text('نتیجه تست اتصال'),
+              Expanded(child: Text(t.taxTestConnectionResultTitle)),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(message ?? 'تست اتصال انجام شد'),
-              const SizedBox(height: 12),
-              if (sandboxMode)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.warning_amber, color: Colors.orange),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'حالت Sandbox فعال است',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(message ?? t.taxTestConnectionDone),
+                  if (jwtClaims != null && jwtClaims.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      t.taxTestConnectionJwtTitle,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    if (jwtClaims['sub'] != null)
+                      Text('${t.taxTestConnectionJwtSub}: ${jwtClaims['sub']}'),
+                    if (jwtClaims['taxpayerId'] != null)
+                      Text(
+                        '${t.taxTestConnectionJwtTaxpayer}: ${jwtClaims['taxpayerId']}',
                       ),
-                    ],
-                  ),
-                ),
-            ],
+                    if (auth?['tax_memory_id_match'] == false)
+                      Text(
+                        t.taxTestConnectionMemoryMismatch,
+                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      ),
+                    if (auth?['economic_code_match'] == false)
+                      Text(
+                        t.taxTestConnectionEconomicMismatch,
+                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                      ),
+                  ],
+                  if (identityCheck != null) ...[
+                    const SizedBox(height: 12),
+                    _buildIdentityCheckSection(context, t, identityCheck),
+                  ],
+                  if (warnings.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      t.taxConfigurationWarningsTitle,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 6),
+                    ...warnings.map((w) => _buildWarningTile(context, w)),
+                  ],
+                  if (sandboxMode) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber, color: Colors.orange),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(t.taxSandboxModeActive)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('بستن'),
+              child: Text(t.close),
             ),
           ],
         ),
       );
       
-      if (status == 'connected') {
-        SnackBarHelper.show(
-          context,
-          message: 'اتصال به سامانه مودیان برقرار است',
-        );
+      if (isOk) {
+        SnackBarHelper.show(context, message: t.taxTestConnectionSuccess);
+      } else if (isIdentityIssue) {
+        SnackBarHelper.showError(context, message: t.taxTestConnectionIdentityFailed);
+      } else {
+        SnackBarHelper.showWarning(context, message: t.taxTestConnectionWithWarnings);
       }
       
     } catch (e) {
@@ -260,6 +323,149 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         });
       }
     }
+  }
+
+  List<Map<String, String>> _parseWarningMaps(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map(
+          (e) => {
+            'code': e['code']?.toString() ?? '',
+            'level': e['level']?.toString() ?? 'warning',
+            'message': e['message']?.toString() ?? '',
+          },
+        )
+        .toList();
+  }
+
+  Widget _buildWarningTile(BuildContext context, Map<String, String> warning) {
+    final level = warning['level'] ?? 'warning';
+    final color = level == 'error'
+        ? Theme.of(context).colorScheme.error
+        : level == 'info'
+            ? Theme.of(context).colorScheme.primary
+            : Colors.orange.shade800;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            level == 'error' ? Icons.error_outline : Icons.info_outline,
+            size: 18,
+            color: color,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(warning['message'] ?? '')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildIdentityCheckSection(
+    BuildContext context,
+    AppLocalizations t,
+    Map<String, dynamic> identityCheck,
+  ) {
+    final status = identityCheck['status']?.toString() ?? '';
+    final msg = identityCheck['message']?.toString() ?? '';
+    final failures = identityCheck['recent_failures'];
+    final isFailed = status == 'failed';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          t.taxIdentityCheckTitle,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: isFailed ? Theme.of(context).colorScheme.error : null,
+              ),
+        ),
+        const SizedBox(height: 6),
+        Text(msg),
+        if (failures is List && failures.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ...failures.take(5).map((item) {
+            if (item is! Map) return const SizedBox.shrink();
+            final code = item['code']?.toString() ?? item['invoice_id']?.toString() ?? '';
+            final err = item['tax_error_message']?.toString() ?? '';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text('• $code${err.isNotEmpty ? ': $err' : ''}'),
+            );
+          }),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildConfigurationWarningsBanner(AppLocalizations t) {
+    final warnings = _settings?.configurationWarnings ?? const [];
+    final identity = _settings?.identityCheck;
+    if (warnings.isEmpty && identity == null) {
+      return const SizedBox.shrink();
+    }
+
+    final hasError = identity?.isFailed == true ||
+        warnings.any((w) => w.level == 'error');
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: hasError
+            ? Theme.of(context).colorScheme.errorContainer.withOpacity(0.5)
+            : Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: hasError
+              ? Theme.of(context).colorScheme.error
+              : Colors.orange.shade300,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                hasError ? Icons.gpp_bad : Icons.warning_amber,
+                color: hasError
+                    ? Theme.of(context).colorScheme.error
+                    : Colors.orange.shade800,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                t.taxConfigurationWarningsTitle,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ],
+          ),
+          if (identity != null && identity.message != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              identity.message!,
+              style: TextStyle(
+                color: identity.isFailed
+                    ? Theme.of(context).colorScheme.error
+                    : null,
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          ...warnings.map(
+            (w) => _buildWarningTile(
+              context,
+              {'code': w.code, 'level': w.level, 'message': w.message},
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _generateKeys() async {
@@ -315,7 +521,9 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
 
-    return DefaultTabController(
+    return MoadianPluginGate(
+      businessId: widget.businessId,
+      child: DefaultTabController(
       length: 3,
       child: Scaffold(
         appBar: AppBar(
@@ -342,6 +550,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         ),
         body: _buildBody(t, cs),
       ),
+    ),
     );
   }
 
@@ -392,6 +601,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
             spacing: 16,
             runSpacing: 16,
             children: [
+              SizedBox(
+                width: availableWidth,
+                child: _buildConfigurationWarningsBanner(t),
+              ),
               SizedBox(
                 width: availableWidth,
                 child: _buildConnectionCard(t, cs),
@@ -573,7 +786,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                   FilledButton.tonalIcon(
                     onPressed: (_saving || _settings == null) ? null : _testConnection,
                     icon: const Icon(Icons.network_check),
-                    label: const Text('تست اتصال'),
+                    label: Text(t.taxTestConnectionButton),
                   ),
                 ),
               ],

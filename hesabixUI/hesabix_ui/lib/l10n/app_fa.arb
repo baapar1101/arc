@@ -952,6 +952,116 @@
   "taxpayers": "مودیان مالیاتی",
   "others": "سایر",
   "pluginMarketplace": "بازار افزونه‌ها",
+  "pluginMarketplaceSubtitle": "قابلیت‌های حسابیکس را با افزونه‌های یکپارچه‌سازی و تخصصی گسترش دهید. پرداخت از کیف‌پول کسب‌وکار.",
+  "pluginMarketplaceBrowseTab": "کاتالوگ",
+  "pluginMarketplaceMyPluginsTab": "افزونه‌های من",
+  "pluginMarketplaceSearchHint": "جستجو در نام و توضیح…",
+  "pluginMarketplaceCategoryAll": "همه",
+  "pluginMarketplaceCategoryIntegration": "یکپارچه‌سازی",
+  "pluginMarketplaceCategoryOperations": "عملیات",
+  "pluginMarketplaceCategoryProductManagement": "محصولات",
+  "pluginMarketplaceCategorySales": "فروش",
+  "pluginMarketplaceCategoryCrmMarketing": "CRM و بازاریابی",
+  "pluginMarketplaceWalletBalance": "موجودی قابل برداشت کیف‌پول",
+  "pluginMarketplaceWalletTopUp": "شارژ کیف‌پول",
+  "pluginMarketplaceWalletLowBalance": "موجودی کمتر از ارزان‌ترین پلن است. قبل از خرید شارژ کنید.",
+  "pluginMarketplaceInvoicesLink": "صورتحساب‌های بازار",
+  "pluginMarketplaceEmpty": "در حال حاضر افزونه‌ای در دسترس نیست.",
+  "pluginMarketplaceMyEmpty": "هنوز افزونه‌ای برای این کسب‌وکار فعال نکرده‌اید.",
+  "pluginMarketplaceError": "بارگذاری بازار افزونه‌ها ناموفق بود",
+  "pluginMarketplaceViewAndBuy": "مشاهده و خرید",
+  "pluginMarketplaceReadMore": "بیشتر بخوانید",
+  "pluginMarketplaceReadLess": "بستن",
+  "pluginMarketplaceFreeTrialDays": "آزمایشی رایگان · {days} روز",
+  "@pluginMarketplaceFreeTrialDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "pluginMarketplaceStartTrial": "شروع دوره آزمایشی",
+  "pluginMarketplacePlanMonthly": "ماهانه",
+  "pluginMarketplacePlanYearly": "سالانه",
+  "pluginMarketplacePlanLifetime": "مادام‌العمر",
+  "pluginMarketplaceStatusActive": "فعال",
+  "pluginMarketplaceStatusInactive": "غیرفعال",
+  "pluginMarketplaceStatusExpired": "منقضی شده",
+  "pluginMarketplaceStatusTrialDays": "آزمایشی · {days} روز مانده",
+  "@pluginMarketplaceStatusTrialDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "pluginMarketplaceStatusTrialExpired": "دوره آزمایشی پایان یافته",
+  "pluginMarketplacePlanPurchased": "خریداری شده",
+  "pluginMarketplacePlanCurrent": "پلن فعلی",
+  "pluginMarketplacePopularPlan": "پیشنهادی",
+  "pluginMarketplaceEquivalentMonthly": "معادل ~{amount} در ماه",
+  "@pluginMarketplaceEquivalentMonthly": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceSavingsPercent": "{percent}٪ صرفه‌جویی نسبت به ماهانه",
+  "@pluginMarketplaceSavingsPercent": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "pluginMarketplaceConfirmPurchaseTitle": "تأیید خرید",
+  "pluginMarketplaceConfirmPurchasePlugin": "افزونه",
+  "pluginMarketplaceConfirmPurchasePlan": "پلن",
+  "pluginMarketplaceConfirmPurchaseAmount": "مبلغ",
+  "pluginMarketplaceConfirmWalletBalance": "موجودی کیف‌پول",
+  "pluginMarketplaceConfirmPay": "تأیید و پرداخت",
+  "pluginMarketplaceInsufficientFundsTitle": "موجودی کافی نیست",
+  "pluginMarketplaceInsufficientFundsBody": "مورد نیاز: {required} · موجودی: {available} · کسری: {shortfall}",
+  "@pluginMarketplaceInsufficientFundsBody": {
+    "placeholders": {
+      "required": {"type": "String"},
+      "available": {"type": "String"},
+      "shortfall": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceGoToWallet": "رفتن به کیف‌پول",
+  "pluginMarketplacePurchaseSuccess": "خرید با موفقیت انجام شد",
+  "pluginMarketplaceConfigurePlugin": "رفتن به تنظیمات افزونه",
+  "pluginMarketplaceReturnToPrevious": "بازگشت به صفحه قبل",
+  "pluginMarketplacePaymentFromWallet": "پرداخت از کیف‌پول کسب‌وکار",
+  "pluginMarketplaceRetry": "تلاش مجدد",
+  "pluginMarketplaceNoPermissionView": "دسترسی مشاهده بازار افزونه‌ها را ندارید.",
+  "pluginMarketplaceNoPermissionBuy": "دسترسی خرید افزونه ندارید.",
+  "pluginMarketplaceNoPlansHidden": "برخی افزونه‌ها به‌دلیل نبود پلن فعال نمایش داده نمی‌شوند.",
+  "pluginMarketplaceExpiresAt": "انقضا: {date}",
+  "@pluginMarketplaceExpiresAt": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceTrialProgress": "پیشرفت دوره آزمایشی",
+  "pluginMarketplaceComparePlans": "انتخاب پلن",
+  "pluginMarketplacePerMonth": "/ ماه",
+  "pluginMarketplacePluginCodeSupport": "کد پشتیبانی: {code}",
+  "@pluginMarketplacePluginCodeSupport": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceRefresh": "بروزرسانی",
+  "pluginMarketplaceTrialSuccess": "دوره آزمایشی با موفقیت شروع شد",
+  "pluginMarketplaceDetailTitle": "جزئیات افزونه",
+  "pluginMarketplaceFromPrice": "از {price}",
+  "@pluginMarketplaceFromPrice": {
+    "placeholders": {
+      "price": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceBuyDisabledTooltip": "برای خرید به دسترسی marketplace.buy نیاز دارید",
+  "pluginMarketplaceActiveCount": "{count} فعال",
+  "@pluginMarketplaceActiveCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "practicalTools": "ابزارهای کاربردی",
   "usersAndPermissions": "کاربران و دسترسی‌ها",
   "businessUsers": "کاربران کسب و کار",
@@ -2474,8 +2584,31 @@
   "taxWorkspaceMenu": "کارپوشه مالیاتی",
   "taxWorkspaceTitle": "کارپوشه مودیان",
   "taxWorkspaceSubtitle": "فاکتورها را قبل از ارسال به سامانه مودیان بررسی و مدیریت کنید.",
+  "taxTestConnectionButton": "تست اتصال",
+  "taxTestConnectionResultTitle": "نتیجه تست اتصال",
+  "taxTestConnectionDone": "تست اتصال انجام شد",
+  "taxTestConnectionSuccess": "اتصال به سامانه مودیان برقرار است",
+  "taxTestConnectionWithWarnings": "اتصال برقرار است اما هشدار پیکربندی وجود دارد",
+  "taxTestConnectionIdentityFailed": "احتمال ناهماهنگی کلید/گواهی با حافظه مودیان (خطای 4103)",
+  "taxTestConnectionJwtTitle": "اطلاعات توکن مودیان",
+  "taxTestConnectionJwtSub": "شناسه حافظه (sub)",
+  "taxTestConnectionJwtTaxpayer": "شناسه مودی (taxpayerId)",
+  "taxTestConnectionMemoryMismatch": "شناسه حافظه توکن با تنظیمات مطابقت ندارد",
+  "taxTestConnectionEconomicMismatch": "کد اقتصادی توکن با تنظیمات مطابقت ندارد",
+  "taxConfigurationWarningsTitle": "هشدارهای پیکربندی مودیان",
+  "taxIdentityCheckTitle": "بررسی هویت امضا",
+  "taxSandboxModeActive": "حالت Sandbox فعال است",
+
   "taxIntegrationTitle": "سامانه مودیان مالیاتی",
   "taxIntegrationSubtitle": "اطلاعات اتصال و کلیدهای ارتباط با سامانه مودیان را مدیریت کنید.",
+  "moadianPluginInactiveTitle": "افزونه مودیان فعال نیست",
+  "moadianPluginInactiveMessage": "برای استفاده از کارپوشه و ارسال صورت‌حساب به سامانه مودیان، افزونه «اتصال به سامانه مودیان» را از بازار افزونه‌ها فعال یا خریداری کنید.",
+  "moadianPluginGoToMarketplace": "رفتن به بازار افزونه‌ها",
+  "moadianPermissionView": "مشاهده کارپوشه مودیان",
+  "moadianPermissionOperate": "ارسال و عملیات کارپوشه مودیان",
+  "moadianPermissionManageSettings": "مدیریت تنظیمات اتصال مودیان",
+  "moadianPermissionExportReports": "خروجی گزارش ارسال‌های مودیان",
+  "moadianMenuSection": "سامانه مودیان",
   "taxSettingsTabConnection": "اتصال و اطلاعات پایه",
   "taxSettingsTabKeys": "کلیدها و گواهی‌ها",
   "taxSettingsTabDataQuality": "کیفیت داده",
@@ -2596,6 +2729,31 @@
   "taxTechnicalDetailsTitle": "جزئیات فنی (پاسخ خام)",
   "taxNoErrorDetails": "جزئیات خطایی ثبت نشده است.",
   "taxErrorCodeLabel": "کد خطا",
+
+  "taxCancelInModian": "ابطال در مودیان",
+  "taxCancelInModianDialogTitle": "ابطال در سامانه مودیان",
+  "taxCancelInModianDialogMessage": "فاکتور {code} در سامانه مودیان ابطال شود؟",
+  "@taxCancelInModianDialogMessage": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "taxCancelInModianSuccess": "درخواست ابطال به سامانه مودیان ارسال شد.",
+  "taxSendCorrective": "ارسال اصلاحی",
+  "taxSendCorrectiveDialogTitle": "ارسال صورتحساب اصلاحی",
+  "taxSendCorrectiveDialogMessage": "صورتحساب اصلاحی برای فاکتور {code} به مودیان ارسال شود؟",
+  "@taxSendCorrectiveDialogMessage": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "taxSendCorrectiveSuccess": "صورتحساب اصلاحی به سامانه مودیان ارسال شد.",
+  "taxLinkReference": "اتصال فاکتور مرجع",
+  "taxLinkReferenceDialogTitle": "انتخاب فاکتور فروش مرجع",
+  "taxLinkReferenceSuccess": "فاکتور مرجع متصل شد.",
+  "taxLinkReferenceEmpty": "فاکتور فروش ارسال‌شده‌ای برای انتخاب یافت نشد.",
+  "taxReferenceInvoiceColumn": "فاکتور مرجع",
+  "taxCancelledInModianBadge": "ابطال‌شده در مودیان",
 
   "taxAddToWorkspaceSingle": "افزودن به کارپوشه مالیاتی",
   "taxRemoveFromWorkspaceSingle": "حذف از کارپوشه مالیاتی",

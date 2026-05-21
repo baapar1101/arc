@@ -21,7 +21,7 @@ from app.integrations.moadian.utils import (
     calculate_vat_rate,
     map_payment_pattern,
     map_invoice_pattern,
-    map_invoice_subject,
+    map_invoice_subject_for_inp,
     validate_national_id,
     validate_economic_code,
 )
@@ -92,6 +92,9 @@ class InvoiceBuilder:
         self,
         document: Dict[str, Any],
         tax_setting: Any,
+        *,
+        submission_mode: str | None = None,
+        irtaxid: str | None = None,
     ) -> InvoiceDto:
         """
         ساخت DTO کامل فاکتور برای ارسال به سامانه مودیان
@@ -117,6 +120,8 @@ class InvoiceBuilder:
             tax_setting,
             body_totals=body_totals,
             setm=setm,
+            submission_mode=submission_mode,
+            irtaxid=irtaxid,
         )
         payments = self._build_payments(document)
 
@@ -157,6 +162,8 @@ class InvoiceBuilder:
         *,
         body_totals: Dict[str, int],
         setm: int,
+        submission_mode: str | None = None,
+        irtaxid: str | None = None,
     ) -> InvoiceHeaderDto:
         """ساخت Header فاکتور"""
 
@@ -175,23 +182,27 @@ class InvoiceBuilder:
             internal_id=document.get("id", 0),
         )
 
-        internal_id = document.get("id", 0)
+        internal_id = document.get("_tax_internal_id_override") or document.get("id", 0)
         inno = normalize_invoice_number(internal_id)
 
         document_type = document.get("document_type", "")
         type_lower = document_type.lower()
-        is_return = "return" in type_lower
-        is_cancel = "cancel" in type_lower or "ابطال" in document_type
+        mode = (submission_mode or "").strip().lower()
+        is_return = mode == "return" or ("return" in type_lower and mode not in ("cancel", "corrective"))
+        is_cancel = mode == "cancel" or ("cancel" in type_lower or "ابطال" in document_type)
+        is_corrective = mode == "corrective" or "corrective" in type_lower or "اصلاح" in document_type
 
         buyer_national_id = (person_snapshot.get("national_id") or "").strip()
         buyer_economic_code = (person_snapshot.get("economic_code") or "").strip()
 
         has_buyer_info = bool(buyer_national_id) and validate_economic_code(buyer_economic_code)
-        # inty: نوع صورت‌حساب (۱ عادی / ۲ ساده). برگشت با inp=۲ مشخص می‌شود نه inty=۳.
         inty = 1 if has_buyer_info else 2
-        inp = map_invoice_pattern(is_return=is_return, is_cancel=is_cancel)
-
-        ins = map_invoice_subject(document_type)
+        inp = map_invoice_pattern(
+            is_return=is_return,
+            is_cancel=is_cancel,
+            is_corrective=is_corrective,
+        )
+        ins = map_invoice_subject_for_inp(inp, document_type)
 
         tins = tax_setting.economic_code
 
@@ -214,10 +225,9 @@ class InvoiceBuilder:
         if tob is not None:
             header.tob = tob
 
-        if is_return:
-            reference_taxid = (document.get("extra_info") or {}).get("reference_tax_id")
-            if reference_taxid:
-                header.irtaxid = reference_taxid
+        resolved_irtaxid = irtaxid or (document.get("extra_info") or {}).get("reference_tax_id")
+        if resolved_irtaxid and inp in (2, 3, 4):
+            header.irtaxid = str(resolved_irtaxid).strip()
 
         # جمع‌های هدر + روش تسویه (الگوی moadian-full)
         header.tprdis = body_totals["tprdis"]
@@ -363,6 +373,9 @@ class InvoiceBuilder:
 def build_invoice_for_moadian(
     document: Dict[str, Any],
     tax_setting: Any,
+    *,
+    submission_mode: str | None = None,
+    irtaxid: str | None = None,
 ) -> InvoiceDto:
     """
     تابع کمکی برای ساخت DTO فاکتور
@@ -370,9 +383,16 @@ def build_invoice_for_moadian(
     Args:
         document: داده‌های فاکتور
         tax_setting: تنظیمات مالیاتی
+        submission_mode: normal | return | cancel | corrective
+        irtaxid: شناسه مالیاتی مرجع (برای برگشت/ابطال/اصلاح)
 
     Returns:
         InvoiceDto آماده برای ارسال
     """
     builder = InvoiceBuilder(seller_economic_code=tax_setting.economic_code)
-    return builder.build_invoice_dto(document, tax_setting)
+    return builder.build_invoice_dto(
+        document,
+        tax_setting,
+        submission_mode=submission_mode,
+        irtaxid=irtaxid,
+    )

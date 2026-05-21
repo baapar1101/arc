@@ -9,6 +9,8 @@ class TaxSettingsModel {
   final bool sandboxMode;
   final bool hasPrivateKey;
   final DateTime? updatedAt;
+  final List<TaxConfigurationWarning> configurationWarnings;
+  final TaxIdentityCheck? identityCheck;
 
   const TaxSettingsModel({
     required this.businessId,
@@ -21,6 +23,8 @@ class TaxSettingsModel {
     this.sandboxMode = false,
     this.hasPrivateKey = false,
     this.updatedAt,
+    this.configurationWarnings = const [],
+    this.identityCheck,
   });
 
   factory TaxSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -39,7 +43,19 @@ class TaxSettingsModel {
       updatedAt: json['updated_at'] != null && json['updated_at'].toString().isNotEmpty
           ? DateTime.tryParse(json['updated_at'].toString())
           : null,
+      configurationWarnings: _parseWarnings(json['configuration_warnings']),
+      identityCheck: json['identity_check'] is Map<String, dynamic>
+          ? TaxIdentityCheck.fromJson(json['identity_check'] as Map<String, dynamic>)
+          : null,
     );
+  }
+
+  static List<TaxConfigurationWarning> _parseWarnings(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => TaxConfigurationWarning.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   Map<String, dynamic> toPayload() {
@@ -64,6 +80,8 @@ class TaxSettingsModel {
     bool? sandboxMode,
     bool? hasPrivateKey,
     DateTime? updatedAt,
+    List<TaxConfigurationWarning>? configurationWarnings,
+    TaxIdentityCheck? identityCheck,
   }) {
     return TaxSettingsModel(
       businessId: businessId,
@@ -76,8 +94,64 @@ class TaxSettingsModel {
       sandboxMode: sandboxMode ?? this.sandboxMode,
       hasPrivateKey: hasPrivateKey ?? this.hasPrivateKey,
       updatedAt: updatedAt ?? this.updatedAt,
+      configurationWarnings: configurationWarnings ?? this.configurationWarnings,
+      identityCheck: identityCheck ?? this.identityCheck,
     );
   }
+}
+
+class TaxConfigurationWarning {
+  final String code;
+  final String level;
+  final String message;
+
+  const TaxConfigurationWarning({
+    required this.code,
+    required this.level,
+    required this.message,
+  });
+
+  factory TaxConfigurationWarning.fromJson(Map<String, dynamic> json) {
+    return TaxConfigurationWarning(
+      code: json['code']?.toString() ?? '',
+      level: json['level']?.toString() ?? 'warning',
+      message: json['message']?.toString() ?? '',
+    );
+  }
+}
+
+class TaxIdentityCheck {
+  final String status;
+  final String? code;
+  final String? message;
+  final List<Map<String, dynamic>> recentFailures;
+
+  const TaxIdentityCheck({
+    required this.status,
+    this.code,
+    this.message,
+    this.recentFailures = const [],
+  });
+
+  factory TaxIdentityCheck.fromJson(Map<String, dynamic> json) {
+    final failures = <Map<String, dynamic>>[];
+    final raw = json['recent_failures'];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map) {
+          failures.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+    return TaxIdentityCheck(
+      status: json['status']?.toString() ?? 'unknown',
+      code: json['code']?.toString(),
+      message: json['message']?.toString(),
+      recentFailures: failures,
+    );
+  }
+
+  bool get isFailed => status == 'failed';
 }
 
 class TaxGeneratedKeys {

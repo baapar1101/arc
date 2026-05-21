@@ -18,6 +18,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../services/errors/api_error.dart';
 import '../../utils/responsive_helper.dart';
 import '../../services/job_service.dart';
+import '../../widgets/marketplace/moadian_plugin_gate.dart';
 
 /// صفحه کارپوشه مودیان (لیست فاکتورهای موجود در کارپوشه و وضعیت ارسال به سامانه)
 class TaxWorkspacePage extends StatefulWidget {
@@ -66,7 +67,9 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: SafeArea(
+      body: MoadianPluginGate(
+        businessId: widget.businessId,
+        child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -85,6 +88,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -554,9 +558,39 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               onTap: (item) => _onSendSingleToSystem(item as Map<String, dynamic>),
               enabled: (item) {
                 final map = item as Map<String, dynamic>;
+                if (map['tax_cancelled_in_modian'] == true) return false;
                 final status = map['tax_status']?.toString() ?? 'not_sent';
-                // غیرفعال کردن برای فاکتورهای ارسال شده یا قطعی شده
                 return status != 'sent' && status != 'finalized';
+              },
+            ),
+            DataTableAction(
+              icon: Icons.link,
+              label: t.taxLinkReference,
+              onTap: (item) => _onLinkReferenceInvoice(item as Map<String, dynamic>),
+              enabled: (item) {
+                final map = item as Map<String, dynamic>;
+                final docType = map['document_type']?.toString() ?? '';
+                if (docType != 'invoice_sales_return') return false;
+                if (_taxIsSubmitted(map)) return false;
+                return map['reference_invoice_id'] == null;
+              },
+            ),
+            DataTableAction(
+              icon: Icons.cancel_outlined,
+              label: t.taxCancelInModian,
+              onTap: (item) => _onCancelInModian(item as Map<String, dynamic>),
+              enabled: (item) {
+                final map = item as Map<String, dynamic>;
+                return _taxIsSubmitted(map) && map['tax_cancelled_in_modian'] != true;
+              },
+            ),
+            DataTableAction(
+              icon: Icons.edit_note_outlined,
+              label: t.taxSendCorrective,
+              onTap: (item) => _onSendCorrective(item as Map<String, dynamic>),
+              enabled: (item) {
+                final map = item as Map<String, dynamic>;
+                return _taxIsSubmitted(map) && map['tax_cancelled_in_modian'] != true;
               },
             ),
             DataTableAction(
@@ -700,6 +734,175 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       errorMessage: t.taxWorkspaceError,
       expandBodyHeightToFitRows: true,
     );
+  }
+
+  bool _taxIsSubmitted(Map<String, dynamic> map) {
+    final status = map['tax_status']?.toString() ?? '';
+    return status == 'sent' || status == 'finalized' || status == 'accepted';
+  }
+
+  Future<int?> _pickTaxReferenceInvoice() async {
+    final t = AppLocalizations.of(context);
+    final api = widget.apiClient;
+    List<Map<String, dynamic>> candidates = const [];
+    try {
+      final res = await api.get<Map<String, dynamic>>(
+        '/invoices/business/${widget.businessId}/tax-workspace/reference-candidates',
+        queryParameters: const {'limit': 100},
+      );
+      final items = res.data?['data']?['items'];
+      if (items is List) {
+        candidates = items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {
+      candidates = const [];
+    }
+    if (!mounted) return null;
+    if (candidates.isEmpty) {
+      SnackBarHelper.showWarning(context, message: t.taxLinkReferenceEmpty);
+      return null;
+    }
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.taxLinkReferenceDialogTitle),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: candidates.length,
+            itemBuilder: (_, i) {
+              final c = candidates[i];
+              final id = c['id'];
+              final code = c['code']?.toString() ?? id?.toString() ?? '';
+              return ListTile(
+                title: Text(code),
+                subtitle: Text('${c['tax_status'] ?? ''} · ${c['tax_tracking_code'] ?? ''}'),
+                onTap: () => Navigator.pop(ctx, id is int ? id : int.tryParse(id?.toString() ?? '')),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _onLinkReferenceInvoice(Map<String, dynamic> item) async {
+    final t = AppLocalizations.of(context);
+    final refId = await _pickTaxReferenceInvoice();
+    if (refId == null || !mounted) return;
+
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      await widget.apiClient.post<Map<String, dynamic>>(
+        '/invoices/business/${widget.businessId}/${item['id']}/tax-workspace/link-reference',
+        data: {'reference_invoice_id': refId},
+      );
+      if (navigator.canPop()) navigator.pop();
+      if (!mounted) return;
+      SnackBarHelper.showSuccess(context, message: t.taxLinkReferenceSuccess);
+      _refreshData();
+    } catch (e) {
+      if (navigator.canPop()) navigator.pop();
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  Future<void> _onCancelInModian(Map<String, dynamic> item) async {
+    final t = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.taxCancelInModianDialogTitle),
+        content: Text(t.taxCancelInModianDialogMessage(item['code']?.toString() ?? '')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.cancel_outlined),
+            label: Text(t.confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runTaxModianAction(
+      item,
+      endpointSuffix: 'cancel-in-system',
+      successMessage: t.taxCancelInModianSuccess,
+    );
+  }
+
+  Future<void> _onSendCorrective(Map<String, dynamic> item) async {
+    final t = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.taxSendCorrectiveDialogTitle),
+        content: Text(t.taxSendCorrectiveDialogMessage(item['code']?.toString() ?? '')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, true),
+            icon: const Icon(Icons.edit_note_outlined),
+            label: Text(t.confirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runTaxModianAction(
+      item,
+      endpointSuffix: 'send-corrective',
+      successMessage: t.taxSendCorrectiveSuccess,
+    );
+  }
+
+  Future<void> _runTaxModianAction(
+    Map<String, dynamic> item, {
+    required String endpointSuffix,
+    required String successMessage,
+  }) async {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      await widget.apiClient.post<Map<String, dynamic>>(
+        '/invoices/business/${widget.businessId}/${item['id']}/tax-workspace/$endpointSuffix',
+        data: const <String, dynamic>{},
+      );
+      if (navigator.canPop()) navigator.pop();
+      if (!mounted) return;
+      SnackBarHelper.showSuccess(context, message: successMessage);
+      _refreshData();
+    } catch (e) {
+      if (navigator.canPop()) navigator.pop();
+      if (!mounted) return;
+      final invoiceId = item['id'] is int ? item['id'] as int : int.tryParse(item['id']?.toString() ?? '');
+      if (!_handleTaxSendError(e, invoiceId: invoiceId)) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+    }
   }
 
   Future<void> _onSendSingleToSystem(Map<String, dynamic> item) async {

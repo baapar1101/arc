@@ -214,3 +214,92 @@ def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
         "total_issues": len(issues),
     }
 
+
+def validate_tax_submission_scenario(
+    db: Session,
+    document,
+    tax_setting,
+    submission_mode: str | None = None,
+) -> Dict[str, Any]:
+    """اعتبارسنجی سناریوی ارسال (فروش / برگشت / ابطال / اصلاح)."""
+    from app.services.tax_reference_service import (
+        resolve_irtaxid,
+        resolve_reference_document,
+        is_modian_submitted,
+        get_document_extra,
+        compute_taxid_for_document,
+        TAX_SENT_STATUSES,
+    )
+
+    issues: List[Dict[str, Any]] = []
+    extra = get_document_extra(document)
+    mode = (submission_mode or "").strip().lower()
+    doc_type = (document.document_type or "").lower()
+
+    if mode == "cancel":
+        mode = "cancel"
+    elif mode == "corrective":
+        pass
+    elif "return" in doc_type or mode == "return":
+        mode = "return"
+    else:
+        mode = "normal"
+
+    if mode == "return":
+        ref_doc = resolve_reference_document(db, document.business_id, document)
+        if ref_doc is None:
+            issues.append({
+                "code": "TAX_REFERENCE_INVOICE_MISSING",
+                "message": "برای برگشت از فروش، فاکتور مرجع (فروش اصلی) باید مشخص شود.",
+            })
+        else:
+            ref_extra = get_document_extra(ref_doc)
+            if not is_modian_submitted(ref_extra):
+                issues.append({
+                    "code": "TAX_REFERENCE_NOT_SENT",
+                    "message": "فاکتور مرجع هنوز در سامانه مودیان ارسال/قطعی نشده است.",
+                    "meta": {"reference_invoice_id": ref_doc.id, "reference_code": ref_doc.code},
+                })
+            irtaxid = resolve_irtaxid(db, document.business_id, document, tax_setting)
+            if not irtaxid:
+                issues.append({
+                    "code": "TAX_REFERENCE_TAXID_MISSING",
+                    "message": "شناسه مالیاتی (taxid) فاکتور مرجع قابل محاسبه نیست.",
+                    "meta": {"reference_invoice_id": ref_doc.id},
+                })
+
+    elif mode == "cancel":
+        status = str(extra.get("tax_status") or "").strip().lower()
+        if status not in TAX_SENT_STATUSES and not extra.get("tax_tracking_code"):
+            issues.append({
+                "code": "TAX_CANCEL_NOT_SENT",
+                "message": "فقط فاکتورهای ارسال‌شده به مودیان قابل ابطال در سامانه هستند.",
+            })
+        if extra.get("tax_cancelled_in_modian"):
+            issues.append({
+                "code": "TAX_ALREADY_CANCELLED",
+                "message": "این فاکتور قبلاً در سامانه مودیان ابطال شده است.",
+            })
+
+    elif mode == "corrective":
+        status = str(extra.get("tax_status") or "").strip().lower()
+        if status not in TAX_SENT_STATUSES and not extra.get("tax_tracking_code"):
+            issues.append({
+                "code": "TAX_CORRECTIVE_REQUIRES_SENT",
+                "message": "صورتحساب اصلاحی فقط پس از ارسال اولیه مجاز است.",
+            })
+        irtaxid = resolve_irtaxid(db, document.business_id, document, tax_setting)
+        if not irtaxid:
+            irtaxid = compute_taxid_for_document(document, tax_setting)
+        if not irtaxid:
+            issues.append({
+                "code": "TAX_CORRECTIVE_TAXID_MISSING",
+                "message": "شناسه مالیاتی مرجع برای اصلاح یافت نشد.",
+            })
+
+    return {
+        "valid": len(issues) == 0,
+        "issues": issues,
+        "submission_mode": mode,
+    }
+

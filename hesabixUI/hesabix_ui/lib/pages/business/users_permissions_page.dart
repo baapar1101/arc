@@ -1274,6 +1274,12 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'view': t.permissionWooCommerceView,
         'manage': t.permissionWooCommerceManage,
       },
+      'moadian': {
+        'view': t.moadianPermissionView,
+        'operate': t.moadianPermissionOperate,
+        'manage_settings': t.moadianPermissionManageSettings,
+        'export_reports': t.moadianPermissionExportReports,
+      },
     };
   }
 
@@ -1832,6 +1838,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'icon': Icons.store_mall_directory_outlined,
         'sections': ['basalam', 'woocommerce'],
       },
+      {
+        'title': t.moadianMenuSection,
+        'icon': Icons.account_balance_outlined,
+        'sections': ['moadian'],
+      },
     ];
     
     for (int i = 0; i < sectionConfigs.length; i++) {
@@ -1980,6 +1991,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
       case 'woocommerce':
         return t.permissionSectionWooCommerce;
+      case 'moadian':
+        return t.moadianMenuSection;
       case 'crm':
         return t.workflowCategoryCrm;
       case 'crm_web_chat':

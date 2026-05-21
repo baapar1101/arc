@@ -2327,6 +2327,11 @@ class _MyAppState extends State<MyApp> {
               path: 'tax-workspace',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('moadian', 'view') &&
+                    _authStore!.currentBusiness?.isOwner != true) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
                 return hesabixNoTransitionPage(state, TaxWorkspacePage(
                     businessId: businessId,
                     calendarController: _calendarController!,
@@ -3152,7 +3157,9 @@ class _MyAppState extends State<MyApp> {
               path: 'settings/tax',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                final isOwner = _authStore!.currentBusiness?.isOwner == true;
+                if (!isOwner &&
+                    !_authStore!.hasBusinessPermission('moadian', 'manage_settings')) {
                   return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
@@ -3469,9 +3476,11 @@ class _MyAppState extends State<MyApp> {
                   return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
+                final returnTo = state.uri.queryParameters['returnTo'];
                 return hesabixNoTransitionPage(state, PluginMarketplacePage(
                     businessId: businessId,
                     authStore: _authStore!,
+                    returnToPath: returnTo,
                   ),
                 );
               },

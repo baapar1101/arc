@@ -285,19 +285,37 @@ def map_payment_pattern(is_cash: bool = True, is_credit: bool = False) -> int:
         return 1
 
 
-def map_invoice_pattern(is_return: bool, is_cancel: bool = False) -> int:
+def map_invoice_pattern(
+    is_return: bool = False,
+    is_cancel: bool = False,
+    is_corrective: bool = False,
+) -> int:
     """
-    الگوی صورت‌حساب (inp): فروش / برگشت از فروش / ابطال.
+    الگوی صورت‌حساب (inp): فروش / برگشت / ابطال / اصلاح.
 
     - 1: فروش
     - 2: برگشت از فروش
     - 3: ابطال
+    - 4: اصلاحی
     """
+    if is_corrective:
+        return 4
     if is_cancel:
         return 3
     if is_return:
         return 2
     return 1
+
+
+def map_invoice_subject_for_inp(inp: int, document_type: str = "") -> int:
+    """موضوع صورتحساب (ins) هم‌راستا با الگوی inp."""
+    if inp == 3:
+        return 3
+    if inp == 4:
+        return 4
+    if inp == 2:
+        return 5
+    return map_invoice_subject(document_type)
 
 
 def map_invoice_subject(document_type: str) -> int:

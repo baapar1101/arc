@@ -16,8 +16,15 @@ from app.core.settings import get_settings
 from app.integrations.moadian.client import MoadianClient
 from app.integrations.moadian.invoice_builder import build_invoice_for_moadian
 from app.services.invoice_service import invoice_document_to_dict
-from app.services.tax_validation_service import validate_document_for_tax
+from app.services.tax_validation_service import validate_document_for_tax, validate_tax_submission_scenario
 from app.integrations.moadian.utils import extract_moadian_error_message
+from app.services.tax_reference_service import (
+    resolve_irtaxid,
+    compute_taxid_for_document,
+    persist_taxid_on_document,
+    get_document_extra,
+)
+from app.core.moadian_plugin_dependency import ensure_moadian_plugin_active
 
 logger = logging.getLogger(__name__)
 
@@ -84,25 +91,28 @@ def _apply_inquiry_result_to_document(doc: Document, item: Dict[str, Any], *, no
     doc.extra_info = extra
 
 
-def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, Any]:
+def _resolve_submission_mode(document: Document, submission_mode: str | None) -> str:
+    mode = (submission_mode or "").strip().lower()
+    doc_type = (document.document_type or "").lower()
+    if mode in ("normal", "return", "cancel", "corrective"):
+        return mode
+    if "return" in doc_type:
+        return "return"
+    return "normal"
+
+
+def send_document_to_tax_system(
+    db: Session,
+    document: Document,
+    *,
+    submission_mode: str | None = None,
+) -> Dict[str, Any]:
     """
     نقطه ورود اصلی ارسال سند به سامانه مودیان.
-    
-    مراحل:
-    1. اعتبارسنجی فاکتور
-    2. بررسی تنظیمات مالیاتی
-    3. ساخت DTO استاندارد
-    4. ارسال به سامانه
-    5. ذخیره نتیجه
-    
-    Args:
-        db: Database session
-        document: سند/فاکتور برای ارسال
-    
-    Returns:
-        نتیجه ارسال شامل کد رهگیری و وضعیت
     """
-    # 1. اعتبارسنجی
+    ensure_moadian_plugin_active(db, int(document.business_id))
+    mode = _resolve_submission_mode(document, submission_mode)
+
     validation = validate_document_for_tax(db, document)
     if not validation["valid"]:
         raise ApiError(
@@ -112,7 +122,6 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
             details={"issues": validation["issues"]},
         )
 
-    # 2. بررسی تنظیمات مالیاتی
     tax_setting = (
         db.query(TaxSetting)
         .filter(TaxSetting.business_id == document.business_id)
@@ -124,7 +133,7 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
             "تنظیمات سامانه مودیان برای این کسب‌وکار ثبت نشده است.",
             http_status=400,
         )
-    
+
     if not (tax_setting.tax_memory_id and tax_setting.private_key and tax_setting.economic_code):
         raise ApiError(
             "TAX_SETTINGS_INCOMPLETE",
@@ -132,9 +141,40 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
             http_status=400,
         )
 
-    # 3. ساخت DTO استاندارد
+    scenario = validate_tax_submission_scenario(db, document, tax_setting, mode)
+    if not scenario["valid"]:
+        raise ApiError(
+            "TAX_VALIDATION_FAILED",
+            "اعتبارسنجی سناریوی ارسال به مودیان ناموفق بود.",
+            http_status=400,
+            details={"issues": scenario["issues"], "submission_mode": mode},
+        )
+
+    irtaxid: str | None = None
+    if mode == "return":
+        irtaxid = resolve_irtaxid(db, document.business_id, document, tax_setting)
+    elif mode == "cancel":
+        irtaxid = compute_taxid_for_document(document, tax_setting)
+    elif mode == "corrective":
+        irtaxid = compute_taxid_for_document(document, tax_setting)
+
     raw_document = invoice_document_to_dict(db, document)
-    invoice_dto = build_invoice_for_moadian(raw_document, tax_setting)
+    if mode in ("cancel", "corrective"):
+        # صورتحساب ابطال/اصلاح باید taxid جدید داشته باشد؛ مرجع در irtaxid است.
+        raw_document["_tax_internal_id_override"] = int(
+            f"{document.id}{1 if mode == 'cancel' else 2}"
+        )
+
+    invoice_dto = build_invoice_for_moadian(
+        raw_document,
+        tax_setting,
+        submission_mode=mode,
+        irtaxid=irtaxid,
+    )
+
+    if mode == "normal":
+        taxid = compute_taxid_for_document(document, tax_setting)
+        persist_taxid_on_document(document, taxid, db)
 
     # 3.5. بررسی rate limit
     from app.services.tax_rate_limiter import get_tax_rate_limiter
@@ -180,7 +220,7 @@ def send_document_to_tax_system(db: Session, document: Document) -> Dict[str, An
             try:
                 submission = client.send_invoice(invoice_dto)
                 # 6. ذخیره نتیجه اولیه (صف async)
-                _apply_submission_result(document, submission, db)
+                _apply_submission_result(document, submission, db, submission_mode=mode)
 
                 # 6.5 استعلام فوری: «sent» یعنی پذیرش در صف، نه ثبت نهایی در کارپوشه مودیان
                 tracking_code = submission.get("tracking_code")
@@ -358,6 +398,7 @@ def inquire_tax_status(
     invoice_ids: List[int] | None = None,
     tracking_codes: List[str] | None = None,
 ) -> Dict[str, Any]:
+    ensure_moadian_plugin_active(db, business_id)
     invoice_ids = invoice_ids or []
     tracking_codes = tracking_codes or []
 
@@ -456,12 +497,24 @@ def _mark_document_failed(doc: Document, error_message: str, db: Session) -> Non
     db.flush()
 
 
-def _apply_submission_result(doc: Document, submission: Dict[str, Any], db: Session) -> None:
+def _apply_submission_result(
+    doc: Document,
+    submission: Dict[str, Any],
+    db: Session,
+    *,
+    submission_mode: str = "normal",
+) -> None:
     extra = dict(doc.extra_info or {})
     extra["tax_workspace"] = True
     extra["tax_status"] = submission.get("status") or "sent"
     extra["tax_tracking_code"] = submission.get("tracking_code") or extra.get("tax_tracking_code")
     extra["tax_last_send_at"] = submission.get("sent_at") or datetime.datetime.utcnow().isoformat()
+    extra["tax_last_submission_mode"] = submission_mode
+    if submission_mode == "cancel":
+        extra["tax_cancelled_in_modian"] = True
+        extra["tax_cancelled_at"] = extra["tax_last_send_at"]
+    if submission_mode == "corrective":
+        extra["tax_corrective_sent_at"] = extra["tax_last_send_at"]
     if "raw_response" in submission:
         extra["tax_last_response"] = submission["raw_response"]
     if submission.get("error_message"):
@@ -470,6 +523,16 @@ def _apply_submission_result(doc: Document, submission: Dict[str, Any], db: Sess
         extra.pop("tax_error_message", None)
     doc.extra_info = extra
     db.add(doc)
+
+
+def cancel_document_in_tax_system(db: Session, document: Document) -> Dict[str, Any]:
+    """ابطال صورتحساب ارسال‌شده در سامانه مودیان (inp=3)."""
+    return send_document_to_tax_system(db, document, submission_mode="cancel")
+
+
+def send_corrective_to_tax_system(db: Session, document: Document) -> Dict[str, Any]:
+    """ارسال صورتحساب اصلاحی (inp=4) برای فاکتور ارسال‌شده."""
+    return send_document_to_tax_system(db, document, submission_mode="corrective")
 
 
 def extract_moadian_errors_from_extra(extra: dict | None) -> List[Dict[str, Any]]:
@@ -517,6 +580,13 @@ def build_tax_status_fields_for_api(extra: dict | None) -> Dict[str, Any]:
     fields: Dict[str, Any] = {
         "tax_error_message": extra.get("tax_error_message"),
         "tax_last_inquiry_at": extra.get("tax_last_inquiry_at"),
+        "tax_moadian_taxid": extra.get("tax_moadian_taxid"),
+        "tax_last_submission_mode": extra.get("tax_last_submission_mode"),
+        "tax_cancelled_in_modian": bool(extra.get("tax_cancelled_in_modian")),
+        "tax_cancelled_at": extra.get("tax_cancelled_at"),
+        "tax_corrective_sent_at": extra.get("tax_corrective_sent_at"),
+        "reference_invoice_id": extra.get("reference_invoice_id"),
+        "reference_tax_id": extra.get("reference_tax_id"),
     }
     moadian_errors = extract_moadian_errors_from_extra(extra)
     if moadian_errors:

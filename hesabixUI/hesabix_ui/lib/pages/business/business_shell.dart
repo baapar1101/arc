@@ -1086,6 +1086,18 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isMoadianPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'moadian_tax_integration',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -3226,6 +3238,13 @@ class _BusinessShellState extends State<BusinessShell> {
         return false;
       }
     }
+
+    // سامانه مودیان
+    if (section == 'moadian') {
+      if (!_isMoadianPluginActive()) {
+        return false;
+      }
+    }
     
     // اگر سکشن تعریف نشده، نمایش داده نشود
     if (section == null) {
@@ -3323,7 +3342,7 @@ class _BusinessShellState extends State<BusinessShell> {
     // بنابراین در مدل دسترسی فعلی زیر مجموعه‌ی warehouse_transfers در نظر گرفته می‌شود.
     if (label == 'انبار گردانی' || label == 'انبارگردانی' || label == 'Stock Count') return 'warehouse_transfers';
     if (label == t.storageSpace) return 'storage';
-    if (label == t.taxpayers) return 'settings';
+    if (label == t.taxpayers) return 'moadian';
     if (label == t.settings) return 'settings';
     if (label == t.pluginMarketplace) return 'marketplace';
     if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';

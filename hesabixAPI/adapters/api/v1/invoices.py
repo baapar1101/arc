@@ -64,11 +64,21 @@ from app.services.invoice_tag_service import (
 )
 from app.services.tax_submission_service import (
     send_document_to_tax_system,
+    cancel_document_in_tax_system,
+    send_corrective_to_tax_system,
     inquire_tax_status,
     build_tax_status_fields_for_api,
     build_tax_failure_details,
     enrich_tax_timeline_event,
 )
+from app.services.tax_reference_service import (
+    link_reference_invoice,
+    can_cancel_in_modian,
+    can_send_corrective,
+    compute_taxid_for_document,
+    get_document_extra,
+)
+from app.core.moadian_plugin_dependency import ensure_moadian_plugin_active
 from app.services.pdf.template_renderer import render_template
 from app.core.calendar import CalendarConverter
 from adapters.db.models.person import Person
@@ -2967,8 +2977,10 @@ async def search_tax_workspace_endpoint(
     query_info: QueryInfo = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "view")),
 ) -> Dict[str, Any]:
     """لیست فاکتورهای موجود در کارپوشه مودیان با فیلتر و صفحه‌بندی."""
+    ensure_moadian_plugin_active(db, business_id)
     from app.core.i18n import negotiate_locale
 
     # Base query: all invoice documents for business
@@ -3205,17 +3217,21 @@ def _ensure_sales_or_return(doc: Document) -> None:
 @router.post(
     "/business/{business_id}/{invoice_id}/tax-workspace/add",
     summary="افزودن فاکتور به کارپوشه مودیان",
-    description="فقط فاکتور فروش یا برگشت از فروش غیرپیش‌فاکتور؛ وضعیت اولیه معمولاً `not_sent`.",
+    description=(
+        "فقط فاکتور فروش یا برگشت از فروش. برای برگشت، `reference_invoice_id` شناسه فاکتور فروش مرجع است."
+    ),
 )
 @require_business_access("business_id")
 def add_invoice_to_tax_workspace(
     request: Request,
     business_id: int,
     invoice_id: int,
+    body: Dict[str, Any] = Body(default={}),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """افزودن فاکتور به کارپوشه مودیان."""
+    ensure_moadian_plugin_active(db, business_id)
     doc = _get_invoice_for_business(db, business_id, invoice_id)
     _ensure_sales_or_return(doc)
 
@@ -3224,15 +3240,125 @@ def add_invoice_to_tax_workspace(
     status = extra.get("tax_status")
     if not isinstance(status, str) or not status.strip():
         extra["tax_status"] = "not_sent"
+
+    ref_id = body.get("reference_invoice_id")
+    if ref_id is not None:
+        try:
+            ref_id_int = int(ref_id)
+        except (TypeError, ValueError):
+            raise ApiError("INVALID_REQUEST", "reference_invoice_id نامعتبر است.", http_status=400)
+        link_reference_invoice(db, business_id, doc, ref_id_int)
+        extra = dict(doc.extra_info or {})
+    elif doc.document_type == "invoice_sales_return":
+        raise ApiError(
+            "TAX_REFERENCE_REQUIRED",
+            "برای برگشت از فروش، شناسه فاکتور فروش مرجع (reference_invoice_id) الزامی است.",
+            http_status=400,
+        )
+
     doc.extra_info = extra
     db.commit()
     db.refresh(doc)
 
     return success_response(
-        data={"id": doc.id, "tax_status": extra.get("tax_status")},
+        data={
+            "id": doc.id,
+            "tax_status": extra.get("tax_status"),
+            "reference_invoice_id": extra.get("reference_invoice_id"),
+        },
         request=request,
         message="INVOICE_ADDED_TO_TAX_WORKSPACE",
     )
+
+
+@router.post(
+    "/business/{business_id}/{invoice_id}/tax-workspace/link-reference",
+    summary="اتصال فاکتور مرجع برای برگشت/اصلاح",
+    description='بدنه: `{"reference_invoice_id": 123}`',
+)
+@require_business_access("business_id")
+def link_tax_workspace_reference(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    body: Dict[str, Any] = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    ensure_moadian_plugin_active(db, business_id)
+    doc = _get_invoice_for_business(db, business_id, invoice_id)
+    ref_id = body.get("reference_invoice_id")
+    if ref_id is None:
+        raise ApiError("INVALID_REQUEST", "reference_invoice_id الزامی است.", http_status=400)
+    try:
+        ref_id_int = int(ref_id)
+    except (TypeError, ValueError):
+        raise ApiError("INVALID_REQUEST", "reference_invoice_id نامعتبر است.", http_status=400)
+
+    ref_doc = link_reference_invoice(db, business_id, doc, ref_id_int)
+    db.commit()
+    db.refresh(doc)
+
+    return success_response(
+        data={
+            "id": doc.id,
+            "reference_invoice_id": ref_id_int,
+            "reference_invoice_code": ref_doc.code,
+            "reference_tax_status": get_document_extra(ref_doc).get("tax_status"),
+        },
+        request=request,
+        message="TAX_REFERENCE_LINKED",
+    )
+
+
+@router.get(
+    "/business/{business_id}/tax-workspace/reference-candidates",
+    summary="فاکتورهای مرجع قابل انتخاب برای برگشت",
+    description="فاکتورهای فروش ارسال‌شده به مودیان برای اتصال به برگشت از فروش.",
+)
+@require_business_access("business_id")
+def list_tax_reference_candidates(
+    request: Request,
+    business_id: int,
+    q: str | None = None,
+    limit: int = 50,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    ensure_moadian_plugin_active(db, business_id)
+    from sqlalchemy import cast, Boolean
+    from sqlalchemy.dialects.postgresql import JSONB
+
+    _extra_info_jb = cast(Document.extra_info, JSONB)
+    query = db.query(Document).filter(
+        Document.business_id == business_id,
+        Document.document_type == "invoice_sales",
+        cast(_extra_info_jb["tax_workspace"], Boolean) == True,
+        _extra_info_jb["tax_status"].astext.in_(["sent", "finalized"]),
+    )
+    if q and q.strip():
+        query = query.filter(Document.code.ilike(f"%{q.strip()}%"))
+
+    from adapters.db.models.tax_setting import TaxSetting
+
+    tax_setting = db.query(TaxSetting).filter(TaxSetting.business_id == business_id).first()
+    docs = query.order_by(Document.document_date.desc()).limit(min(limit, 200)).all()
+    items = []
+    for d in docs:
+        ex = get_document_extra(d)
+        taxid = ex.get("tax_moadian_taxid")
+        if not taxid and tax_setting:
+            taxid = compute_taxid_for_document(d, tax_setting)
+        items.append({
+            "id": d.id,
+            "code": d.code,
+            "document_date": d.document_date.isoformat() if d.document_date else None,
+            "tax_status": ex.get("tax_status"),
+            "tax_tracking_code": ex.get("tax_tracking_code"),
+            "tax_moadian_taxid": taxid,
+        })
+
+    return success_response(data={"items": items}, request=request, message="TAX_REFERENCE_CANDIDATES")
 
 
 @router.post(
@@ -3249,6 +3375,7 @@ def remove_invoice_from_tax_workspace(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """حذف فاکتور از کارپوشه مودیان (فقط اگر قطعی نشده باشد)."""
+    ensure_moadian_plugin_active(db, business_id)
     doc = _get_invoice_for_business(db, business_id, invoice_id)
     extra = dict(doc.extra_info or {})
     status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
@@ -3286,6 +3413,7 @@ def send_invoice_to_tax_system(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """ارسال تکی فاکتور موجود در کارپوشه به سامانه مودیان."""
+    ensure_moadian_plugin_active(db, business_id)
     doc = _get_invoice_for_business(db, business_id, invoice_id)
     _ensure_sales_or_return(doc)
 
@@ -3301,6 +3429,12 @@ def send_invoice_to_tax_system(
         raise ApiError(
             "TAX_ALREADY_SENT",
             "Invoice has already been sent to tax system",
+            http_status=409,
+        )
+    if extra.get("tax_cancelled_in_modian"):
+        raise ApiError(
+            "TAX_CANCELLED_IN_MODIAN",
+            "این فاکتور در سامانه مودیان ابطال شده و ارسال مجدد مجاز نیست.",
             http_status=409,
         )
 
@@ -3333,6 +3467,92 @@ def send_invoice_to_tax_system(
     )
 
 
+def _finalize_tax_workspace_submission(
+    doc: Document,
+    submission: Dict[str, Any],
+    db: Session,
+    *,
+    success_message: str,
+) -> Dict[str, Any]:
+    db.commit()
+    db.refresh(doc)
+    extra_after = doc.extra_info or {}
+    tax_status = extra_after.get("tax_status")
+    if tax_status == "failed" or submission.get("status") == "failed":
+        failure_details = build_tax_failure_details(extra_after, submission)
+        failure_details["id"] = doc.id
+        raise ApiError(
+            "TAX_SUBMISSION_REJECTED",
+            submission.get("error_message")
+            or extra_after.get("tax_error_message")
+            or "عملیات توسط سامانه مودیان رد شد.",
+            http_status=400,
+            details=failure_details,
+        )
+    return {
+        "id": doc.id,
+        "tax_status": tax_status,
+        "tax_tracking_code": extra_after.get("tax_tracking_code"),
+        "tax_cancelled_in_modian": bool(extra_after.get("tax_cancelled_in_modian")),
+        "tax_corrective_sent_at": extra_after.get("tax_corrective_sent_at"),
+        **build_tax_status_fields_for_api(extra_after),
+    }
+
+
+@router.post(
+    "/business/{business_id}/{invoice_id}/tax-workspace/cancel-in-system",
+    summary="ابطال فاکتور در سامانه مودیان",
+    description="ارسال صورتحساب ابطالی (inp=3) برای فاکتور قبلاً ارسال‌شده.",
+)
+@require_business_access("business_id")
+def cancel_invoice_in_tax_system(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    ensure_moadian_plugin_active(db, business_id)
+    doc = _get_invoice_for_business(db, business_id, invoice_id)
+    _ensure_sales_or_return(doc)
+    ok, reason = can_cancel_in_modian(doc)
+    if not ok:
+        raise ApiError("TAX_CANCEL_NOT_ALLOWED", reason, http_status=409)
+
+    submission = cancel_document_in_tax_system(db, doc)
+    data = _finalize_tax_workspace_submission(
+        doc, submission, db, success_message="INVOICE_CANCELLED_IN_TAX_SYSTEM"
+    )
+    return success_response(data=data, request=request, message="INVOICE_CANCELLED_IN_TAX_SYSTEM")
+
+
+@router.post(
+    "/business/{business_id}/{invoice_id}/tax-workspace/send-corrective",
+    summary="ارسال صورتحساب اصلاحی به مودیان",
+    description="ارسال صورتحساب اصلاحی (inp=4) برای فاکتور ارسال‌شده.",
+)
+@require_business_access("business_id")
+def send_corrective_invoice_to_tax_system(
+    request: Request,
+    business_id: int,
+    invoice_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    ensure_moadian_plugin_active(db, business_id)
+    doc = _get_invoice_for_business(db, business_id, invoice_id)
+    _ensure_sales_or_return(doc)
+    ok, reason = can_send_corrective(doc)
+    if not ok:
+        raise ApiError("TAX_CORRECTIVE_NOT_ALLOWED", reason, http_status=409)
+
+    submission = send_corrective_to_tax_system(db, doc)
+    data = _finalize_tax_workspace_submission(
+        doc, submission, db, success_message="INVOICE_CORRECTIVE_SENT_TO_TAX_SYSTEM"
+    )
+    return success_response(data=data, request=request, message="INVOICE_CORRECTIVE_SENT_TO_TAX_SYSTEM")
+
+
 @router.post(
     "/business/{business_id}/tax-workspace/send-to-system-batch",
     summary="ارسال گروهی به سامانه مودیان",
@@ -3347,6 +3567,7 @@ def send_invoices_to_tax_system_batch(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """ارسال گروهی فاکتورهای موجود در کارپوشه به سامانه مودیان."""
+    ensure_moadian_plugin_active(db, business_id)
     ids = body.get("invoice_ids") or []
     if not isinstance(ids, list) or not ids:
         raise ApiError("INVALID_REQUEST", "invoice_ids must be a non-empty list", http_status=400)
@@ -3426,6 +3647,7 @@ def remove_invoices_from_tax_workspace_batch(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """حذف گروهی فاکتورها از کارپوشه مودیان (صرفاً غیرقطعی‌ها)."""
+    ensure_moadian_plugin_active(db, business_id)
     ids = body.get("invoice_ids") or []
     if not isinstance(ids, list) or not ids:
         raise ApiError("INVALID_REQUEST", "invoice_ids must be a non-empty list", http_status=400)
@@ -3477,6 +3699,7 @@ def get_tax_system_health(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """بررسی سلامت سامانه مالیاتی"""
+    ensure_moadian_plugin_active(db, business_id)
     from app.services.tax_health_check import check_tax_system_health
     
     health = check_tax_system_health(db, business_id)
@@ -3504,6 +3727,7 @@ def get_failed_invoices(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """دریافت لیست فاکتورهای failed از Dead Letter Queue"""
+    ensure_moadian_plugin_active(db, business_id)
     from app.services.tax_dead_letter_queue import get_failed_invoices
     
     failed = get_failed_invoices(db, business_id, status, limit, offset)
@@ -3545,6 +3769,7 @@ def retry_failed_invoice_endpoint(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """تلاش مجدد برای ارسال فاکتور failed"""
+    ensure_moadian_plugin_active(db, business_id)
     from app.services.tax_dead_letter_queue import retry_failed_invoice
     
     result = retry_failed_invoice(db, failed_id)
@@ -3571,6 +3796,7 @@ def get_invoice_tax_timeline(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """دریافت Timeline تغییرات وضعیت مالیاتی فاکتور"""
+    ensure_moadian_plugin_active(db, business_id)
     doc = _get_invoice_for_business(db, business_id, invoice_id)
     extra = dict(doc.extra_info or {})
     
@@ -3649,8 +3875,9 @@ def inquire_tax_status_endpoint(
     body: Dict[str, Any] = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("invoices", "view")),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
 ) -> Dict[str, Any]:
+    ensure_moadian_plugin_active(db, business_id)
     invoice_ids = body.get("invoice_ids")
     tracking_codes = body.get("tracking_codes")
     if not isinstance(invoice_ids, list):
@@ -3692,6 +3919,7 @@ def validate_invoices_for_tax_batch(
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """اعتبارسنجی گروهی فاکتورها قبل از ارسال"""
+    ensure_moadian_plugin_active(db, business_id)
     ids = body.get("invoice_ids") or []
     if not isinstance(ids, list) or not ids:
         raise ApiError("INVALID_REQUEST", "invoice_ids must be a non-empty list", http_status=400)
@@ -3767,9 +3995,10 @@ def tax_workspace_quick_actions(
     body: Dict[str, Any] = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("invoices", "add")),
+    _: None = Depends(require_business_permission_dep("moadian", "operate")),
 ) -> Dict[str, Any]:
     """عملیات سریع برای کارپوشه مالیاتی"""
+    ensure_moadian_plugin_active(db, business_id)
     action = body.get("action")
     if not action or not isinstance(action, str):
         raise ApiError("INVALID_REQUEST", "action is required", http_status=400)

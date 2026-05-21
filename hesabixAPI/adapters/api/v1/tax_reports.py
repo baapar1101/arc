@@ -11,7 +11,8 @@ from sqlalchemy import func, and_
 
 from app.core.responses import success_response, ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access
+from app.core.permissions import require_business_access, require_business_permission_dep
+from app.core.moadian_plugin_dependency import ensure_moadian_plugin_active
 from adapters.db.session import get_db
 from adapters.db.models.document import Document
 from adapters.api.v1.invoices import SUPPORTED_INVOICE_TYPES
@@ -27,6 +28,7 @@ def export_tax_report(
     body: Dict[str, Any] = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("moadian", "export_reports")),
 ) -> Dict[str, Any]:
     """
     Export گزارش ارسال‌های مالیاتی به Excel
@@ -37,6 +39,7 @@ def export_tax_report(
         - status: وضعیت (اختیاری)
         - format: excel یا pdf (پیش‌فرض: excel)
     """
+    ensure_moadian_plugin_active(db, business_id)
     from datetime import datetime
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment

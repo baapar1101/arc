@@ -325,6 +325,12 @@ def get_business_info_with_permissions(
             "wallet": {"view": True, "charge": True},
             "storage": {"view": True, "delete": True},
             "marketplace": {"buy": True, "view": True, "invoices": True},
+            "moadian": {
+                "view": True,
+                "operate": True,
+                "manage_settings": True,
+                "export_reports": True,
+            },
             "price_lists": {"add": True, "edit": True, "view": True, "delete": True},
             "sms": {"history": True, "templates": True},
             "join": True

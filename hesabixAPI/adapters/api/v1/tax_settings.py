@@ -11,6 +11,7 @@ from adapters.api.v1.schema_models.tax_settings import (
 )
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
+from app.core.moadian_plugin_dependency import ensure_moadian_plugin_active
 from app.core.responses import success_response, ApiError
 from app.services.tax_setting_service import (
     get_tax_setting,
@@ -37,10 +38,11 @@ def get_tax_settings_endpoint(
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("settings", "business")),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
 ):
+    ensure_moadian_plugin_active(db, business_id)
     setting = get_tax_setting(db, business_id)
-    data = serialize_tax_setting(setting, business_id=business_id)
+    data = serialize_tax_setting(setting, business_id=business_id, db=db)
     return success_response(data=data, request=request, message="TAX_SETTINGS_FETCHED")
 
 
@@ -52,8 +54,9 @@ def save_tax_settings_endpoint(
     payload: TaxSettingsSaveRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("settings", "business")),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
 ):
+    ensure_moadian_plugin_active(db, business_id)
     user_id = ctx.get_user_id()
     if not user_id:
         raise ApiError("UNAUTHORIZED", "Authentication required", http_status=401)
@@ -66,7 +69,7 @@ def save_tax_settings_endpoint(
     )
     db.commit()
     db.refresh(setting)
-    data = serialize_tax_setting(setting, business_id=business_id)
+    data = serialize_tax_setting(setting, business_id=business_id, db=db)
     return success_response(data=data, request=request, message="TAX_SETTINGS_SAVED")
 
 
@@ -78,8 +81,9 @@ def generate_keys_endpoint(
     payload: GenerateKeysRequest = Body(...),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("settings", "business")),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
 ):
+    ensure_moadian_plugin_active(db, business_id)
     private_pem, public_pem, private_key = _generate_rsa_key_pair()
     csr_pem = None
     if payload.person_type == "legal":
@@ -100,8 +104,9 @@ def tax_data_quality_endpoint(
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("settings", "business")),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
 ):
+    ensure_moadian_plugin_active(db, business_id)
     report = get_tax_data_quality(db, business_id)
     data = format_tax_data_quality(report)
     return success_response(data=data, request=request, message="TAX_DATA_QUALITY_REPORT")
@@ -114,7 +119,7 @@ def test_tax_connection_endpoint(
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("settings", "business")),
+    _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
 ):
     """
     تست اتصال به سامانه مودیان
@@ -128,9 +133,10 @@ def test_tax_connection_endpoint(
     Returns:
         نتیجه تست شامل وضعیت اتصال
     """
-    from app.services.tax_setting_service import get_tax_setting
+    ensure_moadian_plugin_active(db, business_id)
     from app.integrations.moadian.client import MoadianClient
     from app.core.settings import get_settings
+    from app.services.tax_setting_health_service import run_extended_connection_test
     
     # بررسی تنظیمات
     tax_setting = get_tax_setting(db, business_id)
@@ -155,25 +161,25 @@ def test_tax_connection_endpoint(
         # 1. دریافت اطلاعات سرور
         server_info = client.get_server_information()
         
-        # 2. تست لاگین
+        # 2. تست لاگین + بررسی JWT، هشدارها، و سوابق 4103
         token = client.login()
-        
+        result = run_extended_connection_test(
+            db,
+            tax_setting,
+            token=token,
+            server_info=server_info if isinstance(server_info, dict) else {},
+        )
+
+        message_key = "TAX_CONNECTION_SUCCESS"
+        if result.get("status") == "identity_mismatch":
+            message_key = "TAX_CONNECTION_IDENTITY_MISMATCH"
+        elif result.get("status") == "connected_with_warnings":
+            message_key = "TAX_CONNECTION_WITH_WARNINGS"
+
         return success_response(
-            data={
-                "status": "connected",
-                "sandbox_mode": tax_setting.sandbox_mode,
-                "server_info": {
-                    "has_public_key": bool(server_info.get('publicKeys')),
-                    "key_count": len(server_info.get('publicKeys', [])),
-                },
-                "auth": {
-                    "logged_in": bool(token),
-                    "token_length": len(token) if token else 0,
-                },
-                "message": "اتصال به سامانه مودیان با موفقیت برقرار شد.",
-            },
+            data=result,
             request=request,
-            message="TAX_CONNECTION_SUCCESS",
+            message=message_key,
         )
         
     except ApiError:

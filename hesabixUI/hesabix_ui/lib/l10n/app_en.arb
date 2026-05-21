@@ -853,6 +853,116 @@
   "taxpayers": "Taxpayers",
   "others": "Others",
   "pluginMarketplace": "Plugin Marketplace",
+  "pluginMarketplaceSubtitle": "Extend Hesabix with integrations and industry add-ons. Pay from your business wallet.",
+  "pluginMarketplaceBrowseTab": "Catalog",
+  "pluginMarketplaceMyPluginsTab": "My add-ons",
+  "pluginMarketplaceSearchHint": "Search by name or description…",
+  "pluginMarketplaceCategoryAll": "All",
+  "pluginMarketplaceCategoryIntegration": "Integrations",
+  "pluginMarketplaceCategoryOperations": "Operations",
+  "pluginMarketplaceCategoryProductManagement": "Products",
+  "pluginMarketplaceCategorySales": "Sales",
+  "pluginMarketplaceCategoryCrmMarketing": "CRM & marketing",
+  "pluginMarketplaceWalletBalance": "Available wallet balance",
+  "pluginMarketplaceWalletTopUp": "Top up wallet",
+  "pluginMarketplaceWalletLowBalance": "Balance is below the cheapest plan. Top up before purchasing.",
+  "pluginMarketplaceInvoicesLink": "Marketplace invoices",
+  "pluginMarketplaceEmpty": "No add-ons are available right now.",
+  "pluginMarketplaceMyEmpty": "You have not activated any add-ons yet.",
+  "pluginMarketplaceError": "Could not load the marketplace",
+  "pluginMarketplaceViewAndBuy": "View & purchase",
+  "pluginMarketplaceReadMore": "Read more",
+  "pluginMarketplaceReadLess": "Show less",
+  "pluginMarketplaceFreeTrialDays": "Free trial · {days} days",
+  "@pluginMarketplaceFreeTrialDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "pluginMarketplaceStartTrial": "Start free trial",
+  "pluginMarketplacePlanMonthly": "Monthly",
+  "pluginMarketplacePlanYearly": "Yearly",
+  "pluginMarketplacePlanLifetime": "Lifetime",
+  "pluginMarketplaceStatusActive": "Active",
+  "pluginMarketplaceStatusInactive": "Inactive",
+  "pluginMarketplaceStatusExpired": "Expired",
+  "pluginMarketplaceStatusTrialDays": "Trial · {days} days left",
+  "@pluginMarketplaceStatusTrialDays": {
+    "placeholders": {
+      "days": {"type": "int"}
+    }
+  },
+  "pluginMarketplaceStatusTrialExpired": "Trial ended",
+  "pluginMarketplacePlanPurchased": "Purchased",
+  "pluginMarketplacePlanCurrent": "Current plan",
+  "pluginMarketplacePopularPlan": "Popular",
+  "pluginMarketplaceEquivalentMonthly": "~{amount} / month",
+  "@pluginMarketplaceEquivalentMonthly": {
+    "placeholders": {
+      "amount": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceSavingsPercent": "Save {percent}% vs monthly",
+  "@pluginMarketplaceSavingsPercent": {
+    "placeholders": {
+      "percent": {"type": "int"}
+    }
+  },
+  "pluginMarketplaceConfirmPurchaseTitle": "Confirm purchase",
+  "pluginMarketplaceConfirmPurchasePlugin": "Add-on",
+  "pluginMarketplaceConfirmPurchasePlan": "Plan",
+  "pluginMarketplaceConfirmPurchaseAmount": "Amount",
+  "pluginMarketplaceConfirmWalletBalance": "Wallet balance",
+  "pluginMarketplaceConfirmPay": "Confirm & pay",
+  "pluginMarketplaceInsufficientFundsTitle": "Insufficient balance",
+  "pluginMarketplaceInsufficientFundsBody": "Required: {required} · Available: {available} · Shortfall: {shortfall}",
+  "@pluginMarketplaceInsufficientFundsBody": {
+    "placeholders": {
+      "required": {"type": "String"},
+      "available": {"type": "String"},
+      "shortfall": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceGoToWallet": "Go to wallet",
+  "pluginMarketplacePurchaseSuccess": "Purchase completed successfully",
+  "pluginMarketplaceConfigurePlugin": "Open add-on settings",
+  "pluginMarketplaceReturnToPrevious": "Back to previous page",
+  "pluginMarketplacePaymentFromWallet": "Paid from business wallet",
+  "pluginMarketplaceRetry": "Try again",
+  "pluginMarketplaceNoPermissionView": "You do not have permission to view the marketplace.",
+  "pluginMarketplaceNoPermissionBuy": "You do not have permission to purchase add-ons.",
+  "pluginMarketplaceNoPlansHidden": "Some add-ons are hidden because they have no active plans.",
+  "pluginMarketplaceExpiresAt": "Expires: {date}",
+  "@pluginMarketplaceExpiresAt": {
+    "placeholders": {
+      "date": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceTrialProgress": "Trial progress",
+  "pluginMarketplaceComparePlans": "Choose a plan",
+  "pluginMarketplacePerMonth": "/ month",
+  "pluginMarketplacePluginCodeSupport": "Support code: {code}",
+  "@pluginMarketplacePluginCodeSupport": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceRefresh": "Refresh",
+  "pluginMarketplaceTrialSuccess": "Free trial started",
+  "pluginMarketplaceDetailTitle": "Add-on details",
+  "pluginMarketplaceFromPrice": "From {price}",
+  "@pluginMarketplaceFromPrice": {
+    "placeholders": {
+      "price": {"type": "String"}
+    }
+  },
+  "pluginMarketplaceBuyDisabledTooltip": "You need marketplace purchase permission",
+  "pluginMarketplaceActiveCount": "{count} active",
+  "@pluginMarketplaceActiveCount": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "practicalTools": "Practical Tools",
   "usersAndPermissions": "Users and Permissions",
   "businessUsers": "Business Users",
@@ -2430,8 +2540,31 @@
   "taxWorkspaceMenu": "Tax workspace",
   "taxWorkspaceTitle": "Tax workspace",
   "taxWorkspaceSubtitle": "Review invoices before sending them to the tax system.",
+  "taxTestConnectionButton": "Test connection",
+  "taxTestConnectionResultTitle": "Connection test result",
+  "taxTestConnectionDone": "Connection test completed",
+  "taxTestConnectionSuccess": "Connected to Modian successfully",
+  "taxTestConnectionWithWarnings": "Connected, but configuration warnings exist",
+  "taxTestConnectionIdentityFailed": "Possible key/certificate mismatch with Modian memory (error 4103)",
+  "taxTestConnectionJwtTitle": "Modian token claims",
+  "taxTestConnectionJwtSub": "Memory ID (sub)",
+  "taxTestConnectionJwtTaxpayer": "Taxpayer ID",
+  "taxTestConnectionMemoryMismatch": "Token memory ID does not match settings",
+  "taxTestConnectionEconomicMismatch": "Token taxpayer ID does not match economic code in settings",
+  "taxConfigurationWarningsTitle": "Modian configuration warnings",
+  "taxIdentityCheckTitle": "Signature identity check",
+  "taxSandboxModeActive": "Sandbox mode is enabled",
+
   "taxIntegrationTitle": "Tax system integration",
   "taxIntegrationSubtitle": "Manage credentials and keys required to connect to the national tax platform.",
+  "moadianPluginInactiveTitle": "Modian add-on is not active",
+  "moadianPluginInactiveMessage": "To use the tax workspace and submit invoices to the national platform, activate or purchase the Modian integration add-on from the marketplace.",
+  "moadianPluginGoToMarketplace": "Go to add-on marketplace",
+  "moadianPermissionView": "View Modian workspace",
+  "moadianPermissionOperate": "Send and operate Modian workspace",
+  "moadianPermissionManageSettings": "Manage Modian connection settings",
+  "moadianPermissionExportReports": "Export Modian submission reports",
+  "moadianMenuSection": "Modian tax system",
   "taxSettingsTabConnection": "Connection & basics",
   "taxSettingsTabKeys": "Keys & certificates",
   "taxSettingsTabDataQuality": "Data quality",
@@ -2552,6 +2685,31 @@
   "taxTechnicalDetailsTitle": "Technical details (raw response)",
   "taxNoErrorDetails": "No error details recorded.",
   "taxErrorCodeLabel": "Error code",
+
+  "taxCancelInModian": "Cancel in Modian",
+  "taxCancelInModianDialogTitle": "Cancel in tax system",
+  "taxCancelInModianDialogMessage": "Cancel invoice {code} in Modian?",
+  "@taxCancelInModianDialogMessage": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "taxCancelInModianSuccess": "Cancellation request sent to Modian.",
+  "taxSendCorrective": "Send corrective",
+  "taxSendCorrectiveDialogTitle": "Send corrective invoice",
+  "taxSendCorrectiveDialogMessage": "Send corrective invoice for {code} to Modian?",
+  "@taxSendCorrectiveDialogMessage": {
+    "placeholders": {
+      "code": {"type": "String"}
+    }
+  },
+  "taxSendCorrectiveSuccess": "Corrective invoice sent to Modian.",
+  "taxLinkReference": "Link reference invoice",
+  "taxLinkReferenceDialogTitle": "Select sales reference invoice",
+  "taxLinkReferenceSuccess": "Reference invoice linked.",
+  "taxLinkReferenceEmpty": "No submitted sales invoice found to link.",
+  "taxReferenceInvoiceColumn": "Reference invoice",
+  "taxCancelledInModianBadge": "Cancelled in Modian",
 
   "taxAddToWorkspaceSingle": "Add to tax workspace",
   "taxRemoveFromWorkspaceSingle": "Remove from tax workspace",

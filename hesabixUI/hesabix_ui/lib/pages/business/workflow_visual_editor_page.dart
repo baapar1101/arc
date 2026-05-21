@@ -108,10 +108,13 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
   }
 
   void _openPluginMarketplaceAndRefresh() {
+    final wfId = widget.workflow['id']?.toString();
+    final returnTo = wfId != null ? 'workflows/$wfId/edit' : 'workflows';
     BusinessNamedRoutes.pushNamed<void>(
       context,
       businessId: widget.businessId,
       routeName: 'business_plugin_marketplace',
+      queryParameters: {'returnTo': returnTo},
     ).then((_) {
       if (mounted) {
         _refreshBasalamMarketplaceStatus();

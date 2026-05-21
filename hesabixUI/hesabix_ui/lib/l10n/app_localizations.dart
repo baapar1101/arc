@@ -4478,6 +4478,388 @@ abstract class AppLocalizations {
   /// **'Plugin Marketplace'**
   String get pluginMarketplace;
 
+  /// No description provided for @pluginMarketplaceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Extend Hesabix with integrations and industry add-ons. Pay from your business wallet.'**
+  String get pluginMarketplaceSubtitle;
+
+  /// No description provided for @pluginMarketplaceBrowseTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Catalog'**
+  String get pluginMarketplaceBrowseTab;
+
+  /// No description provided for @pluginMarketplaceMyPluginsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'My add-ons'**
+  String get pluginMarketplaceMyPluginsTab;
+
+  /// No description provided for @pluginMarketplaceSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name or description…'**
+  String get pluginMarketplaceSearchHint;
+
+  /// No description provided for @pluginMarketplaceCategoryAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get pluginMarketplaceCategoryAll;
+
+  /// No description provided for @pluginMarketplaceCategoryIntegration.
+  ///
+  /// In en, this message translates to:
+  /// **'Integrations'**
+  String get pluginMarketplaceCategoryIntegration;
+
+  /// No description provided for @pluginMarketplaceCategoryOperations.
+  ///
+  /// In en, this message translates to:
+  /// **'Operations'**
+  String get pluginMarketplaceCategoryOperations;
+
+  /// No description provided for @pluginMarketplaceCategoryProductManagement.
+  ///
+  /// In en, this message translates to:
+  /// **'Products'**
+  String get pluginMarketplaceCategoryProductManagement;
+
+  /// No description provided for @pluginMarketplaceCategorySales.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales'**
+  String get pluginMarketplaceCategorySales;
+
+  /// No description provided for @pluginMarketplaceCategoryCrmMarketing.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM & marketing'**
+  String get pluginMarketplaceCategoryCrmMarketing;
+
+  /// No description provided for @pluginMarketplaceWalletBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Available wallet balance'**
+  String get pluginMarketplaceWalletBalance;
+
+  /// No description provided for @pluginMarketplaceWalletTopUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Top up wallet'**
+  String get pluginMarketplaceWalletTopUp;
+
+  /// No description provided for @pluginMarketplaceWalletLowBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance is below the cheapest plan. Top up before purchasing.'**
+  String get pluginMarketplaceWalletLowBalance;
+
+  /// No description provided for @pluginMarketplaceInvoicesLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Marketplace invoices'**
+  String get pluginMarketplaceInvoicesLink;
+
+  /// No description provided for @pluginMarketplaceEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No add-ons are available right now.'**
+  String get pluginMarketplaceEmpty;
+
+  /// No description provided for @pluginMarketplaceMyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You have not activated any add-ons yet.'**
+  String get pluginMarketplaceMyEmpty;
+
+  /// No description provided for @pluginMarketplaceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load the marketplace'**
+  String get pluginMarketplaceError;
+
+  /// No description provided for @pluginMarketplaceViewAndBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'View & purchase'**
+  String get pluginMarketplaceViewAndBuy;
+
+  /// No description provided for @pluginMarketplaceReadMore.
+  ///
+  /// In en, this message translates to:
+  /// **'Read more'**
+  String get pluginMarketplaceReadMore;
+
+  /// No description provided for @pluginMarketplaceReadLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Show less'**
+  String get pluginMarketplaceReadLess;
+
+  /// No description provided for @pluginMarketplaceFreeTrialDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Free trial · {days} days'**
+  String pluginMarketplaceFreeTrialDays(int days);
+
+  /// No description provided for @pluginMarketplaceStartTrial.
+  ///
+  /// In en, this message translates to:
+  /// **'Start free trial'**
+  String get pluginMarketplaceStartTrial;
+
+  /// No description provided for @pluginMarketplacePlanMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get pluginMarketplacePlanMonthly;
+
+  /// No description provided for @pluginMarketplacePlanYearly.
+  ///
+  /// In en, this message translates to:
+  /// **'Yearly'**
+  String get pluginMarketplacePlanYearly;
+
+  /// No description provided for @pluginMarketplacePlanLifetime.
+  ///
+  /// In en, this message translates to:
+  /// **'Lifetime'**
+  String get pluginMarketplacePlanLifetime;
+
+  /// No description provided for @pluginMarketplaceStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get pluginMarketplaceStatusActive;
+
+  /// No description provided for @pluginMarketplaceStatusInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Inactive'**
+  String get pluginMarketplaceStatusInactive;
+
+  /// No description provided for @pluginMarketplaceStatusExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get pluginMarketplaceStatusExpired;
+
+  /// No description provided for @pluginMarketplaceStatusTrialDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial · {days} days left'**
+  String pluginMarketplaceStatusTrialDays(int days);
+
+  /// No description provided for @pluginMarketplaceStatusTrialExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial ended'**
+  String get pluginMarketplaceStatusTrialExpired;
+
+  /// No description provided for @pluginMarketplacePlanPurchased.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchased'**
+  String get pluginMarketplacePlanPurchased;
+
+  /// No description provided for @pluginMarketplacePlanCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current plan'**
+  String get pluginMarketplacePlanCurrent;
+
+  /// No description provided for @pluginMarketplacePopularPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Popular'**
+  String get pluginMarketplacePopularPlan;
+
+  /// No description provided for @pluginMarketplaceEquivalentMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'~{amount} / month'**
+  String pluginMarketplaceEquivalentMonthly(String amount);
+
+  /// No description provided for @pluginMarketplaceSavingsPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Save {percent}% vs monthly'**
+  String pluginMarketplaceSavingsPercent(int percent);
+
+  /// No description provided for @pluginMarketplaceConfirmPurchaseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm purchase'**
+  String get pluginMarketplaceConfirmPurchaseTitle;
+
+  /// No description provided for @pluginMarketplaceConfirmPurchasePlugin.
+  ///
+  /// In en, this message translates to:
+  /// **'Add-on'**
+  String get pluginMarketplaceConfirmPurchasePlugin;
+
+  /// No description provided for @pluginMarketplaceConfirmPurchasePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Plan'**
+  String get pluginMarketplaceConfirmPurchasePlan;
+
+  /// No description provided for @pluginMarketplaceConfirmPurchaseAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get pluginMarketplaceConfirmPurchaseAmount;
+
+  /// No description provided for @pluginMarketplaceConfirmWalletBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Wallet balance'**
+  String get pluginMarketplaceConfirmWalletBalance;
+
+  /// No description provided for @pluginMarketplaceConfirmPay.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm & pay'**
+  String get pluginMarketplaceConfirmPay;
+
+  /// No description provided for @pluginMarketplaceInsufficientFundsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient balance'**
+  String get pluginMarketplaceInsufficientFundsTitle;
+
+  /// No description provided for @pluginMarketplaceInsufficientFundsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Required: {required} · Available: {available} · Shortfall: {shortfall}'**
+  String pluginMarketplaceInsufficientFundsBody(
+    String required,
+    String available,
+    String shortfall,
+  );
+
+  /// No description provided for @pluginMarketplaceGoToWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to wallet'**
+  String get pluginMarketplaceGoToWallet;
+
+  /// No description provided for @pluginMarketplacePurchaseSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase completed successfully'**
+  String get pluginMarketplacePurchaseSuccess;
+
+  /// No description provided for @pluginMarketplaceConfigurePlugin.
+  ///
+  /// In en, this message translates to:
+  /// **'Open add-on settings'**
+  String get pluginMarketplaceConfigurePlugin;
+
+  /// No description provided for @pluginMarketplaceReturnToPrevious.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to previous page'**
+  String get pluginMarketplaceReturnToPrevious;
+
+  /// No description provided for @pluginMarketplacePaymentFromWallet.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid from business wallet'**
+  String get pluginMarketplacePaymentFromWallet;
+
+  /// No description provided for @pluginMarketplaceRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get pluginMarketplaceRetry;
+
+  /// No description provided for @pluginMarketplaceNoPermissionView.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to view the marketplace.'**
+  String get pluginMarketplaceNoPermissionView;
+
+  /// No description provided for @pluginMarketplaceNoPermissionBuy.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to purchase add-ons.'**
+  String get pluginMarketplaceNoPermissionBuy;
+
+  /// No description provided for @pluginMarketplaceNoPlansHidden.
+  ///
+  /// In en, this message translates to:
+  /// **'Some add-ons are hidden because they have no active plans.'**
+  String get pluginMarketplaceNoPlansHidden;
+
+  /// No description provided for @pluginMarketplaceExpiresAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Expires: {date}'**
+  String pluginMarketplaceExpiresAt(String date);
+
+  /// No description provided for @pluginMarketplaceTrialProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial progress'**
+  String get pluginMarketplaceTrialProgress;
+
+  /// No description provided for @pluginMarketplaceComparePlans.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a plan'**
+  String get pluginMarketplaceComparePlans;
+
+  /// No description provided for @pluginMarketplacePerMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'/ month'**
+  String get pluginMarketplacePerMonth;
+
+  /// No description provided for @pluginMarketplacePluginCodeSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support code: {code}'**
+  String pluginMarketplacePluginCodeSupport(String code);
+
+  /// No description provided for @pluginMarketplaceRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get pluginMarketplaceRefresh;
+
+  /// No description provided for @pluginMarketplaceTrialSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Free trial started'**
+  String get pluginMarketplaceTrialSuccess;
+
+  /// No description provided for @pluginMarketplaceDetailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add-on details'**
+  String get pluginMarketplaceDetailTitle;
+
+  /// No description provided for @pluginMarketplaceFromPrice.
+  ///
+  /// In en, this message translates to:
+  /// **'From {price}'**
+  String pluginMarketplaceFromPrice(String price);
+
+  /// No description provided for @pluginMarketplaceBuyDisabledTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'You need marketplace purchase permission'**
+  String get pluginMarketplaceBuyDisabledTooltip;
+
+  /// No description provided for @pluginMarketplaceActiveCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} active'**
+  String pluginMarketplaceActiveCount(int count);
+
   /// No description provided for @practicalTools.
   ///
   /// In en, this message translates to:
@@ -12362,6 +12744,90 @@ abstract class AppLocalizations {
   /// **'Review invoices before sending them to the tax system.'**
   String get taxWorkspaceSubtitle;
 
+  /// No description provided for @taxTestConnectionButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get taxTestConnectionButton;
+
+  /// No description provided for @taxTestConnectionResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test result'**
+  String get taxTestConnectionResultTitle;
+
+  /// No description provided for @taxTestConnectionDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection test completed'**
+  String get taxTestConnectionDone;
+
+  /// No description provided for @taxTestConnectionSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected to Modian successfully'**
+  String get taxTestConnectionSuccess;
+
+  /// No description provided for @taxTestConnectionWithWarnings.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected, but configuration warnings exist'**
+  String get taxTestConnectionWithWarnings;
+
+  /// No description provided for @taxTestConnectionIdentityFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Possible key/certificate mismatch with Modian memory (error 4103)'**
+  String get taxTestConnectionIdentityFailed;
+
+  /// No description provided for @taxTestConnectionJwtTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Modian token claims'**
+  String get taxTestConnectionJwtTitle;
+
+  /// No description provided for @taxTestConnectionJwtSub.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory ID (sub)'**
+  String get taxTestConnectionJwtSub;
+
+  /// No description provided for @taxTestConnectionJwtTaxpayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Taxpayer ID'**
+  String get taxTestConnectionJwtTaxpayer;
+
+  /// No description provided for @taxTestConnectionMemoryMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Token memory ID does not match settings'**
+  String get taxTestConnectionMemoryMismatch;
+
+  /// No description provided for @taxTestConnectionEconomicMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Token taxpayer ID does not match economic code in settings'**
+  String get taxTestConnectionEconomicMismatch;
+
+  /// No description provided for @taxConfigurationWarningsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Modian configuration warnings'**
+  String get taxConfigurationWarningsTitle;
+
+  /// No description provided for @taxIdentityCheckTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Signature identity check'**
+  String get taxIdentityCheckTitle;
+
+  /// No description provided for @taxSandboxModeActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Sandbox mode is enabled'**
+  String get taxSandboxModeActive;
+
   /// No description provided for @taxIntegrationTitle.
   ///
   /// In en, this message translates to:
@@ -12373,6 +12839,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage credentials and keys required to connect to the national tax platform.'**
   String get taxIntegrationSubtitle;
+
+  /// No description provided for @moadianPluginInactiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Modian add-on is not active'**
+  String get moadianPluginInactiveTitle;
+
+  /// No description provided for @moadianPluginInactiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'To use the tax workspace and submit invoices to the national platform, activate or purchase the Modian integration add-on from the marketplace.'**
+  String get moadianPluginInactiveMessage;
+
+  /// No description provided for @moadianPluginGoToMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to add-on marketplace'**
+  String get moadianPluginGoToMarketplace;
+
+  /// No description provided for @moadianPermissionView.
+  ///
+  /// In en, this message translates to:
+  /// **'View Modian workspace'**
+  String get moadianPermissionView;
+
+  /// No description provided for @moadianPermissionOperate.
+  ///
+  /// In en, this message translates to:
+  /// **'Send and operate Modian workspace'**
+  String get moadianPermissionOperate;
+
+  /// No description provided for @moadianPermissionManageSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage Modian connection settings'**
+  String get moadianPermissionManageSettings;
+
+  /// No description provided for @moadianPermissionExportReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Export Modian submission reports'**
+  String get moadianPermissionExportReports;
+
+  /// No description provided for @moadianMenuSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Modian tax system'**
+  String get moadianMenuSection;
 
   /// No description provided for @taxSettingsTabConnection.
   ///
@@ -12957,28 +13471,136 @@ abstract class AppLocalizations {
   String get taxValidationIssuesLineNumber;
 
   /// No description provided for @taxSubmissionFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax submission failed'**
   String get taxSubmissionFailedTitle;
 
   /// No description provided for @taxSubmissionFailedDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The tax authority rejected this invoice. Error details and the authority response are shown below.'**
   String get taxSubmissionFailedDescription;
 
   /// No description provided for @taxViewFailureDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View error details'**
   String get taxViewFailureDetails;
 
   /// No description provided for @taxErrorMessageColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Error message'**
   String get taxErrorMessageColumn;
 
   /// No description provided for @taxMoadianResponseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax authority response'**
   String get taxMoadianResponseTitle;
 
   /// No description provided for @taxTechnicalDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Technical details (raw response)'**
   String get taxTechnicalDetailsTitle;
 
   /// No description provided for @taxNoErrorDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'No error details recorded.'**
   String get taxNoErrorDetails;
 
   /// No description provided for @taxErrorCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Error code'**
   String get taxErrorCodeLabel;
+
+  /// No description provided for @taxCancelInModian.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel in Modian'**
+  String get taxCancelInModian;
+
+  /// No description provided for @taxCancelInModianDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel in tax system'**
+  String get taxCancelInModianDialogTitle;
+
+  /// No description provided for @taxCancelInModianDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel invoice {code} in Modian?'**
+  String taxCancelInModianDialogMessage(String code);
+
+  /// No description provided for @taxCancelInModianSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancellation request sent to Modian.'**
+  String get taxCancelInModianSuccess;
+
+  /// No description provided for @taxSendCorrective.
+  ///
+  /// In en, this message translates to:
+  /// **'Send corrective'**
+  String get taxSendCorrective;
+
+  /// No description provided for @taxSendCorrectiveDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Send corrective invoice'**
+  String get taxSendCorrectiveDialogTitle;
+
+  /// No description provided for @taxSendCorrectiveDialogMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Send corrective invoice for {code} to Modian?'**
+  String taxSendCorrectiveDialogMessage(String code);
+
+  /// No description provided for @taxSendCorrectiveSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Corrective invoice sent to Modian.'**
+  String get taxSendCorrectiveSuccess;
+
+  /// No description provided for @taxLinkReference.
+  ///
+  /// In en, this message translates to:
+  /// **'Link reference invoice'**
+  String get taxLinkReference;
+
+  /// No description provided for @taxLinkReferenceDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select sales reference invoice'**
+  String get taxLinkReferenceDialogTitle;
+
+  /// No description provided for @taxLinkReferenceSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference invoice linked.'**
+  String get taxLinkReferenceSuccess;
+
+  /// No description provided for @taxLinkReferenceEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No submitted sales invoice found to link.'**
+  String get taxLinkReferenceEmpty;
+
+  /// No description provided for @taxReferenceInvoiceColumn.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference invoice'**
+  String get taxReferenceInvoiceColumn;
+
+  /// No description provided for @taxCancelledInModianBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled in Modian'**
+  String get taxCancelledInModianBadge;
 
   /// No description provided for @taxAddToWorkspaceSingle.
   ///

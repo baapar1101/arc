@@ -760,18 +760,30 @@ def update_product(
         min_order_qty=payload.min_order_qty,
         lead_time_days=payload.lead_time_days,
         inventory_mode=payload.inventory_mode if 'inventory_mode' in fields_set else None,
-        track_serial=payload.track_serial if 'track_serial' in fields_set else None,
-        track_barcode=payload.track_barcode if 'track_barcode' in fields_set else None,
-        is_sales_taxable=payload.is_sales_taxable,
-        is_purchase_taxable=payload.is_purchase_taxable,
+        track_serial=(
+            payload.track_serial if payload.track_serial is not None else False
+        ) if 'track_serial' in fields_set else None,
+        track_barcode=(
+            payload.track_barcode if payload.track_barcode is not None else False
+        ) if 'track_barcode' in fields_set else None,
+        is_sales_taxable=(
+            payload.is_sales_taxable if payload.is_sales_taxable is not None else False
+        ) if 'is_sales_taxable' in fields_set else None,
+        is_purchase_taxable=(
+            payload.is_purchase_taxable if payload.is_purchase_taxable is not None else False
+        ) if 'is_purchase_taxable' in fields_set else None,
         sales_tax_rate=payload.sales_tax_rate,
         purchase_tax_rate=payload.purchase_tax_rate,
         tax_type_id=payload.tax_type_id,
         tax_code=payload.tax_code,
         tax_unit_id=payload.tax_unit_id,
         image_file_id=payload.image_file_id if 'image_file_id' in fields_set else None,
-        is_active=payload.is_active if 'is_active' in fields_set else None,
-        is_public_catalog=payload.is_public_catalog if 'is_public_catalog' in fields_set else None,
+        is_active=(
+            payload.is_active if payload.is_active is not None else True
+        ) if 'is_active' in fields_set else None,
+        is_public_catalog=(
+            payload.is_public_catalog if payload.is_public_catalog is not None else False
+        ) if 'is_public_catalog' in fields_set else None,
         default_warehouse_id=(
             None if item_type == ProductItemType.SERVICE.value
             else (

@@ -90,7 +90,12 @@ def upsert_tax_setting(
     return setting
 
 
-def serialize_tax_setting(setting: TaxSetting | None, business_id: int) -> Dict[str, Any]:
+def serialize_tax_setting(
+    setting: TaxSetting | None,
+    business_id: int,
+    *,
+    db: Session | None = None,
+) -> Dict[str, Any]:
     """
     سریالایز کردن تنظیمات مالیاتی برای API response
     کلید خصوصی به صورت خودکار رمزگشایی می‌شود
@@ -107,6 +112,8 @@ def serialize_tax_setting(setting: TaxSetting | None, business_id: int) -> Dict[
             "sandbox_mode": False,
             "has_private_key": False,
             "updated_at": None,
+            "configuration_warnings": [],
+            "identity_check": None,
         }
 
     # رمزگشایی کلید خصوصی برای نمایش
@@ -116,6 +123,16 @@ def serialize_tax_setting(setting: TaxSetting | None, business_id: int) -> Dict[
             private_key = decrypt_private_key(private_key)
         except Exception:
             pass
+
+    from app.services.tax_setting_health_service import (
+        build_configuration_warnings,
+        build_identity_check,
+    )
+
+    warnings = build_configuration_warnings(setting)
+    identity_check = None
+    if db is not None:
+        identity_check = build_identity_check(db, int(business_id))
 
     return {
         "business_id": int(setting.business_id),
@@ -128,6 +145,8 @@ def serialize_tax_setting(setting: TaxSetting | None, business_id: int) -> Dict[
         "sandbox_mode": bool(setting.sandbox_mode),
         "has_private_key": bool(setting.private_key),
         "updated_at": setting.updated_at.isoformat() if setting.updated_at else None,
+        "configuration_warnings": warnings,
+        "identity_check": identity_check,
     }
 
 

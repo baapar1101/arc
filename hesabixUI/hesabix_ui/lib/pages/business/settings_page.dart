@@ -218,6 +218,26 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  bool _isMoadianPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'moadian_tax_integration',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  bool _canAccessMoadianSettings() {
+    final authStore = _authStore;
+    if (authStore == null) return false;
+    if (!_isMoadianPluginActive()) return false;
+    if (authStore.currentBusiness?.isOwner == true) return true;
+    return authStore.hasBusinessPermission('moadian', 'manage_settings');
+  }
+
   bool _canAccessWooCommerceSettings() {
     final authStore = _authStore;
     if (authStore == null) return false;
@@ -429,13 +449,14 @@ class _SettingsPageState extends State<SettingsPage> {
                                   icon: Icons.receipt_long_outlined,
                                   onTap: () => context.push('/business/${widget.businessId}/document-monetization'),
                                 ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.taxIntegrationTitle,
-                                  subtitle: t.taxIntegrationSubtitle,
-                                  icon: Icons.cloud_sync_outlined,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/tax'),
-                                ),
+                                if (_canAccessMoadianSettings())
+                                  _buildSettingItem(
+                                    context,
+                                    title: t.taxIntegrationTitle,
+                                    subtitle: t.taxIntegrationSubtitle,
+                                    icon: Icons.cloud_sync_outlined,
+                                    onTap: () => context.push('/business/${widget.businessId}/settings/tax'),
+                                  ),
                                 if (_canAccessWarrantySettings())
                                   _buildSettingItem(
                                     context,
@@ -769,13 +790,14 @@ class _SettingsPageState extends State<SettingsPage> {
                             icon: Icons.receipt_long_outlined,
                             onTap: () => context.push('/business/${widget.businessId}/document-monetization'),
                           ),
-                          _buildSettingItem(
-                            context,
-                            title: t.taxIntegrationTitle,
-                            subtitle: t.taxIntegrationSubtitle,
-                            icon: Icons.cloud_sync_outlined,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/tax'),
-                          ),
+                          if (_canAccessMoadianSettings())
+                            _buildSettingItem(
+                              context,
+                              title: t.taxIntegrationTitle,
+                              subtitle: t.taxIntegrationSubtitle,
+                              icon: Icons.cloud_sync_outlined,
+                              onTap: () => context.push('/business/${widget.businessId}/settings/tax'),
+                            ),
                           if (_canAccessWarrantySettings())
                             _buildSettingItem(
                               context,

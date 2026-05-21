@@ -435,11 +435,14 @@ class ProductRepository(BaseRepository[Product]):
             "base_purchase_price",
             "general_barcodes",
         }
-        # فیلدهای بولی باید مقدار False هم ذخیره شود (نه فقط True)
+        # فیلدهای بولی NOT NULL: فقط با مقدار bool واقعی به‌روزرسانی شوند (None = بدون تغییر)
         boolean_fields = {"is_public_catalog", "is_active", "track_inventory", "track_serial", "track_barcode", "is_sales_taxable", "is_purchase_taxable"}
         for k, v in data.items():
             if hasattr(obj, k):
-                if k in nullable_overrides or k in boolean_fields:
+                if k in boolean_fields:
+                    if v is not None:
+                        setattr(obj, k, v)
+                elif k in nullable_overrides:
                     setattr(obj, k, v)
                 elif v is not None:
                     setattr(obj, k, v)

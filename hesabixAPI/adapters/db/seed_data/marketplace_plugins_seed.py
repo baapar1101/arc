@@ -113,6 +113,19 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		plans=(("monthly", 200_000), ("yearly", 2_000_000)),
 	),
 	_PluginSeed(
+		code="moadian_tax_integration",
+		name="اتصال به سامانه مودیان",
+		description=(
+			"ارسال صورت‌حساب الکترونیکی به سامانه مودیان: کارپوشه مالیاتی، "
+			"تنظیمات کلید و گواهی، ارسال/ابطال/اصلاحی، استعلام وضعیت و گزارش ارسال‌ها."
+		),
+		category="integration",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 350_000), ("yearly", 3_500_000), ("lifetime", 12_000_000)),
+	),
+	_PluginSeed(
 		code="customer_club",
 		name="باشگاه مشتریان",
 		description=(
@@ -214,6 +227,14 @@ def ensure_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
 			)
 			created_plans += 1
 
+	grandfather_result: Dict[str, Any] = {}
+	try:
+		from app.services.moadian_grandfather_service import grant_moadian_grandfather_licenses
+
+		grandfather_result = grant_moadian_grandfather_licenses(db)
+	except Exception as exc:  # noqa: BLE001
+		grandfather_result = {"ok": False, "error": str(exc)}
+
 	return {
 		"ok": True,
 		"currency_id": currency_id,
@@ -222,4 +243,5 @@ def ensure_default_marketplace_plugins(db: Session) -> Dict[str, Any]:
 		"plugins_updated": updated_plugins,
 		"plans_created": created_plans,
 		"plans_reactivated": reactivated_plans,
+		"moadian_grandfather": grandfather_result,
 	}

@@ -112,8 +112,12 @@ def auto_inquire_pending_invoices(
     all_results: List[Dict[str, Any]] = []
     
     # استعلام برای هر کسب‌وکار
+    from app.core.moadian_plugin_dependency import check_moadian_plugin_active
+
     for bid, docs in by_business.items():
         try:
+            if not check_moadian_plugin_active(db, bid):
+                continue
             # دریافت تنظیمات مالیاتی
             tax_setting = (
                 db.query(TaxSetting)
