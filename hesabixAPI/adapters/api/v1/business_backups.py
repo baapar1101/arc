@@ -28,6 +28,25 @@ import logging
 from app.services.job_manager import JobManager
 from adapters.api.v1.business_ftp_backup import assert_can_use_ftp_on_backup, upload_saved_backup_to_ftp
 from app.services.business_ftp_service import load_decrypted_params
+from app.services.business_backup_financial_policy import (
+    build_backup_metadata,
+    compute_backup_checksum,
+    finalize_financial_state_after_restore,
+    guard_new_business_import,
+    is_backup_excluded_table,
+    register_backup_import,
+    validate_backup_owner,
+)
+from app.services.business_backup_schema_compat import (
+    analyze_schema_diff,
+    backup_columns_for_table,
+    build_table_restore_plan,
+    build_table_schemas_snapshot,
+    iter_jsonl_rows,
+    load_table_column_meta,
+    log_restore_plan_warnings,
+    validate_row_for_insert,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +172,19 @@ def _json_default(o: Any):
     return str(o)
 
 
+def _read_first_business_row_from_zip(zf: zipfile.ZipFile) -> Dict[str, Any] | None:
+    """اولین ردیف businesses.jsonl برای اعتبارسنجی مالک بکاپ‌های قدیمی."""
+    try:
+        with zf.open("tables/businesses.jsonl", "r") as f:
+            for raw in f:
+                if not raw:
+                    continue
+                return json.loads(raw.decode("utf-8"))
+    except KeyError:
+        return None
+    return None
+
+
 def _try_set_session_replication_role_replica(conn) -> bool:
     """
     تلاش برای SET session_replication_role=replica (غیرفعال موقت بررسی FK در PG).
@@ -257,6 +289,82 @@ def _build_insert_params_for_restore(
     return params
 
 
+def _insert_table_from_backup_zip(
+    conn,
+    zf: zipfile.ZipFile,
+    *,
+    table: str,
+    metadata: Dict[str, Any],
+    tables_info: Dict[str, Dict[str, Any]],
+    schema_inspector,
+    new_business_id: int,
+    mode: str,
+    json_cols_cache: Dict[str, set[str]],
+    column_meta_cache: Dict[str, Dict[str, Any]],
+) -> None:
+    """درج ردیف‌های یک جدول از jsonl با سازگاری مبتنی بر اسکیمای DB."""
+    col_list = tables_info[table]["columns"]
+    pk_omit = (
+        _pk_columns_to_omit_for_new_business(schema_inspector, table)
+        if mode == "new_business"
+        else []
+    )
+    preview_rows = iter_jsonl_rows(zf, table)
+    backup_cols = backup_columns_for_table(table, metadata, preview_rows)
+    if table not in column_meta_cache:
+        column_meta_cache[table] = load_table_column_meta(schema_inspector, table, conn)
+    table_meta = column_meta_cache[table]
+    restore_plan = build_table_restore_plan(
+        table, col_list, backup_cols, pk_omit, table_meta
+    )
+    log_restore_plan_warnings(restore_plan)
+    insert_col_list = restore_plan.insert_columns
+    if not insert_col_list:
+        return
+
+    placeholders = ", ".join([f":{c}" for c in insert_col_list])
+    columns_sql = ", ".join([f'"{c}"' for c in insert_col_list])
+    if mode == "new_business":
+        insert_sql = text(
+            f'INSERT INTO "{table}" ({columns_sql}) VALUES ({placeholders}) ON CONFLICT DO NOTHING'
+        )
+    else:
+        insert_sql = text(f'INSERT INTO "{table}" ({columns_sql}) VALUES ({placeholders})')
+
+    validation_logged = False
+    batch: List[Dict[str, Any]] = []
+    with zf.open(f"tables/{table}.jsonl", "r") as f:
+        for raw in f:
+            if not raw:
+                continue
+            rec = json.loads(raw.decode("utf-8"))
+            if "business_id" in rec:
+                rec["business_id"] = new_business_id
+            for _pkc in pk_omit:
+                if _pkc in rec:
+                    del rec[_pkc]
+            rec = restore_plan.enrich_row(rec)
+            if not validation_logged:
+                row_issues = validate_row_for_insert(table, rec, restore_plan)
+                for issue in row_issues[:5]:
+                    logger.warning("backup_restore validation: %s", issue)
+                validation_logged = True
+            params = _build_insert_params_for_restore(
+                schema_inspector,
+                table,
+                insert_col_list,
+                rec,
+                json_cols_cache,
+            )
+            batch.append(params)
+            if len(batch) >= 500:
+                conn.execute(insert_sql, batch)
+                batch.clear()
+
+    if batch:
+        conn.execute(insert_sql, batch)
+
+
 def _pk_columns_to_omit_for_new_business(inspector, table: str) -> List[str]:
     """
     در حالت new_business فقط ستون‌های PK خودکار (serial/identity) را از INSERT حذف می‌کنیم تا
@@ -314,18 +422,25 @@ def _discover_scoped_tables(db: Session) -> Dict[str, Dict[str, Any]]:
 def _dump_business_data(db: Session, business_id: int) -> Dict[str, Any]:
     """
     داده‌های tenant-scoped را به‌صورت پویا با شرط business_id استخراج می‌کند.
+    جداول مالی/اعتباری (کیف پول، اشتراک AI، …) در بکاپ قرار نمی‌گیرند.
     خروجی: { metadata, tables: {table: [rows...] } }
     """
+    from adapters.db.models.business import Business
+
     tables = _discover_scoped_tables(db)
-    engine = db.get_bind()
     data_out: Dict[str, List[Dict[str, Any]]] = {}
+    owner_id: int | None = None
+    biz = db.get(Business, int(business_id))
+    if biz is not None:
+        owner_id = getattr(biz, "owner_id", None)
 
     for table_name, meta in tables.items():
+        if is_backup_excluded_table(table_name):
+            continue
         if table_name == "businesses":
             stmt = text(f"SELECT * FROM {table_name} WHERE id = :bid")
             rows = [dict(r._mapping) for r in db.execute(stmt, {"bid": business_id}).all()]
         else:
-            # جداولی که ستون business_id دارند
             stmt = text(f"SELECT * FROM {table_name} WHERE business_id = :bid")
             try:
                 rows = [dict(r._mapping) for r in db.execute(stmt, {"bid": business_id}).all()]
@@ -333,12 +448,13 @@ def _dump_business_data(db: Session, business_id: int) -> Dict[str, Any]:
                 rows = []
         data_out[table_name] = rows
 
-    metadata = {
-        "schema_version": "v1",
-        "created_at": datetime.utcnow().isoformat(),
-        "business_id": business_id,
-        "tables": list(data_out.keys()),
-    }
+    table_schemas = build_table_schemas_snapshot(tables, data_out)
+    metadata = build_backup_metadata(
+        business_id=int(business_id),
+        table_names=data_out.keys(),
+        owner_id=owner_id,
+        table_schemas=table_schemas,
+    )
     return {"metadata": metadata, "tables": data_out}
 
 
@@ -954,6 +1070,20 @@ async def restore_backup(
                             raise ApiError("INVALID_BACKUP", "metadata.json not found in backup")
 
                         snapshot_business_id = metadata.get("business_id")
+                        backup_business_row = _read_first_business_row_from_zip(zf)
+                        validate_backup_owner(
+                            metadata,
+                            ctx.get_user_id(),
+                            db=db,
+                            backup_business_row=backup_business_row,
+                        )
+                        backup_checksum = compute_backup_checksum(zip_bytes)
+                        guard_new_business_import(
+                            db,
+                            user_id=ctx.get_user_id(),
+                            backup_checksum=backup_checksum,
+                            import_mode=mode,
+                        )
                         if mode == "replace" and int(business_id) != int(snapshot_business_id):
                             raise ApiError("BUSINESS_MISMATCH", "Backup belongs to a different business")
                         
@@ -1012,7 +1142,11 @@ async def restore_backup(
                                 raise ApiError("BUSINESS_CREATION_FAILED", f"Failed to create new business: {str(e)}")
 
                         tables_info = _discover_scoped_tables(db)
-                        target_tables = [t for t in tables_info.keys() if t != "businesses"]
+                        target_tables = [
+                            t
+                            for t in tables_info.keys()
+                            if t != "businesses" and not is_backup_excluded_table(t)
+                        ]
                         target_tables = _sort_tables_for_insert_by_fks(db.get_bind(), target_tables)
 
                         conn = db.connection()
@@ -1056,71 +1190,51 @@ async def restore_backup(
 
                             # Insert data for other tables
                             jm.update(job_id, 70, "Restoring data")
-                            
+                            column_meta_cache: Dict[str, Dict[str, Any]] = {}
+                            for _t in target_tables:
+                                if _t not in column_meta_cache:
+                                    column_meta_cache[_t] = load_table_column_meta(
+                                        schema_inspector, _t, conn
+                                    )
+                            analyze_schema_diff(
+                                metadata, tables_info, target_tables, column_meta_cache
+                            )
+
                             for table in target_tables:
                                 try:
-                                    zinfo = zf.getinfo(f"tables/{table}.jsonl")
+                                    zf.getinfo(f"tables/{table}.jsonl")
                                 except KeyError:
                                     continue
-                                col_list = tables_info[table]["columns"]
-                                
-                                # new_business: فقط PKهای عددی خودکار را حذف می‌کنیم؛ PK رشته/UUID حفظ می‌شود (مثل file_storage)
-                                pk_omit = (
-                                    _pk_columns_to_omit_for_new_business(schema_inspector, table)
-                                    if mode == "new_business"
-                                    else []
-                                )
-                                insert_col_list = col_list.copy()
-                                for _pkc in pk_omit:
-                                    if _pkc in insert_col_list:
-                                        insert_col_list.remove(_pkc)
-                                
-                                placeholders = ", ".join([f":{c}" for c in insert_col_list])
-                                columns_sql = ", ".join([f'"{c}"' for c in insert_col_list])  # PostgreSQL uses double quotes
-                                
-                                # PostgreSQL: ON CONFLICT DO NOTHING (works for any unique constraint)
-                                if mode == "new_business":
-                                    insert_sql = text(f'INSERT INTO "{table}" ({columns_sql}) VALUES ({placeholders}) ON CONFLICT DO NOTHING')
-                                else:
-                                    insert_sql = text(f'INSERT INTO "{table}" ({columns_sql}) VALUES ({placeholders})')
-                                
-                                batch: List[Dict[str, Any]] = []
-                                with zf.open(f"tables/{table}.jsonl", "r") as f:
-                                    for raw in f:
-                                        if not raw:
-                                            continue
-                                        rec = json.loads(raw.decode("utf-8"))
-                                        if "business_id" in rec:
-                                            rec["business_id"] = new_business_id
-                                        
-                                        for _pkc in pk_omit:
-                                            if _pkc in rec:
-                                                del rec[_pkc]
-                                        
-                                        params = _build_insert_params_for_restore(
-                                            schema_inspector,
-                                            table,
-                                            insert_col_list,
-                                            rec,
-                                            json_cols_cache,
-                                        )
-                                        batch.append(params)
-                                        if len(batch) >= 500:
-                                            try:
-                                                conn.execute(insert_sql, batch)
-                                            except Exception as e:
-                                                logger.error(f"Error inserting batch into {table}: {e}")
-                                                raise
-                                            batch.clear()
-                                
-                                if batch:
-                                    try:
-                                        conn.execute(insert_sql, batch)
-                                    except Exception as e:
-                                        logger.error(f"Error inserting final batch into {table}: {e}")
-                                        raise
+                                try:
+                                    _insert_table_from_backup_zip(
+                                        conn,
+                                        zf,
+                                        table=table,
+                                        metadata=metadata,
+                                        tables_info=tables_info,
+                                        schema_inspector=schema_inspector,
+                                        new_business_id=new_business_id,
+                                        mode=mode,
+                                        json_cols_cache=json_cols_cache,
+                                        column_meta_cache=column_meta_cache,
+                                    )
+                                except Exception as e:
+                                    logger.error("Error restoring table %s: %s", table, e)
+                                    raise
 
                             _reset_session_replication_role(conn, replica_role_ok)
+
+                            jm.update(job_id, 85, "Resetting financial state")
+                            finalize_financial_state_after_restore(db, new_business_id)
+                            if mode == "new_business":
+                                register_backup_import(
+                                    db,
+                                    user_id=ctx.get_user_id(),
+                                    backup_checksum=backup_checksum,
+                                    import_mode=mode,
+                                    source_business_id=int(snapshot_business_id) if snapshot_business_id else None,
+                                    target_business_id=new_business_id,
+                                )
                         except Exception as e:
                             db.rollback()
                             _reset_session_replication_role(conn, replica_role_ok)

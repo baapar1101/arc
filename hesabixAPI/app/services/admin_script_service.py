@@ -34,6 +34,29 @@ SCRIPT_DEFINITIONS: List[Dict[str, Any]] = [
 		},
 	},
 	{
+		"key": "cleanup_orphan_backup_businesses",
+		"title": "پاک‌سازی کسب‌وکارهای یتیم import بکاپ",
+		"description": (
+			"حذف کسب‌وکارهایی که از import/restore بکاپ نیمه‌کاره مانده‌اند "
+			"(ثبت‌نشده در business_backup_import_logs یا داده tenant بسیار کم + الگوی نام). "
+			"پیش‌فرض dry_run؛ برای حذف واقعی dry_run=false."
+		),
+		"supports_dry_run": True,
+		"default_params": {
+			"business_id": None,
+			"owner_id": None,
+			"min_age_hours": 1,
+			"limit": None,
+			"require_not_in_import_log": True,
+			"require_backup_name_marker": True,
+			"include_empty_shell": True,
+			"name_substring": "بازیابی شده",
+			"max_documents": 0,
+			"max_persons": 0,
+			"max_products": 0,
+		},
+	},
+	{
 		"key": "remove_orphan_invoice_receipt_payment_documents",
 		"title": "اصلاح اسناد دریافت/پرداخت رها شدهٔ فاکتور",
 		"description": (
@@ -184,6 +207,8 @@ def _execute_script_run(run_id: int) -> None:
 				stats = _run_fix_expense_income_refs(db, run)
 			elif run.script_key == "remove_orphan_invoice_receipt_payment_documents":
 				stats = _run_remove_orphan_invoice_receipt_payments(db, run)
+			elif run.script_key == "cleanup_orphan_backup_businesses":
+				stats = _run_cleanup_orphan_backup_businesses(db, run)
 			else:
 				raise ApiError("SCRIPT_NOT_IMPLEMENTED", "Script implementation not found", http_status=500)
 
@@ -565,5 +590,36 @@ def _run_remove_orphan_invoice_receipt_payments(db: Session, run: AdminScriptRun
 		),
 	)
 	db.commit()
+	return stats
+
+
+def _run_cleanup_orphan_backup_businesses(db: Session, run: AdminScriptRun) -> Dict[str, Any]:
+	from app.services.business_backup_orphan_cleanup_service import run_orphan_backup_business_cleanup
+
+	params = run.params_json or {}
+	dry_run = bool(run.dry_run)
+
+	def log_fn(level: str, message: str) -> None:
+		_append_log(db, run.id, level, message)
+		db.flush()
+
+	_append_log(db, run.id, "info", f"شروع پاک‌سازی کسب‌وکار یتیم بکاپ (dry_run={dry_run})")
+	db.flush()
+
+	current = db.query(AdminScriptRun).filter(AdminScriptRun.id == run.id).first()
+	if current and current.status == "cancelled":
+		return {"scanned": 0, "updated_lines": 0, "errors": 0, "cancelled": True}
+
+	stats = run_orphan_backup_business_cleanup(db, params, dry_run=dry_run, log_fn=log_fn)
+	if not dry_run:
+		db.commit()
+	stats["scanned"] = int(stats.get("scanned", 0))
+	_append_log(
+		db,
+		run.id,
+		"info",
+		f"پایان: کاندید={stats.get('scanned')} حذف/شبیه‌سازی={stats.get('deleted_count', 0)} خطا={stats.get('errors', 0)}",
+	)
+	db.flush()
 	return stats
 

@@ -286,7 +286,29 @@ async def import_business_from_backup(
                         original_business = business_rows[0]
                     except KeyError:
                         raise ApiError("INVALID_BACKUP", "tables/businesses.jsonl در فایل پشتیبان یافت نشد", http_status=400)
-                    
+
+                    from app.services.business_backup_financial_policy import (
+                        compute_backup_checksum,
+                        finalize_financial_state_after_restore,
+                        guard_new_business_import,
+                        register_backup_import,
+                        validate_backup_owner,
+                    )
+
+                    validate_backup_owner(
+                        metadata,
+                        ctx.get_user_id(),
+                        db=db,
+                        backup_business_row=original_business,
+                    )
+                    backup_checksum = compute_backup_checksum(file_bytes)
+                    guard_new_business_import(
+                        db,
+                        user_id=ctx.get_user_id(),
+                        backup_checksum=backup_checksum,
+                        import_mode="new_business",
+                    )
+
                     jm.update(job_id, 30, "Creating new business")
                     
                     # تبدیل به BusinessCreateRequest
@@ -309,14 +331,17 @@ async def import_business_from_backup(
                         check_credit_enabled_by_default=bool(original_business.get('check_credit_enabled_by_default', False)),
                     )
                     
-                    # ایجاد کسب‌وکار جدید
-                    new_business = create_business(db, business_create_data, ctx.get_user_id())
-                    new_business_id = new_business['id']
-                    db.commit()
-                    
+                    # ایجاد کسب‌وکار + ایمپورت جداول در یک تراکنش (مثل /backups/restore)
+                    new_business = create_business(
+                        db,
+                        business_create_data,
+                        ctx.get_user_id(),
+                        defer_commit=True,
+                    )
+                    new_business_id = new_business["id"]
+
                     jm.update(job_id, 40, f"Business created (ID: {new_business_id})")
-                    
-                    # ایمپورت داده‌های سایر جداول
+
                     from sqlalchemy import inspect as sa_inspect
 
                     from adapters.api.v1.business_backups import (
@@ -324,104 +349,76 @@ async def import_business_from_backup(
                         _sort_tables_for_insert_by_fks,
                         _try_set_session_replication_role_replica,
                         _reset_session_replication_role,
-                        _build_insert_params_for_restore,
-                        _pk_columns_to_omit_for_new_business,
+                        _insert_table_from_backup_zip,
+                        is_backup_excluded_table,
                     )
-                    
-                    jm.update(job_id, 50, "Importing data")
-                    
+                    from app.services.business_backup_schema_compat import (
+                        analyze_schema_diff,
+                        load_table_column_meta,
+                    )
+
                     tables_info = _discover_scoped_tables(db)
-                    target_tables = [t for t in tables_info.keys() if t != "businesses"]
+                    target_tables = [
+                        t
+                        for t in tables_info.keys()
+                        if t != "businesses" and not is_backup_excluded_table(t)
+                    ]
                     target_tables = _sort_tables_for_insert_by_fks(db.get_bind(), target_tables)
-                    
+
                     conn = db.connection()
                     replica_role_ok = _try_set_session_replication_role_replica(conn)
                     schema_inspector = sa_inspect(db.get_bind())
                     json_cols_cache: dict[str, set[str]] = {}
-                    
-                    # Insert data for other tables
-                    for table in target_tables:
-                        try:
-                            zinfo = zf.getinfo(f"tables/{table}.jsonl")
-                        except KeyError:
-                            continue
-                        
-                        col_list = tables_info[table]["columns"]
-                        
-                        pk_omit = _pk_columns_to_omit_for_new_business(schema_inspector, table)
-                        insert_col_list = col_list.copy()
-                        for _pkc in pk_omit:
-                            if _pkc in insert_col_list:
-                                insert_col_list.remove(_pkc)
-                        
-                        placeholders = ", ".join([f":{c}" for c in insert_col_list])
-                        columns_sql = ", ".join([f'"{c}"' for c in insert_col_list])  # PostgreSQL uses double quotes
-                        
-                        # PostgreSQL: ON CONFLICT DO NOTHING (works for any unique constraint)
-                        insert_sql = text(f'INSERT INTO "{table}" ({columns_sql}) VALUES ({placeholders}) ON CONFLICT DO NOTHING')
-                        
-                        batch: list[Dict[str, Any]] = []
-                        with zf.open(f"tables/{table}.jsonl", "r") as f:
-                            for raw in f:
-                                if not raw:
-                                    continue
-                                rec = json.loads(raw.decode("utf-8"))
-                                if "business_id" in rec:
-                                    rec["business_id"] = new_business_id
-                                
-                                for _pkc in pk_omit:
-                                    if _pkc in rec:
-                                        del rec[_pkc]
-                                
-                                params = _build_insert_params_for_restore(
-                                    schema_inspector,
-                                    table,
-                                    insert_col_list,
-                                    rec,
-                                    json_cols_cache,
+                    column_meta_cache: dict[str, dict] = {}
+
+                    try:
+                        jm.update(job_id, 50, "Importing data")
+                        for _t in target_tables:
+                            if _t not in column_meta_cache:
+                                column_meta_cache[_t] = load_table_column_meta(
+                                    schema_inspector, _t, conn
                                 )
-                                batch.append(params)
-                                if len(batch) >= 500:
-                                    # هر batch در یک transaction جداگانه
-                                    max_retries = 3
-                                    retry_count = 0
-                                    while retry_count < max_retries:
-                                        try:
-                                            conn.execute(insert_sql, batch)
-                                            db.commit()
-                                            break  # موفق شد
-                                        except Exception as e:
-                                            db.rollback()
-                                            # شروع transaction جدید
-                                            db.begin()
-                                            retry_count += 1
-                                            if retry_count >= max_retries:
-                                                logger.error(f"Error inserting batch into {table} after {max_retries} retries: {e}")
-                                                raise
-                                            logger.warning(f"Error inserting batch into {table}, retry {retry_count}/{max_retries}: {e}")
-                                    batch.clear()
-                        
-                        if batch:
-                            # آخرین batch
-                            max_retries = 3
-                            retry_count = 0
-                            while retry_count < max_retries:
-                                try:
-                                    conn.execute(insert_sql, batch)
-                                    db.commit()
-                                    break  # موفق شد
-                                except Exception as e:
-                                    db.rollback()
-                                    db.begin()
-                                    retry_count += 1
-                                    if retry_count >= max_retries:
-                                        logger.error(f"Error inserting final batch into {table} after {max_retries} retries: {e}")
-                                        raise
-                                    logger.warning(f"Error inserting final batch into {table}, retry {retry_count}/{max_retries}: {e}")
-                    
-                    _reset_session_replication_role(conn, replica_role_ok)
-                    
+                        analyze_schema_diff(metadata, tables_info, target_tables, column_meta_cache)
+
+                        for table in target_tables:
+                            try:
+                                zf.getinfo(f"tables/{table}.jsonl")
+                            except KeyError:
+                                continue
+                            _insert_table_from_backup_zip(
+                                conn,
+                                zf,
+                                table=table,
+                                metadata=metadata,
+                                tables_info=tables_info,
+                                schema_inspector=schema_inspector,
+                                new_business_id=new_business_id,
+                                mode="new_business",
+                                json_cols_cache=json_cols_cache,
+                                column_meta_cache=column_meta_cache,
+                            )
+
+                        _reset_session_replication_role(conn, replica_role_ok)
+
+                        jm.update(job_id, 90, "Resetting financial state")
+                        finalize_financial_state_after_restore(db, new_business_id)
+                        register_backup_import(
+                            db,
+                            user_id=ctx.get_user_id(),
+                            backup_checksum=backup_checksum,
+                            import_mode="new_business",
+                            source_business_id=int(metadata.get("business_id"))
+                            if metadata.get("business_id")
+                            else None,
+                            target_business_id=new_business_id,
+                        )
+                    except Exception:
+                        db.rollback()
+                        _reset_session_replication_role(conn, replica_role_ok)
+                        raise
+
                     zf.close()
+                    # commit نهایی توسط get_db_session() پس از خروج موفق از task
                     
                     result_data = {
                         "business_id": new_business_id,

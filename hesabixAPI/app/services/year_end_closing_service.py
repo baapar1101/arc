@@ -130,11 +130,23 @@ def _discover_scoped_tables(db: Session) -> Dict[str, Dict[str, Any]]:
 
 
 def _dump_business_data(db: Session, business_id: int) -> Dict[str, Any]:
-    """استخراج داده‌های کسب‌وکار برای پشتیبان‌گیری"""
+    """استخراج داده‌های کسب‌وکار برای پشتیبان‌گیری (بدون داده مالی/اعتباری)"""
+    from adapters.db.models.business import Business
+    from app.services.business_backup_financial_policy import (
+        build_backup_metadata,
+        is_backup_excluded_table,
+    )
+
     tables = _discover_scoped_tables(db)
     data_out: Dict[str, List[Dict[str, Any]]] = {}
+    owner_id = None
+    biz = db.get(Business, int(business_id))
+    if biz is not None:
+        owner_id = getattr(biz, "owner_id", None)
 
     for table_name, meta in tables.items():
+        if is_backup_excluded_table(table_name):
+            continue
         if table_name == "businesses":
             stmt = text(f"SELECT * FROM {table_name} WHERE id = :bid")
             rows = [dict(r._mapping) for r in db.execute(stmt, {"bid": business_id}).all()]
@@ -146,13 +158,12 @@ def _dump_business_data(db: Session, business_id: int) -> Dict[str, Any]:
                 rows = []
         data_out[table_name] = rows
 
-    metadata = {
-        "schema_version": "v1",
-        "created_at": datetime.utcnow().isoformat(),
-        "business_id": business_id,
-        "tables": list(data_out.keys()),
-        "backup_reason": "year_end_closing",
-    }
+    metadata = build_backup_metadata(
+        business_id=int(business_id),
+        table_names=data_out.keys(),
+        owner_id=owner_id,
+    )
+    metadata["backup_reason"] = "year_end_closing"
     return {"metadata": metadata, "tables": data_out}
 
 
