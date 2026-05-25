@@ -727,23 +727,35 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                 hintText: widget.hintText,
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.person_search),
-                suffixIconConstraints: const BoxConstraints(minHeight: 48, minWidth: 120),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'افزودن طرف حساب جدید',
-                      icon: Icon(Icons.add, color: colorScheme.primary),
-                      onPressed: _addNewCustomerFromField,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    IconButton(
-                      tooltip: 'انتخاب پیشرفته',
-                      icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
-                      onPressed: _showCustomerPicker,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
+                suffixIconConstraints: const BoxConstraints(
+                  minHeight: 48,
+                  maxHeight: 48,
+                  minWidth: 80,
+                  maxWidth: 80,
+                ),
+                suffixIcon: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'افزودن طرف حساب جدید',
+                        icon: Icon(Icons.add, color: colorScheme.primary),
+                        onPressed: _addNewCustomerFromField,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      ),
+                      IconButton(
+                        tooltip: 'انتخاب پیشرفته',
+                        icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                        onPressed: _showCustomerPicker,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               onTap: () {

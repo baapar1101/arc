@@ -710,29 +710,44 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
                 hintText: widget.hintText,
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.person_search),
-                suffixIconConstraints: const BoxConstraints(minHeight: 48, minWidth: 140),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'افزودن شخص جدید',
-                      icon: Icon(Icons.add, color: colorScheme.primary),
-                      onPressed: _addNewPersonFromField,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    if (_isSearching)
-                      const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                suffixIconConstraints: const BoxConstraints(
+                  minHeight: 48,
+                  maxHeight: 48,
+                  minWidth: 80,
+                  maxWidth: 104,
+                ),
+                suffixIcon: Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'افزودن شخص جدید',
+                        icon: Icon(Icons.add, color: colorScheme.primary),
+                        onPressed: _addNewPersonFromField,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                       ),
-                    IconButton(
-                      tooltip: 'انتخاب پیشرفته',
-                      icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
-                      onPressed: _showPersonPicker,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
+                      if (_isSearching)
+                        const Padding(
+                          padding: EdgeInsetsDirectional.only(end: 4),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      IconButton(
+                        tooltip: 'انتخاب پیشرفته',
+                        icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                        onPressed: _showPersonPicker,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               onTap: () {
