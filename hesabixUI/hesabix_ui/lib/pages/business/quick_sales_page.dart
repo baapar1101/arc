@@ -526,6 +526,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         searchFields: const ['code', 'barcode', 'name', 'general_barcodes'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
+      await _hydrateProductMapsBatched(products);
       
       if (products.isEmpty) {
         if (mounted) {
@@ -799,11 +800,53 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
   }
 
+  /// اگر نتیجهٔ جستجو [code] را خالی یا برابر [id] برگرداند، با GET تک‌کالا مقدار درست را پر می‌کنیم.
+  bool _shouldHydrateProductCode(Map<String, dynamic> product) {
+    final id = (product['id'] as num?)?.toInt();
+    if (id == null) return false;
+    final code = (product['code']?.toString() ?? '').trim();
+    if (code.isEmpty) return true;
+    return code == id.toString();
+  }
+
+  Future<void> _hydrateProductCodeIfNeeded(Map<String, dynamic> product) async {
+    if (!_shouldHydrateProductCode(product)) return;
+    final id = (product['id'] as num?)?.toInt();
+    if (id == null) return;
+    try {
+      final full = await _productService.getProduct(
+        businessId: widget.businessId,
+        productId: id,
+      );
+      if (!mounted || full.isEmpty || full['id'] == null) return;
+      final fc = (full['code']?.toString() ?? '').trim();
+      if (fc.isNotEmpty) {
+        product['code'] = full['code'];
+      }
+    } catch (e) {
+      debugPrint('QuickSales hydrate product code: $e');
+    }
+  }
+
+  Future<void> _hydrateProductMapsBatched(List<Map<String, dynamic>> items, {int batch = 6}) async {
+    if (items.isEmpty) return;
+    for (var i = 0; i < items.length; i += batch) {
+      if (!mounted) return;
+      final end = i + batch > items.length ? items.length : i + batch;
+      await Future.wait(
+        <Future<void>>[
+          for (var j = i; j < end; j++) _hydrateProductCodeIfNeeded(items[j]),
+        ],
+      );
+    }
+  }
+
   Future<void> _addToCart(
     Map<String, dynamic> product, {
     int? instanceId,
     int? instanceWarehouseId,
   }) async {
+    await _hydrateProductCodeIfNeeded(product);
     final productId = (product['id'] as num?)?.toInt();
     if (productId == null) return;
     
@@ -1653,6 +1696,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           }
           items = merged;
         }
+        await _hydrateProductMapsBatched(items);
         if (!mounted) return;
         setState(() {
           _barcodeSuggestions = items;
@@ -1692,6 +1736,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         searchFields: const ['code', 'barcode', 'name', 'general_barcodes'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
+      await _hydrateProductMapsBatched(products);
       if (!mounted) return;
       setState(() {
         _barcodeSuggestions = products;
@@ -1738,6 +1783,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         searchFields: const ['code', 'barcode', 'name', 'general_barcodes'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
+      await _hydrateProductMapsBatched(products);
       if (!mounted) return;
       setState(() {
         _barcodeSuggestions = [..._barcodeSuggestions, ...products];
