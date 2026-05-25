@@ -85,6 +85,9 @@ dependency_overrides:
 
 flutter_launcher_icons:
   android: true
+  windows:
+    generate: true
+    image_path: "web/icons/Icon-512.png"
   image_path: "web/icons/Icon-512.png"
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "web/icons/Icon-512.png"

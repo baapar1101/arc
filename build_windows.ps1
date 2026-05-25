@@ -53,7 +53,10 @@ function Write-BuildGuide {
     Write-Host "  1) Verify Flutter is on PATH and Visual Studio C++ (MSVC) is available for desktop builds."
     Write-Host "  2) Allow Windows to create symlinks (Developer Mode or an elevated terminal)."
     Write-Host "  3) Run flutter pub get when dependencies look stale (use -InstallDeps to always refresh)."
-    Write-Host "  4) Run flutter build windows with your selected -Mode and -ApiBaseUrl."
+    Write-Host "  4) Generate app icons (flutter_launcher_icons, including Windows .ico)."
+    Write-Host "  5) Patch flutter_sound 9.29+ Windows CMake (upstream taudio target name bug)."
+    Write-Host "  6) Run flutter build windows with your selected -Mode and -ApiBaseUrl."
+    Write-Host "  7) Ensure DLLs and data/ are copied next to the .exe (CMake install + fallback staging)."
     Write-Host ""
     Write-Host "If something fails: run .\build_windows.ps1 -Help for all options; check IDE setup with: flutter doctor -v"
     Write-Host "===========================================" -ForegroundColor Cyan
@@ -95,14 +98,67 @@ function Test-NeedsPubGet {
     return $false
 }
 
+# Flutter/Dart write mirror notices to stderr; PowerShell 7+ can treat that as a
+# terminating error when $ErrorActionPreference is Stop. Only exit codes matter.
+function Invoke-NativeCli {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Exe,
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$CliArgs
+    )
+
+    $restoreNative = $null
+    if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -ErrorAction SilentlyContinue) {
+        $restoreNative = $PSNativeCommandUseErrorActionPreference
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    $restoreEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Exe @CliArgs 2>&1 | ForEach-Object {
+            if ($_ -is [System.Management.Automation.ErrorRecord]) {
+                Write-Host $_.ToString()
+            } else {
+                Write-Host $_
+            }
+        }
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $restoreEap
+        if ($null -ne $restoreNative) {
+            $PSNativeCommandUseErrorActionPreference = $restoreNative
+        }
+    }
+}
+
 function Invoke-FlutterPubGet {
     Write-Host ""
     Write-Host "[step] Fetching Dart/Flutter dependencies (flutter pub get)..." -ForegroundColor Cyan
     Write-Host "       Hint: Uses PUB_HOSTED_URL / mirror env if set above." -ForegroundColor DarkGray
-    flutter pub get
-    if ($LASTEXITCODE -ne 0) {
+    $exitCode = Invoke-NativeCli -Exe "flutter" -CliArgs @("pub", "get")
+    if ($exitCode -ne 0) {
         Write-Host "[error] flutter pub get failed. Check network, mirror URLs, and pubspec.yaml." -ForegroundColor Red
         exit 1
+    }
+}
+
+function Invoke-FlutterLauncherIcons {
+    Write-Host ""
+    Write-Host "[step] Generating app icons (flutter_launcher_icons)..." -ForegroundColor Cyan
+    $exitCode = Invoke-NativeCli -Exe "dart" -CliArgs @("run", "flutter_launcher_icons")
+    if ($exitCode -ne 0) {
+        Write-Host "[warn] flutter_launcher_icons failed; Windows may keep the default Flutter icon." -ForegroundColor Yellow
+    }
+}
+
+function Get-WindowsBuildConfigName {
+    param([string]$Mode)
+    switch ($Mode) {
+        "debug" { return "Debug" }
+        "profile" { return "Profile" }
+        default { return "Release" }
     }
 }
 
@@ -248,14 +304,34 @@ if (Test-NeedsPubGet -ProjectRoot $APP_DIR -Force:$InstallDeps) {
     Write-Host "       Use -InstallDeps to always run flutter pub get before build." -ForegroundColor DarkGray
 }
 
+Invoke-FlutterLauncherIcons
+
+$patchScript = Join-Path $APP_DIR "scripts\patch_flutter_sound_windows.ps1"
+if (Test-Path -LiteralPath $patchScript) {
+    & $patchScript -ProjectRoot $APP_DIR
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[error] flutter_sound Windows patch script failed." -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "[warn] Missing $patchScript - flutter_sound 9.29+ Windows builds may fail at CMake." -ForegroundColor Yellow
+}
+
 # Clean build directory if requested
 if ($Clean) {
     Write-Host ""
     Write-Host "[step] Cleaning previous build (flutter clean)..." -ForegroundColor Cyan
-    flutter clean
-    if ($LASTEXITCODE -ne 0) {
+    $cleanExit = Invoke-NativeCli -Exe "flutter" -CliArgs @("clean")
+    if ($cleanExit -ne 0) {
         Write-Host "[error] flutter clean failed." -ForegroundColor Red
         exit 1
+    }
+    if (Test-Path -LiteralPath $patchScript) {
+        & $patchScript -ProjectRoot $APP_DIR
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "[error] flutter_sound Windows patch script failed after clean." -ForegroundColor Red
+            exit 1
+        }
     }
 }
 
@@ -283,13 +359,23 @@ Write-Host "=========================================="
 Write-Host "Command: flutter build windows $($buildFlags -join ' ')"
 Write-Host ""
 
-flutter build windows @buildFlags
+$buildExit = Invoke-NativeCli -Exe "flutter" -CliArgs (@("build", "windows") + $buildFlags)
 
-if ($LASTEXITCODE -ne 0) {
+if ($buildExit -ne 0) {
     Write-Host ""
     Write-Host "[error] Build failed." -ForegroundColor Red
     Write-Host "        Run: flutter doctor -v  ... and confirm Windows (desktop) is supported; fix MSVC or SDK warnings shown there." -ForegroundColor Yellow
     exit 1
+}
+
+$cmakeConfig = Get-WindowsBuildConfigName -Mode $Mode
+$stageScript = Join-Path $APP_DIR "scripts\stage_windows_release.ps1"
+if (Test-Path -LiteralPath $stageScript) {
+    & $stageScript -ProjectRoot $APP_DIR -Config $cmakeConfig
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[error] Windows release staging failed." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Check output
@@ -319,7 +405,13 @@ if ($EXECUTABLE -and (Test-Path -LiteralPath $EXECUTABLE)) {
     Write-Host "  Executable:     $EXECUTABLE"
     Write-Host "  Output folder:  $(Split-Path -Parent $EXECUTABLE)"
     Write-Host ""
-    Write-Host "Tip: Distribution usually includes DLLs alongside the EXE - ship the entire Release/output folder Flutter produced." -ForegroundColor DarkGray
+    $bundleDir = Split-Path -Parent $EXECUTABLE
+    $bundleDllCount = @(Get-ChildItem -LiteralPath $bundleDir -Filter "*.dll" -ErrorAction SilentlyContinue).Count
+    $hasData = Test-Path -LiteralPath (Join-Path $bundleDir "data\flutter_assets")
+    Write-Host "  Bundle DLLs:    $bundleDllCount in output folder"
+    Write-Host "  data/assets:    $(if ($hasData) { 'present' } else { 'MISSING - run with -Clean and rebuild' })"
+    Write-Host ""
+    Write-Host "Tip: Run hesabix_ui.exe from the folder above. Distribute the whole folder (exe + all DLLs + data/), not the .exe alone." -ForegroundColor DarkGray
     Write-Host ""
 } else {
     Write-Host ""
