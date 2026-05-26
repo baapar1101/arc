@@ -24,6 +24,18 @@ from app.services.ai.ai_write_guard import (
     build_approval_required_result,
     WRITE_FUNCTION_LABELS_FA,
 )
+from app.services.ai.ai_tool_keys import (
+    status_event,
+    tool_label_fa,
+    tool_l10n_key,
+)
+from app.services.ai.ai_trace import (
+    CONTEXT_STEP_TITLE_KEYS,
+    format_planned_tools,
+    summarize_tool_result,
+    trace_record_from_event,
+    trace_step,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -427,6 +439,133 @@ class AIService:
             )
         
         return base_prompt
+
+    async def build_system_prompt_stream(
+        self,
+        session_business_id: Optional[int] = None,
+        session_id: Optional[int] = None,
+        user_query: Optional[str] = None,
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """ساخت system prompt با yield رویداد status بین مراحل blocking."""
+        loop = asyncio.get_running_loop()
+
+        if self.ctx.is_superadmin():
+            role = PromptRole.ADMIN
+        elif self.ctx.can_access_support_operator():
+            role = PromptRole.OPERATOR
+        else:
+            role = PromptRole.USER
+
+        yield status_event("preparing_context", "loading_prompt")
+        base_prompt = await loop.run_in_executor(
+            _executor,
+            lambda: get_prompt(
+                db=self.db,
+                role=role,
+                user_id=self.ctx.get_user_id(),
+            ),
+        )
+
+        business_id = session_business_id or self.business_id
+        if not business_id:
+            yield {"event": "prompt_ready", "prompt": base_prompt}
+            return
+
+        business_info = (
+            f"\n\nکسب‌وکار فعلی: شناسه {business_id}"
+            "\nنکته مهم: شما در حال کار با این کسب‌وکار هستید و نیازی به پرسیدن شناسه کسب‌وکار ندارید."
+            " تمام function calls به صورت خودکار با شناسه کسب‌وکار فعلی انجام می‌شوند."
+        )
+
+        yield status_event("preparing_context", "loading_insights")
+
+        def _load_insights() -> str:
+            try:
+                from app.services.ai.ai_insight_service import (
+                    get_business_insights,
+                    format_insights_for_prompt,
+                )
+
+                insights = get_business_insights(self.db, int(business_id), self.ctx)
+                return format_insights_for_prompt(insights)
+            except Exception as exc:
+                logger.warning("Failed to load AI insights for prompt: %s", exc)
+                return ""
+
+        insight_text = await loop.run_in_executor(_executor, _load_insights)
+
+        yield status_event("preparing_context", "loading_memory")
+
+        def _load_memory() -> str:
+            try:
+                from app.services.ai.ai_memory_service import format_memory_for_prompt
+
+                return format_memory_for_prompt(
+                    self.db, int(business_id), self.ctx.get_user_id()
+                )
+            except Exception as exc:
+                logger.warning("Failed to load AI memory for prompt: %s", exc)
+                return ""
+
+        memory_text = await loop.run_in_executor(_executor, _load_memory)
+
+        attachment_text = ""
+        if session_id:
+            yield status_event("preparing_context", "loading_attachments")
+
+            def _load_attachments() -> str:
+                try:
+                    from app.services.ai.ai_attachment_service import (
+                        format_attachments_for_prompt,
+                    )
+
+                    return format_attachments_for_prompt(self.db, session_id)
+                except Exception as exc:
+                    logger.warning("Failed to load AI attachments for prompt: %s", exc)
+                    return ""
+
+            attachment_text = await loop.run_in_executor(_executor, _load_attachments)
+
+        knowledge_text = ""
+        if user_query:
+            yield status_event("preparing_context", "loading_knowledge")
+
+            def _load_knowledge() -> str:
+                try:
+                    from app.services.ai.ai_knowledge_service import format_knowledge_for_prompt
+
+                    return format_knowledge_for_prompt(
+                        self.db, int(business_id), user_query
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to load AI knowledge for prompt: %s", exc)
+                    return ""
+
+            knowledge_text = await loop.run_in_executor(_executor, _load_knowledge)
+
+        yield status_event("preparing_context", "loading_connectors")
+
+        def _load_connectors() -> str:
+            try:
+                from app.services.ai.ai_connector_service import format_connectors_for_prompt
+
+                return format_connectors_for_prompt(self.db, int(business_id))
+            except Exception as exc:
+                logger.warning("Failed to load AI connectors for prompt: %s", exc)
+                return ""
+
+        connector_text = await loop.run_in_executor(_executor, _load_connectors)
+
+        final_prompt = (
+            base_prompt
+            + business_info
+            + insight_text
+            + memory_text
+            + attachment_text
+            + knowledge_text
+            + connector_text
+        )
+        yield {"event": "prompt_ready", "prompt": final_prompt}
     
     def get_available_functions(self, category: Optional[str] = None, session_business_id: Optional[int] = None) -> List[Dict[str, Any]]:
         """دریافت function های قابل استفاده بر اساس نقش کاربر"""
@@ -973,26 +1112,62 @@ class AIService:
             api_base_url=self.config.api_base_url,
         )
 
-        system_prompt = self.get_system_prompt(
-            session_business_id=session_business_id,
-            session_id=session_id,
-            user_query=effective_user_query,
-        )
-        full_messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-            *messages,
-        ]
-
-        eff_tools = self._use_tools_for_request(use_function_calling)
-        if eff_tools and tools is None:
-            tools = self.get_available_functions(session_business_id=session_business_id)
-        elif not eff_tools:
-            tools = None
-
         try:
             accumulated_content = ""
             final_usage = None
             iteration = 0
+            trace_steps: List[Dict[str, Any]] = []
+            trace_step_counter = 0
+
+            def _emit_trace(**kwargs: Any) -> Dict[str, Any]:
+                nonlocal trace_step_counter
+                trace_step_counter += 1
+                event = trace_step(str(trace_step_counter), **kwargs)
+                trace_steps.append(trace_record_from_event(event))
+                return event
+
+            yield status_event("thinking")
+            yield _emit_trace(
+                kind="context",
+                state="done",
+                title_key="aiStatusThinking",
+            )
+
+            system_prompt = ""
+            async for build_item in self.build_system_prompt_stream(
+                session_business_id=session_business_id,
+                session_id=session_id,
+                user_query=effective_user_query,
+            ):
+                if build_item.get("event") == "prompt_ready":
+                    system_prompt = build_item.get("prompt") or ""
+                    continue
+                if build_item.get("event") == "status":
+                    step = build_item.get("step")
+                    title_key = CONTEXT_STEP_TITLE_KEYS.get(
+                        step, "aiStatusPreparingContext"
+                    )
+                    yield build_item
+                    yield _emit_trace(
+                        kind="context",
+                        state="done",
+                        title_key=title_key,
+                    )
+                    continue
+                yield build_item
+
+            full_messages: List[Dict[str, Any]] = [
+                {"role": "system", "content": system_prompt},
+                *messages,
+            ]
+
+            eff_tools = self._use_tools_for_request(use_function_calling)
+            if eff_tools and tools is None:
+                tools = self.get_available_functions(
+                    session_business_id=session_business_id
+                )
+            elif not eff_tools:
+                tools = None
 
             while iteration < max_iterations:
                 iteration += 1
@@ -1000,6 +1175,15 @@ class AIService:
                 tool_call_id_map: Dict[str, str] = {}
                 round_text = ""
                 use_tools = bool(eff_tools and tools)
+                writing_status_sent = False
+
+                if iteration > 1:
+                    yield _emit_trace(
+                        kind="plan_next",
+                        state="done",
+                        title_key="aiTracePlanningNext",
+                        iteration=iteration,
+                    )
 
                 async for chunk in provider.chat_completion_stream(
                     messages=full_messages,
@@ -1019,6 +1203,9 @@ class AIService:
                     if content_chunk:
                         round_text += content_chunk
                         if not function_calls:
+                            if not writing_status_sent:
+                                writing_status_sent = True
+                                yield status_event("writing")
                             yield {
                                 "delta": {"content": content_chunk},
                                 "usage": None,
@@ -1030,12 +1217,41 @@ class AIService:
 
                 if function_calls and use_tools:
                     accumulated_function_calls.extend(function_calls)
+                    yield status_event("planning_tools")
+
+                    if round_text.strip():
+                        yield _emit_trace(
+                            kind="narrative",
+                            state="done",
+                            body_markdown=round_text.strip(),
+                            iteration=iteration,
+                        )
+                    else:
+                        yield _emit_trace(
+                            kind="plan",
+                            state="done",
+                            title_key="aiTracePlanningAction",
+                            body_markdown=format_planned_tools(function_calls),
+                            iteration=iteration,
+                        )
+
                     for call in function_calls:
                         fname = call.get("name", "unknown")
+                        label = tool_label_fa(fname)
+                        yield _emit_trace(
+                            kind="tool",
+                            state="active",
+                            title_key="aiTraceRunningTool",
+                            title_params={"toolName": label},
+                            tool=fname,
+                            tool_key=tool_l10n_key(fname),
+                            iteration=iteration,
+                        )
                         yield {
                             "event": "tool_start",
                             "tool": fname,
-                            "label": WRITE_FUNCTION_LABELS_FA.get(fname, fname),
+                            "tool_key": tool_l10n_key(fname),
+                            "label": label,
                         }
 
                     function_results = await self.handle_function_calls_async(
@@ -1052,15 +1268,27 @@ class AIService:
                             isinstance(result, dict)
                             and result.get("error") == "APPROVAL_REQUIRED"
                         )
+                        success = not (
+                            isinstance(result, dict) and result.get("error")
+                        )
                         yield {
                             "event": "tool_end",
                             "tool": fname,
-                            "label": WRITE_FUNCTION_LABELS_FA.get(fname, fname),
-                            "success": not (
-                                isinstance(result, dict) and result.get("error")
-                            ),
+                            "tool_key": tool_l10n_key(fname),
+                            "label": tool_label_fa(fname),
+                            "success": success,
                             "approval_required": needs_approval,
                         }
+                        yield _emit_trace(
+                            kind="observation",
+                            state="done" if success else "error",
+                            title_key="aiTraceObservation",
+                            title_params={"toolName": tool_label_fa(fname)},
+                            body_markdown=summarize_tool_result(fname, result),
+                            tool=fname,
+                            tool_key=tool_l10n_key(fname),
+                            iteration=iteration,
+                        )
 
                     assistant_msg: Dict[str, Any] = {
                         "role": "assistant",
@@ -1110,6 +1338,16 @@ class AIService:
                         )
                     continue
 
+                if round_text.strip():
+                    yield _emit_trace(
+                        kind="answer",
+                        state="done",
+                        title_key="aiTraceComposingAnswer",
+                        body_markdown=round_text.strip()
+                        if len(round_text.strip()) < 400
+                        else None,
+                        iteration=iteration,
+                    )
                 accumulated_content = round_text
                 break
 
@@ -1119,6 +1357,7 @@ class AIService:
                 "done": True,
                 "function_calls": accumulated_function_calls or None,
                 "function_results": accumulated_function_results or None,
+                "agent_trace": trace_steps or None,
             }
 
         except ApiError:

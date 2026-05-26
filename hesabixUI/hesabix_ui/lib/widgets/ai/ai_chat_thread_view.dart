@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
+import 'ai_agent_trace_timeline.dart';
+import 'ai_chat_l10n.dart';
 import 'ai_chat_message_body.dart';
 
 typedef MessageActionCallback = void Function(AIChatMessage message);
@@ -11,6 +14,10 @@ class AIChatThreadView extends StatelessWidget {
   final List<AIChatMessage> messages;
   final String? streamingContent;
   final List<AIToolActivity> streamingToolActivities;
+  final List<AIAgentTraceStep> streamingTraceSteps;
+  final String? streamingStatusPhase;
+  final String? streamingStatusStep;
+  final int? streamingElapsedSeconds;
   final DateTime? streamingTimestamp;
   final bool messagesLoading;
   final bool sending;
@@ -37,6 +44,10 @@ class AIChatThreadView extends StatelessWidget {
     required this.messages,
     required this.streamingContent,
     this.streamingToolActivities = const [],
+    this.streamingTraceSteps = const [],
+    this.streamingStatusPhase,
+    this.streamingStatusStep,
+    this.streamingElapsedSeconds,
     required this.streamingTimestamp,
     required this.messagesLoading,
     required this.sending,
@@ -73,7 +84,11 @@ class AIChatThreadView extends StatelessWidget {
                 ListView.builder(
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  itemCount: messages.length + (streamingContent != null ? 1 : 0),
+                  itemCount: messages.length +
+                      ((streamingContent != null ||
+                              streamingTraceSteps.isNotEmpty)
+                          ? 1
+                          : 0),
                   itemBuilder: (context, index) {
                     if (index < messages.length) {
                       return _MessageRow(
@@ -85,6 +100,10 @@ class AIChatThreadView extends StatelessWidget {
                     return _StreamingRow(
                       content: streamingContent ?? '',
                       toolActivities: streamingToolActivities,
+                      traceSteps: streamingTraceSteps,
+                      statusPhase: streamingStatusPhase,
+                      statusStep: streamingStatusStep,
+                      elapsedSeconds: streamingElapsedSeconds,
                       formatTime: formatTime(streamingTimestamp),
                     );
                   },
@@ -232,11 +251,19 @@ class _MessageRow extends StatelessWidget {
 class _StreamingRow extends StatelessWidget {
   final String content;
   final List<AIToolActivity> toolActivities;
+  final List<AIAgentTraceStep> traceSteps;
+  final String? statusPhase;
+  final String? statusStep;
+  final int? elapsedSeconds;
   final String formatTime;
 
   const _StreamingRow({
     required this.content,
     this.toolActivities = const [],
+    this.traceSteps = const [],
+    this.statusPhase,
+    this.statusStep,
+    this.elapsedSeconds,
     required this.formatTime,
   });
 
@@ -244,6 +271,16 @@ class _StreamingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
+    final statusLabel = statusPhase != null
+        ? aiStreamStatusLabel(
+            l10n,
+            phase: statusPhase!,
+            step: statusStep,
+          )
+        : l10n.aiStatusThinking;
+    final showStatusLine =
+        content.isEmpty && toolActivities.isEmpty && traceSteps.isEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 28),
@@ -256,17 +293,22 @@ class _StreamingRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (toolActivities.isNotEmpty)
+                if (traceSteps.isNotEmpty) ...[
+                  AIAgentTraceTimeline(steps: traceSteps),
+                  const SizedBox(height: 10),
+                ],
+                if (toolActivities.isNotEmpty && traceSteps.isEmpty)
                   AIChatToolActivityList(activities: toolActivities),
                 if (content.isNotEmpty)
                   AIChatMessageBody(
                     content: content,
                     isUser: false,
                   )
-                else if (toolActivities.isEmpty)
-                  Text(
-                    '...',
-                    style: theme.textTheme.bodyLarge?.copyWith(height: 1.65),
+                else if (showStatusLine)
+                  _StreamingStatusPulse(
+                    label: statusLabel,
+                    theme: theme,
+                    scheme: scheme,
                   ),
                 const SizedBox(height: 8),
                 Row(
@@ -280,18 +322,81 @@ class _StreamingRow extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'در حال نوشتن',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
+                    Expanded(
+                      child: Text(
+                        content.isNotEmpty
+                            ? l10n.aiStatusWriting
+                            : statusLabel,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
+                    if (elapsedSeconds != null && elapsedSeconds! > 0)
+                      Text(
+                        l10n.aiStatusElapsed(elapsedSeconds!),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.outline,
+                        ),
+                      ),
                   ],
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// انیمیشن ملایم برای نمایش وضعیت در انتظار پاسخ.
+class _StreamingStatusPulse extends StatefulWidget {
+  final String label;
+  final ThemeData theme;
+  final ColorScheme scheme;
+
+  const _StreamingStatusPulse({
+    required this.label,
+    required this.theme,
+    required this.scheme,
+  });
+
+  @override
+  State<_StreamingStatusPulse> createState() => _StreamingStatusPulseState();
+}
+
+class _StreamingStatusPulseState extends State<_StreamingStatusPulse>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.45, end: 1).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      ),
+      child: Text(
+        widget.label,
+        style: widget.theme.textTheme.bodyLarge?.copyWith(
+          height: 1.65,
+          color: widget.scheme.onSurfaceVariant,
+        ),
       ),
     );
   }

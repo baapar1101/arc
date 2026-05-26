@@ -402,16 +402,35 @@ class AIService {
     }
 
     final eventType = data['type'] as String?;
+    if (eventType == 'status') {
+      return AIStreamChunk(
+        statusEvent: AIStreamStatusEvent(
+          phase: data['phase'] as String? ?? 'thinking',
+          step: data['step'] as String?,
+          toolKey: data['tool_key'] as String?,
+        ),
+      );
+    }
+    if (eventType == 'heartbeat') {
+      return AIStreamChunk(
+        heartbeatElapsedMs: data['elapsed_ms'] as int? ?? 0,
+      );
+    }
     if (eventType == 'tool_start' || eventType == 'tool_end') {
       return AIStreamChunk(
         toolEvent: AIStreamToolEvent(
           type: eventType!,
           tool: data['tool'] as String? ?? '',
+          toolKey: data['tool_key'] as String?,
           label: data['label'] as String?,
           success: data['success'] as bool?,
           approvalRequired: data['approval_required'] as bool? ?? false,
         ),
       );
+    }
+    if (eventType == 'trace_step') {
+      final step = AIAgentTraceStep.fromJson(data);
+      return AIStreamChunk(traceStep: step);
     }
 
     final done = data['done'] as bool? ?? false;
@@ -422,10 +441,19 @@ class AIService {
         data['usage'] as Map<String, dynamic>?,
         data['message_id'] as int?,
       );
+      List<AIAgentTraceStep>? agentTrace;
+      final rawTrace = data['agent_trace'];
+      if (rawTrace is List) {
+        agentTrace = rawTrace
+            .whereType<Map>()
+            .map((e) => AIAgentTraceStep.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
       return AIStreamChunk(
         done: true,
         functionCalls: data['function_calls'],
         functionResults: data['function_results'],
+        agentTrace: agentTrace,
       );
     }
 

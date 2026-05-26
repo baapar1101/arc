@@ -5,6 +5,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Set
 
+from app.services.ai.ai_tool_keys import TOOL_LABELS_FA
+
 # توابعی که دادهٔ کسب‌وکار را تغییر می‌دهند و قبل از اجرا نیاز به تأیید دارند.
 WRITE_FUNCTIONS: Set[str] = {
     "create_invoice",
@@ -14,10 +16,9 @@ WRITE_FUNCTIONS: Set[str] = {
 }
 
 WRITE_FUNCTION_LABELS_FA: Dict[str, str] = {
-    "create_invoice": "ثبت فاکتور",
-    "create_person": "ایجاد شخص",
-    "update_person": "ویرایش شخص",
-    "create_receipt_payment": "ثبت دریافت/پرداخت",
+    name: TOOL_LABELS_FA[name]
+    for name in WRITE_FUNCTIONS
+    if name in TOOL_LABELS_FA
 }
 
 

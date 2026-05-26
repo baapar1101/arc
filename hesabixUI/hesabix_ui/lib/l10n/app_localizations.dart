@@ -18336,6 +18336,324 @@ abstract class AppLocalizations {
   /// **'AI settings, plans and prompts'**
   String get settingsCategoryAIDescription;
 
+  /// No description provided for @aiStatusSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get aiStatusSending;
+
+  /// No description provided for @aiStatusConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting…'**
+  String get aiStatusConnecting;
+
+  /// No description provided for @aiStatusThinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get aiStatusThinking;
+
+  /// No description provided for @aiStatusPreparingContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing context…'**
+  String get aiStatusPreparingContext;
+
+  /// No description provided for @aiStatusLoadingPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading instructions…'**
+  String get aiStatusLoadingPrompt;
+
+  /// No description provided for @aiStatusLoadingInsights.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading business insights…'**
+  String get aiStatusLoadingInsights;
+
+  /// No description provided for @aiStatusLoadingMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading memory…'**
+  String get aiStatusLoadingMemory;
+
+  /// No description provided for @aiStatusLoadingAttachments.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading attachments…'**
+  String get aiStatusLoadingAttachments;
+
+  /// No description provided for @aiStatusLoadingKnowledge.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching knowledge base…'**
+  String get aiStatusLoadingKnowledge;
+
+  /// No description provided for @aiStatusLoadingConnectors.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading connectors…'**
+  String get aiStatusLoadingConnectors;
+
+  /// No description provided for @aiStatusPlanningTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Planning next move…'**
+  String get aiStatusPlanningTools;
+
+  /// No description provided for @aiStatusWriting.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing response…'**
+  String get aiStatusWriting;
+
+  /// No description provided for @aiStatusSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get aiStatusSaving;
+
+  /// No description provided for @aiStatusRunningTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Running {toolName}…'**
+  String aiStatusRunningTool(String toolName);
+
+  /// No description provided for @aiStatusElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s'**
+  String aiStatusElapsed(int seconds);
+
+  /// No description provided for @aiToolGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Running tool'**
+  String get aiToolGeneric;
+
+  /// No description provided for @aiToolGetBusinessInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Business info'**
+  String get aiToolGetBusinessInfo;
+
+  /// No description provided for @aiToolSearchInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Search invoices'**
+  String get aiToolSearchInvoices;
+
+  /// No description provided for @aiToolGetInvoiceDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice details'**
+  String get aiToolGetInvoiceDetails;
+
+  /// No description provided for @aiToolGetInvoicesCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Count invoices'**
+  String get aiToolGetInvoicesCount;
+
+  /// No description provided for @aiToolCreateInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Create invoice'**
+  String get aiToolCreateInvoice;
+
+  /// No description provided for @aiToolSearchProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'Search products'**
+  String get aiToolSearchProducts;
+
+  /// No description provided for @aiToolGetProductInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Product info'**
+  String get aiToolGetProductInfo;
+
+  /// No description provided for @aiToolGetInventoryStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory status'**
+  String get aiToolGetInventoryStatus;
+
+  /// No description provided for @aiToolGetProductKardex.
+  ///
+  /// In en, this message translates to:
+  /// **'Product kardex'**
+  String get aiToolGetProductKardex;
+
+  /// No description provided for @aiToolGetCustomerInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer info'**
+  String get aiToolGetCustomerInfo;
+
+  /// No description provided for @aiToolSearchPersons.
+  ///
+  /// In en, this message translates to:
+  /// **'Search persons'**
+  String get aiToolSearchPersons;
+
+  /// No description provided for @aiToolGetPersonBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Person balance'**
+  String get aiToolGetPersonBalance;
+
+  /// No description provided for @aiToolCreatePerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Create person'**
+  String get aiToolCreatePerson;
+
+  /// No description provided for @aiToolUpdatePerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Update person'**
+  String get aiToolUpdatePerson;
+
+  /// No description provided for @aiToolGetFinancialSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial summary'**
+  String get aiToolGetFinancialSummary;
+
+  /// No description provided for @aiToolGetDebtorsReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Debtors report'**
+  String get aiToolGetDebtorsReport;
+
+  /// No description provided for @aiToolGetCreditorsReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Creditors report'**
+  String get aiToolGetCreditorsReport;
+
+  /// No description provided for @aiToolSearchReceiptsPayments.
+  ///
+  /// In en, this message translates to:
+  /// **'Search receipts/payments'**
+  String get aiToolSearchReceiptsPayments;
+
+  /// No description provided for @aiToolCreateReceiptPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Create receipt/payment'**
+  String get aiToolCreateReceiptPayment;
+
+  /// No description provided for @aiToolGetSalesReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales report'**
+  String get aiToolGetSalesReport;
+
+  /// No description provided for @aiToolGetPurchaseReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase report'**
+  String get aiToolGetPurchaseReport;
+
+  /// No description provided for @aiToolGetInventoryValuation.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory valuation'**
+  String get aiToolGetInventoryValuation;
+
+  /// No description provided for @aiToolGetCashFlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash flow'**
+  String get aiToolGetCashFlow;
+
+  /// No description provided for @aiToolSearchLeads.
+  ///
+  /// In en, this message translates to:
+  /// **'Search leads'**
+  String get aiToolSearchLeads;
+
+  /// No description provided for @aiToolGetLeadDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Lead details'**
+  String get aiToolGetLeadDetails;
+
+  /// No description provided for @aiToolSearchDeals.
+  ///
+  /// In en, this message translates to:
+  /// **'Search deals'**
+  String get aiToolSearchDeals;
+
+  /// No description provided for @aiToolGetDealDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Deal details'**
+  String get aiToolGetDealDetails;
+
+  /// No description provided for @aiToolSearchActivities.
+  ///
+  /// In en, this message translates to:
+  /// **'Search activities'**
+  String get aiToolSearchActivities;
+
+  /// No description provided for @aiToolGetCrmSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM summary'**
+  String get aiToolGetCrmSummary;
+
+  /// No description provided for @aiToolGetPipelineReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Pipeline report'**
+  String get aiToolGetPipelineReport;
+
+  /// No description provided for @aiToolGetLeadFunnelReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Lead funnel report'**
+  String get aiToolGetLeadFunnelReport;
+
+  /// No description provided for @aiToolInvokeConnector.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoke connector'**
+  String get aiToolInvokeConnector;
+
+  /// No description provided for @aiTracePlanningAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Planning action'**
+  String get aiTracePlanningAction;
+
+  /// No description provided for @aiTracePlanningNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Planning next step…'**
+  String get aiTracePlanningNext;
+
+  /// No description provided for @aiTraceRunningTool.
+  ///
+  /// In en, this message translates to:
+  /// **'Running {toolName}'**
+  String aiTraceRunningTool(String toolName);
+
+  /// No description provided for @aiTraceObservation.
+  ///
+  /// In en, this message translates to:
+  /// **'Result: {toolName}'**
+  String aiTraceObservation(String toolName);
+
+  /// No description provided for @aiTraceComposingAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'Composing final answer'**
+  String get aiTraceComposingAnswer;
+
   /// No description provided for @settingsCategoryExternalServices.
   ///
   /// In en, this message translates to:

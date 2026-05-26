@@ -9831,6 +9831,173 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCategoryAIDescription => 'AI settings, plans and prompts';
 
   @override
+  String get aiStatusSending => 'Sending…';
+
+  @override
+  String get aiStatusConnecting => 'Connecting…';
+
+  @override
+  String get aiStatusThinking => 'Thinking…';
+
+  @override
+  String get aiStatusPreparingContext => 'Preparing context…';
+
+  @override
+  String get aiStatusLoadingPrompt => 'Loading instructions…';
+
+  @override
+  String get aiStatusLoadingInsights => 'Loading business insights…';
+
+  @override
+  String get aiStatusLoadingMemory => 'Loading memory…';
+
+  @override
+  String get aiStatusLoadingAttachments => 'Loading attachments…';
+
+  @override
+  String get aiStatusLoadingKnowledge => 'Searching knowledge base…';
+
+  @override
+  String get aiStatusLoadingConnectors => 'Loading connectors…';
+
+  @override
+  String get aiStatusPlanningTools => 'Planning next move…';
+
+  @override
+  String get aiStatusWriting => 'Writing response…';
+
+  @override
+  String get aiStatusSaving => 'Saving…';
+
+  @override
+  String aiStatusRunningTool(String toolName) {
+    return 'Running $toolName…';
+  }
+
+  @override
+  String aiStatusElapsed(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
+  String get aiToolGeneric => 'Running tool';
+
+  @override
+  String get aiToolGetBusinessInfo => 'Business info';
+
+  @override
+  String get aiToolSearchInvoices => 'Search invoices';
+
+  @override
+  String get aiToolGetInvoiceDetails => 'Invoice details';
+
+  @override
+  String get aiToolGetInvoicesCount => 'Count invoices';
+
+  @override
+  String get aiToolCreateInvoice => 'Create invoice';
+
+  @override
+  String get aiToolSearchProducts => 'Search products';
+
+  @override
+  String get aiToolGetProductInfo => 'Product info';
+
+  @override
+  String get aiToolGetInventoryStatus => 'Inventory status';
+
+  @override
+  String get aiToolGetProductKardex => 'Product kardex';
+
+  @override
+  String get aiToolGetCustomerInfo => 'Customer info';
+
+  @override
+  String get aiToolSearchPersons => 'Search persons';
+
+  @override
+  String get aiToolGetPersonBalance => 'Person balance';
+
+  @override
+  String get aiToolCreatePerson => 'Create person';
+
+  @override
+  String get aiToolUpdatePerson => 'Update person';
+
+  @override
+  String get aiToolGetFinancialSummary => 'Financial summary';
+
+  @override
+  String get aiToolGetDebtorsReport => 'Debtors report';
+
+  @override
+  String get aiToolGetCreditorsReport => 'Creditors report';
+
+  @override
+  String get aiToolSearchReceiptsPayments => 'Search receipts/payments';
+
+  @override
+  String get aiToolCreateReceiptPayment => 'Create receipt/payment';
+
+  @override
+  String get aiToolGetSalesReport => 'Sales report';
+
+  @override
+  String get aiToolGetPurchaseReport => 'Purchase report';
+
+  @override
+  String get aiToolGetInventoryValuation => 'Inventory valuation';
+
+  @override
+  String get aiToolGetCashFlow => 'Cash flow';
+
+  @override
+  String get aiToolSearchLeads => 'Search leads';
+
+  @override
+  String get aiToolGetLeadDetails => 'Lead details';
+
+  @override
+  String get aiToolSearchDeals => 'Search deals';
+
+  @override
+  String get aiToolGetDealDetails => 'Deal details';
+
+  @override
+  String get aiToolSearchActivities => 'Search activities';
+
+  @override
+  String get aiToolGetCrmSummary => 'CRM summary';
+
+  @override
+  String get aiToolGetPipelineReport => 'Pipeline report';
+
+  @override
+  String get aiToolGetLeadFunnelReport => 'Lead funnel report';
+
+  @override
+  String get aiToolInvokeConnector => 'Invoke connector';
+
+  @override
+  String get aiTracePlanningAction => 'Planning action';
+
+  @override
+  String get aiTracePlanningNext => 'Planning next step…';
+
+  @override
+  String aiTraceRunningTool(String toolName) {
+    return 'Running $toolName';
+  }
+
+  @override
+  String aiTraceObservation(String toolName) {
+    return 'Result: $toolName';
+  }
+
+  @override
+  String get aiTraceComposingAnswer => 'Composing final answer';
+
+  @override
   String get settingsCategoryExternalServices => 'External Services';
 
   @override

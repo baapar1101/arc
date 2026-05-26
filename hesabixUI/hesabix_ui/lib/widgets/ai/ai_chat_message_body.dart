@@ -1,31 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'ai_agent_trace_timeline.dart';
 import 'ai_chat_chart_widget.dart';
-
-/// برچسب فارسی ابزارهای AI
-String aiToolLabelFa(String name) {
-  const labels = {
-    'get_business_info': 'اطلاعات کسب‌وکار',
-    'search_invoices': 'جستجوی فاکتور',
-    'get_invoice_details': 'جزئیات فاکتور',
-    'create_invoice': 'ثبت فاکتور',
-    'search_products': 'جستجوی کالا',
-    'get_inventory_status': 'وضعیت موجودی',
-    'get_sales_report': 'گزارش فروش',
-    'get_purchase_report': 'گزارش خرید',
-    'get_cash_flow': 'جریان نقدی',
-    'get_debtors_report': 'گزارش بدهکاران',
-    'get_creditors_report': 'گزارش بستانکاران',
-    'search_persons': 'جستجوی اشخاص',
-    'create_person': 'ایجاد شخص',
-    'update_person': 'ویرایش شخص',
-    'create_receipt_payment': 'ثبت دریافت/پرداخت',
-    'get_crm_summary': 'خلاصه CRM',
-    'get_pipeline_report': 'گزارش قیف فروش',
-  };
-  return labels[name] ?? name;
-}
+import 'ai_chat_l10n.dart';
 
 class AIChatMessageBody extends StatelessWidget {
   final String content;
@@ -45,12 +24,18 @@ class AIChatMessageBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final toolActivities = _buildToolActivities();
+    final l10n = AppLocalizations.of(context)!;
+    final agentTrace = extractAgentTraceFromResults(functionResults);
+    final toolActivities = _buildToolActivities(l10n);
 
     return Column(
       crossAxisAlignment:
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
+        if (agentTrace.isNotEmpty) ...[
+          AIAgentTraceTimeline(steps: agentTrace, compact: true),
+          const SizedBox(height: 12),
+        ],
         if (toolActivities.isNotEmpty) ...[
           for (final activity in toolActivities)
             Padding(
@@ -69,12 +54,13 @@ class AIChatMessageBody extends StatelessWidget {
     );
   }
 
-  List<AIToolActivity> _buildToolActivities() {
+  List<AIToolActivity> _buildToolActivities(AppLocalizations l10n) {
     final calls = _normalizeCalls(functionCalls);
     if (calls.isEmpty) return [];
 
     final results = functionResults is Map
-        ? Map<String, dynamic>.from(functionResults as Map)
+        ? (Map<String, dynamic>.from(functionResults as Map)
+          ..remove(kAgentTraceStorageKey))
         : <String, dynamic>{};
 
     return calls.map((call) {
@@ -86,7 +72,7 @@ class AIChatMessageBody extends StatelessWidget {
 
       return AIToolActivity(
         tool: name,
-        label: aiToolLabelFa(name),
+        label: aiToolLabel(l10n, name),
         running: false,
         success: result != null && !hasError && !needsApproval,
         approvalRequired: needsApproval,
@@ -235,6 +221,7 @@ class _ToolActivityChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     IconData icon;
     Color? iconColor;
@@ -282,7 +269,7 @@ class _ToolActivityChip extends StatelessWidget {
           Flexible(
             child: Text(
               activity.running
-                  ? 'در حال ${activity.label}…'
+                  ? l10n.aiStatusRunningTool(activity.label)
                   : activity.approvalRequired
                       ? '${activity.label} — نیاز به تأیید'
                       : activity.label,

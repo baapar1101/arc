@@ -830,6 +830,14 @@ def _sse_payload(data: Dict[str, Any]) -> str:
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
+def _emit_chunk_as_sse(chunk: Dict[str, Any]):
+    """تبدیل chunk داخلی به payloadهای SSE (generator)."""
+    from app.services.ai.ai_stream_helpers import chunk_to_sse_data
+
+    for data in chunk_to_sse_data(chunk):
+        yield _sse_payload(data)
+
+
 async def _stream_message_response(
     session_id: int,
     messages: List[Dict[str, Any]],
@@ -845,63 +853,70 @@ async def _stream_message_response(
     Session فقط برای commit نهایی استفاده می‌شود و بلافاصله بسته می‌شود.
     """
     from adapters.db.session import get_db_session
-    
+    from app.services.ai.ai_stream_helpers import iter_with_heartbeat
+    from app.services.ai.ai_tool_keys import status_event
+
     try:
         # استفاده از session جدید برای AI service (فقط برای خواندن config)
         with get_db_session() as db:
             ai_service = AIService(db, ctx, business_id)
             # کپی کردن config برای استفاده بعد از بسته شدن session
             ai_config = ai_service.config
-        
-        # استفاده از config برای streaming (بدون session)
+
         accumulated_content = ""
         final_usage = None
         final_function_calls: Optional[List[Dict[str, Any]]] = None
         final_function_results: Optional[Dict[str, Any]] = None
-        
-        # ایجاد AI service موقت برای streaming
+        final_agent_trace: Optional[List[Dict[str, Any]]] = None
+
         with get_db_session() as temp_db:
             temp_ai_service = AIService(temp_db, ctx, business_id)
-            async for chunk in temp_ai_service.chat_completion_stream(
-                messages,
-                use_function_calling=True,
-                session_business_id=business_id,
-                session_id=session_id,
-                approve_writes=approve_writes,
+
+            async def _stream_factory():
+                async for chunk in temp_ai_service.chat_completion_stream(
+                    messages,
+                    use_function_calling=True,
+                    session_business_id=business_id,
+                    session_id=session_id,
+                    approve_writes=approve_writes,
+                ):
+                    yield chunk
+
+            async for chunk in iter_with_heartbeat(
+                _stream_factory,
+                initial_status=status_event("connecting"),
             ):
                 event_type = chunk.get("event")
-                if event_type in ("tool_start", "tool_end"):
+                if event_type == "heartbeat":
                     yield _sse_payload({
-                        "type": event_type,
-                        "tool": chunk.get("tool"),
-                        "label": chunk.get("label"),
-                        "success": chunk.get("success"),
-                        "approval_required": chunk.get("approval_required", False),
+                        "type": "heartbeat",
+                        "elapsed_ms": chunk.get("elapsed_ms", 0),
                         "done": False,
                     })
                     continue
 
+                if event_type == "prompt_ready":
+                    continue
+
                 delta = chunk.get("delta", {})
                 content_chunk = delta.get("content", "")
-                
                 if content_chunk:
                     accumulated_content += content_chunk
-                
                 if chunk.get("usage"):
                     final_usage = chunk["usage"]
                 if chunk.get("function_calls"):
                     final_function_calls = chunk["function_calls"]
                 if chunk.get("function_results"):
                     final_function_results = chunk["function_results"]
-                
-                yield _sse_payload({
-                    "content": content_chunk,
-                    "done": chunk.get("done", False),
-                })
-                
+                if chunk.get("agent_trace"):
+                    final_agent_trace = chunk["agent_trace"]
+
+                for payload in _emit_chunk_as_sse(chunk):
+                    yield payload
+
                 if chunk.get("done", False):
                     break
-        
+
         logger.info(
             "[AI Stream][session=%s] final_response_length=%s preview=%s",
             session_id,
@@ -913,7 +928,9 @@ async def _stream_message_response(
         # 1. ذخیره پیام در دیتابیس
         # 2. بررسی سهمیه و شارژ
         # 3. ارسال chunk نهایی با usage stats
-        
+        for payload in _emit_chunk_as_sse(status_event("saving")):
+            yield payload
+
         # اگر usage موجود نبود، از provider تخمین بزن
         if not final_usage:
             # تخمین tokens از accumulated_content
@@ -963,8 +980,13 @@ async def _stream_message_response(
                 
                 charge_result = new_ai_service.check_quota_and_charge(input_tokens, output_tokens)
                 
+                from app.services.ai.ai_trace import merge_trace_into_function_results
+
+                merged_results = merge_trace_into_function_results(
+                    final_function_results, final_agent_trace or []
+                )
                 fc_json, fr_json = serialize_function_metadata(
-                    final_function_calls, final_function_results
+                    final_function_calls, merged_results
                 )
                 assistant_message = AIChatMessage(
                     session_id=session_id,
@@ -1009,6 +1031,7 @@ async def _stream_message_response(
                 "message_id": message_id,
                 "function_calls": final_function_calls,
                 "function_results": final_function_results,
+                "agent_trace": final_agent_trace,
             })
         else:
             # در صورت خطا - حداقل پیام را ذخیره کن (با session جدید)

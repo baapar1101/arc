@@ -9776,6 +9776,173 @@ class AppLocalizationsFa extends AppLocalizations {
   String get settingsCategoryAIDescription => 'تنظیمات، پلن‌ها و Prompt های AI';
 
   @override
+  String get aiStatusSending => 'در حال ارسال…';
+
+  @override
+  String get aiStatusConnecting => 'در حال اتصال…';
+
+  @override
+  String get aiStatusThinking => 'در حال فکر کردن…';
+
+  @override
+  String get aiStatusPreparingContext => 'در حال آماده‌سازی زمینه…';
+
+  @override
+  String get aiStatusLoadingPrompt => 'بارگذاری دستورالعمل…';
+
+  @override
+  String get aiStatusLoadingInsights => 'بارگذاری بینش کسب‌وکار…';
+
+  @override
+  String get aiStatusLoadingMemory => 'بارگذاری حافظه…';
+
+  @override
+  String get aiStatusLoadingAttachments => 'بارگذاری پیوست‌ها…';
+
+  @override
+  String get aiStatusLoadingKnowledge => 'جستجو در دانشنامه…';
+
+  @override
+  String get aiStatusLoadingConnectors => 'بارگذاری کانکتورها…';
+
+  @override
+  String get aiStatusPlanningTools => 'برنامه‌ریزی اقدام بعدی…';
+
+  @override
+  String get aiStatusWriting => 'در حال نوشتن پاسخ…';
+
+  @override
+  String get aiStatusSaving => 'در حال ذخیره…';
+
+  @override
+  String aiStatusRunningTool(String toolName) {
+    return 'در حال $toolName…';
+  }
+
+  @override
+  String aiStatusElapsed(int seconds) {
+    return '$seconds ثانیه';
+  }
+
+  @override
+  String get aiToolGeneric => 'اجرای ابزار';
+
+  @override
+  String get aiToolGetBusinessInfo => 'اطلاعات کسب‌وکار';
+
+  @override
+  String get aiToolSearchInvoices => 'جستجوی فاکتور';
+
+  @override
+  String get aiToolGetInvoiceDetails => 'جزئیات فاکتور';
+
+  @override
+  String get aiToolGetInvoicesCount => 'شمارش فاکتورها';
+
+  @override
+  String get aiToolCreateInvoice => 'ثبت فاکتور';
+
+  @override
+  String get aiToolSearchProducts => 'جستجوی کالا';
+
+  @override
+  String get aiToolGetProductInfo => 'اطلاعات کالا';
+
+  @override
+  String get aiToolGetInventoryStatus => 'وضعیت موجودی';
+
+  @override
+  String get aiToolGetProductKardex => 'کاردکس کالا';
+
+  @override
+  String get aiToolGetCustomerInfo => 'اطلاعات مشتری';
+
+  @override
+  String get aiToolSearchPersons => 'جستجوی اشخاص';
+
+  @override
+  String get aiToolGetPersonBalance => 'مانده شخص';
+
+  @override
+  String get aiToolCreatePerson => 'ایجاد شخص';
+
+  @override
+  String get aiToolUpdatePerson => 'ویرایش شخص';
+
+  @override
+  String get aiToolGetFinancialSummary => 'خلاصه مالی';
+
+  @override
+  String get aiToolGetDebtorsReport => 'گزارش بدهکاران';
+
+  @override
+  String get aiToolGetCreditorsReport => 'گزارش بستانکاران';
+
+  @override
+  String get aiToolSearchReceiptsPayments => 'جستجوی دریافت/پرداخت';
+
+  @override
+  String get aiToolCreateReceiptPayment => 'ثبت دریافت/پرداخت';
+
+  @override
+  String get aiToolGetSalesReport => 'گزارش فروش';
+
+  @override
+  String get aiToolGetPurchaseReport => 'گزارش خرید';
+
+  @override
+  String get aiToolGetInventoryValuation => 'ارزش موجودی';
+
+  @override
+  String get aiToolGetCashFlow => 'جریان نقدی';
+
+  @override
+  String get aiToolSearchLeads => 'جستجوی سرنخ';
+
+  @override
+  String get aiToolGetLeadDetails => 'جزئیات سرنخ';
+
+  @override
+  String get aiToolSearchDeals => 'جستجوی فرصت';
+
+  @override
+  String get aiToolGetDealDetails => 'جزئیات فرصت';
+
+  @override
+  String get aiToolSearchActivities => 'جستجوی فعالیت';
+
+  @override
+  String get aiToolGetCrmSummary => 'خلاصه CRM';
+
+  @override
+  String get aiToolGetPipelineReport => 'گزارش قیف فروش';
+
+  @override
+  String get aiToolGetLeadFunnelReport => 'گزارش قیف سرنخ';
+
+  @override
+  String get aiToolInvokeConnector => 'فراخوانی کانکتور';
+
+  @override
+  String get aiTracePlanningAction => 'برنامه‌ریزی اقدام';
+
+  @override
+  String get aiTracePlanningNext => 'در حال برنامه‌ریزی مرحله بعد…';
+
+  @override
+  String aiTraceRunningTool(String toolName) {
+    return 'در حال $toolName';
+  }
+
+  @override
+  String aiTraceObservation(String toolName) {
+    return 'نتیجه: $toolName';
+  }
+
+  @override
+  String get aiTraceComposingAnswer => 'نوشتن پاسخ نهایی';
+
+  @override
   String get settingsCategoryExternalServices => 'سرویس‌های خارجی';
 
   @override

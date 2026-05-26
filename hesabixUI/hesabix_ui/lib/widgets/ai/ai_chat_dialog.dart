@@ -13,7 +13,6 @@ import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
-import 'package:hesabix_ui/widgets/ai/ai_chat_message_body.dart';
 import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -25,6 +24,8 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_memory_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_knowledge_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_connectors_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_l10n.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// دسترسی سریع به چت هوش مصنوعی — رابط تمام‌صفحه شبیه صفحه نخست ChatGPT.
@@ -82,6 +83,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
   List<AIChatMessage> _messages = [];
   String? _streamingContent;
   List<AIToolActivity> _streamingToolActivities = [];
+  List<AIAgentTraceStep> _streamingTraceSteps = [];
+  String? _streamingStatusPhase;
+  String? _streamingStatusStep;
+  int _streamingElapsedSeconds = 0;
+  DateTime? _streamStartedAt;
   bool _pendingWriteApproval = false;
   DateTime? _streamingTimestamp;
   final TextEditingController _messageCtrl = TextEditingController();
@@ -110,11 +116,15 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating =>
       _sending &&
-      (_streamingContent != null || _streamingToolActivities.isNotEmpty);
+      (_streamingContent != null ||
+          _streamingToolActivities.isNotEmpty ||
+          _streamingTraceSteps.isNotEmpty ||
+          _streamingStatusPhase != null);
   bool get _isHomeMode =>
       !_messagesLoading &&
       _messages.isEmpty &&
       _streamingContent == null &&
+      _streamingTraceSteps.isEmpty &&
       !_sending;
 
   bool get _canUseAi => _availabilityInfo?['can_use'] as bool? ?? true;
@@ -291,13 +301,117 @@ class _AIChatDialogState extends State<AIChatDialog> {
       token.cancel('user_cancel');
     }
     _streamCancelToken = null;
+    final partial = _streamingContent?.trim() ?? '';
+    final savedTools = List<AIToolActivity>.from(_streamingToolActivities);
+    final savedTrace = List<AIAgentTraceStep>.from(_streamingTraceSteps);
     setState(() {
+      if ((partial.isNotEmpty || savedTools.isNotEmpty || savedTrace.isNotEmpty) &&
+          _currentSession?.id != null) {
+        _messages = List<AIChatMessage>.from(_messages)
+          ..add(
+            AIChatMessage(
+              sessionId: _currentSession!.id!,
+              role: MessageRole.assistant,
+              content: partial.isEmpty ? '…' : partial,
+              functionResults: _functionResultsWithTrace(null, savedTrace),
+              createdAt: _streamingTimestamp,
+            ),
+          );
+      }
       _sending = false;
-      _streamingContent = null;
-      _streamingTimestamp = null;
+      _clearStreamingState();
     });
     if (showNotice) {
       _showSnackbar('تولید پاسخ متوقف شد');
+    }
+  }
+
+  void _clearStreamingState() {
+    _streamingContent = null;
+    _streamingToolActivities = [];
+    _streamingTraceSteps = [];
+    _streamingStatusPhase = null;
+    _streamingStatusStep = null;
+    _streamingElapsedSeconds = 0;
+    _streamStartedAt = null;
+    _streamingTimestamp = null;
+  }
+
+  void _beginOptimisticAssistantRow({String phase = 'sending'}) {
+    _streamStartedAt = DateTime.now();
+    _streamingElapsedSeconds = 0;
+    _streamingStatusPhase = phase;
+    _streamingStatusStep = null;
+    _streamingContent = '';
+    _streamingToolActivities = [];
+    _streamingTraceSteps = [];
+    _streamingTimestamp = DateTime.now();
+    _sending = true;
+    _pendingWriteApproval = false;
+  }
+
+  void _upsertTraceStep(AIAgentTraceStep step) {
+    if (step.stepId.isEmpty) {
+      _streamingTraceSteps.add(step);
+      return;
+    }
+    final idx = _streamingTraceSteps.indexWhere((s) => s.stepId == step.stepId);
+    if (idx >= 0) {
+      _streamingTraceSteps[idx] = step;
+    } else {
+      _streamingTraceSteps.add(step);
+    }
+  }
+
+  Object? _functionResultsWithTrace(
+    Object? functionResults,
+    List<AIAgentTraceStep> trace,
+  ) {
+    if (trace.isEmpty) return functionResults;
+    final map = functionResults is Map
+        ? Map<String, dynamic>.from(functionResults as Map)
+        : <String, dynamic>{};
+    map[kAgentTraceStorageKey] = trace.map((e) => e.toJson()).toList();
+    return map;
+  }
+
+  void _applyStreamChunk(AIStreamChunk chunk) {
+    if (chunk.traceStep != null) {
+      final step = chunk.traceStep!;
+      if (step.kind == 'observation' && step.tool != null) {
+        for (var i = 0; i < _streamingTraceSteps.length; i++) {
+          final existing = _streamingTraceSteps[i];
+          if (existing.kind == 'tool' &&
+              existing.tool == step.tool &&
+              existing.isActive) {
+            _streamingTraceSteps[i] = existing.copyWith(state: 'done');
+          }
+        }
+      }
+      _upsertTraceStep(step);
+      return;
+    }
+    if (chunk.statusEvent != null) {
+      _streamingStatusPhase = chunk.statusEvent!.phase;
+      _streamingStatusStep = chunk.statusEvent!.step;
+      return;
+    }
+    if (chunk.heartbeatElapsedMs != null) {
+      _streamingElapsedSeconds = (chunk.heartbeatElapsedMs! / 1000).ceil();
+      if (_streamStartedAt != null && _streamingStatusPhase == null) {
+        _streamingStatusPhase = 'thinking';
+      }
+      return;
+    }
+    if (chunk.toolEvent != null) {
+      _applyToolStreamEvent(chunk.toolEvent!);
+      return;
+    }
+    if (chunk.contentDelta != null &&
+        chunk.contentDelta!.isNotEmpty &&
+        _streamingStatusPhase != 'writing') {
+      _streamingStatusPhase = 'writing';
+      _streamingStatusStep = null;
     }
   }
 
@@ -807,6 +921,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _pendingWriteApproval = false;
       _streamingContent = '';
       _streamingToolActivities = [];
+      _streamingTraceSteps = [];
       _streamingTimestamp = DateTime.now();
     });
 
@@ -913,33 +1028,42 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _streamCancelToken = cancelToken;
     try {
       var accumulatedContent = '';
-      Map<String, dynamic>? finalUsage;
       Object? finalFunctionCalls;
       Object? finalFunctionResults;
 
       await for (final chunk in streamFactory(cancelToken)) {
         if (chunk.error != null) return;
-        if (chunk.toolEvent != null) {
-          _applyToolStreamEvent(chunk.toolEvent!);
-          if (mounted) setState(() {});
-          continue;
-        }
+        _applyStreamChunk(chunk);
         if (chunk.contentDelta != null && chunk.contentDelta!.isNotEmpty) {
           accumulatedContent += chunk.contentDelta!;
         }
         if (chunk.done) {
           finalFunctionCalls = chunk.functionCalls;
           finalFunctionResults = chunk.functionResults;
+          if (chunk.agentTrace != null && chunk.agentTrace!.isNotEmpty) {
+            _streamingTraceSteps = List<AIAgentTraceStep>.from(chunk.agentTrace!);
+          }
           break;
         }
-        if (mounted && chunk.contentDelta != null) {
-          setState(() => _streamingContent = accumulatedContent);
+        if (mounted &&
+            (chunk.contentDelta != null ||
+                chunk.statusEvent != null ||
+                chunk.toolEvent != null ||
+                chunk.traceStep != null ||
+                chunk.heartbeatElapsedMs != null)) {
+          setState(() {
+            _streamingContent = accumulatedContent;
+          });
         }
       }
 
       if (!mounted) return;
+      final savedTools = List<AIToolActivity>.from(_streamingToolActivities);
+      final savedTrace = List<AIAgentTraceStep>.from(_streamingTraceSteps);
       setState(() {
-        if (accumulatedContent.isNotEmpty) {
+        if (accumulatedContent.isNotEmpty ||
+            savedTools.isNotEmpty ||
+            savedTrace.isNotEmpty) {
           _messages = List<AIChatMessage>.from(_messages)
             ..add(
               AIChatMessage(
@@ -947,23 +1071,26 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 role: MessageRole.assistant,
                 content: accumulatedContent,
                 functionCalls: finalFunctionCalls,
-                functionResults: finalFunctionResults,
-                tokensUsed: finalUsage?['total_tokens'] as int? ?? 0,
+                functionResults: _functionResultsWithTrace(
+                  finalFunctionResults,
+                  savedTrace,
+                ),
                 createdAt: _streamingTimestamp,
               ),
             );
         }
-        _streamingContent = null;
-        _streamingToolActivities = [];
+        _clearStreamingState();
         _sending = false;
       });
       _scrollToBottom(force: true);
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        return;
+      }
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _streamingContent = null;
-        _streamingToolActivities = [];
+        _clearStreamingState();
       });
       _showError('$errorLabel ناموفق: ${ErrorExtractor.forContext(e, context)}');
     } finally {
@@ -988,6 +1115,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _pendingWriteApproval = false;
       _streamingContent = '';
       _streamingToolActivities = [];
+      _streamingTraceSteps = [];
       _streamingTimestamp = DateTime.now();
     });
 
@@ -1028,7 +1156,19 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (_sending) return;
     final content = (contentOverride ?? _messageCtrl.text).trim();
     if (content.isEmpty) return;
-    if (!await _ensureSession()) return;
+
+    if (!skipUserBubble) {
+      _messageCtrl.clear();
+    }
+
+    setState(() => _sending = true);
+    _scrollToBottom(force: true);
+
+    if (!await _ensureSession()) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      return;
+    }
 
     try {
       final availability = await _aiService.checkAvailability(
@@ -1036,15 +1176,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
         estimatedTokens: content.length * 2,
       );
       if (!(availability['can_use'] as bool? ?? false)) {
+        if (!mounted) return;
+        setState(() => _sending = false);
         _showDetailedError(availability);
         return;
       }
     } catch (e) {
       debugPrint('[AIChatDialog] Error checking availability before send: $e');
-    }
-
-    if (!skipUserBubble) {
-      _messageCtrl.clear();
     }
 
     if (!skipUserBubble) {
@@ -1054,16 +1192,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
         content: content,
         createdAt: DateTime.now(),
       );
+      if (!mounted) return;
       setState(() {
         _messages = List<AIChatMessage>.from(_messages)..add(userMessage);
       });
     }
 
-    setState(() {
-      _sending = true;
-      _pendingWriteApproval = false;
-    });
-    _scrollToBottom(force: true);
+    if (!mounted) return;
+    setState(() => _beginOptimisticAssistantRow(phase: 'connecting'));
 
     try {
       _streamCancelToken?.cancel('replaced');
@@ -1073,11 +1209,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
       Map<String, dynamic>? finalUsage;
       Object? finalFunctionCalls;
       Object? finalFunctionResults;
-      setState(() {
-        _streamingContent = '';
-        _streamingToolActivities = [];
-        _streamingTimestamp = DateTime.now();
-      });
 
       await for (final chunk in _aiService.sendMessageStream(
         sessionId: _currentSession!.id!,
@@ -1090,9 +1221,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
           if (!mounted) return;
           setState(() {
             _sending = false;
-            _streamingContent = null;
-            _streamingToolActivities = [];
-            _streamingTimestamp = null;
+            _clearStreamingState();
           });
           _showError(
             'ارسال پیام ناموفق بود: ${ErrorExtractor.forContext(error, context)}',
@@ -1102,13 +1231,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       )) {
         if (chunk.error != null) return;
 
-        if (chunk.toolEvent != null) {
-          _applyToolStreamEvent(chunk.toolEvent!);
-          if (!mounted) return;
-          setState(() {});
-          _scrollToBottom();
-          continue;
-        }
+        _applyStreamChunk(chunk);
 
         if (chunk.contentDelta != null && chunk.contentDelta!.isNotEmpty) {
           accumulatedContent += chunk.contentDelta!;
@@ -1117,16 +1240,26 @@ class _AIChatDialogState extends State<AIChatDialog> {
         if (chunk.done) {
           finalFunctionCalls = chunk.functionCalls;
           finalFunctionResults = chunk.functionResults;
+          if (chunk.agentTrace != null && chunk.agentTrace!.isNotEmpty) {
+            _streamingTraceSteps = List<AIAgentTraceStep>.from(chunk.agentTrace!);
+          }
           break;
         }
 
         final now = DateTime.now();
         final shouldUpdate = _lastStreamUiUpdate == null ||
             now.difference(_lastStreamUiUpdate!) >= const Duration(milliseconds: 60);
-        if (shouldUpdate && chunk.contentDelta != null) {
+        if (shouldUpdate &&
+            (chunk.contentDelta != null ||
+                chunk.statusEvent != null ||
+                chunk.toolEvent != null ||
+                chunk.traceStep != null ||
+                chunk.heartbeatElapsedMs != null)) {
           _lastStreamUiUpdate = now;
           if (!mounted) return;
-          setState(() => _streamingContent = accumulatedContent);
+          setState(() {
+            _streamingContent = accumulatedContent;
+          });
           _scrollToBottom();
           await Future<void>.delayed(Duration.zero);
         }
@@ -1134,8 +1267,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
       if (!mounted) return;
       final savedTools = List<AIToolActivity>.from(_streamingToolActivities);
+      final savedTrace = List<AIAgentTraceStep>.from(_streamingTraceSteps);
       setState(() {
-        if (accumulatedContent.isNotEmpty || savedTools.isNotEmpty) {
+        if (accumulatedContent.isNotEmpty ||
+            savedTools.isNotEmpty ||
+            savedTrace.isNotEmpty) {
           _messages = List<AIChatMessage>.from(_messages)
             ..add(
               AIChatMessage(
@@ -1143,15 +1279,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 role: MessageRole.assistant,
                 content: accumulatedContent,
                 functionCalls: finalFunctionCalls,
-                functionResults: finalFunctionResults,
+                functionResults: _functionResultsWithTrace(
+                  finalFunctionResults,
+                  savedTrace,
+                ),
                 tokensUsed: finalUsage?['total_tokens'] as int? ?? 0,
                 createdAt: _streamingTimestamp,
               ),
             );
         }
-        _streamingContent = null;
-        _streamingToolActivities = [];
-        _streamingTimestamp = null;
+        _clearStreamingState();
         _sending = false;
         _pendingWriteApproval = savedTools.any((t) => t.approvalRequired);
       });
@@ -1160,14 +1297,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
       unawaited(_loadSessions());
     } catch (e, stack) {
       if (e is DioException && CancelToken.isCancel(e)) {
-        if (!mounted) return;
-        setState(() {
-          _sending = false;
-          _streamingContent = null;
-          _streamingToolActivities = [];
-          _streamingTimestamp = null;
-        });
-        _streamCancelToken = null;
         return;
       }
       debugPrint('[AIChatDialog] Streaming error: $e');
@@ -1175,9 +1304,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       if (!mounted) return;
       setState(() {
         _sending = false;
-        _streamingContent = null;
-        _streamingToolActivities = [];
-        _streamingTimestamp = null;
+        _clearStreamingState();
       });
       _streamCancelToken = null;
       _showError('ارسال پیام ناموفق بود: ${ErrorExtractor.forContext(e, context)}');
@@ -1185,11 +1312,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   void _applyToolStreamEvent(AIStreamToolEvent event) {
-    final label = event.label ?? aiToolLabelFa(event.tool);
+    final l10n = AppLocalizations.of(context)!;
+    final label = event.label ??
+        aiToolLabel(l10n, event.tool, toolKey: event.toolKey);
+    _streamingStatusPhase = 'running_tool';
+    _streamingStatusStep = event.tool;
     final idx = _streamingToolActivities.indexWhere((a) => a.tool == event.tool);
 
     if (event.isStart) {
-      final activity = AIToolActivity(tool: event.tool, label: label, running: true);
+      final activity = AIToolActivity(
+        tool: event.tool,
+        toolKey: event.toolKey,
+        label: label,
+        running: true,
+      );
       if (idx >= 0) {
         _streamingToolActivities[idx] = activity;
       } else {
@@ -1201,6 +1337,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (event.isEnd) {
       final activity = AIToolActivity(
         tool: event.tool,
+        toolKey: event.toolKey,
         label: label,
         running: false,
         success: event.success,
@@ -1601,6 +1738,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 messages: _messages,
                                 streamingContent: _streamingContent,
                                 streamingToolActivities: _streamingToolActivities,
+                                streamingTraceSteps: _streamingTraceSteps,
+                                streamingStatusPhase: _streamingStatusPhase,
+                                streamingStatusStep: _streamingStatusStep,
+                                streamingElapsedSeconds: _streamingElapsedSeconds > 0
+                                    ? _streamingElapsedSeconds
+                                    : null,
                                 streamingTimestamp: _streamingTimestamp,
                                 messagesLoading: _messagesLoading,
                                 sending: _sending,
