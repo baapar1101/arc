@@ -642,6 +642,7 @@ def update_product(
     payload: ProductUpdateRequest,
     *,
     defer_cache_invalidation: bool = False,
+    user_id: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     repo = ProductRepository(db)
     obj = db.get(Product, product_id)
@@ -697,6 +698,18 @@ def update_product(
     # فقط اگر code در fields_set است و مقدار دارد، آن را به‌روزرسانی کن
     # اگر code در fields_set نیست یا None است، مقدار قبلی را نگه می‌داریم
     code_to_update = code_value if 'code' in fields_set else None
+
+    old_track_inventory = bool(obj.track_inventory)
+    new_track_inventory = (
+        bool(payload.track_inventory)
+        if 'track_inventory' in fields_set and payload.track_inventory is not None
+        else old_track_inventory
+    )
+    track_inventory_changed = (
+        'track_inventory' in fields_set
+        and payload.track_inventory is not None
+        and old_track_inventory != new_track_inventory
+    )
 
     # بررسی تغییر inventory_mode از bulk به unique
     old_inventory_mode = obj.inventory_mode or "bulk"
@@ -801,6 +814,30 @@ def update_product(
         replace_general_barcode_aliases(db, business_id, product_id, general_tokens)
 
     _upsert_attributes(db, product_id, business_id, payload.attribute_ids, auto_commit=False)
+
+    if track_inventory_changed or (
+        new_track_inventory
+        and product_has_stale_inventory_tracking_lines(
+            db,
+            business_id=business_id,
+            product_id=product_id,
+            expected_tracked=True,
+        )
+    ):
+        from app.services.product_inventory_tracking_sync import (
+            product_has_stale_inventory_tracking_lines,
+            sync_product_inventory_tracking_change,
+        )
+
+        sync_product_inventory_tracking_change(
+            db,
+            business_id=business_id,
+            product_id=product_id,
+            old_track_inventory=old_track_inventory,
+            new_track_inventory=new_track_inventory,
+            user_id=user_id,
+        )
+
     try:
         db.commit()
     except IntegrityError:
@@ -2203,7 +2240,11 @@ def get_inventory_stock_report(
             'summary': خلاصه آمار
         }
     """
-    from app.services.invoice_service import _compute_available_stock, _iter_product_movements
+    from app.services.warehouse_service import (
+        get_physical_stock,
+        get_warehouse_history_index,
+        _include_inventory_stock_row,
+    )
     from adapters.db.models.warehouse import Warehouse
     from adapters.db.models.warehouse_document import WarehouseDocument
     from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
@@ -2298,18 +2339,6 @@ def get_inventory_stock_report(
     # بررسی حرکات برای فیلتر فاقد حواله
     products_with_movements = set()
     if only_without_movements:
-        # بررسی حرکات از DocumentLine
-        movements_doc = _iter_product_movements(
-            db,
-            business_id,
-            product_id_list,
-            warehouse_ids,
-            as_of_date_obj,
-        )
-        for mv in movements_doc:
-            products_with_movements.add(mv['product_id'])
-        
-        # بررسی حرکات از WarehouseDocumentLine
         movements_wh_query = db.query(WarehouseDocumentLine.product_id).distinct().join(
             WarehouseDocument,
             WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id
@@ -2325,9 +2354,15 @@ def get_inventory_stock_report(
             movements_wh_query = movements_wh_query.filter(
                 WarehouseDocumentLine.warehouse_id.in_([int(w) for w in warehouse_ids])
             )
-        movements_wh = movements_wh_query.all()
-        for mv_line in movements_wh:
+        for mv_line in movements_wh_query.all():
             products_with_movements.add(mv_line.product_id)
+
+    products_with_wh_history, wh_history_pairs = get_warehouse_history_index(
+        db,
+        business_id,
+        product_ids=product_id_list,
+        warehouse_ids=[int(w) for w in warehouse_ids] if warehouse_ids else None,
+    )
     
     # ساخت لیست آیتم‌ها
     items = []
@@ -2345,10 +2380,13 @@ def get_inventory_stock_report(
         
         # اگر انباری انتخاب نشده، موجودی کل را محاسبه کن
         if not wh_list:
-            stock = _compute_available_stock(db, business_id, product.id, None, as_of_date_obj)
+            stock = get_physical_stock(db, business_id, product.id, None, as_of_date_obj)
             
-            # بررسی فیلتر موجودی صفر
-            if not include_zero and stock == 0:
+            if not _include_inventory_stock_row(
+                stock=stock,
+                include_zero=include_zero,
+                has_warehouse_history=product.id in products_with_wh_history,
+            ):
                 continue
             
             # بررسی فیلتر موجودی منفی
@@ -2375,10 +2413,13 @@ def get_inventory_stock_report(
         else:
             # موجودی به تفکیک انبار
             for warehouse in wh_list:
-                stock = _compute_available_stock(db, business_id, product.id, warehouse.id, as_of_date_obj)
+                stock = get_physical_stock(db, business_id, product.id, warehouse.id, as_of_date_obj)
                 
-                # بررسی فیلتر موجودی صفر
-                if not include_zero and stock == 0:
+                if not _include_inventory_stock_row(
+                    stock=stock,
+                    include_zero=include_zero,
+                    has_warehouse_history=(product.id, warehouse.id) in wh_history_pairs,
+                ):
                     continue
                 
                 # بررسی فیلتر موجودی منفی

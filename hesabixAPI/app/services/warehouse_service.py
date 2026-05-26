@@ -3000,7 +3000,6 @@ def get_warehouse_stock_report(
 	query: Dict[str, Any],
 ) -> Dict[str, Any]:
 	"""گزارش موجودی انبار به تفکیک محصول و انبار."""
-	from app.services.invoice_service import _compute_available_stock
 	from datetime import date as date_type
 	
 	# پارامترهای ورودی
@@ -3044,6 +3043,14 @@ def get_warehouse_stock_report(
 		).all()
 	else:
 		warehouses = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
+
+	product_id_list = [p.id for p in products]
+	products_with_wh_history, wh_history_pairs = get_warehouse_history_index(
+		db,
+		business_id,
+		product_ids=product_id_list or None,
+		warehouse_ids=[int(w) for w in warehouse_ids] if warehouse_ids else None,
+	)
 	
 	# اگر انباری وجود ندارد، یک رکورد "بدون انبار" اضافه کن
 	items = []
@@ -3057,8 +3064,12 @@ def get_warehouse_stock_report(
 		
 		# اگر انباری انتخاب نشده، موجودی کل را محاسبه کن
 		if not wh_list:
-			stock = _compute_available_stock(db, business_id, product.id, None, as_of_date)
-			if include_zero or stock > 0:
+			stock = get_physical_stock(db, business_id, product.id, None, as_of_date)
+			if _include_inventory_stock_row(
+				stock=stock,
+				include_zero=include_zero,
+				has_warehouse_history=product.id in products_with_wh_history,
+			):
 				items.append({
 					"product_id": product.id,
 					"product_code": product.code,
@@ -3072,8 +3083,12 @@ def get_warehouse_stock_report(
 		else:
 			# موجودی به تفکیک انبار
 			for warehouse in wh_list:
-				stock = _compute_available_stock(db, business_id, product.id, warehouse.id, as_of_date)
-				if include_zero or stock > 0:
+				stock = get_physical_stock(db, business_id, product.id, warehouse.id, as_of_date)
+				if _include_inventory_stock_row(
+					stock=stock,
+					include_zero=include_zero,
+					has_warehouse_history=(product.id, warehouse.id) in wh_history_pairs,
+				):
 					items.append({
 						"product_id": product.id,
 						"product_code": product.code,
@@ -3098,27 +3113,25 @@ def start_stock_count(
 	warehouse_id: Optional[int] = None,
 	product_ids: Optional[List[int]] = None,
 	as_of_date: Optional[date] = None,
+	only_with_warehouse_history: bool = False,
 ) -> Dict[str, Any]:
-	"""شروع انبار گردانی: دریافت لیست محصولات با موجودی سیستم."""
-	from app.services.invoice_service import _compute_available_stock
-	
+	"""شروع انبار گردانی: دریافت لیست محصولات با موجودی سیستم (فقط حواله‌های posted)."""
 	if as_of_date is None:
 		as_of_date = datetime.now().date()
-	
-	# دریافت لیست محصولات
+
 	products_query = db.query(Product).filter(
 		and_(
 			Product.business_id == business_id,
 			Product.track_inventory == True,
 		)
 	)
-	
+
 	if product_ids:
 		products_query = products_query.filter(Product.id.in_([int(p) for p in product_ids]))
-	
+
 	products = products_query.all()
-	
-	# دریافت لیست انبارها
+	product_id_list = [p.id for p in products]
+
 	if warehouse_id:
 		warehouses = db.query(Warehouse).filter(
 			and_(
@@ -3128,28 +3141,41 @@ def start_stock_count(
 		).all()
 	else:
 		warehouses = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
-	
-	# ساخت لیست محصولات با موجودی سیستم
+
+	products_with_wh_history: set[int] = set()
+	wh_history_pairs: set[tuple[int, int]] = set()
+	if only_with_warehouse_history and product_id_list:
+		products_with_wh_history, wh_history_pairs = get_warehouse_history_index(
+			db,
+			business_id,
+			product_ids=product_id_list,
+			warehouse_ids=[int(warehouse_id)] if warehouse_id else None,
+		)
+
+	selected_wh = warehouses[0] if warehouse_id and warehouses else None
+
 	items = []
 	for product in products:
 		if warehouse_id:
-			# فقط انبار انتخاب شده
-			stock = _compute_available_stock(db, business_id, product.id, warehouse_id, as_of_date)
+			if only_with_warehouse_history and (product.id, int(warehouse_id)) not in wh_history_pairs:
+				continue
+			stock = get_physical_stock(db, business_id, product.id, warehouse_id, as_of_date)
 			items.append({
 				"product_id": product.id,
 				"product_code": product.code or "",
 				"product_name": product.name,
 				"warehouse_id": warehouse_id,
-				"warehouse_code": None,
-				"warehouse_name": None,
+				"warehouse_code": selected_wh.code if selected_wh else None,
+				"warehouse_name": selected_wh.name if selected_wh else None,
 				"system_quantity": float(stock),
 				"unit": product.main_unit or "",
 			})
 		else:
-			# همه انبارها
 			if warehouses:
 				for warehouse in warehouses:
-					stock = _compute_available_stock(db, business_id, product.id, warehouse.id, as_of_date)
+					if only_with_warehouse_history and (product.id, warehouse.id) not in wh_history_pairs:
+						continue
+					stock = get_physical_stock(db, business_id, product.id, warehouse.id, as_of_date)
 					items.append({
 						"product_id": product.id,
 						"product_code": product.code or "",
@@ -3161,8 +3187,9 @@ def start_stock_count(
 						"unit": product.main_unit or "",
 					})
 			else:
-				# بدون انبار
-				stock = _compute_available_stock(db, business_id, product.id, None, as_of_date)
+				if only_with_warehouse_history and product.id not in products_with_wh_history:
+					continue
+				stock = get_physical_stock(db, business_id, product.id, None, as_of_date)
 				items.append({
 					"product_id": product.id,
 					"product_code": product.code or "",
@@ -3173,11 +3200,12 @@ def start_stock_count(
 					"system_quantity": float(stock),
 					"unit": product.main_unit or "",
 				})
-	
+
 	return {
 		"items": items,
 		"as_of_date": as_of_date.isoformat(),
 		"total_items": len(items),
+		"only_with_warehouse_history": bool(only_with_warehouse_history),
 	}
 
 
@@ -3185,23 +3213,38 @@ def calculate_stock_count_differences(
 	db: Session,
 	business_id: int,
 	items: List[Dict[str, Any]],
+	as_of_date: Optional[date] = None,
 ) -> Dict[str, Any]:
-	"""محاسبه تفاوت‌های انبار گردانی."""
-	from app.services.invoice_service import _compute_available_stock
-	from datetime import date as date_type
-	
+	"""محاسبه تفاوت‌های انبار گردانی؛ موجودی سیستم از سرور (posted) خوانده می‌شود."""
+	if as_of_date is None:
+		as_of_date = datetime.now().date()
+
 	result_items = []
-	
+
 	for item in items:
 		product_id = item.get("product_id")
 		warehouse_id = item.get("warehouse_id")
-		system_quantity = Decimal(str(item.get("system_quantity", 0)))
-		physical_quantity = Decimal(str(item.get("physical_quantity", 0)))
-		
+
 		if not product_id:
 			continue
-		
-		# محاسبه تفاوت
+
+		try:
+			wh_id = int(warehouse_id) if warehouse_id is not None else None
+		except (TypeError, ValueError):
+			wh_id = None
+
+		system_quantity = get_physical_stock(
+			db,
+			business_id,
+			int(product_id),
+			wh_id,
+			as_of_date,
+		)
+		try:
+			physical_quantity = Decimal(str(item.get("physical_quantity", 0)))
+		except Exception:
+			physical_quantity = Decimal(0)
+
 		difference = physical_quantity - system_quantity
 		
 		# تعیین نوع حرکت برای حواله تعدیل
@@ -3327,11 +3370,30 @@ def create_stock_count_adjustment(
 	return wh
 
 
+def get_physical_stock(
+	db: Session,
+	business_id: int,
+	product_id: int,
+	warehouse_id: Optional[int] = None,
+	as_of_date: Optional[date] = None,
+) -> Decimal:
+	"""موجودی انبارداری (فیزیکی) یک کالا؛ فقط حواله‌های posted."""
+	stocks = get_physical_stock_bulk(
+		db,
+		business_id,
+		[int(product_id)],
+		as_of_date=as_of_date,
+		warehouse_id=warehouse_id,
+	)
+	return stocks.get(int(product_id), Decimal(0))
+
+
 def get_physical_stock_bulk(
 	db: Session,
 	business_id: int,
 	product_ids: List[int],
 	as_of_date: Optional[date] = None,
+	warehouse_id: Optional[int] = None,
 ) -> Dict[int, Decimal]:
 	"""
 	محاسبه موجودی انبارداری (فیزیکی) برای لیستی از کالاها.
@@ -3340,12 +3402,11 @@ def get_physical_stock_bulk(
 	"""
 	if not product_ids:
 		return {}
-	
+
 	if as_of_date is None:
 		as_of_date = datetime.now().date()
-	
-	# دریافت حرکات از حواله‌های انبار با وضعیت posted
-	lines = (
+
+	lines_query = (
 		db.query(WarehouseDocumentLine, WarehouseDocument)
 		.join(WarehouseDocument, WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id)
 		.filter(
@@ -3356,29 +3417,76 @@ def get_physical_stock_bulk(
 				WarehouseDocumentLine.product_id.in_(product_ids),
 			)
 		)
-		.all()
 	)
-	
-	# محاسبه موجودی
+	if warehouse_id is not None:
+		lines_query = lines_query.filter(WarehouseDocumentLine.warehouse_id == int(warehouse_id))
+
+	lines = lines_query.all()
+
 	stock_dict: Dict[int, Decimal] = {}
-	for line, doc in lines:
+	for line, _doc in lines:
 		pid = int(line.product_id)
 		qty = Decimal(str(line.quantity or 0))
 		if qty <= 0:
 			continue
-		
+
 		if pid not in stock_dict:
 			stock_dict[pid] = Decimal(0)
-		
+
 		if line.movement == "in":
 			stock_dict[pid] += qty
 		elif line.movement == "out":
 			stock_dict[pid] -= qty
-	
-	# برای کالاهایی که حرکتی نداشتند، مقدار 0 برگردان
+
 	for pid in product_ids:
 		if pid not in stock_dict:
 			stock_dict[pid] = Decimal(0)
-	
+
 	return stock_dict
+
+
+def get_warehouse_history_index(
+	db: Session,
+	business_id: int,
+	product_ids: Optional[List[int]] = None,
+	warehouse_ids: Optional[List[int]] = None,
+) -> tuple[set[int], set[tuple[int, int]]]:
+	"""
+	کالاهایی که حداقل یک خط حواله انبار (هر وضعیتی) دارند.
+	بازگشت: (product_ids, {(product_id, warehouse_id), ...})
+	"""
+	q = (
+		db.query(WarehouseDocumentLine.product_id, WarehouseDocumentLine.warehouse_id)
+		.join(
+			WarehouseDocument,
+			WarehouseDocument.id == WarehouseDocumentLine.warehouse_document_id,
+		)
+		.filter(WarehouseDocument.business_id == int(business_id))
+		.distinct()
+	)
+	if product_ids:
+		q = q.filter(WarehouseDocumentLine.product_id.in_([int(p) for p in product_ids]))
+	if warehouse_ids:
+		q = q.filter(WarehouseDocumentLine.warehouse_id.in_([int(w) for w in warehouse_ids]))
+
+	product_set: set[int] = set()
+	pair_set: set[tuple[int, int]] = set()
+	for pid, wh_id in q.all():
+		if pid is None:
+			continue
+		product_set.add(int(pid))
+		if wh_id is not None:
+			pair_set.add((int(pid), int(wh_id)))
+	return product_set, pair_set
+
+
+def _include_inventory_stock_row(
+	*,
+	stock: Decimal,
+	include_zero: bool,
+	has_warehouse_history: bool,
+) -> bool:
+	if include_zero or stock != 0:
+		return True
+	return has_warehouse_history
 

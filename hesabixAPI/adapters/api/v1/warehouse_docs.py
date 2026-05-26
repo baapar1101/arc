@@ -1176,8 +1176,17 @@ def start_stock_count_endpoint(
 			as_of_date = _parse_date(as_of_date_str)
 		except Exception:
 			as_of_date = None
-	
-	result = start_stock_count(db, business_id, warehouse_id, product_ids, as_of_date)
+
+	only_with_warehouse_history = bool(payload.get("only_with_warehouse_history", False))
+
+	result = start_stock_count(
+		db,
+		business_id,
+		warehouse_id,
+		product_ids,
+		as_of_date,
+		only_with_warehouse_history=only_with_warehouse_history,
+	)
 	return success_response(data=result, request=request)
 
 
@@ -1197,8 +1206,18 @@ def calculate_stock_count_differences_endpoint(
 	items = payload.get("items", [])
 	if not isinstance(items, list) or not items:
 		raise ApiError("INVALID_PAYLOAD", "items list is required", http_status=400)
-	
-	result = calculate_stock_count_differences(db, business_id, items)
+
+	from app.services.transfer_service import _parse_iso_date as _parse_date
+
+	as_of_date_str = payload.get("as_of_date")
+	as_of_date = None
+	if as_of_date_str:
+		try:
+			as_of_date = _parse_date(as_of_date_str)
+		except Exception:
+			as_of_date = None
+
+	result = calculate_stock_count_differences(db, business_id, items, as_of_date=as_of_date)
 	return success_response(data=result, request=request)
 
 

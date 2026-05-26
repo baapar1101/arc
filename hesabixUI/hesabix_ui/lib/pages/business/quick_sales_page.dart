@@ -41,6 +41,36 @@ import '../../widgets/barcode/web_barcode_scan_screen.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../utils/responsive_helper.dart';
 
+/// کد کسب‌وکاری برای نمایش در فروش سریع: اگر [code] با [id] یکی باشد، از `product_code`، `tax_code` یا اولین بارکد عمومی استفاده می‌شود.
+String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
+  final idRaw = p['id'];
+  final idStr = idRaw == null
+      ? ''
+      : number_utils.toEnglishDigits(idRaw.toString().trim());
+
+  bool looksLikeInternalIdOnly(String v) {
+    final t = v.trim();
+    if (t.isEmpty) return true;
+    if (idStr.isEmpty) return false;
+    final tNorm = number_utils.toEnglishDigits(t);
+    return tNorm == idStr;
+  }
+
+  final code = (p['code']?.toString() ?? '').trim();
+  final productCode = (p['product_code']?.toString() ?? '').trim();
+  final tax = (p['tax_code']?.toString() ?? '').trim();
+  final tokens = parseGeneralBarcodeTokens(p['general_barcodes']?.toString());
+  final gb0 = tokens.isNotEmpty ? tokens.first.trim() : '';
+
+  for (final candidate in [code, productCode, tax, gb0]) {
+    if (!looksLikeInternalIdOnly(candidate)) return candidate;
+  }
+  if (code.isNotEmpty) return code;
+  if (productCode.isNotEmpty) return productCode;
+  if (tax.isNotEmpty) return tax;
+  return null;
+}
+
 class QuickSalesPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
@@ -238,16 +268,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   
   Future<void> _saveRecentProduct(Map<String, dynamic> product) async {
     try {
-      final productId = (product['id'] as num?)?.toInt();
+      final productId = _productIntId(product);
       if (productId == null) return;
       
       // حذف محصول اگر قبلاً وجود داشته
-      _recentProducts.removeWhere((p) => (p['id'] as num?)?.toInt() == productId);
+      _recentProducts.removeWhere((p) => _productIntId(Map<String, dynamic>.from(p)) == productId);
       
       // اضافه کردن به ابتدا
       _recentProducts.insert(0, {
         'id': productId,
-        'code': product['code']?.toString(),
+        'code': _quickSalesDisplayProductBusinessCode(product) ?? product['code']?.toString(),
         'name': product['name']?.toString(),
         'sales_price': _toNum(product['base_sales_price'] ?? product['sales_price']),
         'tax_rate': _toNum(product['sales_tax_rate'] ?? product['tax_rate']),
@@ -800,28 +830,54 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
   }
 
+  /// شناسهٔ عددی کالا از map (پشتیبانی از `id` به‌صورت رشته با ارقام فارسی).
+  int? _productIntId(Map<String, dynamic> p) {
+    final v = p['id'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) {
+      return int.tryParse(number_utils.toEnglishDigits(v.trim()));
+    }
+    return null;
+  }
+
   /// اگر نتیجهٔ جستجو [code] را خالی یا برابر [id] برگرداند، با GET تک‌کالا مقدار درست را پر می‌کنیم.
   bool _shouldHydrateProductCode(Map<String, dynamic> product) {
-    final id = (product['id'] as num?)?.toInt();
+    final id = _productIntId(product);
     if (id == null) return false;
-    final code = (product['code']?.toString() ?? '').trim();
+    final code = number_utils.toEnglishDigits((product['code']?.toString() ?? '').trim());
     if (code.isEmpty) return true;
     return code == id.toString();
   }
 
   Future<void> _hydrateProductCodeIfNeeded(Map<String, dynamic> product) async {
     if (!_shouldHydrateProductCode(product)) return;
-    final id = (product['id'] as num?)?.toInt();
+    final id = _productIntId(product);
     if (id == null) return;
     try {
       final full = await _productService.getProduct(
         businessId: widget.businessId,
         productId: id,
       );
-      if (!mounted || full.isEmpty || full['id'] == null) return;
-      final fc = (full['code']?.toString() ?? '').trim();
-      if (fc.isNotEmpty) {
-        product['code'] = full['code'];
+      if (!mounted || full.isEmpty || _productIntId(full) == null) return;
+      for (final k in const [
+        'code',
+        'product_code',
+        'tax_code',
+        'name',
+        'general_barcodes',
+        'barcode',
+        'base_sales_price',
+        'sales_price',
+        'track_inventory',
+        'sales_tax_rate',
+        'tax_rate',
+        'base_purchase_price',
+      ]) {
+        final v = full[k];
+        if (v != null && v.toString().trim().isNotEmpty) {
+          product[k] = v;
+        }
       }
     } catch (e) {
       debugPrint('QuickSales hydrate product code: $e');
@@ -847,7 +903,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     int? instanceWarehouseId,
   }) async {
     await _hydrateProductCodeIfNeeded(product);
-    final productId = (product['id'] as num?)?.toInt();
+    final productId = _productIntId(product);
     if (productId == null) return;
     
     final trackInventory = product['track_inventory'] == true;
@@ -894,7 +950,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     
     final lineItem = InvoiceLineItem(
       productId: productId,
-      productCode: product['code']?.toString(),
+      productCode: _quickSalesDisplayProductBusinessCode(product) ?? product['code']?.toString(),
       productName: product['name']?.toString(),
       quantity: instanceId != null ? 1 : 1, // برای کالاهای یونیک همیشه 1
       unitPrice: unitPrice,
@@ -1614,7 +1670,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               final product = _barcodeSuggestions[index];
               final selected = index == _barcodeHighlightedIndex;
               final name = product['name']?.toString() ?? 'نامشخص';
-              final code = product['code']?.toString() ?? '';
+              final code = _quickSalesDisplayProductBusinessCode(product) ?? '';
               final gb = productPrimaryBarcodeForSearchDisplay(product);
               final subStyle = TextStyle(
                 fontSize: 12,
@@ -1844,7 +1900,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   void _onBarcodeOverlayRowTapped(Map<String, dynamic> product) {
-    final id = (product['id'] as num?)?.toInt();
+    final id = _productIntId(product);
     final now = DateTime.now();
     if (id != null &&
         _lastOverlaySuggestionTapProductId == id &&
@@ -2409,7 +2465,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                 child: InkWell(
                                   onTap: () async {
                                     try {
-                                      final productId = (product['id'] as num?)?.toInt();
+                                      final productId = _productIntId(product);
                                       if (productId != null) {
                                         final fullProduct = await _productService.getProduct(
                                           businessId: widget.businessId,
@@ -2768,7 +2824,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                         child: InkWell(
                           onTap: () async {
                             try {
-                              final productId = (product['id'] as num?)?.toInt();
+                              final productId = _productIntId(product);
                               if (productId != null) {
                                 final fullProduct = await _productService.getProduct(
                                   businessId: widget.businessId,
@@ -4422,7 +4478,7 @@ class _ProductSelectionDialog extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final product = products[index];
                   final productName = product['name']?.toString() ?? 'نامشخص';
-                  final productCode = product['code']?.toString();
+                  final productCode = _quickSalesDisplayProductBusinessCode(product);
                   final showBarcodeLine = !ResponsiveHelper.isMobile(context);
                   final barcodeLine =
                       showBarcodeLine ? productPrimaryBarcodeForSearchDisplay(product) : null;

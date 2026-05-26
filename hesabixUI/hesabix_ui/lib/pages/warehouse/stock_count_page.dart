@@ -20,6 +20,9 @@ import '../../utils/responsive_helper.dart';
 
 String _rowKey(int? productId, int? warehouseId) => '${productId ?? 0}:${warehouseId ?? 0}';
 
+/// برچسب موجودی سیستم در انبارگردانی (فقط حواله‌های posted)
+const String _kStockCountSystemQtyLabel = 'موجودی سیستم (انبار posted)';
+
 double? _tryParseNum(String raw) {
   final s = raw.trim();
   if (s.isEmpty) return null;
@@ -75,6 +78,7 @@ class _StockCountPageState extends State<StockCountPage> {
   Map<String, dynamic>? _summary;
   String _stockCountCode = '';
   bool _onlyDifferences = false;
+  bool _onlyWithWarehouseHistory = false;
 
   Timer? _draftAutoSaveTimer;
   String? _lastDraftSnapshot;
@@ -127,6 +131,7 @@ class _StockCountPageState extends State<StockCountPage> {
       'notes': _notesController.text,
       'search': _searchController.text,
       'only_differences': _onlyDifferences,
+      'only_with_warehouse_history': _onlyWithWarehouseHistory,
       'items': items,
       'calculated_by_key': calculated,
       'summary': _summary == null ? null : Map<String, dynamic>.from(_summary!),
@@ -275,6 +280,7 @@ class _StockCountPageState extends State<StockCountPage> {
       _notesController.text = (decoded['notes'] ?? '').toString();
       _searchController.text = (decoded['search'] ?? '').toString();
       _onlyDifferences = decoded['only_differences'] == true;
+      _onlyWithWarehouseHistory = decoded['only_with_warehouse_history'] == true;
       _rows = newRows;
       _rowVmByKey
         ..clear()
@@ -320,6 +326,7 @@ class _StockCountPageState extends State<StockCountPage> {
             ? [_selectedProduct!['id'] as int]
             : null,
         asOfDate: _asOfDate!.toIso8601String().split('T')[0],
+        onlyWithWarehouseHistory: _onlyWithWarehouseHistory,
       );
       
       final items = List<Map<String, dynamic>>.from(res['items'] ?? const []);
@@ -397,7 +404,6 @@ class _StockCountPageState extends State<StockCountPage> {
         return {
           'product_id': item['product_id'],
           'warehouse_id': item['warehouse_id'],
-          'system_quantity': item['system_quantity'],
           'physical_quantity': physical,
         };
       }).toList();
@@ -405,6 +411,7 @@ class _StockCountPageState extends State<StockCountPage> {
       final res = await _svc.calculateStockCountDifferences(
         businessId: widget.businessId,
         items: itemsToCalculate,
+        asOfDate: _asOfDate?.toIso8601String().split('T').first,
       );
       
       final calculatedItems = List<Map<String, dynamic>>.from(res['items'] ?? const []);
@@ -412,7 +419,12 @@ class _StockCountPageState extends State<StockCountPage> {
       for (final it in calculatedItems) {
         final pid = (it['product_id'] as num?)?.toInt();
         final wid = (it['warehouse_id'] as num?)?.toInt();
-        map[_rowKey(pid, wid)] = it;
+        final key = _rowKey(pid, wid);
+        map[key] = it;
+        final vm = _rowVmByKey[key];
+        if (vm != null && it['system_quantity'] != null) {
+          vm.raw['system_quantity'] = it['system_quantity'];
+        }
       }
       if (!mounted) return;
       setState(() {
@@ -630,7 +642,7 @@ class _StockCountPageState extends State<StockCountPage> {
         ),
         NumberColumn(
           'system_quantity',
-          'موجودی سیستم',
+          _kStockCountSystemQtyLabel,
           width: ColumnWidth.medium,
           sortable: false,
           searchable: false,
@@ -882,6 +894,16 @@ class _StockCountPageState extends State<StockCountPage> {
               ],
             ),
             const SizedBox(height: 12),
+            FilterChip(
+              label: const Text('فقط کالاهای دارای سابقه حواله در انبار'),
+              selected: _onlyWithWarehouseHistory,
+              onSelected: _loading
+                  ? null
+                  : (selected) {
+                      setState(() => _onlyWithWarehouseHistory = selected);
+                    },
+            ),
+            const SizedBox(height: 12),
             if (isMobile) ...[
               SizedBox(height: 56, child: dateField),
               const SizedBox(height: 12),
@@ -921,7 +943,7 @@ class _StockCountPageState extends State<StockCountPage> {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _startStockCount,
-              tooltip: 'بارگذاری مجدد از سرور (موجودی سیستم به‌روز؛ شمارش فیزیکی قبلی برای هر کالا حفظ می‌شود)',
+              tooltip: 'بارگذاری مجدد از سرور ($_kStockCountSystemQtyLabel به‌روز؛ شمارش فیزیکی قبلی برای هر کالا حفظ می‌شود)',
             ),
         ],
       ),
@@ -1256,7 +1278,7 @@ class _StockCountRowCard extends StatelessWidget {
             const SizedBox(height: 10),
             Row(
               children: [
-                Expanded(child: _kv(context, 'موجودی سیستم', formatWithThousands(systemQty))),
+                Expanded(child: _kv(context, _kStockCountSystemQtyLabel, formatWithThousands(systemQty))),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(

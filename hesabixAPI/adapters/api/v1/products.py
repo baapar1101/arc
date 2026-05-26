@@ -993,7 +993,7 @@ async def update_product_endpoint(
     if not payload:
         raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)
     
-    result = update_product(db, product_id, business_id, payload)
+    result = update_product(db, product_id, business_id, payload, user_id=ctx.get_user_id())
     if not result:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
     

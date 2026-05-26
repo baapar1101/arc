@@ -312,11 +312,13 @@ class WarehouseService {
     int? warehouseId,
     List<int>? productIds,
     String? asOfDate,
+    bool onlyWithWarehouseHistory = false,
   }) async {
     final payload = <String, dynamic>{};
     if (warehouseId != null) payload['warehouse_id'] = warehouseId;
     if (productIds != null && productIds.isNotEmpty) payload['product_ids'] = productIds;
     if (asOfDate != null) payload['as_of_date'] = asOfDate;
+    if (onlyWithWarehouseHistory) payload['only_with_warehouse_history'] = true;
     
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/warehouse-docs/business/$businessId/stock-count/start',
@@ -328,10 +330,14 @@ class WarehouseService {
   Future<Map<String, dynamic>> calculateStockCountDifferences({
     required int businessId,
     required List<Map<String, dynamic>> items,
+    String? asOfDate,
   }) async {
+    final payload = <String, dynamic>{'items': items};
+    if (asOfDate != null) payload['as_of_date'] = asOfDate;
+
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/warehouse-docs/business/$businessId/stock-count/calculate',
-      data: {'items': items},
+      data: payload,
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }

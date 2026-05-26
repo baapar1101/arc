@@ -24,6 +24,8 @@ extension type _DetectedBarcode._(JSObject _) implements JSObject {
   external JSString? get rawValue;
 }
 
+typedef _VideoDevice = ({String deviceId, String label});
+
 /// اسکن بارکد و QR در وب: [getUserMedia] + [BarcodeDetector]؛ در نبود API، ورود دستی کد.
 class WebBarcodeScanScreen extends StatefulWidget {
   const WebBarcodeScanScreen({super.key});
@@ -63,10 +65,27 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
 
   final TextEditingController _manualController = TextEditingController();
 
+  List<_VideoDevice> _videoInputs = const [];
+  int _videoInputIndex = 0;
+  bool _preferFacingUser = false;
+  bool _torchBrowserHint = false;
+  bool _torchFromTrack = false;
+  bool _torchOn = false;
+
   @override
   void initState() {
     super.initState();
+    _readGlobalTorchSupport();
     _registerViewFactory();
+  }
+
+  void _readGlobalTorchSupport() {
+    try {
+      final c = web.window.navigator.mediaDevices.getSupportedConstraints();
+      _torchBrowserHint = c.torch;
+    } catch (_) {
+      _torchBrowserHint = false;
+    }
   }
 
   void _registerViewFactory() {
@@ -113,6 +132,88 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
     });
   }
 
+  JSAny _videoConstraintsForRequest() {
+    if (_videoInputs.length >= 2) {
+      final safeIdx = _videoInputIndex.clamp(0, _videoInputs.length - 1);
+      final id = _videoInputs[safeIdx].deviceId;
+      return web.MediaTrackConstraints(
+        deviceId: web.ConstrainDOMStringParameters(exact: id.toJS),
+      );
+    }
+    if (_videoInputs.length == 1) {
+      final id = _videoInputs.first.deviceId;
+      return web.MediaTrackConstraints(
+        deviceId: web.ConstrainDOMStringParameters(exact: id.toJS),
+      );
+    }
+    return web.MediaTrackConstraints(
+      facingMode: (_preferFacingUser ? 'user' : 'environment').toJS,
+    );
+  }
+
+  Future<void> _refreshCameraList() async {
+    try {
+      final arr = await web.window.navigator.mediaDevices.enumerateDevices().toDart;
+      final list = <_VideoDevice>[];
+      var i = 0;
+      for (final d in arr.toDart) {
+        if (d.kind != 'videoinput') continue;
+        i++;
+        final label = d.label.isEmpty ? 'دوربین $i' : d.label;
+        list.add((deviceId: d.deviceId, label: label));
+      }
+
+      var idx = _videoInputIndex;
+      final stream = _mediaStream;
+      if (stream != null) {
+        final vt = stream.getVideoTracks().toDart;
+        if (vt.isNotEmpty) {
+          try {
+            final currentId = vt.first.getSettings().deviceId;
+            final found = list.indexWhere((e) => e.deviceId == currentId);
+            if (found >= 0) idx = found;
+          } catch (_) {}
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _videoInputs = list;
+        if (list.isEmpty) {
+          _videoInputIndex = 0;
+        } else {
+          _videoInputIndex = idx.clamp(0, list.length - 1);
+        }
+      });
+    } catch (e, st) {
+      debugPrint('WebBarcodeScan: enumerateDevices: $e\n$st');
+    }
+  }
+
+  void _updateTorchFromTrack(web.MediaStreamTrack track) {
+    var fromCaps = false;
+    try {
+      final caps = track.getCapabilities();
+      for (final x in caps.torch.toDart) {
+        if (x.toDart == true) {
+          fromCaps = true;
+          break;
+        }
+      }
+    } catch (_) {}
+
+    var on = false;
+    try {
+      on = track.getSettings().torch;
+    } catch (_) {}
+
+    if (!mounted) return;
+    setState(() {
+      _torchFromTrack = fromCaps || _torchBrowserHint;
+      _torchOn = on;
+    });
+  }
+
   Future<void> _openCameraAndScanner() async {
     if (_handled || !mounted) return;
     final video = _surfaceVideo;
@@ -123,10 +224,12 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
       _errorText = null;
     });
 
+    _cleanupStream();
+
     try {
       final stream = await web.window.navigator.mediaDevices
           .getUserMedia(web.MediaStreamConstraints(
-            video: true.toJS,
+            video: _videoConstraintsForRequest(),
             audio: false.toJS,
           ))
           .toDart;
@@ -139,6 +242,20 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
       _mediaStream = stream;
       video.srcObject = stream;
       await video.play().toDart;
+
+      final vTracks = stream.getVideoTracks().toDart;
+      if (vTracks.isNotEmpty) {
+        _updateTorchFromTrack(vTracks.first);
+      } else {
+        if (mounted) {
+          setState(() {
+            _torchFromTrack = false;
+            _torchOn = false;
+          });
+        }
+      }
+
+      unawaited(_refreshCameraList());
 
       _JsBarcodeDetector? det;
       try {
@@ -173,6 +290,47 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
           _cameraStarting = false;
           _errorText =
               'دسترسی به دوربین ممکن نشد. HTTPS یا localhost لازم است؛ یا اجازهٔ دوربین را بدهید. جزئیات: $e';
+        });
+      }
+    }
+  }
+
+    if (_handled || !mounted || _cameraStarting) return;
+    _scanTimer?.cancel();
+    if (_videoInputs.length >= 2) {
+      setState(() {
+        _videoInputIndex = (_videoInputIndex + 1) % _videoInputs.length;
+      });
+    } else {
+      setState(() {
+        _preferFacingUser = !_preferFacingUser;
+      });
+    }
+    await _openCameraAndScanner();
+  }
+
+  Future<void> _toggleTorch() async {
+    final stream = _mediaStream;
+    if (stream == null || !_torchFromTrack || _handled) return;
+    final tracks = stream.getVideoTracks().toDart;
+    if (tracks.isEmpty) return;
+    final track = tracks.first;
+    final next = !_torchOn;
+    try {
+      await track
+          .applyConstraints(
+            web.MediaTrackConstraints(
+              advanced: [web.MediaTrackConstraintSet(torch: next.toJS)].toJS,
+            ),
+          )
+          .toDart;
+      if (mounted) setState(() => _torchOn = next);
+    } catch (e, st) {
+      debugPrint('WebBarcodeScan: torch applyConstraints: $e\n$st');
+      if (mounted) {
+        setState(() {
+          _torchFromTrack = false;
+          _torchOn = false;
         });
       }
     }
@@ -234,6 +392,7 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
         v.srcObject = null;
       } catch (_) {}
     }
+    _torchOn = false;
   }
 
   void _submitManual() {
@@ -244,6 +403,15 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
       _scanTimer?.cancel();
       _cleanupStream();
       Navigator.of(context).pop<String>(t);
+    }
+  }
+
+  void _closeScreen() {
+    if (!_handled) {
+      _handled = true;
+      _scanTimer?.cancel();
+      _cleanupStream();
+      Navigator.of(context).pop<String>();
     }
   }
 
@@ -268,15 +436,24 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () {
-            if (!_handled) {
-              _handled = true;
-              _scanTimer?.cancel();
-              _cleanupStream();
-              Navigator.of(context).pop<String>();
-            }
-          },
+          onPressed: _closeScreen,
         ),
+        actions: [
+          IconButton(
+            tooltip: _torchFromTrack
+                ? (_torchOn ? 'خاموش کردن فلش' : 'روشن کردن فلش (در صورت پشتیبانی دستگاه)')
+                : 'فلش در این ترکیب مرورگر/دوربین در دسترس نیست',
+            onPressed: (_torchFromTrack && _mediaStream != null) ? () => unawaited(_toggleTorch()) : null,
+            icon: Icon(_torchOn ? Icons.flash_on : Icons.flash_off),
+          ),
+          IconButton(
+            tooltip: 'تعویض دوربین',
+            onPressed: (!_cameraStarting && _mediaStream != null)
+                ? () => unawaited(_cycleCamera())
+                : null,
+            icon: const Icon(Icons.cameraswitch),
+          ),
+        ],
       ),
       body: Column(
         children: [

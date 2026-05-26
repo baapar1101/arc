@@ -55,7 +55,18 @@ class ProductService {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/products/business/$businessId/$productId',
     );
-    return Map<String, dynamic>.from(res.data?['data']?['item'] ?? const {});
+    final raw = res.data?['data'];
+    if (raw is! Map) return const {};
+    final data = Map<String, dynamic>.from(raw);
+    final item = data['item'];
+    if (item is Map) {
+      return Map<String, dynamic>.from(item);
+    }
+    // برخی پروکسی‌ها/نسخه‌های قدیمی ممکن است بدون wrapper «item» برگردانند
+    if (data['id'] != null) {
+      return Map<String, dynamic>.from(data);
+    }
+    return const {};
   }
 
   Future<Map<String, dynamic>> updateProduct({
