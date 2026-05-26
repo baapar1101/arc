@@ -827,9 +827,11 @@ async def send_message(
 
 
 def _sse_payload(data: Dict[str, Any]) -> str:
+    from app.core.json_safe import json_dumps_safe
+
     # comment بلند برای عبور از بافر nginx/پروکسی (حدود ۲KB)
     pad = ":" + (" " * 2048) + "\n"
-    return f"{pad}data: {json.dumps(data, ensure_ascii=False)}\n\n"
+    return f"{pad}data: {json_dumps_safe(data)}\n\n"
 
 
 def _emit_chunk_as_sse(chunk: Dict[str, Any]):
@@ -870,9 +872,11 @@ async def _stream_message_response(
         final_function_calls: Optional[List[Dict[str, Any]]] = None
         final_function_results: Optional[Dict[str, Any]] = None
         final_agent_trace: Optional[List[Dict[str, Any]]] = None
+        stream_ai_config = None
 
         with get_db_session() as temp_db:
             temp_ai_service = AIService(temp_db, ctx, business_id)
+            stream_ai_config = temp_ai_service.config
 
             async def _stream_factory():
                 async for chunk in temp_ai_service.chat_completion_stream(
@@ -940,13 +944,17 @@ async def _stream_message_response(
             from app.services.ai.ai_provider import create_provider
             from app.services.ai.encryption import decrypt_api_key
             
-            if ai_service.config:
-                api_key = decrypt_api_key(ai_service.config.api_key) if ai_service.config.api_key else None
+            if stream_ai_config:
+                api_key = (
+                    decrypt_api_key(stream_ai_config.api_key)
+                    if stream_ai_config.api_key
+                    else None
+                )
                 if api_key:
                     provider = create_provider(
-                        provider_type=ai_service.config.provider,
+                        provider_type=stream_ai_config.provider,
                         api_key=api_key,
-                        api_base_url=ai_service.config.api_base_url
+                        api_base_url=stream_ai_config.api_base_url,
                     )
                     
                     # تخمین input tokens از messages

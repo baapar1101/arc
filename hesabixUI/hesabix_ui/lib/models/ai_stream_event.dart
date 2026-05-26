@@ -119,11 +119,15 @@ class AIStreamStatusEvent {
   final String phase;
   final String? step;
   final String? toolKey;
+  final int? iteration;
+  final int? maxIterations;
 
   const AIStreamStatusEvent({
     required this.phase,
     this.step,
     this.toolKey,
+    this.iteration,
+    this.maxIterations,
   });
 }
 

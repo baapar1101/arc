@@ -551,6 +551,7 @@ app/services/zohal_service.py
 app/services/ai/__init__.py
 app/services/ai/ai_attachment_service.py
 app/services/ai/ai_connector_service.py
+app/services/ai/ai_db_helpers.py
 app/services/ai/ai_embedding_service.py
 app/services/ai/ai_eval_schedule_service.py
 app/services/ai/ai_eval_service.py

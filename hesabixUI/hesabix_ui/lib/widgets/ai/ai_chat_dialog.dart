@@ -86,6 +86,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
   List<AIAgentTraceStep> _streamingTraceSteps = [];
   String? _streamingStatusPhase;
   String? _streamingStatusStep;
+  int? _streamingIteration;
+  int? _streamingMaxIterations;
   int _streamingElapsedSeconds = 0;
   DateTime? _streamStartedAt;
   bool _pendingWriteApproval = false;
@@ -332,6 +334,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _streamingTraceSteps = [];
     _streamingStatusPhase = null;
     _streamingStatusStep = null;
+    _streamingIteration = null;
+    _streamingMaxIterations = null;
     _streamingElapsedSeconds = 0;
     _streamStartedAt = null;
     _streamingTimestamp = null;
@@ -342,6 +346,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _streamingElapsedSeconds = 0;
     _streamingStatusPhase = phase;
     _streamingStatusStep = null;
+    _streamingIteration = null;
+    _streamingMaxIterations = null;
     _streamingContent = '';
     _streamingToolActivities = [];
     _streamingTraceSteps = [];
@@ -394,6 +400,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (chunk.statusEvent != null) {
       _streamingStatusPhase = chunk.statusEvent!.phase;
       _streamingStatusStep = chunk.statusEvent!.step;
+      if (chunk.statusEvent!.phase == 'agent_progress') {
+        _streamingIteration = chunk.statusEvent!.iteration;
+        _streamingMaxIterations = chunk.statusEvent!.maxIterations;
+        if (_streamingIteration != null && _streamingMaxIterations != null) {
+          _streamingStatusStep =
+              '${_streamingIteration!}/${_streamingMaxIterations!}';
+        }
+      }
       return;
     }
     if (chunk.heartbeatElapsedMs != null) {
@@ -1751,6 +1765,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 streamingTraceSteps: _streamingTraceSteps,
                                 streamingStatusPhase: _streamingStatusPhase,
                                 streamingStatusStep: _streamingStatusStep,
+                                streamingIteration: _streamingIteration,
+                                streamingMaxIterations: _streamingMaxIterations,
                                 streamingElapsedSeconds: _streamingElapsedSeconds > 0
                                     ? _streamingElapsedSeconds
                                     : null,

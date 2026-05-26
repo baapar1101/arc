@@ -9979,6 +9979,165 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiToolInvokeConnector => 'Invoke connector';
 
   @override
+  String get aiToolQueryBusinessData => 'Query business data';
+
+  @override
+  String get aiToolSearchWarehouseDocuments => 'Search warehouse documents';
+
+  @override
+  String get aiToolGetWarehouseDocumentDetails => 'Warehouse document details';
+
+  @override
+  String get aiToolListWarehouses => 'List warehouses';
+
+  @override
+  String get aiToolGetWarehouseStockSummary => 'Warehouse stock summary';
+
+  @override
+  String get aiToolSearchChecks => 'Search checks';
+
+  @override
+  String get aiToolGetCheckDetails => 'Check details';
+
+  @override
+  String get aiToolSearchTransfers => 'Search transfers';
+
+  @override
+  String get aiToolSearchExpenseIncome => 'Search expense/income';
+
+  @override
+  String get aiToolSearchDocuments => 'Search documents';
+
+  @override
+  String get aiToolGetDocumentDetails => 'Document details';
+
+  @override
+  String get aiToolListBankAccounts => 'List bank accounts';
+
+  @override
+  String get aiToolListCashRegisters => 'List cash registers';
+
+  @override
+  String get aiToolListFiscalYears => 'List fiscal years';
+
+  @override
+  String get aiToolGetCurrentFiscalYear => 'Current fiscal year';
+
+  @override
+  String get aiToolGetBusinessDashboard => 'Business dashboard';
+
+  @override
+  String get aiToolGetPersonTransactions => 'Person transactions';
+
+  @override
+  String get aiToolSearchProjects => 'Search projects';
+
+  @override
+  String get aiToolGetProjectSummary => 'Project summary';
+
+  @override
+  String get aiToolListBoms => 'List BOMs';
+
+  @override
+  String get aiToolGetBomDetails => 'BOM details';
+
+  @override
+  String get aiToolSearchProductionDocuments => 'Production documents';
+
+  @override
+  String get aiToolSearchRepairOrders => 'Repair orders';
+
+  @override
+  String get aiToolGetRepairOrderDetails => 'Repair order details';
+
+  @override
+  String get aiToolGetTaxSettings => 'Tax settings';
+
+  @override
+  String get aiToolSearchTaxWorkspace => 'Tax workspace';
+
+  @override
+  String get aiToolGetTaxDataQuality => 'Tax data quality';
+
+  @override
+  String get aiToolListWorkflows => 'List workflows';
+
+  @override
+  String get aiToolListWorkflowExecutions => 'Workflow executions';
+
+  @override
+  String get aiToolListDistributionRoutes => 'Distribution routes';
+
+  @override
+  String get aiToolSearchWarrantyCodes => 'Warranty codes';
+
+  @override
+  String get aiToolListPettyCash => 'Petty cash';
+
+  @override
+  String get aiToolGetCustomerClubSettings => 'Customer club settings';
+
+  @override
+  String get aiToolListCustomerClubTiers => 'Customer club tiers';
+
+  @override
+  String get aiToolListCustomerClubLedger => 'Customer club ledger';
+
+  @override
+  String get aiToolGetCustomerClubRfmSummary => 'RFM summary';
+
+  @override
+  String get aiToolSearchCustomerClubRfmPersons => 'RFM customer search';
+
+  @override
+  String get aiToolGetQuickSalesSettings => 'Quick sales settings';
+
+  @override
+  String get aiToolListPriceLists => 'Price lists';
+
+  @override
+  String get aiToolSearchActivityLogs => 'Activity logs';
+
+  @override
+  String get aiToolGetOpeningBalance => 'Opening balance';
+
+  @override
+  String get aiToolGetBusinessCreditSettings => 'Credit settings';
+
+  @override
+  String get aiToolListCreditInstallmentPlans => 'Installment plans';
+
+  @override
+  String get aiToolGetPersonCredit => 'Customer credit';
+
+  @override
+  String get aiToolListWooCommerceOrders => 'WooCommerce orders';
+
+  @override
+  String get aiToolListWooCommerceProducts => 'WooCommerce products';
+
+  @override
+  String get aiToolListBasalamSyncedInvoices => 'Basalam invoices';
+
+  @override
+  String get aiToolListBasalamProductConflicts => 'Basalam product conflicts';
+
+  @override
+  String aiTraceStepsHeader(int count) {
+    return 'Execution steps ($count)';
+  }
+
+  @override
+  String aiTraceStepsActive(int count) {
+    return '$count active';
+  }
+
+  @override
+  String aiStatusAgentProgress(int iteration, int max) {
+    return 'Step $iteration of $max';
+  }
+
+  @override
   String get aiTracePlanningAction => 'Planning action';
 
   @override

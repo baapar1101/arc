@@ -408,6 +408,8 @@ class AIService {
           phase: data['phase'] as String? ?? 'thinking',
           step: data['step'] as String?,
           toolKey: data['tool_key'] as String?,
+          iteration: data['iteration'] as int?,
+          maxIterations: data['max_iterations'] as int?,
         ),
       );
     }

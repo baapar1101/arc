@@ -69,6 +69,102 @@ String aiToolLabel(AppLocalizations l10n, String toolName, {String? toolKey}) {
       return l10n.aiToolGetLeadFunnelReport;
     case 'aiToolInvokeConnector':
       return l10n.aiToolInvokeConnector;
+    case 'aiToolQueryBusinessData':
+      return l10n.aiToolQueryBusinessData;
+    case 'aiToolSearchWarehouseDocuments':
+      return l10n.aiToolSearchWarehouseDocuments;
+    case 'aiToolGetWarehouseDocumentDetails':
+      return l10n.aiToolGetWarehouseDocumentDetails;
+    case 'aiToolListWarehouses':
+      return l10n.aiToolListWarehouses;
+    case 'aiToolGetWarehouseStockSummary':
+      return l10n.aiToolGetWarehouseStockSummary;
+    case 'aiToolSearchChecks':
+      return l10n.aiToolSearchChecks;
+    case 'aiToolGetCheckDetails':
+      return l10n.aiToolGetCheckDetails;
+    case 'aiToolSearchTransfers':
+      return l10n.aiToolSearchTransfers;
+    case 'aiToolSearchExpenseIncome':
+      return l10n.aiToolSearchExpenseIncome;
+    case 'aiToolSearchDocuments':
+      return l10n.aiToolSearchDocuments;
+    case 'aiToolGetDocumentDetails':
+      return l10n.aiToolGetDocumentDetails;
+    case 'aiToolListBankAccounts':
+      return l10n.aiToolListBankAccounts;
+    case 'aiToolListCashRegisters':
+      return l10n.aiToolListCashRegisters;
+    case 'aiToolListFiscalYears':
+      return l10n.aiToolListFiscalYears;
+    case 'aiToolGetCurrentFiscalYear':
+      return l10n.aiToolGetCurrentFiscalYear;
+    case 'aiToolGetBusinessDashboard':
+      return l10n.aiToolGetBusinessDashboard;
+    case 'aiToolGetPersonTransactions':
+      return l10n.aiToolGetPersonTransactions;
+    case 'aiToolSearchProjects':
+      return l10n.aiToolSearchProjects;
+    case 'aiToolGetProjectSummary':
+      return l10n.aiToolGetProjectSummary;
+    case 'aiToolListBoms':
+      return l10n.aiToolListBoms;
+    case 'aiToolGetBomDetails':
+      return l10n.aiToolGetBomDetails;
+    case 'aiToolSearchProductionDocuments':
+      return l10n.aiToolSearchProductionDocuments;
+    case 'aiToolSearchRepairOrders':
+      return l10n.aiToolSearchRepairOrders;
+    case 'aiToolGetRepairOrderDetails':
+      return l10n.aiToolGetRepairOrderDetails;
+    case 'aiToolGetTaxSettings':
+      return l10n.aiToolGetTaxSettings;
+    case 'aiToolSearchTaxWorkspace':
+      return l10n.aiToolSearchTaxWorkspace;
+    case 'aiToolGetTaxDataQuality':
+      return l10n.aiToolGetTaxDataQuality;
+    case 'aiToolListWorkflows':
+      return l10n.aiToolListWorkflows;
+    case 'aiToolListWorkflowExecutions':
+      return l10n.aiToolListWorkflowExecutions;
+    case 'aiToolListDistributionRoutes':
+      return l10n.aiToolListDistributionRoutes;
+    case 'aiToolSearchWarrantyCodes':
+      return l10n.aiToolSearchWarrantyCodes;
+    case 'aiToolListPettyCash':
+      return l10n.aiToolListPettyCash;
+    case 'aiToolGetCustomerClubSettings':
+      return l10n.aiToolGetCustomerClubSettings;
+    case 'aiToolListCustomerClubTiers':
+      return l10n.aiToolListCustomerClubTiers;
+    case 'aiToolListCustomerClubLedger':
+      return l10n.aiToolListCustomerClubLedger;
+    case 'aiToolGetCustomerClubRfmSummary':
+      return l10n.aiToolGetCustomerClubRfmSummary;
+    case 'aiToolSearchCustomerClubRfmPersons':
+      return l10n.aiToolSearchCustomerClubRfmPersons;
+    case 'aiToolGetQuickSalesSettings':
+      return l10n.aiToolGetQuickSalesSettings;
+    case 'aiToolListPriceLists':
+      return l10n.aiToolListPriceLists;
+    case 'aiToolSearchActivityLogs':
+      return l10n.aiToolSearchActivityLogs;
+    case 'aiToolGetOpeningBalance':
+      return l10n.aiToolGetOpeningBalance;
+    case 'aiToolGetBusinessCreditSettings':
+      return l10n.aiToolGetBusinessCreditSettings;
+    case 'aiToolListCreditInstallmentPlans':
+      return l10n.aiToolListCreditInstallmentPlans;
+    case 'aiToolGetPersonCredit':
+      return l10n.aiToolGetPersonCredit;
+    case 'aiToolListWooCommerceOrders':
+      return l10n.aiToolListWooCommerceOrders;
+    case 'aiToolListWooCommerceProducts':
+      return l10n.aiToolListWooCommerceProducts;
+    case 'aiToolListBasalamSyncedInvoices':
+      return l10n.aiToolListBasalamSyncedInvoices;
+    case 'aiToolListBasalamProductConflicts':
+      return l10n.aiToolListBasalamProductConflicts;
     default:
       return l10n.aiToolGeneric;
   }
@@ -108,6 +204,54 @@ String _toolNameToKey(String name) {
     'get_pipeline_report': 'aiToolGetPipelineReport',
     'get_lead_funnel_report': 'aiToolGetLeadFunnelReport',
     'invoke_business_connector': 'aiToolInvokeConnector',
+    'query_business_data': 'aiToolQueryBusinessData',
+    'search_warehouse_documents': 'aiToolSearchWarehouseDocuments',
+    'get_warehouse_document_details': 'aiToolGetWarehouseDocumentDetails',
+    'list_warehouses': 'aiToolListWarehouses',
+    'get_warehouse_stock_summary': 'aiToolGetWarehouseStockSummary',
+    'search_checks': 'aiToolSearchChecks',
+    'get_check_details': 'aiToolGetCheckDetails',
+    'search_transfers': 'aiToolSearchTransfers',
+    'search_expense_income': 'aiToolSearchExpenseIncome',
+    'search_documents': 'aiToolSearchDocuments',
+    'get_document_details': 'aiToolGetDocumentDetails',
+    'list_bank_accounts': 'aiToolListBankAccounts',
+    'list_cash_registers': 'aiToolListCashRegisters',
+    'list_fiscal_years': 'aiToolListFiscalYears',
+    'get_current_fiscal_year': 'aiToolGetCurrentFiscalYear',
+    'get_business_dashboard': 'aiToolGetBusinessDashboard',
+    'get_person_transactions': 'aiToolGetPersonTransactions',
+    'search_projects': 'aiToolSearchProjects',
+    'get_project_summary': 'aiToolGetProjectSummary',
+    'list_boms': 'aiToolListBoms',
+    'get_bom_details': 'aiToolGetBomDetails',
+    'search_production_documents': 'aiToolSearchProductionDocuments',
+    'search_repair_orders': 'aiToolSearchRepairOrders',
+    'get_repair_order_details': 'aiToolGetRepairOrderDetails',
+    'get_tax_settings': 'aiToolGetTaxSettings',
+    'search_tax_workspace': 'aiToolSearchTaxWorkspace',
+    'get_tax_data_quality': 'aiToolGetTaxDataQuality',
+    'list_workflows': 'aiToolListWorkflows',
+    'list_workflow_executions': 'aiToolListWorkflowExecutions',
+    'list_distribution_routes': 'aiToolListDistributionRoutes',
+    'search_warranty_codes': 'aiToolSearchWarrantyCodes',
+    'list_petty_cash': 'aiToolListPettyCash',
+    'get_customer_club_settings': 'aiToolGetCustomerClubSettings',
+    'list_customer_club_tiers': 'aiToolListCustomerClubTiers',
+    'list_customer_club_ledger': 'aiToolListCustomerClubLedger',
+    'get_customer_club_rfm_summary': 'aiToolGetCustomerClubRfmSummary',
+    'search_customer_club_rfm_persons': 'aiToolSearchCustomerClubRfmPersons',
+    'get_quick_sales_settings': 'aiToolGetQuickSalesSettings',
+    'list_price_lists': 'aiToolListPriceLists',
+    'search_activity_logs': 'aiToolSearchActivityLogs',
+    'get_opening_balance': 'aiToolGetOpeningBalance',
+    'get_business_credit_settings': 'aiToolGetBusinessCreditSettings',
+    'list_credit_installment_plans': 'aiToolListCreditInstallmentPlans',
+    'get_person_credit': 'aiToolGetPersonCredit',
+    'list_woocommerce_orders': 'aiToolListWooCommerceOrders',
+    'list_woocommerce_products': 'aiToolListWooCommerceProducts',
+    'list_basalam_synced_invoices': 'aiToolListBasalamSyncedInvoices',
+    'list_basalam_product_conflicts': 'aiToolListBasalamProductConflicts',
   };
   return map[name] ?? 'aiToolGeneric';
 }
@@ -119,7 +263,14 @@ String aiStreamStatusLabel(
   String? step,
   String? toolKey,
   String? toolName,
+  int? iteration,
+  int? maxIterations,
 }) {
+  if (phase == 'agent_progress' &&
+      iteration != null &&
+      maxIterations != null) {
+    return l10n.aiStatusAgentProgress(iteration, maxIterations);
+  }
   switch (phase) {
     case 'sending':
       return l10n.aiStatusSending;
@@ -133,6 +284,16 @@ String aiStreamStatusLabel(
       return l10n.aiStatusWriting;
     case 'saving':
       return l10n.aiStatusSaving;
+    case 'agent_progress':
+      if (step != null && step.contains('/')) {
+        final parts = step.split('/');
+        final it = int.tryParse(parts.first);
+        final mx = int.tryParse(parts.length > 1 ? parts[1] : '');
+        if (it != null && mx != null) {
+          return l10n.aiStatusAgentProgress(it, mx);
+        }
+      }
+      return l10n.aiStatusThinking;
     case 'running_tool':
       final label = aiToolLabel(
         l10n,

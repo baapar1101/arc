@@ -8,7 +8,11 @@ from typing import Any, Dict
 
 from sqlalchemy.orm import Session
 
+from app.core.json_safe import json_dumps_safe, json_safe_value
+
 logger = logging.getLogger(__name__)
+
+__all__ = ["json_safe_value", "json_dumps_safe", "safe_db_rollback", "run_ai_registry_function"]
 
 
 def safe_db_rollback(db: Session | None) -> None:

@@ -64,6 +64,20 @@ class AIFunctionRegistry:
         self._register_admin_functions()
         # Business owner functions
         self._register_business_owner_functions()
+        # Extended business queries (warehouse, checks, generic query, ...)
+        from app.services.ai.ai_function_extensions import register_extended_business_functions
+
+        register_extended_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase2 import (
+            register_phase2_business_functions,
+        )
+
+        register_phase2_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase3 import (
+            register_phase3_business_functions,
+        )
+
+        register_phase3_business_functions(self)
         # External HTTP connectors
         self._register_connector_functions()
     

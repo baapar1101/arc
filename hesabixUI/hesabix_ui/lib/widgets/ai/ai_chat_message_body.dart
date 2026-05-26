@@ -65,7 +65,18 @@ class AIChatMessageBody extends StatelessWidget {
 
     return calls.map((call) {
       final name = call['name'] as String? ?? 'unknown';
-      final result = results[name];
+      final callId = call['id'] as String?;
+      Object? result;
+      if (callId != null && results.containsKey(callId)) {
+        final raw = results[callId];
+        if (raw is Map && raw.containsKey('result')) {
+          result = raw['result'];
+        } else {
+          result = raw;
+        }
+      } else {
+        result = results[name];
+      }
       final needsApproval = result is Map &&
           result['error'] == 'APPROVAL_REQUIRED';
       final hasError = result is Map && result.containsKey('error') && !needsApproval;

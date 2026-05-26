@@ -1,6 +1,7 @@
 """تست‌های سازنده پیام LLM از تاریخچه چت."""
 import json
 import importlib.util
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -38,3 +39,14 @@ def test_build_with_tool_history():
 def test_serialize_metadata():
     fc, fr = serialize_function_metadata([{"name": "x"}], {"x": 1})
     assert fc is not None and fr is not None
+
+
+def test_serialize_metadata_datetime():
+    dt = datetime(2026, 5, 26, 17, 15, 20)
+    fc, fr = serialize_function_metadata(
+        [{"name": "search_invoices"}],
+        {"search_invoices": {"items": [{"document_date": dt}]}},
+    )
+    assert fr is not None
+    parsed = json.loads(fr)
+    assert parsed["search_invoices"]["items"][0]["document_date"] == dt.isoformat()

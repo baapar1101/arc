@@ -18624,6 +18624,312 @@ abstract class AppLocalizations {
   /// **'Invoke connector'**
   String get aiToolInvokeConnector;
 
+  /// No description provided for @aiToolQueryBusinessData.
+  ///
+  /// In en, this message translates to:
+  /// **'Query business data'**
+  String get aiToolQueryBusinessData;
+
+  /// No description provided for @aiToolSearchWarehouseDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Search warehouse documents'**
+  String get aiToolSearchWarehouseDocuments;
+
+  /// No description provided for @aiToolGetWarehouseDocumentDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse document details'**
+  String get aiToolGetWarehouseDocumentDetails;
+
+  /// No description provided for @aiToolListWarehouses.
+  ///
+  /// In en, this message translates to:
+  /// **'List warehouses'**
+  String get aiToolListWarehouses;
+
+  /// No description provided for @aiToolGetWarehouseStockSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Warehouse stock summary'**
+  String get aiToolGetWarehouseStockSummary;
+
+  /// No description provided for @aiToolSearchChecks.
+  ///
+  /// In en, this message translates to:
+  /// **'Search checks'**
+  String get aiToolSearchChecks;
+
+  /// No description provided for @aiToolGetCheckDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Check details'**
+  String get aiToolGetCheckDetails;
+
+  /// No description provided for @aiToolSearchTransfers.
+  ///
+  /// In en, this message translates to:
+  /// **'Search transfers'**
+  String get aiToolSearchTransfers;
+
+  /// No description provided for @aiToolSearchExpenseIncome.
+  ///
+  /// In en, this message translates to:
+  /// **'Search expense/income'**
+  String get aiToolSearchExpenseIncome;
+
+  /// No description provided for @aiToolSearchDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Search documents'**
+  String get aiToolSearchDocuments;
+
+  /// No description provided for @aiToolGetDocumentDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Document details'**
+  String get aiToolGetDocumentDetails;
+
+  /// No description provided for @aiToolListBankAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'List bank accounts'**
+  String get aiToolListBankAccounts;
+
+  /// No description provided for @aiToolListCashRegisters.
+  ///
+  /// In en, this message translates to:
+  /// **'List cash registers'**
+  String get aiToolListCashRegisters;
+
+  /// No description provided for @aiToolListFiscalYears.
+  ///
+  /// In en, this message translates to:
+  /// **'List fiscal years'**
+  String get aiToolListFiscalYears;
+
+  /// No description provided for @aiToolGetCurrentFiscalYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Current fiscal year'**
+  String get aiToolGetCurrentFiscalYear;
+
+  /// No description provided for @aiToolGetBusinessDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Business dashboard'**
+  String get aiToolGetBusinessDashboard;
+
+  /// No description provided for @aiToolGetPersonTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Person transactions'**
+  String get aiToolGetPersonTransactions;
+
+  /// No description provided for @aiToolSearchProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Search projects'**
+  String get aiToolSearchProjects;
+
+  /// No description provided for @aiToolGetProjectSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Project summary'**
+  String get aiToolGetProjectSummary;
+
+  /// No description provided for @aiToolListBoms.
+  ///
+  /// In en, this message translates to:
+  /// **'List BOMs'**
+  String get aiToolListBoms;
+
+  /// No description provided for @aiToolGetBomDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'BOM details'**
+  String get aiToolGetBomDetails;
+
+  /// No description provided for @aiToolSearchProductionDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Production documents'**
+  String get aiToolSearchProductionDocuments;
+
+  /// No description provided for @aiToolSearchRepairOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair orders'**
+  String get aiToolSearchRepairOrders;
+
+  /// No description provided for @aiToolGetRepairOrderDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair order details'**
+  String get aiToolGetRepairOrderDetails;
+
+  /// No description provided for @aiToolGetTaxSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax settings'**
+  String get aiToolGetTaxSettings;
+
+  /// No description provided for @aiToolSearchTaxWorkspace.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax workspace'**
+  String get aiToolSearchTaxWorkspace;
+
+  /// No description provided for @aiToolGetTaxDataQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax data quality'**
+  String get aiToolGetTaxDataQuality;
+
+  /// No description provided for @aiToolListWorkflows.
+  ///
+  /// In en, this message translates to:
+  /// **'List workflows'**
+  String get aiToolListWorkflows;
+
+  /// No description provided for @aiToolListWorkflowExecutions.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow executions'**
+  String get aiToolListWorkflowExecutions;
+
+  /// No description provided for @aiToolListDistributionRoutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution routes'**
+  String get aiToolListDistributionRoutes;
+
+  /// No description provided for @aiToolSearchWarrantyCodes.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty codes'**
+  String get aiToolSearchWarrantyCodes;
+
+  /// No description provided for @aiToolListPettyCash.
+  ///
+  /// In en, this message translates to:
+  /// **'Petty cash'**
+  String get aiToolListPettyCash;
+
+  /// No description provided for @aiToolGetCustomerClubSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer club settings'**
+  String get aiToolGetCustomerClubSettings;
+
+  /// No description provided for @aiToolListCustomerClubTiers.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer club tiers'**
+  String get aiToolListCustomerClubTiers;
+
+  /// No description provided for @aiToolListCustomerClubLedger.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer club ledger'**
+  String get aiToolListCustomerClubLedger;
+
+  /// No description provided for @aiToolGetCustomerClubRfmSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'RFM summary'**
+  String get aiToolGetCustomerClubRfmSummary;
+
+  /// No description provided for @aiToolSearchCustomerClubRfmPersons.
+  ///
+  /// In en, this message translates to:
+  /// **'RFM customer search'**
+  String get aiToolSearchCustomerClubRfmPersons;
+
+  /// No description provided for @aiToolGetQuickSalesSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sales settings'**
+  String get aiToolGetQuickSalesSettings;
+
+  /// No description provided for @aiToolListPriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'Price lists'**
+  String get aiToolListPriceLists;
+
+  /// No description provided for @aiToolSearchActivityLogs.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity logs'**
+  String get aiToolSearchActivityLogs;
+
+  /// No description provided for @aiToolGetOpeningBalance.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance'**
+  String get aiToolGetOpeningBalance;
+
+  /// No description provided for @aiToolGetBusinessCreditSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit settings'**
+  String get aiToolGetBusinessCreditSettings;
+
+  /// No description provided for @aiToolListCreditInstallmentPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'Installment plans'**
+  String get aiToolListCreditInstallmentPlans;
+
+  /// No description provided for @aiToolGetPersonCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer credit'**
+  String get aiToolGetPersonCredit;
+
+  /// No description provided for @aiToolListWooCommerceOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce orders'**
+  String get aiToolListWooCommerceOrders;
+
+  /// No description provided for @aiToolListWooCommerceProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'WooCommerce products'**
+  String get aiToolListWooCommerceProducts;
+
+  /// No description provided for @aiToolListBasalamSyncedInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam invoices'**
+  String get aiToolListBasalamSyncedInvoices;
+
+  /// No description provided for @aiToolListBasalamProductConflicts.
+  ///
+  /// In en, this message translates to:
+  /// **'Basalam product conflicts'**
+  String get aiToolListBasalamProductConflicts;
+
+  /// No description provided for @aiTraceStepsHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Execution steps ({count})'**
+  String aiTraceStepsHeader(int count);
+
+  /// No description provided for @aiTraceStepsActive.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} active'**
+  String aiTraceStepsActive(int count);
+
+  /// No description provided for @aiStatusAgentProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {iteration} of {max}'**
+  String aiStatusAgentProgress(int iteration, int max);
+
   /// No description provided for @aiTracePlanningAction.
   ///
   /// In en, this message translates to:

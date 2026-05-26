@@ -9924,6 +9924,165 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiToolInvokeConnector => 'فراخوانی کانکتور';
 
   @override
+  String get aiToolQueryBusinessData => 'پرس‌وجوی داده';
+
+  @override
+  String get aiToolSearchWarehouseDocuments => 'جستجوی حواله انبار';
+
+  @override
+  String get aiToolGetWarehouseDocumentDetails => 'جزئیات حواله انبار';
+
+  @override
+  String get aiToolListWarehouses => 'لیست انبارها';
+
+  @override
+  String get aiToolGetWarehouseStockSummary => 'خلاصه موجودی انبار';
+
+  @override
+  String get aiToolSearchChecks => 'جستجوی چک';
+
+  @override
+  String get aiToolGetCheckDetails => 'جزئیات چک';
+
+  @override
+  String get aiToolSearchTransfers => 'جستجوی انتقال';
+
+  @override
+  String get aiToolSearchExpenseIncome => 'جستجوی هزینه/درآمد';
+
+  @override
+  String get aiToolSearchDocuments => 'جستجوی اسناد';
+
+  @override
+  String get aiToolGetDocumentDetails => 'جزئیات سند';
+
+  @override
+  String get aiToolListBankAccounts => 'لیست حساب بانکی';
+
+  @override
+  String get aiToolListCashRegisters => 'لیست صندوق';
+
+  @override
+  String get aiToolListFiscalYears => 'لیست سال مالی';
+
+  @override
+  String get aiToolGetCurrentFiscalYear => 'سال مالی جاری';
+
+  @override
+  String get aiToolGetBusinessDashboard => 'داشبورد کسب‌وکار';
+
+  @override
+  String get aiToolGetPersonTransactions => 'گردش حساب شخص';
+
+  @override
+  String get aiToolSearchProjects => 'جستجوی پروژه';
+
+  @override
+  String get aiToolGetProjectSummary => 'خلاصه پروژه';
+
+  @override
+  String get aiToolListBoms => 'لیست BOM';
+
+  @override
+  String get aiToolGetBomDetails => 'جزئیات BOM';
+
+  @override
+  String get aiToolSearchProductionDocuments => 'اسناد تولید';
+
+  @override
+  String get aiToolSearchRepairOrders => 'سفارش تعمیر';
+
+  @override
+  String get aiToolGetRepairOrderDetails => 'جزئیات تعمیر';
+
+  @override
+  String get aiToolGetTaxSettings => 'تنظیمات مالیاتی';
+
+  @override
+  String get aiToolSearchTaxWorkspace => 'کارپوشه مودیان';
+
+  @override
+  String get aiToolGetTaxDataQuality => 'کیفیت داده مالیاتی';
+
+  @override
+  String get aiToolListWorkflows => 'لیست workflow';
+
+  @override
+  String get aiToolListWorkflowExecutions => 'اجراهای workflow';
+
+  @override
+  String get aiToolListDistributionRoutes => 'مسیرهای توزیع';
+
+  @override
+  String get aiToolSearchWarrantyCodes => 'کدهای گارانتی';
+
+  @override
+  String get aiToolListPettyCash => 'صندوق خرد';
+
+  @override
+  String get aiToolGetCustomerClubSettings => 'تنظیمات باشگاه مشتری';
+
+  @override
+  String get aiToolListCustomerClubTiers => 'سطوح باشگاه مشتری';
+
+  @override
+  String get aiToolListCustomerClubLedger => 'گردش امتیاز باشگاه';
+
+  @override
+  String get aiToolGetCustomerClubRfmSummary => 'خلاصه RFM';
+
+  @override
+  String get aiToolSearchCustomerClubRfmPersons => 'جستجوی RFM';
+
+  @override
+  String get aiToolGetQuickSalesSettings => 'تنظیمات فروش سریع';
+
+  @override
+  String get aiToolListPriceLists => 'لیست قیمت';
+
+  @override
+  String get aiToolSearchActivityLogs => 'لاگ فعالیت';
+
+  @override
+  String get aiToolGetOpeningBalance => 'تراز افتتاحیه';
+
+  @override
+  String get aiToolGetBusinessCreditSettings => 'تنظیمات اعتبار';
+
+  @override
+  String get aiToolListCreditInstallmentPlans => 'طرح اقساط';
+
+  @override
+  String get aiToolGetPersonCredit => 'اعتبار مشتری';
+
+  @override
+  String get aiToolListWooCommerceOrders => 'سفارش ووکامرس';
+
+  @override
+  String get aiToolListWooCommerceProducts => 'محصول ووکامرس';
+
+  @override
+  String get aiToolListBasalamSyncedInvoices => 'فاکتور باسلام';
+
+  @override
+  String get aiToolListBasalamProductConflicts => 'تعارض محصول باسلام';
+
+  @override
+  String aiTraceStepsHeader(int count) {
+    return 'مراحل اجرا ($count)';
+  }
+
+  @override
+  String aiTraceStepsActive(int count) {
+    return '$count فعال';
+  }
+
+  @override
+  String aiStatusAgentProgress(int iteration, int max) {
+    return 'مرحله $iteration از $max';
+  }
+
+  @override
   String get aiTracePlanningAction => 'برنامه‌ریزی اقدام';
 
   @override

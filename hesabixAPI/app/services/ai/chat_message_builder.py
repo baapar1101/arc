@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.core.json_safe import json_dumps_safe
+
 
 def parse_json_field(raw: Any) -> Any:
     if raw is None:
@@ -77,7 +79,7 @@ def build_llm_messages_from_history(db_messages: List[Any]) -> List[Dict[str, An
                 tc_id = call.get("id") or tool_call_ids.get(fname, f"hist_{fname}")
                 result = results.get(fname, {})
                 if isinstance(result, (dict, list)):
-                    serialized = json.dumps(result, ensure_ascii=False)
+                    serialized = json_dumps_safe(result)
                 else:
                     serialized = str(result) if result is not None else "{}"
                 llm_messages.append(
@@ -97,10 +99,6 @@ def serialize_function_metadata(
     function_calls: Optional[List[Dict[str, Any]]],
     function_results: Optional[Dict[str, Any]],
 ) -> Tuple[Optional[str], Optional[str]]:
-    calls_json = (
-        json.dumps(function_calls, ensure_ascii=False) if function_calls else None
-    )
-    results_json = (
-        json.dumps(function_results, ensure_ascii=False) if function_results else None
-    )
+    calls_json = json_dumps_safe(function_calls) if function_calls else None
+    results_json = json_dumps_safe(function_results) if function_results else None
     return calls_json, results_json

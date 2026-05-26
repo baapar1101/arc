@@ -104,6 +104,47 @@ def format_planned_tools(function_calls: List[Dict[str, Any]]) -> str:
     return "\n\n".join(lines)
 
 
+def summarize_tool_result_for_llm(function_name: str, result: Any) -> str:
+    """خلاصهٔ فشرده برای قرار دادن در پیام role=tool (کاهش توکن)."""
+    if result is None:
+        return "نتیجه‌ای برنگشت."
+    if isinstance(result, dict):
+        if result.get("error") == "APPROVAL_REQUIRED":
+            return json.dumps(result, ensure_ascii=False)
+        if "error" in result:
+            return json.dumps({"error": result.get("error"), "message": result.get("message")}, ensure_ascii=False)
+        compact: Dict[str, Any] = {}
+        for key in ("message", "summary", "description", "total", "pagination"):
+            if key in result:
+                compact[key] = result[key]
+        for key in ("items", "data", "results", "invoices", "products", "persons"):
+            items = result.get(key)
+            if isinstance(items, list):
+                compact[key] = items[:15]
+                compact[f"{key}_total"] = (
+                    (result.get("pagination") or {}).get("total")
+                    if isinstance(result.get("pagination"), dict)
+                    else len(items)
+                )
+                if len(items) > 15:
+                    compact[f"{key}_truncated"] = True
+                break
+        if compact:
+            return json.dumps(compact, ensure_ascii=False)
+        text = json.dumps(result, ensure_ascii=False)
+        if len(text) > 4000:
+            return text[:4000] + "…"
+        return text
+    if isinstance(result, list):
+        preview = result[:15]
+        payload: Dict[str, Any] = {"items": preview, "total": len(result)}
+        if len(result) > 15:
+            payload["truncated"] = True
+        return json.dumps(payload, ensure_ascii=False)
+    text = str(result)
+    return text[:4000] + ("…" if len(text) > 4000 else "")
+
+
 def summarize_tool_result(function_name: str, result: Any) -> str:
     """خلاصهٔ خوانا از نتیجهٔ tool برای نمایش در trace."""
     if result is None:

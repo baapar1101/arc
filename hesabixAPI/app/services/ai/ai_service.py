@@ -34,15 +34,66 @@ from app.services.ai.ai_trace import (
     context_trace,
     format_planned_tools,
     summarize_tool_result,
+    summarize_tool_result_for_llm,
     trace_record_from_event,
     trace_step,
 )
-from app.services.ai.ai_db_helpers import run_ai_registry_function, safe_db_rollback
+from app.services.ai.ai_db_helpers import (
+    json_safe_value,
+    run_ai_registry_function,
+    safe_db_rollback,
+)
+from app.services.ai.ai_constants import MAX_AGENT_ITERATIONS
+from app.services.ai.ai_message_budget import (
+    trim_messages_for_llm,
+    trim_system_prompt,
+)
+from app.services.ai.ai_tool_intent import (
+    filter_function_definitions,
+    select_tool_names,
+)
 
 logger = logging.getLogger(__name__)
 
 # Thread pool executor برای اجرای عملیات blocking
 _executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="ai_service")
+
+
+def _tool_call_id_for(call: Dict[str, Any], iteration: int, index: int) -> str:
+    return str(call.get("id") or f"call_{iteration}_{index}_{call.get('name', 'unknown')}")
+
+
+def _lookup_tool_result(
+    function_results: Dict[str, Any],
+    call: Dict[str, Any],
+) -> Any:
+    """یافتن نتیجه با tool_call_id؛ fallback به نام function."""
+    tc_id = call.get("id")
+    if tc_id and tc_id in function_results:
+        val = function_results[tc_id]
+        if isinstance(val, dict) and "result" in val:
+            return val["result"]
+        return val
+    name = call.get("name")
+    if name and name in function_results:
+        val = function_results[name]
+        if isinstance(val, dict) and "result" in val and "name" in val:
+            return val.get("result")
+        return val
+    return {}
+
+
+def _merge_round_tool_results(
+    accumulated: Dict[str, Any],
+    round_results: Dict[str, Any],
+) -> None:
+    """ادغام نتایج یک round؛ کلید اصلی tool_call_id + سازگاری با نام."""
+    for tc_id, entry in round_results.items():
+        if isinstance(entry, dict) and "name" in entry and "result" in entry:
+            accumulated[tc_id] = entry
+            accumulated[entry["name"]] = entry["result"]
+        else:
+            accumulated[tc_id] = entry
 
 
 class AIService:
@@ -391,6 +442,7 @@ class AIService:
                 insight_text = format_insights_for_prompt(insights)
             except Exception as exc:
                 logger.warning("Failed to load AI insights for prompt: %s", exc)
+                safe_db_rollback(self.db)
 
             memory_text = ""
             try:
@@ -401,6 +453,7 @@ class AIService:
                 )
             except Exception as exc:
                 logger.warning("Failed to load AI memory for prompt: %s", exc)
+                safe_db_rollback(self.db)
 
             attachment_text = ""
             if session_id:
@@ -410,6 +463,7 @@ class AIService:
                     attachment_text = format_attachments_for_prompt(self.db, session_id)
                 except Exception as exc:
                     logger.warning("Failed to load AI attachments for prompt: %s", exc)
+                    safe_db_rollback(self.db)
 
             knowledge_text = ""
             if user_query:
@@ -421,6 +475,7 @@ class AIService:
                     )
                 except Exception as exc:
                     logger.warning("Failed to load AI knowledge for prompt: %s", exc)
+                    safe_db_rollback(self.db)
 
             connector_text = ""
             try:
@@ -429,8 +484,9 @@ class AIService:
                 connector_text = format_connectors_for_prompt(self.db, int(business_id))
             except Exception as exc:
                 logger.warning("Failed to load AI connectors for prompt: %s", exc)
+                safe_db_rollback(self.db)
 
-            return (
+            return trim_system_prompt(
                 base_prompt
                 + business_info
                 + insight_text
@@ -439,8 +495,8 @@ class AIService:
                 + knowledge_text
                 + connector_text
             )
-        
-        return base_prompt
+
+        return trim_system_prompt(base_prompt)
 
     async def build_system_prompt_stream(
         self,
@@ -482,8 +538,7 @@ class AIService:
             " تمام function calls به صورت خودکار با شناسه کسب‌وکار فعلی انجام می‌شوند."
         )
 
-        yield context_trace("loading_insights", "active")
-        await asyncio.sleep(0)
+        bid = int(business_id)
 
         def _load_insights() -> str:
             try:
@@ -492,112 +547,121 @@ class AIService:
                     format_insights_for_prompt,
                 )
 
-                insights = get_business_insights(self.db, int(business_id), self.ctx)
+                insights = get_business_insights(self.db, bid, self.ctx)
                 return format_insights_for_prompt(insights)
             except Exception as exc:
                 logger.warning("Failed to load AI insights for prompt: %s", exc)
                 safe_db_rollback(self.db)
                 return ""
 
-        insight_text = await loop.run_in_executor(_executor, _load_insights)
-        yield context_trace("loading_insights", "done")
-
-        yield context_trace("loading_memory", "active")
-        await asyncio.sleep(0)
-
         def _load_memory() -> str:
             try:
                 from app.services.ai.ai_memory_service import format_memory_for_prompt
 
                 return format_memory_for_prompt(
-                    self.db, int(business_id), self.ctx.get_user_id()
+                    self.db, bid, self.ctx.get_user_id()
                 )
             except Exception as exc:
                 logger.warning("Failed to load AI memory for prompt: %s", exc)
                 safe_db_rollback(self.db)
                 return ""
 
-        memory_text = await loop.run_in_executor(_executor, _load_memory)
-        yield context_trace("loading_memory", "done")
+        def _load_attachments() -> str:
+            try:
+                from app.services.ai.ai_attachment_service import (
+                    format_attachments_for_prompt,
+                )
 
-        attachment_text = ""
-        if session_id:
-            yield context_trace("loading_attachments", "active")
-            await asyncio.sleep(0)
+                return format_attachments_for_prompt(self.db, session_id)
+            except Exception as exc:
+                logger.warning("Failed to load AI attachments for prompt: %s", exc)
+                safe_db_rollback(self.db)
+                return ""
 
-            def _load_attachments() -> str:
-                try:
-                    from app.services.ai.ai_attachment_service import (
-                        format_attachments_for_prompt,
-                    )
+        def _load_knowledge() -> str:
+            try:
+                from app.services.ai.ai_knowledge_service import format_knowledge_for_prompt
 
-                    return format_attachments_for_prompt(self.db, session_id)
-                except Exception as exc:
-                    logger.warning("Failed to load AI attachments for prompt: %s", exc)
-                    safe_db_rollback(self.db)
-                    return ""
-
-            attachment_text = await loop.run_in_executor(_executor, _load_attachments)
-            yield context_trace("loading_attachments", "done")
-
-        knowledge_text = ""
-        if user_query:
-            yield context_trace("loading_knowledge", "active")
-            await asyncio.sleep(0)
-
-            def _load_knowledge() -> str:
-                try:
-                    from app.services.ai.ai_knowledge_service import format_knowledge_for_prompt
-
-                    return format_knowledge_for_prompt(
-                        self.db, int(business_id), user_query
-                    )
-                except Exception as exc:
-                    logger.warning("Failed to load AI knowledge for prompt: %s", exc)
-                    safe_db_rollback(self.db)
-                    return ""
-
-            knowledge_text = await loop.run_in_executor(_executor, _load_knowledge)
-            yield context_trace("loading_knowledge", "done")
-
-        yield context_trace("loading_connectors", "active")
-        await asyncio.sleep(0)
+                return format_knowledge_for_prompt(self.db, bid, user_query or "")
+            except Exception as exc:
+                logger.warning("Failed to load AI knowledge for prompt: %s", exc)
+                safe_db_rollback(self.db)
+                return ""
 
         def _load_connectors() -> str:
             try:
                 from app.services.ai.ai_connector_service import format_connectors_for_prompt
 
-                return format_connectors_for_prompt(self.db, int(business_id))
+                return format_connectors_for_prompt(self.db, bid)
             except Exception as exc:
                 logger.warning("Failed to load AI connectors for prompt: %s", exc)
                 safe_db_rollback(self.db)
                 return ""
 
-        connector_text = await loop.run_in_executor(_executor, _load_connectors)
-        yield context_trace("loading_connectors", "done")
+        parallel_loaders: List[tuple[str, Any]] = [
+            ("loading_insights", _load_insights),
+            ("loading_memory", _load_memory),
+            ("loading_connectors", _load_connectors),
+        ]
+        if session_id:
+            parallel_loaders.append(("loading_attachments", _load_attachments))
+        if user_query:
+            parallel_loaders.append(("loading_knowledge", _load_knowledge))
 
-        final_prompt = (
+        for step_key, _ in parallel_loaders:
+            yield context_trace(step_key, "active")
+        await asyncio.sleep(0)
+
+        loaded_texts = await asyncio.gather(
+            *[
+                loop.run_in_executor(_executor, loader_fn)
+                for _, loader_fn in parallel_loaders
+            ]
+        )
+        parts = {
+            step_key: text or ""
+            for (step_key, _), text in zip(parallel_loaders, loaded_texts)
+        }
+        for step_key, _ in parallel_loaders:
+            yield context_trace(step_key, "done")
+
+        final_prompt = trim_system_prompt(
             base_prompt
             + business_info
-            + insight_text
-            + memory_text
-            + attachment_text
-            + knowledge_text
-            + connector_text
+            + parts.get("loading_insights", "")
+            + parts.get("loading_memory", "")
+            + parts.get("loading_attachments", "")
+            + parts.get("loading_knowledge", "")
+            + parts.get("loading_connectors", "")
         )
         yield {"event": "prompt_ready", "prompt": final_prompt}
     
-    def get_available_functions(self, category: Optional[str] = None, session_business_id: Optional[int] = None) -> List[Dict[str, Any]]:
-        """دریافت function های قابل استفاده بر اساس نقش کاربر"""
-        # استفاده از business_id از session (اولویت) یا از context
+    def get_available_functions(
+        self,
+        category: Optional[str] = None,
+        session_business_id: Optional[int] = None,
+        user_query: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """دریافت function های قابل استفاده بر اساس نقش کاربر و intent سوال."""
         effective_business_id = session_business_id or self.business_id
         context = {
             "db": self.db,
             "user_context": self.ctx,
             "business_id": effective_business_id,
-            "session_business_id": session_business_id  # برای validation در handler
+            "session_business_id": session_business_id,
         }
-        return registry.get_function_definitions(context, filter_by_category=category)
+        definitions = registry.get_function_definitions(
+            context, filter_by_category=category
+        )
+        if user_query and effective_business_id:
+            all_names = {
+                (d.get("function") or {}).get("name")
+                for d in definitions
+                if (d.get("function") or {}).get("name")
+            }
+            allowed = select_tool_names(all_names, user_query)
+            definitions = filter_function_definitions(definitions, allowed)
+        return definitions
     
     def check_quota_and_charge(
         self,
@@ -907,7 +971,7 @@ class AIService:
         temperature_override: Optional[float] = None,
         session_business_id: Optional[int] = None,
         session_id: Optional[int] = None,
-        max_iterations: int = 10,
+        max_iterations: int = MAX_AGENT_ITERATIONS,
         approve_writes: bool = False,
         user_query: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -944,14 +1008,17 @@ class AIService:
             session_id=session_id,
             user_query=effective_user_query,
         )
-        full_messages = [
-            {"role": "system", "content": system_prompt},
-            *messages
-        ]
+        full_messages = trim_messages_for_llm([
+            {"role": "system", "content": trim_system_prompt(system_prompt)},
+            *messages,
+        ])
         
         eff_tools = self._use_tools_for_request(use_function_calling)
         if eff_tools and tools is None:
-            tools = self.get_available_functions(session_business_id=session_business_id)
+            tools = self.get_available_functions(
+                session_business_id=session_business_id,
+                user_query=effective_user_query,
+            )
         elif not eff_tools:
             tools = None
         
@@ -990,8 +1057,9 @@ class AIService:
                 current_calls,
                 session_business_id=session_business_id,
                 approve_writes=approve_writes,
+                iteration=iteration,
             )
-            accumulated_function_results.update(function_results)
+            _merge_round_tool_results(accumulated_function_results, function_results)
             
             # ایجاد assistant message با tool_calls برای OpenAI API
             assistant_msg = {
@@ -1001,10 +1069,10 @@ class AIService:
             }
             
             # ساخت tool_calls به فرمت OpenAI
-            tool_call_ids = {}
             for idx, call in enumerate(response["message"]["function_calls"]):
-                tool_call_id = call.get("id") or f"call_{iteration}_{idx}_{call.get('name', 'unknown')}"
-                tool_call_ids[call.get("name")] = tool_call_id
+                tool_call_id = _tool_call_id_for(call, iteration, idx)
+                if not call.get("id"):
+                    call["id"] = tool_call_id
                 assistant_msg["tool_calls"].append({
                     "id": tool_call_id,
                     "type": "function",
@@ -1020,15 +1088,18 @@ class AIService:
             full_messages.append(assistant_msg)
             
             function_messages = []
-            for call in response["message"]["function_calls"]:
+            for idx, call in enumerate(response["message"]["function_calls"]):
                 function_name = call.get("name")
-                result = function_results.get(function_name, {})
-                serialized_result = self._serialize_for_json(result)
-                tool_call_id = call.get("id") or tool_call_ids.get(function_name, f"call_{function_name}")
+                result = _lookup_tool_result(function_results, call)
+                tool_call_id = _tool_call_id_for(call, iteration, idx)
+                content = summarize_tool_result_for_llm(
+                    function_name or "unknown",
+                    self._serialize_for_json(result),
+                )
                 function_messages.append({
                     "role": "tool",
                     "tool_call_id": tool_call_id,
-                    "content": json.dumps(serialized_result, ensure_ascii=False) if isinstance(serialized_result, (dict, list)) else str(serialized_result)
+                    "content": content,
                 })
             
             full_messages.extend(function_messages)
@@ -1068,7 +1139,7 @@ class AIService:
         max_tokens_override: Optional[int] = None,
         temperature_override: Optional[float] = None,
         session_business_id: Optional[int] = None,
-        max_iterations: int = 10
+        max_iterations: int = MAX_AGENT_ITERATIONS,
     ) -> Dict[str, Any]:
         """
         نسخه sync برای استفاده در workflow engine
@@ -1105,7 +1176,7 @@ class AIService:
         session_business_id: Optional[int] = None,
         session_id: Optional[int] = None,
         approve_writes: bool = False,
-        max_iterations: int = 8,
+        max_iterations: int = MAX_AGENT_ITERATIONS,
         user_query: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال streaming با چند نوبت tool calling (مثل chat_completion)."""
@@ -1192,15 +1263,16 @@ class AIService:
                 title_key="aiStatusThinking",
             )
 
-            full_messages: List[Dict[str, Any]] = [
-                {"role": "system", "content": system_prompt},
+            full_messages = trim_messages_for_llm([
+                {"role": "system", "content": trim_system_prompt(system_prompt)},
                 *messages,
-            ]
+            ])
 
             eff_tools = self._use_tools_for_request(use_function_calling)
             if eff_tools and tools is None:
                 tools = self.get_available_functions(
-                    session_business_id=session_business_id
+                    session_business_id=session_business_id,
+                    user_query=effective_user_query,
                 )
             elif not eff_tools:
                 tools = None
@@ -1212,6 +1284,14 @@ class AIService:
                 round_text = ""
                 use_tools = bool(eff_tools and tools)
                 writing_status_sent = False
+
+                yield {
+                    "event": "status",
+                    "phase": "agent_progress",
+                    "iteration": iteration,
+                    "max_iterations": max_iterations,
+                    "done": False,
+                }
 
                 if iteration > 1:
                     yield _emit_trace(
@@ -1344,10 +1424,13 @@ class AIService:
                             iteration=iteration,
                         )
 
-                    for call in function_calls:
+                    for idx, call in enumerate(function_calls):
                         fname = call.get("name", "unknown")
+                        tc_id = _tool_call_id_for(call, iteration, idx)
+                        if not call.get("id"):
+                            call["id"] = tc_id
                         label = tool_label_fa(fname)
-                        tool_step_id = f"tool_{iteration}_{fname}"
+                        tool_step_id = f"tool_{tc_id}"
                         yield _emit_trace(
                             step_id=tool_step_id,
                             kind="tool",
@@ -1369,13 +1452,17 @@ class AIService:
                         function_calls,
                         session_business_id=session_business_id,
                         approve_writes=approve_writes,
+                        iteration=iteration,
                     )
-                    accumulated_function_results.update(function_results)
+                    _merge_round_tool_results(
+                        accumulated_function_results, function_results
+                    )
 
-                    for call in function_calls:
+                    for idx, call in enumerate(function_calls):
                         fname = call.get("name", "unknown")
-                        tool_step_id = f"tool_{iteration}_{fname}"
-                        result = function_results.get(fname, {})
+                        tc_id = _tool_call_id_for(call, iteration, idx)
+                        tool_step_id = f"tool_{tc_id}"
+                        result = _lookup_tool_result(function_results, call)
                         needs_approval = (
                             isinstance(result, dict)
                             and result.get("error") == "APPROVAL_REQUIRED"
@@ -1402,7 +1489,7 @@ class AIService:
                             iteration=iteration,
                         )
                         yield _emit_trace(
-                            step_id=f"obs_{iteration}_{fname}",
+                            step_id=f"obs_{tc_id}",
                             kind="observation",
                             state="done" if success else "error",
                             title_key="aiTraceObservation",
@@ -1420,8 +1507,10 @@ class AIService:
                     if round_text:
                         assistant_msg["content"] = round_text
 
-                    for call in function_calls:
-                        tc_id = call.get("id") or f"call_{call.get('name', 'unknown')}"
+                    for idx, call in enumerate(function_calls):
+                        tc_id = _tool_call_id_for(call, iteration, idx)
+                        if not call.get("id"):
+                            call["id"] = tc_id
                         assistant_msg["tool_calls"].append(
                             {
                                 "id": tc_id,
@@ -1440,22 +1529,17 @@ class AIService:
 
                     full_messages.append(assistant_msg)
 
-                    for call in function_calls:
-                        function_name = call.get("name")
-                        result = function_results.get(function_name, {})
+                    for idx, call in enumerate(function_calls):
+                        function_name = call.get("name") or "unknown"
+                        result = _lookup_tool_result(function_results, call)
                         serialized = self._serialize_for_json(result)
-                        tc_id = (
-                            call.get("id")
-                            or tool_call_id_map.get(function_name, f"call_{function_name}")
-                        )
+                        tc_id = _tool_call_id_for(call, iteration, idx)
                         full_messages.append(
                             {
                                 "role": "tool",
                                 "tool_call_id": tc_id,
-                                "content": (
-                                    json.dumps(serialized, ensure_ascii=False)
-                                    if isinstance(serialized, (dict, list))
-                                    else str(serialized)
+                                "content": summarize_tool_result_for_llm(
+                                    function_name, serialized
                                 ),
                             }
                         )
@@ -1474,12 +1558,28 @@ class AIService:
                 accumulated_content = round_text
                 break
 
+            if not accumulated_content.strip() and iteration >= max_iterations:
+                accumulated_content = (
+                    f"به حداکثر تعداد مراحل تحلیل ({max_iterations}) رسیدم. "
+                    "با داده‌های جمع‌آوری‌شده می‌توانید سوال را دقیق‌تر تکرار کنید "
+                    "یا موضوع را در چند پیام جدا بپرسید."
+                )
+                yield {
+                    "delta": {"content": accumulated_content},
+                    "usage": None,
+                    "done": False,
+                }
+
             yield {
                 "delta": {"content": ""},
                 "usage": final_usage,
                 "done": True,
                 "function_calls": accumulated_function_calls or None,
-                "function_results": accumulated_function_results or None,
+                "function_results": (
+                    json_safe_value(accumulated_function_results)
+                    if accumulated_function_results
+                    else None
+                ),
                 "agent_trace": trace_steps or None,
             }
 
@@ -1532,8 +1632,9 @@ class AIService:
         function_calls: List[Dict[str, Any]],
         session_business_id: Optional[int] = None,
         approve_writes: bool = False,
+        iteration: int = 0,
     ) -> Dict[str, Any]:
-        """پردازش function calling به صورت async برای جلوگیری از blocking"""
+        """پردازش function calling به صورت async — کلید نتیجه tool_call_id."""
         effective_business_id = session_business_id or self.business_id
         context = {
             "user_context": self.ctx,
@@ -1541,13 +1642,20 @@ class AIService:
             "session_business_id": session_business_id,
         }
 
-        async def call_single_function(call: Dict[str, Any]) -> tuple[str, Any]:
-            function_name = call.get("name")
+        async def call_single_function(
+            call: Dict[str, Any], index: int
+        ) -> tuple[str, str, Any]:
+            function_name = call.get("name") or "unknown"
             arguments = call.get("arguments", {}) or {}
+            tc_id = _tool_call_id_for(call, iteration, index)
+            if not call.get("id"):
+                call["id"] = tc_id
 
             if is_write_function(function_name) and not approve_writes:
-                return function_name, build_approval_required_result(function_name, arguments)
-            
+                return tc_id, function_name, build_approval_required_result(
+                    function_name, arguments
+                )
+
             try:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
@@ -1556,40 +1664,31 @@ class AIService:
                         fn, args, context
                     ),
                 )
-                return function_name, result
+                return tc_id, function_name, result
             except Exception as e:
-                logger.error(f"Error calling function {function_name}: {e}", exc_info=True)
-                return function_name, {"error": str(e)}
-        
-        # اجرای تمام function calls به صورت concurrent (اگر ممکن باشد)
-        tasks = [call_single_function(call) for call in function_calls]
+                logger.error(
+                    "Error calling function %s (%s): %s",
+                    function_name,
+                    tc_id,
+                    e,
+                    exc_info=True,
+                )
+                return tc_id, function_name, {"error": str(e)}
+
+        tasks = [
+            call_single_function(call, idx)
+            for idx, call in enumerate(function_calls)
+        ]
         results_list = await asyncio.gather(*tasks)
-        
-        # تبدیل به dictionary
-        results = {name: result for name, result in results_list}
-        return results
+
+        return {
+            tc_id: {"name": fname, "result": result}
+            for tc_id, fname, result in results_list
+        }
     
     def _serialize_for_json(self, obj: Any) -> Any:
         """تبدیل datetime, date و سایر objects به JSON-serializable format"""
-        if isinstance(obj, dict):
-            return {key: self._serialize_for_json(value) for key, value in obj.items()}
-        elif isinstance(obj, list):
-            return [self._serialize_for_json(item) for item in obj]
-        elif isinstance(obj, datetime):
-            return obj.isoformat()
-        elif isinstance(obj, date):
-            return obj.isoformat()
-        elif isinstance(obj, Decimal):
-            # تبدیل Decimal به float برای JSON serialization
-            return float(obj)
-        elif hasattr(obj, '__dict__'):
-            # برای objects دیگر، تلاش می‌کنیم attributes را تبدیل کنیم
-            try:
-                return self._serialize_for_json(obj.__dict__)
-            except:
-                return str(obj)
-        else:
-            return obj
+        return json_safe_value(obj)
     
     async def generate_chat_title(self, user_message: str) -> Optional[str]:
         """

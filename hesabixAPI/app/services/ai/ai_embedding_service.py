@@ -27,6 +27,8 @@ _pgvector_available_cache: Optional[bool] = None
 
 
 def _pgvector_available(db: Session) -> bool:
+    from app.services.ai.ai_db_helpers import safe_db_rollback
+
     global _pgvector_available_cache
     if _pgvector_available_cache is not None:
         return _pgvector_available_cache
@@ -34,6 +36,7 @@ def _pgvector_available(db: Session) -> bool:
         db.execute(text("SELECT embedding_vector FROM ai_knowledge_chunks LIMIT 0"))
         _pgvector_available_cache = True
     except Exception:
+        safe_db_rollback(db)
         _pgvector_available_cache = False
     return _pgvector_available_cache
 
@@ -244,7 +247,10 @@ def _semantic_search_pgvector(
             {"qvec": _vector_literal(q_vec), "bid": business_id, "lim": limit},
         ).mappings().all()
     except Exception as exc:
+        from app.services.ai.ai_db_helpers import safe_db_rollback
+
         logger.warning("pgvector search failed: %s", exc)
+        safe_db_rollback(db)
         return []
 
     results: List[Dict[str, Any]] = []

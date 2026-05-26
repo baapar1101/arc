@@ -17,6 +17,8 @@ class AIChatThreadView extends StatelessWidget {
   final List<AIAgentTraceStep> streamingTraceSteps;
   final String? streamingStatusPhase;
   final String? streamingStatusStep;
+  final int? streamingIteration;
+  final int? streamingMaxIterations;
   final int? streamingElapsedSeconds;
   final DateTime? streamingTimestamp;
   final bool messagesLoading;
@@ -47,6 +49,8 @@ class AIChatThreadView extends StatelessWidget {
     this.streamingTraceSteps = const [],
     this.streamingStatusPhase,
     this.streamingStatusStep,
+    this.streamingIteration,
+    this.streamingMaxIterations,
     this.streamingElapsedSeconds,
     required this.streamingTimestamp,
     required this.messagesLoading,
@@ -103,6 +107,8 @@ class AIChatThreadView extends StatelessWidget {
                       traceSteps: streamingTraceSteps,
                       statusPhase: streamingStatusPhase,
                       statusStep: streamingStatusStep,
+                      iteration: streamingIteration,
+                      maxIterations: streamingMaxIterations,
                       elapsedSeconds: streamingElapsedSeconds,
                       formatTime: formatTime(streamingTimestamp),
                     );
@@ -254,6 +260,8 @@ class _StreamingRow extends StatelessWidget {
   final List<AIAgentTraceStep> traceSteps;
   final String? statusPhase;
   final String? statusStep;
+  final int? iteration;
+  final int? maxIterations;
   final int? elapsedSeconds;
   final String formatTime;
 
@@ -263,6 +271,8 @@ class _StreamingRow extends StatelessWidget {
     this.traceSteps = const [],
     this.statusPhase,
     this.statusStep,
+    this.iteration,
+    this.maxIterations,
     this.elapsedSeconds,
     required this.formatTime,
   });
@@ -277,6 +287,8 @@ class _StreamingRow extends StatelessWidget {
             l10n,
             phase: statusPhase!,
             step: statusStep,
+            iteration: iteration,
+            maxIterations: maxIterations,
           )
         : l10n.aiStatusThinking;
     final showStatusLine =
