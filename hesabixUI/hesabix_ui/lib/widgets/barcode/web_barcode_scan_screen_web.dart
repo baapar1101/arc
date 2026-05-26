@@ -295,6 +295,7 @@ class _WebBarcodeScanScreenState extends State<WebBarcodeScanScreen> {
     }
   }
 
+  Future<void> _cycleCamera() async {
     if (_handled || !mounted || _cameraStarting) return;
     _scanTimer?.cancel();
     if (_videoInputs.length >= 2) {

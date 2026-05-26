@@ -471,6 +471,7 @@ app/services/product_attribute_service.py
 app/services/product_bulk_upsert_service.py
 app/services/product_commercial_insights_service.py
 app/services/product_general_barcode_service.py
+app/services/product_inventory_tracking_sync.py
 app/services/product_service.py
 app/services/profile_dashboard_widgets_service.py
 app/services/project_service.py
@@ -722,4 +723,7 @@ tests/test_moadian_plugin_license_gate.py
 tests/test_permissions.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
+tests/test_physical_stock.py
+tests/test_product_inventory_tracking_sync.py
 tests/test_public_catalog_utils.py
+tests/test_stock_count.py
