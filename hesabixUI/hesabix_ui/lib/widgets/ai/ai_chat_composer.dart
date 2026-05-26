@@ -41,11 +41,14 @@ class AIChatComposer extends StatefulWidget {
 
 class _AIChatComposerState extends State<AIChatComposer> {
   bool _focused = false;
+  bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
     widget.focusNode.addListener(_onFocus);
+    widget.controller.addListener(_onTextChanged);
+    _hasText = widget.controller.text.trim().isNotEmpty;
   }
 
   @override
@@ -55,11 +58,17 @@ class _AIChatComposerState extends State<AIChatComposer> {
       oldWidget.focusNode.removeListener(_onFocus);
       widget.focusNode.addListener(_onFocus);
     }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onTextChanged);
+      widget.controller.addListener(_onTextChanged);
+      _hasText = widget.controller.text.trim().isNotEmpty;
+    }
   }
 
   @override
   void dispose() {
     widget.focusNode.removeListener(_onFocus);
+    widget.controller.removeListener(_onTextChanged);
     super.dispose();
   }
 
@@ -68,8 +77,12 @@ class _AIChatComposerState extends State<AIChatComposer> {
     if (f != _focused) setState(() => _focused = f);
   }
 
-  bool get _canSend =>
-      !widget.disabled && !widget.sending && widget.controller.text.trim().isNotEmpty;
+  void _onTextChanged() {
+    final hasText = widget.controller.text.trim().isNotEmpty;
+    if (hasText != _hasText) setState(() => _hasText = hasText);
+  }
+
+  bool get _canSend => !widget.disabled && !widget.sending && _hasText;
 
   @override
   Widget build(BuildContext context) {
@@ -89,104 +102,158 @@ class _AIChatComposerState extends State<AIChatComposer> {
       ),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AIChatDesign.contentMaxWidth),
+          constraints: const BoxConstraints(
+            maxWidth: AIChatDesign.contentMaxWidth,
+          ),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            decoration: AIChatDesign.composerDecoration(theme, focused: _focused),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            decoration: AIChatDesign.composerDecoration(
+              theme,
+              focused: _focused,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: widget.controller,
-                    focusNode: widget.focusNode,
-                    enabled: !widget.disabled,
-                    minLines: 1,
-                    maxLines: isCenter ? 4 : 6,
-                    textInputAction: TextInputAction.send,
-                    style: theme.textTheme.bodyLarge,
-                    decoration: InputDecoration(
-                      hintText: isCenter
-                          ? 'هر سوالی دارید بپرسید...'
-                          : 'پیام خود را بنویسید...',
-                      hintStyle: TextStyle(
-                        color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.fromLTRB(
-                        compact ? 18 : 22,
-                        compact ? 14 : 18,
-                        8,
-                        compact ? 14 : 18,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        textField: true,
+                        label: 'متن پیام دستیار هوشمند',
+                        child: TextField(
+                          controller: widget.controller,
+                          focusNode: widget.focusNode,
+                          enabled: !widget.disabled,
+                          minLines: 1,
+                          maxLines: isCenter ? 4 : 6,
+                          textInputAction: TextInputAction.send,
+                          style: theme.textTheme.bodyLarge,
+                          decoration: InputDecoration(
+                            hintText: isCenter
+                                ? 'هر سوالی دارید بپرسید...'
+                                : 'پیام خود را بنویسید...',
+                            hintStyle: TextStyle(
+                              color: scheme.onSurfaceVariant.withValues(
+                                alpha: 0.65,
+                              ),
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.fromLTRB(
+                              compact ? 18 : 22,
+                              compact ? 14 : 18,
+                              8,
+                              compact ? 14 : 18,
+                            ),
+                          ),
+                          onSubmitted: (_) {
+                            if (_canSend) widget.onSend();
+                          },
+                        ),
                       ),
                     ),
-                    onSubmitted: (_) {
-                      if (_canSend) widget.onSend();
-                    },
-                  ),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6, bottom: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (widget.onStopGenerating != null)
+                            IconButton(
+                              tooltip: 'توقف تولید پاسخ',
+                              onPressed: widget.onStopGenerating,
+                              icon: Icon(
+                                Icons.stop_circle_outlined,
+                                color: scheme.error,
+                              ),
+                            ),
+                          if (widget.onAttach != null)
+                            IconButton(
+                              tooltip: 'پیوست فایل به گفت‌وگو',
+                              onPressed: widget.disabled || widget.sending
+                                  ? null
+                                  : widget.onAttach,
+                              icon: Icon(
+                                Icons.attach_file_rounded,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          if (widget.onMic != null)
+                            IconButton(
+                              tooltip: widget.voiceActive
+                                  ? (widget.voiceRecording
+                                        ? 'توقف ضبط صدا'
+                                        : 'شروع ضبط صدا')
+                                  : 'شروع مکالمه صوتی',
+                              onPressed: widget.disabled || widget.voiceStarting
+                                  ? null
+                                  : widget.onMic,
+                              icon: widget.voiceStarting
+                                  ? SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: scheme.primary,
+                                      ),
+                                    )
+                                  : Icon(
+                                      widget.voiceActive
+                                          ? (widget.voiceRecording
+                                                ? Icons.mic_off_rounded
+                                                : Icons.mic_none_rounded)
+                                          : Icons.mic_none_rounded,
+                                      color: widget.voiceActive
+                                          ? scheme.primary
+                                          : scheme.onSurfaceVariant,
+                                    ),
+                            ),
+                          if (widget.voiceActive && widget.onStopVoice != null)
+                            IconButton(
+                              tooltip: 'پایان مکالمه صوتی',
+                              onPressed: widget.voiceStarting
+                                  ? null
+                                  : widget.onStopVoice,
+                              icon: Icon(
+                                Icons.call_end_rounded,
+                                color: scheme.error,
+                              ),
+                            ),
+                          _SendButton(
+                            sending: widget.sending,
+                            enabled: _canSend,
+                            onPressed: _canSend ? widget.onSend : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 6, bottom: 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (widget.onStopGenerating != null)
-                        IconButton(
-                          tooltip: 'توقف تولید',
-                          onPressed: widget.onStopGenerating,
-                          icon: Icon(Icons.stop_circle_outlined, color: scheme.error),
+                if (_focused && !compact)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.verified_user_outlined,
+                          size: 14,
+                          color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
                         ),
-                      if (widget.onAttach != null)
-                        IconButton(
-                          tooltip: 'پیوست فایل',
-                          onPressed: widget.disabled || widget.sending ? null : widget.onAttach,
-                          icon: Icon(
-                            Icons.attach_file_rounded,
-                            color: scheme.onSurfaceVariant,
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            widget.onStopGenerating != null
+                                ? 'در حال تولید پاسخ هستم؛ هر زمان خواستید می‌توانید توقف بزنید.'
+                                : 'برای عملیات ثبت یا ویرایش، قبل از اجرا از شما تأیید جداگانه گرفته می‌شود.',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant.withValues(
+                                alpha: 0.72,
+                              ),
+                            ),
                           ),
                         ),
-                      if (widget.onMic != null)
-                        IconButton(
-                          tooltip: widget.voiceActive
-                              ? (widget.voiceRecording ? 'توقف ضبط' : 'شروع ضبط')
-                              : 'مکالمه صوتی',
-                          onPressed: widget.disabled || widget.voiceStarting
-                              ? null
-                              : widget.onMic,
-                          icon: widget.voiceStarting
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: scheme.primary,
-                                  ),
-                                )
-                              : Icon(
-                                  widget.voiceActive
-                                      ? (widget.voiceRecording
-                                          ? Icons.mic_off_rounded
-                                          : Icons.mic_none_rounded)
-                                      : Icons.mic_none_rounded,
-                                  color: widget.voiceActive
-                                      ? scheme.primary
-                                      : scheme.onSurfaceVariant,
-                                ),
-                        ),
-                      if (widget.voiceActive && widget.onStopVoice != null)
-                        IconButton(
-                          tooltip: 'پایان مکالمه صوتی',
-                          onPressed: widget.voiceStarting ? null : widget.onStopVoice,
-                          icon: Icon(Icons.call_end_rounded, color: scheme.error),
-                        ),
-                      _SendButton(
-                        sending: widget.sending,
-                        enabled: _canSend,
-                        onPressed: _canSend ? widget.onSend : null,
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -211,30 +278,40 @@ class _SendButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: enabled ? scheme.primary : scheme.surfaceContainerHighest,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          width: 40,
-          height: 40,
-          alignment: Alignment.center,
-          child: sending
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: scheme.onPrimary,
-                  ),
-                )
-              : Icon(
-                  Icons.arrow_upward_rounded,
-                  size: 22,
-                  color: enabled ? scheme.onPrimary : scheme.onSurfaceVariant,
-                ),
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: sending ? 'در حال ارسال پیام' : 'ارسال پیام',
+      child: Tooltip(
+        message: enabled ? 'ارسال پیام' : 'ابتدا پیام را بنویسید',
+        child: Material(
+          color: enabled ? scheme.primary : scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              child: sending
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: scheme.onPrimary,
+                      ),
+                    )
+                  : Icon(
+                      Icons.arrow_upward_rounded,
+                      size: 22,
+                      color: enabled
+                          ? scheme.onPrimary
+                          : scheme.onSurfaceVariant,
+                    ),
+            ),
+          ),
         ),
       ),
     );

@@ -13,6 +13,7 @@ from app.core.responses import success_response, ApiError, format_datetime_field
 from app.services.ai.ai_service import AIService
 from app.services.ai.chat_message_builder import (
     build_llm_messages_from_history,
+    parse_json_field,
     serialize_function_metadata,
 )
 from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository, AIChatMessageRepository
@@ -64,6 +65,44 @@ def _schedule_session_title_generation(
             )
 
     asyncio.create_task(_task())
+
+
+def _approval_from_result_entry(entry: Any) -> Optional[Dict[str, Any]]:
+    if isinstance(entry, dict) and isinstance(entry.get("result"), dict):
+        entry = entry["result"]
+    if not isinstance(entry, dict):
+        return None
+    if entry.get("error") != "APPROVAL_REQUIRED":
+        return None
+    function_name = entry.get("function")
+    arguments = entry.get("arguments")
+    if not isinstance(function_name, str) or not isinstance(arguments, dict):
+        return None
+    return {"function": function_name, "arguments": arguments}
+
+
+def _extract_pending_write_approvals(messages: List[AIChatMessage]) -> List[Dict[str, Any]]:
+    """فقط approvalهای آخرین پاسخ assistant را معتبر می‌داند."""
+    for msg in reversed(messages):
+        role = msg.role if isinstance(msg.role, str) else getattr(msg.role, "value", str(msg.role))
+        if role != MessageRole.ASSISTANT.value:
+            continue
+        raw_results = parse_json_field(msg.function_results)
+        approvals: List[Dict[str, Any]] = []
+        if isinstance(raw_results, dict):
+            for key, value in raw_results.items():
+                if str(key).startswith("_"):
+                    continue
+                approval = _approval_from_result_entry(value)
+                if approval:
+                    approvals.append(approval)
+        elif isinstance(raw_results, list):
+            for value in raw_results:
+                approval = _approval_from_result_entry(value)
+                if approval:
+                    approvals.append(approval)
+        return approvals
+    return []
 
 
 class ChatMessageRequest(BaseModel):
@@ -410,7 +449,7 @@ async def create_connector(
         ctx.get_user_id(),
         params.model_dump(),
     )
-    return success_response(connector_to_dict(row, include_secrets=True), request, "کانکتور ایجاد شد")
+    return success_response(connector_to_dict(row), request, "کانکتور ایجاد شد")
 
 
 @router.delete("/connectors/{connector_id}", summary="حذف کانکتور")
@@ -714,6 +753,11 @@ async def send_message(
         "content": message_data.content
     })
     approve_writes = bool(message_data.approve_writes)
+    approved_write_calls = (
+        _extract_pending_write_approvals(previous_messages)
+        if approve_writes
+        else []
+    )
     
     # ذخیره پیام کاربر
     user_message = AIChatMessage(
@@ -749,6 +793,7 @@ async def send_message(
                 previous_messages=previous_messages,
                 message_content=message_data.content,
                 approve_writes=approve_writes,
+                approved_write_calls=approved_write_calls,
             ),
             media_type="text/event-stream",
             headers={
@@ -780,6 +825,7 @@ async def send_message(
             session_business_id=business_id,
             session_id=session_id,
             approve_writes=approve_writes,
+            approved_write_calls=approved_write_calls,
         )
     
     response_content_preview = (response.get("message", {}).get("content") or "")[:500]
@@ -897,6 +943,7 @@ async def _stream_message_response(
     previous_messages: List[AIChatMessage],
     message_content: str,
     approve_writes: bool = False,
+    approved_write_calls: Optional[List[Dict[str, Any]]] = None,
 ):
     """Generator برای streaming response
     
@@ -934,6 +981,7 @@ async def _stream_message_response(
                     session_business_id=business_id,
                     session_id=session_id,
                     approve_writes=approve_writes,
+                    approved_write_calls=approved_write_calls,
                 ):
                     yield chunk
 
@@ -1181,6 +1229,7 @@ async def regenerate_last_response(
     messages = build_llm_messages_from_history(remaining)
 
     business_id = session.business_id
+    approved_write_calls = _extract_pending_write_approvals(remaining) if approve_writes else []
 
     if stream:
         db.close()
@@ -1193,6 +1242,7 @@ async def regenerate_last_response(
                 previous_messages=remaining,
                 message_content=last_user.content,
                 approve_writes=approve_writes,
+                approved_write_calls=approved_write_calls,
             ),
             media_type="text/event-stream",
             headers={
@@ -1213,6 +1263,7 @@ async def regenerate_last_response(
             session_business_id=business_id,
             session_id=session_id,
             approve_writes=approve_writes,
+            approved_write_calls=approved_write_calls,
         )
 
     usage = response.get("usage", {})
@@ -1363,6 +1414,11 @@ async def edit_user_message(
         regenerate_after=params.regenerate_after,
     )
     business_id = session.business_id
+    approved_write_calls = (
+        _extract_pending_write_approvals(remaining)
+        if params.approve_writes
+        else []
+    )
 
     if not should_stream:
         return success_response(
@@ -1388,6 +1444,7 @@ async def edit_user_message(
                 previous_messages=remaining,
                 message_content=user_text,
                 approve_writes=params.approve_writes,
+                approved_write_calls=approved_write_calls,
             ),
             media_type="text/event-stream",
             headers={
@@ -1408,6 +1465,7 @@ async def edit_user_message(
             session_business_id=business_id,
             session_id=session_id,
             approve_writes=params.approve_writes,
+            approved_write_calls=approved_write_calls,
             user_query=user_text,
         )
 

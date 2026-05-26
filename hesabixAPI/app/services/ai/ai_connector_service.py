@@ -6,7 +6,10 @@ from __future__ import annotations
 import json
 import logging
 import re
+import ipaddress
+import socket
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 import httpx
 from sqlalchemy.orm import Session
@@ -19,11 +22,87 @@ logger = logging.getLogger(__name__)
 MAX_RESPONSE_CHARS = 16_000
 REQUEST_TIMEOUT = 25.0
 ALLOWED_METHODS = {"GET", "POST"}
+ALLOWED_SCHEMES = {"http", "https"}
+METADATA_HOSTS = {
+    "metadata.google.internal",
+}
+METADATA_IPS = {
+    "169.254.169.254",  # AWS/GCP/Azure metadata endpoint
+}
 
 
 def _slug_name(name: str) -> str:
     s = re.sub(r"[^\w\u0600-\u06FF-]+", "_", (name or "").strip().lower())
     return s[:128] or "connector"
+
+
+def _mask_secret(value: str) -> str:
+    if not value:
+        return ""
+    if len(value) <= 8:
+        return "••••"
+    return f"{value[:4]}…{value[-4:]}"
+
+
+def _mask_headers(headers: Dict[str, Any]) -> Dict[str, str]:
+    secretish = ("authorization", "api-key", "apikey", "token", "secret", "password", "cookie")
+    masked: Dict[str, str] = {}
+    for key, value in headers.items():
+        k = str(key)
+        v = str(value)
+        masked[k] = _mask_secret(v) if any(part in k.lower() for part in secretish) else v
+    return masked
+
+
+def _is_blocked_ip(host: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if str(addr) in METADATA_IPS:
+        return True
+    return not addr.is_global
+
+
+def _validate_connector_url(url: str) -> str:
+    candidate = (url or "").strip()
+    if not candidate:
+        raise ApiError("INVALID_URL", "آدرس URL الزامی است", http_status=400)
+    parsed = urlparse(candidate)
+    if parsed.scheme.lower() not in ALLOWED_SCHEMES:
+        raise ApiError("INVALID_URL", "فقط آدرس‌های http و https مجاز هستند", http_status=400)
+    if not parsed.hostname:
+        raise ApiError("INVALID_URL", "دامنه URL معتبر نیست", http_status=400)
+    if parsed.username or parsed.password:
+        raise ApiError("INVALID_URL", "استفاده از نام کاربری/رمز در URL مجاز نیست", http_status=400)
+    if "{{" in parsed.netloc or "}}" in parsed.netloc:
+        raise ApiError(
+            "INVALID_URL",
+            "قالب‌گذاری فقط در مسیر یا query مجاز است، نه دامنه",
+            http_status=400,
+        )
+
+    host = parsed.hostname.strip().lower().rstrip(".")
+    if host in {"localhost", "localhost.localdomain"} or host.endswith(".localhost"):
+        raise ApiError("CONNECTOR_HOST_BLOCKED", "اتصال به localhost مجاز نیست", http_status=400)
+    if host in METADATA_HOSTS:
+        raise ApiError("CONNECTOR_HOST_BLOCKED", "اتصال به آدرس metadata مجاز نیست", http_status=400)
+    if _is_blocked_ip(host):
+        raise ApiError("CONNECTOR_HOST_BLOCKED", "اتصال به IP داخلی یا غیرعمومی مجاز نیست", http_status=400)
+
+    try:
+        infos = socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80))
+    except socket.gaierror as exc:
+        raise ApiError("INVALID_URL", "دامنه URL قابل resolve نیست", http_status=400) from exc
+    for info in infos:
+        resolved_ip = info[4][0]
+        if _is_blocked_ip(resolved_ip):
+            raise ApiError(
+                "CONNECTOR_HOST_BLOCKED",
+                "دامنه کانکتور به IP داخلی یا غیرعمومی resolve می‌شود",
+                http_status=400,
+            )
+    return candidate
 
 
 def list_connectors(db: Session, business_id: int) -> List[AIConnector]:
@@ -57,8 +136,8 @@ def connector_to_dict(row: AIConnector, include_secrets: bool = False) -> Dict[s
         "created_at": row.created_at.isoformat() if row.created_at else None,
     }
     if include_secrets:
-        d["headers"] = headers
-        d["body_template"] = row.body_template
+        d["headers"] = _mask_headers(headers)
+        d["body_template"] = "***" if row.body_template else None
     else:
         d["has_headers"] = bool(headers)
         d["has_body_template"] = bool(row.body_template)
@@ -87,6 +166,8 @@ def create_connector(
     if data.get("headers"):
         headers_json = json.dumps(data["headers"], ensure_ascii=False)
 
+    validated_url = _validate_connector_url((data.get("url") or "").strip())
+
     row = AIConnector(
         business_id=business_id,
         user_id=user_id,
@@ -94,13 +175,11 @@ def create_connector(
         title=(data.get("title") or name)[:512],
         description=data.get("description"),
         http_method=method,
-        url=(data.get("url") or "").strip(),
+        url=validated_url,
         headers_json=headers_json,
         body_template=data.get("body_template"),
         is_active=True,
     )
-    if not row.url:
-        raise ApiError("INVALID_URL", "آدرس URL الزامی است", http_status=400)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -175,10 +254,10 @@ def invoke_connector(
 
     params = query_params or {}
     method = row.http_method.upper()
-    url = _render_template(row.url, params) or row.url
+    url = _validate_connector_url(_render_template(row.url, params) or row.url)
 
     try:
-        with httpx.Client(timeout=REQUEST_TIMEOUT, follow_redirects=True) as client:
+        with httpx.Client(timeout=REQUEST_TIMEOUT, follow_redirects=False) as client:
             if method == "GET":
                 resp = client.get(url, headers=headers, params=params)
             else:
@@ -191,10 +270,20 @@ def invoke_connector(
                         except json.JSONDecodeError:
                             body_data = rendered
                 resp = client.post(url, headers=headers, json=body_data, params=params)
+    except ApiError:
+        raise
     except httpx.TimeoutException:
         raise ApiError("CONNECTOR_TIMEOUT", "زمان درخواست به کانکتور تمام شد", http_status=504)
     except Exception as exc:
         raise ApiError("CONNECTOR_ERROR", f"خطا در فراخوانی کانکتور: {exc}", http_status=502)
+
+    logger.info(
+        "AI connector invoked: business=%s connector=%s method=%s status=%s",
+        business_id,
+        name,
+        method,
+        resp.status_code,
+    )
 
     text = resp.text[:MAX_RESPONSE_CHARS]
     parsed: Any = text

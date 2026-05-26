@@ -77,7 +77,9 @@ def build_llm_messages_from_history(db_messages: List[Any]) -> List[Dict[str, An
             for call in calls:
                 fname = call.get("name", "unknown")
                 tc_id = call.get("id") or tool_call_ids.get(fname, f"hist_{fname}")
-                result = results.get(fname, {})
+                result = results.get(tc_id, results.get(fname, {}))
+                if isinstance(result, dict) and "result" in result and "name" in result:
+                    result = result.get("result")
                 if isinstance(result, (dict, list)):
                     serialized = json_dumps_safe(result)
                 else:

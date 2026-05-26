@@ -34,6 +34,7 @@ class AIChatDialog extends StatefulWidget {
   final int? businessId;
   final AuthStore authStore;
   final CalendarController? calendarController;
+
   /// وقتی true باشد داخل [AIChatPage] و go_router نمایش داده می‌شود (بدون دکمه بستن fullscreen).
   final bool embeddedInShell;
 
@@ -110,10 +111,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
   bool get _isHomeMode =>
-      !_messagesLoading &&
-      _messages.isEmpty &&
-      !_stream.isActive &&
-      !_sending;
+      !_messagesLoading && _messages.isEmpty && !_stream.isActive && !_sending;
 
   bool get _canUseAi => _availabilityInfo?['can_use'] as bool? ?? true;
 
@@ -154,7 +152,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   String _resolveToolLabel(String tool, String? toolKey) {
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     return aiToolLabel(l10n, tool, toolKey: toolKey);
   }
 
@@ -345,7 +343,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
     int rating = 4;
     final ctrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok =
+        await showDialog<bool>(
           context: context,
           builder: (context) {
             return AlertDialog(
@@ -353,7 +352,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('به کیفیت صدای پاسخ AI امتیاز دهید تا در آینده بهتر شود.'),
+                  const Text(
+                    'به کیفیت صدای پاسخ AI امتیاز دهید تا در آینده بهتر شود.',
+                  ),
                   const SizedBox(height: 12),
                   StatefulBuilder(
                     builder: (context, setLocal) => Row(
@@ -412,7 +413,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _showSnackbar('بازخورد ثبت شد');
     } catch (e) {
       if (!mounted) return;
-      _showError('خطا در ثبت بازخورد: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        'خطا در ثبت بازخورد: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       ctrl.dispose();
     }
@@ -421,7 +424,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Future<void> _loadSuggestions() async {
     if (widget.businessId == null) return;
     try {
-      final raw = await _aiService.getChatSuggestions(businessId: widget.businessId);
+      final raw = await _aiService.getChatSuggestions(
+        businessId: widget.businessId,
+      );
       if (!mounted || raw.isEmpty) return;
       setState(() {
         _suggestions = raw.map(AIChatSuggestion.fromApi).toList();
@@ -434,7 +439,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Future<void> _loadProactiveAlerts() async {
     if (widget.businessId == null) return;
     try {
-      final alerts = await _aiService.getProactiveAlerts(businessId: widget.businessId);
+      final alerts = await _aiService.getProactiveAlerts(
+        businessId: widget.businessId,
+      );
       if (!mounted) return;
       setState(() => _proactiveAlerts = alerts);
     } catch (e) {
@@ -460,8 +467,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
       if (!mounted) return;
       setState(() {
         list.sort((a, b) {
-          final aDate = a.updatedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final bDate = b.updatedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final aDate =
+              a.updatedAt ??
+              a.createdAt ??
+              DateTime.fromMillisecondsSinceEpoch(0);
+          final bDate =
+              b.updatedAt ??
+              b.createdAt ??
+              DateTime.fromMillisecondsSinceEpoch(0);
           return bDate.compareTo(aDate);
         });
         _sessions = list;
@@ -471,7 +484,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _sessionsLoading = false);
-      _showError('خطا در بارگذاری گفت‌وگوها: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        'خطا در بارگذاری گفت‌وگوها: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -490,7 +505,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       return true;
     } catch (e) {
       if (!mounted) return false;
-      _showError('خطا در آغاز گفت‌وگو: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        'خطا در آغاز گفت‌وگو: ${ErrorExtractor.forContext(e, context)}',
+      );
       return false;
     }
   }
@@ -524,7 +541,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _messagesLoading = false);
-      _showError('خطا در دریافت پیام‌ها: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        'خطا در دریافت پیام‌ها: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -544,7 +563,17 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (!await _ensureSession()) return;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['txt', 'md', 'csv', 'json', 'pdf', 'log', 'xml', 'html', 'htm'],
+      allowedExtensions: [
+        'txt',
+        'md',
+        'csv',
+        'json',
+        'pdf',
+        'log',
+        'xml',
+        'html',
+        'htm',
+      ],
       withData: true,
     );
     if (result == null || result.files.isEmpty) return;
@@ -565,7 +594,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       await _loadAttachments();
     } catch (e) {
       if (!mounted) return;
-      _showError('آپلود پیوست ناموفق: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        'آپلود پیوست ناموفق: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -643,7 +674,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   ),
                   const SizedBox(height: 12),
                   if (searching)
-                    const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                    const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   else if (hits.isEmpty)
                     Text(
                       'نتیجه‌ای نیست',
@@ -708,7 +741,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
   /// چک اعتبار فقط وقتی کش منقضی شده یا قبلاً ناموفق بوده.
   Future<bool> _ensureCanSend(String content) async {
-    if (_availabilityFresh && (_availabilityInfo?['can_use'] as bool? ?? false)) {
+    if (_availabilityFresh &&
+        (_availabilityInfo?['can_use'] as bool? ?? false)) {
       return true;
     }
     try {
@@ -755,14 +789,21 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Future<void> _startNewConversation() => _goToHome();
 
   Future<void> _deleteSession(AIChatSession session) async {
-    final confirm = await showDialog<bool>(
+    final confirm =
+        await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('حذف گفت‌وگو'),
             content: const Text('آیا از حذف این گفت‌وگو مطمئن هستید؟'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('لغو')),
-              FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حذف')),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('لغو'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('حذف'),
+              ),
             ],
           ),
         ) ??
@@ -781,7 +822,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       }
     } catch (e) {
       if (!mounted) return;
-      _showError('حذف گفت‌وگو با خطا مواجه شد: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        'حذف گفت‌وگو با خطا مواجه شد: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -790,7 +833,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     await _sendMessage();
   }
 
-  Future<void> _editMessage(AIChatMessage msg, {required bool regenerateAfter}) async {
+  Future<void> _editMessage(
+    AIChatMessage msg, {
+    required bool regenerateAfter,
+  }) async {
     if (_sending || _currentSession?.id == null || msg.id == null) return;
     final ctrl = TextEditingController(text: msg.content);
     final newText = await showDialog<String>(
@@ -807,7 +853,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('انصراف'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
             child: const Text('ارسال'),
@@ -881,7 +930,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
             _sending = false;
             _stream.clear();
           });
-          _showError('ویرایش ناموفق: ${ErrorExtractor.forContext(error, context)}');
+          _showError(
+            'ویرایش ناموفق: ${ErrorExtractor.forContext(error, context)}',
+          );
         },
       ),
       errorLabel: 'ویرایش',
@@ -956,7 +1007,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _showSnackbar(rating > 0 ? 'ممنون از بازخورد مثبت' : 'بازخورد ثبت شد');
     } catch (e) {
       if (!mounted) return;
-      _showError('ثبت بازخورد ناموفق: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        'ثبت بازخورد ناموفق: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -975,10 +1028,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
       await for (final chunk in streamFactory(cancelToken)) {
         if (chunk.error != null) return;
-        _stream.applyChunk(
-          chunk,
-          resolveToolLabel: _resolveToolLabel,
-        );
+        _stream.applyChunk(chunk, resolveToolLabel: _resolveToolLabel);
         if (chunk.contentDelta != null && chunk.contentDelta!.isNotEmpty) {
           accumulatedContent += chunk.contentDelta!;
         }
@@ -1014,8 +1064,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
               ),
             );
         }
-        _pendingWriteApproval =
-            _stream.toolActivities.any((t) => t.approvalRequired);
+        _pendingWriteApproval = _stream.toolActivities.any(
+          (t) => t.approvalRequired,
+        );
         _stream.clear();
         _sending = false;
       });
@@ -1030,7 +1081,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _sending = false;
         _stream.clear();
       });
-      _showError('$errorLabel ناموفق: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        '$errorLabel ناموفق: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (_streamCancelToken == cancelToken) {
         _streamCancelToken = null;
@@ -1065,7 +1118,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
             _sending = false;
             _stream.clear();
           });
-          _showError('تولید مجدد ناموفق: ${ErrorExtractor.forContext(error, context)}');
+          _showError(
+            'تولید مجدد ناموفق: ${ErrorExtractor.forContext(error, context)}',
+          );
         },
       ),
       errorLabel: 'تولید مجدد',
@@ -1190,7 +1245,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
         }
       } catch (e) {
         if (!mounted) return;
-        _showError('خطا در کنترل ضبط: ${ErrorExtractor.forContext(e, context)}');
+        _showError(
+          'خطا در کنترل ضبط: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
       return;
     }
@@ -1266,8 +1323,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
           if (!gotReady && !ready.isCompleted) {
             ready.completeError(errorMessage);
           }
-          if (errorCode == 'SESSION_TIMEOUT' || errorCode == 'INACTIVITY_TIMEOUT') {
-            _showError('جلسه صوتی به دلیل timeout بسته شد. لطفاً دوباره تلاش کنید.');
+          if (errorCode == 'SESSION_TIMEOUT' ||
+              errorCode == 'INACTIVITY_TIMEOUT') {
+            _showError(
+              'جلسه صوتی به دلیل timeout بسته شد. لطفاً دوباره تلاش کنید.',
+            );
             _stopVoiceSession();
           } else if (errorCode == 'STT_FAILED') {
             _showError('خطا در تشخیص گفتار: $errorMessage');
@@ -1312,7 +1372,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _voiceStarting = false);
-      _showError('خطا در شروع مکالمه صوتی: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        'خطا در شروع مکالمه صوتی: ${ErrorExtractor.forContext(e, context)}',
+      );
     }
   }
 
@@ -1371,10 +1433,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
       case 'NO_ACTIVE_SUBSCRIPTION':
         title = 'نیاز به اشتراک';
         message = 'برای استفاده از هوش مصنوعی، ابتدا یک پلن را انتخاب کنید.';
-        final suggestions = (details?['suggestions'] as List?)?.cast<String>() ?? [];
+        final suggestions =
+            (details?['suggestions'] as List?)?.cast<String>() ?? [];
         if (suggestions.isNotEmpty) message += '\n\n${suggestions.join('\n')}';
         actions = [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('بستن')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('بستن'),
+          ),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
@@ -1392,7 +1458,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
         message =
             'شما ${tokensUsed.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} از ${tokensLimit.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} توکن خود را استفاده کرده‌اید.';
         actions = [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('بستن')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('بستن'),
+          ),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
@@ -1411,14 +1480,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
             'موجودی: ${balance.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} ریال\n'
             'هزینه تخمینی: ${estimatedCost.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} ریال';
         actions = [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('بستن')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('بستن'),
+          ),
         ];
         break;
       default:
         title = 'خطا';
         message = details?['message'] as String? ?? 'خطای نامشخص';
         actions = [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('بستن')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('بستن'),
+          ),
         ];
     }
 
@@ -1427,7 +1502,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+            Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
+            ),
             const SizedBox(width: 8),
             Expanded(child: Text(title)),
           ],
@@ -1455,7 +1533,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('بهبود کیفیت صدا'),
-                  subtitle: const Text('با ارسال داده‌های ناشناس به بهبود تجربه صوتی کمک کنید.'),
+                  subtitle: const Text(
+                    'با ارسال داده‌های ناشناس به بهبود تجربه صوتی کمک کنید.',
+                  ),
                   value: _voiceCollectData,
                   onChanged: (v) => setState(() => _voiceCollectData = v),
                 ),
@@ -1561,7 +1641,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 streamingStatusStep: _stream.statusStep,
                                 streamingIteration: _stream.iteration,
                                 streamingMaxIterations: _stream.maxIterations,
-                                streamingElapsedSeconds: _stream.elapsedSeconds > 0
+                                streamingElapsedSeconds:
+                                    _stream.elapsedSeconds > 0
                                     ? _stream.elapsedSeconds
                                     : null,
                                 streamingTimestamp: _stream.timestamp,
@@ -1569,8 +1650,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 onCopyMessage: _copyToClipboard,
                                 onFeedback: _submitFeedback,
                                 onRegenerateLast: _regenerateLastResponse,
-                                lastAssistantMessageId: _messages.isNotEmpty &&
-                                        _messages.last.role == MessageRole.assistant
+                                lastAssistantMessageId:
+                                    _messages.isNotEmpty &&
+                                        _messages.last.role ==
+                                            MessageRole.assistant
                                     ? _messages.last.id
                                     : null,
                                 messagesLoading: _messagesLoading,
@@ -1589,7 +1672,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 onMic: _toggleVoice,
                                 onStopVoice: _stopVoiceSession,
                                 onStopGenerating: _stopGenerating,
-                                onScrollToBottom: () => _scrollToBottom(force: true),
+                                onScrollToBottom: () =>
+                                    _scrollToBottom(force: true),
                                 onMessageLongPress: _showMessageActions,
                                 onAttach: _pickAndUploadAttachment,
                               ),
@@ -1629,7 +1713,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
                     : (_currentSession?.title ?? 'گفت‌وگو'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             if (_isGenerating)
@@ -1727,7 +1813,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
                     att['filename'] as String? ?? 'فایل',
                     style: theme.textTheme.labelSmall,
                   ),
-                  avatar: const Icon(Icons.insert_drive_file_outlined, size: 18),
+                  avatar: const Icon(
+                    Icons.insert_drive_file_outlined,
+                    size: 18,
+                  ),
                   onDeleted: () async {
                     final id = att['id'] as int?;
                     final sid = _currentSession?.id;
@@ -1766,16 +1855,33 @@ class _AIChatDialogState extends State<AIChatDialog> {
           Icon(Icons.verified_user_outlined, color: scheme.tertiary, size: 22),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              'یک عملیات ثبت/ویرایش نیاز به تأیید شما دارد.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onTertiaryContainer,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'یک عملیات ثبت/ویرایش نیاز به تأیید شما دارد.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onTertiaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'برای امنیت، فقط همان عملیات و جزئیاتی اجرا می‌شود که دستیار قبلاً پیشنهاد کرده است.',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onTertiaryContainer.withValues(alpha: 0.78),
+                  ),
+                ),
+              ],
             ),
           ),
-          FilledButton.tonal(
-            onPressed: _sending ? null : _confirmWriteApproval,
-            child: const Text('تأیید و اجرا'),
+          const SizedBox(width: 10),
+          Tooltip(
+            message: 'اجرای عملیات تأییدشده',
+            child: FilledButton.tonal(
+              onPressed: _sending ? null : _confirmWriteApproval,
+              child: const Text('تأیید و اجرا'),
+            ),
           ),
         ],
       ),
@@ -1801,16 +1907,24 @@ class _AIChatDialogState extends State<AIChatDialog> {
       ),
       child: Row(
         children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800, size: 20),
+          Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange.shade800,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               'اعتبار رو به اتمام — ${tokensRemaining.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} توکن باقی‌مانده',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade900),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: Colors.orange.shade900,
+              ),
             ),
           ),
           TextButton(
-            onPressed: widget.businessId != null ? _navigateToSubscription : null,
+            onPressed: widget.businessId != null
+                ? _navigateToSubscription
+                : null,
             child: const Text('ارتقا'),
           ),
         ],

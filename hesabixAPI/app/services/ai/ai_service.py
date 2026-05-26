@@ -23,6 +23,8 @@ from app.services.ai.prompt_service import get_prompt, PromptRole
 from app.services.ai.ai_write_guard import (
     is_write_function,
     build_approval_required_result,
+    build_approval_mismatch_result,
+    write_call_is_approved,
     WRITE_FUNCTION_LABELS_FA,
 )
 from app.services.ai.ai_tool_keys import (
@@ -1025,6 +1027,7 @@ class AIService:
         session_id: Optional[int] = None,
         max_iterations: int = MAX_AGENT_ITERATIONS,
         approve_writes: bool = False,
+        approved_write_calls: Optional[List[Dict[str, Any]]] = None,
         user_query: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -1109,6 +1112,7 @@ class AIService:
                 current_calls,
                 session_business_id=session_business_id,
                 approve_writes=approve_writes,
+                approved_write_calls=approved_write_calls,
                 iteration=iteration,
             )
             _merge_round_tool_results(accumulated_function_results, function_results)
@@ -1228,6 +1232,7 @@ class AIService:
         session_business_id: Optional[int] = None,
         session_id: Optional[int] = None,
         approve_writes: bool = False,
+        approved_write_calls: Optional[List[Dict[str, Any]]] = None,
         max_iterations: int = MAX_AGENT_ITERATIONS,
         user_query: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
@@ -1504,6 +1509,7 @@ class AIService:
                         function_calls,
                         session_business_id=session_business_id,
                         approve_writes=approve_writes,
+                        approved_write_calls=approved_write_calls,
                         iteration=iteration,
                     )
                     _merge_round_tool_results(
@@ -1650,6 +1656,7 @@ class AIService:
         function_calls: List[Dict[str, Any]],
         session_business_id: Optional[int] = None,
         approve_writes: bool = False,
+        approved_write_calls: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """پردازش function calling (sync — سازگاری با گذشته)"""
         results = {}
@@ -1664,11 +1671,17 @@ class AIService:
             function_name = call.get("name")
             arguments = call.get("arguments", {}) or {}
 
-            if is_write_function(function_name) and not approve_writes:
-                results[function_name] = build_approval_required_result(
-                    function_name, arguments
-                )
-                continue
+            if is_write_function(function_name):
+                if not approve_writes:
+                    results[function_name] = build_approval_required_result(
+                        function_name, arguments
+                    )
+                    continue
+                if not write_call_is_approved(function_name, arguments, approved_write_calls):
+                    results[function_name] = build_approval_mismatch_result(
+                        function_name, arguments
+                    )
+                    continue
 
             try:
                 result = run_ai_registry_function(function_name, arguments, context)
@@ -1684,6 +1697,7 @@ class AIService:
         function_calls: List[Dict[str, Any]],
         session_business_id: Optional[int] = None,
         approve_writes: bool = False,
+        approved_write_calls: Optional[List[Dict[str, Any]]] = None,
         iteration: int = 0,
     ) -> Dict[str, Any]:
         """پردازش function calling به صورت async — کلید نتیجه tool_call_id."""
@@ -1703,10 +1717,15 @@ class AIService:
             if not call.get("id"):
                 call["id"] = tc_id
 
-            if is_write_function(function_name) and not approve_writes:
-                return tc_id, function_name, build_approval_required_result(
-                    function_name, arguments
-                )
+            if is_write_function(function_name):
+                if not approve_writes:
+                    return tc_id, function_name, build_approval_required_result(
+                        function_name, arguments
+                    )
+                if not write_call_is_approved(function_name, arguments, approved_write_calls):
+                    return tc_id, function_name, build_approval_mismatch_result(
+                        function_name, arguments
+                    )
 
             try:
                 loop = asyncio.get_event_loop()

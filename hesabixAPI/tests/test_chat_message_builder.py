@@ -36,6 +36,34 @@ def test_build_with_tool_history():
     assert built[2]["tool_call_id"] == "tc1"
 
 
+def test_build_with_tool_history_prefers_tool_call_id_result():
+    msgs = [
+        SimpleNamespace(
+            id=2,
+            role="assistant",
+            content="",
+            function_calls=json.dumps(
+                [
+                    {"name": "search_persons", "arguments": {"q": "علی"}, "id": "call_a"},
+                    {"name": "search_persons", "arguments": {"q": "رضا"}, "id": "call_b"},
+                ]
+            ),
+            function_results=json.dumps(
+                {
+                    "call_a": {"name": "search_persons", "result": {"items": ["علی"]}},
+                    "call_b": {"name": "search_persons", "result": {"items": ["رضا"]}},
+                    "search_persons": {"items": ["fallback"]},
+                },
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    built = build_llm_messages_from_history(msgs)
+
+    assert json.loads(built[1]["content"])["items"] == ["علی"]
+    assert json.loads(built[2]["content"])["items"] == ["رضا"]
+
+
 def test_serialize_metadata():
     fc, fr = serialize_function_metadata([{"name": "x"}], {"x": 1})
     assert fc is not None and fr is not None
