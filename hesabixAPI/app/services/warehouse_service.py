@@ -2295,6 +2295,18 @@ def post_warehouse_document(
 			exc_info=True,
 		)
 
+	try:
+		from app.services.purchase_accounting_service import post_purchase_grni_clearance_for_warehouse
+
+		post_purchase_grni_clearance_for_warehouse(db, int(wh.id))
+	except Exception as grni_err:
+		logger.warning(
+			"warehouse_post grni clearance failed wh_id=%s err=%s",
+			getattr(wh, "id", None),
+			grni_err,
+			exc_info=True,
+		)
+
 	return {"id": wh.id, "status": wh.status}
 
 
@@ -2926,6 +2938,18 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 		)
 		db.add(cancel_line)
 	
+	try:
+		from app.services.purchase_accounting_service import reverse_purchase_grni_clearance_for_warehouse
+
+		reverse_purchase_grni_clearance_for_warehouse(db, int(wh.id))
+	except Exception as grni_rev_err:
+		logger.warning(
+			"warehouse_cancel grni reversal failed wh_id=%s err=%s",
+			wh.id,
+			grni_rev_err,
+			exc_info=True,
+		)
+
 	# دریافت اطلاعات قبل از تغییر status برای invalidation
 	old_status = wh.status
 	business_id = wh.business_id

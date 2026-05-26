@@ -712,6 +712,10 @@ class BusinessUpdateRequest(BaseModel):
 		default=None,
 		description="حواله پس از ثبت فاکتور: none (بدون حواله)، draft (پیش‌نویس)، posted (قطعی فوری)",
 	)
+	invoice_purchase_accounting_mode: Optional[str] = Field(
+		default=None,
+		description="ثبت حسابداری خرید: direct_inventory | grni_two_step | grni_legacy",
+	)
 	invoice_missing_line_warehouse_policy: Optional[str] = Field(
 		default=None,
 		description="reject (جلوگیری با پیام راهنما) | use_default_warehouse (پر کردن خودکار از انبار پیش‌فرض کسب‌وکار)",
@@ -808,6 +812,20 @@ class BusinessUpdateRequest(BaseModel):
 		if s in ("draft",):
 			return "draft"
 		raise ValueError("invoice_warehouse_release_mode نامعتبر است (none، draft یا posted)")
+
+	@validator("invoice_purchase_accounting_mode")
+	def _validate_invoice_purchase_accounting_mode(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		from app.services.purchase_accounting_service import PURCHASE_ACCOUNTING_MODES, normalize_purchase_accounting_mode
+
+		n = normalize_purchase_accounting_mode(v)
+		if n not in PURCHASE_ACCOUNTING_MODES:
+			raise ValueError(
+				"invoice_purchase_accounting_mode نامعتبر است "
+				"(direct_inventory، grni_two_step یا grni_legacy)"
+			)
+		return n
 
 	@validator("invoice_missing_line_warehouse_policy")
 	def _validate_invoice_missing_line_warehouse_policy(cls, v):  # noqa: N805
@@ -961,6 +979,10 @@ class BusinessResponse(BaseModel):
 	invoice_warehouse_release_mode: str = Field(
 		default="draft",
 		description="حواله پس از ثبت فاکتور: none، draft، posted",
+	)
+	invoice_purchase_accounting_mode: str = Field(
+		default="direct_inventory",
+		description="ثبت حسابداری خرید: direct_inventory، grni_two_step، grni_legacy",
 	)
 	invoice_missing_line_warehouse_policy: str = Field(
 		default="reject",

@@ -19,6 +19,11 @@ from adapters.db.models.ai_usage_log import AIUsageLog, PaymentMethod
 from adapters.db.models.ai_subscription import UserAISubscription
 from app.services.wallet_service import charge_wallet_for_service
 from app.services.ai.prompt_service import get_prompt, PromptRole
+from app.services.ai.ai_write_guard import (
+    is_write_function,
+    build_approval_required_result,
+    WRITE_FUNCTION_LABELS_FA,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -324,8 +329,22 @@ class AIService:
             }
         }
     
-    def get_system_prompt(self, session_business_id: Optional[int] = None) -> str:
-        """دریافت system prompt مناسب با business_id"""
+    @staticmethod
+    def _last_user_query(messages: List[Dict[str, Any]]) -> Optional[str]:
+        for m in reversed(messages):
+            if m.get("role") == "user":
+                content = m.get("content")
+                if isinstance(content, str) and content.strip():
+                    return content.strip()
+        return None
+
+    def get_system_prompt(
+        self,
+        session_business_id: Optional[int] = None,
+        session_id: Optional[int] = None,
+        user_query: Optional[str] = None,
+    ) -> str:
+        """دریافت system prompt مناسب با business_id، حافظه، پیوست‌ها و دانشنامه"""
         # تشخیص role کاربر
         if self.ctx.is_superadmin():
             role = PromptRole.ADMIN
@@ -347,7 +366,65 @@ class AIService:
             business_info = f"\n\nکسب‌وکار فعلی: شناسه {business_id}"
             business_info += "\nنکته مهم: شما در حال کار با این کسب‌وکار هستید و نیازی به پرسیدن شناسه کسب‌وکار ندارید."
             business_info += " تمام function calls به صورت خودکار با شناسه کسب‌وکار فعلی انجام می‌شوند."
-            return base_prompt + business_info
+            insight_text = ""
+            try:
+                from app.services.ai.ai_insight_service import (
+                    get_business_insights,
+                    format_insights_for_prompt,
+                )
+
+                insights = get_business_insights(self.db, int(business_id), self.ctx)
+                insight_text = format_insights_for_prompt(insights)
+            except Exception as exc:
+                logger.warning("Failed to load AI insights for prompt: %s", exc)
+
+            memory_text = ""
+            try:
+                from app.services.ai.ai_memory_service import format_memory_for_prompt
+
+                memory_text = format_memory_for_prompt(
+                    self.db, int(business_id), self.ctx.get_user_id()
+                )
+            except Exception as exc:
+                logger.warning("Failed to load AI memory for prompt: %s", exc)
+
+            attachment_text = ""
+            if session_id:
+                try:
+                    from app.services.ai.ai_attachment_service import format_attachments_for_prompt
+
+                    attachment_text = format_attachments_for_prompt(self.db, session_id)
+                except Exception as exc:
+                    logger.warning("Failed to load AI attachments for prompt: %s", exc)
+
+            knowledge_text = ""
+            if user_query:
+                try:
+                    from app.services.ai.ai_knowledge_service import format_knowledge_for_prompt
+
+                    knowledge_text = format_knowledge_for_prompt(
+                        self.db, int(business_id), user_query
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to load AI knowledge for prompt: %s", exc)
+
+            connector_text = ""
+            try:
+                from app.services.ai.ai_connector_service import format_connectors_for_prompt
+
+                connector_text = format_connectors_for_prompt(self.db, int(business_id))
+            except Exception as exc:
+                logger.warning("Failed to load AI connectors for prompt: %s", exc)
+
+            return (
+                base_prompt
+                + business_info
+                + insight_text
+                + memory_text
+                + attachment_text
+                + knowledge_text
+                + connector_text
+            )
         
         return base_prompt
     
@@ -622,6 +699,45 @@ class AIService:
         self.db.add(usage_log)
         self.db.commit()
         return usage_log
+
+    @staticmethod
+    def _validate_messages(messages: List[Dict[str, Any]]) -> None:
+        """اعتبارسنجی پیام‌ها — پشتیبانی از tool و assistant با tool_calls."""
+        if not messages:
+            raise ApiError("MESSAGES_REQUIRED", "حداقل یک پیام الزامی است", http_status=400)
+        if not isinstance(messages, list):
+            raise ApiError("INVALID_MESSAGES", "messages باید یک لیست باشد", http_status=400)
+
+        for idx, msg in enumerate(messages):
+            if not isinstance(msg, dict):
+                raise ApiError(
+                    "INVALID_MESSAGE_FORMAT",
+                    f"پیام {idx} باید یک dictionary باشد",
+                    http_status=400,
+                )
+            if "role" not in msg:
+                raise ApiError(
+                    "INVALID_MESSAGE_FORMAT",
+                    f"پیام {idx} باید role داشته باشد",
+                    http_status=400,
+                )
+            role = msg.get("role")
+            if role == "tool":
+                if not msg.get("tool_call_id"):
+                    raise ApiError(
+                        "INVALID_MESSAGE_FORMAT",
+                        f"پیام tool {idx} باید tool_call_id داشته باشد",
+                        http_status=400,
+                    )
+                continue
+            if role == "assistant" and msg.get("tool_calls"):
+                continue
+            if "content" not in msg:
+                raise ApiError(
+                    "INVALID_MESSAGE_FORMAT",
+                    f"پیام {idx} باید content داشته باشد",
+                    http_status=400,
+                )
     
     async def chat_completion(
         self,
@@ -631,24 +747,19 @@ class AIService:
         max_tokens_override: Optional[int] = None,
         temperature_override: Optional[float] = None,
         session_business_id: Optional[int] = None,
-        max_iterations: int = 10
+        session_id: Optional[int] = None,
+        max_iterations: int = 10,
+        approve_writes: bool = False,
+        user_query: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         ارسال درخواست به AI (async version برای جلوگیری از blocking)
         """
-        # Validation
-        if not messages:
-            raise ApiError("MESSAGES_REQUIRED", "حداقل یک پیام الزامی است", http_status=400)
-        
-        if not isinstance(messages, list):
-            raise ApiError("INVALID_MESSAGES", "messages باید یک لیست باشد", http_status=400)
-        
-        # بررسی ساختار messages
-        for idx, msg in enumerate(messages):
-            if not isinstance(msg, dict):
-                raise ApiError("INVALID_MESSAGE_FORMAT", f"پیام {idx} باید یک dictionary باشد", http_status=400)
-            if "role" not in msg or "content" not in msg:
-                raise ApiError("INVALID_MESSAGE_FORMAT", f"پیام {idx} باید role و content داشته باشد", http_status=400)
+        self._validate_messages(messages)
+        effective_user_query = user_query or self._last_user_query(messages)
+
+        accumulated_function_calls: List[Dict[str, Any]] = []
+        accumulated_function_results: Dict[str, Any] = {}
         
         if not self.config or not self.config.is_active:
             raise ApiError("AI_NOT_CONFIGURED", "تنظیمات AI فعال نیست", http_status=400)
@@ -669,20 +780,22 @@ class AIService:
         )
         
         # اضافه کردن system prompt با business_id از session
-        system_prompt = self.get_system_prompt(session_business_id=session_business_id)
+        system_prompt = self.get_system_prompt(
+            session_business_id=session_business_id,
+            session_id=session_id,
+            user_query=effective_user_query,
+        )
         full_messages = [
             {"role": "system", "content": system_prompt},
             *messages
         ]
         
-        # دریافت function definitions
         eff_tools = self._use_tools_for_request(use_function_calling)
         if eff_tools and tools is None:
             tools = self.get_available_functions(session_business_id=session_business_id)
         elif not eff_tools:
             tools = None
         
-        # ارسال به AI provider در thread pool برای جلوگیری از blocking
         try:
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
@@ -711,10 +824,15 @@ class AIService:
         iteration = 0
         while eff_tools and response["message"].get("function_calls") and iteration < max_iterations:
             iteration += 1
+            current_calls = response["message"]["function_calls"]
+            accumulated_function_calls.extend(current_calls)
+
             function_results = await self.handle_function_calls_async(
-                response["message"]["function_calls"],
-                session_business_id=session_business_id
+                current_calls,
+                session_business_id=session_business_id,
+                approve_writes=approve_writes,
             )
+            accumulated_function_results.update(function_results)
             
             # ایجاد assistant message با tool_calls برای OpenAI API
             assistant_msg = {
@@ -759,13 +877,13 @@ class AIService:
                 loop = asyncio.get_event_loop()
                 response = await loop.run_in_executor(
                     _executor,
-                    lambda: provider.chat_completion(
-                        messages=full_messages,
+                    lambda msgs=full_messages, t=tools: provider.chat_completion(
+                        messages=msgs,
                         model=self.config.model_name,
                         max_tokens=max_tokens_override or self.config.max_tokens,
                         temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
-                        tools=None
-                    )
+                        tools=t if eff_tools else None,
+                    ),
                 )
             except ApiError:
                 raise
@@ -776,6 +894,10 @@ class AIService:
                     f"خطا در سرویس AI: {str(e)}",
                     http_status=500
                 )
+
+        if accumulated_function_calls:
+            response["_function_calls"] = accumulated_function_calls
+            response["_function_results"] = accumulated_function_results
         
         return response
     
@@ -821,243 +943,234 @@ class AIService:
         tools: Optional[List[Dict[str, Any]]] = None,
         use_function_calling: bool = True,
         max_tokens_override: Optional[int] = None,
-        session_business_id: Optional[int] = None
+        session_business_id: Optional[int] = None,
+        session_id: Optional[int] = None,
+        approve_writes: bool = False,
+        max_iterations: int = 8,
+        user_query: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        ارسال درخواست به AI به صورت streaming
-        """
-        # Validation
-        if not messages:
-            raise ApiError("MESSAGES_REQUIRED", "حداقل یک پیام الزامی است", http_status=400)
-        
-        if not isinstance(messages, list):
-            raise ApiError("INVALID_MESSAGES", "messages باید یک لیست باشد", http_status=400)
-        
-        # بررسی ساختار messages
-        for idx, msg in enumerate(messages):
-            if not isinstance(msg, dict):
-                raise ApiError("INVALID_MESSAGE_FORMAT", f"پیام {idx} باید یک dictionary باشد", http_status=400)
-            if "role" not in msg or "content" not in msg:
-                raise ApiError("INVALID_MESSAGE_FORMAT", f"پیام {idx} باید role و content داشته باشد", http_status=400)
-        
+        """ارسال streaming با چند نوبت tool calling (مثل chat_completion)."""
+        self._validate_messages(messages)
+        effective_user_query = user_query or self._last_user_query(messages)
+
+        accumulated_function_calls: List[Dict[str, Any]] = []
+        accumulated_function_results: Dict[str, Any] = {}
+
         if not self.config or not self.config.is_active:
             raise ApiError("AI_NOT_CONFIGURED", "تنظیمات AI فعال نیست", http_status=400)
-        
-        # رمزگشایی API Key
+
         from app.services.ai.encryption import decrypt_api_key
+
         api_key = decrypt_api_key(self.config.api_key) if self.config.api_key else None
-        
         if not api_key:
             raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
-        
-        # ایجاد provider
+
         from app.services.ai.ai_provider import create_provider
+
         provider = create_provider(
             provider_type=self.config.provider,
             api_key=api_key,
-            api_base_url=self.config.api_base_url
+            api_base_url=self.config.api_base_url,
         )
-        
-        # اضافه کردن system prompt با business_id از session
-        system_prompt = self.get_system_prompt(session_business_id=session_business_id)
-        full_messages = [
+
+        system_prompt = self.get_system_prompt(
+            session_business_id=session_business_id,
+            session_id=session_id,
+            user_query=effective_user_query,
+        )
+        full_messages: List[Dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
-            *messages
+            *messages,
         ]
-        
-        # دریافت function definitions
+
         eff_tools = self._use_tools_for_request(use_function_calling)
         if eff_tools and tools is None:
             tools = self.get_available_functions(session_business_id=session_business_id)
         elif not eff_tools:
             tools = None
-        
-        # ارسال به AI provider (streaming)
+
         try:
             accumulated_content = ""
-            accumulated_chunks = []
             final_usage = None
-            function_calls = None
-            tool_call_id_map = {}
-            
-            async for chunk in provider.chat_completion_stream(
-                messages=full_messages,
-                model=self.config.model_name,
-                max_tokens=max_tokens_override or self.config.max_tokens,
-                temperature=float(self.config.temperature),
-                tools=tools if tools else None
-            ):
-                accumulated_chunks.append(chunk)
-                
-                # جمع‌آوری محتوا
-                delta = chunk.get("delta", {})
-                content_chunk = delta.get("content", "")
-                if content_chunk:
-                    accumulated_content += content_chunk
-                
-                # بررسی usage
-                if chunk.get("usage"):
-                    final_usage = chunk["usage"]
-                
-                # بررسی function_calls (در chunk نهایی)
-                if chunk.get("function_calls"):
-                    function_calls = chunk["function_calls"]
-                    tool_call_id_map = chunk.get("tool_call_id_map", {})
-                
-                # بررسی done
-                if chunk.get("done", False):
-                    # chunk نهایی را yield نکنیم، چون ممکن است function calls داشته باشد
-                    break
-                
-                # ارسال chunk به client (فقط chunks میانی)
-                yield chunk
-            
-            # بررسی function calls (اگر وجود داشته باشد)
-            if function_calls and eff_tools:
-                # پردازش function calls به صورت async
-                function_results = await self.handle_function_calls_async(function_calls, session_business_id=session_business_id)
-                
-                # ایجاد assistant message با tool_calls برای OpenAI API
-                assistant_msg = {
-                    "role": "assistant",
-                    "content": accumulated_content or None,
-                    "tool_calls": []
-                }
-                
-                # ساخت tool_calls به فرمت OpenAI با استفاده از id از provider
-                for call in function_calls:
-                    tool_call_id = call.get("id") or f"call_{call.get('name', 'unknown')}"
-                    assistant_msg["tool_calls"].append({
-                        "id": tool_call_id,
-                        "type": "function",
-                        "function": {
-                            "name": call.get("name"),
-                            "arguments": json.dumps(call.get("arguments", {}), ensure_ascii=False)
-                        }
-                    })
-                
-                # حذف content اگر None یا خالی باشد
-                if not assistant_msg["content"]:
-                    del assistant_msg["content"]
-                
-                full_messages.append(assistant_msg)
-                
-                # اضافه کردن نتایج function calls به messages با استفاده از tool_call_id
-                function_messages = []
-                for call in function_calls:
-                    function_name = call.get("name")
-                    result = function_results.get(function_name, {})
-                    # تبدیل datetime objects به string برای JSON serialization
-                    serialized_result = self._serialize_for_json(result)
-                    tool_call_id = call.get("id") or tool_call_id_map.get(function_name, f"call_{function_name}")
-                    function_messages.append({
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "content": json.dumps(serialized_result, ensure_ascii=False) if isinstance(serialized_result, (dict, list)) else str(serialized_result)
-                    })
-                
-                full_messages.extend(function_messages)
-                
-                # ارسال مجدد به AI (بدون tools، چون دیگر نیازی نیست)
-                # در این مرحله از non-streaming استفاده می‌کنیم برای پاسخ نهایی
-                try:
-                    loop = asyncio.get_event_loop()
-                    response = await loop.run_in_executor(
-                        _executor,
-                        lambda: provider.chat_completion(
-                        messages=full_messages,
-                        model=self.config.model_name,
-                        max_tokens=max_tokens_override or self.config.max_tokens,
-                        temperature=float(self.config.temperature),
-                        tools=None  # دیگر نیازی به tools نیست
-                        )
-                    )
-                    
-                    # ارسال پاسخ نهایی به صورت streaming (شبیه‌سازی)
-                    final_content = response["message"]["content"]
-                    if final_content:
-                        # ارسال به صورت تدریجی برای تجربه بهتر
-                        chunk_size = 50
-                        for i in range(0, len(final_content), chunk_size):
-                            chunk = final_content[i:i + chunk_size]
-                            await asyncio.sleep(0.01)  # کمی تأخیر برای شبیه‌سازی streaming
+            iteration = 0
+
+            while iteration < max_iterations:
+                iteration += 1
+                function_calls = None
+                tool_call_id_map: Dict[str, str] = {}
+                round_text = ""
+                use_tools = bool(eff_tools and tools)
+
+                async for chunk in provider.chat_completion_stream(
+                    messages=full_messages,
+                    model=self.config.model_name,
+                    max_tokens=max_tokens_override or self.config.max_tokens,
+                    temperature=float(self.config.temperature),
+                    tools=tools if use_tools else None,
+                ):
+                    if chunk.get("usage"):
+                        final_usage = chunk["usage"]
+                    if chunk.get("function_calls"):
+                        function_calls = chunk["function_calls"]
+                        tool_call_id_map = chunk.get("tool_call_id_map", {}) or {}
+
+                    delta = chunk.get("delta", {})
+                    content_chunk = delta.get("content", "")
+                    if content_chunk:
+                        round_text += content_chunk
+                        if not function_calls:
                             yield {
-                                "delta": {
-                                    "content": chunk
-                                },
+                                "delta": {"content": content_chunk},
                                 "usage": None,
-                                "done": False
+                                "done": False,
                             }
-                    
-                    # به‌روزرسانی usage و accumulated_content
-                    if response.get("usage"):
-                        final_usage = response["usage"]
-                    accumulated_content = final_content
-                    
-                except ApiError:
-                    raise
-                except Exception as e:
-                    logger.error(f"Error in function call retry (streaming): {e}", exc_info=True)
-                    raise ApiError(
-                        "AI_SERVICE_ERROR",
-                        f"خطا در سرویس AI: {str(e)}",
-                        http_status=500
+
+                    if chunk.get("done", False):
+                        break
+
+                if function_calls and use_tools:
+                    accumulated_function_calls.extend(function_calls)
+                    for call in function_calls:
+                        fname = call.get("name", "unknown")
+                        yield {
+                            "event": "tool_start",
+                            "tool": fname,
+                            "label": WRITE_FUNCTION_LABELS_FA.get(fname, fname),
+                        }
+
+                    function_results = await self.handle_function_calls_async(
+                        function_calls,
+                        session_business_id=session_business_id,
+                        approve_writes=approve_writes,
                     )
-            
-            # ارسال chunk نهایی با usage
+                    accumulated_function_results.update(function_results)
+
+                    for call in function_calls:
+                        fname = call.get("name", "unknown")
+                        result = function_results.get(fname, {})
+                        needs_approval = (
+                            isinstance(result, dict)
+                            and result.get("error") == "APPROVAL_REQUIRED"
+                        )
+                        yield {
+                            "event": "tool_end",
+                            "tool": fname,
+                            "label": WRITE_FUNCTION_LABELS_FA.get(fname, fname),
+                            "success": not (
+                                isinstance(result, dict) and result.get("error")
+                            ),
+                            "approval_required": needs_approval,
+                        }
+
+                    assistant_msg: Dict[str, Any] = {
+                        "role": "assistant",
+                        "tool_calls": [],
+                    }
+                    if round_text:
+                        assistant_msg["content"] = round_text
+
+                    for call in function_calls:
+                        tc_id = call.get("id") or f"call_{call.get('name', 'unknown')}"
+                        assistant_msg["tool_calls"].append(
+                            {
+                                "id": tc_id,
+                                "type": "function",
+                                "function": {
+                                    "name": call.get("name"),
+                                    "arguments": json.dumps(
+                                        call.get("arguments", {}),
+                                        ensure_ascii=False,
+                                    ),
+                                },
+                            }
+                        )
+                    if not assistant_msg.get("content"):
+                        assistant_msg.pop("content", None)
+
+                    full_messages.append(assistant_msg)
+
+                    for call in function_calls:
+                        function_name = call.get("name")
+                        result = function_results.get(function_name, {})
+                        serialized = self._serialize_for_json(result)
+                        tc_id = (
+                            call.get("id")
+                            or tool_call_id_map.get(function_name, f"call_{function_name}")
+                        )
+                        full_messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tc_id,
+                                "content": (
+                                    json.dumps(serialized, ensure_ascii=False)
+                                    if isinstance(serialized, (dict, list))
+                                    else str(serialized)
+                                ),
+                            }
+                        )
+                    continue
+
+                accumulated_content = round_text
+                break
+
             yield {
-                "delta": {
-                    "content": ""
-                },
+                "delta": {"content": ""},
                 "usage": final_usage,
-                "done": True
+                "done": True,
+                "function_calls": accumulated_function_calls or None,
+                "function_results": accumulated_function_results or None,
             }
-            
+
         except ApiError:
-            # خطاهای ApiError را مستقیماً propagate کنیم
             raise
         except Exception as e:
-            # خطاهای دیگر را به ApiError تبدیل کنیم
             logger.error(f"Unexpected error in AI streaming service: {e}", exc_info=True)
             raise ApiError(
                 "AI_SERVICE_ERROR",
                 f"خطا در سرویس AI: {str(e)}",
-                http_status=500
+                http_status=500,
             )
     
     def handle_function_calls(
         self,
         function_calls: List[Dict[str, Any]],
-        session_business_id: Optional[int] = None
+        session_business_id: Optional[int] = None,
+        approve_writes: bool = False,
     ) -> Dict[str, Any]:
-        """پردازش function calling و برگرداندن نتایج به صورت dictionary (sync version برای backward compatibility)"""
+        """پردازش function calling (sync — سازگاری با گذشته)"""
         results = {}
-        # استفاده از business_id از session (اولویت) یا از context
         effective_business_id = session_business_id or self.business_id
         context = {
             "db": self.db,
             "user_context": self.ctx,
             "business_id": effective_business_id,
-            "session_business_id": session_business_id  # برای validation در handler
+            "session_business_id": session_business_id,
         }
-        
+
         for call in function_calls:
             function_name = call.get("name")
-            arguments = call.get("arguments", {})
-            
+            arguments = call.get("arguments", {}) or {}
+
+            if is_write_function(function_name) and not approve_writes:
+                results[function_name] = build_approval_required_result(
+                    function_name, arguments
+                )
+                continue
+
             try:
                 result = registry.call_function(function_name, arguments, context)
                 results[function_name] = result
             except Exception as e:
                 logger.error(f"Error calling function {function_name}: {e}", exc_info=True)
                 results[function_name] = {"error": str(e)}
-        
+
         return results
 
     async def handle_function_calls_async(
         self,
         function_calls: List[Dict[str, Any]],
-        session_business_id: Optional[int] = None
+        session_business_id: Optional[int] = None,
+        approve_writes: bool = False,
     ) -> Dict[str, Any]:
         """پردازش function calling به صورت async برای جلوگیری از blocking"""
         # استفاده از business_id از session (اولویت) یا از context
@@ -1072,13 +1185,16 @@ class AIService:
         # اجرای function calls در thread pool برای جلوگیری از blocking
         async def call_single_function(call: Dict[str, Any]) -> tuple[str, Any]:
             function_name = call.get("name")
-            arguments = call.get("arguments", {})
+            arguments = call.get("arguments", {}) or {}
+
+            if is_write_function(function_name) and not approve_writes:
+                return function_name, build_approval_required_result(function_name, arguments)
             
             try:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
                     _executor,
-                    lambda: registry.call_function(function_name, arguments, context)
+                    lambda fn=function_name, args=arguments: registry.call_function(fn, args, context),
                 )
                 return function_name, result
             except Exception as e:

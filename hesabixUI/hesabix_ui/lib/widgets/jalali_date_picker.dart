@@ -105,7 +105,7 @@ class _JalaliDatePickerState extends State<JalaliDatePicker> {
               child: _buildCalendar(),
             ),
             
-            // Buttons
+            // Cancel only — selecting a day in the calendar confirms immediately.
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -116,14 +116,6 @@ class _JalaliDatePickerState extends State<JalaliDatePicker> {
                     'انصراف',
                     style: TextStyle(color: theme.textTheme.bodyMedium?.color),
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () {
-                    widget.onDateChanged?.call(_selectedDate);
-                    Navigator.of(context).pop(_selectedDate);
-                  },
-                  child: const Text('تایید'),
                 ),
               ],
             ),
@@ -139,10 +131,9 @@ class _JalaliDatePickerState extends State<JalaliDatePicker> {
       firstDate: Jalali.fromDateTime(widget.firstDate ?? DateTime(1900)),
       lastDate: Jalali.fromDateTime(widget.lastDate ?? DateTime(2100)),
       onDateChanged: (jalali) {
-        setState(() {
-          _selectedJalali = jalali;
-          _selectedDate = jalali.toDateTime();
-        });
+        final selected = jalali.toDateTime();
+        widget.onDateChanged?.call(selected);
+        Navigator.of(context).pop(selected);
       },
     );
   }

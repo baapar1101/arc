@@ -1107,9 +1107,11 @@ def create_app() -> FastAPI:
     from adapters.api.v1.admin.ai_settings import router as admin_ai_settings_router
     from adapters.api.v1.admin.ai_plans import router as admin_ai_plans_router
     from adapters.api.v1.admin.ai_prompts import router as admin_ai_prompts_router
+    from adapters.api.v1.admin.ai_eval import router as admin_ai_eval_router
     application.include_router(admin_ai_settings_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_plans_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_prompts_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_ai_eval_router, prefix=settings.api_v1_prefix)
     # User AI endpoints
     from adapters.api.v1.ai.chat import router as ai_chat_router
     from adapters.api.v1.ai.crm_ai import router as ai_crm_router
@@ -1117,7 +1119,9 @@ def create_app() -> FastAPI:
     from adapters.api.v1.ai.prompts import router as ai_prompts_router
     from adapters.api.v1.ai.usage import router as ai_usage_router
     from adapters.api.v1.ai.voice_feedback import router as ai_voice_feedback_router
+    from adapters.api.v1.ai.mcp import router as ai_mcp_router
     application.include_router(ai_chat_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_mcp_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_crm_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_subscription_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_prompts_router, prefix=settings.api_v1_prefix)
@@ -1165,7 +1169,8 @@ def create_app() -> FastAPI:
         from app.services.ai_background_jobs import (
             ai_quota_reset_loop,
             ai_chat_cleanup_loop,
-            ai_subscription_check_loop
+            ai_subscription_check_loop,
+            ai_eval_schedule_loop,
         )
         # AI quota reset: هر 24 ساعت یکبار
         asyncio.create_task(ai_quota_reset_loop(24))
@@ -1173,6 +1178,8 @@ def create_app() -> FastAPI:
         asyncio.create_task(ai_chat_cleanup_loop(24))
         # AI subscription check: هر 6 ساعت یکبار
         asyncio.create_task(ai_subscription_check_loop(6))
+        # AI eval regression: هر ۶۰ ثانیه بررسی cron (پیش‌فرض غیرفعال تا فعال‌سازی در ادمین)
+        asyncio.create_task(ai_eval_schedule_loop(60))
 
         # حذف/پنهان خودکار اعلان‌های in-app خوانده‌شده (تنظیم مدیر)
         from app.services.announcement_retention_jobs import announcement_read_retention_loop

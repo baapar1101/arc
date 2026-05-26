@@ -39,6 +39,12 @@ def _normalize_invoice_warehouse_release_mode(value) -> str:
     return "draft"
 
 
+def _normalize_purchase_accounting_mode_for_response(value) -> str:
+    from app.services.purchase_accounting_service import normalize_purchase_accounting_mode
+
+    return normalize_purchase_accounting_mode(value)
+
+
 def ensure_wallet_currency_in_business(db: Session, business_id: int) -> bool:
     """
     بررسی و اضافه کردن ارز کیف پول به لیست ارزهای کسب و کار در صورت عدم وجود
@@ -1397,6 +1403,9 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "invoice_sync_purchase_price_basis": getattr(business, "invoice_sync_purchase_price_basis", None),
         "invoice_warehouse_release_mode": _normalize_invoice_warehouse_release_mode(
             getattr(business, "invoice_warehouse_release_mode", None),
+        ),
+        "invoice_purchase_accounting_mode": _normalize_purchase_accounting_mode_for_response(
+            getattr(business, "invoice_purchase_accounting_mode", None)
         ),
         "invoice_missing_line_warehouse_policy": str(
             getattr(business, "invoice_missing_line_warehouse_policy", None) or "reject",

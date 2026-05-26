@@ -377,6 +377,8 @@ class BusinessResponse {
   final String? invoiceSyncPurchasePriceBasis;
   /// none | draft | posted
   final String invoiceWarehouseReleaseMode;
+  /// direct_inventory | grni_two_step | grni_legacy
+  final String invoicePurchaseAccountingMode;
   /// reject | use_default_warehouse
   final String invoiceMissingLineWarehousePolicy;
   final int? invoiceDefaultWarehouseId;
@@ -442,6 +444,7 @@ class BusinessResponse {
     this.invoiceSyncSalesPriceBasis,
     this.invoiceSyncPurchasePriceBasis,
     this.invoiceWarehouseReleaseMode = 'draft',
+    this.invoicePurchaseAccountingMode = 'direct_inventory',
     this.invoiceMissingLineWarehousePolicy = 'reject',
     this.invoiceDefaultWarehouseId,
     this.invoiceDefaultWarehouseFillDocumentHeader = true,
@@ -469,6 +472,14 @@ class BusinessResponse {
     final s = (raw ?? 'draft').toString().trim().toLowerCase();
     if (s == 'none' || s == 'posted' || s == 'draft') return s;
     return 'draft';
+  }
+
+  static String _normalizeInvoicePurchaseAccountingMode(String? raw) {
+    final s = (raw ?? 'direct_inventory').toString().trim().toLowerCase();
+    if (s == 'direct_inventory' || s == 'grni_two_step' || s == 'grni_legacy') {
+      return s;
+    }
+    return 'direct_inventory';
   }
 
   static String _normalizeInvoiceMissingLineWarehousePolicy(String? raw) {
@@ -521,6 +532,9 @@ class BusinessResponse {
       invoiceSyncPurchasePriceBasis: json['invoice_sync_purchase_price_basis'] as String?,
       invoiceWarehouseReleaseMode: _normalizeInvoiceWarehouseReleaseMode(
         json['invoice_warehouse_release_mode'] as String?,
+      ),
+      invoicePurchaseAccountingMode: _normalizeInvoicePurchaseAccountingMode(
+        json['invoice_purchase_accounting_mode'] as String?,
       ),
       invoiceMissingLineWarehousePolicy: _normalizeInvoiceMissingLineWarehousePolicy(
         json['invoice_missing_line_warehouse_policy'] as String?,

@@ -11583,6 +11583,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'With “post immediately”, the warehouse document is posted when the invoice is saved and the same shortage / negative-stock rules from the section below apply. Draft keeps it until you post manually.';
 
   @override
+  String get invoicePurchaseAccountingBusinessTitle =>
+      'Purchase invoice accounting';
+
+  @override
+  String get invoicePurchaseAccountingBusinessSubtitle =>
+      'How purchase debits are posted to the GL. Changes apply to new invoices only; use the admin script to fix legacy documents.';
+
+  @override
+  String get invoicePurchaseAccountingDirect => 'Direct to inventory';
+
+  @override
+  String get invoicePurchaseAccountingGrni => 'GRNI (two-step)';
+
+  @override
   String get invoiceMissingLineWarehousePolicySectionTitle =>
       'Policy when invoice lines have no warehouse';
 

@@ -33,6 +33,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
   bool _loading = true;
   String? _error;
   AIUsageStats? _stats;
+  Map<String, dynamic>? _feedbackAnalytics;
   int _selectedTab = 0;
 
   @override
@@ -60,6 +61,16 @@ class _AIUsagePageState extends State<AIUsagePage> {
       final stats = await _aiService.getUsageStats(
         businessId: widget.businessId,
       );
+      Map<String, dynamic>? feedback;
+      if (widget.businessId != null) {
+        try {
+          feedback = await _aiService.getFeedbackAnalytics(
+            businessId: widget.businessId,
+          );
+        } catch (e) {
+          debugPrint('[AIUsagePage] feedback analytics failed: $e');
+        }
+      }
       debugPrint('[AIUsagePage] آمار دریافت شد');
       debugPrint('[AIUsagePage] total: ${stats.total}');
       debugPrint('[AIUsagePage] daily length: ${stats.daily.length}');
@@ -69,6 +80,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
       
       setState(() {
         _stats = stats;
+        _feedbackAnalytics = feedback;
         _loading = false;
       });
       
@@ -151,13 +163,14 @@ class _AIUsagePageState extends State<AIUsagePage> {
         ],
       ),
       body: DefaultTabController(
-        length: 2,
+        length: 3,
         initialIndex: _selectedTab,
         child: Column(
           children: [
             TabBar(
               tabs: const [
                 Tab(text: 'آمار کلی', icon: Icon(Icons.bar_chart)),
+                Tab(text: 'بازخورد', icon: Icon(Icons.thumb_up_outlined)),
                 Tab(text: 'لاگ استفاده', icon: Icon(Icons.list)),
               ],
               onTap: (index) => setState(() => _selectedTab = index),
@@ -179,7 +192,9 @@ class _AIUsagePageState extends State<AIUsagePage> {
                     )
                   : _selectedTab == 0
                       ? _buildStatsTab(theme)
-                      : _buildLogsTab(),
+                      : _selectedTab == 1
+                          ? _buildFeedbackTab(theme)
+                          : _buildLogsTab(),
             ),
           ],
         ),
@@ -351,6 +366,97 @@ class _AIUsagePageState extends State<AIUsagePage> {
         ),
       );
     }
+  }
+
+  Widget _buildFeedbackTab(ThemeData theme) {
+    final data = _feedbackAnalytics;
+    if (data == null) {
+      return const Center(child: Text('داده بازخوردی ثبت نشده است'));
+    }
+    final summary = data['summary'] as Map<String, dynamic>? ?? {};
+    final daily = (data['daily'] as List?) ?? [];
+    final negative = (data['recent_negative'] as List?) ?? [];
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _StatCard(
+                label: 'مثبت',
+                value: '${summary['positive'] ?? 0}',
+                icon: Icons.thumb_up_outlined,
+                color: Colors.green,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'منفی',
+                value: '${summary['negative'] ?? 0}',
+                icon: Icons.thumb_down_outlined,
+                color: Colors.red,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _StatCard(
+                label: 'رضایت',
+                value: summary['satisfaction_rate_percent'] != null
+                    ? '${summary['satisfaction_rate_percent']}%'
+                    : '—',
+                icon: Icons.sentiment_satisfied_alt_outlined,
+                color: Colors.blue,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        if (daily.isNotEmpty)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('روند روزانه', style: theme.textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  ...daily.map((d) {
+                    final m = Map<String, dynamic>.from(d as Map);
+                    return ListTile(
+                      dense: true,
+                      title: Text(m['date'] as String? ?? ''),
+                      trailing: Text(
+                        '+${m['positive']} / -${m['negative']}',
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+          ),
+        if (negative.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Text('بازخورد منفی اخیر', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 8),
+          ...negative.map((item) {
+            final m = Map<String, dynamic>.from(item as Map);
+            return Card(
+              child: ListTile(
+                title: Text(
+                  (m['content_preview'] as String? ?? '').length > 100
+                      ? '${(m['content_preview'] as String).substring(0, 100)}…'
+                      : m['content_preview'] as String? ?? '',
+                ),
+                subtitle: Text(m['created_at'] as String? ?? ''),
+                isThreeLine: true,
+              ),
+            );
+          }),
+        ],
+      ],
+    );
   }
 
   Widget _buildLogsTab() {

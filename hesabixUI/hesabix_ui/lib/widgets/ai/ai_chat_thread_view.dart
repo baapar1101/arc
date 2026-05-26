@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
+import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_message_body.dart';
 
 typedef MessageActionCallback = void Function(AIChatMessage message);
 
 class AIChatThreadView extends StatelessWidget {
   final List<AIChatMessage> messages;
   final String? streamingContent;
+  final List<AIToolActivity> streamingToolActivities;
   final DateTime? streamingTimestamp;
   final bool messagesLoading;
   final bool sending;
@@ -25,6 +28,7 @@ class AIChatThreadView extends StatelessWidget {
   final VoidCallback? onMic;
   final VoidCallback? onStopVoice;
   final VoidCallback? onStopGenerating;
+  final VoidCallback? onAttach;
   final VoidCallback onScrollToBottom;
   final MessageActionCallback onMessageLongPress;
 
@@ -32,6 +36,7 @@ class AIChatThreadView extends StatelessWidget {
     super.key,
     required this.messages,
     required this.streamingContent,
+    this.streamingToolActivities = const [],
     required this.streamingTimestamp,
     required this.messagesLoading,
     required this.sending,
@@ -49,6 +54,7 @@ class AIChatThreadView extends StatelessWidget {
     this.onMic,
     this.onStopVoice,
     this.onStopGenerating,
+    this.onAttach,
     required this.onScrollToBottom,
     required this.onMessageLongPress,
   });
@@ -78,6 +84,7 @@ class AIChatThreadView extends StatelessWidget {
                     }
                     return _StreamingRow(
                       content: streamingContent ?? '',
+                      toolActivities: streamingToolActivities,
                       formatTime: formatTime(streamingTimestamp),
                     );
                   },
@@ -107,6 +114,7 @@ class AIChatThreadView extends StatelessWidget {
           onMic: onMic,
           onStopVoice: onStopVoice,
           onStopGenerating: isGenerating ? onStopGenerating : null,
+          onAttach: onAttach,
         ),
       ],
     );
@@ -157,9 +165,11 @@ class _MessageRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    SelectableText(
-                      message.content,
-                      style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
+                    AIChatMessageBody(
+                      content: message.content,
+                      isUser: true,
+                      functionCalls: message.functionCalls,
+                      functionResults: message.functionResults,
                     ),
                     if (timeText.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -193,12 +203,11 @@ class _MessageRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SelectableText(
-                    message.content,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      height: 1.65,
-                      letterSpacing: 0.1,
-                    ),
+                  AIChatMessageBody(
+                    content: message.content,
+                    isUser: false,
+                    functionCalls: message.functionCalls,
+                    functionResults: message.functionResults,
                   ),
                   if (timeText.isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -222,9 +231,14 @@ class _MessageRow extends StatelessWidget {
 
 class _StreamingRow extends StatelessWidget {
   final String content;
+  final List<AIToolActivity> toolActivities;
   final String formatTime;
 
-  const _StreamingRow({required this.content, required this.formatTime});
+  const _StreamingRow({
+    required this.content,
+    this.toolActivities = const [],
+    required this.formatTime,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -242,10 +256,18 @@ class _StreamingRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  content.isEmpty ? '...' : content,
-                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.65),
-                ),
+                if (toolActivities.isNotEmpty)
+                  AIChatToolActivityList(activities: toolActivities),
+                if (content.isNotEmpty)
+                  AIChatMessageBody(
+                    content: content,
+                    isUser: false,
+                  )
+                else if (toolActivities.isEmpty)
+                  Text(
+                    '...',
+                    style: theme.textTheme.bodyLarge?.copyWith(height: 1.65),
+                  ),
                 const SizedBox(height: 8),
                 Row(
                   children: [

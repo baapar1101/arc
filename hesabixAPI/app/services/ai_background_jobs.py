@@ -167,3 +167,23 @@ async def ai_subscription_check_loop(interval_hours: int = 6) -> None:
         
         await asyncio.sleep(interval_seconds)
 
+
+async def ai_eval_schedule_loop(interval_seconds: int = 60) -> None:
+    """بررسی cron ارزیابی خودکار AI."""
+    from app.services.ai.ai_eval_schedule_service import run_scheduled_eval_if_due
+
+    while True:
+        try:
+            with get_db_session() as db:
+                result = await run_scheduled_eval_if_due(db)
+                if result.get("fired"):
+                    logger.info(
+                        "AI scheduled eval completed run_id=%s pass_rate=%s",
+                        result.get("run_id"),
+                        result.get("pass_rate"),
+                    )
+                db.commit()
+        except Exception as e:
+            logger.error("AI eval schedule loop error: %s", e, exc_info=True)
+        await asyncio.sleep(max(30, int(interval_seconds)))
+

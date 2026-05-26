@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../utils/error_extractor.dart';
 import '../models/ai_models.dart';
+import '../models/ai_stream_event.dart';
 
 // Enable debug prints
 bool get debugPrintEnabled => kDebugMode;
@@ -140,15 +141,121 @@ class AIService {
     return body['data'] as Map<String, dynamic>;
   }
   
+  Future<List<Map<String, dynamic>>> getChatSuggestions({int? businessId}) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/suggestions',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> getAIMemory({int? businessId}) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateAIMemory({
+    required String content,
+    int? businessId,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory',
+      data: {
+        'content': content,
+        if (businessId != null) 'business_id': businessId,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> listSessionAttachments(int sessionId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/attachments',
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> uploadSessionAttachment({
+    required int sessionId,
+    required String filename,
+    required List<int> bytes,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/attachments',
+      data: formData,
+      options: Options(
+        sendTimeout: const Duration(seconds: 120),
+        receiveTimeout: const Duration(seconds: 120),
+      ),
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<void> deleteSessionAttachment({
+    required int sessionId,
+    required int attachmentId,
+  }) async {
+    await _api.delete(
+      '/api/v1/ai/chat/sessions/$sessionId/attachments/$attachmentId',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> searchSessionMessages({
+    required int sessionId,
+    required String query,
+    int limit = 30,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/messages/search',
+      query: {'q': query, 'limit': limit.toString()},
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> getBusinessInsights({int? businessId}) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/insights',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
   Future<List<AIChatSession>> listChatSessions({
     int? businessId,
     int limit = 50,
     int skip = 0,
+    String? search,
   }) async {
     final query = <String, dynamic>{
       'limit': limit.toString(),
       'skip': skip.toString(),
       if (businessId != null) 'business_id': businessId.toString(),
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
     };
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions',
@@ -206,26 +313,24 @@ class AIService {
     return body['data'] as Map<String, dynamic>;
   }
 
-  /// ارسال پیام به صورت streaming
-  /// 
-  /// Returns a Stream<String> که هر chunk محتوای جدید است
-  /// onComplete callback با usage stats فراخوانی می‌شود
-  Stream<String> sendMessageStream({
+  /// ارسال پیام به صورت streaming (متن، رویداد ابزار، پایان)
+  Stream<AIStreamChunk> sendMessageStream({
     required int sessionId,
     required String content,
+    bool approveWrites = false,
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
     CancelToken? cancelToken,
   }) async* {
     try {
-      // Use ApiClient with streaming response type
-      debugPrint('[AIService] Starting streaming request for session $sessionId');
       final response = await _api.post<ResponseBody>(
         '/api/v1/ai/chat/sessions/$sessionId/messages?stream=true',
-        data: {'content': content},
+        data: {
+          'content': content,
+          'approve_writes': approveWrites,
+        },
         responseType: ResponseType.stream,
         options: Options(
-          // استریم ممکن است بین chunkها مکث طولانی داشته باشد (مدل سنگین)
           receiveTimeout: const Duration(minutes: 10),
           sendTimeout: const Duration(seconds: 60),
           headers: {
@@ -238,103 +343,476 @@ class AIService {
 
       final responseBody = response.data;
       if (responseBody == null) {
-        debugPrint('[AIService] Empty streaming response body');
         onError?.call('Empty response');
         return;
       }
 
-      // Transform stream to UTF-8 decoded lines
       final lineStream = responseBody.stream
           .cast<List<int>>()
           .transform(utf8.decoder)
           .transform(const LineSplitter());
 
-      final List<String> eventBuffer = [];
+      final eventBuffer = <String>[];
 
       await for (final rawLine in lineStream) {
-        debugPrint('[AIService] SSE raw line: $rawLine');
         final line = rawLine.trimRight();
-
-        // Empty line → event separator
         if (line.isEmpty) {
-          if (eventBuffer.isEmpty) {
-            continue;
-          }
-
-          final payload = eventBuffer.join('\n');
+          if (eventBuffer.isEmpty) continue;
+          final chunk = _parseSsePayload(eventBuffer.join('\n'), onError, onComplete);
           eventBuffer.clear();
-
-          Map<String, dynamic> data;
-          try {
-            data = jsonDecode(payload) as Map<String, dynamic>;
-            debugPrint('[AIService] SSE event payload: $data');
-          } catch (_) {
-            debugPrint('[AIService] Failed to decode SSE payload: $payload');
-            continue;
-          }
-
-              if (data.containsKey('error')) {
-            final errorMessage = data['error'] as String? ?? 'خطای نامشخص در استریم';
-            debugPrint('[AIService] SSE error event: $errorMessage');
-            onError?.call(errorMessage);
-                return;
-              }
-              
-              final done = data['done'] as bool? ?? false;
-          final contentChunk = data['content'] as String? ?? '';
-              
-              if (contentChunk.isNotEmpty) {
-                yield contentChunk;
-              }
-              
-              if (done) {
-                final usage = data['usage'] as Map<String, dynamic>?;
-                final messageId = data['message_id'] as int?;
-                onComplete?.call(usage, messageId);
-                return;
-              }
-              continue;
-            }
-
+          if (chunk != null) yield chunk;
+          continue;
+        }
         if (line.startsWith('data:')) {
-          // Support both "data: " and "data:"
           final value = line.length > 5 && line[5] == ' '
               ? line.substring(6)
               : line.substring(5);
           eventBuffer.add(value);
-          }
         }
+      }
 
-      // Flush remaining buffer if stream ended without trailing newline
       if (eventBuffer.isNotEmpty) {
-        final payload = eventBuffer.join('\n');
-        Map<String, dynamic> data;
-        try {
-          data = jsonDecode(payload) as Map<String, dynamic>;
-          debugPrint('[AIService] SSE final payload: $data');
-        } catch (_) {
-          debugPrint('[AIService] Failed to decode final SSE payload: $payload');
-          return;
-        }
-
-        if (data.containsKey('error')) {
-          final errorMessage = data['error'] as String? ?? 'خطای نامشخص در استریم';
-          debugPrint('[AIService] SSE final error event: $errorMessage');
-          onError?.call(errorMessage);
-          return;
-        }
-
-        final contentChunk = data['content'] as String? ?? '';
-        if (contentChunk.isNotEmpty) {
-          yield contentChunk;
-        }
-
-        final usage = data['usage'] as Map<String, dynamic>?;
-        final messageId = data['message_id'] as int?;
-        onComplete?.call(usage, messageId);
+        final chunk = _parseSsePayload(eventBuffer.join('\n'), onError, onComplete);
+        if (chunk != null) yield chunk;
       }
     } catch (e, stack) {
       debugPrint('[AIService] Streaming error: $e');
+      debugPrintStack(stackTrace: stack);
+      onError?.call(ErrorExtractor.userMessage(e));
+      rethrow;
+    }
+  }
+
+  AIStreamChunk? _parseSsePayload(
+    String payload,
+    void Function(String error)? onError,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+  ) {
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(payload) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+
+    if (data.containsKey('error') && (data['done'] as bool? ?? false)) {
+      final errorMessage = data['error'] as String? ?? 'خطای نامشخص';
+      onError?.call(errorMessage);
+      return AIStreamChunk(error: errorMessage, done: true);
+    }
+
+    final eventType = data['type'] as String?;
+    if (eventType == 'tool_start' || eventType == 'tool_end') {
+      return AIStreamChunk(
+        toolEvent: AIStreamToolEvent(
+          type: eventType!,
+          tool: data['tool'] as String? ?? '',
+          label: data['label'] as String?,
+          success: data['success'] as bool?,
+          approvalRequired: data['approval_required'] as bool? ?? false,
+        ),
+      );
+    }
+
+    final done = data['done'] as bool? ?? false;
+    final content = data['content'] as String? ?? '';
+
+    if (done) {
+      onComplete?.call(
+        data['usage'] as Map<String, dynamic>?,
+        data['message_id'] as int?,
+      );
+      return AIStreamChunk(
+        done: true,
+        functionCalls: data['function_calls'],
+        functionResults: data['function_results'],
+      );
+    }
+
+    if (content.isNotEmpty) {
+      return AIStreamChunk(contentDelta: content);
+    }
+    return null;
+  }
+
+  /// تولید مجدد آخرین پاسخ (همان قرارداد استریم sendMessageStream)
+  Stream<AIStreamChunk> regenerateLastResponseStream({
+    required int sessionId,
+    bool approveWrites = false,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+    void Function(String error)? onError,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/ai/chat/sessions/$sessionId/regenerate?stream=true',
+      data: {},
+      queryParameters: {'approve_writes': approveWrites},
+      onComplete: onComplete,
+      onError: onError,
+      cancelToken: cancelToken,
+      logLabel: 'Regenerate',
+    );
+  }
+
+  /// ویرایش پیام کاربر و تولید پاسخ جدید (استریم)
+  Future<Map<String, dynamic>> editChatMessage({
+    required int sessionId,
+    required int messageId,
+    required String content,
+    bool regenerateAfter = true,
+    bool approveWrites = false,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/messages/$messageId/edit?stream=false',
+      data: {
+        'content': content,
+        'approve_writes': approveWrites,
+        'regenerate_after': regenerateAfter,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> getProactiveAlerts({int? businessId}) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/alerts',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>;
+    final alerts = data['alerts'] as List? ?? [];
+    return alerts.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<void> submitMessageFeedback({
+    required int sessionId,
+    required int messageId,
+    required int rating,
+    String? comment,
+  }) async {
+    await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/messages/$messageId/feedback',
+      data: {
+        'rating': rating,
+        if (comment != null && comment.isNotEmpty) 'comment': comment,
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> listConnectors({int? businessId}) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/connectors',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> createConnector({
+    required String title,
+    required String url,
+    String? name,
+    String? description,
+    String httpMethod = 'GET',
+    Map<String, String>? headers,
+    String? bodyTemplate,
+    int? businessId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/connectors',
+      data: {
+        'title': title,
+        'url': url,
+        if (name != null) 'name': name,
+        if (description != null) 'description': description,
+        'http_method': httpMethod,
+        if (headers != null) 'headers': headers,
+        if (bodyTemplate != null) 'body_template': bodyTemplate,
+        if (businessId != null) 'business_id': businessId,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<void> deleteConnector({
+    required int connectorId,
+    int? businessId,
+  }) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    await _api.delete('/api/v1/ai/chat/connectors/$connectorId', query: query);
+  }
+
+  // ========== Admin: AI Eval ==========
+  Future<List<Map<String, dynamic>>> listEvalCases() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/ai/eval/cases');
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<void> seedDefaultEvalCases() async {
+    await _api.post('/api/v1/admin/ai/eval/cases/seed-defaults');
+  }
+
+  Future<Map<String, dynamic>> runEvalSuite({int? businessId, List<int>? caseIds}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/eval/runs',
+      data: {
+        if (businessId != null) 'business_id': businessId,
+        if (caseIds != null) 'case_ids': caseIds,
+      },
+      options: Options(
+        receiveTimeout: const Duration(minutes: 15),
+        sendTimeout: const Duration(seconds: 60),
+      ),
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getFeedbackAnalytics({
+    int? businessId,
+    int days = 30,
+  }) async {
+    final query = <String, dynamic>{
+      'days': days.toString(),
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/feedback/analytics',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getEvalSchedule() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/ai/eval/schedule');
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateEvalSchedule(Map<String, dynamic> data) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/ai/eval/schedule',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> runEvalScheduleNow() async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/eval/schedule/run-now',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> listEvalRuns() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/ai/eval/runs');
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> reindexKnowledge({int? businessId}) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/knowledge/reindex',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Stream<AIStreamChunk> editUserMessageStream({
+    required int sessionId,
+    required int messageId,
+    required String content,
+    bool regenerateAfter = true,
+    bool approveWrites = false,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+    void Function(String error)? onError,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/ai/chat/sessions/$sessionId/messages/$messageId/edit?stream=true',
+      data: {
+        'content': content,
+        'approve_writes': approveWrites,
+        'regenerate_after': regenerateAfter,
+      },
+      queryParameters: null,
+      onComplete: onComplete,
+      onError: onError,
+      cancelToken: cancelToken,
+      logLabel: 'Edit message',
+    );
+  }
+
+  Future<Map<String, dynamic>> forkChatSession({
+    required int sessionId,
+    int? upToMessageId,
+  }) async {
+    final query = <String, dynamic>{
+      if (upToMessageId != null) 'up_to_message_id': upToMessageId.toString(),
+    };
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/fork',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> exportChatSession(int sessionId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/export',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> listKnowledgeDocuments({int? businessId}) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/knowledge',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> createKnowledgeDocument({
+    required String title,
+    required String content,
+    int? businessId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/knowledge',
+      data: {
+        'title': title,
+        'content': content,
+        if (businessId != null) 'business_id': businessId,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<void> deleteKnowledgeDocument({
+    required int documentId,
+    int? businessId,
+  }) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    await _api.delete('/api/v1/ai/chat/knowledge/$documentId', query: query);
+  }
+
+  Future<Map<String, dynamic>> uploadKnowledgeDocument({
+    required String filename,
+    required List<int> bytes,
+    String? title,
+    int? businessId,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+      if (title != null && title.isNotEmpty) 'title': title,
+    });
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/knowledge/upload',
+      data: formData,
+      query: query,
+      options: Options(
+        sendTimeout: const Duration(seconds: 120),
+        receiveTimeout: const Duration(seconds: 120),
+      ),
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Stream<AIStreamChunk> _postSseStream(
+    String path, {
+    Object? data,
+    Map<String, dynamic>? queryParameters,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+    void Function(String error)? onError,
+    CancelToken? cancelToken,
+    String logLabel = 'SSE',
+  }) async* {
+    try {
+      final response = await _api.post<ResponseBody>(
+        path,
+        data: data ?? {},
+        queryParameters: queryParameters,
+        responseType: ResponseType.stream,
+        options: Options(
+          receiveTimeout: const Duration(minutes: 10),
+          sendTimeout: const Duration(seconds: 60),
+          headers: {
+            'Accept': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+          },
+        ),
+        cancelToken: cancelToken,
+      );
+
+      final responseBody = response.data;
+      if (responseBody == null) {
+        onError?.call('Empty response');
+        return;
+      }
+
+      final lineStream = responseBody.stream
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+
+      final eventBuffer = <String>[];
+      await for (final rawLine in lineStream) {
+        final line = rawLine.trimRight();
+        if (line.isEmpty) {
+          if (eventBuffer.isEmpty) continue;
+          final chunk = _parseSsePayload(eventBuffer.join('\n'), onError, onComplete);
+          eventBuffer.clear();
+          if (chunk != null) yield chunk;
+          continue;
+        }
+        if (line.startsWith('data:')) {
+          final value = line.length > 5 && line[5] == ' '
+              ? line.substring(6)
+              : line.substring(5);
+          eventBuffer.add(value);
+        }
+      }
+      if (eventBuffer.isNotEmpty) {
+        final chunk = _parseSsePayload(eventBuffer.join('\n'), onError, onComplete);
+        if (chunk != null) yield chunk;
+      }
+    } catch (e, stack) {
+      debugPrint('[AIService] $logLabel stream error: $e');
       debugPrintStack(stackTrace: stack);
       onError?.call(ErrorExtractor.userMessage(e));
       rethrow;

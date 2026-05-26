@@ -317,8 +317,8 @@ class AIChatMessage {
   final int sessionId;
   final MessageRole role;
   final String content;
-  final Map<String, dynamic>? functionCalls;
-  final Map<String, dynamic>? functionResults;
+  final Object? functionCalls;
+  final Object? functionResults;
   final int tokensUsed;
   final DateTime? createdAt;
 
@@ -339,12 +339,8 @@ class AIChatMessage {
       sessionId: json['session_id'] as int,
       role: MessageRole.fromString(json['role'] as String),
       content: json['content'] as String,
-      functionCalls: json['function_calls'] != null
-          ? Map<String, dynamic>.from(json['function_calls'] as Map)
-          : null,
-      functionResults: json['function_results'] != null
-          ? Map<String, dynamic>.from(json['function_results'] as Map)
-          : null,
+      functionCalls: json['function_calls'],
+      functionResults: json['function_results'],
       tokensUsed: json['tokens_used'] as int? ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)

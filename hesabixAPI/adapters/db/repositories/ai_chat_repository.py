@@ -16,7 +16,8 @@ class AIChatSessionRepository(BaseRepository[AIChatSession]):
         user_id: int,
         business_id: Optional[int] = None,
         limit: int = 50,
-        skip: int = 0
+        skip: int = 0,
+        search: Optional[str] = None,
     ) -> List[AIChatSession]:
         """دریافت جلسات چت کاربر"""
         query = self.db.query(self.model_class).filter(
@@ -27,6 +28,10 @@ class AIChatSessionRepository(BaseRepository[AIChatSession]):
             query = query.filter(self.model_class.business_id == business_id)
         else:
             query = query.filter(self.model_class.business_id == None)  # noqa: E711
+
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            query = query.filter(self.model_class.title.ilike(term))
         
         return query.order_by(self.model_class.updated_at.desc()).offset(skip).limit(limit).all()
     

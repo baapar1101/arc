@@ -21528,6 +21528,30 @@ abstract class AppLocalizations {
   /// **'With “post immediately”, the warehouse document is posted when the invoice is saved and the same shortage / negative-stock rules from the section below apply. Draft keeps it until you post manually.'**
   String get invoiceWarehouseReleaseStockHint;
 
+  /// No description provided for @invoicePurchaseAccountingBusinessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchase invoice accounting'**
+  String get invoicePurchaseAccountingBusinessTitle;
+
+  /// No description provided for @invoicePurchaseAccountingBusinessSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How purchase debits are posted to the GL. Changes apply to new invoices only; use the admin script to fix legacy documents.'**
+  String get invoicePurchaseAccountingBusinessSubtitle;
+
+  /// No description provided for @invoicePurchaseAccountingDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct to inventory'**
+  String get invoicePurchaseAccountingDirect;
+
+  /// No description provided for @invoicePurchaseAccountingGrni.
+  ///
+  /// In en, this message translates to:
+  /// **'GRNI (two-step)'**
+  String get invoicePurchaseAccountingGrni;
+
   /// No description provided for @invoiceMissingLineWarehousePolicySectionTitle.
   ///
   /// In en, this message translates to:

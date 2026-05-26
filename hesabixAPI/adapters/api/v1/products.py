@@ -989,6 +989,10 @@ async def update_product_endpoint(
     # تنظیم image_file_id در payload
     if image_file_id and payload:
         payload.image_file_id = image_file_id
+        if hasattr(payload, "model_fields_set"):
+            payload.model_fields_set.add("image_file_id")
+        elif hasattr(payload, "__fields_set__"):
+            payload.__fields_set__.add("image_file_id")
     
     if not payload:
         raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)

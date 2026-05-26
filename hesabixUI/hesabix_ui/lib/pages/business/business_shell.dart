@@ -1534,6 +1534,15 @@ class _BusinessShellState extends State<BusinessShell> {
         type: _MenuItemType.expandable,
         children: [
           _MenuItem(
+            key: 'ai/chat',
+            label: 'دستیار هوشمند',
+            icon: Icons.chat_bubble_outline,
+            selectedIcon: Icons.chat_bubble,
+            path: _bu('ai/chat'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             key: 'ai/subscription',
             label: 'اشتراک AI',
             icon: Icons.subscriptions_outlined,

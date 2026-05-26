@@ -199,10 +199,12 @@ import 'pages/public/public_storage_file_share_page.dart';
 import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_prompts_admin_page.dart';
+import 'pages/admin/ai_eval_admin_page.dart';
 import 'pages/admin/tax_product_codes_page.dart';
 import 'pages/admin/zohal_settings_page.dart';
 import 'pages/admin/zohal_services_admin_page.dart';
 import 'pages/admin/zohal_statistics_page.dart';
+import 'pages/business/ai_chat_page.dart';
 import 'pages/business/ai_subscription_page.dart';
 import 'pages/business/ai_usage_page.dart';
 import 'pages/business/zohal_inquiries_page.dart';
@@ -1526,6 +1528,20 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'ai-eval',
+                  name: 'system_settings_ai_eval',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AIEvalAdminPage();
+                  },
+                ),
+                GoRoute(
                   path: 'announcements',
                   name: 'system_settings_announcements',
                   builder: (context, state) {
@@ -1928,6 +1944,20 @@ class _MyAppState extends State<MyApp> {
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'ai/chat',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  AIChatPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController,
                   ),
                 );
               },

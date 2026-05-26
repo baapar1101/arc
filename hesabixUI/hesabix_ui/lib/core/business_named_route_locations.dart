@@ -17,6 +17,7 @@ abstract final class BusinessNamedRoutes {
     'business_petty_cash': 'petty-cash',
     'business_cash_box': 'cash-box',
     'business_wallet': 'wallet',
+    'business_ai_chat': 'ai/chat',
     'business_ai_subscription': 'ai/subscription',
     'business_ai_usage': 'ai/usage',
     'business_zohal_inquiries': 'zohal/inquiries',

@@ -117,6 +117,13 @@ class Business(Base):
         server_default="draft",
         comment="none | draft | posted",
     )
+    invoice_purchase_accounting_mode: Mapped[str] = mapped_column(
+        String(40),
+        nullable=False,
+        default="direct_inventory",
+        server_default="direct_inventory",
+        comment="direct_inventory | grni_two_step | grni_legacy",
+    )
     # ردیف‌های انبارداری بدون انبار در فاکتور (هنگام ثبت/ویرایش با post_inventory)
     invoice_missing_line_warehouse_policy: Mapped[str] = mapped_column(
         String(32),

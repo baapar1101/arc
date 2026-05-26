@@ -3,7 +3,7 @@ import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'ai_chat_design.dart';
 
-class AIChatSidebar extends StatelessWidget {
+class AIChatSidebar extends StatefulWidget {
   final List<AIChatSession> sessions;
   final AIChatSession? currentSession;
   final bool loading;
@@ -11,6 +11,7 @@ class AIChatSidebar extends StatelessWidget {
   final VoidCallback onNewChat;
   final ValueChanged<AIChatSession> onSelectSession;
   final ValueChanged<AIChatSession> onDeleteSession;
+  final ValueChanged<String>? onSearch;
 
   const AIChatSidebar({
     super.key,
@@ -21,7 +22,21 @@ class AIChatSidebar extends StatelessWidget {
     required this.onNewChat,
     required this.onSelectSession,
     required this.onDeleteSession,
+    this.onSearch,
   });
+
+  @override
+  State<AIChatSidebar> createState() => _AIChatSidebarState();
+}
+
+class _AIChatSidebarState extends State<AIChatSidebar> {
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,9 +56,37 @@ class AIChatSidebar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: TextField(
+              controller: _searchCtrl,
+              onChanged: (v) {
+                widget.onSearch?.call(v);
+                setState(() {});
+              },
+              decoration: InputDecoration(
+                hintText: 'جستجو در گفت‌وگوها…',
+                isDense: true,
+                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded, size: 18),
+                        onPressed: () {
+                          _searchCtrl.clear();
+                          widget.onSearch?.call('');
+                          setState(() {});
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: FilledButton.tonalIcon(
-              onPressed: onNewChat,
+              onPressed: widget.onNewChat,
               icon: const Icon(Icons.add_rounded, size: 20),
               label: const Text('گفت‌وگوی جدید'),
               style: FilledButton.styleFrom(
@@ -64,9 +107,9 @@ class AIChatSidebar extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Expanded(
-            child: loading
+            child: widget.loading
                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-                : sessions.isEmpty
+                : widget.sessions.isEmpty
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(24),
@@ -81,15 +124,15 @@ class AIChatSidebar extends StatelessWidget {
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        itemCount: sessions.length,
+                        itemCount: widget.sessions.length,
                         itemBuilder: (context, index) {
-                          final session = sessions[index];
+                          final session = widget.sessions[index];
                           return _SessionTile(
                             session: session,
-                            selected: currentSession?.id == session.id,
-                            isJalali: isJalali,
-                            onTap: () => onSelectSession(session),
-                            onDelete: () => onDeleteSession(session),
+                            selected: widget.currentSession?.id == session.id,
+                            isJalali: widget.isJalali,
+                            onTap: () => widget.onSelectSession(session),
+                            onDelete: () => widget.onDeleteSession(session),
                           );
                         },
                       ),
@@ -198,6 +241,7 @@ class AIChatHistoryDrawer extends StatelessWidget {
   final VoidCallback onNewChat;
   final ValueChanged<AIChatSession> onSelectSession;
   final ValueChanged<AIChatSession> onDeleteSession;
+  final ValueChanged<String>? onSearch;
 
   const AIChatHistoryDrawer({
     super.key,
@@ -208,6 +252,7 @@ class AIChatHistoryDrawer extends StatelessWidget {
     required this.onNewChat,
     required this.onSelectSession,
     required this.onDeleteSession,
+    this.onSearch,
   });
 
   @override
@@ -228,6 +273,7 @@ class AIChatHistoryDrawer extends StatelessWidget {
             onSelectSession(s);
           },
           onDeleteSession: onDeleteSession,
+          onSearch: onSearch,
         ),
       ),
     );

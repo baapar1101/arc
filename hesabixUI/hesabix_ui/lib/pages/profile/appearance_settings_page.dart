@@ -96,7 +96,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       'currency-revaluation',
     ],
     'group:warehouses': ['warehouses', 'warehouse-docs', 'stock-count'],
-    'group:ai': ['ai/subscription', 'ai/usage'],
+    'group:ai': ['ai/chat', 'ai/subscription', 'ai/usage'],
     'group:crm': [
       'crm/dashboard',
       'crm/notes-calendar',
@@ -157,6 +157,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'warehouses': 'انبارها',
     'warehouse-docs': 'حواله‌های انبار',
     'stock-count': 'انبار گردانی',
+    'ai/chat': 'دستیار هوشمند',
     'ai/subscription': 'اشتراک AI',
     'ai/usage': 'آمار استفاده',
     'crm/dashboard': 'داشبورد CRM',

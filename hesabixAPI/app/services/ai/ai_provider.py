@@ -345,125 +345,278 @@ class OpenAIProvider(AIProviderBase):
                 )
 
 
+def _openai_tools_to_anthropic(tools: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
+    if not tools:
+        return None
+    out: List[Dict[str, Any]] = []
+    for tool in tools:
+        fn = tool.get("function") if isinstance(tool, dict) else None
+        if not fn:
+            continue
+        out.append(
+            {
+                "name": fn["name"],
+                "description": fn.get("description") or "",
+                "input_schema": fn.get("parameters") or {"type": "object", "properties": {}},
+            }
+        )
+    return out or None
+
+
+def _parse_tool_arguments(raw: Any) -> Dict[str, Any]:
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else {}
+        except json.JSONDecodeError:
+            return {}
+    return {}
+
+
+def _openai_messages_to_anthropic(
+    messages: List[Dict[str, Any]],
+) -> tuple[Optional[str], List[Dict[str, Any]]]:
+    system_message: Optional[str] = None
+    body: List[Dict[str, Any]] = []
+    non_system = [m for m in messages if m.get("role") != "system"]
+    for m in messages:
+        if m.get("role") == "system":
+            system_message = m.get("content") or system_message
+
+    i = 0
+    while i < len(non_system):
+        msg = non_system[i]
+        role = msg.get("role")
+        if role == "user":
+            body.append({"role": "user", "content": msg.get("content") or ""})
+            i += 1
+        elif role == "assistant":
+            if msg.get("tool_calls"):
+                blocks: List[Dict[str, Any]] = []
+                if msg.get("content"):
+                    blocks.append({"type": "text", "text": msg["content"]})
+                for tc in msg["tool_calls"]:
+                    fn = tc.get("function") or {}
+                    blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc.get("id") or f"call_{fn.get('name', 'tool')}",
+                            "name": fn.get("name", "unknown"),
+                            "input": _parse_tool_arguments(fn.get("arguments")),
+                        }
+                    )
+                body.append({"role": "assistant", "content": blocks})
+            else:
+                body.append({"role": "assistant", "content": msg.get("content") or ""})
+            i += 1
+        elif role == "tool":
+            tool_blocks: List[Dict[str, Any]] = []
+            while i < len(non_system) and non_system[i].get("role") == "tool":
+                tm = non_system[i]
+                tool_blocks.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": tm.get("tool_call_id") or "unknown",
+                        "content": tm.get("content") or "{}",
+                    }
+                )
+                i += 1
+            body.append({"role": "user", "content": tool_blocks})
+        else:
+            i += 1
+    return system_message, body
+
+
+def _anthropic_blocks_to_openai_result(content_blocks: Any) -> tuple[str, Optional[List[Dict[str, Any]]]]:
+    text_parts: List[str] = []
+    function_calls: List[Dict[str, Any]] = []
+    for block in content_blocks or []:
+        btype = getattr(block, "type", None) or (block.get("type") if isinstance(block, dict) else None)
+        if btype == "text":
+            text_parts.append(getattr(block, "text", None) or (block.get("text") if isinstance(block, dict) else ""))
+        elif btype == "tool_use":
+            bid = getattr(block, "id", None) or (block.get("id") if isinstance(block, dict) else None)
+            name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else "unknown")
+            inp = getattr(block, "input", None) if hasattr(block, "input") else block.get("input")
+            function_calls.append(
+                {
+                    "id": bid or f"call_{name}",
+                    "name": name,
+                    "arguments": inp if isinstance(inp, dict) else {},
+                }
+            )
+    content = "".join(text_parts)
+    return content, function_calls or None
+
+
 class AnthropicProvider(AIProviderBase):
-    """Provider برای Anthropic (Claude)"""
-    
+    """Provider برای Anthropic (Claude) با پشتیبانی tool calling."""
+
     def __init__(self, api_key: str, api_base_url: Optional[str] = None):
-        super().__init__(api_key, api_base_url or "https://api.anthropic.com/v1")
+        super().__init__(api_key, api_base_url or "https://api.anthropic.com")
         try:
             import anthropic
-            self.client = anthropic.Anthropic(api_key=api_key)
+
+            base = (api_base_url or "https://api.anthropic.com").rstrip("/")
+            self.client = anthropic.Anthropic(api_key=api_key, base_url=base)
+            self.async_client = anthropic.AsyncAnthropic(api_key=api_key, base_url=base)
         except ImportError:
-            raise ImportError("anthropic package is required. Install it with: pip install anthropic")
-    
+            raise ImportError(
+                "anthropic package is required. Install it with: pip install anthropic"
+            )
+
+    def _build_request_kwargs(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Optional[List[Dict[str, Any]]],
+    ) -> Dict[str, Any]:
+        if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
+            max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
+        system_message, anthropic_messages = _openai_messages_to_anthropic(messages)
+        anthropic_tools = _openai_tools_to_anthropic(tools)
+        kwargs: Dict[str, Any] = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "messages": anthropic_messages,
+        }
+        if system_message:
+            kwargs["system"] = system_message
+        if anthropic_tools:
+            kwargs["tools"] = anthropic_tools
+        return kwargs
+
     def chat_completion(
         self,
         messages: List[Dict[str, Any]],
         model: str,
         max_tokens: int,
         temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
-        """ارسال درخواست به Anthropic"""
         try:
-            # تبدیل messages به فرمت Anthropic
-            anthropic_messages = []
-            system_message = None
-            
-            for msg in messages:
-                if msg["role"] == "system":
-                    system_message = msg["content"]
-                else:
-                    anthropic_messages.append({
-                        "role": msg["role"],
-                        "content": msg["content"]
-                    })
-            
-            # تبدیل tools به فرمت Anthropic
-            anthropic_tools = None
-            if tools:
-                anthropic_tools = []
-                for tool in tools:
-                    if "function" in tool:
-                        anthropic_tools.append({
-                            "name": tool["function"]["name"],
-                            "description": tool["function"]["description"],
-                            "input_schema": tool["function"]["parameters"]
-                        })
-            
             response = self.client.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=anthropic_messages,
-                system=system_message,
-                tools=anthropic_tools if anthropic_tools else None
+                **self._build_request_kwargs(messages, model, max_tokens, temperature, tools)
             )
-            
-            # تبدیل response به فرمت یکسان
-            content = response.content[0].text if response.content else ""
-            
-            result = {
+            content, function_calls = _anthropic_blocks_to_openai_result(response.content)
+            return {
                 "message": {
                     "role": "assistant",
                     "content": content,
-                    "function_calls": None  # Anthropic function calling متفاوت است
+                    "function_calls": function_calls,
                 },
                 "usage": {
                     "input_tokens": response.usage.input_tokens,
                     "output_tokens": response.usage.output_tokens,
-                    "total_tokens": response.usage.input_tokens + response.usage.output_tokens
-                }
+                    "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
+                },
             }
-            
-            return result
         except Exception as e:
             logger.error(f"Anthropic API error: {e}", exc_info=True)
             raise
-    
+
     def estimate_tokens(self, text: str) -> int:
-        """تخمین تعداد توکن"""
         return len(text) // 4
-    
+
     async def chat_completion_stream(
         self,
         messages: List[Dict[str, Any]],
         model: str,
         max_tokens: int,
         temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        ارسال درخواست به Anthropic به صورت streaming
-        نکته: Anthropic streaming متفاوت است، فعلاً از non-streaming استفاده می‌کنیم
-        """
-        # Fallback به non-streaming برای Anthropic
-        # در آینده می‌توان از Anthropic streaming API استفاده کرد
-        result = self.chat_completion(messages, model, max_tokens, temperature, tools)
-        
-        # شبیه‌سازی streaming با ارسال کل محتوا در یک chunk
-        content = result["message"]["content"]
-        if content:
-            # ارسال به صورت تدریجی (هر 50 کاراکتر یک chunk)
-            chunk_size = 50
-            for i in range(0, len(content), chunk_size):
-                chunk = content[i:i + chunk_size]
-                yield {
-                    "delta": {
-                        "content": chunk
-                    },
-                    "usage": None,
-                    "done": False
+        kwargs = self._build_request_kwargs(messages, model, max_tokens, temperature, tools)
+        try:
+            accumulated_text = ""
+            tool_blocks: Dict[int, Dict[str, Any]] = {}
+            final_usage = None
+
+            async with self.async_client.messages.stream(**kwargs) as stream:
+                async for event in stream:
+                    etype = getattr(event, "type", None)
+                    if etype == "content_block_start":
+                        block = getattr(event, "content_block", None)
+                        if block and getattr(block, "type", None) == "tool_use":
+                            idx = getattr(event, "index", 0)
+                            tool_blocks[idx] = {
+                                "id": getattr(block, "id", f"call_{idx}"),
+                                "name": getattr(block, "name", "unknown"),
+                                "arguments_json": "",
+                            }
+                    elif etype == "content_block_delta":
+                        delta = getattr(event, "delta", None)
+                        if not delta:
+                            continue
+                        dtype = getattr(delta, "type", None)
+                        if dtype == "text_delta":
+                            piece = getattr(delta, "text", "") or ""
+                            if piece:
+                                accumulated_text += piece
+                                yield {"delta": {"content": piece}, "usage": None, "done": False}
+                        elif dtype == "input_json_delta":
+                            idx = getattr(event, "index", 0)
+                            if idx in tool_blocks:
+                                tool_blocks[idx]["arguments_json"] += getattr(delta, "partial_json", "") or ""
+                    elif etype == "message_delta":
+                        usage = getattr(event, "usage", None)
+                        if usage:
+                            final_usage = {
+                                "input_tokens": getattr(usage, "input_tokens", 0),
+                                "output_tokens": getattr(usage, "output_tokens", 0),
+                                "total_tokens": getattr(usage, "input_tokens", 0)
+                                + getattr(usage, "output_tokens", 0),
+                            }
+
+                final_message = await stream.get_final_message()
+                if final_usage is None and final_message.usage:
+                    final_usage = {
+                        "input_tokens": final_message.usage.input_tokens,
+                        "output_tokens": final_message.usage.output_tokens,
+                        "total_tokens": final_message.usage.input_tokens
+                        + final_message.usage.output_tokens,
+                    }
+
+            function_calls = None
+            if tool_blocks:
+                function_calls = []
+                for idx in sorted(tool_blocks.keys()):
+                    tb = tool_blocks[idx]
+                    function_calls.append(
+                        {
+                            "id": tb["id"],
+                            "name": tb["name"],
+                            "arguments": _parse_tool_arguments(tb.get("arguments_json")),
+                        }
+                    )
+            elif final_message.content:
+                _, parsed_calls = _anthropic_blocks_to_openai_result(final_message.content)
+                function_calls = parsed_calls
+
+            if not final_usage:
+                final_usage = {
+                    "input_tokens": self.estimate_tokens(str(messages)),
+                    "output_tokens": self.estimate_tokens(accumulated_text),
+                    "total_tokens": 0,
                 }
-        
-        # ارسال chunk نهایی با usage
-        yield {
-            "delta": {
-                "content": ""
-            },
-            "usage": result["usage"],
-            "done": True
-        }
+                final_usage["total_tokens"] = (
+                    final_usage["input_tokens"] + final_usage["output_tokens"]
+                )
+
+            yield {
+                "delta": {"content": ""},
+                "usage": final_usage,
+                "function_calls": function_calls,
+                "done": True,
+            }
+        except Exception as e:
+            logger.error(f"Anthropic streaming API error: {e}", exc_info=True)
+            raise
 
 
 class LocalProvider(AIProviderBase):

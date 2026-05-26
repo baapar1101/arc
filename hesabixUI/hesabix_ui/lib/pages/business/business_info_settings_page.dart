@@ -77,6 +77,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   String? _invoiceSyncPurchasePriceBasis;
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
+  /// direct_inventory | grni_two_step | grni_legacy
+  String _invoicePurchaseAccountingMode = 'direct_inventory';
   String _invoiceGlobalDiscountPercentBasis = 'subtotal_after_line_discount';
   String _invoiceGlobalDiscountTaxMode = 'recalculate_tax_proportional';
   final _invoiceGlobalDiscountMaxPercentController = TextEditingController();
@@ -174,6 +176,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _invoiceSyncSalesPriceBasis = resp.invoiceSyncSalesPriceBasis ?? 'net_after_line_discount';
       _invoiceSyncPurchasePriceBasis = resp.invoiceSyncPurchasePriceBasis ?? 'net_after_line_discount';
       _invoiceWarehouseReleaseMode = resp.invoiceWarehouseReleaseMode;
+      _invoicePurchaseAccountingMode = resp.invoicePurchaseAccountingMode;
       _invoiceGlobalDiscountPercentBasis = resp.invoiceGlobalDiscountPercentBasis;
       _invoiceGlobalDiscountTaxMode = resp.invoiceGlobalDiscountTaxMode;
       _invoiceGlobalDiscountMaxPercentController.text =
@@ -337,6 +340,9 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_invoiceWarehouseReleaseMode != orig.invoiceWarehouseReleaseMode) {
       payload['invoice_warehouse_release_mode'] = _invoiceWarehouseReleaseMode;
+    }
+    if (_invoicePurchaseAccountingMode != orig.invoicePurchaseAccountingMode) {
+      payload['invoice_purchase_accounting_mode'] = _invoicePurchaseAccountingMode;
     }
     if (_invoiceGlobalDiscountPercentBasis != orig.invoiceGlobalDiscountPercentBasis) {
       payload['invoice_global_discount_percent_basis'] = _invoiceGlobalDiscountPercentBasis;
@@ -1159,6 +1165,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               _buildInvoiceWarehouseReleaseSettings(cs),
 
               const SizedBox(height: 24),
+              _buildSectionTitle(AppLocalizations.of(context).invoicePurchaseAccountingBusinessTitle, cs),
+              const SizedBox(height: 8),
+              _buildInvoicePurchaseAccountingSettings(cs),
+
+              const SizedBox(height: 24),
               _buildSectionTitle(AppLocalizations.of(context).invoiceMissingLineWarehousePolicySectionTitle, cs),
               const SizedBox(height: 8),
               _buildInvoiceMissingLineWarehousePolicySettings(cs),
@@ -1688,6 +1699,43 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               onSelectionChanged: (Set<String> next) {
                 setState(() {
                   _invoiceWarehouseReleaseMode = next.first;
+                });
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoicePurchaseAccountingSettings(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t.invoicePurchaseAccountingBusinessSubtitle,
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
+            ),
+            const SizedBox(height: 16),
+            SegmentedButton<String>(
+              segments: <ButtonSegment<String>>[
+                ButtonSegment<String>(
+                  value: 'direct_inventory',
+                  label: Text(t.invoicePurchaseAccountingDirect),
+                ),
+                ButtonSegment<String>(
+                  value: 'grni_two_step',
+                  label: Text(t.invoicePurchaseAccountingGrni),
+                ),
+              ],
+              selected: <String>{_invoicePurchaseAccountingMode == 'grni_two_step' ? 'grni_two_step' : 'direct_inventory'},
+              onSelectionChanged: (Set<String> next) {
+                setState(() {
+                  _invoicePurchaseAccountingMode = next.first;
                 });
               },
             ),

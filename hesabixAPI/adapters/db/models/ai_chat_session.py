@@ -26,4 +26,10 @@ class AIChatSession(Base):
     user = relationship("User", backref="ai_chat_sessions")
     business = relationship("Business", backref="ai_chat_sessions")
     messages = relationship("AIChatMessage", back_populates="session", cascade="all, delete-orphan", order_by="AIChatMessage.created_at")
+    attachments = relationship(
+        "AIChatAttachment",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="AIChatAttachment.created_at",
+    )
 

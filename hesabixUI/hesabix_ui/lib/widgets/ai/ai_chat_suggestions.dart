@@ -11,6 +11,33 @@ class AIChatSuggestion {
     required this.prompt,
     required this.icon,
   });
+
+  factory AIChatSuggestion.fromApi(Map<String, dynamic> json) {
+    return AIChatSuggestion(
+      label: json['label'] as String? ?? '',
+      prompt: json['prompt'] as String? ?? '',
+      icon: _iconFromApiName(json['icon'] as String?),
+    );
+  }
+
+  static IconData _iconFromApiName(String? name) {
+    switch (name) {
+      case 'dashboard':
+        return Icons.dashboard_outlined;
+      case 'receipt':
+        return Icons.receipt_long_outlined;
+      case 'trending_up':
+        return Icons.trending_up_rounded;
+      case 'people':
+        return Icons.people_outline_rounded;
+      case 'inventory':
+        return Icons.inventory_2_outlined;
+      case 'warning':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.auto_awesome_outlined;
+    }
+  }
 }
 
 /// پیشنهادهای شروع گفتگو (ثابت — قابل گسترش از API در آینده).

@@ -57,6 +57,22 @@ SCRIPT_DEFINITIONS: List[Dict[str, Any]] = [
 		},
 	},
 	{
+		"key": "migrate_purchase_invoice_accounting_lines",
+		"title": "اصلاح ثبت حسابداری فاکتورهای خرید قدیمی",
+		"description": (
+			"انتقال سطرهای GRNI قدیمی (حساب ۳۰۱۰۱ سرمایه اولیه) به موجودی ۱۰۱۰۲ (ثبت مستقیم) "
+			"یا GRNI استاندارد ۱۰۱۰۷ (دو مرحله‌ای). در حالت grni_two_step می‌توان تسویه حواله‌های posted را هم اضافه کرد. "
+			"business_id خالی = همهٔ کسب‌وکارها."
+		),
+		"supports_dry_run": True,
+		"default_params": {
+			"business_id": None,
+			"limit": None,
+			"target_mode": "direct_inventory",
+			"add_grni_clearance_for_posted_warehouse": True,
+		},
+	},
+	{
 		"key": "remove_orphan_invoice_receipt_payment_documents",
 		"title": "اصلاح اسناد دریافت/پرداخت رها شدهٔ فاکتور",
 		"description": (
@@ -209,6 +225,8 @@ def _execute_script_run(run_id: int) -> None:
 				stats = _run_remove_orphan_invoice_receipt_payments(db, run)
 			elif run.script_key == "cleanup_orphan_backup_businesses":
 				stats = _run_cleanup_orphan_backup_businesses(db, run)
+			elif run.script_key == "migrate_purchase_invoice_accounting_lines":
+				stats = _run_migrate_purchase_invoice_accounting_lines(db, run)
 			else:
 				raise ApiError("SCRIPT_NOT_IMPLEMENTED", "Script implementation not found", http_status=500)
 
@@ -621,5 +639,165 @@ def _run_cleanup_orphan_backup_businesses(db: Session, run: AdminScriptRun) -> D
 		f"پایان: کاندید={stats.get('scanned')} حذف/شبیه‌سازی={stats.get('deleted_count', 0)} خطا={stats.get('errors', 0)}",
 	)
 	db.flush()
+	return stats
+
+
+def _account_id_by_code(db: Session, code: str) -> Optional[int]:
+	row = (
+		db.query(Account.id)
+		.filter(Account.business_id.is_(None), Account.code == str(code))
+		.first()
+	)
+	return int(row[0]) if row else None
+
+
+def _run_migrate_purchase_invoice_accounting_lines(db: Session, run: AdminScriptRun) -> Dict[str, Any]:
+	"""اصلاح خطوط حسابداری فاکتور خرید/برگشت خرید با GRNI روی ۳۰۱۰۱."""
+	from decimal import Decimal
+
+	from sqlalchemy.orm.attributes import flag_modified
+
+	from adapters.db.models.warehouse_document import WarehouseDocument
+	from app.services.invoice_service import INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN
+	from app.services.purchase_accounting_service import (
+		GRNI_ACCOUNT_CODE_LEGACY,
+		GRNI_ACCOUNT_CODE_STANDARD,
+		INVENTORY_ACCOUNT_CODE,
+		PURCHASE_ACCOUNTING_DIRECT,
+		PURCHASE_ACCOUNTING_GRNI,
+		normalize_purchase_accounting_mode,
+		post_purchase_grni_clearance_for_warehouse,
+	)
+
+	params = run.params_json or {}
+	business_id = _to_int(params.get("business_id"))
+	limit = _to_int(params.get("limit"))
+	target_mode = normalize_purchase_accounting_mode(params.get("target_mode") or PURCHASE_ACCOUNTING_DIRECT)
+	add_clearance = bool(params.get("add_grni_clearance_for_posted_warehouse", True))
+	dry_run = bool(run.dry_run)
+
+	stats = {
+		"scanned": 0,
+		"updated_lines": 0,
+		"updated_documents": 0,
+		"grni_clearances_added": 0,
+		"skipped": 0,
+		"errors": 0,
+		"target_mode": target_mode,
+		"dry_run": dry_run,
+	}
+
+	legacy_id = _account_id_by_code(db, GRNI_ACCOUNT_CODE_LEGACY)
+	inventory_id = _account_id_by_code(db, INVENTORY_ACCOUNT_CODE)
+	grni_std_id = _account_id_by_code(db, GRNI_ACCOUNT_CODE_STANDARD)
+	if legacy_id is None:
+		raise ApiError("ACCOUNT_NOT_FOUND", "حساب 30101 یافت نشد", http_status=500)
+	if target_mode == PURCHASE_ACCOUNTING_DIRECT and inventory_id is None:
+		raise ApiError("ACCOUNT_NOT_FOUND", "حساب 10102 یافت نشد", http_status=500)
+	if target_mode == PURCHASE_ACCOUNTING_GRNI and grni_std_id is None:
+		raise ApiError("ACCOUNT_NOT_FOUND", "حساب 10107 یافت نشد — ابتدا migration را اجرا کنید", http_status=500)
+
+	target_debit_account_id = inventory_id if target_mode == PURCHASE_ACCOUNTING_DIRECT else grni_std_id
+
+	q = db.query(Document).filter(
+		Document.document_type.in_([INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN])
+	)
+	if business_id is not None:
+		q = q.filter(Document.business_id == business_id)
+	q = q.order_by(Document.id.asc())
+	if limit is not None:
+		q = q.limit(limit)
+	docs = q.all()
+	stats["scanned"] = len(docs)
+	_append_log(db, run.id, "info", f"اسناد خرید/برگشت برای بررسی: {stats['scanned']}")
+	db.commit()
+
+	for doc in docs:
+		current = db.query(AdminScriptRun).filter(AdminScriptRun.id == run.id).first()
+		if current and current.status == "cancelled":
+			_append_log(db, run.id, "warning", "توقف به‌دلیل لغو")
+			db.commit()
+			return stats
+		try:
+			lines = (
+				db.query(DocumentLine)
+				.filter(
+					DocumentLine.document_id == int(doc.id),
+					DocumentLine.account_id == int(legacy_id),
+				)
+				.all()
+			)
+			doc_changed = False
+			for line in lines:
+				is_purchase = doc.document_type == INVOICE_PURCHASE
+				is_return = doc.document_type == INVOICE_PURCHASE_RETURN
+				if is_purchase and Decimal(str(line.debit or 0)) <= 0:
+					stats["skipped"] += 1
+					continue
+				if is_return and Decimal(str(line.credit or 0)) <= 0:
+					stats["skipped"] += 1
+					continue
+				if not dry_run:
+					line.account_id = int(target_debit_account_id)
+					if is_purchase:
+						if target_mode == PURCHASE_ACCOUNTING_DIRECT:
+							line.description = "ثبت موجودی کالا (فاکتور خرید)"
+						else:
+							line.description = "ثبت GRNI خرید (مبلغ ناخالص)"
+					else:
+						if target_mode == PURCHASE_ACCOUNTING_DIRECT:
+							line.description = "برگشت موجودی کالا (برگشت از خرید)"
+						else:
+							line.description = "برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)"
+				stats["updated_lines"] += 1
+				doc_changed = True
+
+			extra = dict(doc.extra_info or {})
+			prev_mode = extra.get("purchase_accounting_mode")
+			if prev_mode != target_mode:
+				if not dry_run:
+					extra["purchase_accounting_mode"] = target_mode
+					doc.extra_info = extra
+					flag_modified(doc, "extra_info")
+				doc_changed = True
+
+			if doc_changed:
+				stats["updated_documents"] += 1
+
+			if (
+				not dry_run
+				and target_mode == PURCHASE_ACCOUNTING_GRNI
+				and add_clearance
+			):
+				links = (doc.extra_info or {}).get("links") or {}
+				for raw_wid in links.get("warehouse_document_ids") or []:
+					try:
+						wid = int(raw_wid)
+					except (TypeError, ValueError):
+						continue
+					wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wid).first()
+					if not wh or str(wh.status or "").lower() != "posted":
+						continue
+					if post_purchase_grni_clearance_for_warehouse(db, wid):
+						stats["grni_clearances_added"] += 1
+
+			if not dry_run and doc_changed:
+				db.commit()
+		except Exception as exc:
+			stats["errors"] += 1
+			_append_log(db, run.id, "error", f"سند {doc.id}: {exc}")
+			db.rollback()
+
+	_append_log(
+		db,
+		run.id,
+		"info",
+		(
+			f"پایان: اسناد={stats['scanned']} خطوط={stats['updated_lines']} "
+			f"اسناد_به‌روز={stats['updated_documents']} تسویه_GRNI={stats['grni_clearances_added']} "
+			f"خطا={stats['errors']} dry_run={dry_run}"
+		),
+	)
+	db.commit()
 	return stats
 

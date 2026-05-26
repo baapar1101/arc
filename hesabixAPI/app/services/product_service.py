@@ -28,6 +28,10 @@ from app.services.product_general_barcode_service import (
     split_raw_general_barcodes,
 )
 from app.services.public_catalog_service import invalidate_public_catalog_caches
+from app.services.product_inventory_tracking_sync import (
+    product_has_stale_inventory_tracking_lines,
+    sync_product_inventory_tracking_change,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -824,11 +828,6 @@ def update_product(
             expected_tracked=True,
         )
     ):
-        from app.services.product_inventory_tracking_sync import (
-            product_has_stale_inventory_tracking_lines,
-            sync_product_inventory_tracking_change,
-        )
-
         sync_product_inventory_tracking_change(
             db,
             business_id=business_id,

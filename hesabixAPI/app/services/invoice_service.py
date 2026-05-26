@@ -1801,6 +1801,23 @@ def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str
     def code(name: str, default_code: str) -> str:
         return str(overrides.get(name) or default_code)
 
+    grni_default_code = "10107"
+    business_id_raw = data.get("business_id")
+    if invoice_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN) and business_id_raw is not None:
+        from app.services.purchase_accounting_service import (
+            PURCHASE_ACCOUNTING_DIRECT,
+            grni_account_code_for_mode,
+            resolve_purchase_accounting_mode,
+        )
+
+        purchase_mode = resolve_purchase_accounting_mode(
+            db,
+            int(business_id_raw),
+            extra_info=data.get("extra_info"),
+        )
+        if purchase_mode != PURCHASE_ACCOUNTING_DIRECT:
+            grni_default_code = grni_account_code_for_mode(purchase_mode)
+
     return {
         # درآمد و برگشت فروش مطابق چارت سید:
         "revenue": _get_fixed_account_by_code(db, code("revenue", "50001")),
@@ -1811,7 +1828,7 @@ def _resolve_accounts_for_invoice(db: Session, data: Dict[str, Any]) -> Dict[str
         # موجودی، GRNI و ساخته‌شده (در نبود حساب مجزا)
         "inventory": _get_fixed_account_by_code(db, code("inventory", "10102")),
         "inventory_finished": _get_fixed_account_by_code(db, code("inventory_finished", "10102")),
-        "grni": _get_fixed_account_by_code(db, code("grni", "30101")),
+        "grni": _get_fixed_account_by_code(db, code("grni", grni_default_code)),
         # بهای تمام شده و VAT ها مطابق سید
         "cogs": _get_fixed_account_by_code(db, code("cogs", "40001")),
         "vat_out": _get_fixed_account_by_code(db, code("vat_out", "20101")),
@@ -4079,6 +4096,11 @@ def create_invoice(
             raise ApiError("FX_REVALUATION_ERROR", "خطا در محاسبه تسعیر ارز", http_status=400)
         new_extra_info = _normalize_document_extra_info_for_storage(new_extra_info) or new_extra_info
 
+    if invoice_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
+        from app.services.purchase_accounting_service import stamp_purchase_accounting_mode_on_extra_info
+
+        new_extra_info = stamp_purchase_accounting_mode_on_extra_info(db, business_id, new_extra_info)
+
     # Create document با کنترل رقابت در شماره‌گذاری (خودکار) یا ثبت شماره دستی
     from app.services.document_numbering_service import generate_document_code
 
@@ -4212,8 +4234,12 @@ def create_invoice(
     if not document.is_proforma:
         from app.services.invoice_adjustments_service import add_adjustment_document_lines
 
-        accounts = _resolve_accounts_for_invoice(db, data)
+        accounts = _resolve_accounts_for_invoice(
+            db,
+            {**data, "invoice_type": invoice_type, "business_id": business_id, "extra_info": document.extra_info},
+        )
         _adj_extra = dict(document.extra_info or {})
+        _purchase_mode = (_adj_extra.get("purchase_accounting_mode") or "").strip()
 
         # COGS به پست حواله منتقل شد
 
@@ -4339,15 +4365,15 @@ def create_invoice(
 
         # Purchase
         elif invoice_type == INVOICE_PURCHASE:
-            # ثبت GRNI بابت خرید به مبلغ ناخالص (قبل از تخفیف)
-            if gross > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["grni"].id,
-                    debit=gross,
-                    credit=Decimal(0),
-                    description="ثبت GRNI خرید (مبلغ ناخالص)",
-                ))
+            from app.services.purchase_accounting_service import add_purchase_invoice_debit_lines
+
+            add_purchase_invoice_debit_lines(
+                db,
+                document_id=int(document.id),
+                mode=_purchase_mode,
+                accounts=accounts,
+                gross=gross,
+            )
             # تخفیفات خرید به صورت جداگانه
             if discount > 0:
                 db.add(DocumentLine(
@@ -4388,15 +4414,15 @@ def create_invoice(
 
         # Purchase Return
         elif invoice_type == INVOICE_PURCHASE_RETURN:
-            # ثبت برگشت GRNI به مبلغ ناخالص (قبل از تخفیف)
-            if gross > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["grni"].id,
-                    debit=Decimal(0),
-                    credit=gross,
-                    description="برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)",
-                ))
+            from app.services.purchase_accounting_service import add_purchase_return_credit_lines
+
+            add_purchase_return_credit_lines(
+                db,
+                document_id=int(document.id),
+                mode=_purchase_mode,
+                accounts=accounts,
+                gross=gross,
+            )
             # برگشت تخفیفات خرید
             if discount > 0:
                 db.add(DocumentLine(
@@ -5214,9 +5240,20 @@ def update_invoice(
 
     # Accounting lines if finalized
     if not document.is_proforma:
-        header_for_accounts: Dict[str, Any] = {"invoice_type": inv_type, **(data or {"extra_info": document.extra_info})}
-        accounts = _resolve_accounts_for_invoice(db, header_for_accounts)
         header_extra = dict(data.get("extra_info") or document.extra_info or {})
+        if inv_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
+            from app.services.purchase_accounting_service import stamp_purchase_accounting_mode_on_extra_info
+
+            header_extra = stamp_purchase_accounting_mode_on_extra_info(
+                db, int(document.business_id), header_extra
+            )
+        header_for_accounts: Dict[str, Any] = {
+            "invoice_type": inv_type,
+            "business_id": int(document.business_id),
+            "extra_info": header_extra,
+            **(data or {}),
+        }
+        accounts = _resolve_accounts_for_invoice(db, header_for_accounts)
         totals = dict(header_extra.get("totals") or {})
         if not totals:
             totals = _extract_totals_from_lines(lines_input)
@@ -5266,6 +5303,8 @@ def update_invoice(
             ex_merge["invoice_adjustments"] = header_extra["invoice_adjustments"]
         else:
             ex_merge.pop("invoice_adjustments", None)
+        if header_extra.get("purchase_accounting_mode"):
+            ex_merge["purchase_accounting_mode"] = header_extra["purchase_accounting_mode"]
         if "customer_club" in header_extra:
             ex_merge["customer_club"] = header_extra["customer_club"]
         elif "customer_club" in ex_merge and data.get("loyalty_redemption_points") is None:
@@ -5387,15 +5426,16 @@ def update_invoice(
                 db.add(DocumentLine(document_id=document.id, account_id=accounts["vat_out"].id, debit=tax, credit=Decimal(0), description="تعدیل VAT برگشت از فروش"))
             # Inventory/COGS handled in warehouse posting
         elif inv_type == INVOICE_PURCHASE:
-            # ثبت GRNI به مبلغ ناخالص
-            if gross > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["grni"].id,
-                    debit=gross,
-                    credit=Decimal(0),
-                    description="ثبت GRNI خرید (مبلغ ناخالص)",
-                ))
+            from app.services.purchase_accounting_service import add_purchase_invoice_debit_lines
+
+            _purchase_mode_upd = (header_extra.get("purchase_accounting_mode") or "").strip()
+            add_purchase_invoice_debit_lines(
+                db,
+                document_id=int(document.id),
+                mode=_purchase_mode_upd,
+                accounts=accounts,
+                gross=gross,
+            )
             # تخفیفات خرید
             if discount > 0:
                 db.add(DocumentLine(
@@ -5433,15 +5473,16 @@ def update_invoice(
                 header_extra=_adj_extra_hdr,
             )
         elif inv_type == INVOICE_PURCHASE_RETURN:
-            # برگشت GRNI به مبلغ ناخالص
-            if gross > 0:
-                db.add(DocumentLine(
-                    document_id=document.id,
-                    account_id=accounts["grni"].id,
-                    debit=Decimal(0),
-                    credit=gross,
-                    description="برگشت GRNI بابت برگشت خرید (مبلغ ناخالص)",
-                ))
+            from app.services.purchase_accounting_service import add_purchase_return_credit_lines
+
+            _purchase_mode_upd = (header_extra.get("purchase_accounting_mode") or "").strip()
+            add_purchase_return_credit_lines(
+                db,
+                document_id=int(document.id),
+                mode=_purchase_mode_upd,
+                accounts=accounts,
+                gross=gross,
+            )
             # برگشت تخفیفات خرید
             if discount > 0:
                 db.add(DocumentLine(

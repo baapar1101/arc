@@ -125,6 +125,10 @@ async def process_product_request(
     # تنظیم image_file_id در payload
     if image_file_id and payload:
         payload.image_file_id = image_file_id
+        if hasattr(payload, "model_fields_set"):
+            payload.model_fields_set.add("image_file_id")
+        elif hasattr(payload, "__fields_set__"):
+            payload.__fields_set__.add("image_file_id")
     
     return payload, file, image_file_id
 

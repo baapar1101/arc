@@ -16,6 +16,7 @@ class AIChatComposer extends StatefulWidget {
   final VoidCallback? onMic;
   final VoidCallback? onStopVoice;
   final VoidCallback? onStopGenerating;
+  final VoidCallback? onAttach;
 
   const AIChatComposer({
     super.key,
@@ -31,6 +32,7 @@ class AIChatComposer extends StatefulWidget {
     this.onMic,
     this.onStopVoice,
     this.onStopGenerating,
+    this.onAttach,
   });
 
   @override
@@ -133,6 +135,15 @@ class _AIChatComposerState extends State<AIChatComposer> {
                           tooltip: 'توقف تولید',
                           onPressed: widget.onStopGenerating,
                           icon: Icon(Icons.stop_circle_outlined, color: scheme.error),
+                        ),
+                      if (widget.onAttach != null)
+                        IconButton(
+                          tooltip: 'پیوست فایل',
+                          onPressed: widget.disabled || widget.sending ? null : widget.onAttach,
+                          icon: Icon(
+                            Icons.attach_file_rounded,
+                            color: scheme.onSurfaceVariant,
+                          ),
                         ),
                       if (widget.onMic != null)
                         IconButton(

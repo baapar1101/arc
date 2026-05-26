@@ -17,6 +17,9 @@ class AIChatHomeView extends StatelessWidget {
   final VoidCallback? onMic;
   final VoidCallback? onStopVoice;
   final ValueChanged<AIChatSuggestion> onSuggestionSelected;
+  final List<AIChatSuggestion> suggestions;
+  final List<Map<String, dynamic>> proactiveAlerts;
+  final ValueChanged<String>? onAlertAction;
   final VoidCallback? onUpgradePlan;
 
   const AIChatHomeView({
@@ -34,6 +37,9 @@ class AIChatHomeView extends StatelessWidget {
     this.onMic,
     this.onStopVoice,
     required this.onSuggestionSelected,
+    this.suggestions = kDefaultAIChatSuggestions,
+    this.proactiveAlerts = const [],
+    this.onAlertAction,
     this.onUpgradePlan,
   });
 
@@ -79,6 +85,18 @@ class AIChatHomeView extends StatelessWidget {
                         onUpgrade: onUpgradePlan,
                       ),
                     ],
+                    if (proactiveAlerts.isNotEmpty && canUseAi) ...[
+                      const SizedBox(height: 20),
+                      ...proactiveAlerts.take(3).map(
+                            (a) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _ProactiveAlertCard(
+                                alert: a,
+                                onAction: onAlertAction,
+                              ),
+                            ),
+                          ),
+                    ],
                     SizedBox(height: compact ? 28 : 40),
                     AIChatComposer(
                       controller: messageController,
@@ -95,6 +113,7 @@ class AIChatHomeView extends StatelessWidget {
                     ),
                     SizedBox(height: compact ? 24 : 32),
                     AIChatSuggestionChips(
+                      suggestions: suggestions,
                       enabled: canUseAi && !disabled,
                       onSelected: onSuggestionSelected,
                     ),
@@ -142,6 +161,69 @@ class _HeroIcon extends StatelessWidget {
         Icons.auto_awesome_rounded,
         size: 36,
         color: scheme.onPrimary,
+      ),
+    );
+  }
+}
+
+class _ProactiveAlertCard extends StatelessWidget {
+  final Map<String, dynamic> alert;
+  final ValueChanged<String>? onAction;
+
+  const _ProactiveAlertCard({required this.alert, this.onAction});
+
+  Color _levelColor(ColorScheme scheme) {
+    switch (alert['level'] as String? ?? 'info') {
+      case 'warning':
+        return scheme.tertiary;
+      case 'success':
+        return scheme.primary;
+      case 'error':
+        return scheme.error;
+      default:
+        return scheme.secondary;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final accent = _levelColor(scheme);
+    final title = alert['title'] as String? ?? '';
+    final message = alert['message'] as String? ?? '';
+    final actionPrompt = alert['action_prompt'] as String?;
+
+    return Material(
+      color: accent.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: actionPrompt != null && onAction != null
+            ? () => onAction!(actionPrompt!)
+            : null,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.notifications_active_outlined, color: accent, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: theme.textTheme.titleSmall),
+                    if (message.isNotEmpty && message != title)
+                      Text(message, style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              if (actionPrompt != null)
+                Icon(Icons.chevron_left_rounded, color: scheme.outline),
+            ],
+          ),
+        ),
       ),
     );
   }

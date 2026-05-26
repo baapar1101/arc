@@ -101,6 +101,16 @@ from .ai_invoice import AIInvoice, AIInvoiceType, AIInvoiceStatus  # noqa: F401
 from .ai_usage_log import AIUsageLog, PaymentMethod  # noqa: F401
 from .ai_chat_session import AIChatSession  # noqa: F401
 from .ai_chat_message import AIChatMessage, MessageRole  # noqa: F401
+from .ai_business_memory import AIBusinessMemory  # noqa: F401
+from .ai_chat_attachment import AIChatAttachment  # noqa: F401
+from .ai_knowledge_document import AIKnowledgeDocument  # noqa: F401
+from .ai_knowledge_chunk import AIKnowledgeChunk  # noqa: F401
+from .ai_eval_case import AIEvalCase  # noqa: F401
+from .ai_eval_run import AIEvalRun  # noqa: F401
+from .ai_eval_result import AIEvalResult  # noqa: F401
+from .ai_connector import AIConnector  # noqa: F401
+from .ai_message_feedback import AIMessageFeedback  # noqa: F401
+from .ai_eval_schedule import AIEvalSchedule  # noqa: F401
 from .ai_prompt import AIPrompt, PromptRole, PromptType  # noqa: F401
 from .ai_voice_interaction import AIVoiceInteraction  # noqa: F401
 # Activity Log models

@@ -11522,6 +11522,20 @@ class AppLocalizationsFa extends AppLocalizations {
       'در حالت «قطعی فوری»، حواله با ثبت فاکتور قطعی می‌شود و همان قوانین کسری و موجودی منفیِ همین صفحه (بخش پایین) اعمال می‌شود؛ پیش‌نویس فقط روی کاغذ مانده تا خودتان بعداً قطعی کنید.';
 
   @override
+  String get invoicePurchaseAccountingBusinessTitle =>
+      'ثبت حسابداری فاکتور خرید';
+
+  @override
+  String get invoicePurchaseAccountingBusinessSubtitle =>
+      'روش ثبت سطر بدهکار خرید در دفتر کل. تغییر فقط روی فاکتورهای جدید اثر دارد؛ برای اصلاح فاکتورهای قدیمی از اسکریپت مدیریتی استفاده کنید.';
+
+  @override
+  String get invoicePurchaseAccountingDirect => 'مستقیم روی موجودی';
+
+  @override
+  String get invoicePurchaseAccountingGrni => 'GRNI دو مرحله‌ای';
+
+  @override
   String get invoiceMissingLineWarehousePolicySectionTitle =>
       'سیاست انبار برای ردیف‌های بدون انبار';
 

@@ -64,6 +64,8 @@ class AIFunctionRegistry:
         self._register_admin_functions()
         # Business owner functions
         self._register_business_owner_functions()
+        # External HTTP connectors
+        self._register_connector_functions()
     
     def _register_business_functions(self):
         """ثبت function های مربوط به کسب‌وکار"""
@@ -1536,6 +1538,42 @@ class AIFunctionRegistry:
         """ثبت function های مخصوص مالک کسب‌وکار"""
         # این function ها بعداً اضافه می‌شوند
         pass
+
+    def _register_connector_functions(self):
+        """فراخوانی کانکتورهای HTTP تعریف‌شده توسط کسب‌وکار."""
+        from app.services.ai.ai_connector_service import invoke_connector_handler
+
+        self.register(
+            AIFunction(
+                name="invoke_business_connector",
+                description=(
+                    "فراخوانی یک کانکتور HTTP خارجی که برای این کسب‌وکار تعریف شده "
+                    "(لیست نام‌ها در system prompt). برای پارامترهای URL از query_params استفاده کن."
+                ),
+                parameters_schema={
+                    "type": "object",
+                    "properties": {
+                        "connector_name": {
+                            "type": "string",
+                            "description": "نام یکتا کانکتور (slug)",
+                        },
+                        "query_params": {
+                            "type": "object",
+                            "description": "پارامترهای query یا جایگزین {{key}} در URL",
+                        },
+                        "body": {
+                            "type": "object",
+                            "description": "بدنه JSON برای POST",
+                        },
+                    },
+                    "required": ["connector_name"],
+                },
+                handler=invoke_connector_handler,
+                allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.ADMIN},
+                business_context_required=True,
+                category="integration",
+            )
+        )
     
     def _create_handler(self, service_func: Callable) -> Callable:
         """

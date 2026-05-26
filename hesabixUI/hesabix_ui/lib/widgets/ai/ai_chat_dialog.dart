@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +11,9 @@ import 'package:hesabix_ui/core/business_route_paths.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
+import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_message_body.dart';
 import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -18,6 +21,9 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_home_view.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_sidebar.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_suggestions.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_memory_sheet.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_knowledge_sheet.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_connectors_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -26,12 +32,15 @@ class AIChatDialog extends StatefulWidget {
   final int? businessId;
   final AuthStore authStore;
   final CalendarController? calendarController;
+  /// وقتی true باشد داخل [AIChatPage] و go_router نمایش داده می‌شود (بدون دکمه بستن fullscreen).
+  final bool embeddedInShell;
 
   const AIChatDialog({
     super.key,
     this.businessId,
     required this.authStore,
     this.calendarController,
+    this.embeddedInShell = false,
   });
 
   static Future<void> show(
@@ -72,6 +81,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
   AIChatSession? _currentSession;
   List<AIChatMessage> _messages = [];
   String? _streamingContent;
+  List<AIToolActivity> _streamingToolActivities = [];
+  bool _pendingWriteApproval = false;
   DateTime? _streamingTimestamp;
   final TextEditingController _messageCtrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -89,9 +100,17 @@ class _AIChatDialogState extends State<AIChatDialog> {
   CancelToken? _streamCancelToken;
   DateTime? _lastStreamUiUpdate;
   bool _autoScrollEnabled = true;
+  List<AIChatSuggestion> _suggestions = kDefaultAIChatSuggestions;
+  List<Map<String, dynamic>> _proactiveAlerts = [];
+  final Map<int, int> _messageFeedbackRatings = {};
+  String _sessionSearch = '';
+  Timer? _sessionSearchDebounce;
+  List<Map<String, dynamic>> _attachments = [];
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
-  bool get _isGenerating => _sending && _streamingContent != null;
+  bool get _isGenerating =>
+      _sending &&
+      (_streamingContent != null || _streamingToolActivities.isNotEmpty);
   bool get _isHomeMode =>
       !_messagesLoading &&
       _messages.isEmpty &&
@@ -122,6 +141,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _aiService = AIService(ApiClient());
     _scrollController.addListener(_onScrollChanged);
     _loadSessions();
+    _loadSuggestions();
+    if (widget.businessId != null) {
+      unawaited(_loadProactiveAlerts());
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _isHomeMode) _focusNode.requestFocus();
     });
@@ -130,6 +153,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   @override
   void dispose() {
     _streamCancelToken?.cancel('disposed');
+    _sessionSearchDebounce?.cancel();
     _scrollController.removeListener(_onScrollChanged);
     _messageCtrl.dispose();
     _focusNode.dispose();
@@ -186,6 +210,68 @@ class _AIChatDialogState extends State<AIChatDialog> {
                     await Share.share(msg.content);
                   },
                 ),
+                if (msg.role == MessageRole.user)
+                  ListTile(
+                    leading: const Icon(Icons.edit_outlined),
+                    title: const Text('ویرایش و ارسال مجدد'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _editMessage(msg, regenerateAfter: true);
+                    },
+                  ),
+                if (msg.role == MessageRole.assistant) ...[
+                  ListTile(
+                    leading: const Icon(Icons.edit_note_outlined),
+                    title: const Text('ویرایش متن پاسخ'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _editMessage(msg, regenerateAfter: false);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.refresh_rounded),
+                    title: const Text('ویرایش و تولید مجدد'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _editMessage(msg, regenerateAfter: true);
+                    },
+                  ),
+                ],
+                if (msg.id != null)
+                  ListTile(
+                    leading: const Icon(Icons.call_split_rounded),
+                    title: const Text('شاخه از اینجا'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _forkFromMessage(msg.id!);
+                    },
+                  ),
+                if (msg.role == MessageRole.assistant && msg.id != null) ...[
+                  ListTile(
+                    leading: const Icon(Icons.thumb_up_outlined),
+                    title: const Text('پاسخ مفید بود'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _submitFeedback(msg, 1);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.thumb_down_outlined),
+                    title: const Text('پاسخ مفید نبود'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _submitFeedback(msg, -1);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.refresh_rounded),
+                    title: const Text('تولید مجدد پاسخ'),
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _regenerateLastResponse();
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -310,11 +396,44 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
+  Future<void> _loadSuggestions() async {
+    if (widget.businessId == null) return;
+    try {
+      final raw = await _aiService.getChatSuggestions(businessId: widget.businessId);
+      if (!mounted || raw.isEmpty) return;
+      setState(() {
+        _suggestions = raw.map(AIChatSuggestion.fromApi).toList();
+      });
+    } catch (e) {
+      debugPrint('[AIChatDialog] suggestions load failed: $e');
+    }
+  }
+
+  Future<void> _loadProactiveAlerts() async {
+    if (widget.businessId == null) return;
+    try {
+      final alerts = await _aiService.getProactiveAlerts(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() => _proactiveAlerts = alerts);
+    } catch (e) {
+      debugPrint('[AIChatDialog] proactive alerts load failed: $e');
+    }
+  }
+
+  void _onSessionSearchChanged(String query) {
+    _sessionSearch = query;
+    _sessionSearchDebounce?.cancel();
+    _sessionSearchDebounce = Timer(const Duration(milliseconds: 320), () {
+      if (mounted) unawaited(_loadSessions());
+    });
+  }
+
   Future<void> _loadSessions() async {
     setState(() => _sessionsLoading = true);
     try {
       final list = await _aiService.listChatSessions(
         businessId: widget.businessId,
+        search: _sessionSearch.isNotEmpty ? _sessionSearch : null,
       );
       if (!mounted) return;
       setState(() {
@@ -376,6 +495,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       });
       _scrollToBottom(force: true);
       await _checkAvailability();
+      unawaited(_loadAttachments());
       if (_messages.isEmpty) {
         _focusNode.requestFocus();
       }
@@ -384,6 +504,158 @@ class _AIChatDialogState extends State<AIChatDialog> {
       setState(() => _messagesLoading = false);
       _showError('خطا در دریافت پیام‌ها: ${ErrorExtractor.forContext(e, context)}');
     }
+  }
+
+  Future<void> _loadAttachments() async {
+    final sid = _currentSession?.id;
+    if (sid == null) return;
+    try {
+      final list = await _aiService.listSessionAttachments(sid);
+      if (!mounted) return;
+      setState(() => _attachments = list);
+    } catch (e) {
+      debugPrint('[AIChatDialog] attachments load failed: $e');
+    }
+  }
+
+  Future<void> _pickAndUploadAttachment() async {
+    if (!await _ensureSession()) return;
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['txt', 'md', 'csv', 'json', 'pdf', 'log', 'xml', 'html', 'htm'],
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) {
+      _showError('فایل خالی است یا قابل خواندن نیست');
+      return;
+    }
+    try {
+      await _aiService.uploadSessionAttachment(
+        sessionId: _currentSession!.id!,
+        filename: file.name,
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      _showSnackbar('پیوست اضافه شد');
+      await _loadAttachments();
+    } catch (e) {
+      if (!mounted) return;
+      _showError('آپلود پیوست ناموفق: ${ErrorExtractor.forContext(e, context)}');
+    }
+  }
+
+  Future<void> _openMemorySheet() async {
+    await showAIChatMemorySheet(
+      context: context,
+      aiService: _aiService,
+      businessId: widget.businessId,
+    );
+  }
+
+  Future<void> _openMessageSearch() async {
+    final sid = _currentSession?.id;
+    if (sid == null) return;
+    final searchCtrl = TextEditingController();
+    List<Map<String, dynamic>> hits = [];
+    bool searching = false;
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> runSearch(String q) async {
+              if (q.trim().length < 2) {
+                setSheetState(() => hits = []);
+                return;
+              }
+              setSheetState(() => searching = true);
+              try {
+                final r = await _aiService.searchSessionMessages(
+                  sessionId: sid,
+                  query: q.trim(),
+                );
+                setSheetState(() => hits = r);
+              } catch (e) {
+                SnackBarHelper.show(
+                  context,
+                  message: ErrorExtractor.forContext(e, context),
+                  isError: true,
+                );
+              } finally {
+                setSheetState(() => searching = false);
+              }
+            }
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                8,
+                16,
+                16 + MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'جستجو در گفت‌وگو',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: searchCtrl,
+                    autofocus: true,
+                    decoration: const InputDecoration(
+                      hintText: 'عبارت جستجو…',
+                      prefixIcon: Icon(Icons.search_rounded),
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: runSearch,
+                  ),
+                  const SizedBox(height: 12),
+                  if (searching)
+                    const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                  else if (hits.isEmpty)
+                    Text(
+                      'نتیجه‌ای نیست',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    )
+                  else
+                    SizedBox(
+                      height: 280,
+                      child: ListView.builder(
+                        itemCount: hits.length,
+                        itemBuilder: (context, i) {
+                          final h = hits[i];
+                          final role = h['role'] as String? ?? '';
+                          final content = h['content'] as String? ?? '';
+                          return ListTile(
+                            title: Text(
+                              content.length > 120
+                                  ? '${content.substring(0, 120)}…'
+                                  : content,
+                            ),
+                            subtitle: Text(role == 'user' ? 'شما' : 'دستیار'),
+                            onTap: () => Navigator.pop(ctx),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    searchCtrl.dispose();
   }
 
   Future<void> _checkAvailability() async {
@@ -415,6 +687,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _messagesLoading = false;
       _streamingContent = null;
       _streamingTimestamp = null;
+      _attachments = [];
     });
     _messageCtrl.clear();
     _focusNode.requestFocus();
@@ -458,11 +731,304 @@ class _AIChatDialogState extends State<AIChatDialog> {
     await _sendMessage();
   }
 
-  Future<void> _sendMessage() async {
-    if (_sending || _messageCtrl.text.trim().isEmpty) return;
-    if (!await _ensureSession()) return;
+  Future<void> _editMessage(AIChatMessage msg, {required bool regenerateAfter}) async {
+    if (_sending || _currentSession?.id == null || msg.id == null) return;
+    final ctrl = TextEditingController(text: msg.content);
+    final newText = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ویرایش پیام'),
+        content: TextField(
+          controller: ctrl,
+          maxLines: 6,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'متن جدید…',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+            child: const Text('ارسال'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (newText == null || newText.isEmpty) return;
 
-    final content = _messageCtrl.text.trim();
+    final idx = _messages.indexWhere((m) => m.id == msg.id);
+    if (idx < 0) return;
+
+    if (!regenerateAfter) {
+      try {
+        await _aiService.editChatMessage(
+          sessionId: _currentSession!.id!,
+          messageId: msg.id!,
+          content: newText,
+          regenerateAfter: false,
+        );
+        if (!mounted) return;
+        setState(() {
+          _messages[idx] = AIChatMessage(
+            id: msg.id,
+            sessionId: msg.sessionId,
+            role: msg.role,
+            content: newText,
+            createdAt: msg.createdAt,
+            functionCalls: msg.functionCalls,
+            functionResults: msg.functionResults,
+          );
+        });
+        _showSnackbar('پیام به‌روزرسانی شد');
+      } catch (e) {
+        if (!mounted) return;
+        _showError('ویرایش ناموفق: ${ErrorExtractor.forContext(e, context)}');
+      }
+      return;
+    }
+
+    setState(() {
+      if (msg.role == MessageRole.user) {
+        _messages = List<AIChatMessage>.from(_messages.sublist(0, idx + 1));
+        _messages[idx] = AIChatMessage(
+          id: msg.id,
+          sessionId: msg.sessionId,
+          role: MessageRole.user,
+          content: newText,
+          createdAt: msg.createdAt,
+        );
+      } else {
+        _messages = List<AIChatMessage>.from(_messages.sublist(0, idx));
+      }
+      _sending = true;
+      _pendingWriteApproval = false;
+      _streamingContent = '';
+      _streamingToolActivities = [];
+      _streamingTimestamp = DateTime.now();
+    });
+
+    await _runAssistantStream(
+      (token) => _aiService.editUserMessageStream(
+        sessionId: _currentSession!.id!,
+        messageId: msg.id!,
+        content: newText,
+        regenerateAfter: true,
+        cancelToken: token,
+        onComplete: (_, __) {},
+        onError: (error) {
+          if (!mounted) return;
+          setState(() {
+            _sending = false;
+            _streamingContent = null;
+            _streamingToolActivities = [];
+          });
+          _showError('ویرایش ناموفق: ${ErrorExtractor.forContext(error, context)}');
+        },
+      ),
+      errorLabel: 'ویرایش',
+    );
+  }
+
+  Future<void> _forkFromMessage(int upToMessageId) async {
+    if (_currentSession?.id == null) return;
+    try {
+      final data = await _aiService.forkChatSession(
+        sessionId: _currentSession!.id!,
+        upToMessageId: upToMessageId,
+      );
+      final sessionJson = data['session'] as Map<String, dynamic>?;
+      final newId = sessionJson?['id'] as int?;
+      if (newId == null) return;
+      await _loadSessions();
+      if (!mounted) return;
+      final matches = _sessions.where((s) => s.id == newId);
+      if (matches.isNotEmpty) {
+        await _selectSession(matches.first);
+        _showSnackbar('شاخهٔ گفت‌وگو باز شد');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showError('شاخه‌سازی ناموفق: ${ErrorExtractor.forContext(e, context)}');
+    }
+  }
+
+  Future<void> _exportConversation() async {
+    if (_currentSession?.id == null) return;
+    try {
+      final data = await _aiService.exportChatSession(_currentSession!.id!);
+      final md = data['markdown'] as String? ?? '';
+      if (md.isEmpty) {
+        _showSnackbar('گفت‌وگو خالی است');
+        return;
+      }
+      await Share.share(md, subject: data['title'] as String?);
+    } catch (e) {
+      if (!mounted) return;
+      _showError('خروجی ناموفق: ${ErrorExtractor.forContext(e, context)}');
+    }
+  }
+
+  void _openKnowledgeSheet() {
+    showAIChatKnowledgeSheet(
+      context: context,
+      aiService: _aiService,
+      businessId: widget.businessId,
+    );
+  }
+
+  void _openConnectorsSheet() {
+    showAIChatConnectorsSheet(
+      context: context,
+      aiService: _aiService,
+      businessId: widget.businessId,
+    );
+  }
+
+  Future<void> _submitFeedback(AIChatMessage msg, int rating) async {
+    if (_currentSession?.id == null || msg.id == null) return;
+    try {
+      await _aiService.submitMessageFeedback(
+        sessionId: _currentSession!.id!,
+        messageId: msg.id!,
+        rating: rating,
+      );
+      if (!mounted) return;
+      setState(() => _messageFeedbackRatings[msg.id!] = rating);
+      _showSnackbar(rating > 0 ? 'ممنون از بازخورد مثبت' : 'بازخورد ثبت شد');
+    } catch (e) {
+      if (!mounted) return;
+      _showError('ثبت بازخورد ناموفق: ${ErrorExtractor.forContext(e, context)}');
+    }
+  }
+
+  Future<void> _runAssistantStream(
+    Stream<AIStreamChunk> Function(CancelToken cancelToken) streamFactory, {
+    String errorLabel = 'پاسخ',
+  }) async {
+    _streamCancelToken?.cancel('replaced');
+    final cancelToken = CancelToken();
+    _streamCancelToken = cancelToken;
+    try {
+      var accumulatedContent = '';
+      Map<String, dynamic>? finalUsage;
+      Object? finalFunctionCalls;
+      Object? finalFunctionResults;
+
+      await for (final chunk in streamFactory(cancelToken)) {
+        if (chunk.error != null) return;
+        if (chunk.toolEvent != null) {
+          _applyToolStreamEvent(chunk.toolEvent!);
+          if (mounted) setState(() {});
+          continue;
+        }
+        if (chunk.contentDelta != null && chunk.contentDelta!.isNotEmpty) {
+          accumulatedContent += chunk.contentDelta!;
+        }
+        if (chunk.done) {
+          finalFunctionCalls = chunk.functionCalls;
+          finalFunctionResults = chunk.functionResults;
+          break;
+        }
+        if (mounted && chunk.contentDelta != null) {
+          setState(() => _streamingContent = accumulatedContent);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        if (accumulatedContent.isNotEmpty) {
+          _messages = List<AIChatMessage>.from(_messages)
+            ..add(
+              AIChatMessage(
+                sessionId: _currentSession!.id!,
+                role: MessageRole.assistant,
+                content: accumulatedContent,
+                functionCalls: finalFunctionCalls,
+                functionResults: finalFunctionResults,
+                tokensUsed: finalUsage?['total_tokens'] as int? ?? 0,
+                createdAt: _streamingTimestamp,
+              ),
+            );
+        }
+        _streamingContent = null;
+        _streamingToolActivities = [];
+        _sending = false;
+      });
+      _scrollToBottom(force: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _sending = false;
+        _streamingContent = null;
+        _streamingToolActivities = [];
+      });
+      _showError('$errorLabel ناموفق: ${ErrorExtractor.forContext(e, context)}');
+    } finally {
+      if (_streamCancelToken == cancelToken) {
+        _streamCancelToken = null;
+      }
+    }
+  }
+
+  Future<void> _regenerateLastResponse() async {
+    if (_sending || _currentSession?.id == null) return;
+    if (_messages.isEmpty) return;
+    final last = _messages.last;
+    if (last.role != MessageRole.assistant) {
+      _showSnackbar('آخرین پیام باید از دستیار باشد');
+      return;
+    }
+
+    setState(() {
+      _messages = List<AIChatMessage>.from(_messages)..removeLast();
+      _sending = true;
+      _pendingWriteApproval = false;
+      _streamingContent = '';
+      _streamingToolActivities = [];
+      _streamingTimestamp = DateTime.now();
+    });
+
+    await _runAssistantStream(
+      (token) => _aiService.regenerateLastResponseStream(
+        sessionId: _currentSession!.id!,
+        cancelToken: token,
+        onComplete: (_, __) {},
+        onError: (error) {
+          if (!mounted) return;
+          setState(() {
+            _sending = false;
+            _streamingContent = null;
+            _streamingToolActivities = [];
+          });
+          _showError('تولید مجدد ناموفق: ${ErrorExtractor.forContext(error, context)}');
+        },
+      ),
+      errorLabel: 'تولید مجدد',
+    );
+  }
+
+  Future<void> _confirmWriteApproval() async {
+    if (_sending || !_pendingWriteApproval) return;
+    await _sendMessage(
+      contentOverride:
+          'کاربر عملیات پیشنهادی را تأیید کرد. لطفاً همان عملیات را اجرا کن.',
+      approveWrites: true,
+      skipUserBubble: true,
+    );
+  }
+
+  Future<void> _sendMessage({
+    String? contentOverride,
+    bool approveWrites = false,
+    bool skipUserBubble = false,
+  }) async {
+    if (_sending) return;
+    final content = (contentOverride ?? _messageCtrl.text).trim();
+    if (content.isEmpty) return;
+    if (!await _ensureSession()) return;
 
     try {
       final availability = await _aiService.checkAvailability(
@@ -477,18 +1043,25 @@ class _AIChatDialogState extends State<AIChatDialog> {
       debugPrint('[AIChatDialog] Error checking availability before send: $e');
     }
 
-    _messageCtrl.clear();
+    if (!skipUserBubble) {
+      _messageCtrl.clear();
+    }
 
-    final userMessage = AIChatMessage(
-      sessionId: _currentSession!.id!,
-      role: MessageRole.user,
-      content: content,
-      createdAt: DateTime.now(),
-    );
+    if (!skipUserBubble) {
+      final userMessage = AIChatMessage(
+        sessionId: _currentSession!.id!,
+        role: MessageRole.user,
+        content: content,
+        createdAt: DateTime.now(),
+      );
+      setState(() {
+        _messages = List<AIChatMessage>.from(_messages)..add(userMessage);
+      });
+    }
 
     setState(() {
-      _messages = List<AIChatMessage>.from(_messages)..add(userMessage);
       _sending = true;
+      _pendingWriteApproval = false;
     });
     _scrollToBottom(force: true);
 
@@ -496,16 +1069,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _streamCancelToken?.cancel('replaced');
       final cancelToken = CancelToken();
       _streamCancelToken = cancelToken;
-      String accumulatedContent = '';
+      var accumulatedContent = '';
       Map<String, dynamic>? finalUsage;
+      Object? finalFunctionCalls;
+      Object? finalFunctionResults;
       setState(() {
         _streamingContent = '';
+        _streamingToolActivities = [];
         _streamingTimestamp = DateTime.now();
       });
 
       await for (final chunk in _aiService.sendMessageStream(
         sessionId: _currentSession!.id!,
         content: content,
+        approveWrites: approveWrites,
         onComplete: (usage, messageId) {
           finalUsage = usage;
         },
@@ -514,17 +1091,39 @@ class _AIChatDialogState extends State<AIChatDialog> {
           setState(() {
             _sending = false;
             _streamingContent = null;
+            _streamingToolActivities = [];
             _streamingTimestamp = null;
           });
-          _showError('ارسال پیام ناموفق بود: ${ErrorExtractor.forContext(error, context)}');
+          _showError(
+            'ارسال پیام ناموفق بود: ${ErrorExtractor.forContext(error, context)}',
+          );
         },
         cancelToken: cancelToken,
       )) {
-        accumulatedContent += chunk;
+        if (chunk.error != null) return;
+
+        if (chunk.toolEvent != null) {
+          _applyToolStreamEvent(chunk.toolEvent!);
+          if (!mounted) return;
+          setState(() {});
+          _scrollToBottom();
+          continue;
+        }
+
+        if (chunk.contentDelta != null && chunk.contentDelta!.isNotEmpty) {
+          accumulatedContent += chunk.contentDelta!;
+        }
+
+        if (chunk.done) {
+          finalFunctionCalls = chunk.functionCalls;
+          finalFunctionResults = chunk.functionResults;
+          break;
+        }
+
         final now = DateTime.now();
         final shouldUpdate = _lastStreamUiUpdate == null ||
             now.difference(_lastStreamUiUpdate!) >= const Duration(milliseconds: 60);
-        if (shouldUpdate) {
+        if (shouldUpdate && chunk.contentDelta != null) {
           _lastStreamUiUpdate = now;
           if (!mounted) return;
           setState(() => _streamingContent = accumulatedContent);
@@ -534,22 +1133,27 @@ class _AIChatDialogState extends State<AIChatDialog> {
       }
 
       if (!mounted) return;
+      final savedTools = List<AIToolActivity>.from(_streamingToolActivities);
       setState(() {
-        if (accumulatedContent.isNotEmpty) {
+        if (accumulatedContent.isNotEmpty || savedTools.isNotEmpty) {
           _messages = List<AIChatMessage>.from(_messages)
             ..add(
               AIChatMessage(
                 sessionId: _currentSession!.id!,
                 role: MessageRole.assistant,
                 content: accumulatedContent,
+                functionCalls: finalFunctionCalls,
+                functionResults: finalFunctionResults,
                 tokensUsed: finalUsage?['total_tokens'] as int? ?? 0,
                 createdAt: _streamingTimestamp,
               ),
             );
         }
         _streamingContent = null;
+        _streamingToolActivities = [];
         _streamingTimestamp = null;
         _sending = false;
+        _pendingWriteApproval = savedTools.any((t) => t.approvalRequired);
       });
       _streamCancelToken = null;
       _scrollToBottom(force: true);
@@ -560,6 +1164,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         setState(() {
           _sending = false;
           _streamingContent = null;
+          _streamingToolActivities = [];
           _streamingTimestamp = null;
         });
         _streamCancelToken = null;
@@ -571,10 +1176,44 @@ class _AIChatDialogState extends State<AIChatDialog> {
       setState(() {
         _sending = false;
         _streamingContent = null;
+        _streamingToolActivities = [];
         _streamingTimestamp = null;
       });
       _streamCancelToken = null;
       _showError('ارسال پیام ناموفق بود: ${ErrorExtractor.forContext(e, context)}');
+    }
+  }
+
+  void _applyToolStreamEvent(AIStreamToolEvent event) {
+    final label = event.label ?? aiToolLabelFa(event.tool);
+    final idx = _streamingToolActivities.indexWhere((a) => a.tool == event.tool);
+
+    if (event.isStart) {
+      final activity = AIToolActivity(tool: event.tool, label: label, running: true);
+      if (idx >= 0) {
+        _streamingToolActivities[idx] = activity;
+      } else {
+        _streamingToolActivities.add(activity);
+      }
+      return;
+    }
+
+    if (event.isEnd) {
+      final activity = AIToolActivity(
+        tool: event.tool,
+        label: label,
+        running: false,
+        success: event.success,
+        approvalRequired: event.approvalRequired,
+      );
+      if (idx >= 0) {
+        _streamingToolActivities[idx] = activity;
+      } else {
+        _streamingToolActivities.add(activity);
+      }
+      if (event.approvalRequired) {
+        _pendingWriteApproval = true;
+      }
     }
   }
 
@@ -897,6 +1536,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
               onNewChat: _startNewConversation,
               onSelectSession: _selectSession,
               onDeleteSession: _deleteSession,
+              onSearch: _onSessionSearchChanged,
             ),
       body: Container(
         decoration: AIChatDesign.pageBackground(theme, isDark: isDark),
@@ -913,6 +1553,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   onNewChat: _startNewConversation,
                   onSelectSession: _selectSession,
                   onDeleteSession: _deleteSession,
+                  onSearch: _onSessionSearchChanged,
                 ),
               Expanded(
                 child: Column(
@@ -920,6 +1561,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   children: [
                     _buildAppBar(theme),
                     if (_showCreditWarning) _buildCreditWarning(theme),
+                    if (_pendingWriteApproval && !_sending)
+                      _buildWriteApprovalBanner(theme),
+                    if (_attachments.isNotEmpty && !_isHomeMode)
+                      _buildAttachmentsBar(theme),
                     Expanded(
                       child: AnimatedSwitcher(
                         duration: AIChatDesign.layoutTransition,
@@ -937,10 +1582,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 voiceRecording: _voiceRecording,
                                 canUseAi: _canUseAi,
                                 blockReason: _aiBlockReason,
-                                onSend: _sendMessage,
+                                onSend: () => _sendMessage(),
                                 onMic: _toggleVoice,
                                 onStopVoice: _stopVoiceSession,
                                 onSuggestionSelected: _onSuggestionSelected,
+                                suggestions: _suggestions,
+                                proactiveAlerts: _proactiveAlerts,
+                                onAlertAction: (prompt) {
+                                  _messageCtrl.text = prompt;
+                                  unawaited(_sendMessage());
+                                },
                                 onUpgradePlan: widget.businessId != null
                                     ? _navigateToSubscription
                                     : null,
@@ -949,6 +1600,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 key: ValueKey('thread-${_currentSession?.id}'),
                                 messages: _messages,
                                 streamingContent: _streamingContent,
+                                streamingToolActivities: _streamingToolActivities,
                                 streamingTimestamp: _streamingTimestamp,
                                 messagesLoading: _messagesLoading,
                                 sending: _sending,
@@ -962,12 +1614,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 messageController: _messageCtrl,
                                 focusNode: _focusNode,
                                 formatTime: _formatMessageTime,
-                                onSend: _sendMessage,
+                                onSend: () => _sendMessage(),
                                 onMic: _toggleVoice,
                                 onStopVoice: _stopVoiceSession,
                                 onStopGenerating: _stopGenerating,
                                 onScrollToBottom: () => _scrollToBottom(force: true),
                                 onMessageLongPress: _showMessageActions,
+                                onAttach: _pickAndUploadAttachment,
                               ),
                       ),
                     ),
@@ -1014,6 +1667,35 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 onPressed: _stopGenerating,
                 icon: Icon(Icons.stop_circle_outlined, color: scheme.error),
               ),
+            if (!_isHomeMode && _currentSession != null) ...[
+              IconButton(
+                tooltip: 'جستجو در پیام‌ها',
+                onPressed: _openMessageSearch,
+                icon: const Icon(Icons.search_rounded),
+              ),
+              IconButton(
+                tooltip: 'حافظه دستیار',
+                onPressed: _openMemorySheet,
+                icon: const Icon(Icons.psychology_outlined),
+              ),
+              IconButton(
+                tooltip: 'خروجی گفت‌وگو',
+                onPressed: _exportConversation,
+                icon: const Icon(Icons.ios_share_outlined),
+              ),
+            ],
+            if (widget.businessId != null) ...[
+              IconButton(
+                tooltip: 'کانکتورها',
+                onPressed: _openConnectorsSheet,
+                icon: const Icon(Icons.link_rounded),
+              ),
+              IconButton(
+                tooltip: 'دانشنامه',
+                onPressed: _openKnowledgeSheet,
+                icon: const Icon(Icons.menu_book_outlined),
+              ),
+            ],
             IconButton(
               tooltip: 'تنظیمات صدا',
               onPressed: _openVoiceSettings,
@@ -1031,13 +1713,100 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 onPressed: _startNewConversation,
                 icon: const Icon(Icons.add_comment_outlined),
               ),
-            IconButton(
-              tooltip: 'بستن',
-              onPressed: () => Navigator.of(context).pop(),
-              icon: const Icon(Icons.close_rounded),
-            ),
+            if (widget.embeddedInShell)
+              IconButton(
+                tooltip: 'بازگشت',
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
+                },
+                icon: const Icon(Icons.arrow_back_rounded),
+              )
+            else
+              IconButton(
+                tooltip: 'بستن',
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentsBar(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final att in _attachments)
+              Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: InputChip(
+                  label: Text(
+                    att['filename'] as String? ?? 'فایل',
+                    style: theme.textTheme.labelSmall,
+                  ),
+                  avatar: const Icon(Icons.insert_drive_file_outlined, size: 18),
+                  onDeleted: () async {
+                    final id = att['id'] as int?;
+                    final sid = _currentSession?.id;
+                    if (id == null || sid == null) return;
+                    try {
+                      await _aiService.deleteSessionAttachment(
+                        sessionId: sid,
+                        attachmentId: id,
+                      );
+                      await _loadAttachments();
+                    } catch (e) {
+                      if (!mounted) return;
+                      _showError(ErrorExtractor.forContext(e, context));
+                    }
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWriteApprovalBanner(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: scheme.tertiaryContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.verified_user_outlined, color: scheme.tertiary, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'یک عملیات ثبت/ویرایش نیاز به تأیید شما دارد.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onTertiaryContainer,
+              ),
+            ),
+          ),
+          FilledButton.tonal(
+            onPressed: _sending ? null : _confirmWriteApproval,
+            child: const Text('تأیید و اجرا'),
+          ),
+        ],
       ),
     );
   }
