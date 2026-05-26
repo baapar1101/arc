@@ -1641,3 +1641,53 @@ async def delete_chat_session(
     
     return success_response({"id": session_id}, request, "گفت‌وگو با موفقیت حذف شد")
 
+
+# ---- Scheduled Tasks ----
+
+@router.get("/scheduled-tasks", summary="لیست task های زمان‌بندی‌شده")
+async def list_scheduled_tasks(
+    request: Request = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """لیست task های پیش‌فرض زمان‌بندی‌شده."""
+    from app.services.ai.ai_scheduled_task_service import get_built_in_tasks
+    tasks = get_built_in_tasks()
+    return success_response({"tasks": tasks}, request)
+
+
+@router.post("/scheduled-tasks/{task_id}/run", summary="اجرای فوری یک scheduled task")
+async def run_scheduled_task_now(
+    task_id: str = Path(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """اجرای فوری یک scheduled task برای کسب‌وکار فعلی."""
+    from app.services.ai.ai_scheduled_task_service import get_task_by_id, run_scheduled_task
+
+    task = get_task_by_id(task_id)
+    if not task:
+        raise ApiError("TASK_NOT_FOUND", f"task '{task_id}' یافت نشد", http_status=404)
+
+    business_id = ctx.business_id
+    if not business_id:
+        raise ApiError("BUSINESS_REQUIRED", "کسب‌وکار مشخص نشده", http_status=400)
+
+    ai_service = AIService(db, ctx, business_id)
+    result = await run_scheduled_task(db, task, business_id, ai_service)
+    return success_response(result, request)
+
+
+@router.get("/cache-stats", summary="آمار کش ابزار (debug)")
+async def get_tool_cache_stats(
+    request: Request = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """آمار کش نتایج tool — فقط برای ادمین."""
+    if not (ctx.is_superadmin() or ctx.can_access_support_operator()):
+        raise ApiError("FORBIDDEN", "دسترسی محدود", http_status=403)
+    from app.services.ai.ai_tool_cache import cache_stats
+    return success_response(cache_stats(), request)
+

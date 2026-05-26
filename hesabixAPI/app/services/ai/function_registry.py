@@ -27,6 +27,10 @@ class AIFunction:
     required_permissions: Optional[List[str]] = None
     business_context_required: bool = True
     category: Optional[str] = None
+    # ---- فیلدهای امنیتی و بهینه‌سازی ----
+    requires_approval: bool = False   # نیاز به تأیید صریح کاربر قبل از اجرا
+    risk_level: str = "safe"          # safe / medium / high
+    is_readonly: bool = True          # قابل کش شدن — عملیات read-only
 
 
 class AIFunctionRegistry:
@@ -351,7 +355,10 @@ class AIFunctionRegistry:
             handler=create_invoice_wrapper,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["invoices.write"],
-            category="invoices"
+            category="invoices",
+            requires_approval=True,
+            risk_level="high",
+            is_readonly=False,
         ))
     
     def _register_product_functions(self):
@@ -622,7 +629,10 @@ class AIFunctionRegistry:
             handler=create_person_wrapper,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.write"],
-            category="persons"
+            category="persons",
+            requires_approval=True,
+            risk_level="medium",
+            is_readonly=False,
         ))
         
         # اضافه کردن update_person
@@ -675,7 +685,10 @@ class AIFunctionRegistry:
             handler=update_person_wrapper,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.write"],
-            category="persons"
+            category="persons",
+            requires_approval=True,
+            risk_level="medium",
+            is_readonly=False,
         ))
     
     def _register_financial_functions(self):
@@ -873,7 +886,10 @@ class AIFunctionRegistry:
             handler=create_receipt_payment_wrapper,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["receipts_payments.write"],
-            category="financial"
+            category="financial",
+            requires_approval=True,
+            risk_level="high",
+            is_readonly=False,
         ))
         
         # اضافه کردن get_sales_report
@@ -1647,6 +1663,10 @@ class AIFunctionRegistry:
     def register(self, func: AIFunction):
         """ثبت function جدید"""
         self._functions[func.name] = func
+
+    def get_function(self, name: str) -> Optional[AIFunction]:
+        """دریافت AIFunction با نام — None اگر وجود نداشته باشد."""
+        return self._functions.get(name)
     
     def _detect_user_role(
         self,

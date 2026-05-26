@@ -212,34 +212,67 @@ def get_business_insights(
     inventory = _low_stock_snapshot(db, business_id)
 
     alerts: List[Dict[str, str]] = []
+
+    # هشدار کالاهای کم‌موجود
     if inventory.get("count", 0) > 0:
+        items_preview = ", ".join(
+            i.get("product_name", "") for i in (inventory.get("items") or [])[:3]
+        )
         alerts.append(
             {
                 "level": "warning",
-                "message": f"{inventory['count']} کالا کم‌موجود یا ناموجود است.",
+                "title": f"{inventory['count']} کالای کم‌موجود",
+                "message": items_preview or f"{inventory['count']} کالا کم‌موجود یا ناموجود است.",
+                "action_prompt": "لیست کامل کالاهای کم‌موجود انبار را با جزئیات نشان بده.",
             }
         )
-    if debtors.get("total_debt", 0) > 0:
+
+    # هشدار بدهکاران
+    total_debt = debtors.get("total_debt", 0)
+    if total_debt > 0:
+        top_debtor = (debtors.get("top") or [{}])[0]
+        top_name = top_debtor.get("name", "")
         alerts.append(
             {
                 "level": "info",
-                "message": f"مجموع بدهی مشتریان: {debtors['total_debt']:,.0f}",
+                "title": "بدهکاران",
+                "message": f"مجموع بدهی: {total_debt:,.0f}" + (f" — بیشترین: {top_name}" if top_name else ""),
+                "action_prompt": "لیست بدهکاران کسب‌وکار با مانده‌حساب را نشان بده.",
             }
         )
+
+    # هشدار افت فروش هفتگی
     if week_change_pct is not None and week_change_pct < -15:
         alerts.append(
             {
                 "level": "warning",
-                "message": f"فروش هفتگی نسبت به هفته قبل {week_change_pct}% کاهش یافته.",
+                "title": "افت فروش هفتگی",
+                "message": f"فروش هفتگی {week_change_pct}% کاهش یافته.",
+                "action_prompt": "تحلیل کن چرا فروش این هفته کاهش داشته و پیشنهادات بهبود بده.",
             }
         )
     elif week_change_pct is not None and week_change_pct > 15:
         alerts.append(
             {
                 "level": "success",
-                "message": f"فروش هفتگی نسبت به هفته قبل {week_change_pct}% رشد داشته.",
+                "title": "رشد فروش هفتگی",
+                "message": f"فروش هفتگی {week_change_pct}% رشد داشته.",
+                "action_prompt": "تحلیل کن کدام محصولات یا مشتریان بیشترین سهم در رشد فروش این هفته داشتند.",
             }
         )
+
+    # هشدار فروش صفر امروز
+    if sales_today.get("count", 0) == 0:
+        today_weekday = date.today().weekday()
+        if today_weekday < 5:  # روزهای کاری (شنبه تا چهارشنبه)
+            alerts.append(
+                {
+                    "level": "warning",
+                    "title": "هنوز فروشی ثبت نشده",
+                    "message": "امروز هیچ فاکتور فروشی ثبت نشده است.",
+                    "action_prompt": "بررسی کن چه محصولاتی را باید امروز به مشتریان پیشنهاد داد.",
+                }
+            )
 
     chart_spec = {
         "type": "bar",

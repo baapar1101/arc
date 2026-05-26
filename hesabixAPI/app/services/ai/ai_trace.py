@@ -35,6 +35,9 @@ def trace_step(
     tool: Optional[str] = None,
     tool_key: Optional[str] = None,
     iteration: Optional[int] = None,
+    elapsed_ms: Optional[int] = None,
+    result_count: Optional[int] = None,
+    citations: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "event": "trace_step",
@@ -54,6 +57,12 @@ def trace_step(
         payload["tool_key"] = tool_key
     if iteration is not None:
         payload["iteration"] = iteration
+    if elapsed_ms is not None:
+        payload["elapsed_ms"] = elapsed_ms
+    if result_count is not None:
+        payload["result_count"] = result_count
+    if citations:
+        payload["citations"] = citations
     return payload
 
 
@@ -230,6 +239,50 @@ def _extract_numeric_highlights(data: Dict[str, Any], prefix: str = "") -> List[
 def _short_json(obj: Dict[str, Any]) -> str:
     text = json.dumps(obj, ensure_ascii=False)
     return text[:120] + ("…" if len(text) > 120 else "")
+
+
+def extract_result_count(result: Any) -> Optional[int]:
+    """تعداد رکوردهای برگشتی از نتیجه tool را استخراج می‌کند."""
+    if not isinstance(result, dict):
+        if isinstance(result, list):
+            return len(result)
+        return None
+
+    # pagination.total
+    pagination = result.get("pagination")
+    if isinstance(pagination, dict):
+        total = pagination.get("total")
+        if isinstance(total, int):
+            return total
+
+    # لیست‌های رایج
+    for key in ("items", "data", "results", "invoices", "products", "persons",
+                "leads", "deals", "documents", "checks"):
+        items = result.get(key)
+        if isinstance(items, list):
+            return len(items)
+
+    return None
+
+
+def extract_citations_from_result(result: Any) -> List[str]:
+    """استخراج منابع/citation از نتیجه tool برای explainability."""
+    citations: List[str] = []
+    if not isinstance(result, dict):
+        return citations
+
+    for item in (result.get("items") or result.get("data") or []):
+        if not isinstance(item, dict):
+            continue
+        ref = item.get("code") or item.get("number") or item.get("id")
+        name = item.get("name") or item.get("title") or ""
+        if ref and name:
+            citations.append(f"{name} (#{ref})")
+        elif ref:
+            citations.append(f"#{ref}")
+        if len(citations) >= 5:
+            break
+    return citations
 
 
 def merge_trace_into_function_results(

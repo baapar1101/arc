@@ -1842,45 +1842,95 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
   Widget _buildWriteApprovalBanner(ThemeData theme) {
     final scheme = theme.colorScheme;
+    // جمع‌آوری عملیات‌های در انتظار تأیید از آخرین پیام
+    final pendingOps = <Map<String, dynamic>>[];
+    if (_messages.isNotEmpty) {
+      final lastMsg = _messages.last;
+      final fnResults = lastMsg.functionResults;
+      if (fnResults is Map) {
+        for (final entry in fnResults.entries) {
+          final val = entry.value;
+          if (val is Map && val['error'] == 'APPROVAL_REQUIRED') {
+            pendingOps.add(Map<String, dynamic>.from(val));
+          }
+        }
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: scheme.tertiaryContainer.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.4)),
+        color: scheme.tertiaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.5)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(Icons.verified_user_outlined, color: scheme.tertiary, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+            child: Row(
               children: [
-                Text(
-                  'یک عملیات ثبت/ویرایش نیاز به تأیید شما دارد.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: scheme.onTertiaryContainer,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'برای امنیت، فقط همان عملیات و جزئیاتی اجرا می‌شود که دستیار قبلاً پیشنهاد کرده است.',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onTertiaryContainer.withValues(alpha: 0.78),
+                Icon(Icons.verified_user_outlined,
+                    color: scheme.tertiary, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'عملیات زیر نیاز به تأیید شما دارد:',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onTertiaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Tooltip(
-            message: 'اجرای عملیات تأییدشده',
-            child: FilledButton.tonal(
-              onPressed: _sending ? null : _confirmWriteApproval,
-              child: const Text('تأیید و اجرا'),
+          // نمایش پارامترهای هر عملیات
+          if (pendingOps.isNotEmpty)
+            ...pendingOps.map((op) => _WriteOpPreview(
+                  op: op,
+                  theme: theme,
+                  scheme: scheme,
+                ))
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              child: Text(
+                'برای امنیت، فقط همان عملیاتی اجرا می‌شود که دستیار پیشنهاد کرده.',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.onTertiaryContainer.withValues(alpha: 0.78),
+                ),
+              ),
+            ),
+          // دکمه‌های تأیید/رد
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _sending
+                      ? null
+                      : () {
+                          setState(() => _pendingWriteApproval = false);
+                        },
+                  child: Text(
+                    'لغو',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  onPressed: _sending ? null : _confirmWriteApproval,
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('تأیید و اجرا'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.tertiary,
+                    foregroundColor: scheme.onTertiary,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1927,6 +1977,119 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 : null,
             child: const Text('ارتقا'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// نمایش diff/preview پارامترهای یک عملیات نوشتنی در حال انتظار تأیید
+class _WriteOpPreview extends StatefulWidget {
+  final Map<String, dynamic> op;
+  final ThemeData theme;
+  final ColorScheme scheme;
+
+  const _WriteOpPreview({
+    required this.op,
+    required this.theme,
+    required this.scheme,
+  });
+
+  @override
+  State<_WriteOpPreview> createState() => _WriteOpPreviewState();
+}
+
+class _WriteOpPreviewState extends State<_WriteOpPreview> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = widget.op['label'] as String? ?? widget.op['function'] as String? ?? 'عملیات';
+    final args = widget.op['arguments'] as Map? ?? {};
+    final scheme = widget.scheme;
+    final theme = widget.theme;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 2, 12, 4),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.edit_note_rounded,
+                    size: 16,
+                    color: scheme.tertiary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 16,
+                    color: scheme.outline,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded && args.isNotEmpty) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Table(
+                columnWidths: const {
+                  0: IntrinsicColumnWidth(),
+                  1: FlexColumnWidth(),
+                },
+                children: args.entries
+                    .where((e) => e.value != null && e.value.toString().isNotEmpty)
+                    .map(
+                      (e) => TableRow(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(0, 2, 10, 2),
+                            child: Text(
+                              e.key,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            child: Text(
+                              e.value.toString(),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          ],
         ],
       ),
     );

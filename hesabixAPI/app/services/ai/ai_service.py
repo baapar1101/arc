@@ -34,6 +34,8 @@ from app.services.ai.ai_tool_keys import (
 )
 from app.services.ai.ai_trace import (
     context_trace,
+    extract_citations_from_result,
+    extract_result_count,
     format_planned_tools,
     summarize_tool_result,
     summarize_tool_result_for_llm,
@@ -48,6 +50,12 @@ from app.services.ai.ai_db_helpers import (
 from app.services.ai.ai_constants import (
     KNOWLEDGE_LOAD_TIMEOUT_SEC,
     MAX_AGENT_ITERATIONS,
+    PLANNING_STEP_MIN_CHARS,
+)
+from app.services.ai.ai_tool_cache import (
+    get_cached,
+    invalidate_session,
+    set_cached,
 )
 from app.services.ai.ai_message_budget import (
     trim_messages_for_llm,
@@ -55,6 +63,7 @@ from app.services.ai.ai_message_budget import (
 )
 from app.services.ai.ai_tool_intent import (
     filter_function_definitions,
+    iterations_for_query,
     query_needs_knowledge,
     select_tool_names,
 )
@@ -1236,9 +1245,25 @@ class AIService:
         max_iterations: int = MAX_AGENT_ITERATIONS,
         user_query: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """ارسال streaming با چند نوبت tool calling (مثل chat_completion)."""
+        """ارسال streaming با چند نوبت tool calling (مثل chat_completion).
+
+        ویژگی‌های جدید:
+         - adaptive max_iterations بر اساس پیچیدگی سوال
+         - tool timing در trace events
+         - planning step برای سوال‌های پیچیده
+         - session caching در handle_function_calls_async
+        """
         self._validate_messages(messages)
         effective_user_query = user_query or self._last_user_query(messages)
+
+        # تنظیم خودکار max_iterations بر اساس پیچیدگی
+        adaptive_max_iterations = iterations_for_query(
+            effective_user_query, messages
+        )
+        # اگر caller مقدار غیر پیش‌فرض داد، max بگیر
+        if max_iterations != MAX_AGENT_ITERATIONS:
+            adaptive_max_iterations = max(adaptive_max_iterations, max_iterations)
+        max_iterations = adaptive_max_iterations
 
         accumulated_function_calls: List[Dict[str, Any]] = []
         accumulated_function_results: Dict[str, Any] = {}
@@ -1333,6 +1358,19 @@ class AIService:
                 )
             elif not eff_tools:
                 tools = None
+
+            # Planning step برای سوال‌های با کافی طول
+            _query_len = len(effective_user_query or "")
+            if eff_tools and tools and _query_len >= PLANNING_STEP_MIN_CHARS:
+                yield _emit_trace(
+                    step_id="agent_plan_root",
+                    kind="plan",
+                    state="done",
+                    title_key="aiTracePlanningAction",
+                    body_markdown=f"**هدف:** {effective_user_query[:180]}" if effective_user_query else None,
+                    iteration=0,
+                )
+                await asyncio.sleep(0)
 
             while iteration < max_iterations:
                 iteration += 1
@@ -1511,6 +1549,7 @@ class AIService:
                         approve_writes=approve_writes,
                         approved_write_calls=approved_write_calls,
                         iteration=iteration,
+                        session_id=session_id,
                     )
                     _merge_round_tool_results(
                         accumulated_function_results, function_results
@@ -1528,6 +1567,16 @@ class AIService:
                         success = not (
                             isinstance(result, dict) and result.get("error")
                         )
+                        # استخراج اطلاعات غنی برای trace
+                        elapsed_ms: Optional[int] = None
+                        result_count: Optional[int] = None
+                        citations: Optional[List[str]] = None
+                        if isinstance(result, dict):
+                            elapsed_ms = result.get("_elapsed_ms")
+                            result_count = extract_result_count(result)
+                            if result_count and result_count > 0:
+                                citations = extract_citations_from_result(result)
+
                         yield {
                             "event": "tool_end",
                             "tool": fname,
@@ -1535,6 +1584,8 @@ class AIService:
                             "label": tool_label_fa(fname),
                             "success": success,
                             "approval_required": needs_approval,
+                            "elapsed_ms": elapsed_ms,
+                            "result_count": result_count,
                         }
                         yield _emit_trace(
                             step_id=tool_step_id,
@@ -1545,6 +1596,8 @@ class AIService:
                             tool=fname,
                             tool_key=tool_l10n_key(fname),
                             iteration=iteration,
+                            elapsed_ms=elapsed_ms,
+                            result_count=result_count,
                         )
                         yield _emit_trace(
                             step_id=f"obs_{tc_id}",
@@ -1556,6 +1609,7 @@ class AIService:
                             tool=fname,
                             tool_key=tool_l10n_key(fname),
                             iteration=iteration,
+                            citations=citations,
                         )
 
                     assistant_msg: Dict[str, Any] = {
@@ -1628,6 +1682,17 @@ class AIService:
                     "done": False,
                 }
 
+            # ساخت citations از نتایج tool calls
+            citations_context: Optional[str] = None
+            if accumulated_function_results:
+                try:
+                    from app.services.ai.ai_citation_service import format_citations_for_response
+                    citations_context = format_citations_for_response(
+                        accumulated_function_results
+                    )
+                except Exception:
+                    pass
+
             yield {
                 "delta": {"content": ""},
                 "usage": final_usage,
@@ -1639,6 +1704,7 @@ class AIService:
                     else None
                 ),
                 "agent_trace": trace_steps or None,
+                "citations_context": citations_context or None,
             }
 
         except ApiError:
@@ -1699,8 +1765,16 @@ class AIService:
         approve_writes: bool = False,
         approved_write_calls: Optional[List[Dict[str, Any]]] = None,
         iteration: int = 0,
+        session_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """پردازش function calling به صورت async — کلید نتیجه tool_call_id."""
+        """پردازش function calling به صورت async — کلید نتیجه tool_call_id.
+
+        ویژگی‌های جدید:
+         - registry-based write detection
+         - tool-level session caching (فقط read-only)
+         - زمان‌بندی اجرا در نتیجه (_elapsed_ms)
+         - invalidation کش بعد از عملیات نوشتنی
+        """
         effective_business_id = session_business_id or self.business_id
         context = {
             "user_context": self.ctx,
@@ -1717,7 +1791,8 @@ class AIService:
             if not call.get("id"):
                 call["id"] = tc_id
 
-            if is_write_function(function_name):
+            # بررسی نیاز به تأیید با استفاده از registry
+            if is_write_function(function_name, registry):
                 if not approve_writes:
                     return tc_id, function_name, build_approval_required_result(
                         function_name, arguments
@@ -1727,6 +1802,20 @@ class AIService:
                         function_name, arguments
                     )
 
+            # بررسی کش برای توابع read-only
+            from app.services.ai.ai_write_guard import is_readonly_function
+            is_readonly = is_readonly_function(function_name, registry)
+            if is_readonly and effective_business_id and session_id:
+                hit, cached_result = get_cached(
+                    effective_business_id, session_id, function_name, arguments
+                )
+                if hit:
+                    logger.debug("Tool cache hit: %s", function_name)
+                    cached_with_meta = dict(cached_result) if isinstance(cached_result, dict) else {"data": cached_result}
+                    cached_with_meta["_from_cache"] = True
+                    return tc_id, function_name, cached_with_meta
+
+            start_time = time.monotonic()
             try:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
@@ -1735,8 +1824,20 @@ class AIService:
                         fn, args, context
                     ),
                 )
+                elapsed_ms = int((time.monotonic() - start_time) * 1000)
+
+                # ذخیره در کش برای توابع read-only
+                if is_readonly and effective_business_id and session_id:
+                    set_cached(effective_business_id, session_id, function_name, arguments, result)
+                # بعد از عملیات نوشتنی کش session را پاک کن
+                elif not is_readonly and effective_business_id and session_id:
+                    invalidate_session(effective_business_id, session_id)
+
+                if isinstance(result, dict):
+                    result["_elapsed_ms"] = elapsed_ms
                 return tc_id, function_name, result
             except Exception as e:
+                elapsed_ms = int((time.monotonic() - start_time) * 1000)
                 logger.error(
                     "Error calling function %s (%s): %s",
                     function_name,
@@ -1744,7 +1845,7 @@ class AIService:
                     e,
                     exc_info=True,
                 )
-                return tc_id, function_name, {"error": str(e)}
+                return tc_id, function_name, {"error": str(e), "_elapsed_ms": elapsed_ms}
 
         tasks = [
             call_single_function(call, idx)

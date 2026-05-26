@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
@@ -112,7 +113,7 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
   }
 }
 
-class _TraceStepTile extends StatelessWidget {
+class _TraceStepTile extends StatefulWidget {
   final AIAgentTraceStep step;
   final String title;
   final bool isLast;
@@ -129,8 +130,15 @@ class _TraceStepTile extends StatelessWidget {
     required this.compact,
   });
 
+  @override
+  State<_TraceStepTile> createState() => _TraceStepTileState();
+}
+
+class _TraceStepTileState extends State<_TraceStepTile> {
+  bool _bodyExpanded = false;
+
   IconData _iconForKind() {
-    switch (step.kind) {
+    switch (widget.step.kind) {
       case 'plan':
       case 'plan_next':
         return Icons.route_outlined;
@@ -151,12 +159,20 @@ class _TraceStepTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final step = widget.step;
     final body = step.bodyMarkdown?.trim() ?? '';
-    final showBody = body.isNotEmpty &&
+    final hasBody = body.isNotEmpty &&
         (step.kind == 'narrative' ||
             step.kind == 'plan' ||
             step.kind == 'observation' ||
             (step.kind != 'answer' && !step.isActive));
+
+    final showBodyAlways = hasBody &&
+        (step.kind == 'narrative' || step.kind == 'plan' || widget.compact);
+    final showBodyToggle = hasBody && !showBodyAlways;
+
+    final theme = widget.theme;
+    final scheme = widget.scheme;
 
     return IntrinsicHeight(
       child: Row(
@@ -172,7 +188,7 @@ class _TraceStepTile extends StatelessWidget {
                   error: step.isError,
                   scheme: scheme,
                 ),
-                if (!isLast)
+                if (!widget.isLast)
                   Expanded(
                     child: Container(
                       width: 2,
@@ -186,54 +202,202 @@ class _TraceStepTile extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: EdgeInsets.only(
-                bottom: isLast ? 4 : (compact ? 10 : 14),
+                bottom: widget.isLast ? 4 : (widget.compact ? 10 : 14),
                 left: 4,
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: step.isActive
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            color: step.isError
-                                ? scheme.error
-                                : scheme.onSurface,
+                  // ردیف عنوان + badge‌های غنی
+                  GestureDetector(
+                    onTap: showBodyToggle
+                        ? () => setState(() => _bodyExpanded = !_bodyExpanded)
+                        : null,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.title,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: step.isActive
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: step.isError
+                                  ? scheme.error
+                                  : scheme.onSurface,
+                            ),
                           ),
                         ),
-                      ),
-                      if (step.iteration != null)
-                        Text(
-                          '#${step.iteration}',
-                          style: theme.textTheme.labelSmall?.copyWith(
+                        // badge تعداد نتایج
+                        if (step.resultCount != null && step.resultCount! > 0) ...[
+                          const SizedBox(width: 6),
+                          _Badge(
+                            label: '${step.resultCount}',
+                            icon: Icons.format_list_bulleted_rounded,
+                            color: scheme.secondary,
+                            scheme: scheme,
+                          ),
+                        ],
+                        // badge زمان اجرا
+                        if (step.elapsedLabel != null) ...[
+                          const SizedBox(width: 4),
+                          _Badge(
+                            label: step.elapsedLabel!,
+                            icon: Icons.timer_outlined,
+                            color: scheme.outline,
+                            scheme: scheme,
+                          ),
+                        ],
+                        // iteration number
+                        if (step.iteration != null) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            '#${step.iteration}',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.outline,
+                            ),
+                          ),
+                        ],
+                        // toggle expand
+                        if (showBodyToggle) ...[
+                          const SizedBox(width: 2),
+                          Icon(
+                            _bodyExpanded
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 16,
                             color: scheme.outline,
                           ),
-                        ),
-                    ],
-                  ),
-                  if (showBody) ...[
-                    const SizedBox(height: 6),
-                    MarkdownBody(
-                      data: body,
-                      selectable: true,
-                      styleSheet: MarkdownStyleSheet(
-                        p: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          height: 1.45,
-                        ),
-                        listBullet: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
+                        ],
+                      ],
                     ),
+                  ),
+                  // بدنه همیشه نمایش
+                  if (showBodyAlways) ...[
+                    const SizedBox(height: 6),
+                    _BodyContent(body: body, theme: theme, scheme: scheme),
+                  ],
+                  // بدنه با toggle
+                  if (showBodyToggle && _bodyExpanded) ...[
+                    const SizedBox(height: 6),
+                    _BodyContent(body: body, theme: theme, scheme: scheme),
+                  ],
+                  // citations
+                  if (step.citations != null && step.citations!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    _CitationRow(citations: step.citations!, scheme: scheme, theme: theme),
                   ],
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BodyContent extends StatelessWidget {
+  final String body;
+  final ThemeData theme;
+  final ColorScheme scheme;
+
+  const _BodyContent({
+    required this.body,
+    required this.theme,
+    required this.scheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return MarkdownBody(
+      data: body,
+      selectable: true,
+      styleSheet: MarkdownStyleSheet(
+        p: theme.textTheme.bodySmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+          height: 1.45,
+        ),
+        listBullet: theme.textTheme.bodySmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _CitationRow extends StatelessWidget {
+  final List<String> citations;
+  final ThemeData theme;
+  final ColorScheme scheme;
+
+  const _CitationRow({
+    required this.citations,
+    required this.theme,
+    required this.scheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 4,
+      runSpacing: 2,
+      children: citations.take(5).map((c) {
+        return GestureDetector(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: c));
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: scheme.secondaryContainer.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              c,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final ColorScheme scheme;
+
+  const _Badge({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.scheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: color,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

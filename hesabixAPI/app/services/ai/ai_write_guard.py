@@ -1,14 +1,18 @@
 """
 کنترل عملیات نوشتنی AI — نیاز به تأیید صریح کاربر.
+
+دو روش تشخیص (اولویت با registry):
+  1. registry-based: AIFunction.requires_approval = True
+  2. static fallback: WRITE_FUNCTIONS (برای backward compat)
 """
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Iterable, Set
+from typing import Any, Dict, Iterable, Optional, Set
 
 from app.services.ai.ai_tool_keys import TOOL_LABELS_FA
 
-# توابعی که دادهٔ کسب‌وکار را تغییر می‌دهند و قبل از اجرا نیاز به تأیید دارند.
+# Fallback static list — تا زمانی که registry آماده نشده
 WRITE_FUNCTIONS: Set[str] = {
     "create_invoice",
     "create_person",
@@ -23,8 +27,37 @@ WRITE_FUNCTION_LABELS_FA: Dict[str, str] = {
 }
 
 
-def is_write_function(name: str) -> bool:
+def is_write_function(name: str, registry=None) -> bool:
+    """
+    بررسی اینکه آیا function نیاز به تأیید دارد.
+    اگر registry داده شود از AIFunction.requires_approval استفاده می‌کند؛
+    در غیر این صورت به WRITE_FUNCTIONS static برمی‌گردد.
+    """
+    if registry is not None:
+        fn = registry.get_function(name)
+        if fn is not None:
+            return bool(getattr(fn, "requires_approval", False))
     return name in WRITE_FUNCTIONS
+
+
+def get_risk_level(name: str, registry=None) -> str:
+    """سطح ریسک function: safe / medium / high."""
+    if registry is not None:
+        fn = registry.get_function(name)
+        if fn is not None:
+            return getattr(fn, "risk_level", "safe")
+    if name in WRITE_FUNCTIONS:
+        return "medium"
+    return "safe"
+
+
+def is_readonly_function(name: str, registry=None) -> bool:
+    """آیا function فقط خواندنی است (قابل کش)؟"""
+    if registry is not None:
+        fn = registry.get_function(name)
+        if fn is not None:
+            return bool(getattr(fn, "is_readonly", True))
+    return name not in WRITE_FUNCTIONS
 
 
 def _canonical_json(value: Any) -> str:

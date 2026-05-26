@@ -56,6 +56,10 @@ class AIAgentTraceStep {
   final String? tool;
   final String? toolKey;
   final int? iteration;
+  // ---- فیلدهای غنی‌سازی (جدید) ----
+  final int? elapsedMs;       // زمان اجرای tool به میلی‌ثانیه
+  final int? resultCount;     // تعداد رکوردهای برگشتی
+  final List<String>? citations; // منابع/رکوردهای مرجع
 
   const AIAgentTraceStep({
     required this.stepId,
@@ -67,12 +71,24 @@ class AIAgentTraceStep {
     this.tool,
     this.toolKey,
     this.iteration,
+    this.elapsedMs,
+    this.resultCount,
+    this.citations,
   });
 
   bool get isActive => state == 'active';
   bool get isError => state == 'error';
 
+  /// نمایش زمان اجرا به صورت خوانا
+  String? get elapsedLabel {
+    final ms = elapsedMs;
+    if (ms == null) return null;
+    if (ms < 1000) return '${ms}ms';
+    return '${(ms / 1000).toStringAsFixed(1)}s';
+  }
+
   factory AIAgentTraceStep.fromJson(Map<String, dynamic> json) {
+    final rawCitations = json['citations'];
     return AIAgentTraceStep(
       stepId: json['step_id'] as String? ?? '',
       kind: json['kind'] as String? ?? 'plan',
@@ -85,6 +101,11 @@ class AIAgentTraceStep {
       tool: json['tool'] as String?,
       toolKey: json['tool_key'] as String?,
       iteration: json['iteration'] as int?,
+      elapsedMs: json['elapsed_ms'] as int?,
+      resultCount: json['result_count'] as int?,
+      citations: rawCitations is List
+          ? rawCitations.whereType<String>().toList()
+          : null,
     );
   }
 
@@ -98,9 +119,17 @@ class AIAgentTraceStep {
         if (tool != null) 'tool': tool,
         if (toolKey != null) 'tool_key': toolKey,
         if (iteration != null) 'iteration': iteration,
+        if (elapsedMs != null) 'elapsed_ms': elapsedMs,
+        if (resultCount != null) 'result_count': resultCount,
+        if (citations != null) 'citations': citations,
       };
 
-  AIAgentTraceStep copyWith({String? state, String? bodyMarkdown}) {
+  AIAgentTraceStep copyWith({
+    String? state,
+    String? bodyMarkdown,
+    int? elapsedMs,
+    int? resultCount,
+  }) {
     return AIAgentTraceStep(
       stepId: stepId,
       kind: kind,
@@ -111,6 +140,9 @@ class AIAgentTraceStep {
       tool: tool,
       toolKey: toolKey,
       iteration: iteration,
+      elapsedMs: elapsedMs ?? this.elapsedMs,
+      resultCount: resultCount ?? this.resultCount,
+      citations: citations,
     );
   }
 }

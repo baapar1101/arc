@@ -1,12 +1,13 @@
 """
 انتخاب زیرمجموعهٔ ابزارها بر اساس intent متن کاربر (بدون API دوم).
+همچنین تخمین پیچیدگی سوال برای تنظیم تعداد iteration.
 """
 from __future__ import annotations
 
 import re
 from typing import AbstractSet, Iterable, List, Optional, Set
 
-from app.services.ai.ai_constants import MAX_TOOLS_PER_REQUEST
+from app.services.ai.ai_constants import MAX_TOOLS_PER_REQUEST, QUERY_COMPLEXITY_ITERATIONS
 
 # همیشه در دسترس (پرس‌وجو و دادهٔ پایه)
 _CORE_TOOL_NAMES: frozenset[str] = frozenset({
@@ -188,11 +189,103 @@ def detect_categories(user_query: Optional[str]) -> Set[str]:
     return found
 
 
+# ---- الگوهای تشخیص پیچیدگی ----
+_COMPLEX_PATTERNS = re.compile(
+    r"مقایسه|تحلیل|گزارش\s*جامع|روند|پیش‌بینی|همه\s*محصولات|تمام\s*فاکتورها|"
+    r"compare|analysis|trend|forecast|comprehensive|overview|summary.*and.*"
+    r"|چند.*گزارش|چند.*بررسی|هم.*هم|ضمناً|همچنین.*و.*و",
+    re.IGNORECASE,
+)
+_SIMPLE_PATTERNS = re.compile(
+    r"^(سلام|درود|hello|hi|ممنون|خوبی|باشه|اوکی|ok|thanks?)\b",
+    re.IGNORECASE,
+)
+_MEDIUM_PATTERNS = re.compile(
+    r"چند|چقدر|لیست|تعداد|جمع|میانگین|how\s+many|total|list|count|average",
+    re.IGNORECASE,
+)
+
+
+def estimate_query_complexity(
+    user_query: Optional[str],
+    history_messages: Optional[List[dict]] = None,
+) -> str:
+    """
+    تخمین پیچیدگی سوال: simple / medium / complex.
+    از تاریخچه مکالمه برای بافت چندوجهی استفاده می‌کند.
+    """
+    q = (user_query or "").strip()
+    if not q:
+        return "simple"
+
+    # سوال بسیار کوتاه یا خوش‌و‌بش
+    if len(q) < 15 or _SIMPLE_PATTERNS.match(q):
+        return "simple"
+
+    # الگوهای صریحاً پیچیده
+    if _COMPLEX_PATTERNS.search(q) or len(q) > 200:
+        return "complex"
+
+    # تعداد علائم سوالی یا ترکیب چند موضوع
+    question_marks = q.count("؟") + q.count("?")
+    conjunctions = len(re.findall(r"\bو\b|\bهم\b|and\b|also\b|plus\b", q, re.IGNORECASE))
+    if question_marks >= 2 or conjunctions >= 2:
+        return "complex"
+
+    # بررسی تاریخچه: اگر مکالمه طولانی است سوال احتمالاً عمیق‌تر است
+    if history_messages and len(history_messages) >= 6:
+        if _MEDIUM_PATTERNS.search(q):
+            return "complex"
+
+    if _MEDIUM_PATTERNS.search(q) or len(q) > 60:
+        return "medium"
+
+    return "simple"
+
+
+def iterations_for_query(
+    user_query: Optional[str],
+    history_messages: Optional[List[dict]] = None,
+) -> int:
+    """تعداد iteration پیشنهادی برای یک سوال."""
+    complexity = estimate_query_complexity(user_query, history_messages)
+    return QUERY_COMPLEXITY_ITERATIONS[complexity]
+
+
+def detect_categories_from_history(
+    user_query: Optional[str],
+    history_messages: Optional[List[dict]] = None,
+) -> Set[str]:
+    """
+    تشخیص دسته‌بندی با در نظر گرفتن تاریخچه مکالمه.
+    اگر سوال فعلی مبهم باشد از پیام‌های قبلی استفاده می‌کند.
+    """
+    cats = detect_categories(user_query)
+    if cats and "financial" not in cats | {"misc"}:
+        return cats
+
+    # اگر نتیجه عمومی بود، از آخرین پیام‌های کاربر کمک بگیر
+    if history_messages:
+        for msg in reversed(history_messages[-8:]):
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content") or ""
+            if len(content) < 10:
+                continue
+            prev_cats = detect_categories(content)
+            specific = prev_cats - {"misc", "financial"}
+            if specific:
+                cats |= specific
+                break
+    return cats
+
+
 def select_tool_names(
     all_names: Iterable[str],
     user_query: Optional[str],
     *,
     max_tools: int = MAX_TOOLS_PER_REQUEST,
+    history_messages: Optional[List[dict]] = None,
 ) -> Set[str]:
     """
     زیرمجموعهٔ نام functionها برای ارسال به مدل.
@@ -200,7 +293,8 @@ def select_tool_names(
     available = set(all_names)
     selected: Set[str] = set(_CORE_TOOL_NAMES) & available
 
-    for cat in detect_categories(user_query):
+    cats = detect_categories_from_history(user_query, history_messages)
+    for cat in cats:
         selected |= _CATEGORY_TOOLS.get(cat, frozenset()) & available
 
     if _WRITE_KEYWORDS.search(user_query or ""):
