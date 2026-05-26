@@ -62,7 +62,7 @@ class _TraceStepTile extends StatelessWidget {
       case 'plan_next':
         return Icons.route_outlined;
       case 'narrative':
-        return Icons.psychology_outlined;
+        return Icons.record_voice_over_outlined;
       case 'tool':
         return Icons.build_circle_outlined;
       case 'observation':
@@ -79,7 +79,11 @@ class _TraceStepTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final body = step.bodyMarkdown?.trim() ?? '';
-    final showBody = body.isNotEmpty && step.kind != 'answer';
+    final showBody = body.isNotEmpty &&
+        (step.kind == 'narrative' ||
+            step.kind == 'plan' ||
+            step.kind == 'observation' ||
+            (step.kind != 'answer' && !step.isActive));
 
     return IntrinsicHeight(
       child: Row(

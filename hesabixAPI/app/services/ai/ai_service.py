@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 import json
 import logging
 import asyncio
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from app.core.auth_dependency import AuthContext
@@ -30,7 +31,7 @@ from app.services.ai.ai_tool_keys import (
     tool_l10n_key,
 )
 from app.services.ai.ai_trace import (
-    CONTEXT_STEP_TITLE_KEYS,
+    context_trace,
     format_planned_tools,
     summarize_tool_result,
     trace_record_from_event,
@@ -446,7 +447,7 @@ class AIService:
         session_id: Optional[int] = None,
         user_query: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """ساخت system prompt با yield رویداد status بین مراحل blocking."""
+        """ساخت system prompt — هر مرحله ابتدا trace فعال، سپس پس از اتمام trace انجام‌شده."""
         loop = asyncio.get_running_loop()
 
         if self.ctx.is_superadmin():
@@ -456,7 +457,8 @@ class AIService:
         else:
             role = PromptRole.USER
 
-        yield status_event("preparing_context", "loading_prompt")
+        yield context_trace("loading_prompt", "active")
+        await asyncio.sleep(0)
         base_prompt = await loop.run_in_executor(
             _executor,
             lambda: get_prompt(
@@ -465,6 +467,8 @@ class AIService:
                 user_id=self.ctx.get_user_id(),
             ),
         )
+        yield context_trace("loading_prompt", "done")
+        await asyncio.sleep(0)
 
         business_id = session_business_id or self.business_id
         if not business_id:
@@ -477,7 +481,8 @@ class AIService:
             " تمام function calls به صورت خودکار با شناسه کسب‌وکار فعلی انجام می‌شوند."
         )
 
-        yield status_event("preparing_context", "loading_insights")
+        yield context_trace("loading_insights", "active")
+        await asyncio.sleep(0)
 
         def _load_insights() -> str:
             try:
@@ -493,8 +498,10 @@ class AIService:
                 return ""
 
         insight_text = await loop.run_in_executor(_executor, _load_insights)
+        yield context_trace("loading_insights", "done")
 
-        yield status_event("preparing_context", "loading_memory")
+        yield context_trace("loading_memory", "active")
+        await asyncio.sleep(0)
 
         def _load_memory() -> str:
             try:
@@ -508,10 +515,12 @@ class AIService:
                 return ""
 
         memory_text = await loop.run_in_executor(_executor, _load_memory)
+        yield context_trace("loading_memory", "done")
 
         attachment_text = ""
         if session_id:
-            yield status_event("preparing_context", "loading_attachments")
+            yield context_trace("loading_attachments", "active")
+            await asyncio.sleep(0)
 
             def _load_attachments() -> str:
                 try:
@@ -525,10 +534,12 @@ class AIService:
                     return ""
 
             attachment_text = await loop.run_in_executor(_executor, _load_attachments)
+            yield context_trace("loading_attachments", "done")
 
         knowledge_text = ""
         if user_query:
-            yield status_event("preparing_context", "loading_knowledge")
+            yield context_trace("loading_knowledge", "active")
+            await asyncio.sleep(0)
 
             def _load_knowledge() -> str:
                 try:
@@ -542,8 +553,10 @@ class AIService:
                     return ""
 
             knowledge_text = await loop.run_in_executor(_executor, _load_knowledge)
+            yield context_trace("loading_knowledge", "done")
 
-        yield status_event("preparing_context", "loading_connectors")
+        yield context_trace("loading_connectors", "active")
+        await asyncio.sleep(0)
 
         def _load_connectors() -> str:
             try:
@@ -555,6 +568,7 @@ class AIService:
                 return ""
 
         connector_text = await loop.run_in_executor(_executor, _load_connectors)
+        yield context_trace("loading_connectors", "done")
 
         final_prompt = (
             base_prompt
@@ -1119,17 +1133,34 @@ class AIService:
             trace_steps: List[Dict[str, Any]] = []
             trace_step_counter = 0
 
-            def _emit_trace(**kwargs: Any) -> Dict[str, Any]:
-                nonlocal trace_step_counter
-                trace_step_counter += 1
-                event = trace_step(str(trace_step_counter), **kwargs)
-                trace_steps.append(trace_record_from_event(event))
+            def _ingest_trace_event(event: Dict[str, Any]) -> Dict[str, Any]:
+                record = trace_record_from_event(event)
+                sid = record.get("step_id")
+                if sid:
+                    for i, existing in enumerate(trace_steps):
+                        if existing.get("step_id") == sid:
+                            trace_steps[i] = record
+                            break
+                    else:
+                        trace_steps.append(record)
                 return event
+
+            def _emit_trace(*, step_id: Optional[str] = None, **kwargs: Any) -> Dict[str, Any]:
+                nonlocal trace_step_counter
+                if step_id is None:
+                    trace_step_counter += 1
+                    sid = str(trace_step_counter)
+                else:
+                    sid = step_id
+                kind = kwargs.pop("kind")
+                state = kwargs.pop("state", "done")
+                return _ingest_trace_event(trace_step(sid, kind, state, **kwargs))
 
             yield status_event("thinking")
             yield _emit_trace(
+                step_id="ctx_thinking",
                 kind="context",
-                state="done",
+                state="active",
                 title_key="aiStatusThinking",
             )
 
@@ -1142,19 +1173,18 @@ class AIService:
                 if build_item.get("event") == "prompt_ready":
                     system_prompt = build_item.get("prompt") or ""
                     continue
-                if build_item.get("event") == "status":
-                    step = build_item.get("step")
-                    title_key = CONTEXT_STEP_TITLE_KEYS.get(
-                        step, "aiStatusPreparingContext"
-                    )
-                    yield build_item
-                    yield _emit_trace(
-                        kind="context",
-                        state="done",
-                        title_key=title_key,
-                    )
+                if build_item.get("event") == "trace_step":
+                    yield _ingest_trace_event(build_item)
+                    await asyncio.sleep(0)
                     continue
                 yield build_item
+
+            yield _emit_trace(
+                step_id="ctx_thinking",
+                kind="context",
+                state="done",
+                title_key="aiStatusThinking",
+            )
 
             full_messages: List[Dict[str, Any]] = [
                 {"role": "system", "content": system_prompt},
@@ -1179,11 +1209,24 @@ class AIService:
 
                 if iteration > 1:
                     yield _emit_trace(
+                        step_id=f"plan_next_{iteration}",
                         kind="plan_next",
-                        state="done",
+                        state="active",
                         title_key="aiTracePlanningNext",
                         iteration=iteration,
                     )
+
+                llm_step_id = f"llm_{iteration}"
+                yield _emit_trace(
+                    step_id=llm_step_id,
+                    kind="context",
+                    state="active",
+                    title_key="aiStatusThinking",
+                    iteration=iteration,
+                )
+                narrative_step_id = f"narrative_{iteration}"
+                narrative_started = False
+                last_narrative_emit = 0.0
 
                 async for chunk in provider.chat_completion_stream(
                     messages=full_messages,
@@ -1206,6 +1249,30 @@ class AIService:
                             if not writing_status_sent:
                                 writing_status_sent = True
                                 yield status_event("writing")
+                                yield _emit_trace(
+                                    step_id=llm_step_id,
+                                    kind="context",
+                                    state="done",
+                                    title_key="aiStatusThinking",
+                                    iteration=iteration,
+                                )
+                            if round_text.strip():
+                                if not narrative_started:
+                                    narrative_started = True
+                                now_mono = time.monotonic()
+                                if (
+                                    now_mono - last_narrative_emit >= 0.06
+                                    or len(content_chunk) > 80
+                                ):
+                                    last_narrative_emit = now_mono
+                                    yield _emit_trace(
+                                        step_id=narrative_step_id,
+                                        kind="narrative",
+                                        state="active",
+                                        body_markdown=round_text,
+                                        iteration=iteration,
+                                    )
+                                    await asyncio.sleep(0)
                             yield {
                                 "delta": {"content": content_chunk},
                                 "usage": None,
@@ -1215,12 +1282,47 @@ class AIService:
                     if chunk.get("done", False):
                         break
 
+                if narrative_started and round_text.strip():
+                    yield _emit_trace(
+                        step_id=narrative_step_id,
+                        kind="narrative",
+                        state="done",
+                        body_markdown=round_text.strip(),
+                        iteration=iteration,
+                    )
+                elif not narrative_started:
+                    yield _emit_trace(
+                        step_id=llm_step_id,
+                        kind="context",
+                        state="done",
+                        title_key="aiStatusThinking",
+                        iteration=iteration,
+                    )
+
+                if iteration > 1:
+                    yield _emit_trace(
+                        step_id=f"plan_next_{iteration}",
+                        kind="plan_next",
+                        state="done",
+                        title_key="aiTracePlanningNext",
+                        iteration=iteration,
+                    )
+
                 if function_calls and use_tools:
                     accumulated_function_calls.extend(function_calls)
                     yield status_event("planning_tools")
 
-                    if round_text.strip():
+                    if narrative_started:
                         yield _emit_trace(
+                            step_id=narrative_step_id,
+                            kind="narrative",
+                            state="done",
+                            body_markdown=round_text.strip(),
+                            iteration=iteration,
+                        )
+                    elif round_text.strip():
+                        yield _emit_trace(
+                            step_id=f"narrative_{iteration}",
                             kind="narrative",
                             state="done",
                             body_markdown=round_text.strip(),
@@ -1228,6 +1330,7 @@ class AIService:
                         )
                     else:
                         yield _emit_trace(
+                            step_id=f"plan_{iteration}",
                             kind="plan",
                             state="done",
                             title_key="aiTracePlanningAction",
@@ -1238,7 +1341,9 @@ class AIService:
                     for call in function_calls:
                         fname = call.get("name", "unknown")
                         label = tool_label_fa(fname)
+                        tool_step_id = f"tool_{iteration}_{fname}"
                         yield _emit_trace(
+                            step_id=tool_step_id,
                             kind="tool",
                             state="active",
                             title_key="aiTraceRunningTool",
@@ -1263,6 +1368,7 @@ class AIService:
 
                     for call in function_calls:
                         fname = call.get("name", "unknown")
+                        tool_step_id = f"tool_{iteration}_{fname}"
                         result = function_results.get(fname, {})
                         needs_approval = (
                             isinstance(result, dict)
@@ -1280,6 +1386,17 @@ class AIService:
                             "approval_required": needs_approval,
                         }
                         yield _emit_trace(
+                            step_id=tool_step_id,
+                            kind="tool",
+                            state="done" if success else "error",
+                            title_key="aiTraceRunningTool",
+                            title_params={"toolName": tool_label_fa(fname)},
+                            tool=fname,
+                            tool_key=tool_l10n_key(fname),
+                            iteration=iteration,
+                        )
+                        yield _emit_trace(
+                            step_id=f"obs_{iteration}_{fname}",
                             kind="observation",
                             state="done" if success else "error",
                             title_key="aiTraceObservation",

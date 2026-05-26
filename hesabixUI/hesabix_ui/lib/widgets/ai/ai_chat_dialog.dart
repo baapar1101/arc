@@ -415,6 +415,37 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
+  /// به‌روزرسانی UI — رویدادهای ساختاری فوری، متن با throttle.
+  void _refreshStreamUi(String accumulatedContent, AIStreamChunk chunk) {
+    final immediate = chunk.traceStep != null ||
+        chunk.statusEvent != null ||
+        chunk.toolEvent != null ||
+        chunk.heartbeatElapsedMs != null;
+
+    if (immediate) {
+      if (!mounted) return;
+      setState(() {
+        _streamingContent = accumulatedContent;
+      });
+      _scrollToBottom();
+      return;
+    }
+
+    if (chunk.contentDelta == null || chunk.contentDelta!.isEmpty) return;
+
+    final now = DateTime.now();
+    final shouldUpdate = _lastStreamUiUpdate == null ||
+        now.difference(_lastStreamUiUpdate!) >= const Duration(milliseconds: 32);
+    if (!shouldUpdate) return;
+
+    _lastStreamUiUpdate = now;
+    if (!mounted) return;
+    setState(() {
+      _streamingContent = accumulatedContent;
+    });
+    _scrollToBottom();
+  }
+
   Future<void> _stopVoiceSession() async {
     if (_voice == null) return;
     setState(() {
@@ -1040,21 +1071,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
         if (chunk.done) {
           finalFunctionCalls = chunk.functionCalls;
           finalFunctionResults = chunk.functionResults;
-          if (chunk.agentTrace != null && chunk.agentTrace!.isNotEmpty) {
+          if (chunk.agentTrace != null &&
+              chunk.agentTrace!.isNotEmpty &&
+              _streamingTraceSteps.isEmpty) {
             _streamingTraceSteps = List<AIAgentTraceStep>.from(chunk.agentTrace!);
           }
           break;
         }
-        if (mounted &&
-            (chunk.contentDelta != null ||
-                chunk.statusEvent != null ||
-                chunk.toolEvent != null ||
-                chunk.traceStep != null ||
-                chunk.heartbeatElapsedMs != null)) {
-          setState(() {
-            _streamingContent = accumulatedContent;
-          });
-        }
+        _refreshStreamUi(accumulatedContent, chunk);
       }
 
       if (!mounted) return;
@@ -1240,29 +1264,15 @@ class _AIChatDialogState extends State<AIChatDialog> {
         if (chunk.done) {
           finalFunctionCalls = chunk.functionCalls;
           finalFunctionResults = chunk.functionResults;
-          if (chunk.agentTrace != null && chunk.agentTrace!.isNotEmpty) {
+          if (chunk.agentTrace != null &&
+              chunk.agentTrace!.isNotEmpty &&
+              _streamingTraceSteps.isEmpty) {
             _streamingTraceSteps = List<AIAgentTraceStep>.from(chunk.agentTrace!);
           }
           break;
         }
 
-        final now = DateTime.now();
-        final shouldUpdate = _lastStreamUiUpdate == null ||
-            now.difference(_lastStreamUiUpdate!) >= const Duration(milliseconds: 60);
-        if (shouldUpdate &&
-            (chunk.contentDelta != null ||
-                chunk.statusEvent != null ||
-                chunk.toolEvent != null ||
-                chunk.traceStep != null ||
-                chunk.heartbeatElapsedMs != null)) {
-          _lastStreamUiUpdate = now;
-          if (!mounted) return;
-          setState(() {
-            _streamingContent = accumulatedContent;
-          });
-          _scrollToBottom();
-          await Future<void>.delayed(Duration.zero);
-        }
+        _refreshStreamUi(accumulatedContent, chunk);
       }
 
       if (!mounted) return;

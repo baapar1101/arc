@@ -564,6 +564,9 @@ app/services/ai/ai_mcp_service.py
 app/services/ai/ai_memory_service.py
 app/services/ai/ai_provider.py
 app/services/ai/ai_service.py
+app/services/ai/ai_stream_helpers.py
+app/services/ai/ai_tool_keys.py
+app/services/ai/ai_trace.py
 app/services/ai/ai_write_guard.py
 app/services/ai/chat_message_builder.py
 app/services/ai/encryption.py

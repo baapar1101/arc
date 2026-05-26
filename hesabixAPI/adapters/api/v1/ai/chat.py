@@ -827,7 +827,9 @@ async def send_message(
 
 
 def _sse_payload(data: Dict[str, Any]) -> str:
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+    # comment بلند برای عبور از بافر nginx/پروکسی (حدود ۲KB)
+    pad = ":" + (" " * 2048) + "\n"
+    return f"{pad}data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 def _emit_chunk_as_sse(chunk: Dict[str, Any]):
@@ -852,16 +854,16 @@ async def _stream_message_response(
     ⚠️ مهم: از session جدید برای هر عملیات استفاده می‌کنیم تا از connection leak جلوگیری کنیم.
     Session فقط برای commit نهایی استفاده می‌شود و بلافاصله بسته می‌شود.
     """
+    import asyncio
+
     from adapters.db.session import get_db_session
     from app.services.ai.ai_stream_helpers import iter_with_heartbeat
     from app.services.ai.ai_tool_keys import status_event
 
     try:
-        # استفاده از session جدید برای AI service (فقط برای خواندن config)
-        with get_db_session() as db:
-            ai_service = AIService(db, ctx, business_id)
-            # کپی کردن config برای استفاده بعد از بسته شدن session
-            ai_config = ai_service.config
+        # بلافاصله به کلاینت سیگنال بده (قبل از کارهای سنگین DB)
+        yield _sse_payload({"type": "status", "phase": "connecting", "done": False})
+        await asyncio.sleep(0)
 
         accumulated_content = ""
         final_usage = None
@@ -884,7 +886,7 @@ async def _stream_message_response(
 
             async for chunk in iter_with_heartbeat(
                 _stream_factory,
-                initial_status=status_event("connecting"),
+                initial_status=None,
             ):
                 event_type = chunk.get("event")
                 if event_type == "heartbeat":
@@ -913,6 +915,7 @@ async def _stream_message_response(
 
                 for payload in _emit_chunk_as_sse(chunk):
                     yield payload
+                    await asyncio.sleep(0)
 
                 if chunk.get("done", False):
                     break

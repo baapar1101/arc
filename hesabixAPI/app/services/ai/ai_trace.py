@@ -62,6 +62,16 @@ def trace_record_from_event(event: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in event.items() if k != "event"}
 
 
+def context_trace(step_key: str, state: TraceState) -> Dict[str, Any]:
+    """گام ثابت context با step_id پایدار برای به‌روزرسانی active → done."""
+    return trace_step(
+        f"ctx_{step_key}",
+        "context",
+        state,
+        title_key=CONTEXT_STEP_TITLE_KEYS.get(step_key, "aiStatusPreparingContext"),
+    )
+
+
 def format_tool_arguments(arguments: Any) -> str:
     if not arguments:
         return ""
