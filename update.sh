@@ -263,6 +263,18 @@ log_ok "Frontend built and deployed to /var/www/${UI_DOMAIN}."
 
 # --- 4. Nginx: ensure client_max_body_size 1g for database restore, then reload ---
 log_info "Step 4: Updating Nginx config and reloading..."
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PATH:-}"
+hesabix_nginx_bin() {
+  if command -v nginx >/dev/null 2>&1; then
+    command -v nginx
+    return 0
+  fi
+  if [[ -x /usr/sbin/nginx ]]; then
+    echo /usr/sbin/nginx
+    return 0
+  fi
+  return 1
+}
 if [[ -f /etc/nginx/sites-available/hesabix-api.conf ]]; then
   if grep -q 'client_max_body_size' /etc/nginx/sites-available/hesabix-api.conf; then
     sed -i 's/client_max_body_size [0-9]*[kmgKMG]*/client_max_body_size 1g/' /etc/nginx/sites-available/hesabix-api.conf
@@ -285,11 +297,22 @@ if [[ -f "${ensure_ui_nginx}" ]]; then
 else
   log_info "ensure_nginx_ui_version_probe.sh not found at ${ensure_ui_nginx}; skipped."
 fi
-if ! nginx -t 2>/dev/null; then
-  log_err "Nginx config test failed."
+NGINX_BIN="$(hesabix_nginx_bin)" || {
+  log_err "nginx not found in PATH or /usr/sbin/nginx"
+  exit 1
+}
+nginx_test_out="$("$NGINX_BIN" -t 2>&1)" || nginx_test_rc=$?
+if [[ -n "${nginx_test_out:-}" ]]; then
+  echo "${nginx_test_out}" | tee -a "${LOG_FILE}"
+fi
+if [[ "${nginx_test_rc:-0}" -ne 0 ]]; then
+  log_err "Nginx config test failed (${NGINX_BIN} -t exit ${nginx_test_rc})."
   exit 1
 fi
-systemctl reload nginx
+if ! systemctl reload nginx; then
+  log_err "systemctl reload nginx failed."
+  exit 1
+fi
 log_ok "Nginx reloaded."
 
 # --- 5. Optional health check ---
