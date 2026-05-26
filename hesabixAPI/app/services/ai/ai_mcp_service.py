@@ -10,6 +10,10 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.core.auth_dependency import AuthContext
+from app.services.ai.ai_write_guard import (
+    build_approval_required_result,
+    is_write_function,
+)
 from app.services.ai.function_registry import registry
 
 logger = logging.getLogger(__name__)
@@ -45,6 +49,7 @@ async def handle_mcp_request(
     body: Dict[str, Any],
     *,
     business_id: Optional[int] = None,
+    approve_writes: bool = False,
 ) -> Dict[str, Any]:
     req_id = body.get("id")
     method = body.get("method")
@@ -80,11 +85,27 @@ async def handle_mcp_request(
 
     if method == "tools/call":
         tool_name = params.get("name")
-        arguments = params.get("arguments") or {}
+        arguments = dict(params.get("arguments") or {})
         if not tool_name:
             return _jsonrpc_error(req_id, -32602, "Missing tool name")
         if not eff_business:
             return _jsonrpc_error(req_id, -32602, "business_id required for tools/call")
+
+        tool_name_str = str(tool_name)
+        mcp_approve = bool(
+            approve_writes or params.get("approve_writes") or arguments.pop("_approve_writes", False)
+        )
+        if is_write_function(tool_name_str) and not mcp_approve:
+            result = build_approval_required_result(tool_name_str, arguments)
+            text = json.dumps(result, ensure_ascii=False)
+            return _jsonrpc_result(
+                req_id,
+                {
+                    "content": [{"type": "text", "text": text}],
+                    "isError": False,
+                },
+            )
+
         context = {
             "user_context": ctx,
             "business_id": int(eff_business),
@@ -93,7 +114,7 @@ async def handle_mcp_request(
         try:
             from app.services.ai.ai_db_helpers import run_ai_registry_function
 
-            result = run_ai_registry_function(str(tool_name), arguments, context)
+            result = run_ai_registry_function(tool_name_str, arguments, context)
             text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)
             return _jsonrpc_result(
                 req_id,

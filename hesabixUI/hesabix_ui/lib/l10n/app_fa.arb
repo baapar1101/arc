@@ -3943,6 +3943,10 @@
   "@aiTraceStepsActive": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "aiActionCopy": "کپی",
+  "aiActionRegenerate": "تولید مجدد",
+  "aiActionThumbsUp": "مفید بود",
+  "aiActionThumbsDown": "مفید نبود",
   "aiStatusAgentProgress": "مرحله {iteration} از {max}",
   "@aiStatusAgentProgress": {
     "placeholders": {

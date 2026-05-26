@@ -10133,6 +10133,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get aiActionCopy => 'Copy';
+
+  @override
+  String get aiActionRegenerate => 'Regenerate';
+
+  @override
+  String get aiActionThumbsUp => 'Helpful';
+
+  @override
+  String get aiActionThumbsDown => 'Not helpful';
+
+  @override
   String aiStatusAgentProgress(int iteration, int max) {
     return 'Step $iteration of $max';
   }

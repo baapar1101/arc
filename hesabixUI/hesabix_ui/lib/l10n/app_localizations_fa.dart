@@ -10078,6 +10078,18 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get aiActionCopy => 'کپی';
+
+  @override
+  String get aiActionRegenerate => 'تولید مجدد';
+
+  @override
+  String get aiActionThumbsUp => 'مفید بود';
+
+  @override
+  String get aiActionThumbsDown => 'مفید نبود';
+
+  @override
   String aiStatusAgentProgress(int iteration, int max) {
     return 'مرحله $iteration از $max';
   }

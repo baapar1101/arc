@@ -3901,6 +3901,10 @@
   "@aiTraceStepsActive": {
     "placeholders": { "count": { "type": "int" } }
   },
+  "aiActionCopy": "Copy",
+  "aiActionRegenerate": "Regenerate",
+  "aiActionThumbsUp": "Helpful",
+  "aiActionThumbsDown": "Not helpful",
   "aiStatusAgentProgress": "Step {iteration} of {max}",
   "@aiStatusAgentProgress": {
     "placeholders": {

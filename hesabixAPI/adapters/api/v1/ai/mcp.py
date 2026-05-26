@@ -18,6 +18,10 @@ async def mcp_jsonrpc_endpoint(
     request: Request,
     body: Dict[str, Any] = Body(...),
     business_id: Optional[int] = Query(None, description="شناسه کسب‌وکار برای tools"),
+    approve_writes: bool = Query(
+        False,
+        description="اجازه اجرای ابزارهای تغییردهنده (create_invoice و …)",
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -31,5 +35,11 @@ async def mcp_jsonrpc_endpoint(
     if effective_business_id and not ctx.can_access_business(int(effective_business_id)):
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
 
-    response = await handle_mcp_request(db, ctx, body, business_id=effective_business_id)
+    response = await handle_mcp_request(
+        db,
+        ctx,
+        body,
+        business_id=effective_business_id,
+        approve_writes=approve_writes,
+    )
     return response

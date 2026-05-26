@@ -431,69 +431,94 @@ class AIService:
             business_info = f"\n\nکسب‌وکار فعلی: شناسه {business_id}"
             business_info += "\nنکته مهم: شما در حال کار با این کسب‌وکار هستید و نیازی به پرسیدن شناسه کسب‌وکار ندارید."
             business_info += " تمام function calls به صورت خودکار با شناسه کسب‌وکار فعلی انجام می‌شوند."
-            insight_text = ""
-            try:
-                from app.services.ai.ai_insight_service import (
-                    get_business_insights,
-                    format_insights_for_prompt,
-                )
 
-                insights = get_business_insights(self.db, int(business_id), self.ctx)
-                insight_text = format_insights_for_prompt(insights)
-            except Exception as exc:
-                logger.warning("Failed to load AI insights for prompt: %s", exc)
-                safe_db_rollback(self.db)
+            bid = int(business_id)
 
-            memory_text = ""
-            try:
-                from app.services.ai.ai_memory_service import format_memory_for_prompt
-
-                memory_text = format_memory_for_prompt(
-                    self.db, int(business_id), self.ctx.get_user_id()
-                )
-            except Exception as exc:
-                logger.warning("Failed to load AI memory for prompt: %s", exc)
-                safe_db_rollback(self.db)
-
-            attachment_text = ""
-            if session_id:
+            def _load_insights() -> str:
                 try:
-                    from app.services.ai.ai_attachment_service import format_attachments_for_prompt
+                    from app.services.ai.ai_insight_service import (
+                        get_business_insights,
+                        format_insights_for_prompt,
+                    )
 
-                    attachment_text = format_attachments_for_prompt(self.db, session_id)
+                    insights = get_business_insights(self.db, bid, self.ctx)
+                    return format_insights_for_prompt(insights)
+                except Exception as exc:
+                    logger.warning("Failed to load AI insights for prompt: %s", exc)
+                    safe_db_rollback(self.db)
+                    return ""
+
+            def _load_memory() -> str:
+                try:
+                    from app.services.ai.ai_memory_service import format_memory_for_prompt
+
+                    return format_memory_for_prompt(
+                        self.db, bid, self.ctx.get_user_id()
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to load AI memory for prompt: %s", exc)
+                    safe_db_rollback(self.db)
+                    return ""
+
+            def _load_attachments() -> str:
+                try:
+                    from app.services.ai.ai_attachment_service import (
+                        format_attachments_for_prompt,
+                    )
+
+                    return format_attachments_for_prompt(self.db, session_id)
                 except Exception as exc:
                     logger.warning("Failed to load AI attachments for prompt: %s", exc)
                     safe_db_rollback(self.db)
+                    return ""
 
-            knowledge_text = ""
-            if user_query:
+            def _load_knowledge() -> str:
                 try:
                     from app.services.ai.ai_knowledge_service import format_knowledge_for_prompt
 
-                    knowledge_text = format_knowledge_for_prompt(
-                        self.db, int(business_id), user_query
-                    )
+                    return format_knowledge_for_prompt(self.db, bid, user_query or "")
                 except Exception as exc:
                     logger.warning("Failed to load AI knowledge for prompt: %s", exc)
                     safe_db_rollback(self.db)
+                    return ""
 
-            connector_text = ""
-            try:
-                from app.services.ai.ai_connector_service import format_connectors_for_prompt
+            def _load_connectors() -> str:
+                try:
+                    from app.services.ai.ai_connector_service import format_connectors_for_prompt
 
-                connector_text = format_connectors_for_prompt(self.db, int(business_id))
-            except Exception as exc:
-                logger.warning("Failed to load AI connectors for prompt: %s", exc)
-                safe_db_rollback(self.db)
+                    return format_connectors_for_prompt(self.db, bid)
+                except Exception as exc:
+                    logger.warning("Failed to load AI connectors for prompt: %s", exc)
+                    safe_db_rollback(self.db)
+                    return ""
+
+            loaders: List[tuple[str, Any]] = [
+                ("insights", _load_insights),
+                ("memory", _load_memory),
+                ("connectors", _load_connectors),
+            ]
+            if session_id:
+                loaders.append(("attachments", _load_attachments))
+            if user_query:
+                loaders.append(("knowledge", _load_knowledge))
+
+            parts: Dict[str, str] = {}
+            futures = [_executor.submit(fn) for _, fn in loaders]
+            for (key, _), fut in zip(loaders, futures):
+                try:
+                    parts[key] = fut.result() or ""
+                except Exception as exc:
+                    logger.warning("Prompt loader %s failed: %s", key, exc)
+                    parts[key] = ""
 
             return trim_system_prompt(
                 base_prompt
                 + business_info
-                + insight_text
-                + memory_text
-                + attachment_text
-                + knowledge_text
-                + connector_text
+                + parts.get("insights", "")
+                + parts.get("memory", "")
+                + parts.get("attachments", "")
+                + parts.get("knowledge", "")
+                + parts.get("connectors", "")
             )
 
         return trim_system_prompt(base_prompt)

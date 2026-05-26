@@ -7,6 +7,7 @@ import 'ai_chat_design.dart';
 import 'ai_agent_trace_timeline.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_message_body.dart';
+import 'ai_chat_message_actions.dart';
 
 typedef MessageActionCallback = void Function(AIChatMessage message);
 
@@ -40,6 +41,11 @@ class AIChatThreadView extends StatelessWidget {
   final VoidCallback? onAttach;
   final VoidCallback onScrollToBottom;
   final MessageActionCallback onMessageLongPress;
+  final Map<int, int> messageFeedbackRatings;
+  final void Function(String text) onCopyMessage;
+  final void Function(AIChatMessage message, int rating) onFeedback;
+  final VoidCallback? onRegenerateLast;
+  final int? lastAssistantMessageId;
 
   const AIChatThreadView({
     super.key,
@@ -72,6 +78,11 @@ class AIChatThreadView extends StatelessWidget {
     this.onAttach,
     required this.onScrollToBottom,
     required this.onMessageLongPress,
+    this.messageFeedbackRatings = const {},
+    required this.onCopyMessage,
+    required this.onFeedback,
+    this.onRegenerateLast,
+    this.lastAssistantMessageId,
   });
 
   @override
@@ -99,6 +110,18 @@ class AIChatThreadView extends StatelessWidget {
                         message: messages[index],
                         formatTime: formatTime,
                         onLongPress: () => onMessageLongPress(messages[index]),
+                        onCopy: () => onCopyMessage(messages[index].content),
+                        onFeedback: messages[index].id != null
+                            ? (r) => onFeedback(messages[index], r)
+                            : null,
+                        feedbackRating: messages[index].id != null
+                            ? messageFeedbackRatings[messages[index].id!]
+                            : null,
+                        onRegenerate: messages[index].id != null &&
+                                messages[index].id == lastAssistantMessageId &&
+                                messages[index].role == MessageRole.assistant
+                            ? onRegenerateLast
+                            : null,
                       );
                     }
                     return _StreamingRow(
@@ -150,11 +173,19 @@ class _MessageRow extends StatelessWidget {
   final AIChatMessage message;
   final String Function(DateTime?) formatTime;
   final VoidCallback onLongPress;
+  final VoidCallback onCopy;
+  final ValueChanged<int>? onFeedback;
+  final int? feedbackRating;
+  final VoidCallback? onRegenerate;
 
   const _MessageRow({
     required this.message,
     required this.formatTime,
     required this.onLongPress,
+    required this.onCopy,
+    this.onFeedback,
+    this.feedbackRating,
+    this.onRegenerate,
   });
 
   @override
@@ -234,8 +265,14 @@ class _MessageRow extends StatelessWidget {
                     functionCalls: message.functionCalls,
                     functionResults: message.functionResults,
                   ),
+                  AIChatMessageActions(
+                    onCopy: onCopy,
+                    onRegenerate: onRegenerate,
+                    onFeedback: onFeedback,
+                    currentRating: feedbackRating,
+                  ),
                   if (timeText.isNotEmpty) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       timeText,
                       textDirection: TextDirection.ltr,

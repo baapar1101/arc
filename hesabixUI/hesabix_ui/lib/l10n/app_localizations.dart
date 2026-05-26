@@ -18924,6 +18924,30 @@ abstract class AppLocalizations {
   /// **'{count} active'**
   String aiTraceStepsActive(int count);
 
+  /// No description provided for @aiActionCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get aiActionCopy;
+
+  /// No description provided for @aiActionRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate'**
+  String get aiActionRegenerate;
+
+  /// No description provided for @aiActionThumbsUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Helpful'**
+  String get aiActionThumbsUp;
+
+  /// No description provided for @aiActionThumbsDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not helpful'**
+  String get aiActionThumbsDown;
+
   /// No description provided for @aiStatusAgentProgress.
   ///
   /// In en, this message translates to:
