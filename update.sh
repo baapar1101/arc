@@ -3,6 +3,7 @@
 # pip: Hesabix mirror only (https://p.mirror.hesabix.ir/simple) — configure_pip_hesabix_mirror before backend pip install. Nginx نصب: scripts/install_pip_mirror_nginx.sh
 # Flutter: فقط f.mirror.hesabix.ir (pub + gcs؛ upstream pub-azs.ir) — hesabixAPI/f.mirror.hesabix.ir.conf
 # Run via: hesabix -update [-source URL] [-branch NAME]
+# PostgreSQL pgvector: scripts/ensure_pgvector.sh (idempotent, non-fatal) before Alembic migrations.
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 # آدرس API در بیلد وب: https اگر /etc/letsencrypt/live/<API_DOMAIN> وجود داشته باشد؛ وگرنه http مگر API_PUBLIC_SCHEME در محیط ست شود (TLS سفارشی).
 set -euo pipefail
@@ -163,6 +164,16 @@ export PIP_INDEX_URL="${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}"
 export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}"
 pip install --upgrade pip setuptools wheel -q
 pip install -e . -q
+ensure_pgvector="${APP_ROOT}/app/scripts/ensure_pgvector.sh"
+if [[ -f "${ensure_pgvector}" ]]; then
+  chmod +x "${ensure_pgvector}" 2>/dev/null || true
+  log_info "Ensuring PostgreSQL pgvector package (optional)..."
+  if bash "${ensure_pgvector}"; then
+    log_ok "pgvector package check completed."
+  else
+    log_info "pgvector package not installed (non-fatal)."
+  fi
+fi
 # Ensure alembic_version.version_num is VARCHAR(255) for long revision IDs (fixes StringDataRightTruncation)
 log_info "Ensuring alembic_version schema compatibility..."
 PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -U hesabix -d hesabix -tAc "

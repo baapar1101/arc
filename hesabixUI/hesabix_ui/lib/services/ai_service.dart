@@ -446,7 +446,7 @@ class AIService {
     return _postSseStream(
       '/api/v1/ai/chat/sessions/$sessionId/regenerate?stream=true',
       data: {},
-      queryParameters: {'approve_writes': approveWrites},
+      query: {'approve_writes': approveWrites},
       onComplete: onComplete,
       onError: onError,
       cancelToken: cancelToken,
@@ -656,7 +656,7 @@ class AIService {
         'approve_writes': approveWrites,
         'regenerate_after': regenerateAfter,
       },
-      queryParameters: null,
+      query: null,
       onComplete: onComplete,
       onError: onError,
       cancelToken: cancelToken,
@@ -756,7 +756,7 @@ class AIService {
   Stream<AIStreamChunk> _postSseStream(
     String path, {
     Object? data,
-    Map<String, dynamic>? queryParameters,
+    Map<String, dynamic>? query,
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
     CancelToken? cancelToken,
@@ -766,7 +766,7 @@ class AIService {
       final response = await _api.post<ResponseBody>(
         path,
         data: data ?? {},
-        queryParameters: queryParameters,
+        query: query,
         responseType: ResponseType.stream,
         options: Options(
           receiveTimeout: const Duration(minutes: 10),

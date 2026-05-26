@@ -60,6 +60,8 @@ IFS=$'\n\t'
 #   default keep. arvan uses http://mirror.arvancloud.ir/ubuntu for archive.ubuntu.com and security.ubuntu.com.
 #   official restores those URLs from Arvan (per-stanza: *-security → security.ubuntu.com).
 # - Debian: mirror prompt skipped; sources unchanged.
+# - PostgreSQL pgvector: scripts/ensure_pgvector.sh installs postgresql-N-pgvector when available
+#   (deploy install_prereqs + deploy_backend; hesabix -update before migrations). Non-fatal if missing.
 # - Apt/needrestart: by default NEEDRESTART_SUSPEND=1 during deploy so post-install service
 #   restarts (e.g. fwupd-refresh) do not run and fail on headless VPS. Set NEEDRESTART_SUSPEND=0
 #   to allow needrestart behavior.
@@ -1172,6 +1174,17 @@ install_prereqs() {
       systemctl start redis-server 2>/dev/null || systemctl start redis 2>/dev/null || true
     fi
   fi
+
+  # pgvector برای جستجوی معنایی RAG (اختیاری؛ در صورت نبود بسته در apt، غیرمرگبار)
+  if [[ -f "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" ]]; then
+    chmod +x "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" 2>/dev/null || true
+    log_info "Ensuring PostgreSQL pgvector package (optional)..."
+    if bash "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh"; then
+      log_success "pgvector package check completed."
+    else
+      log_warning "pgvector package install skipped or failed (non-fatal)."
+    fi
+  fi
   
   log_success "Prerequisites installed (or already present)."
 }
@@ -1475,6 +1488,13 @@ print('Connection successful')
     if [[ -z "${seed_dump}" || ! -f "${seed_dump}" ]]; then
       echo "$WARNING_MARK Seed dump not found in ${backup_dir}/hesabix_seed*.dump"
     fi
+  fi
+
+  # pgvector (برای سرورهایی که مرحله prereqs قبلاً skip شده)
+  if [[ -f "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" ]]; then
+    chmod +x "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" 2>/dev/null || true
+    log_info "Ensuring PostgreSQL pgvector package before migrations..."
+    bash "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" || log_warning "pgvector install skipped (non-fatal)."
   fi
 
   # Always run migrations (after optional seed import, or when DB was already initialized)
