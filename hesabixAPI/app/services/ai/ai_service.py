@@ -43,13 +43,17 @@ from app.services.ai.ai_db_helpers import (
     run_ai_registry_function,
     safe_db_rollback,
 )
-from app.services.ai.ai_constants import MAX_AGENT_ITERATIONS
+from app.services.ai.ai_constants import (
+    KNOWLEDGE_LOAD_TIMEOUT_SEC,
+    MAX_AGENT_ITERATIONS,
+)
 from app.services.ai.ai_message_budget import (
     trim_messages_for_llm,
     trim_system_prompt,
 )
 from app.services.ai.ai_tool_intent import (
     filter_function_definitions,
+    query_needs_knowledge,
     select_tool_names,
 )
 
@@ -437,11 +441,11 @@ class AIService:
             def _load_insights() -> str:
                 try:
                     from app.services.ai.ai_insight_service import (
-                        get_business_insights,
+                        get_business_insights_cached,
                         format_insights_for_prompt,
                     )
 
-                    insights = get_business_insights(self.db, bid, self.ctx)
+                    insights = get_business_insights_cached(self.db, bid, self.ctx)
                     return format_insights_for_prompt(insights)
                 except Exception as exc:
                     logger.warning("Failed to load AI insights for prompt: %s", exc)
@@ -499,7 +503,7 @@ class AIService:
             ]
             if session_id:
                 loaders.append(("attachments", _load_attachments))
-            if user_query:
+            if user_query and query_needs_knowledge(user_query):
                 loaders.append(("knowledge", _load_knowledge))
 
             parts: Dict[str, str] = {}
@@ -568,11 +572,11 @@ class AIService:
         def _load_insights() -> str:
             try:
                 from app.services.ai.ai_insight_service import (
-                    get_business_insights,
+                    get_business_insights_cached,
                     format_insights_for_prompt,
                 )
 
-                insights = get_business_insights(self.db, bid, self.ctx)
+                insights = get_business_insights_cached(self.db, bid, self.ctx)
                 return format_insights_for_prompt(insights)
             except Exception as exc:
                 logger.warning("Failed to load AI insights for prompt: %s", exc)
@@ -630,25 +634,48 @@ class AIService:
         ]
         if session_id:
             parallel_loaders.append(("loading_attachments", _load_attachments))
-        if user_query:
+        if user_query and query_needs_knowledge(user_query):
             parallel_loaders.append(("loading_knowledge", _load_knowledge))
+
+        async def _run_loader(step_key: str, loader_fn) -> tuple[str, str]:
+            try:
+                if step_key == "loading_knowledge":
+                    text = await asyncio.wait_for(
+                        loop.run_in_executor(_executor, loader_fn),
+                        timeout=KNOWLEDGE_LOAD_TIMEOUT_SEC,
+                    )
+                else:
+                    text = await loop.run_in_executor(_executor, loader_fn)
+                return step_key, text or ""
+            except asyncio.TimeoutError:
+                logger.info(
+                    "Knowledge loader timed out after %ss, continuing without RAG",
+                    KNOWLEDGE_LOAD_TIMEOUT_SEC,
+                )
+                return step_key, ""
+            except Exception as exc:
+                logger.warning("Prompt loader %s failed: %s", step_key, exc)
+                return step_key, ""
 
         for step_key, _ in parallel_loaders:
             yield context_trace(step_key, "active")
         await asyncio.sleep(0)
 
-        loaded_texts = await asyncio.gather(
-            *[
-                loop.run_in_executor(_executor, loader_fn)
-                for _, loader_fn in parallel_loaders
-            ]
-        )
-        parts = {
-            step_key: text or ""
-            for (step_key, _), text in zip(parallel_loaders, loaded_texts)
+        tasks = {
+            asyncio.create_task(_run_loader(step_key, loader_fn)): step_key
+            for step_key, loader_fn in parallel_loaders
         }
-        for step_key, _ in parallel_loaders:
-            yield context_trace(step_key, "done")
+        parts: Dict[str, str] = {}
+        pending = set(tasks.keys())
+        while pending:
+            done_set, pending = await asyncio.wait(
+                pending, return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in done_set:
+                step_key, text = await task
+                parts[step_key] = text
+                yield context_trace(step_key, "done")
+                await asyncio.sleep(0)
 
         final_prompt = trim_system_prompt(
             base_prompt
@@ -1372,8 +1399,8 @@ class AIService:
                                     narrative_started = True
                                 now_mono = time.monotonic()
                                 if (
-                                    now_mono - last_narrative_emit >= 0.06
-                                    or len(content_chunk) > 80
+                                    now_mono - last_narrative_emit >= 0.04
+                                    or len(content_chunk) > 64
                                 ):
                                     last_narrative_emit = now_mono
                                     yield _emit_trace(

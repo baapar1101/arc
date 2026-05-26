@@ -26,6 +26,46 @@ router = APIRouter(prefix="/ai/chat", tags=["هوش مصنوعی"])
 DEFAULT_CHAT_TITLE = "گفت‌وگوی جدید"
 
 
+def _schedule_session_title_generation(
+    session_id: int,
+    message_content: str,
+    ctx: AuthContext,
+    business_id: int,
+) -> None:
+    """تولید عنوان گفت‌وگو در پس‌زمینه تا رویداد done مسدود نشود."""
+    import asyncio
+
+    async def _task() -> None:
+        try:
+            from adapters.db.session import get_db_session
+            from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository
+
+            with get_db_session() as db:
+                session_repo = AIChatSessionRepository(db)
+                updated_session = session_repo.get_by_id(session_id)
+                if not updated_session:
+                    return
+                if updated_session.title and updated_session.title != DEFAULT_CHAT_TITLE:
+                    return
+                ai_service = AIService(db, ctx, business_id)
+                generated_title = await ai_service.generate_chat_title(message_content)
+                if not generated_title:
+                    return
+                updated_session.title = generated_title[:80]
+                from datetime import datetime
+
+                updated_session.updated_at = datetime.utcnow()
+                db.commit()
+        except Exception as exc:
+            logger.warning(
+                "Background chat title generation failed for session %s: %s",
+                session_id,
+                exc,
+            )
+
+    asyncio.create_task(_task())
+
+
 class ChatMessageRequest(BaseModel):
     content: str
     session_id: Optional[int] = None
@@ -793,19 +833,26 @@ async def send_message(
             document_id=charge_result.get("document_id")
         )
         
-        # اگر عنوان پیش‌فرض است و این اولین پیام کاربر است، عنوان هوشمند بساز
-        if (not commit_session.title or commit_session.title == DEFAULT_CHAT_TITLE) and is_first_message:
-            generated_title = await commit_ai_service.generate_chat_title(message_data.content)
-            if generated_title:
-                commit_session.title = generated_title[:80]
-        
         # به‌روزرسانی زمان جلسه
         from datetime import datetime
         commit_session.updated_at = datetime.utcnow()
-        
+
+        needs_title = (
+            (not commit_session.title or commit_session.title == DEFAULT_CHAT_TITLE)
+            and is_first_message
+        )
+
         commit_db.commit()
         commit_db.refresh(assistant_message)
         message_id = assistant_message.id
+
+        if needs_title:
+            _schedule_session_title_generation(
+                session_id,
+                message_data.content,
+                ctx,
+                business_id,
+            )
     
     return success_response({
         "message": {
@@ -863,8 +910,10 @@ async def _stream_message_response(
     from app.services.ai.ai_tool_keys import status_event
 
     try:
-        # بلافاصله به کلاینت سیگنال بده (قبل از کارهای سنگین DB)
+        # بلافاصله به کلاینت سیگنال بده (قبل از کارهای سنگین)
         yield _sse_payload({"type": "status", "phase": "connecting", "done": False})
+        await asyncio.sleep(0)
+        yield _sse_payload({"type": "status", "phase": "thinking", "done": False})
         await asyncio.sleep(0)
 
         accumulated_content = ""
@@ -1021,19 +1070,26 @@ async def _stream_message_response(
                     document_id=charge_result.get("document_id")
                 )
                 
-                # اگر عنوان پیش‌فرض است و این اولین پیام کاربر است، عنوان هوشمند بساز
-                if (not updated_session.title or updated_session.title == DEFAULT_CHAT_TITLE) and len(previous_messages) == 0:
-                    generated_title = await new_ai_service.generate_chat_title(message_content)
-                    if generated_title:
-                        updated_session.title = generated_title[:80]
-                
                 # به‌روزرسانی زمان جلسه
                 from datetime import datetime
                 updated_session.updated_at = datetime.utcnow()
-                
+
+                needs_title = (
+                    (not updated_session.title or updated_session.title == DEFAULT_CHAT_TITLE)
+                    and len(previous_messages) == 0
+                )
+
                 new_db.commit()
                 new_db.refresh(assistant_message)
                 message_id = assistant_message.id
+
+                if needs_title:
+                    _schedule_session_title_generation(
+                        session_id,
+                        message_content,
+                        ctx,
+                        updated_session.business_id or business_id,
+                    )
             
             yield _sse_payload({
                 "content": "",

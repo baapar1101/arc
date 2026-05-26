@@ -453,6 +453,7 @@ class AIService {
       }
       return AIStreamChunk(
         done: true,
+        messageId: data['message_id'] as int?,
         functionCalls: data['function_calls'],
         functionResults: data['function_results'],
         agentTrace: agentTrace,

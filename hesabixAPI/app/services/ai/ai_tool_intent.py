@@ -138,6 +138,42 @@ def _normalize_query(q: Optional[str]) -> str:
     return (q or "").strip().lower()
 
 
+_GREETING_ONLY = re.compile(
+    r"^(سلام|درود|hello|hi|hey|صبح بخیر|عصر بخیر|وقت بخیر)\b",
+    re.IGNORECASE,
+)
+_KNOWLEDGE_HINTS = re.compile(
+    r"دانشنامه|قوانین|سیاست|رویه|دستورالعمل|راهنما|مقررات|فرآیند|فرایند|"
+    r"documentation|policy|procedure|how\s+to",
+    re.IGNORECASE,
+)
+
+
+def query_needs_knowledge(user_query: Optional[str]) -> bool:
+    """آیا جستجوی دانشنامه (embedding) برای این سوال ارزش تأخیر دارد؟"""
+    q = (user_query or "").strip()
+    if len(q) < 12:
+        return False
+    if _GREETING_ONLY.match(q) and len(q) < 48:
+        return False
+    if _KNOWLEDGE_HINTS.search(q):
+        return True
+    if any(
+        token in q
+        for token in (
+            "چگونه",
+            "چطور",
+            "چطوری",
+            "نحوه",
+            "آموزش",
+            "توضیح بده",
+            "راهنمایی",
+        )
+    ):
+        return True
+    return len(q) >= 56
+
+
 def detect_categories(user_query: Optional[str]) -> Set[str]:
     text = _normalize_query(user_query)
     if not text:

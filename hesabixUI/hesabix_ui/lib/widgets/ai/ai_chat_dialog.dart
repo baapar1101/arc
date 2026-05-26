@@ -91,6 +91,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool _messagesLoading = false;
   bool _sending = false;
   Map<String, dynamic>? _availabilityInfo;
+  DateTime? _availabilityCheckedAt;
   bool _showCreditWarning = false;
   bool _voiceCollectData = false;
   VoiceChatController? _voice;
@@ -485,7 +486,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _currentSession = session;
         _messages = [];
       });
-      await _loadSessions();
+      unawaited(_loadSessions());
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -679,15 +680,22 @@ class _AIChatDialogState extends State<AIChatDialog> {
     searchCtrl.dispose();
   }
 
-  Future<void> _checkAvailability() async {
+  bool get _availabilityFresh {
+    if (_availabilityCheckedAt == null) return false;
+    return DateTime.now().difference(_availabilityCheckedAt!) <
+        const Duration(minutes: 2);
+  }
+
+  Future<void> _checkAvailability({int estimatedTokens = 1000}) async {
     try {
       final availability = await _aiService.checkAvailability(
         businessId: widget.businessId,
-        estimatedTokens: 1000,
+        estimatedTokens: estimatedTokens,
       );
       if (!mounted) return;
       setState(() {
         _availabilityInfo = availability;
+        _availabilityCheckedAt = DateTime.now();
         final details = availability['details'] as Map<String, dynamic>?;
         final subscription = details?['subscription'] as Map<String, dynamic>?;
         final usagePercentage = subscription?['usage_percentage'] as num?;
@@ -696,6 +704,37 @@ class _AIChatDialogState extends State<AIChatDialog> {
     } catch (e) {
       debugPrint('[AIChatDialog] Error checking availability: $e');
     }
+  }
+
+  /// چک اعتبار فقط وقتی کش منقضی شده یا قبلاً ناموفق بوده.
+  Future<bool> _ensureCanSend(String content) async {
+    if (_availabilityFresh && (_availabilityInfo?['can_use'] as bool? ?? false)) {
+      return true;
+    }
+    try {
+      final availability = await _aiService.checkAvailability(
+        businessId: widget.businessId,
+        estimatedTokens: content.length * 2,
+      );
+      if (!mounted) return false;
+      _availabilityInfo = availability;
+      _availabilityCheckedAt = DateTime.now();
+      if (!(availability['can_use'] as bool? ?? false)) {
+        _showDetailedError(availability);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('[AIChatDialog] Error checking availability before send: $e');
+      return true;
+    }
+  }
+
+  void _scheduleSessionsRefreshForTitle() {
+    unawaited(_loadSessions());
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (mounted) unawaited(_loadSessions());
+    });
   }
 
   Future<void> _goToHome() async {
@@ -932,6 +971,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       var accumulatedContent = '';
       Object? finalFunctionCalls;
       Object? finalFunctionResults;
+      int? assistantMessageId;
 
       await for (final chunk in streamFactory(cancelToken)) {
         if (chunk.error != null) return;
@@ -945,6 +985,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         if (chunk.done) {
           finalFunctionCalls = chunk.functionCalls;
           finalFunctionResults = chunk.functionResults;
+          assistantMessageId = chunk.messageId;
           _stream.mergeAgentTraceFromDone(chunk.agentTrace);
           break;
         }
@@ -961,6 +1002,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
           _messages = List<AIChatMessage>.from(_messages)
             ..add(
               AIChatMessage(
+                id: assistantMessageId,
                 sessionId: _currentSession!.id!,
                 role: MessageRole.assistant,
                 content: accumulatedContent,
@@ -978,6 +1020,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _sending = false;
       });
       _scrollToBottom(force: true);
+      _scheduleSessionsRefreshForTitle();
     } catch (e) {
       if (e is DioException && CancelToken.isCancel(e)) {
         return;
@@ -1061,19 +1104,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
       return;
     }
 
-    try {
-      final availability = await _aiService.checkAvailability(
-        businessId: widget.businessId,
-        estimatedTokens: content.length * 2,
-      );
-      if (!(availability['can_use'] as bool? ?? false)) {
-        if (!mounted) return;
-        setState(() => _sending = false);
-        _showDetailedError(availability);
-        return;
-      }
-    } catch (e) {
-      debugPrint('[AIChatDialog] Error checking availability before send: $e');
+    if (!await _ensureCanSend(content)) {
+      if (!mounted) return;
+      setState(() => _sending = false);
+      return;
     }
 
     if (!skipUserBubble) {
@@ -1137,7 +1171,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
         });
       }
     }
-    unawaited(_loadSessions());
   }
 
   Future<void> _toggleVoice() async {

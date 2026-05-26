@@ -19,7 +19,7 @@ class AIChatStreamController extends ChangeNotifier {
   bool pendingWriteApproval = false;
 
   DateTime? _lastUiUpdate;
-  static const _contentThrottleMs = 32;
+  static const _contentThrottleMs = 16;
 
   bool get isActive =>
       content != null || traceSteps.isNotEmpty || toolActivities.isNotEmpty;
@@ -108,7 +108,8 @@ class AIChatStreamController extends ChangeNotifier {
     }
     if (chunk.heartbeatElapsedMs != null) {
       elapsedSeconds = (chunk.heartbeatElapsedMs! / 1000).ceil();
-      if (startedAt != null && statusPhase == null) {
+      if (startedAt != null &&
+          (statusPhase == null || statusPhase == 'connecting')) {
         statusPhase = 'thinking';
       }
       notifyListeners();

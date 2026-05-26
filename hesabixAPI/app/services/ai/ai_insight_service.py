@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -17,6 +18,9 @@ from app.core.auth_dependency import AuthContext
 from app.services.invoice_service import INVOICE_SALES
 
 logger = logging.getLogger(__name__)
+
+# کش درون‌پردازه‌ای بینش برای prompt (کلید: business_id, user_id)
+_insights_prompt_cache: dict[tuple[int, int], tuple[float, Dict[str, Any]]] = {}
 
 
 def _safe_float(value: Any) -> float:
@@ -149,6 +153,32 @@ def _low_stock_snapshot(db: Session, business_id: int) -> Dict[str, Any]:
     except Exception as exc:
         logger.warning("inventory insight failed: %s", exc)
         return {"count": 0, "items": [], "error": str(exc)}
+
+
+def get_business_insights_cached(
+    db: Session,
+    business_id: int,
+    ctx: AuthContext,
+    *,
+    ttl_sec: float | None = None,
+) -> Dict[str, Any]:
+    """بینش با کش کوتاه‌مدت برای کاهش queryهای تکراری در prompt."""
+    from app.services.ai.ai_constants import INSIGHTS_CACHE_TTL_SEC
+
+    if not ctx.can_access_business(business_id):
+        return {"error": "FORBIDDEN"}
+
+    user_id = int(ctx.get_user_id() or 0)
+    cache_key = (int(business_id), user_id)
+    ttl = ttl_sec if ttl_sec is not None else float(INSIGHTS_CACHE_TTL_SEC)
+    now = time.monotonic()
+    cached = _insights_prompt_cache.get(cache_key)
+    if cached and (now - cached[0]) < ttl:
+        return cached[1]
+
+    data = get_business_insights(db, business_id, ctx)
+    _insights_prompt_cache[cache_key] = (now, data)
+    return data
 
 
 def get_business_insights(

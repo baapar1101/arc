@@ -16,3 +16,9 @@ MAX_SYSTEM_PROMPT_CHARS = 32_000
 
 # حداکثر طول JSON نتیجه tool در پیام role=tool
 MAX_TOOL_RESULT_JSON_CHARS = 6_000
+
+# کش بینش کسب‌وکار در prompt (ثانیه)
+INSIGHTS_CACHE_TTL_SEC = 300
+
+# حداکثر انتظار برای RAG/embedding در ساخت prompt (ثانیه)
+KNOWLEDGE_LOAD_TIMEOUT_SEC = 2.5

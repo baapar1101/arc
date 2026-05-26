@@ -6,6 +6,9 @@
 
 | موضوع | وضعیت |
 |--------|--------|
+| تأخیر `done` به‌خاطر `generate_chat_title` | عنوان در پس‌زمینه؛ `done` بلافاصله پس از commit |
+| بارگذاری prompt همه‌یا‌هیچ | trace هر loader به‌محض اتمام؛ RAG با timeout و intent |
+| `checkAvailability` قبل از هر پیام | کش ۲ دقیقه‌ای در Flutter |
 | نبود بازخورد قبل از اولین chunk SSE | رویدادهای `status` + `heartbeat` + UI optimistic |
 | برچسب‌های تکراری ابزار (FA hardcoded) | `ai_tool_keys.py` + کلیدهای l10n در Flutter |
 | Function calls sequential | `asyncio.gather` + `run_in_executor` |
