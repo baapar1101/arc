@@ -234,6 +234,8 @@ class AIFunctionRegistry:
                 query["to_date"] = kwargs["to_date"]
             if "person_id" in kwargs:
                 query["person_id"] = kwargs["person_id"]
+            if "search" in kwargs:
+                query["search"] = kwargs["search"]
             
             # برای دریافت تعداد، فقط یک رکورد می‌خواهیم
             query["take"] = 1
@@ -1617,8 +1619,14 @@ class AIFunctionRegistry:
             if "user_id" not in args:
                 args["user_id"] = user_context.get_user_id()
             
-            # فراخوانی service function
-            return service_func(db=db, **args)
+            try:
+                return service_func(db=db, **args)
+            except Exception:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                raise
         
         return handler
     

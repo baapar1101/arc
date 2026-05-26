@@ -86,13 +86,14 @@ async def handle_mcp_request(
         if not eff_business:
             return _jsonrpc_error(req_id, -32602, "business_id required for tools/call")
         context = {
-            "db": db,
             "user_context": ctx,
             "business_id": int(eff_business),
             "session_business_id": int(eff_business),
         }
         try:
-            result = registry.call_function(str(tool_name), arguments, context)
+            from app.services.ai.ai_db_helpers import run_ai_registry_function
+
+            result = run_ai_registry_function(str(tool_name), arguments, context)
             text = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False, default=str)
             return _jsonrpc_result(
                 req_id,
@@ -107,6 +108,9 @@ async def handle_mcp_request(
                 {"content": [{"type": "text", "text": str(exc)}], "isError": True},
             )
         except Exception as exc:
+            from app.services.ai.ai_db_helpers import safe_db_rollback
+
+            safe_db_rollback(db)
             logger.error("MCP tools/call error: %s", exc, exc_info=True)
             return _jsonrpc_result(
                 req_id,

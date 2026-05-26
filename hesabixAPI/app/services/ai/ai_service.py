@@ -37,6 +37,7 @@ from app.services.ai.ai_trace import (
     trace_record_from_event,
     trace_step,
 )
+from app.services.ai.ai_db_helpers import run_ai_registry_function, safe_db_rollback
 
 logger = logging.getLogger(__name__)
 
@@ -495,6 +496,7 @@ class AIService:
                 return format_insights_for_prompt(insights)
             except Exception as exc:
                 logger.warning("Failed to load AI insights for prompt: %s", exc)
+                safe_db_rollback(self.db)
                 return ""
 
         insight_text = await loop.run_in_executor(_executor, _load_insights)
@@ -512,6 +514,7 @@ class AIService:
                 )
             except Exception as exc:
                 logger.warning("Failed to load AI memory for prompt: %s", exc)
+                safe_db_rollback(self.db)
                 return ""
 
         memory_text = await loop.run_in_executor(_executor, _load_memory)
@@ -531,6 +534,7 @@ class AIService:
                     return format_attachments_for_prompt(self.db, session_id)
                 except Exception as exc:
                     logger.warning("Failed to load AI attachments for prompt: %s", exc)
+                    safe_db_rollback(self.db)
                     return ""
 
             attachment_text = await loop.run_in_executor(_executor, _load_attachments)
@@ -550,6 +554,7 @@ class AIService:
                     )
                 except Exception as exc:
                     logger.warning("Failed to load AI knowledge for prompt: %s", exc)
+                    safe_db_rollback(self.db)
                     return ""
 
             knowledge_text = await loop.run_in_executor(_executor, _load_knowledge)
@@ -565,6 +570,7 @@ class AIService:
                 return format_connectors_for_prompt(self.db, int(business_id))
             except Exception as exc:
                 logger.warning("Failed to load AI connectors for prompt: %s", exc)
+                safe_db_rollback(self.db)
                 return ""
 
         connector_text = await loop.run_in_executor(_executor, _load_connectors)
@@ -1497,7 +1503,6 @@ class AIService:
         results = {}
         effective_business_id = session_business_id or self.business_id
         context = {
-            "db": self.db,
             "user_context": self.ctx,
             "business_id": effective_business_id,
             "session_business_id": session_business_id,
@@ -1514,7 +1519,7 @@ class AIService:
                 continue
 
             try:
-                result = registry.call_function(function_name, arguments, context)
+                result = run_ai_registry_function(function_name, arguments, context)
                 results[function_name] = result
             except Exception as e:
                 logger.error(f"Error calling function {function_name}: {e}", exc_info=True)
@@ -1529,16 +1534,13 @@ class AIService:
         approve_writes: bool = False,
     ) -> Dict[str, Any]:
         """پردازش function calling به صورت async برای جلوگیری از blocking"""
-        # استفاده از business_id از session (اولویت) یا از context
         effective_business_id = session_business_id or self.business_id
         context = {
-            "db": self.db,
             "user_context": self.ctx,
             "business_id": effective_business_id,
-            "session_business_id": session_business_id  # برای validation در handler
+            "session_business_id": session_business_id,
         }
-        
-        # اجرای function calls در thread pool برای جلوگیری از blocking
+
         async def call_single_function(call: Dict[str, Any]) -> tuple[str, Any]:
             function_name = call.get("name")
             arguments = call.get("arguments", {}) or {}
@@ -1550,7 +1552,9 @@ class AIService:
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
                     _executor,
-                    lambda fn=function_name, args=arguments: registry.call_function(fn, args, context),
+                    lambda fn=function_name, args=arguments: run_ai_registry_function(
+                        fn, args, context
+                    ),
                 )
                 return function_name, result
             except Exception as e:
