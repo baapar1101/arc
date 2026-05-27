@@ -187,7 +187,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
   String? _validate() {
     if (_type != 'received' && _type != 'transferred') return 'نوع چک الزامی است';
     if (_selectedPerson == null) {
-      return _type == 'received' ? 'انتخاب شخص برای چک دریافتی الزامی است' : 'انتخاب شخص برای چک واگذار شده الزامی است';
+      return _type == 'received' ? 'انتخاب شخص برای چک دریافتی الزامی است' : 'انتخاب گیرنده چک پرداختنی الزامی است';
     }
     if ((_checkNumberCtrl.text.trim()).isEmpty) return 'شماره چک الزامی است';
     final sayadText = _sayadCtrl.text.trim();
@@ -334,7 +334,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                     initialValue: _type,
                     items: const [
                       DropdownMenuItem(value: 'received', child: Text('دریافتی')),
-                      DropdownMenuItem(value: 'transferred', child: Text('واگذار شده')),
+                      DropdownMenuItem(value: 'transferred', child: Text('پرداختنی (صادرشده)')),
                     ],
                     onChanged: (val) => setState(() => _type = val),
                     decoration: const InputDecoration(labelText: 'نوع چک *', border: OutlineInputBorder()),
@@ -348,7 +348,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
                     selectedPerson: _selectedPerson,
                     onChanged: (p) => setState(() => _selectedPerson = p),
                     isRequired: true,
-                    label: _type == 'received' ? 'شخص (برای چک دریافتی)' : 'شخص (برای چک واگذار شده)',
+                    label: _type == 'received' ? 'شخص (صادرکننده چک دریافتی)' : 'شخص (گیرنده چک پرداختنی)',
                     hintText: _type == 'received'
                         ? 'جست‌وجو و انتخاب شخص'
                         : 'جست‌وجو و انتخاب شخصی که چک به او داده می‌شود',

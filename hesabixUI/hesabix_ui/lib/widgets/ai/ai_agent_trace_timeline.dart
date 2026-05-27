@@ -4,8 +4,9 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_l10n.dart';
+import 'ai_chat_design.dart';
 
-/// تایم‌لاین عمودی مراحل agent (شبیه Cursor) — پیش‌فرض جمع‌شده.
+/// تایم‌لاین عمودی مراحل agent — پیش‌فرض جمع‌شده.
 class AIAgentTraceTimeline extends StatefulWidget {
   final List<AIAgentTraceStep> steps;
   final bool compact;
@@ -42,7 +43,7 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
   @override
   Widget build(BuildContext context) {
     if (widget.steps.isEmpty) return const SizedBox.shrink();
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final activeCount =
@@ -226,7 +227,20 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                     onTap: showBodyToggle
                         ? () => setState(() => _bodyExpanded = !_bodyExpanded)
                         : null,
-                    child: Row(
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: step.kind == 'thought' || step.kind == 'explored' ? 10 : 0,
+                        vertical: step.kind == 'thought' || step.kind == 'explored' ? 8 : 0,
+                      ),
+                      decoration: step.kind == 'thought' || step.kind == 'explored'
+                          ? AIChatDesign.subtlePanel(
+                              theme,
+                              accent: step.kind == 'thought'
+                                  ? scheme.primary
+                                  : scheme.secondary,
+                            )
+                          : null,
+                      child: Row(
                       children: [
                         Expanded(
                           child: Text(
@@ -266,7 +280,7 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                             (step.kind == 'thought')) ...[
                           const SizedBox(width: 4),
                           _Badge(
-                            label: step.confidence!,
+                            label: _confidenceLabel(step.confidence!),
                             icon: Icons.verified_outlined,
                             color: _confidenceColor(scheme, step.confidence!),
                             scheme: scheme,
@@ -304,16 +318,27 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                         ],
                       ],
                     ),
+                    ),
                   ),
                   // بدنه همیشه نمایش
                   if (showBodyAlways) ...[
                     const SizedBox(height: 6),
-                    _BodyContent(body: body, theme: theme, scheme: scheme),
+                    _BodyContent(
+                      body: body,
+                      kind: step.kind,
+                      theme: theme,
+                      scheme: scheme,
+                    ),
                   ],
                   // بدنه با toggle
                   if (showBodyToggle && _bodyExpanded) ...[
                     const SizedBox(height: 6),
-                    _BodyContent(body: body, theme: theme, scheme: scheme),
+                    _BodyContent(
+                      body: body,
+                      kind: step.kind,
+                      theme: theme,
+                      scheme: scheme,
+                    ),
                   ],
                   // citations
                   if (step.citations != null && step.citations!.isNotEmpty) ...[
@@ -332,29 +357,40 @@ class _TraceStepTileState extends State<_TraceStepTile> {
 
 class _BodyContent extends StatelessWidget {
   final String body;
+  final String kind;
   final ThemeData theme;
   final ColorScheme scheme;
 
   const _BodyContent({
     required this.body,
+    required this.kind,
     required this.theme,
     required this.scheme,
   });
 
   @override
   Widget build(BuildContext context) {
-    return MarkdownBody(
+    final content = MarkdownBody(
       data: body,
       selectable: true,
       styleSheet: MarkdownStyleSheet(
         p: theme.textTheme.bodySmall?.copyWith(
           color: scheme.onSurfaceVariant,
-          height: 1.45,
+          height: 1.5,
         ),
         listBullet: theme.textTheme.bodySmall?.copyWith(
           color: scheme.onSurfaceVariant,
         ),
       ),
+    );
+    if (kind != 'thought' && kind != 'explored') {
+      return content;
+    }
+    final accent = kind == 'thought' ? scheme.primary : scheme.secondary;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: AIChatDesign.subtlePanel(theme, accent: accent),
+      child: content,
     );
   }
 }
@@ -407,6 +443,17 @@ Color _confidenceColor(ColorScheme scheme, String confidence) {
       return scheme.error;
     default:
       return scheme.tertiary;
+  }
+}
+
+String _confidenceLabel(String confidence) {
+  switch (confidence) {
+    case 'high':
+      return 'اطمینان بالا';
+    case 'low':
+      return 'داده ناکافی';
+    default:
+      return 'نیازمند بررسی';
   }
 }
 

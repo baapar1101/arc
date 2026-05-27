@@ -173,7 +173,7 @@ async def clear_check_endpoint(
 @router.post(
     "/checks/{check_id}/actions/return",
     summary="عودت چک",
-    description="عودت چک به طرف مقابل",
+    description="عودت چک: from_endorsee (برگشت از واگذارشونده) یا to_drawer (عودت به صادرکننده)",
 )
 async def return_check_endpoint(
     request: Request,

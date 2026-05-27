@@ -1,5 +1,5 @@
 """
-Agent trace — زنجیرهٔ مراحل قابل نمایش برای کاربر (شبیه Cursor).
+Agent trace — زنجیرهٔ مراحل قابل نمایش برای کاربر.
 """
 from __future__ import annotations
 

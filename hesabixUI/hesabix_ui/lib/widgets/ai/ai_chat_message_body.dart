@@ -24,7 +24,7 @@ class AIChatMessageBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final agentTrace = extractAgentTraceFromResults(functionResults);
     final toolActivities = _buildToolActivities(l10n);
 
@@ -43,13 +43,18 @@ class AIChatMessageBody extends StatelessWidget {
               child: _ToolActivityChip(activity: activity),
             ),
         ],
-        if (content.trim().isNotEmpty)
+        if (content.trim().isNotEmpty) ...[
+          if (!isUser) ...[
+            const _ResponseLabel(),
+            const SizedBox(height: 10),
+          ],
           isUser
               ? SelectableText(
                   content,
                   style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
                 )
               : _AssistantRichContent(content: content, theme: theme, scheme: scheme),
+        ],
       ],
     );
   }
@@ -110,6 +115,36 @@ class AIChatMessageBody extends StatelessWidget {
       if (m['name'] != null) return [m];
     }
     return [];
+  }
+}
+
+class _ResponseLabel extends StatelessWidget {
+  const _ResponseLabel();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Row(
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: scheme.primary,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 7),
+        Text(
+          'پاسخ تحلیلی',
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: scheme.primary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -232,7 +267,7 @@ class _ToolActivityChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
 
     IconData icon;
     Color? iconColor;

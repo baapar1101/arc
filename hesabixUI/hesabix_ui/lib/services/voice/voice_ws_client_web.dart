@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
@@ -12,17 +13,20 @@ class VoiceWsClientWeb implements VoiceWsClient {
   web.WebSocket? _ws;
   bool _connected = false;
   bool _shouldReconnect = false;
+  bool _preferBinaryDownlink = true;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
   static const Duration _reconnectDelay = Duration(seconds: 2);
   Timer? _reconnectTimer;
   String? _storedApiKey;
+  Map<String, dynamic>? _sessionStartPayload;
   Completer<void>? _openCompleter;
 
   void Function(Map<String, dynamic>)? _onEvent;
   void Function(List<int>)? _onAudioFrame;
   void Function(Object error)? _onError;
   void Function()? _onDone;
+  void Function()? _onReconnected;
 
   @override
   bool get isConnected => _connected && _ws != null;
@@ -34,14 +38,21 @@ class VoiceWsClientWeb implements VoiceWsClient {
     required void Function(List<int> pcmFrame) onAudioFrame,
     void Function(Object error)? onError,
     void Function()? onDone,
+    void Function()? onReconnected,
+    bool preferBinaryDownlink = true,
   }) async {
-    disconnect();
+    final savedStart = _sessionStartPayload;
+    _tearDownSocket();
+    _sessionStartPayload = savedStart;
     _storedApiKey = apiKey;
     _onEvent = onEvent;
     _onAudioFrame = onAudioFrame;
     _onError = onError;
     _onDone = onDone;
+    _onReconnected = onReconnected;
+    _preferBinaryDownlink = preferBinaryDownlink;
     _reconnectAttempts = 0;
+    final restoring = _sessionStartPayload != null;
 
     try {
       final apiBase = AppConfig.apiBaseUrl;
@@ -58,7 +69,11 @@ class VoiceWsClientWeb implements VoiceWsClient {
       _ws!.onOpen.listen((_) {
         _ws!.send(jsonEncode(<String, String>{'type': 'auth', 'api_key': apiKey}).toJS);
         _connected = true;
-        _reconnectAttempts = 0; // Reset on successful connection
+        _reconnectAttempts = 0;
+        if (restoring && _sessionStartPayload != null) {
+          sendJson(_sessionStartPayload!);
+          _onReconnected?.call();
+        }
         if (_openCompleter == openCompleter && !openCompleter.isCompleted) {
           openCompleter.complete();
         }
@@ -84,13 +99,11 @@ class VoiceWsClientWeb implements VoiceWsClient {
       _ws!.onMessage.listen((web.MessageEvent e) {
         final data = e.data;
         try {
-          if (data is JSString) {
-            final msg = jsonDecode(data.toDart);
+          if (data.isA<JSString>()) {
+            final msg = jsonDecode((data as JSString).toDart);
             if (msg is Map<String, dynamic>) {
-              // اگر صوت به صورت base64 ارسال شود، اینجا decode و به audio callback پاس می‌دهیم
               if (msg['type'] == 'assistant_audio' && msg['audio_b64'] is String) {
-                final b64 = msg['audio_b64'] as String;
-                final bytes = base64Decode(b64);
+                final bytes = base64Decode(msg['audio_b64'] as String);
                 _onAudioFrame?.call(bytes);
               } else {
                 _onEvent?.call(msg);
@@ -98,12 +111,13 @@ class VoiceWsClientWeb implements VoiceWsClient {
             }
             return;
           }
-          // Web binary: ArrayBuffer -> Uint8List (js_interop)
-          // فعلاً مسیر اصلی وب با base64 است. اگر باینری هم آمد، نادیده می‌گیریم.
+          if (_preferBinaryDownlink && data.isA<JSArrayBuffer>()) {
+            final buffer = (data as JSArrayBuffer).toDart;
+            _onAudioFrame?.call(buffer.asUint8List());
+          }
         } catch (_) {}
       });
 
-      // IMPORTANT: wait for WebSocket to be open before returning
       try {
         await openCompleter.future.timeout(const Duration(seconds: 5));
       } catch (e) {
@@ -121,9 +135,19 @@ class VoiceWsClientWeb implements VoiceWsClient {
   void sendBytes(List<int> bytes) {
     if (!isConnected) return;
     try {
-      // برای ساده‌سازی و سازگاری، صوت را در وب base64 و به صورت JSON می‌فرستیم
-      final b64 = base64Encode(bytes);
-      sendJson({'type': 'audio', 'audio_b64': b64});
+      final u8 = Uint8List.fromList(bytes);
+      _ws!.send(u8.toJS);
+    } catch (_) {}
+  }
+
+  @override
+  void sendWebmChunk(List<int> bytes) {
+    if (!isConnected || bytes.isEmpty) return;
+    try {
+      sendJson({
+        'type': 'audio_webm',
+        'data_b64': base64Encode(bytes),
+      });
     } catch (_) {}
   }
 
@@ -138,12 +162,11 @@ class VoiceWsClientWeb implements VoiceWsClient {
   void _handleDisconnection(bool wasConnected) {
     _ws = null;
     _connected = false;
-    
-    if (_shouldReconnect && _reconnectAttempts < _maxReconnectAttempts) {
+
+    if (_shouldReconnect && wasConnected && _reconnectAttempts < _maxReconnectAttempts) {
       _reconnectAttempts++;
       _reconnectTimer = Timer(_reconnectDelay * _reconnectAttempts, () {
         if (_shouldReconnect && !isConnected && _storedApiKey != null) {
-          // Retry connection with stored callbacks
           if (_onEvent != null && _onAudioFrame != null) {
             connect(
               apiKey: _storedApiKey!,
@@ -151,6 +174,8 @@ class VoiceWsClientWeb implements VoiceWsClient {
               onAudioFrame: _onAudioFrame!,
               onError: _onError,
               onDone: _onDone,
+              onReconnected: _onReconnected,
+              preferBinaryDownlink: _preferBinaryDownlink,
             );
           }
         }
@@ -159,11 +184,11 @@ class VoiceWsClientWeb implements VoiceWsClient {
   }
 
   @override
-  void disconnect() {
-    _shouldReconnect = false;
-    _reconnectTimer?.cancel();
-    _reconnectTimer = null;
-    _storedApiKey = null;
+  void setSessionStartPayload(Map<String, dynamic> payload) {
+    _sessionStartPayload = Map<String, dynamic>.from(payload);
+  }
+
+  void _tearDownSocket() {
     _openCompleter = null;
     try {
       _ws?.close();
@@ -173,11 +198,22 @@ class VoiceWsClientWeb implements VoiceWsClient {
   }
 
   @override
+  void disconnect() {
+    _shouldReconnect = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+    _storedApiKey = null;
+    _sessionStartPayload = null;
+    _tearDownSocket();
+  }
+
+  @override
   void enableReconnect() {
     _shouldReconnect = true;
     _reconnectAttempts = 0;
   }
 
+  @override
   void disableReconnect() {
     _shouldReconnect = false;
     _reconnectTimer?.cancel();
@@ -186,5 +222,3 @@ class VoiceWsClientWeb implements VoiceWsClient {
 }
 
 VoiceWsClient createVoiceWsClient() => VoiceWsClientWeb();
-
-

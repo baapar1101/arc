@@ -16,7 +16,7 @@
 | Progress فقط spinner | نوار وضعیت + **تایم‌لاین Agent Trace** (زنجیره مراحل) |
 | لغو بدون ذخیره partial | ذخیره محتوای نیمه‌کاره + trace در `_stopGenerating` |
 | نبود زنجیره تفکر مرئی | `trace_step` SSE + `AIAgentTraceTimeline` + ذخیره در `_agent_trace` |
-| Exploration (Cursor-style) | `explore` / `explored` / `thought` trace + `ai_exploration_service` + `mode=explore\|auto\|off` |
+| Exploration | `explore` / `explored` / `thought` trace + `ai_exploration_service` + `mode=explore\|auto\|off` |
 
 ## 🟡 باقی‌مانده (متوسط)
 

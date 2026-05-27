@@ -888,6 +888,16 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           },
         ),
         TextColumn(
+          'check_number',
+          'شماره چک',
+          width: ColumnWidth.medium,
+          formatter: (item) {
+            final map = item as Map<String, dynamic>;
+            final cn = map['check_number']?.toString();
+            return (cn != null && cn.isNotEmpty) ? cn : '-';
+          },
+        ),
+        TextColumn(
           'description',
           t.description,
           width: ColumnWidth.large,

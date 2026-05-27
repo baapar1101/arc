@@ -9896,6 +9896,38 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get aiVoiceStatusConnecting => 'Starting voice chat…';
+
+  @override
+  String get aiVoiceStatusListening => 'Listening…';
+
+  @override
+  String get aiVoiceStatusProcessing => 'Processing speech…';
+
+  @override
+  String get aiVoiceStatusSpeaking => 'Playing response…';
+
+  @override
+  String get aiVoiceTextBlockedWhileActive =>
+      'Text input is disabled during an active voice session.';
+
+  @override
+  String get aiVoiceDummyTtsWarning =>
+      'Server TTS is in test mode; you may not hear spoken responses.';
+
+  @override
+  String get aiVoiceActiveHint => 'Voice chat active';
+
+  @override
+  String get aiVoiceInputHint => 'Voice input';
+
+  @override
+  String get aiVoiceEndCall => 'End voice call';
+
+  @override
+  String get aiVoiceStartMic => 'Start voice chat';
+
+  @override
   String aiStatusElapsed(int seconds) {
     return '${seconds}s';
   }
@@ -10207,20 +10239,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String aiTraceExplored(String title, String count) {
-    return 'Explored · $title ($count sources)';
+    return 'Reviewed · $title ($count sources)';
   }
 
   @override
   String aiTraceThought(String count) {
-    return 'Thought · $count findings';
+    return 'Key findings · $count';
   }
-
-  @override
-  String get aiChatExploreMode => 'Deep analysis';
-
-  @override
-  String get aiChatExploreModeHint =>
-      'Multi-step exploration with key findings (Cursor-style)';
 
   @override
   String get settingsCategoryExternalServices => 'External Services';

@@ -6,6 +6,7 @@ abstract final class AIChatDesign {
   static const double sidebarWidth = 280;
   static const double composerRadius = 26;
   static const double chipRadius = 20;
+  static const double cardRadius = 22;
   static const Duration layoutTransition = Duration(milliseconds: 380);
   static const Duration fadeTransition = Duration(milliseconds: 280);
 
@@ -66,6 +67,43 @@ abstract final class AIChatDesign {
       borderRadius: BorderRadius.circular(chipRadius),
       border: Border.all(
         color: scheme.outlineVariant.withValues(alpha: 0.45),
+      ),
+    );
+  }
+
+  static BoxDecoration elevatedCard(
+    ThemeData theme, {
+    double alpha = 0.78,
+    Color? accent,
+  }) {
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    return BoxDecoration(
+      color: (isDark ? scheme.surfaceContainerHigh : scheme.surface)
+          .withValues(alpha: alpha),
+      borderRadius: BorderRadius.circular(cardRadius),
+      border: Border.all(
+        color: (accent ?? scheme.outlineVariant).withValues(
+          alpha: accent == null ? 0.42 : 0.22,
+        ),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: scheme.shadow.withValues(alpha: isDark ? 0.22 : 0.07),
+          blurRadius: 28,
+          offset: const Offset(0, 14),
+        ),
+      ],
+    );
+  }
+
+  static BoxDecoration subtlePanel(ThemeData theme, {Color? accent}) {
+    final scheme = theme.colorScheme;
+    return BoxDecoration(
+      color: (accent ?? scheme.surfaceContainerHighest).withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: (accent ?? scheme.outlineVariant).withValues(alpha: 0.18),
       ),
     );
   }

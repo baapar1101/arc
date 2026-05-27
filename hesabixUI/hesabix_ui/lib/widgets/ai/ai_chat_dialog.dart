@@ -14,6 +14,7 @@ import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
+import 'package:hesabix_ui/services/voice/voice_phase.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
@@ -91,15 +92,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool _sessionsLoading = true;
   bool _messagesLoading = false;
   bool _sending = false;
-  /// explore | auto | off — تحلیل عمیق (Exploring / Thought)
-  String _explorationMode = 'auto';
   Map<String, dynamic>? _availabilityInfo;
   DateTime? _availabilityCheckedAt;
   bool _showCreditWarning = false;
   bool _voiceCollectData = false;
   VoiceChatController? _voice;
   bool _voiceStarting = false;
-  bool _voiceRecording = false;
+  VoicePhase _voicePhase = VoicePhase.idle;
+  Map<String, dynamic>? _voiceStatusEvent;
   int? _lastVoiceInteractionId;
   CancelToken? _streamCancelToken;
   bool _autoScrollEnabled = true;
@@ -327,7 +327,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (_voice == null) return;
     setState(() {
       _voiceStarting = true;
-      _voiceRecording = false;
+      _voicePhase = VoicePhase.idle;
+      _voiceStatusEvent = null;
     });
     try {
       await _voice!.dispose();
@@ -336,6 +337,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
     setState(() {
       _voice = null;
       _voiceStarting = false;
+      _voicePhase = VoicePhase.idle;
+      _voiceStatusEvent = null;
     });
   }
 
@@ -1144,6 +1147,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     bool approveWrites = false,
     bool skipUserBubble = false,
   }) async {
+    if (_voice != null) {
+      _showSnackbar(AppLocalizations.of(context).aiVoiceTextBlockedWhileActive);
+      return;
+    }
     if (_sending) return;
     final content = (contentOverride ?? _messageCtrl.text).trim();
     if (content.isEmpty) return;
@@ -1192,7 +1199,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sessionId: _currentSession!.id!,
         content: content,
         approveWrites: approveWrites,
-        explorationMode: _explorationMode,
         onComplete: (usage, messageId) {
           finalUsage = usage;
         },
@@ -1231,31 +1237,75 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
+  void _setVoicePhase(VoicePhase phase, {Map<String, dynamic>? statusEvent}) {
+    if (!mounted) return;
+    setState(() {
+      _voicePhase = phase;
+      if (statusEvent != null) {
+        _voiceStatusEvent = statusEvent;
+      }
+    });
+  }
+
+  void _handleVoiceServerEvent(Map<String, dynamic> event) {
+    final type = event['type'] as String?;
+    switch (type) {
+      case 'ready':
+      case 'reconnected':
+        _setVoicePhase(VoicePhase.listening);
+        return;
+      case 'started':
+        _setVoicePhase(VoicePhase.listening);
+        final tts = event['tts'] as Map<String, dynamic>?;
+        if (tts?['dummy_warning'] == true) {
+          _showSnackbar(
+            AppLocalizations.of(context).aiVoiceDummyTtsWarning,
+          );
+        }
+        return;
+      case 'speech_start':
+        _setVoicePhase(VoicePhase.listening);
+        return;
+      case 'speech_end':
+      case 'stt_started':
+        _setVoicePhase(VoicePhase.processing, statusEvent: event);
+        return;
+      case 'voice_status':
+        final phase = event['phase'] as String?;
+        if (phase == 'speaking') {
+          _setVoicePhase(VoicePhase.speaking, statusEvent: event);
+        } else if (phase == 'listening') {
+          _setVoicePhase(VoicePhase.listening, statusEvent: event);
+        } else {
+          _setVoicePhase(VoicePhase.processing, statusEvent: event);
+        }
+        return;
+      case 'transcript_final':
+        _setVoicePhase(VoicePhase.processing, statusEvent: event);
+        break;
+      case 'assistant_text_delta':
+        _setVoicePhase(VoicePhase.speaking, statusEvent: event);
+        break;
+      case 'assistant_done':
+        _setVoicePhase(VoicePhase.listening, statusEvent: event);
+        break;
+      case 'error':
+        _setVoicePhase(VoicePhase.error, statusEvent: event);
+        break;
+      default:
+        break;
+    }
+  }
+
   Future<void> _toggleVoice() async {
     if (!await _ensureSession()) return;
-    if (_voiceStarting) return;
+    if (_voiceStarting || _voice != null) return;
 
-    if (_voice != null) {
-      try {
-        if (_voiceRecording) {
-          await _voice!.stopRecording();
-          if (!mounted) return;
-          setState(() => _voiceRecording = false);
-        } else {
-          await _voice!.startRecording();
-          if (!mounted) return;
-          setState(() => _voiceRecording = true);
-        }
-      } catch (e) {
-        if (!mounted) return;
-        _showError(
-          'خطا در کنترل ضبط: ${ErrorExtractor.forContext(e, context)}',
-        );
-      }
-      return;
-    }
-
-    setState(() => _voiceStarting = true);
+    setState(() {
+      _voiceStarting = true;
+      _voicePhase = VoicePhase.connecting;
+      _voiceStatusEvent = null;
+    });
     final ready = Completer<void>();
     bool gotReady = false;
     final controller = VoiceChatController(
@@ -1263,6 +1313,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       collectDataOptIn: _voiceCollectData,
       onEvent: (event) {
         final type = event['type'] as String?;
+        _handleVoiceServerEvent(event);
         if (type == 'ready' || type == 'started') {
           if (!gotReady) {
             gotReady = true;
@@ -1299,6 +1350,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
           final text = (event['text'] as String?) ?? '';
           final usage = event['usage'] as Map<String, dynamic>?;
           final interactionId = event['interaction_id'] as int?;
+          final inputTokens = usage?['input_tokens'] as int? ?? 0;
+          final outputTokens = usage?['output_tokens'] as int? ?? 0;
+          final totalTokens = usage?['total_tokens'] as int? ??
+              (inputTokens + outputTokens);
           setState(() {
             if (text.trim().isNotEmpty) {
               _messages = List<AIChatMessage>.from(_messages)
@@ -1307,7 +1362,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                     sessionId: _currentSession!.id!,
                     role: MessageRole.assistant,
                     content: text,
-                    tokensUsed: usage?['total_tokens'] as int? ?? 0,
+                    tokensUsed: totalTokens,
                     createdAt: _stream.timestamp ?? DateTime.now(),
                   ),
                 );
@@ -1332,9 +1387,15 @@ class _AIChatDialogState extends State<AIChatDialog> {
               'جلسه صوتی به دلیل timeout بسته شد. لطفاً دوباره تلاش کنید.',
             );
             _stopVoiceSession();
+          } else if (errorCode == 'VOICE_DEPS_MISSING' ||
+              errorCode == 'WEBM_NOT_SUPPORTED') {
+            _showError(errorMessage);
+            _stopVoiceSession();
           } else if (errorCode == 'STT_FAILED') {
             _showError('خطا در تشخیص گفتار: $errorMessage');
+            _setVoicePhase(VoicePhase.listening);
           } else if (errorCode == 'EMPTY_TRANSCRIPT') {
+            _setVoicePhase(VoicePhase.listening);
             _showError('متن قابل تشخیص نیست. لطفاً دوباره تلاش کنید.');
           } else if (errorCode == 'NO_ACTIVE_SUBSCRIPTION' ||
               errorCode == 'QUOTA_EXCEEDED' ||
@@ -1371,10 +1432,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
       if (!mounted) return;
       await _voice!.startRecording();
       if (!mounted) return;
-      setState(() => _voiceRecording = true);
+      setState(() => _voicePhase = VoicePhase.listening);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _voiceStarting = false);
+      setState(() {
+        _voiceStarting = false;
+        _voicePhase = VoicePhase.idle;
+      });
       _showError(
         'خطا در شروع مکالمه صوتی: ${ErrorExtractor.forContext(e, context)}',
       );
@@ -1617,7 +1681,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 disabled: _sessionsLoading,
                                 voiceStarting: _voiceStarting,
                                 voiceActive: _voice != null,
-                                voiceRecording: _voiceRecording,
+                                voicePhase: _voicePhase,
+                                voiceStatusEvent: _voiceStatusEvent,
                                 canUseAi: _canUseAi,
                                 blockReason: _aiBlockReason,
                                 onSend: () => _sendMessage(),
@@ -1664,7 +1729,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 disabled: !_canUseAi,
                                 voiceStarting: _voiceStarting,
                                 voiceActive: _voice != null,
-                                voiceRecording: _voiceRecording,
+                                voicePhase: _voicePhase,
+                                voiceStatusEvent: _voiceStatusEvent,
                                 showScrollToBottom: !_autoScrollEnabled,
                                 isGenerating: _isGenerating,
                                 scrollController: _scrollController,
@@ -1692,38 +1758,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
     );
   }
 
-  Widget _buildExploreModeChip(ThemeData theme, ColorScheme scheme) {
-    final l10n = AppLocalizations.of(context)!;
-    final isDeep = _explorationMode == 'explore';
-    return Padding(
-      padding: const EdgeInsets.only(left: 4),
-      child: Tooltip(
-        message: l10n.aiChatExploreModeHint,
-        child: FilterChip(
-          label: Text(
-            l10n.aiChatExploreMode,
-            style: theme.textTheme.labelSmall,
-          ),
-          selected: isDeep,
-          onSelected: _sending
-              ? null
-              : (_) {
-                  setState(() {
-                    _explorationMode = isDeep ? 'auto' : 'explore';
-                  });
-                },
-          avatar: Icon(
-            Icons.travel_explore_outlined,
-            size: 16,
-            color: isDeep ? scheme.onPrimaryContainer : scheme.primary,
-          ),
-          visualDensity: VisualDensity.compact,
-          showCheckmark: false,
-        ),
-      ),
-    );
-  }
-
   Widget _buildAppBar(ThemeData theme) {
     final scheme = theme.colorScheme;
     final compact = AIChatDesign.isCompactWidth(context);
@@ -1732,7 +1766,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     return Material(
       color: Colors.transparent,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 8, 12, 4),
+        padding: const EdgeInsets.fromLTRB(10, 10, 12, 6),
         child: Row(
           children: [
             if (showHistoryBtn)
@@ -1741,59 +1775,72 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 onPressed: _openHistory,
                 icon: const Icon(Icons.menu_rounded),
               ),
-            Expanded(
-              child: Text(
-                _isHomeMode
-                    ? 'دستیار هوشمند'
-                    : (_currentSession?.title ?? 'گفت‌وگو'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    scheme.primary,
+                    scheme.tertiary.withValues(alpha: 0.92),
+                  ],
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                size: 18,
+                color: scheme.onPrimary,
               ),
             ),
-            _buildExploreModeChip(theme, scheme),
-            if (_isGenerating)
-              IconButton(
-                tooltip: 'توقف',
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _isHomeMode
+                        ? 'دستیار هوشمند حسابیکس'
+                        : (_currentSession?.title ?? 'گفت‌وگو'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    _isGenerating
+                        ? 'در حال تحلیل و آماده‌سازی پاسخ'
+                        : 'تحلیل مالی، گزارش و راهنمایی عملیاتی',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_isGenerating) ...[
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
                 onPressed: _stopGenerating,
                 icon: Icon(Icons.stop_circle_outlined, color: scheme.error),
-              ),
-            if (!_isHomeMode && _currentSession != null) ...[
-              IconButton(
-                tooltip: 'جستجو در پیام‌ها',
-                onPressed: _openMessageSearch,
-                icon: const Icon(Icons.search_rounded),
-              ),
-              IconButton(
-                tooltip: 'حافظه دستیار',
-                onPressed: _openMemorySheet,
-                icon: const Icon(Icons.psychology_outlined),
-              ),
-              IconButton(
-                tooltip: 'خروجی گفت‌وگو',
-                onPressed: _exportConversation,
-                icon: const Icon(Icons.ios_share_outlined),
+                label: const Text('توقف'),
+                style: FilledButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: scheme.error,
+                ),
               ),
             ],
-            if (widget.businessId != null) ...[
-              IconButton(
-                tooltip: 'کانکتورها',
-                onPressed: _openConnectorsSheet,
-                icon: const Icon(Icons.link_rounded),
-              ),
-              IconButton(
-                tooltip: 'دانشنامه',
-                onPressed: _openKnowledgeSheet,
-                icon: const Icon(Icons.menu_book_outlined),
-              ),
-            ],
-            IconButton(
-              tooltip: 'تنظیمات صدا',
-              onPressed: _openVoiceSettings,
-              icon: const Icon(Icons.tune_rounded),
-            ),
             if (!compact)
               TextButton.icon(
                 onPressed: _startNewConversation,
@@ -1806,6 +1853,17 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 onPressed: _startNewConversation,
                 icon: const Icon(Icons.add_comment_outlined),
               ),
+            _AiMoreMenu(
+              isHomeMode: _isHomeMode,
+              hasSession: _currentSession != null,
+              hasBusiness: widget.businessId != null,
+              onSearch: _openMessageSearch,
+              onMemory: _openMemorySheet,
+              onExport: _exportConversation,
+              onConnectors: _openConnectorsSheet,
+              onKnowledge: _openKnowledgeSheet,
+              onVoiceSettings: _openVoiceSettings,
+            ),
             if (widget.embeddedInShell)
               IconButton(
                 tooltip: 'بازگشت',
@@ -2015,6 +2073,113 @@ class _AIChatDialogState extends State<AIChatDialog> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AiMoreMenu extends StatelessWidget {
+  final bool isHomeMode;
+  final bool hasSession;
+  final bool hasBusiness;
+  final VoidCallback onSearch;
+  final VoidCallback onMemory;
+  final VoidCallback onExport;
+  final VoidCallback onConnectors;
+  final VoidCallback onKnowledge;
+  final VoidCallback onVoiceSettings;
+
+  const _AiMoreMenu({
+    required this.isHomeMode,
+    required this.hasSession,
+    required this.hasBusiness,
+    required this.onSearch,
+    required this.onMemory,
+    required this.onExport,
+    required this.onConnectors,
+    required this.onKnowledge,
+    required this.onVoiceSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_AiMenuAction>(
+      tooltip: 'ابزارهای دستیار',
+      icon: const Icon(Icons.more_horiz_rounded),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      position: PopupMenuPosition.under,
+      onSelected: (value) {
+        switch (value) {
+          case _AiMenuAction.search:
+            onSearch();
+            break;
+          case _AiMenuAction.memory:
+            onMemory();
+            break;
+          case _AiMenuAction.export:
+            onExport();
+            break;
+          case _AiMenuAction.connectors:
+            onConnectors();
+            break;
+          case _AiMenuAction.knowledge:
+            onKnowledge();
+            break;
+          case _AiMenuAction.voice:
+            onVoiceSettings();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (!isHomeMode && hasSession) ...[
+          const PopupMenuItem(
+            value: _AiMenuAction.search,
+            child: _AiMenuItem(icon: Icons.search_rounded, label: 'جستجو در پیام‌ها'),
+          ),
+          const PopupMenuItem(
+            value: _AiMenuAction.memory,
+            child: _AiMenuItem(icon: Icons.psychology_outlined, label: 'حافظه دستیار'),
+          ),
+          const PopupMenuItem(
+            value: _AiMenuAction.export,
+            child: _AiMenuItem(icon: Icons.ios_share_outlined, label: 'خروجی گفت‌وگو'),
+          ),
+        ],
+        if (hasBusiness) ...[
+          const PopupMenuItem(
+            value: _AiMenuAction.connectors,
+            child: _AiMenuItem(icon: Icons.link_rounded, label: 'کانکتورها'),
+          ),
+          const PopupMenuItem(
+            value: _AiMenuAction.knowledge,
+            child: _AiMenuItem(icon: Icons.menu_book_outlined, label: 'دانشنامه'),
+          ),
+        ],
+        const PopupMenuItem(
+          value: _AiMenuAction.voice,
+          child: _AiMenuItem(icon: Icons.tune_rounded, label: 'تنظیمات صدا'),
+        ),
+      ],
+    );
+  }
+}
+
+enum _AiMenuAction { search, memory, export, connectors, knowledge, voice }
+
+class _AiMenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _AiMenuItem({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 19, color: scheme.primary),
+        const SizedBox(width: 10),
+        Text(label),
+      ],
     );
   }
 }

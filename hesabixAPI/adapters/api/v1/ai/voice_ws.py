@@ -27,6 +27,7 @@ import time
 from app.services.voice.vad import VadEndpointing, VadConfig
 from app.services.voice.stt import WhisperSTT, STTConfig
 from app.services.voice.tts import TTSFactory, TTSConfig, TextChunker
+from app.services.voice.webm_decode import WebmOpusStreamDecoder, webm_opus_available
 from app.services.ws_api_key_handshake import (
 	WsAuthClientDisconnected,
 	WsAuthRejected,
@@ -38,6 +39,76 @@ from app.services.ws_api_key_handshake import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["هوش مصنوعی"])
+
+
+def _voice_deps_ready() -> str | None:
+	"""اگر وابستگی‌های صوتی نصب نیستند، کد خطا برمی‌گرداند."""
+	try:
+		import webrtcvad  # noqa: F401
+	except ImportError:
+		return "VOICE_DEPS_MISSING"
+	try:
+		import numpy  # noqa: F401
+	except ImportError:
+		return "VOICE_DEPS_MISSING"
+	return None
+
+
+def _availability_error_message(reason: str | None, details: dict[str, Any]) -> str:
+	message = details.get("message", "خطای نامشخص")
+	if reason == "NO_ACTIVE_SUBSCRIPTION":
+		return (
+			"❌ اشتراک فعالی ندارید\n\n"
+			"برای استفاده از هوش مصنوعی، ابتدا یک پلن را از داخل برنامه انتخاب کنید."
+		)
+	if reason == "QUOTA_EXCEEDED":
+		subscription = details.get("subscription", {})
+		tokens_used = subscription.get("tokens_used", 0)
+		tokens_limit = subscription.get("tokens_limit", 0)
+		return (
+			f"⚠️ سهمیه شما تمام شده است\n\n"
+			f"استفاده شده: {tokens_used:,}\nسقف: {tokens_limit:,}"
+		)
+	if reason == "INSUFFICIENT_FUNDS":
+		wallet = details.get("wallet", {})
+		balance = wallet.get("balance", 0)
+		estimated_cost = wallet.get("estimated_cost", 0)
+		return (
+			f"💰 موجودی کیف پول ناکافی\n\n"
+			f"موجودی فعلی: {balance:,.0f} ریال\nهزینه تخمینی: {estimated_cost:,.0f} ریال"
+		)
+	return f"❌ {message}"
+
+
+async def _forward_agent_chunk(chunk: dict[str, Any], send_event) -> bool:
+	"""
+	رویدادهای agent را به کلاینت صوتی تبدیل می‌کند.
+	True یعنی chunk مصرف شد و نیازی به پردازش delta نیست.
+	"""
+	ev = chunk.get("event")
+	if ev == "status":
+		phase = chunk.get("phase")
+		if phase in ("thinking", "exploring", "agent_progress"):
+			await send_event({"type": "voice_status", "phase": "thinking"})
+		elif phase == "planning_tools":
+			await send_event({"type": "voice_status", "phase": "planning_tools"})
+		elif phase == "writing":
+			await send_event({"type": "voice_status", "phase": "writing"})
+		else:
+			await send_event({"type": "voice_status", "phase": phase or "thinking"})
+		return True
+	if ev == "tool_start":
+		await send_event(
+			{
+				"type": "voice_status",
+				"phase": "tool_running",
+				"tool": chunk.get("tool"),
+				"tool_key": chunk.get("tool_key"),
+				"label": chunk.get("label"),
+			}
+		)
+		return True
+	return False
 
 
 @router.websocket("/ws/ai/voice")
@@ -85,13 +156,31 @@ async def ai_voice_ws(websocket: WebSocket):
 		await close_ws_safe(websocket, 4403)
 		return
 
+	deps_error = _voice_deps_ready()
+	if deps_error:
+		await websocket.send_text(
+			json.dumps(
+				{
+					"type": "error",
+					"error": deps_error,
+					"message": "وابستگی‌های صوتی سرور نصب نیست. pip install -e \".[voice]\"",
+				},
+				ensure_ascii=False,
+			)
+		)
+		await close_ws_safe(websocket, 4503)
+		return
+
 	# State
 	session_id = None  # type: Optional[int]
 	business_id = None  # type: Optional[int]
 	collect_data_opt_in: bool = False
 	cancel_event = asyncio.Event()
 	currently_speaking = False
+	utterance_lock = asyncio.Lock()
 	audio_transport: str = "binary"  # binary | base64
+	input_codec: str = "pcm"  # pcm | webm_opus
+	webm_decoder: WebmOpusStreamDecoder | None = None
 	connection_start_time = time.time()
 	last_activity_time = time.time()
 	SESSION_TIMEOUT_SECONDS = 3600  # 1 hour timeout
@@ -134,6 +223,18 @@ async def ai_voice_ws(websocket: WebSocket):
 	async def send_event(event: dict[str, Any]) -> None:
 		await websocket.send_text(json.dumps(event, ensure_ascii=False))
 
+	def _process_audio_frame(frame: bytes) -> None:
+		nonlocal currently_speaking
+		if session_id is None or business_id is None or not frame:
+			return
+		vad_event = vad.process_bytes(frame)
+		if vad_event.speech_started:
+			if currently_speaking:
+				cancel_event.set()
+			asyncio.create_task(send_event({"type": "speech_start"}))
+		if vad_event.utterance_completed and vad_event.utterance_pcm is not None:
+			_schedule_utterance(vad_event.utterance_pcm)
+
 	async def _send_audio_frame(pcm_frame: bytes, capture: bytearray | None) -> None:
 		if capture is not None:
 			capture.extend(pcm_frame)
@@ -172,48 +273,40 @@ async def ai_voice_ws(websocket: WebSocket):
 			await send_event({"type": "error", "error": "EMPTY_TRANSCRIPT", "message": "متن قابل تشخیص نیست"})
 			return
 
-		# Use a single DB session for the entire utterance processing
+		messages: list[dict[str, Any]]
 		with get_db_session() as db_utterance:
-			# save user message + build history
+			ctx = AuthContext(user=user, api_key_id=api_key_id or 0, language="fa", db=db_utterance)
+			ai_service = AIService(db_utterance, ctx, business_id)
+			estimated_tokens = max(100, len(text) * 2)
+			availability = ai_service.check_availability(estimated_tokens=estimated_tokens)
+			if not availability["can_use"]:
+				reason = availability.get("reason")
+				details = availability.get("details", {}) or {}
+				error_msg = _availability_error_message(reason, details)
+				await send_event(
+					{
+						"type": "error",
+						"error": reason or "AVAILABILITY_CHECK_FAILED",
+						"message": error_msg,
+					}
+				)
+				return
+
 			msg_repo = AIChatMessageRepository(db_utterance)
 			prev = msg_repo.get_session_messages(session_id, limit=50)
 			messages = [{"role": m.role, "content": m.content} for m in prev]
 			messages.append({"role": "user", "content": text})
 
-			user_message = AIChatMessage(session_id=session_id, role=MessageRole.USER.value, content=text, tokens_used=0)
+			user_message = AIChatMessage(
+				session_id=session_id,
+				role=MessageRole.USER.value,
+				content=text,
+				tokens_used=0,
+			)
 			db_utterance.add(user_message)
 			db_utterance.commit()
 
-			# Check availability before processing
-			ctx = AuthContext(user=user, api_key_id=api_key_id or 0, language="fa", db=db_utterance)
-			ai_service = AIService(db_utterance, ctx, business_id)
-			
-			# Estimate tokens (rough estimate: 1 token per 4 characters)
-			estimated_tokens = len(text) * 2  # conservative estimate
-			availability = ai_service.check_availability(estimated_tokens=estimated_tokens)
-			
-			if not availability["can_use"]:
-				reason = availability.get("reason")
-				details = availability.get("details", {})
-				message = details.get("message", "خطای نامشخص")
-				
-				if reason == "NO_ACTIVE_SUBSCRIPTION":
-					error_msg = "❌ اشتراک فعالی ندارید\n\nبرای استفاده از هوش مصنوعی، ابتدا یک پلن را از داخل برنامه انتخاب کنید."
-				elif reason == "QUOTA_EXCEEDED":
-					subscription = details.get("subscription", {})
-					tokens_used = subscription.get("tokens_used", 0)
-					tokens_limit = subscription.get("tokens_limit", 0)
-					error_msg = f"⚠️ سهمیه شما تمام شده است\n\nاستفاده شده: {tokens_used:,}\nسقف: {tokens_limit:,}"
-				elif reason == "INSUFFICIENT_FUNDS":
-					wallet = details.get("wallet", {})
-					balance = wallet.get("balance", 0)
-					estimated_cost = wallet.get("estimated_cost", 0)
-					error_msg = f"💰 موجودی کیف پول ناکافی\n\nموجودی فعلی: {balance:,.0f} ریال\nهزینه تخمینی: {estimated_cost:,.0f} ریال"
-				else:
-					error_msg = f"❌ {message}"
-				
-				await send_event({"type": "error", "error": reason or "AVAILABILITY_CHECK_FAILED", "message": error_msg})
-				return
+		await send_event({"type": "voice_status", "phase": "thinking"})
 
 		# LLM streaming + TTS streaming
 		cancel_event.clear()
@@ -224,6 +317,7 @@ async def ai_voice_ws(websocket: WebSocket):
 		final_usage: dict[str, Any] | None = None
 		assistant_audio_capture: bytearray | None = bytearray() if collect_data_opt_in else None
 		assistant_message_id: int | None = None
+		speaking_status_sent = False
 
 		try:
 			with get_db_session() as db4:
@@ -239,9 +333,15 @@ async def ai_voice_ws(websocket: WebSocket):
 						await send_event({"type": "cancelled"})
 						break
 
+					if await _forward_agent_chunk(chunk, send_event):
+						continue
+
 					delta = chunk.get("delta", {})
 					delta_text = delta.get("content", "") or ""
 					if delta_text:
+						if not speaking_status_sent:
+							await send_event({"type": "voice_status", "phase": "speaking"})
+							speaking_status_sent = True
 						accumulated_text += delta_text
 						await send_event({"type": "assistant_text_delta", "text": delta_text})
 
@@ -317,16 +417,17 @@ async def ai_voice_ws(websocket: WebSocket):
 			except Exception:
 				logger.exception("Failed to commit assistant voice message")
 
-		# opt-in data collection
 		interaction_id: int | None = None
-		if collect_data_opt_in and settings.voice_data_collection_enabled:
-			try:
+		try:
+			in_path: str | None = None
+			out_path: str | None = None
+			store_audio = collect_data_opt_in and settings.voice_data_collection_enabled
+			if store_audio:
 				base_dir = settings.voice_data_collection_dir
 				now = datetime.utcnow()
 				day = now.strftime("%Y-%m-%d")
 				dir_path = os.path.join(base_dir, day, f"user_{user.id}", f"ai_session_{session_id}")
 				os.makedirs(dir_path, exist_ok=True)
-
 				ts = now.strftime("%H%M%S_%f")
 				in_path = os.path.join(dir_path, f"{ts}_input.pcm16")
 				out_path = os.path.join(dir_path, f"{ts}_assistant.pcm16")
@@ -336,38 +437,52 @@ async def ai_voice_ws(websocket: WebSocket):
 					with open(out_path, "wb") as f:
 						f.write(bytes(assistant_audio_capture))
 				else:
-					out_path = None  # type: ignore[assignment]
+					out_path = None
 
-				meta = {
-					"input_audio": {"format": "pcm_s16le", "sample_rate": audio_sample_rate, "channels": 1},
-					"output_audio": {"format": "pcm_s16le", "sample_rate": int(settings.voice_tts_output_sample_rate_hz), "channels": 1},
-					"stt": {"engine": "faster-whisper", "language": settings.voice_stt_language, "model": settings.voice_stt_model_size_or_path},
-					"tts": {"engine": settings.voice_tts_engine, "model_name": settings.voice_tts_model_name, "model_path": settings.voice_tts_model_path},
-					"usage": final_usage,
-				}
+			meta = {
+				"input_audio": {"format": "pcm_s16le", "sample_rate": audio_sample_rate, "channels": 1},
+				"output_audio": {
+					"format": "pcm_s16le",
+					"sample_rate": int(settings.voice_tts_output_sample_rate_hz),
+					"channels": 1,
+				},
+				"stt": {
+					"engine": "faster-whisper",
+					"language": settings.voice_stt_language,
+					"model": settings.voice_stt_model_size_or_path,
+				},
+				"tts": {
+					"engine": settings.voice_tts_engine,
+					"model_name": settings.voice_tts_model_name,
+					"model_path": settings.voice_tts_model_path,
+				},
+				"usage": final_usage,
+				"audio_stored": store_audio,
+			}
 
-				with get_db_session() as db5:
-					obj = AIVoiceInteraction(
-						user_id=user.id,
-						business_id=business_id,
-						ai_session_id=session_id,
-						consent=True,
-						input_transcript=text,
-						input_audio_path=in_path,
-						assistant_text=accumulated_text,
-						assistant_audio_path=out_path,
-						stt_model=settings.voice_stt_model_size_or_path,
-						tts_engine=settings.voice_tts_engine,
-						tts_model=settings.voice_tts_model_name or settings.voice_tts_model_path,
-						meta_json=json.dumps(meta, ensure_ascii=False),
-					)
-					db5.add(obj)
-					db5.commit()
-					db5.refresh(obj)
-					interaction_id = obj.id
-			except Exception:
-				logger.exception("voice data collection failed")
+			with get_db_session() as db5:
+				obj = AIVoiceInteraction(
+					user_id=user.id,
+					business_id=business_id,
+					ai_session_id=session_id,
+					consent=store_audio,
+					input_transcript=text,
+					input_audio_path=in_path,
+					assistant_text=accumulated_text,
+					assistant_audio_path=out_path,
+					stt_model=settings.voice_stt_model_size_or_path,
+					tts_engine=settings.voice_tts_engine,
+					tts_model=settings.voice_tts_model_name or settings.voice_tts_model_path,
+					meta_json=json.dumps(meta, ensure_ascii=False),
+				)
+				db5.add(obj)
+				db5.commit()
+				db5.refresh(obj)
+				interaction_id = obj.id
+		except Exception:
+			logger.exception("voice interaction record failed")
 
+		await send_event({"type": "voice_status", "phase": "listening"})
 		await send_event(
 			{
 				"type": "assistant_done",
@@ -378,6 +493,7 @@ async def ai_voice_ws(websocket: WebSocket):
 			}
 		)
 
+	tts_engine = (settings.voice_tts_engine or "dummy").strip().lower()
 	await send_event(
 		{
 			"type": "ready",
@@ -388,8 +504,20 @@ async def ai_voice_ws(websocket: WebSocket):
 				"channels": 1,
 				"frame_ms": int(settings.voice_tts_frame_ms),
 			},
+			"tts": {
+				"engine": tts_engine,
+				"dummy_warning": tts_engine == "dummy",
+			},
+			"webm_opus_supported": webm_opus_available(),
 		}
 	)
+
+	def _schedule_utterance(utterance_pcm: bytes) -> None:
+		async def _run() -> None:
+			async with utterance_lock:
+				await _handle_utterance(utterance_pcm)
+
+		asyncio.create_task(_run())
 
 	try:
 		while True:
@@ -422,7 +550,6 @@ async def ai_voice_ws(websocket: WebSocket):
 
 				action = payload.get("type")
 				if action == "audio":
-					# Web/client base64 audio frame
 					b64 = payload.get("audio_b64")
 					if not isinstance(b64, str) or not b64:
 						await send_event({"type": "error", "error": "INVALID_AUDIO", "message": "audio_b64 نامعتبر است"})
@@ -432,19 +559,36 @@ async def ai_voice_ws(websocket: WebSocket):
 					except Exception:
 						await send_event({"type": "error", "error": "INVALID_AUDIO", "message": "base64 نامعتبر است"})
 						continue
-
 					if session_id is None or business_id is None:
 						await send_event({"type": "error", "error": "NOT_STARTED", "message": "ابتدا پیام start را ارسال کنید"})
 						continue
+					_process_audio_frame(frame)
+					continue
 
-					vad_event = vad.process_bytes(frame)
-					if vad_event.speech_started:
-						if currently_speaking:
-							cancel_event.set()
-						await send_event({"type": "speech_start"})
-
-					if vad_event.utterance_completed and vad_event.utterance_pcm is not None:
-						await _handle_utterance(vad_event.utterance_pcm)
+				if action == "audio_webm":
+					b64 = payload.get("data_b64")
+					if not isinstance(b64, str) or not b64:
+						await send_event({"type": "error", "error": "INVALID_AUDIO", "message": "data_b64 نامعتبر است"})
+						continue
+					if session_id is None or business_id is None:
+						await send_event({"type": "error", "error": "NOT_STARTED", "message": "ابتدا پیام start را ارسال کنید"})
+						continue
+					if webm_decoder is None:
+						await send_event(
+							{
+								"type": "error",
+								"error": "WEBM_NOT_SUPPORTED",
+								"message": "سرور از WebM/Opus پشتیبانی نمی‌کند (PyAV نصب نیست).",
+							}
+						)
+						continue
+					try:
+						chunk = base64.b64decode(b64)
+						pcm = webm_decoder.feed(chunk)
+						if pcm:
+							_process_audio_frame(pcm)
+					except Exception as exc:
+						logger.warning("audio_webm decode failed: %s", exc)
 					continue
 
 				if action == "start":
@@ -462,6 +606,22 @@ async def ai_voice_ws(websocket: WebSocket):
 						await send_event({"type": "error", "error": "INVALID_TRANSPORT", "message": "audio_transport نامعتبر است"})
 						continue
 					audio_transport = transport
+
+					codec = str(payload.get("input_codec", "pcm") or "pcm").strip().lower()
+					if codec not in ("pcm", "webm_opus"):
+						await send_event({"type": "error", "error": "INVALID_CODEC", "message": "input_codec نامعتبر است"})
+						continue
+					if codec == "webm_opus" and not webm_opus_available():
+						await send_event(
+							{
+								"type": "error",
+								"error": "WEBM_NOT_SUPPORTED",
+								"message": "برای WebM/Opus محلی، PyAV را نصب کنید: pip install -e \".[voice]\"",
+							}
+						)
+						continue
+					input_codec = codec
+					webm_decoder = WebmOpusStreamDecoder(audio_sample_rate) if codec == "webm_opus" else None
 
 					with get_db_session() as db2:
 						session_repo = AIChatSessionRepository(db2)
@@ -482,25 +642,15 @@ async def ai_voice_ws(websocket: WebSocket):
 						
 						if not availability["can_use"]:
 							reason = availability.get("reason")
-							details = availability.get("details", {})
-							message = details.get("message", "خطای نامشخص")
-							
-							if reason == "NO_ACTIVE_SUBSCRIPTION":
-								error_msg = "❌ اشتراک فعالی ندارید\n\nبرای استفاده از هوش مصنوعی، ابتدا یک پلن را از داخل برنامه انتخاب کنید."
-							elif reason == "QUOTA_EXCEEDED":
-								subscription = details.get("subscription", {})
-								tokens_used = subscription.get("tokens_used", 0)
-								tokens_limit = subscription.get("tokens_limit", 0)
-								error_msg = f"⚠️ سهمیه شما تمام شده است\n\nاستفاده شده: {tokens_used:,}\nسقف: {tokens_limit:,}"
-							elif reason == "INSUFFICIENT_FUNDS":
-								wallet = details.get("wallet", {})
-								balance = wallet.get("balance", 0)
-								estimated_cost = wallet.get("estimated_cost", 0)
-								error_msg = f"💰 موجودی کیف پول ناکافی\n\nموجودی فعلی: {balance:,.0f} ریال\nهزینه تخمینی: {estimated_cost:,.0f} ریال"
-							else:
-								error_msg = f"❌ {message}"
-							
-							await send_event({"type": "error", "error": reason or "AVAILABILITY_CHECK_FAILED", "message": error_msg})
+							details = availability.get("details", {}) or {}
+							error_msg = _availability_error_message(reason, details)
+							await send_event(
+								{
+									"type": "error",
+									"error": reason or "AVAILABILITY_CHECK_FAILED",
+									"message": error_msg,
+								}
+							)
 							continue
 						
 						session_id = requested_session_id
@@ -516,7 +666,16 @@ async def ai_voice_ws(websocket: WebSocket):
 							"session_id": session_id,
 							"business_id": business_id,
 							"audio_transport": audio_transport,
-							"data_collection": {"enabled": bool(settings.voice_data_collection_enabled), "opt_in": collect_data_opt_in},
+							"data_collection": {
+								"enabled": bool(settings.voice_data_collection_enabled),
+								"opt_in": collect_data_opt_in,
+							},
+							"tts": {
+								"engine": tts_engine,
+								"dummy_warning": tts_engine == "dummy",
+							},
+							"input_codec": input_codec,
+							"webm_opus_supported": webm_opus_available(),
 						}
 					)
 					continue
@@ -539,19 +698,19 @@ async def ai_voice_ws(websocket: WebSocket):
 					await send_event({"type": "error", "error": "NOT_STARTED", "message": "ابتدا پیام start را ارسال کنید"})
 					continue
 
-				frame = message["bytes"]
-				last_activity_time = time.time()
-				vad_event = vad.process_bytes(frame)
-
-				if vad_event.speech_started:
-					if currently_speaking:
-						cancel_event.set()
-					await send_event({"type": "speech_start"})
-
-				if vad_event.utterance_completed and vad_event.utterance_pcm is not None:
-					await _handle_utterance(vad_event.utterance_pcm)
+				if input_codec != "pcm":
+					await send_event(
+						{
+							"type": "error",
+							"error": "INVALID_AUDIO",
+							"message": "برای webm_opus از پیام audio_webm استفاده کنید",
+						}
+					)
 					continue
 
+				frame = message["bytes"]
+				last_activity_time = time.time()
+				_process_audio_frame(frame)
 				continue
 
 			if msg_type == "websocket.disconnect":

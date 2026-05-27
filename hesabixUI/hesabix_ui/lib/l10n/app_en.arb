@@ -3812,6 +3812,16 @@
       "toolName": { "type": "String" }
     }
   },
+  "aiVoiceStatusConnecting": "Starting voice chat…",
+  "aiVoiceStatusListening": "Listening…",
+  "aiVoiceStatusProcessing": "Processing speech…",
+  "aiVoiceStatusSpeaking": "Playing response…",
+  "aiVoiceTextBlockedWhileActive": "Text input is disabled during an active voice session.",
+  "aiVoiceDummyTtsWarning": "Server TTS is in test mode; you may not hear spoken responses.",
+  "aiVoiceActiveHint": "Voice chat active",
+  "aiVoiceInputHint": "Voice input",
+  "aiVoiceEndCall": "End voice call",
+  "aiVoiceStartMic": "Start voice chat",
   "aiStatusElapsed": "{seconds}s",
   "@aiStatusElapsed": {
     "placeholders": {
@@ -3939,19 +3949,17 @@
   "@aiTraceExploredTarget": {
     "placeholders": { "target": { "type": "String" } }
   },
-  "aiTraceExplored": "Explored · {title} ({count} sources)",
+  "aiTraceExplored": "Reviewed · {title} ({count} sources)",
   "@aiTraceExplored": {
     "placeholders": {
       "title": { "type": "String" },
       "count": { "type": "String" }
     }
   },
-  "aiTraceThought": "Thought · {count} findings",
+  "aiTraceThought": "Key findings · {count}",
   "@aiTraceThought": {
     "placeholders": { "count": { "type": "String" } }
   },
-  "aiChatExploreMode": "Deep analysis",
-  "aiChatExploreModeHint": "Multi-step exploration with key findings (Cursor-style)",
   "settingsCategoryExternalServices": "External Services",
   "settingsCategoryExternalServicesDescription": "External service integrations",
   "settingsCategoryMonitoringLogs": "Monitoring & Logs",

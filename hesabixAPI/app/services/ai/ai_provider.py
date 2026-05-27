@@ -206,6 +206,7 @@ class OpenAIProvider(AIProviderBase):
             accumulated_content = ""
             final_usage = None
             tool_calls_accumulator = {}  # برای جمع‌آوری tool_calls از chunks مختلف
+            tool_planning_sent = False
             
             async for chunk in stream:
                 # بررسی usage (معمولاً در chunk آخر می‌آید)
@@ -233,6 +234,13 @@ class OpenAIProvider(AIProviderBase):
                     
                     # بررسی tool_calls - جمع‌آوری از chunks مختلف
                     if delta.tool_calls:
+                        if not tool_planning_sent:
+                            tool_planning_sent = True
+                            yield {
+                                "event": "tool_planning",
+                                "usage": None,
+                                "done": False,
+                            }
                         for tool_call_delta in delta.tool_calls:
                             index = tool_call_delta.index
                             if index not in tool_calls_accumulator:
@@ -536,6 +544,7 @@ class AnthropicProvider(AIProviderBase):
             accumulated_text = ""
             tool_blocks: Dict[int, Dict[str, Any]] = {}
             final_usage = None
+            tool_planning_sent = False
 
             async with self.async_client.messages.stream(**kwargs) as stream:
                 async for event in stream:
@@ -543,6 +552,13 @@ class AnthropicProvider(AIProviderBase):
                     if etype == "content_block_start":
                         block = getattr(event, "content_block", None)
                         if block and getattr(block, "type", None) == "tool_use":
+                            if not tool_planning_sent:
+                                tool_planning_sent = True
+                                yield {
+                                    "event": "tool_planning",
+                                    "usage": None,
+                                    "done": False,
+                                }
                             idx = getattr(event, "index", 0)
                             tool_blocks[idx] = {
                                 "id": getattr(block, "id", f"call_{idx}"),

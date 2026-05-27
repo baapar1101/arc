@@ -18456,6 +18456,66 @@ abstract class AppLocalizations {
   /// **'Running {toolName}…'**
   String aiStatusRunningTool(String toolName);
 
+  /// No description provided for @aiVoiceStatusConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting voice chat…'**
+  String get aiVoiceStatusConnecting;
+
+  /// No description provided for @aiVoiceStatusListening.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening…'**
+  String get aiVoiceStatusListening;
+
+  /// No description provided for @aiVoiceStatusProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing speech…'**
+  String get aiVoiceStatusProcessing;
+
+  /// No description provided for @aiVoiceStatusSpeaking.
+  ///
+  /// In en, this message translates to:
+  /// **'Playing response…'**
+  String get aiVoiceStatusSpeaking;
+
+  /// No description provided for @aiVoiceTextBlockedWhileActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Text input is disabled during an active voice session.'**
+  String get aiVoiceTextBlockedWhileActive;
+
+  /// No description provided for @aiVoiceDummyTtsWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Server TTS is in test mode; you may not hear spoken responses.'**
+  String get aiVoiceDummyTtsWarning;
+
+  /// No description provided for @aiVoiceActiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice chat active'**
+  String get aiVoiceActiveHint;
+
+  /// No description provided for @aiVoiceInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice input'**
+  String get aiVoiceInputHint;
+
+  /// No description provided for @aiVoiceEndCall.
+  ///
+  /// In en, this message translates to:
+  /// **'End voice call'**
+  String get aiVoiceEndCall;
+
+  /// No description provided for @aiVoiceStartMic.
+  ///
+  /// In en, this message translates to:
+  /// **'Start voice chat'**
+  String get aiVoiceStartMic;
+
   /// No description provided for @aiStatusElapsed.
   ///
   /// In en, this message translates to:
@@ -19047,26 +19107,14 @@ abstract class AppLocalizations {
   /// No description provided for @aiTraceExplored.
   ///
   /// In en, this message translates to:
-  /// **'Explored · {title} ({count} sources)'**
+  /// **'Reviewed · {title} ({count} sources)'**
   String aiTraceExplored(String title, String count);
 
   /// No description provided for @aiTraceThought.
   ///
   /// In en, this message translates to:
-  /// **'Thought · {count} findings'**
+  /// **'Key findings · {count}'**
   String aiTraceThought(String count);
-
-  /// No description provided for @aiChatExploreMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Deep analysis'**
-  String get aiChatExploreMode;
-
-  /// No description provided for @aiChatExploreModeHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Multi-step exploration with key findings (Cursor-style)'**
-  String get aiChatExploreModeHint;
 
   /// No description provided for @settingsCategoryExternalServices.
   ///

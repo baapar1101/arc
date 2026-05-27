@@ -140,6 +140,8 @@ class Settings(BaseSettings):
 	voice_tts_language: str = "fa"
 	voice_tts_model_name: str | None = None
 	voice_tts_model_path: str | None = None
+	# مدل Coqui پیش‌فرض فارسی (محلی، بدون API) وقتی model_name خالی است
+	voice_tts_coqui_model_fa: str = "tts_models/fa/cv/vits/glow-tts"
 	voice_tts_output_sample_rate_hz: int = 16000
 	voice_tts_frame_ms: int = 20
 

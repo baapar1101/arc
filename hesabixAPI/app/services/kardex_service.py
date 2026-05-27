@@ -301,6 +301,26 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             except Exception:
                 continue
 
+    check_ids_in_page: set[int] = set()
+    for line, _ in rows:
+        if line.check_id is not None:
+            try:
+                check_ids_in_page.add(int(line.check_id))
+            except Exception:
+                pass
+    check_number_map: Dict[int, str] = {}
+    if check_ids_in_page:
+        from adapters.db.models.check import Check
+
+        for ch in db.query(Check).filter(
+            Check.business_id == business_id,
+            Check.id.in_(list(check_ids_in_page)),
+        ).all():
+            try:
+                check_number_map[int(ch.id)] = str(ch.check_number or "")
+            except Exception:
+                continue
+
     def _movement_from_type(inv_type: str | None) -> str | None:
         t = (inv_type or "").strip()
         if t in ("invoice_sales",):
@@ -361,6 +381,13 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             "petty_cash_id": line.petty_cash_id,
             "check_id": line.check_id,
         }
+        if line.check_id is not None:
+            try:
+                cn = check_number_map.get(int(line.check_id))
+                if cn:
+                    item["check_number"] = cn
+            except Exception:
+                pass
 
         # movement & warehouse
         try:

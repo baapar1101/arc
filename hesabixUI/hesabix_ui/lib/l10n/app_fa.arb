@@ -3854,6 +3854,16 @@
       "toolName": { "type": "String" }
     }
   },
+  "aiVoiceStatusConnecting": "در حال برقراری مکالمه صوتی…",
+  "aiVoiceStatusListening": "در حال گوش دادن…",
+  "aiVoiceStatusProcessing": "در حال پردازش گفتار…",
+  "aiVoiceStatusSpeaking": "در حال پخش پاسخ…",
+  "aiVoiceTextBlockedWhileActive": "در حین مکالمه صوتی، ارسال متن غیرفعال است.",
+  "aiVoiceDummyTtsWarning": "موتور TTS سرور روی حالت آزمایشی است؛ ممکن است صدای پاسخ شنیده نشود.",
+  "aiVoiceActiveHint": "مکالمه صوتی فعال",
+  "aiVoiceInputHint": "ورودی صوتی",
+  "aiVoiceEndCall": "پایان مکالمه صوتی",
+  "aiVoiceStartMic": "شروع مکالمه صوتی",
   "aiStatusElapsed": "{seconds} ثانیه",
   "@aiStatusElapsed": {
     "placeholders": {
@@ -3981,19 +3991,17 @@
   "@aiTraceExploredTarget": {
     "placeholders": { "target": { "type": "String" } }
   },
-  "aiTraceExplored": "Explored · {title} ({count} منبع)",
+  "aiTraceExplored": "بررسی شد · {title} ({count} منبع)",
   "@aiTraceExplored": {
     "placeholders": {
       "title": { "type": "String" },
       "count": { "type": "String" }
     }
   },
-  "aiTraceThought": "Thought · {count} یافته",
+  "aiTraceThought": "یافته‌های کلیدی · {count} مورد",
   "@aiTraceThought": {
     "placeholders": { "count": { "type": "String" } }
   },
-  "aiChatExploreMode": "تحلیل عمیق",
-  "aiChatExploreModeHint": "کاوش چندمرحله‌ای با یافته‌های مهم (شبیه Cursor)",
   "settingsCategoryExternalServices": "سرویس‌های خارجی",
   "settingsCategoryExternalServicesDescription": "ادغام‌های سرویس‌های خارجی",
   "settingsCategoryMonitoringLogs": "مانیتورینگ و لاگ‌ها",

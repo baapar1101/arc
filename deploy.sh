@@ -62,6 +62,8 @@ IFS=$'\n\t'
 # - Debian: mirror prompt skipped; sources unchanged.
 # - PostgreSQL pgvector: scripts/ensure_pgvector.sh installs postgresql-N-pgvector when available
 #   (deploy install_prereqs + deploy_backend; hesabix -update before migrations). Non-fatal if missing.
+# - AI voice chat (local STT/TTS): scripts/ensure_voice_chat.sh — optional at prompt (INSTALL_VOICE);
+#   libav dev packages + pip install -e ".[voice]" (no cloud speech APIs).
 # - Apt/needrestart: by default NEEDRESTART_SUSPEND=1 during deploy so post-install service
 #   restarts (e.g. fwupd-refresh) do not run and fail on headless VPS. Set NEEDRESTART_SUSPEND=0
 #   to allow needrestart behavior.
@@ -633,6 +635,7 @@ save_deploy_saved_vars() {
     echo "PGADMIN4_EMAIL=${PGADMIN4_EMAIL:-}"
     echo "PGADMIN4_PASSWORD=${PGADMIN4_PASSWORD:-}"
     echo "UBUNTU_APT_MIRROR=${UBUNTU_APT_MIRROR:-}"
+    echo "INSTALL_VOICE=${INSTALL_VOICE:-N}"
   } > "${file}"
   chmod 600 "${file}"
   log_info "Saved inputs for next run (${file})"
@@ -825,6 +828,7 @@ API_DOMAIN=${API_DOMAIN}
 UI_DOMAIN=${UI_DOMAIN}
 BRANCH=${BRANCH}
 REPO_URL=${REPO_URL}
+INSTALL_VOICE=${INSTALL_VOICE:-N}
 ENV
   chmod 600 "${env_file}"
   log_info "Saved deployment config to ${env_file}"
@@ -1045,9 +1049,18 @@ prompt_vars() {
       fi
     fi
   fi
+
+  # مکالمه صوتی AI — اختیاری (STT/TTS محلی)
+  : "${INSTALL_VOICE:=}"
+  if [[ -z "${INSTALL_VOICE}" ]]; then
+    echo
+    echo "مکالمه صوتی AI: تشخیص گفتار و TTS روی همین سرور (بدون API ابری؛ نیاز به RAM/CPU بیشتر)."
+    read -rp "Install AI voice chat dependencies (pip [voice], ~2–4GB disk)? (y/N): " INSTALL_VOICE
+    INSTALL_VOICE=${INSTALL_VOICE:-N}
+  fi
   
   save_deploy_saved_vars
-  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD DB_POOL_SIZE DB_MAX_OVERFLOW
+  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD INSTALL_VOICE DB_POOL_SIZE DB_MAX_OVERFLOW
 }
 
 # Show configuration summary and ask for confirmation
@@ -1088,6 +1101,13 @@ show_config_summary() {
     echo
   else
     echo "pgAdmin4:          Not installed"
+    echo
+  fi
+  if [[ "${INSTALL_VOICE}" =~ ^[Yy]$ ]]; then
+    echo "AI Voice Chat:     Enabled (local Whisper + Coqui TTS)"
+    echo "  • Data dir:       /var/lib/hesabix/voice-data"
+  else
+    echo "AI Voice Chat:     Not installed (optional)"
     echo
   fi
   echo "Installation Paths:"
@@ -1436,6 +1456,21 @@ deploy_backend() {
     : > "${env_file}"
   fi
   merge_hesabix_api_env_file "${env_file}"
+
+  if [[ "${INSTALL_VOICE:-N}" =~ ^[Yy]$ ]]; then
+    local voice_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_voice_chat.sh"
+    if [[ -f "${voice_script}" ]]; then
+      chmod +x "${voice_script}" 2>/dev/null || true
+      log_info "Installing AI voice chat prerequisites (local STT/TTS)..."
+      if INSTALL_VOICE=Y bash "${voice_script}" --non-interactive; then
+        log_success "AI voice chat dependencies installed."
+      else
+        log_warning "AI voice chat install failed (non-fatal). Run later: INSTALL_VOICE=Y bash ${voice_script}"
+      fi
+    else
+      log_warning "ensure_voice_chat.sh not found; skip voice install."
+    fi
+  fi
   
   log_info "Database connection pool configured: pool_size=${DB_POOL_SIZE}, max_overflow=${DB_MAX_OVERFLOW}, timeout=30s, recycle=300s"
   
@@ -2312,6 +2347,28 @@ server {
     proxy_set_header Connection "upgrade";
   }
 
+  # AI chat SSE: stream chunks immediately (no proxy buffering)
+  location ^~ /api/v1/ai/chat/ {
+    limit_req zone=api_limit burst=120 nodelay;
+    proxy_pass http://127.0.0.1:8000/api/v1/ai/chat/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_set_header X-Forwarded-Host \$host;
+    proxy_set_header X-Forwarded-Port \$server_port;
+    proxy_read_timeout 600;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 600;
+    client_max_body_size 1g;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_cache off;
+    gzip off;
+    add_header X-Accel-Buffering no always;
+  }
+
   location /api/ {
     limit_req zone=api_limit burst=120 nodelay;
     proxy_pass http://127.0.0.1:8000/api/;
@@ -2422,6 +2479,25 @@ server {
   }
 
   # Proxy /api/ and /ws/ to backend (when API and UI share same domain)
+  # AI chat SSE: stream chunks immediately (no proxy buffering)
+  location ^~ /api/v1/ai/chat/ {
+    proxy_pass http://127.0.0.1:8000/api/v1/ai/chat/;
+    proxy_http_version 1.1;
+    proxy_set_header Host \$host;
+    proxy_set_header X-Real-IP \$remote_addr;
+    proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto \$scheme;
+    proxy_read_timeout 600;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 600;
+    client_max_body_size 1g;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_cache off;
+    gzip off;
+    add_header X-Accel-Buffering no always;
+  }
+
   location /api/ {
     proxy_pass http://127.0.0.1:8000/api/;
     proxy_http_version 1.1;
@@ -3127,6 +3203,9 @@ main() {
     else
       echo "  pgAdmin4: http://${PGADMIN4_DOMAIN}/"
     fi
+  fi
+  if [[ "${INSTALL_VOICE:-N}" =~ ^[Yy]$ ]]; then
+    echo "  Voice WS: wss://${API_DOMAIN}/ws/ai/voice (local STT/TTS)"
   fi
   echo
   log_info "Service management:"

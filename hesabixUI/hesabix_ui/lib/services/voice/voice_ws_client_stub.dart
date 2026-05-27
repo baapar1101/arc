@@ -5,18 +5,27 @@ abstract class VoiceWsClient {
     required void Function(List<int> pcmFrame) onAudioFrame,
     void Function(Object error)? onError,
     void Function()? onDone,
+    void Function()? onReconnected,
+    bool preferBinaryDownlink = true,
   });
 
   void sendJson(Map<String, dynamic> payload);
 
   void sendBytes(List<int> bytes);
 
+  void sendWebmChunk(List<int> bytes);
+
   void disconnect();
 
   bool get isConnected;
 
+  /// پیام start پس از reconnect مجدداً ارسال می‌شود.
+  void setSessionStartPayload(Map<String, dynamic> payload);
+
   /// پیاده‌سازی‌های وب/موبایل پس از وصل‌شدن WS؛ روی سکوهای دیگر تهی است.
   void enableReconnect();
+
+  void disableReconnect();
 }
 
 VoiceWsClient createVoiceWsClient() => _NoopVoiceWsClient();
@@ -29,9 +38,14 @@ class _NoopVoiceWsClient implements VoiceWsClient {
     required void Function(List<int> pcmFrame) onAudioFrame,
     void Function(Object error)? onError,
     void Function()? onDone,
+    void Function()? onReconnected,
+    bool preferBinaryDownlink = true,
   }) async {
     onError?.call('Voice WebSocket is not supported on this platform.');
   }
+
+  @override
+  void setSessionStartPayload(Map<String, dynamic> payload) {}
 
   @override
   void disconnect() {}
@@ -43,10 +57,16 @@ class _NoopVoiceWsClient implements VoiceWsClient {
   void sendBytes(List<int> bytes) {}
 
   @override
+  void sendWebmChunk(List<int> bytes) {}
+
+  @override
   void sendJson(Map<String, dynamic> payload) {}
 
   @override
   void enableReconnect() {}
+
+  @override
+  void disableReconnect() {}
 }
 
 

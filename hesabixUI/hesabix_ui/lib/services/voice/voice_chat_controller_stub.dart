@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart';
-
-/// نسخه‌ی stub برای وب/پلتفرم‌های غیرپشتیبانی‌شده.
+/// نسخه‌ی stub برای پلتفرم‌های غیرپشتیبانی‌شده.
 /// هدف: build وب نشکند و UI بتواند پیام مناسب نشان دهد.
 class VoiceChatController {
   VoiceChatController({
@@ -19,11 +17,7 @@ class VoiceChatController {
   bool get isRecording => false;
 
   Future<void> start() async {
-    if (kIsWeb) {
-      onError('مکالمه صوتی در نسخه وب فعلاً پشتیبانی نمی‌شود.');
-    } else {
-      onError('مکالمه صوتی روی این پلتفرم پشتیبانی نمی‌شود.');
-    }
+    onError('مکالمه صوتی روی این پلتفرم پشتیبانی نمی‌شود.');
   }
 
   Future<void> startRecording() async {}

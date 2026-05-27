@@ -9840,6 +9840,38 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get aiVoiceStatusConnecting => 'در حال برقراری مکالمه صوتی…';
+
+  @override
+  String get aiVoiceStatusListening => 'در حال گوش دادن…';
+
+  @override
+  String get aiVoiceStatusProcessing => 'در حال پردازش گفتار…';
+
+  @override
+  String get aiVoiceStatusSpeaking => 'در حال پخش پاسخ…';
+
+  @override
+  String get aiVoiceTextBlockedWhileActive =>
+      'در حین مکالمه صوتی، ارسال متن غیرفعال است.';
+
+  @override
+  String get aiVoiceDummyTtsWarning =>
+      'موتور TTS سرور روی حالت آزمایشی است؛ ممکن است صدای پاسخ شنیده نشود.';
+
+  @override
+  String get aiVoiceActiveHint => 'مکالمه صوتی فعال';
+
+  @override
+  String get aiVoiceInputHint => 'ورودی صوتی';
+
+  @override
+  String get aiVoiceEndCall => 'پایان مکالمه صوتی';
+
+  @override
+  String get aiVoiceStartMic => 'شروع مکالمه صوتی';
+
+  @override
   String aiStatusElapsed(int seconds) {
     return '$seconds ثانیه';
   }
@@ -10151,20 +10183,13 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String aiTraceExplored(String title, String count) {
-    return 'Explored · $title ($count منبع)';
+    return 'بررسی شد · $title ($count منبع)';
   }
 
   @override
   String aiTraceThought(String count) {
-    return 'Thought · $count یافته';
+    return 'یافته‌های کلیدی · $count مورد';
   }
-
-  @override
-  String get aiChatExploreMode => 'تحلیل عمیق';
-
-  @override
-  String get aiChatExploreModeHint =>
-      'کاوش چندمرحله‌ای با یافته‌های مهم (شبیه Cursor)';
 
   @override
   String get settingsCategoryExternalServices => 'سرویس‌های خارجی';

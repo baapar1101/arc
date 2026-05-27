@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../services/voice/voice_phase.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
@@ -27,7 +29,8 @@ class AIChatThreadView extends StatelessWidget {
   final bool disabled;
   final bool voiceStarting;
   final bool voiceActive;
-  final bool voiceRecording;
+  final VoicePhase voicePhase;
+  final Map<String, dynamic>? voiceStatusEvent;
   final bool showScrollToBottom;
   final bool isGenerating;
   final ScrollController scrollController;
@@ -64,7 +67,8 @@ class AIChatThreadView extends StatelessWidget {
     required this.disabled,
     required this.voiceStarting,
     required this.voiceActive,
-    required this.voiceRecording,
+    this.voicePhase = VoicePhase.idle,
+    this.voiceStatusEvent,
     required this.showScrollToBottom,
     required this.isGenerating,
     required this.scrollController,
@@ -157,7 +161,8 @@ class AIChatThreadView extends StatelessWidget {
           disabled: disabled,
           voiceStarting: voiceStarting,
           voiceActive: voiceActive,
-          voiceRecording: voiceRecording,
+          voicePhase: voicePhase,
+          voiceStatusEvent: voiceStatusEvent,
           onSend: onSend,
           onMic: onMic,
           onStopVoice: onStopVoice,
@@ -259,11 +264,26 @@ class _MessageRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AIChatMessageBody(
-                    content: message.content,
-                    isUser: false,
-                    functionCalls: message.functionCalls,
-                    functionResults: message.functionResults,
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                    decoration: AIChatDesign.elevatedCard(
+                      theme,
+                      alpha: theme.brightness == Brightness.dark ? 0.42 : 0.66,
+                    ).copyWith(
+                      boxShadow: [
+                        BoxShadow(
+                          color: scheme.shadow.withValues(alpha: 0.04),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: AIChatMessageBody(
+                      content: message.content,
+                      isUser: false,
+                      functionCalls: message.functionCalls,
+                      functionResults: message.functionResults,
+                    ),
                   ),
                   AIChatMessageActions(
                     onCopy: onCopy,
@@ -318,7 +338,7 @@ class _StreamingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final l10n = AppLocalizations.of(context)!;
+    final l10n = AppLocalizations.of(context);
     final statusLabel = statusPhase != null
         ? aiStreamStatusLabel(
             l10n,
@@ -349,9 +369,24 @@ class _StreamingRow extends StatelessWidget {
                 if (toolActivities.isNotEmpty && traceSteps.isEmpty)
                   AIChatToolActivityList(activities: toolActivities),
                 if (content.isNotEmpty)
-                  AIChatMessageBody(
-                    content: content,
-                    isUser: false,
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                    decoration: AIChatDesign.elevatedCard(
+                      theme,
+                      alpha: theme.brightness == Brightness.dark ? 0.42 : 0.66,
+                    ).copyWith(
+                      boxShadow: [
+                        BoxShadow(
+                          color: scheme.shadow.withValues(alpha: 0.04),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: AIChatMessageBody(
+                      content: content,
+                      isUser: false,
+                    ),
                   )
                 else if (showStatusLine)
                   _StreamingStatusPulse(
@@ -459,15 +494,27 @@ class _AssistantAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 32,
-      height: 32,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [scheme.primary, scheme.tertiary],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+          colors: [
+            scheme.primary,
+            scheme.tertiary.withValues(alpha: 0.92),
+          ],
         ),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: scheme.primary.withValues(alpha: 0.18),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Icon(Icons.auto_awesome_rounded, size: 18, color: scheme.onPrimary),
+      child: Icon(Icons.auto_awesome_rounded, size: 19, color: scheme.onPrimary),
     );
   }
 }

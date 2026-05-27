@@ -304,45 +304,77 @@ def _load_check_or_404(db: Session, check_id: int) -> Check:
     return obj
 
 
+def _person_display_name(db: Session, person_id: Optional[int]) -> Optional[str]:
+    if not person_id:
+        return None
+    p = db.query(Person).filter(Person.id == int(person_id)).first()
+    return getattr(p, "alias_name", None) if p else None
+
+
+def _unwrap_check_from_deposit(
+    db: Session,
+    obj: Check,
+    user_id: int,
+    *,
+    purpose: str,
+) -> None:
+    """اگر چک سپرده شده باشد، قبل از واگذاری/عودت به RECEIVED_ON_HAND برمی‌گرداند."""
+    if obj.status != CheckStatus.DEPOSITED:
+        return
+    amount_dec = Decimal(str(obj.amount))
+    purpose_labels = {
+        "endorse": ("برگشت از سپرده برای واگذاری", "deposit_return_for_endorse"),
+        "return": ("برگشت از سپرده برای عودت", "deposit_return_for_return"),
+    }
+    label, action_key = purpose_labels.get(purpose, purpose_labels["return"])
+    deposit_return_lines: List[Dict[str, Any]] = [
+        {
+            "account_id": _ensure_account(db, "10403"),
+            "debit": amount_dec,
+            "credit": Decimal(0),
+            "description": label,
+            "check_id": obj.id,
+        },
+        {
+            "account_id": _ensure_account(db, "10404"),
+            "debit": Decimal(0),
+            "credit": amount_dec,
+            "description": label,
+            "check_id": obj.id,
+        },
+    ]
+    _create_document_for_check_action(
+        db,
+        business_id=obj.business_id,
+        user_id=user_id,
+        currency_id=obj.currency_id,
+        document_date=obj.due_date.date(),
+        description=label,
+        lines=deposit_return_lines,
+        extra_info={"source": "check_action", "action": action_key, "check_id": obj.id},
+    )
+    obj.status = CheckStatus.RECEIVED_ON_HAND
+    obj.status_at = datetime.utcnow()
+    obj.current_holder_type = HolderType.BUSINESS
+    obj.current_holder_id = None
+
+
+def _resolve_return_type(obj: Check, data: Dict[str, Any]) -> str:
+    explicit = (data.get("return_type") or "").strip().lower()
+    if explicit in ("from_endorsee", "to_drawer"):
+        return explicit
+    if obj.type == CheckType.RECEIVED and obj.status == CheckStatus.ENDORSED:
+        return "from_endorsee"
+    return "to_drawer"
+
+
 def endorse_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
     obj = _load_check_or_404(db, check_id)
     if obj.type != CheckType.RECEIVED:
         raise ApiError("INVALID_ACTION", "Only received checks can be endorsed", http_status=400)
     
-    # اگر چک از وضعیت DEPOSITED باشد، ابتدا باید به RECEIVED_ON_HAND برگردد
-    if obj.status == CheckStatus.DEPOSITED:
-        # ایجاد سند برای برگشت از DEPOSITED به RECEIVED_ON_HAND
-        deposit_return_lines: List[Dict[str, Any]] = []
-        amount_dec = Decimal(str(obj.amount))
-        # Dr 10403, Cr 10404
-        deposit_return_lines.append({
-            "account_id": _ensure_account(db, "10403"),
-            "debit": amount_dec,
-            "credit": Decimal(0),
-            "description": "برگشت از سپرده برای واگذاری",
-            "check_id": obj.id,
-        })
-        deposit_return_lines.append({
-            "account_id": _ensure_account(db, "10404"),
-            "debit": Decimal(0),
-            "credit": amount_dec,
-            "description": "برگشت از سپرده برای واگذاری",
-            "check_id": obj.id,
-        })
-        
-        _create_document_for_check_action(
-            db,
-            business_id=obj.business_id,
-            user_id=user_id,
-            currency_id=obj.currency_id,
-            document_date=obj.due_date.date(),
-            description="برگشت از سپرده برای واگذاری",
-            lines=deposit_return_lines,
-            extra_info={"source": "check_action", "action": "deposit_return_for_endorse", "check_id": obj.id},
-        )
-        obj.status = CheckStatus.RECEIVED_ON_HAND
-        obj.status_at = datetime.utcnow()
-    
+    _unwrap_check_from_deposit(db, obj, user_id, purpose="endorse")
+
     # اجازه واگذاری از وضعیت‌های RECEIVED_ON_HAND, RETURNED, BOUNCED یا وضعیت خالی (None)
     if obj.status is not None and obj.status not in (CheckStatus.RECEIVED_ON_HAND, CheckStatus.RETURNED, CheckStatus.BOUNCED):
         raise ApiError("INVALID_STATE", f"Cannot endorse from status {obj.status}", http_status=400)
@@ -379,7 +411,12 @@ def endorse_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]
         document_date=document_date,
         description=description,
         lines=lines,
-        extra_info={"source": "check_action", "action": "endorse", "check_id": obj.id},
+        extra_info={
+            "source": "check_action",
+            "action": "endorse",
+            "check_id": obj.id,
+            "target_person_id": target_person_id,
+        },
     )
 
     # Update state
@@ -484,93 +521,177 @@ def pay_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]) ->
 
 def return_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
     obj = _load_check_or_404(db, check_id)
-    # بررسی وضعیت: نمی‌توان چک پاس شده را عودت داد
     if obj.status == CheckStatus.CLEARED:
         raise ApiError("INVALID_STATE", "Cannot return a cleared check", http_status=400)
-    
-    # اگر چک دریافتی از وضعیت DEPOSITED باشد، ابتدا باید به RECEIVED_ON_HAND برگردد
-    if obj.type == CheckType.RECEIVED and obj.status == CheckStatus.DEPOSITED:
-        # ایجاد سند برای برگشت از DEPOSITED به RECEIVED_ON_HAND
-        deposit_return_lines: List[Dict[str, Any]] = []
-        amount_dec = Decimal(str(obj.amount))
-        # Dr 10403, Cr 10404
-        deposit_return_lines.append({
-            "account_id": _ensure_account(db, "10403"),
-            "debit": amount_dec,
-            "credit": Decimal(0),
-            "description": "برگشت از سپرده برای عودت",
-            "check_id": obj.id,
-        })
-        deposit_return_lines.append({
-            "account_id": _ensure_account(db, "10404"),
-            "debit": Decimal(0),
-            "credit": amount_dec,
-            "description": "برگشت از سپرده برای عودت",
-            "check_id": obj.id,
-        })
-        
-        _create_document_for_check_action(
-            db,
-            business_id=obj.business_id,
-            user_id=user_id,
-            currency_id=obj.currency_id,
-            document_date=obj.due_date.date(),
-            description="برگشت از سپرده برای عودت",
-            lines=deposit_return_lines,
-            extra_info={"source": "check_action", "action": "deposit_return_for_return", "check_id": obj.id},
-        )
-        obj.status = CheckStatus.RECEIVED_ON_HAND
-        obj.status_at = datetime.utcnow()
-    
+    if obj.status == CheckStatus.CANCELLED:
+        raise ApiError("INVALID_STATE", "Cannot return a cancelled check", http_status=400)
+
     document_date = _parse_optional_date(data.get("document_date"), obj.issue_date.date())
     description = (data.get("description") or None)
     amount_dec = Decimal(str(obj.amount))
     lines: List[Dict[str, Any]] = []
+    doc_extra: Dict[str, Any] = {"source": "check_action", "check_id": obj.id}
 
-    if obj.type == CheckType.RECEIVED:
-        if not obj.person_id:
-            raise ApiError("PERSON_REQUIRED", "person_id is required on received check to return", http_status=400)
-        # Dr 10401(person), Cr 10403
-        lines.append({
-            "account_id": _ensure_account(db, "10401"),
-            "person_id": int(obj.person_id),
-            "debit": amount_dec,
-            "credit": Decimal(0),
-            "description": description or "عودت چک",
-            "check_id": obj.id,
-        })
-        lines.append({
-            "account_id": _ensure_account(db, "10403"),
-            "debit": Decimal(0),
-            "credit": amount_dec,
-            "description": description or "عودت چک",
-            "check_id": obj.id,
-        })
-        obj.current_holder_type = HolderType.PERSON
-        obj.current_holder_id = int(obj.person_id)
-    else:
-        # transferred: Dr 20202, Cr 20201(person)
+    if obj.type == CheckType.TRANSFERRED:
+        if obj.status == CheckStatus.RETURNED:
+            raise ApiError("INVALID_STATE", "Check is already returned", http_status=400)
         if not obj.person_id:
             raise ApiError("PERSON_REQUIRED", "person_id is required on transferred check to return", http_status=400)
-        lines.append({
-            "account_id": _ensure_account(db, "20202"),
-            "debit": amount_dec,
-            "credit": Decimal(0),
-            "description": description or "عودت چک",
-            "check_id": obj.id,
-        })
-        lines.append({
-            "account_id": _ensure_account(db, "20201"),
-            "person_id": int(obj.person_id),
-            "debit": Decimal(0),
-            "credit": amount_dec,
-            "description": description or "عودت چک",
-            "check_id": obj.id,
-        })
+        lines.extend([
+            {
+                "account_id": _ensure_account(db, "20202"),
+                "debit": amount_dec,
+                "credit": Decimal(0),
+                "description": description or "عودت چک پرداختنی",
+                "check_id": obj.id,
+            },
+            {
+                "account_id": _ensure_account(db, "20201"),
+                "person_id": int(obj.person_id),
+                "debit": Decimal(0),
+                "credit": amount_dec,
+                "description": description or "عودت چک پرداختنی",
+                "check_id": obj.id,
+            },
+        ])
+        doc_extra["action"] = "return_transferred"
+        obj.status = CheckStatus.RETURNED
         obj.current_holder_type = HolderType.BUSINESS
         obj.current_holder_id = None
+    else:
+        _unwrap_check_from_deposit(db, obj, user_id, purpose="return")
+        return_type = _resolve_return_type(obj, data)
 
-    # ایجاد سند (الزامی)
+        if return_type == "from_endorsee":
+            if obj.status != CheckStatus.ENDORSED:
+                raise ApiError(
+                    "INVALID_STATE",
+                    "Return from endorsee is only allowed when check status is ENDORSED",
+                    http_status=400,
+                )
+            endorsee_id = data.get("target_person_id") or obj.current_holder_id
+            if not endorsee_id:
+                raise ApiError("PERSON_REQUIRED", "target_person_id or current_holder_id required", http_status=400)
+            endorsee_id = int(endorsee_id)
+            if (
+                obj.current_holder_type == HolderType.PERSON
+                and obj.current_holder_id
+                and int(obj.current_holder_id) != endorsee_id
+            ):
+                raise ApiError(
+                    "INVALID_PERSON",
+                    "target_person_id does not match current endorsee",
+                    http_status=400,
+                )
+            desc = description or "برگشت چک از واگذارشونده"
+            lines.extend([
+                {
+                    "account_id": _ensure_account(db, "10403"),
+                    "debit": amount_dec,
+                    "credit": Decimal(0),
+                    "description": desc,
+                    "check_id": obj.id,
+                },
+                {
+                    "account_id": _ensure_account(db, "20201"),
+                    "person_id": endorsee_id,
+                    "debit": Decimal(0),
+                    "credit": amount_dec,
+                    "description": desc,
+                    "check_id": obj.id,
+                },
+            ])
+            doc_extra["action"] = "return_from_endorsee"
+            doc_extra["target_person_id"] = endorsee_id
+            obj.status = CheckStatus.RECEIVED_ON_HAND
+            obj.current_holder_type = HolderType.BUSINESS
+            obj.current_holder_id = None
+        else:
+            # to_drawer — عودت به صادرکننده
+            if obj.status == CheckStatus.RETURNED:
+                raise ApiError("INVALID_STATE", "Check is already returned to drawer", http_status=400)
+            if not obj.person_id:
+                raise ApiError("PERSON_REQUIRED", "person_id is required on received check to return", http_status=400)
+            drawer_id = int(obj.person_id)
+            desc_drawer = description or "عودت چک به صادرکننده"
+
+            if obj.status == CheckStatus.ENDORSED:
+                endorsee_id = obj.current_holder_id
+                if not endorsee_id:
+                    raise ApiError("PERSON_REQUIRED", "current_holder_id required for endorsed check", http_status=400)
+                endorsee_id = int(endorsee_id)
+                desc_unwind = description or "لغو واگذاری و عودت به صادرکننده"
+                lines.extend([
+                    {
+                        "account_id": _ensure_account(db, "10403"),
+                        "debit": amount_dec,
+                        "credit": Decimal(0),
+                        "description": desc_unwind,
+                        "check_id": obj.id,
+                    },
+                    {
+                        "account_id": _ensure_account(db, "20201"),
+                        "person_id": endorsee_id,
+                        "debit": Decimal(0),
+                        "credit": amount_dec,
+                        "description": desc_unwind,
+                        "check_id": obj.id,
+                    },
+                    {
+                        "account_id": _ensure_account(db, "10401"),
+                        "person_id": drawer_id,
+                        "debit": amount_dec,
+                        "credit": Decimal(0),
+                        "description": desc_drawer,
+                        "check_id": obj.id,
+                    },
+                    {
+                        "account_id": _ensure_account(db, "10403"),
+                        "debit": Decimal(0),
+                        "credit": amount_dec,
+                        "description": desc_drawer,
+                        "check_id": obj.id,
+                    },
+                ])
+                doc_extra["action"] = "return_to_drawer_after_endorse"
+                doc_extra["target_person_id"] = endorsee_id
+                doc_extra["drawer_person_id"] = drawer_id
+            else:
+                allowed = (
+                    CheckStatus.RECEIVED_ON_HAND,
+                    CheckStatus.BOUNCED,
+                    None,
+                )
+                if obj.status not in allowed:
+                    raise ApiError(
+                        "INVALID_STATE",
+                        f"Cannot return to drawer from status {obj.status}",
+                        http_status=400,
+                    )
+                lines.extend([
+                    {
+                        "account_id": _ensure_account(db, "10401"),
+                        "person_id": drawer_id,
+                        "debit": amount_dec,
+                        "credit": Decimal(0),
+                        "description": desc_drawer,
+                        "check_id": obj.id,
+                    },
+                    {
+                        "account_id": _ensure_account(db, "10403"),
+                        "debit": Decimal(0),
+                        "credit": amount_dec,
+                        "description": desc_drawer,
+                        "check_id": obj.id,
+                    },
+                ])
+                doc_extra["action"] = "return_to_drawer"
+                doc_extra["drawer_person_id"] = drawer_id
+
+            obj.status = CheckStatus.RETURNED
+            obj.current_holder_type = HolderType.PERSON
+            obj.current_holder_id = drawer_id
+
     document_id = _create_document_for_check_action(
         db,
         business_id=obj.business_id,
@@ -579,10 +700,9 @@ def return_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any])
         document_date=document_date,
         description=description,
         lines=lines,
-        extra_info={"source": "check_action", "action": "return", "check_id": obj.id},
+        extra_info=doc_extra,
     )
 
-    obj.status = CheckStatus.RETURNED
     obj.status_at = datetime.utcnow()
     obj.last_action_document_id = document_id
     try:
@@ -593,6 +713,7 @@ def return_check(db: Session, check_id: int, user_id: int, data: Dict[str, Any])
     db.refresh(obj)
     res = check_to_dict(db, obj)
     res["document_id"] = document_id
+    res["return_type"] = doc_extra.get("action")
     return res
 
 
@@ -1263,11 +1384,20 @@ def list_checks(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[st
                 except Exception:
                     pass
 
-    # additional params: person_id
+    # additional params: person_id — صادرکننده/طرف ثبت یا واگذارشونده فعلی
     person_param = query.get('person_id')
     if person_param:
         try:
-            q = q.filter(Check.person_id == int(person_param))
+            pid = int(person_param)
+            q = q.filter(
+                or_(
+                    Check.person_id == pid,
+                    and_(
+                        Check.current_holder_type == HolderType.PERSON,
+                        Check.current_holder_id == pid,
+                    ),
+                )
+            )
         except Exception:
             pass
 
@@ -1306,22 +1436,29 @@ def list_checks(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[st
 def check_to_dict(db: Session, obj: Optional[Check]) -> Optional[Dict[str, Any]]:
     if obj is None:
         return None
-    person_name = None
-    if obj.person_id:
-        p = db.query(Person).filter(Person.id == obj.person_id).first()
-        person_name = getattr(p, 'alias_name', None)
+    person_name = _person_display_name(db, obj.person_id)
+    current_holder_name = None
+    if obj.current_holder_type == HolderType.PERSON and obj.current_holder_id:
+        current_holder_name = _person_display_name(db, obj.current_holder_id)
     currency_title = None
     try:
         c = db.query(Currency).filter(Currency.id == obj.currency_id).first()
         currency_title = c.title or c.code if c else None
     except Exception:
         pass
+    endorsed_to_person_id = None
+    endorsed_to_person_name = None
+    if obj.status == CheckStatus.ENDORSED and obj.current_holder_id:
+        endorsed_to_person_id = obj.current_holder_id
+        endorsed_to_person_name = current_holder_name
     return {
         "id": obj.id,
         "business_id": obj.business_id,
         "type": obj.type.name.lower(),
         "person_id": obj.person_id,
         "person_name": person_name,
+        "drawer_person_id": obj.person_id,
+        "drawer_person_name": person_name,
         "issue_date": obj.issue_date.isoformat(),
         "due_date": obj.due_date.isoformat(),
         "check_number": obj.check_number,
@@ -1335,10 +1472,44 @@ def check_to_dict(db: Session, obj: Optional[Check]) -> Optional[Dict[str, Any]]
         "status_at": (obj.status_at.isoformat() if obj.status_at else None),
         "current_holder_type": (obj.current_holder_type.name if obj.current_holder_type else None),
         "current_holder_id": obj.current_holder_id,
+        "current_holder_name": current_holder_name,
+        "endorsed_to_person_id": endorsed_to_person_id,
+        "endorsed_to_person_name": endorsed_to_person_name,
         "last_action_document_id": obj.last_action_document_id,
         "created_at": obj.created_at.isoformat(),
         "updated_at": obj.updated_at.isoformat(),
     }
+
+
+def _history_action_label(db: Session, action_type: str, extra_info: Dict[str, Any]) -> str:
+    action_names = {
+        "endorse": "واگذاری",
+        "clear": "وصول/پاس",
+        "return": "عودت",
+        "return_from_endorsee": "برگشت از واگذارشونده",
+        "return_to_drawer": "عودت به صادرکننده",
+        "return_to_drawer_after_endorse": "عودت به صادرکننده (پس از لغو واگذاری)",
+        "return_transferred": "عودت چک پرداختنی",
+        "bounce": "برگشت از بانک",
+        "pay": "پرداخت",
+        "deposit": "سپرده",
+        "deposit_return_for_endorse": "برگشت از سپرده برای واگذاری",
+        "deposit_return_for_return": "برگشت از سپرده برای عودت",
+    }
+    base = action_names.get(action_type, "عملیات")
+    if action_type == "endorse":
+        name = _person_display_name(db, extra_info.get("target_person_id"))
+        if name:
+            return f"واگذاری به {name}"
+    if action_type == "return_from_endorsee":
+        name = _person_display_name(db, extra_info.get("target_person_id"))
+        if name:
+            return f"برگشت از واگذارشونده ({name})"
+    if action_type in ("return_to_drawer", "return_to_drawer_after_endorse"):
+        name = _person_display_name(db, extra_info.get("drawer_person_id"))
+        if name:
+            return f"عودت به صادرکننده ({name})"
+    return base
 
 
 def get_check_history_and_documents(db: Session, check_id: int) -> Dict[str, Any]:
@@ -1444,17 +1615,7 @@ def get_check_history_and_documents(db: Session, check_id: int) -> Dict[str, Any
         extra_info = doc.extra_info or {}
         if extra_info.get("source") == "check_action":
             action_type = extra_info.get("action_type") or extra_info.get("action") or "unknown"
-            action_names = {
-                "endorse": "واگذاری",
-                "clear": "وصول/پاس",
-                "return": "عودت",
-                "bounce": "برگشت",
-                "pay": "پرداخت",
-                "deposit": "سپرده",
-                "deposit_return_for_endorse": "برگشت از سپرده برای واگذاری",
-                "deposit_return_for_return": "برگشت از سپرده برای عودت",
-            }
-            action_name = action_names.get(action_type, "عملیات")
+            action_name = _history_action_label(db, action_type, extra_info)
             history.append({
                 "action": action_name,
                 "action_type": action_type,
@@ -1462,6 +1623,10 @@ def get_check_history_and_documents(db: Session, check_id: int) -> Dict[str, Any
                 "document_id": doc.id,
                 "document_code": doc.code,
                 "description": doc.description or action_name,
+                "target_person_id": extra_info.get("target_person_id"),
+                "target_person_name": _person_display_name(db, extra_info.get("target_person_id")),
+                "drawer_person_id": extra_info.get("drawer_person_id"),
+                "drawer_person_name": _person_display_name(db, extra_info.get("drawer_person_id")),
             })
     
     # مرتب‌سازی سوابق بر اساس تاریخ

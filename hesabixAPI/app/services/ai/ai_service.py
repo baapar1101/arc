@@ -53,6 +53,7 @@ from app.services.ai.ai_constants import (
     KNOWLEDGE_LOAD_TIMEOUT_SEC,
     MAX_AGENT_ITERATIONS,
     PLANNING_STEP_MIN_CHARS,
+    PROMPT_LOADER_TIMEOUT_SEC,
 )
 from app.services.ai.ai_exploration_service import (
     EXPLORATION_MODE_EXPLORE,
@@ -599,62 +600,77 @@ class AIService:
         bid = int(business_id)
 
         def _load_insights() -> str:
-            try:
-                from app.services.ai.ai_insight_service import (
-                    get_business_insights_cached,
-                    format_insights_for_prompt,
-                )
+            from adapters.db.session import get_db_session
 
-                insights = get_business_insights_cached(self.db, bid, self.ctx)
-                return format_insights_for_prompt(insights)
-            except Exception as exc:
-                logger.warning("Failed to load AI insights for prompt: %s", exc)
-                safe_db_rollback(self.db)
-                return ""
+            with get_db_session() as loader_db:
+                try:
+                    from app.services.ai.ai_insight_service import (
+                        get_business_insights_cached,
+                        format_insights_for_prompt,
+                    )
+
+                    insights = get_business_insights_cached(loader_db, bid, self.ctx)
+                    return format_insights_for_prompt(insights)
+                except Exception as exc:
+                    logger.warning("Failed to load AI insights for prompt: %s", exc)
+                    safe_db_rollback(loader_db)
+                    return ""
 
         def _load_memory() -> str:
-            try:
-                from app.services.ai.ai_memory_service import format_memory_for_prompt
+            from adapters.db.session import get_db_session
 
-                return format_memory_for_prompt(
-                    self.db, bid, self.ctx.get_user_id()
-                )
-            except Exception as exc:
-                logger.warning("Failed to load AI memory for prompt: %s", exc)
-                safe_db_rollback(self.db)
-                return ""
+            with get_db_session() as loader_db:
+                try:
+                    from app.services.ai.ai_memory_service import format_memory_for_prompt
+
+                    return format_memory_for_prompt(
+                        loader_db, bid, self.ctx.get_user_id()
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to load AI memory for prompt: %s", exc)
+                    safe_db_rollback(loader_db)
+                    return ""
 
         def _load_attachments() -> str:
-            try:
-                from app.services.ai.ai_attachment_service import (
-                    format_attachments_for_prompt,
-                )
+            from adapters.db.session import get_db_session
 
-                return format_attachments_for_prompt(self.db, session_id)
-            except Exception as exc:
-                logger.warning("Failed to load AI attachments for prompt: %s", exc)
-                safe_db_rollback(self.db)
-                return ""
+            with get_db_session() as loader_db:
+                try:
+                    from app.services.ai.ai_attachment_service import (
+                        format_attachments_for_prompt,
+                    )
+
+                    return format_attachments_for_prompt(loader_db, session_id)
+                except Exception as exc:
+                    logger.warning("Failed to load AI attachments for prompt: %s", exc)
+                    safe_db_rollback(loader_db)
+                    return ""
 
         def _load_knowledge() -> str:
-            try:
-                from app.services.ai.ai_knowledge_service import format_knowledge_for_prompt
+            from adapters.db.session import get_db_session
 
-                return format_knowledge_for_prompt(self.db, bid, user_query or "")
-            except Exception as exc:
-                logger.warning("Failed to load AI knowledge for prompt: %s", exc)
-                safe_db_rollback(self.db)
-                return ""
+            with get_db_session() as loader_db:
+                try:
+                    from app.services.ai.ai_knowledge_service import format_knowledge_for_prompt
+
+                    return format_knowledge_for_prompt(loader_db, bid, user_query or "")
+                except Exception as exc:
+                    logger.warning("Failed to load AI knowledge for prompt: %s", exc)
+                    safe_db_rollback(loader_db)
+                    return ""
 
         def _load_connectors() -> str:
-            try:
-                from app.services.ai.ai_connector_service import format_connectors_for_prompt
+            from adapters.db.session import get_db_session
 
-                return format_connectors_for_prompt(self.db, bid)
-            except Exception as exc:
-                logger.warning("Failed to load AI connectors for prompt: %s", exc)
-                safe_db_rollback(self.db)
-                return ""
+            with get_db_session() as loader_db:
+                try:
+                    from app.services.ai.ai_connector_service import format_connectors_for_prompt
+
+                    return format_connectors_for_prompt(loader_db, bid)
+                except Exception as exc:
+                    logger.warning("Failed to load AI connectors for prompt: %s", exc)
+                    safe_db_rollback(loader_db)
+                    return ""
 
         parallel_loaders: List[tuple[str, Any]] = [
             ("loading_insights", _load_insights),
@@ -668,19 +684,18 @@ class AIService:
 
         async def _run_loader(step_key: str, loader_fn) -> tuple[str, str]:
             try:
-                if step_key == "loading_knowledge":
-                    text = await asyncio.wait_for(
-                        loop.run_in_executor(_executor, loader_fn),
-                        timeout=KNOWLEDGE_LOAD_TIMEOUT_SEC,
-                    )
-                else:
-                    text = await loop.run_in_executor(_executor, loader_fn)
+                timeout = (
+                    KNOWLEDGE_LOAD_TIMEOUT_SEC
+                    if step_key == "loading_knowledge"
+                    else PROMPT_LOADER_TIMEOUT_SEC
+                )
+                text = await asyncio.wait_for(
+                    loop.run_in_executor(_executor, loader_fn),
+                    timeout=timeout,
+                )
                 return step_key, text or ""
             except asyncio.TimeoutError:
-                logger.info(
-                    "Knowledge loader timed out after %ss, continuing without RAG",
-                    KNOWLEDGE_LOAD_TIMEOUT_SEC,
-                )
+                logger.info("Prompt loader %s timed out, continuing", step_key)
                 return step_key, ""
             except Exception as exc:
                 logger.warning("Prompt loader %s failed: %s", step_key, exc)
@@ -1467,6 +1482,10 @@ class AIService:
                     temperature=float(self.config.temperature),
                     tools=tools if use_tools else None,
                 ):
+                    if chunk.get("event") == "tool_planning":
+                        yield status_event("planning_tools")
+                        await asyncio.sleep(0)
+                        continue
                     if chunk.get("usage"):
                         final_usage = chunk["usage"]
                     if chunk.get("function_calls"):

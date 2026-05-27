@@ -268,6 +268,67 @@ class ApiClient {
     );
   }
 
+  /// URI نهایی برای مسیرهای سفارشی خارج از Dio، مثل streaming در Flutter Web.
+  Uri resolveUri(String path, {Map<String, dynamic>? query}) {
+    final resolvedPath = _resolveApiPath(path);
+    final normalizedQuery = normalizeQueryParameters(query ?? const <String, dynamic>{});
+    final base = Uri.parse(_dio.options.baseUrl);
+    final rawUri = Uri.parse(resolvedPath);
+    final uri = rawUri.hasScheme ? rawUri : base.resolve(resolvedPath);
+    if (normalizedQuery.isEmpty) {
+      return uri;
+    }
+    final merged = <String, String>{
+      ...uri.queryParameters,
+      ...normalizedQuery.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+    };
+    return uri.replace(queryParameters: merged);
+  }
+
+  /// Headerهای لازم برای درخواست‌های سفارشی که از interceptor عبور نمی‌کنند.
+  Map<String, String> streamingHeadersFor(Uri uri) {
+    final headers = <String, String>{
+      ..._dio.options.headers.map((key, value) => MapEntry(key, value.toString())),
+      'Accept': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+    };
+    final lang = _currentLocale?.toLanguageTag();
+    if (lang != null && lang.isNotEmpty) {
+      headers['Accept-Language'] = lang;
+    }
+    final apiKey = _authStore?.apiKey;
+    if (apiKey != null && apiKey.isNotEmpty) {
+      headers['Authorization'] = 'ApiKey $apiKey';
+    }
+    final deviceId = _authStore?.deviceId;
+    if (deviceId != null && deviceId.isNotEmpty) {
+      headers['X-Device-Id'] = deviceId;
+    }
+    final calendarType = _calendarController?.calendarType.value;
+    if (calendarType != null && calendarType.isNotEmpty) {
+      headers['X-Calendar-Type'] = calendarType;
+    }
+    final fyId = _fiscalYearId?.value;
+    if (fyId != null && fyId > 0) {
+      headers['X-Fiscal-Year-ID'] = fyId.toString();
+    }
+    final currentBusinessId = _authStore?.currentBusiness?.id;
+    if (currentBusinessId != null) {
+      headers['X-Business-ID'] = currentBusinessId.toString();
+    } else {
+      final idStr = uri.queryParameters['business_id'] ?? uri.queryParameters['businessId'];
+      final businessId = idStr == null ? null : int.tryParse(idStr);
+      if (businessId != null) {
+        headers['X-Business-ID'] = businessId.toString();
+      }
+    }
+    final currencyCode = _authStore?.selectedCurrencyCode;
+    if (currencyCode != null && currencyCode.isNotEmpty) {
+      headers['X-Currency'] = currencyCode;
+    }
+    return headers;
+  }
+
   Future<Response<T>> put<T>(String path, {Object? data, Map<String, dynamic>? query, Options? options, CancelToken? cancelToken}) {
     path = _resolveApiPath(path);
     return _dio.put<T>(path, data: data, queryParameters: query, options: options, cancelToken: cancelToken);

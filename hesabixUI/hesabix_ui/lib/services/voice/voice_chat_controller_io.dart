@@ -70,6 +70,13 @@ class VoiceChatController {
     );
     _playing = true;
 
+    final startPayload = <String, dynamic>{
+      'type': 'start',
+      'session_id': sessionId,
+      'collect_data': collectDataOptIn,
+    };
+    _ws.setSessionStartPayload(startPayload);
+
     await _ws.connect(
       apiKey: apiKey,
       onEvent: (event) => onEvent(event),
@@ -81,15 +88,11 @@ class VoiceChatController {
       },
       onError: (e) => onError(e.toString()),
       onDone: () => onError('اتصال صوت قطع شد.'),
+      onReconnected: () => onEvent({'type': 'reconnected'}),
     );
 
     _ws.enableReconnect();
-
-    _ws.sendJson({
-      'type': 'start',
-      'session_id': sessionId,
-      'collect_data': collectDataOptIn,
-    });
+    _ws.sendJson(startPayload);
 
     _started = true;
   }
@@ -134,6 +137,7 @@ class VoiceChatController {
   Future<void> stop() async {
     if (!_started) return;
     _ws.sendJson({'type': 'stop'});
+    _ws.disableReconnect();
     _ws.disconnect();
     await stopRecording();
     await _stopPlayer();

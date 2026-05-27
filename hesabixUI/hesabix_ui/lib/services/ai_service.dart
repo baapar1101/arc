@@ -5,6 +5,7 @@ import '../core/api_client.dart';
 import '../utils/error_extractor.dart';
 import '../models/ai_models.dart';
 import '../models/ai_stream_event.dart';
+import 'ai_sse_client.dart';
 
 // Enable debug prints
 bool get debugPrintEnabled => kDebugMode;
@@ -328,15 +329,31 @@ class AIService {
       if (explorationMode != null && explorationMode.isNotEmpty) {
         query['mode'] = explorationMode;
       }
+      final payload = <String, dynamic>{
+        'content': content,
+        'approve_writes': approveWrites,
+        if (explorationMode != null && explorationMode.isNotEmpty)
+          'mode': explorationMode,
+      };
+      final endpoint = '/api/v1/ai/chat/sessions/$sessionId/messages';
+      if (kIsWeb) {
+        final uri = _api.resolveUri(endpoint, query: query);
+        final headers = _api.streamingHeadersFor(uri);
+        await for (final eventPayload in postSsePayloads(
+          uri: uri,
+          headers: headers,
+          body: jsonEncode(payload),
+          cancelToken: cancelToken,
+        )) {
+          final chunk = _parseSsePayload(eventPayload, onError, onComplete);
+          if (chunk != null) yield chunk;
+        }
+        return;
+      }
       final response = await _api.post<ResponseBody>(
-        '/api/v1/ai/chat/sessions/$sessionId/messages',
+        endpoint,
         query: query,
-        data: {
-          'content': content,
-          'approve_writes': approveWrites,
-          if (explorationMode != null && explorationMode.isNotEmpty)
-            'mode': explorationMode,
-        },
+        data: payload,
         responseType: ResponseType.stream,
         options: Options(
           receiveTimeout: const Duration(minutes: 10),
@@ -802,6 +819,20 @@ class AIService {
     String logLabel = 'SSE',
   }) async* {
     try {
+      if (kIsWeb) {
+        final uri = _api.resolveUri(path, query: query);
+        final headers = _api.streamingHeadersFor(uri);
+        await for (final eventPayload in postSsePayloads(
+          uri: uri,
+          headers: headers,
+          body: jsonEncode(data ?? const <String, dynamic>{}),
+          cancelToken: cancelToken,
+        )) {
+          final chunk = _parseSsePayload(eventPayload, onError, onComplete);
+          if (chunk != null) yield chunk;
+        }
+        return;
+      }
       final response = await _api.post<ResponseBody>(
         path,
         data: data ?? {},

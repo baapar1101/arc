@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+
+import '../../l10n/app_localizations.dart';
+import '../../services/voice/voice_phase.dart';
 import 'ai_chat_design.dart';
+import 'voice_status_label.dart';
 
 enum AIChatComposerPlacement { center, bottom }
 
@@ -71,7 +75,8 @@ class AIChatComposer extends StatefulWidget {
   final bool disabled;
   final bool voiceStarting;
   final bool voiceActive;
-  final bool voiceRecording;
+  final VoicePhase voicePhase;
+  final Map<String, dynamic>? voiceStatusEvent;
   final VoidCallback onSend;
   final VoidCallback? onMic;
   final VoidCallback? onStopVoice;
@@ -87,7 +92,8 @@ class AIChatComposer extends StatefulWidget {
     required this.disabled,
     required this.voiceStarting,
     required this.voiceActive,
-    required this.voiceRecording,
+    this.voicePhase = VoicePhase.idle,
+    this.voiceStatusEvent,
     required this.onSend,
     this.onMic,
     this.onStopVoice,
@@ -215,14 +221,24 @@ class _AIChatComposerState extends State<AIChatComposer> {
     );
   }
 
-  bool get _canSend => !widget.disabled && !widget.sending && _hasText;
+  bool get _canSend =>
+      !widget.disabled &&
+      !widget.sending &&
+      !widget.voiceActive &&
+      _hasText;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context);
     final compact = AIChatDesign.isCompactWidth(context);
     final isCenter = widget.placement == AIChatComposerPlacement.center;
+    final voiceLabel = voiceStatusLabel(
+      l10n,
+      widget.voicePhase,
+      lastVoiceStatusEvent: widget.voiceStatusEvent,
+    );
 
     return AnimatedContainer(
       duration: AIChatDesign.layoutTransition,
@@ -249,6 +265,35 @@ class _AIChatComposerState extends State<AIChatComposer> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (widget.voiceActive && voiceLabel != null)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      compact ? 14 : 18,
+                      10,
+                      compact ? 14 : 18,
+                      0,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          widget.voicePhase == VoicePhase.speaking
+                              ? Icons.graphic_eq_rounded
+                              : Icons.mic_rounded,
+                          size: 18,
+                          color: scheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            voiceLabel,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -259,15 +304,15 @@ class _AIChatComposerState extends State<AIChatComposer> {
                         child: TextField(
                           controller: widget.controller,
                           focusNode: widget.focusNode,
-                          enabled: !widget.disabled,
+                          enabled: !widget.disabled && !widget.voiceActive,
                           minLines: 1,
                           maxLines: isCenter ? 4 : 6,
                           textInputAction: TextInputAction.send,
                           style: theme.textTheme.bodyLarge,
                           decoration: InputDecoration(
                             hintText: isCenter
-                                ? 'هر سوالی دارید بپرسید...'
-                                : 'پیام خود را بنویسید...',
+                                ? 'مثلاً: فروش این ماه را با ماه قبل مقایسه کن'
+                                : 'از دستیار مالی خود بپرسید...',
                             hintStyle: TextStyle(
                               color: scheme.onSurfaceVariant.withValues(
                                 alpha: 0.65,
@@ -312,13 +357,9 @@ class _AIChatComposerState extends State<AIChatComposer> {
                                 color: scheme.onSurfaceVariant,
                               ),
                             ),
-                          if (widget.onMic != null)
+                          if (widget.onMic != null && !widget.voiceActive)
                             IconButton(
-                              tooltip: widget.voiceActive
-                                  ? (widget.voiceRecording
-                                        ? 'توقف ضبط صدا'
-                                        : 'شروع ضبط صدا')
-                                  : 'شروع مکالمه صوتی',
+                              tooltip: l10n.aiVoiceStartMic,
                               onPressed: widget.disabled || widget.voiceStarting
                                   ? null
                                   : widget.onMic,
@@ -332,19 +373,13 @@ class _AIChatComposerState extends State<AIChatComposer> {
                                       ),
                                     )
                                   : Icon(
-                                      widget.voiceActive
-                                          ? (widget.voiceRecording
-                                                ? Icons.mic_off_rounded
-                                                : Icons.mic_none_rounded)
-                                          : Icons.mic_none_rounded,
-                                      color: widget.voiceActive
-                                          ? scheme.primary
-                                          : scheme.onSurfaceVariant,
+                                      Icons.mic_none_rounded,
+                                      color: scheme.onSurfaceVariant,
                                     ),
                             ),
                           if (widget.voiceActive && widget.onStopVoice != null)
                             IconButton(
-                              tooltip: 'پایان مکالمه صوتی',
+                              tooltip: l10n.aiVoiceEndCall,
                               onPressed: widget.voiceStarting
                                   ? null
                                   : widget.onStopVoice,
@@ -363,9 +398,21 @@ class _AIChatComposerState extends State<AIChatComposer> {
                     ),
                   ],
                 ),
+                if (!compact)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+                    child: _CommandBar(
+                      focused: _focused,
+                      sending: widget.sending,
+                      hasAttach: widget.onAttach != null,
+                      hasVoice: widget.onMic != null,
+                      voiceActive: widget.voiceActive,
+                      l10n: l10n,
+                    ),
+                  ),
                 if (_focused && !compact)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+                    padding: const EdgeInsets.fromLTRB(22, 0, 22, 12),
                     child: Row(
                       children: [
                         Icon(
@@ -458,6 +505,102 @@ class _SlashCommandOverlay extends StatelessWidget {
             const SizedBox(height: 4),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CommandBar extends StatelessWidget {
+  final bool focused;
+  final bool sending;
+  final bool hasAttach;
+  final bool hasVoice;
+  final bool voiceActive;
+  final AppLocalizations l10n;
+
+  const _CommandBar({
+    required this.focused,
+    required this.sending,
+    required this.hasAttach,
+    required this.hasVoice,
+    required this.voiceActive,
+    required this.l10n,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return AnimatedOpacity(
+      opacity: focused || sending ? 1 : 0.72,
+      duration: const Duration(milliseconds: 180),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          _ComposerHintChip(
+            icon: Icons.keyboard_command_key_rounded,
+            label: '/ برای دستورات سریع',
+            color: scheme.primary,
+          ),
+          if (hasAttach)
+            _ComposerHintChip(
+              icon: Icons.attach_file_rounded,
+              label: 'فایل و سند',
+              color: scheme.secondary,
+            ),
+          if (hasVoice)
+            _ComposerHintChip(
+              icon: voiceActive ? Icons.graphic_eq_rounded : Icons.mic_none_rounded,
+              label: voiceActive ? l10n.aiVoiceActiveHint : l10n.aiVoiceInputHint,
+              color: voiceActive ? scheme.primary : scheme.tertiary,
+            ),
+          _ComposerHintChip(
+            icon: Icons.verified_user_outlined,
+            label: 'ثبت و ویرایش فقط با تأیید شما',
+            color: scheme.outline,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ComposerHintChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _ComposerHintChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }

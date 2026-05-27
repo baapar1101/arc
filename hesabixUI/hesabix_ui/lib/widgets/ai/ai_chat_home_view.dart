@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../services/voice/voice_phase.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
 import 'ai_chat_suggestions.dart';
@@ -10,7 +12,8 @@ class AIChatHomeView extends StatelessWidget {
   final bool disabled;
   final bool voiceStarting;
   final bool voiceActive;
-  final bool voiceRecording;
+  final VoicePhase voicePhase;
+  final Map<String, dynamic>? voiceStatusEvent;
   final bool canUseAi;
   final String? blockReason;
   final VoidCallback onSend;
@@ -30,7 +33,8 @@ class AIChatHomeView extends StatelessWidget {
     required this.disabled,
     required this.voiceStarting,
     required this.voiceActive,
-    required this.voiceRecording,
+    this.voicePhase = VoicePhase.idle,
+    this.voiceStatusEvent,
     required this.canUseAi,
     this.blockReason,
     required this.onSend,
@@ -68,15 +72,20 @@ class AIChatHomeView extends StatelessWidget {
                     _HeroIcon(isDark: isDark, scheme: scheme),
                     SizedBox(height: compact ? 20 : 28),
                     Text(
-                      'چطور می‌توانم کمکتان کنم؟',
+                      'امروز چه چیزی را در کسب‌وکارتان بررسی کنیم؟',
                       textAlign: TextAlign.center,
                       style: AIChatDesign.greetingStyle(theme),
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      'دستیار هوشمند حسابیکس در حسابداری، گزارش‌ها و تصمیم‌های روزمره کنار شماست.',
+                      'از فروش و موجودی تا مالیات، بدهکاران و جریان نقدی؛ پاسخ‌ها را با داده‌های همین کسب‌وکار تحلیل می‌کنم.',
                       textAlign: TextAlign.center,
                       style: AIChatDesign.subtitleStyle(theme),
+                    ),
+                    SizedBox(height: compact ? 20 : 28),
+                    _CapabilityCards(
+                      enabled: canUseAi && !disabled,
+                      onSelected: onSuggestionSelected,
                     ),
                     if (!canUseAi && blockReason != null) ...[
                       const SizedBox(height: 20),
@@ -97,7 +106,7 @@ class AIChatHomeView extends StatelessWidget {
                             ),
                           ),
                     ],
-                    SizedBox(height: compact ? 28 : 40),
+                    SizedBox(height: compact ? 24 : 36),
                     AIChatComposer(
                       controller: messageController,
                       focusNode: focusNode,
@@ -106,12 +115,24 @@ class AIChatHomeView extends StatelessWidget {
                       disabled: disabled || !canUseAi,
                       voiceStarting: voiceStarting,
                       voiceActive: voiceActive,
-                      voiceRecording: voiceRecording,
+                      voicePhase: voicePhase,
+                      voiceStatusEvent: voiceStatusEvent,
                       onSend: onSend,
                       onMic: canUseAi ? onMic : null,
                       onStopVoice: onStopVoice,
                     ),
-                    SizedBox(height: compact ? 24 : 32),
+                    SizedBox(height: compact ? 22 : 28),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        'شروع سریع',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     AIChatSuggestionChips(
                       suggestions: suggestions,
                       enabled: canUseAi && !disabled,
@@ -166,6 +187,142 @@ class _HeroIcon extends StatelessWidget {
   }
 }
 
+class _CapabilityCards extends StatelessWidget {
+  final bool enabled;
+  final ValueChanged<AIChatSuggestion> onSelected;
+
+  const _CapabilityCards({
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  static const _items = [
+    AIChatSuggestion(
+      label: 'گزارش مدیریتی',
+      prompt: 'یک گزارش مدیریتی کوتاه از فروش، هزینه‌ها، بدهکاران و نقدینگی کسب‌وکار تهیه کن.',
+      icon: Icons.query_stats_rounded,
+    ),
+    AIChatSuggestion(
+      label: 'هشدارهای امروز',
+      prompt: 'هشدارهای مهم امروز کسب‌وکار مثل موجودی کم، بدهی‌ها و خطاهای احتمالی را بررسی کن.',
+      icon: Icons.crisis_alert_rounded,
+    ),
+    AIChatSuggestion(
+      label: 'تحلیل مالیات',
+      prompt: 'وضعیت مالیاتی و خطاهای احتمالی ارسال فاکتورهای مالیاتی را بررسی کن.',
+      icon: Icons.verified_outlined,
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = AIChatDesign.isCompactWidth(context);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = compact
+            ? constraints.maxWidth
+            : (constraints.maxWidth - 24) / 3;
+        return Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final item in _items)
+              SizedBox(
+                width: cardWidth.clamp(190.0, 260.0).toDouble(),
+                child: _CapabilityCard(
+                  item: item,
+                  enabled: enabled,
+                  onTap: () => onSelected(item),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CapabilityCard extends StatefulWidget {
+  final AIChatSuggestion item;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _CapabilityCard({
+    required this.item,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  State<_CapabilityCard> createState() => _CapabilityCardState();
+}
+
+class _CapabilityCardState extends State<_CapabilityCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedScale(
+        scale: _hovered && widget.enabled ? 1.015 : 1,
+        duration: const Duration(milliseconds: 160),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.enabled ? widget.onTap : null,
+            borderRadius: BorderRadius.circular(AIChatDesign.cardRadius),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.all(16),
+              decoration: AIChatDesign.elevatedCard(
+                theme,
+                alpha: _hovered ? 0.96 : 0.78,
+                accent: _hovered ? scheme.primary : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: scheme.primaryContainer.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(widget.item.icon, color: scheme.primary),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    widget.item.label,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.item.prompt,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProactiveAlertCard extends StatelessWidget {
   final Map<String, dynamic> alert;
   final ValueChanged<String>? onAction;
@@ -199,7 +356,7 @@ class _ProactiveAlertCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: actionPrompt != null && onAction != null
-            ? () => onAction!(actionPrompt!)
+            ? () => onAction!(actionPrompt)
             : null,
         borderRadius: BorderRadius.circular(14),
         child: Padding(

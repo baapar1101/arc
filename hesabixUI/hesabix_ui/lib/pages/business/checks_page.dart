@@ -136,12 +136,28 @@ class _ChecksPageState extends State<ChecksPage> {
           filterType: ColumnFilterType.multiSelect,
           filterOptions: const [
             FilterOption(value: 'received', label: 'دریافتی'),
-            FilterOption(value: 'transferred', label: 'واگذار شده'),
+            FilterOption(value: 'transferred', label: 'پرداختنی'),
           ],
           formatter: (row) =>
-              (row['type'] == 'received') ? 'دریافتی' : (row['type'] == 'transferred' ? 'واگذار شده' : '-'),
+              (row['type'] == 'received') ? 'دریافتی' : (row['type'] == 'transferred' ? 'پرداختنی' : '-'),
         ),
-        TextColumn('person_name', 'شخص', width: ColumnWidth.large, formatter: (row) => (row['person_name'] ?? '-')),
+        TextColumn(
+          'person_name',
+          'صادرکننده / طرف',
+          width: ColumnWidth.large,
+          formatter: (row) => (row['drawer_person_name'] ?? row['person_name'] ?? '-'),
+        ),
+        TextColumn(
+          'endorsed_to_person_name',
+          'واگذار به',
+          width: ColumnWidth.medium,
+          formatter: (row) {
+            final name = row['endorsed_to_person_name'] ?? row['current_holder_name'];
+            if (name != null && name.toString().isNotEmpty) return name.toString();
+            final status = (row['status'] ?? '').toString();
+            return status == 'ENDORSED' ? '-' : '';
+          },
+        ),
         DateColumn(
           'issue_date',
           'تاریخ صدور',
@@ -187,7 +203,7 @@ class _ChecksPageState extends State<ChecksPage> {
             FilterOption(value: 'TRANSFERRED_ISSUED', label: 'صادر شده (پرداختنی)'),
             FilterOption(value: 'DEPOSITED', label: 'سپرده به بانک'),
             FilterOption(value: 'CLEARED', label: 'پاس/وصول شده'),
-            FilterOption(value: 'ENDORSED', label: 'واگذار شده'),
+            FilterOption(value: 'ENDORSED', label: 'واگذاری به شخص'),
             FilterOption(value: 'RETURNED', label: 'عودت شده'),
             FilterOption(value: 'BOUNCED', label: 'برگشت خورده'),
             FilterOption(value: 'CANCELLED', label: 'ابطال'),
@@ -204,7 +220,7 @@ class _ChecksPageState extends State<ChecksPage> {
               case 'CLEARED':
                 return 'پاس/وصول شده';
               case 'ENDORSED':
-                return 'واگذار شده';
+                return 'واگذاری به شخص';
               case 'RETURNED':
                 return 'عودت شده';
               case 'BOUNCED':
@@ -274,24 +290,26 @@ class _ChecksPageState extends State<ChecksPage> {
             DataTableAction(
               icon: Icons.reply,
               label: 'عودت',
-              onTap: (row) {
-                final status = (row['status'] ?? '').toString();
-                if (status != 'CLEARED') {
-                  _confirmReturn(context, row as Map<String, dynamic>);
-                } else {
-                  SnackBarHelper.show(context, message: 'این چک قبلاً پاس شده است');
-                }
-              },
+              onTap: (row) => _confirmReturn(context, row as Map<String, dynamic>),
             ),
             DataTableAction(
               icon: Icons.block,
               label: 'برگشت',
               onTap: (row) {
+                final type = (row['type'] ?? '').toString();
                 final status = (row['status'] ?? '').toString();
-                if (status != 'CLEARED') {
+                final canBounceReceived =
+                    type == 'received' && (status == 'DEPOSITED' || status == 'CLEARED');
+                final canBounceTransferred = type == 'transferred' && status != 'CLEARED';
+                if (canBounceReceived || canBounceTransferred) {
                   _confirmBounce(context, row as Map<String, dynamic>);
+                } else if (type == 'received') {
+                  SnackBarHelper.show(
+                    context,
+                    message: 'برگشت از بانک فقط برای چک سپرده‌شده یا پاس‌شده مجاز است',
+                  );
                 } else {
-                  SnackBarHelper.show(context, message: 'این چک قبلاً پاس شده است');
+                  SnackBarHelper.show(context, message: 'این عملیات برای وضعیت فعلی مجاز نیست');
                 }
               },
             ),
@@ -514,11 +532,103 @@ class _ChecksPageState extends State<ChecksPage> {
   }
 
   Future<void> _confirmReturn(BuildContext context, Map<String, dynamic> row) async {
+    final type = (row['type'] ?? '').toString();
+    final status = (row['status'] ?? '').toString();
+    final checkId = row['id'] as int;
+
+    if (status == 'CLEARED') {
+      SnackBarHelper.show(context, message: 'چک پاس‌شده قابل عودت نیست');
+      return;
+    }
+    if (status == 'CANCELLED') {
+      SnackBarHelper.show(context, message: 'چک ابطال‌شده قابل عودت نیست');
+      return;
+    }
+
+    String? returnType;
+    String confirmMessage;
+
+    if (type == 'transferred') {
+      if (status == 'RETURNED') {
+        SnackBarHelper.show(context, message: 'این چک قبلاً عودت شده است');
+        return;
+      }
+      confirmMessage = 'چک پرداختنی به وضعیت عودت‌شده منتقل می‌شود. ادامه می‌دهید؟';
+    } else if (type == 'received') {
+      if (status == 'RETURNED') {
+        SnackBarHelper.show(context, message: 'این چک قبلاً به صادرکننده عودت شده است');
+        return;
+      }
+      if (status == 'ENDORSED') {
+        final choice = await showDialog<String>(
+          context: context,
+          builder: (ctx) {
+            var selected = 'from_endorsee';
+            return StatefulBuilder(
+              builder: (context, setState) => AlertDialog(
+                title: const Text('نوع عودت چک'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'چک به ${row['endorsed_to_person_name'] ?? row['current_holder_name'] ?? 'شخص واگذارشونده'} واگذار شده است.',
+                    ),
+                    const SizedBox(height: 16),
+                    RadioListTile<String>(
+                      title: const Text('برگشت از واگذارشونده'),
+                      subtitle: const Text('چک دوباره در دست شما می‌ماند (اسناد دریافتنی)'),
+                      value: 'from_endorsee',
+                      groupValue: selected,
+                      onChanged: (v) => setState(() => selected = v ?? 'from_endorsee'),
+                    ),
+                    RadioListTile<String>(
+                      title: const Text('عودت به صادرکننده'),
+                      subtitle: Text(
+                        'لغو واگذاری و برگشت چک به ${row['drawer_person_name'] ?? row['person_name'] ?? 'صادرکننده'}',
+                      ),
+                      value: 'to_drawer',
+                      groupValue: selected,
+                      onChanged: (v) => setState(() => selected = v ?? 'to_drawer'),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+                  FilledButton(onPressed: () => Navigator.pop(ctx, selected), child: const Text('ادامه')),
+                ],
+              ),
+            );
+          },
+        );
+        if (choice == null || !context.mounted) return;
+        returnType = choice;
+        confirmMessage = choice == 'from_endorsee'
+            ? 'چک از واگذارشونده به دست شما برمی‌گردد. ادامه می‌دهید؟'
+            : 'واگذاری لغو و چک به صادرکننده عودت داده می‌شود. ادامه می‌دهید؟';
+      } else if (status.isEmpty ||
+          status == 'RECEIVED_ON_HAND' ||
+          status == 'BOUNCED' ||
+          status == 'DEPOSITED') {
+        returnType = 'to_drawer';
+        final drawer = row['drawer_person_name'] ?? row['person_name'] ?? 'صادرکننده';
+        confirmMessage = status == 'DEPOSITED'
+            ? 'چک از سپرده خارج و سپس به $drawer عودت داده می‌شود. ادامه می‌دهید؟'
+            : 'چک به $drawer (صادرکننده) عودت داده می‌شود. ادامه می‌دهید؟';
+      } else {
+        SnackBarHelper.show(context, message: 'عودت در وضعیت فعلی مجاز نیست');
+        return;
+      }
+    } else {
+      SnackBarHelper.show(context, message: 'نوع چک نامعتبر است');
+      return;
+    }
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('عودت چک'),
-        content: const Text('آیا از عودت این چک مطمئن هستید؟'),
+        title: const Text('تأیید عودت'),
+        content: Text(confirmMessage),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('خیر')),
           FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('بله')),
@@ -528,8 +638,21 @@ class _ChecksPageState extends State<ChecksPage> {
     if (ok != true) return;
     if (!context.mounted) return;
     try {
-      await _checkService.returnCheck(checkId: row['id'] as int, body: {});
+      final body = <String, dynamic>{};
+      if (returnType != null) {
+        body['return_type'] = returnType;
+      }
+      if (returnType == 'from_endorsee') {
+        final holderId = row['current_holder_id'] ?? row['endorsed_to_person_id'];
+        if (holderId != null) {
+          body['target_person_id'] = holderId;
+        }
+      }
+      await _checkService.returnCheck(checkId: checkId, body: body);
       _refresh();
+      if (context.mounted) {
+        SnackBarHelper.showSuccess(context, message: 'عودت با موفقیت ثبت شد');
+      }
     } catch (e) {
       if (!context.mounted) return;
       SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');

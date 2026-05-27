@@ -15,11 +15,13 @@ class VoiceWsClientIO implements VoiceWsClient {
   static const Duration _reconnectDelay = Duration(seconds: 2);
   Timer? _reconnectTimer;
   String? _storedApiKey;
+  Map<String, dynamic>? _sessionStartPayload;
 
   void Function(Map<String, dynamic>)? _onEvent;
   void Function(List<int>)? _onAudioFrame;
   void Function(Object error)? _onError;
   void Function()? _onDone;
+  void Function()? _onReconnected;
 
   @override
   bool get isConnected => _socket != null && _socket!.readyState == WebSocket.open;
@@ -31,6 +33,8 @@ class VoiceWsClientIO implements VoiceWsClient {
     required void Function(List<int> pcmFrame) onAudioFrame,
     void Function(Object error)? onError,
     void Function()? onDone,
+    void Function()? onReconnected,
+    bool preferBinaryDownlink = true,
   }) async {
     if (_connecting || isConnected) return;
     _connecting = true;
@@ -39,7 +43,9 @@ class VoiceWsClientIO implements VoiceWsClient {
     _onAudioFrame = onAudioFrame;
     _onError = onError;
     _onDone = onDone;
+    _onReconnected = onReconnected;
     _reconnectAttempts = 0;
+    final restoring = _sessionStartPayload != null;
 
     try {
       final apiBase = AppConfig.apiBaseUrl;
@@ -50,7 +56,11 @@ class VoiceWsClientIO implements VoiceWsClient {
 
       _socket = await WebSocket.connect(url);
       _socket!.add(jsonEncode(<String, String>{'type': 'auth', 'api_key': apiKey}));
-      _reconnectAttempts = 0; // Reset on successful connection
+      _reconnectAttempts = 0;
+      if (restoring && _sessionStartPayload != null) {
+        sendJson(_sessionStartPayload!);
+        _onReconnected?.call();
+      }
       _socket!.listen(
         (dynamic data) {
           try {
@@ -103,6 +113,8 @@ class VoiceWsClientIO implements VoiceWsClient {
               onAudioFrame: _onAudioFrame!,
               onError: _onError,
               onDone: _onDone,
+              onReconnected: _onReconnected,
+              preferBinaryDownlink: true,
             );
           }
         }
@@ -127,11 +139,22 @@ class VoiceWsClientIO implements VoiceWsClient {
   }
 
   @override
+  void sendWebmChunk(List<int> bytes) {
+    sendBytes(bytes);
+  }
+
+  @override
+  void setSessionStartPayload(Map<String, dynamic> payload) {
+    _sessionStartPayload = Map<String, dynamic>.from(payload);
+  }
+
+  @override
   void disconnect() {
     _shouldReconnect = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
     _storedApiKey = null;
+    _sessionStartPayload = null;
     try {
       _socket?.close();
     } catch (_) {}
@@ -145,6 +168,7 @@ class VoiceWsClientIO implements VoiceWsClient {
     _reconnectAttempts = 0;
   }
 
+  @override
   void disableReconnect() {
     _shouldReconnect = false;
     _reconnectTimer?.cancel();

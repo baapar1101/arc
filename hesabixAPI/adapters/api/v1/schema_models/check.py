@@ -57,6 +57,8 @@ class CheckResponse(BaseModel):
     type: str
     person_id: Optional[int]
     person_name: Optional[str]
+    drawer_person_id: Optional[int] = None
+    drawer_person_name: Optional[str] = None
     issue_date: str
     due_date: str
     check_number: str
@@ -66,6 +68,13 @@ class CheckResponse(BaseModel):
     amount: float
     currency_id: int
     currency: Optional[str]
+    status: Optional[str] = None
+    status_at: Optional[str] = None
+    current_holder_type: Optional[str] = None
+    current_holder_id: Optional[int] = None
+    current_holder_name: Optional[str] = None
+    endorsed_to_person_id: Optional[int] = None
+    endorsed_to_person_name: Optional[str] = None
     created_at: str
     updated_at: str
 
@@ -91,7 +100,16 @@ class CheckClearRequest(BaseModel):
 
 
 class CheckReturnRequest(BaseModel):
-    target_person_id: Optional[int] = Field(default=None, ge=1)
+    """عودت چک دریافتی: از واگذارشونده (from_endorsee) یا به صادرکننده (to_drawer)."""
+    return_type: Optional[Literal['from_endorsee', 'to_drawer']] = Field(
+        default=None,
+        description="from_endorsee: برگشت از واگذارشونده؛ to_drawer: عودت به صادرکننده. در صورت خالی، از وضعیت چک استنباط می‌شود.",
+    )
+    target_person_id: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="برای from_endorsee: شناسه واگذارشونده (پیش‌فرض: current_holder_id)",
+    )
     document_date: Optional[str] = None
     description: Optional[str] = Field(default=None, max_length=500)
 

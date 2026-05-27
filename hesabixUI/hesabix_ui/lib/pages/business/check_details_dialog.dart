@@ -407,7 +407,10 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
     final data = _checkData ?? widget.initialData!;
     final checkNumber = data['check_number']?.toString() ?? '-';
     final type = data['type']?.toString() ?? '';
-    final personName = data['person_name']?.toString() ?? '-';
+    final personName = data['drawer_person_name']?.toString() ?? data['person_name']?.toString() ?? '-';
+    final endorsedToName = data['endorsed_to_person_name']?.toString() ??
+        data['current_holder_name']?.toString();
+    final holderType = data['current_holder_type']?.toString() ?? '';
     final issueDate = _formatDate(data['issue_date'], rawValue: data['issue_date_raw']);
     final dueDate = _formatDate(data['due_date'], rawValue: data['due_date_raw']);
     final sayadCode = data['sayad_code']?.toString();
@@ -415,7 +418,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
     final branchName = data['branch_name']?.toString();
     final currency = data['currency']?.toString() ?? '-';
     final status = _formatStatus(data['status']?.toString() ?? '');
-    final typeLabel = type == 'received' ? 'دریافتی' : (type == 'transferred' ? 'واگذار شده' : '-');
+    final typeLabel = type == 'received' ? 'دریافتی' : (type == 'transferred' ? 'پرداختنی' : '-');
     final amountValue = data['amount'];
     final amountStr = _formatAmount(amountValue);
 
@@ -439,7 +442,21 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
             spacing: 12,
             runSpacing: 12,
             children: [
-              _buildInfoCard(theme, title: 'شخص مرتبط', value: personName, icon: Icons.person_outline),
+              _buildInfoCard(theme, title: 'صادرکننده / طرف ثبت', value: personName, icon: Icons.person_outline),
+              if (endorsedToName != null && endorsedToName.isNotEmpty)
+                _buildInfoCard(
+                  theme,
+                  title: 'واگذار شده به',
+                  value: endorsedToName,
+                  icon: Icons.swap_horiz,
+                )
+              else if (holderType == 'PERSON' && (data['current_holder_name']?.toString().isNotEmpty ?? false))
+                _buildInfoCard(
+                  theme,
+                  title: 'نگهدارنده فعلی',
+                  value: data['current_holder_name'].toString(),
+                  icon: Icons.how_to_reg_outlined,
+                ),
               _buildInfoCard(theme, title: 'شماره چک', value: checkNumber, icon: Icons.confirmation_number),
               _buildInfoCard(theme, title: 'تاریخ صدور', value: issueDate, icon: Icons.event_available),
               _buildInfoCard(theme, title: 'تاریخ سررسید', value: dueDate, icon: Icons.event_note),
@@ -683,6 +700,8 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
     final date = item['date'];
     final description = item['description']?.toString() ?? '';
     final documentCode = item['document_code']?.toString();
+    final targetName = item['target_person_name']?.toString();
+    final drawerName = item['drawer_person_name']?.toString();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -693,6 +712,10 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (description.isNotEmpty) Text(description),
+            if (targetName != null && targetName.isNotEmpty)
+              Text('طرف: $targetName', style: theme.textTheme.bodySmall),
+            if (drawerName != null && drawerName.isNotEmpty)
+              Text('صادرکننده: $drawerName', style: theme.textTheme.bodySmall),
             const SizedBox(height: 4),
             Text(_formatDate(date, rawValue: item['date_raw']), style: theme.textTheme.bodySmall),
           ],
@@ -810,7 +833,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
       case 'CLEARED':
         return 'پاس/وصول شده';
       case 'ENDORSED':
-        return 'واگذار شده';
+        return 'واگذاری به شخص';
       case 'RETURNED':
         return 'عودت شده';
       case 'BOUNCED':

@@ -4,6 +4,7 @@
 # Flutter: فقط f.mirror.hesabix.ir (pub + gcs؛ upstream pub-azs.ir) — hesabixAPI/f.mirror.hesabix.ir.conf
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # PostgreSQL pgvector: scripts/ensure_pgvector.sh (idempotent, non-fatal) before Alembic migrations.
+# AI voice (local STT/TTS): scripts/ensure_voice_chat.sh — prompts if deps missing (INSTALL_VOICE in .deploy_env).
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 # آدرس API در بیلد وب: https اگر /etc/letsencrypt/live/<API_DOMAIN> وجود داشته باشد؛ وگرنه http مگر API_PUBLIC_SCHEME در محیط ست شود (TLS سفارشی).
 set -euo pipefail
@@ -100,12 +101,17 @@ if [[ ! -d "${APP_ROOT}/app/.git" ]]; then
   exit 1
 fi
 
-# Load saved config if not in env
-if [[ -z "${API_DOMAIN:-}" ]] && [[ -f "${APP_ROOT}/.deploy_env" ]]; then
-  set -a
-  # shellcheck source=/dev/null
-  source "${APP_ROOT}/.deploy_env"
-  set +a
+# Load saved deploy config (.deploy_env)
+if [[ -f "${APP_ROOT}/.deploy_env" ]]; then
+  if [[ -z "${API_DOMAIN:-}" ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "${APP_ROOT}/.deploy_env"
+    set +a
+  elif [[ -z "${INSTALL_VOICE:-}" ]]; then
+    # shellcheck source=/dev/null
+    source "${APP_ROOT}/.deploy_env"
+  fi
 fi
 
 for v in API_DOMAIN UI_DOMAIN BRANCH REPO_URL; do
@@ -164,6 +170,16 @@ export PIP_INDEX_URL="${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}"
 export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}"
 pip install --upgrade pip setuptools wheel -q
 pip install -e . -q
+ensure_voice="${APP_ROOT}/app/scripts/ensure_voice_chat.sh"
+if [[ -f "${ensure_voice}" ]]; then
+  chmod +x "${ensure_voice}" 2>/dev/null || true
+  log_info "AI voice chat (optional local STT/TTS)..."
+  if bash "${ensure_voice}" --update; then
+    log_ok "Voice chat prerequisites check completed."
+  else
+    log_info "Voice chat deps skipped or failed (non-fatal)."
+  fi
+fi
 ensure_pgvector="${APP_ROOT}/app/scripts/ensure_pgvector.sh"
 if [[ -f "${ensure_pgvector}" ]]; then
   chmod +x "${ensure_pgvector}" 2>/dev/null || true
@@ -275,6 +291,44 @@ hesabix_nginx_bin() {
   fi
   return 1
 }
+ensure_ai_chat_sse_location() {
+  local conf="$1"
+  [[ -f "$conf" ]] || return 0
+  if grep -q 'location \^~ /api/v1/ai/chat/' "$conf"; then
+    return 0
+  fi
+  python3 - "$conf" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text()
+needle = "  location /api/ {\n"
+if "location ^~ /api/v1/ai/chat/" in text or needle not in text:
+    raise SystemExit(0)
+block = """  # AI chat SSE: stream chunks immediately (no proxy buffering)
+  location ^~ /api/v1/ai/chat/ {
+    proxy_pass http://127.0.0.1:8000/api/v1/ai/chat/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 600;
+    proxy_connect_timeout 60;
+    proxy_send_timeout 600;
+    client_max_body_size 1g;
+    proxy_buffering off;
+    proxy_request_buffering off;
+    proxy_cache off;
+    gzip off;
+    add_header X-Accel-Buffering no always;
+  }
+
+"""
+path.write_text(text.replace(needle, block + needle, 1))
+PY
+}
 if [[ -f /etc/nginx/sites-available/hesabix-api.conf ]]; then
   if grep -q 'client_max_body_size' /etc/nginx/sites-available/hesabix-api.conf; then
     sed -i 's/client_max_body_size [0-9]*[kmgKMG]*/client_max_body_size 1g/' /etc/nginx/sites-available/hesabix-api.conf
@@ -283,6 +337,49 @@ if [[ -f /etc/nginx/sites-available/hesabix-api.conf ]]; then
   fi
   log_info "Ensured client_max_body_size 1g (database restore uploads)."
 fi
+ensure_ai_chat_sse_location /etc/nginx/sites-available/hesabix-api.conf
+ensure_ai_chat_sse_location /etc/nginx/sites-available/hesabix-ui.conf
+log_info "Ensured AI chat SSE nginx location (no proxy buffering)."
+ensure_voice_ws_nginx() {
+  local conf="$1"
+  [[ -f "$conf" ]] || return 0
+  if grep -q 'location /ws/' "$conf"; then
+    if ! grep -q 'proxy_read_timeout 86400' "$conf" 2>/dev/null; then
+      sed -i '/location \/ws\//,/^[[:space:]]*}/ s/proxy_read_timeout [0-9]*;/proxy_read_timeout 86400;/' "$conf" 2>/dev/null || true
+    fi
+    return 0
+  fi
+  python3 - "$conf" <<'PY'
+from pathlib import Path
+import sys
+path = Path(sys.argv[1])
+text = path.read_text()
+if "location /ws/" in text:
+    raise SystemExit(0)
+block = """
+  # WebSocket (/ws/ai/voice, notifications, ...)
+  location /ws/ {
+    proxy_pass http://127.0.0.1:8000/ws/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 86400;
+    proxy_send_timeout 86400;
+  }
+"""
+needle = "  location /api/ {\n"
+if needle not in text:
+    raise SystemExit(0)
+path.write_text(text.replace(needle, block + needle, 1))
+PY
+}
+ensure_voice_ws_nginx /etc/nginx/sites-available/hesabix-api.conf
+ensure_voice_ws_nginx /etc/nginx/sites-available/hesabix-ui.conf
+log_info "Ensured WebSocket nginx location (/ws/ai/voice)."
 # UI: version.json، service worker، flutter_bootstrap.js و main.dart.js بدون کش یک‌سالهٔ immutable
 # اگر هر دو location ورودی JS از قبل باشد، اسکریپت بلافاصله خارج می‌شود و فایل nginx را دست نمی‌زند.
 ensure_ui_nginx="${app_dir}/scripts/ensure_nginx_ui_version_probe.sh"

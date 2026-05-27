@@ -17,7 +17,7 @@ extension _SessionGroupLabel on _SessionGroup {
   String label() {
     switch (this) {
       case _SessionGroup.pinned:
-        return '📌 پین‌شده';
+        return 'پین‌شده';
       case _SessionGroup.today:
         return 'امروز';
       case _SessionGroup.yesterday:
@@ -279,8 +279,16 @@ class _SessionTileState extends State<_SessionTile> {
           child: InkWell(
             onTap: widget.onTap,
             borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: widget.selected
+                      ? scheme.primary.withValues(alpha: 0.24)
+                      : Colors.transparent,
+                ),
+              ),
               child: Row(
                 children: [
                   // آیکون pin

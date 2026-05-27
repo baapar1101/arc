@@ -1,5 +1,5 @@
 """
-Exploration mode — الگوی Cursor: Exploring → Explored → Thought.
+Exploration mode — بررسی زنده، جمع‌بندی شواهد و یافته‌های کلیدی.
 
 - ObservationStore: حافظهٔ ساخت‌یافته per-request
 - Explored bundle: ادغام چند tool در یک کارت UX

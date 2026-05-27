@@ -62,9 +62,17 @@ class CoquiTTSEngine(TTSEngineBase):
 			elif self.cfg.model_name:
 				self._tts = TTS(self.cfg.model_name)
 			else:
-				# مدل پیش‌فرض باید توسط شما در تنظیمات تعیین شود.
-				# عمداً اینجا خطا می‌دهیم تا در prod بدون مدل، کیفیت نامعلوم نباشد.
-				raise RuntimeError("TTS model_name/model_path تنظیم نشده است.")
+				from app.core.settings import get_settings
+
+				settings = get_settings()
+				default_fa = (settings.voice_tts_coqui_model_fa or "").strip()
+				if (self.cfg.language or "").startswith("fa") and default_fa:
+					self._tts = TTS(default_fa)
+				else:
+					raise RuntimeError(
+						"TTS model_name/model_path تنظیم نشده است. "
+						"برای فارسی می‌توانید VOICE_TTS_COQUI_MODEL_FA را در env تنظیم کنید."
+					)
 			return self._tts
 
 	def _float_to_pcm16(self, wav_float, sample_rate_hz: int) -> tuple[bytes, int]:

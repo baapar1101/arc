@@ -91,7 +91,7 @@ class AIChatSuggestionChips extends StatelessWidget {
     final compact = AIChatDesign.isCompactWidth(context);
 
     return Wrap(
-      alignment: WrapAlignment.center,
+      alignment: compact ? WrapAlignment.start : WrapAlignment.center,
       spacing: 10,
       runSpacing: 10,
       children: [
@@ -99,7 +99,6 @@ class AIChatSuggestionChips extends StatelessWidget {
           _SuggestionChip(
             suggestion: s,
             enabled: enabled,
-            compact: compact,
             onTap: () => onSelected(s),
           ),
       ],
@@ -110,13 +109,11 @@ class AIChatSuggestionChips extends StatelessWidget {
 class _SuggestionChip extends StatefulWidget {
   final AIChatSuggestion suggestion;
   final bool enabled;
-  final bool compact;
   final VoidCallback onTap;
 
   const _SuggestionChip({
     required this.suggestion,
     required this.enabled,
-    required this.compact,
     required this.onTap,
   });
 
@@ -142,10 +139,7 @@ class _SuggestionChipState extends State<_SuggestionChip> {
           borderRadius: BorderRadius.circular(AIChatDesign.chipRadius),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: EdgeInsets.symmetric(
-              horizontal: widget.compact ? 14 : 18,
-              vertical: widget.compact ? 10 : 12,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: AIChatDesign.chipDecoration(theme).copyWith(
               color: _hovered && widget.enabled
                   ? scheme.primaryContainer.withValues(alpha: 0.55)
@@ -159,12 +153,20 @@ class _SuggestionChipState extends State<_SuggestionChip> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  widget.suggestion.icon,
-                  size: 18,
-                  color: widget.enabled
-                      ? scheme.primary
-                      : scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    widget.suggestion.icon,
+                    size: 16,
+                    color: widget.enabled
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
