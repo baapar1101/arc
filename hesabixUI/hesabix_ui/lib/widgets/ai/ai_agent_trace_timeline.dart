@@ -139,6 +139,12 @@ class _TraceStepTileState extends State<_TraceStepTile> {
 
   IconData _iconForKind() {
     switch (widget.step.kind) {
+      case 'explore':
+        return Icons.travel_explore_outlined;
+      case 'explored':
+        return Icons.fact_check_outlined;
+      case 'thought':
+        return Icons.psychology_outlined;
       case 'plan':
       case 'plan_next':
         return Icons.route_outlined;
@@ -165,10 +171,17 @@ class _TraceStepTileState extends State<_TraceStepTile> {
         (step.kind == 'narrative' ||
             step.kind == 'plan' ||
             step.kind == 'observation' ||
+            step.kind == 'explored' ||
+            step.kind == 'thought' ||
+            step.kind == 'explore' ||
             (step.kind != 'answer' && !step.isActive));
 
     final showBodyAlways = hasBody &&
-        (step.kind == 'narrative' || step.kind == 'plan' || widget.compact);
+        (step.kind == 'narrative' ||
+            step.kind == 'plan' ||
+            step.kind == 'explored' ||
+            step.kind == 'thought' ||
+            widget.compact);
     final showBodyToggle = hasBody && !showBodyAlways;
 
     final theme = widget.theme;
@@ -249,6 +262,26 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                           ),
                         ],
                         // iteration number
+                        if (step.confidence != null &&
+                            (step.kind == 'thought')) ...[
+                          const SizedBox(width: 4),
+                          _Badge(
+                            label: step.confidence!,
+                            icon: Icons.verified_outlined,
+                            color: _confidenceColor(scheme, step.confidence!),
+                            scheme: scheme,
+                          ),
+                        ],
+                        if (step.findingsCount != null &&
+                            step.kind == 'thought') ...[
+                          const SizedBox(width: 4),
+                          _Badge(
+                            label: '${step.findingsCount}',
+                            icon: Icons.lightbulb_outline,
+                            color: scheme.tertiary,
+                            scheme: scheme,
+                          ),
+                        ],
                         if (step.iteration != null) ...[
                           const SizedBox(width: 4),
                           Text(
@@ -363,6 +396,17 @@ class _CitationRow extends StatelessWidget {
         );
       }).toList(),
     );
+  }
+}
+
+Color _confidenceColor(ColorScheme scheme, String confidence) {
+  switch (confidence) {
+    case 'high':
+      return scheme.primary;
+    case 'low':
+      return scheme.error;
+    default:
+      return scheme.tertiary;
   }
 }
 

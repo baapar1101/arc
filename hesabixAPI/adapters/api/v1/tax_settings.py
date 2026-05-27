@@ -22,11 +22,14 @@ from app.services.tax_data_quality_service import (
     get_tax_data_quality,
     format_tax_data_quality,
 )
+from app.services.tax_key_material_service import (
+    generate_csr_pem,
+    validate_generate_keys_request,
+    validate_tax_setting_key_material,
+)
 
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization, hashes
-from cryptography import x509
-from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import serialization
 
 
 router = APIRouter(prefix="/tax-settings", tags=["مالیات"])
@@ -61,6 +64,8 @@ def save_tax_settings_endpoint(
     if not user_id:
         raise ApiError("UNAUTHORIZED", "Authentication required", http_status=401)
 
+    validate_tax_setting_key_material(payload.dict())
+
     setting = upsert_tax_setting(
         db,
         business_id=business_id,
@@ -84,10 +89,10 @@ def generate_keys_endpoint(
     _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
 ):
     ensure_moadian_plugin_active(db, business_id)
+    validate_generate_keys_request(payload)
+
     private_pem, public_pem, private_key = _generate_rsa_key_pair()
-    csr_pem = None
-    if payload.person_type == "legal":
-        csr_pem = _generate_csr(private_key, payload)
+    csr_pem = generate_csr_pem(private_key, payload)
 
     data = GenerateKeysResponse(
         private_key=private_pem,
@@ -213,39 +218,5 @@ def _generate_rsa_key_pair() -> Tuple[str, str, rsa.RSAPrivateKey]:
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     ).decode("utf-8")
     return private_pem, public_pem, key
-
-
-def _generate_csr(private_key: rsa.RSAPrivateKey, request_data: GenerateKeysRequest) -> str:
-    subject = x509.Name(
-        [
-            x509.NameAttribute(NameOID.SERIAL_NUMBER, request_data.national_id),
-            x509.NameAttribute(NameOID.COUNTRY_NAME, "IR"),
-            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, request_data.name_fa or "تهران"),
-            x509.NameAttribute(NameOID.LOCALITY_NAME, request_data.name_fa or "تهران"),
-            x509.NameAttribute(
-                NameOID.ORGANIZATION_NAME,
-                request_data.name_fa or request_data.name_en or "Legal Entity",
-            ),
-            x509.NameAttribute(
-                NameOID.COMMON_NAME,
-                f"{request_data.name_en or request_data.name_fa or 'Legal Entity'} [Stamp]",
-            ),
-        ]
-    )
-
-    builder = x509.CertificateSigningRequestBuilder().subject_name(subject)
-
-    if request_data.email:
-        builder = builder.add_extension(
-            x509.SubjectAlternativeName(
-                [
-                    x509.RFC822Name(request_data.email),
-                ]
-            ),
-            critical=False,
-        )
-
-    csr = builder.sign(private_key, hashes.SHA256())
-    return csr.public_bytes(serialization.Encoding.PEM).decode("utf-8")
 
 

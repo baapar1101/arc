@@ -91,6 +91,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool _sessionsLoading = true;
   bool _messagesLoading = false;
   bool _sending = false;
+  /// explore | auto | off — تحلیل عمیق (Exploring / Thought)
+  String _explorationMode = 'auto';
   Map<String, dynamic>? _availabilityInfo;
   DateTime? _availabilityCheckedAt;
   bool _showCreditWarning = false;
@@ -1190,6 +1192,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sessionId: _currentSession!.id!,
         content: content,
         approveWrites: approveWrites,
+        explorationMode: _explorationMode,
         onComplete: (usage, messageId) {
           finalUsage = usage;
         },
@@ -1689,6 +1692,38 @@ class _AIChatDialogState extends State<AIChatDialog> {
     );
   }
 
+  Widget _buildExploreModeChip(ThemeData theme, ColorScheme scheme) {
+    final l10n = AppLocalizations.of(context)!;
+    final isDeep = _explorationMode == 'explore';
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Tooltip(
+        message: l10n.aiChatExploreModeHint,
+        child: FilterChip(
+          label: Text(
+            l10n.aiChatExploreMode,
+            style: theme.textTheme.labelSmall,
+          ),
+          selected: isDeep,
+          onSelected: _sending
+              ? null
+              : (_) {
+                  setState(() {
+                    _explorationMode = isDeep ? 'auto' : 'explore';
+                  });
+                },
+          avatar: Icon(
+            Icons.travel_explore_outlined,
+            size: 16,
+            color: isDeep ? scheme.onPrimaryContainer : scheme.primary,
+          ),
+          visualDensity: VisualDensity.compact,
+          showCheckmark: false,
+        ),
+      ),
+    );
+  }
+
   Widget _buildAppBar(ThemeData theme) {
     final scheme = theme.colorScheme;
     final compact = AIChatDesign.isCompactWidth(context);
@@ -1718,6 +1753,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 ),
               ),
             ),
+            _buildExploreModeChip(theme, scheme),
             if (_isGenerating)
               IconButton(
                 tooltip: 'توقف',

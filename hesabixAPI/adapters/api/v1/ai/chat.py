@@ -109,6 +109,7 @@ class ChatMessageRequest(BaseModel):
     content: str
     session_id: Optional[int] = None
     approve_writes: bool = False
+    mode: Optional[str] = None  # explore | auto | off
 
 
 class CheckAvailabilityRequest(BaseModel):
@@ -731,10 +732,15 @@ async def send_message(
     request: Request = None,
     message_data: ChatMessageRequest = Body(...),
     stream: bool = Query(False, description="استفاده از streaming"),
+    mode: Optional[str] = Query(
+        None,
+        description="حالت agent: explore (تحلیل عمیق), auto (پیش‌فرض), off",
+    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
     """ارسال پیام به AI و دریافت پاسخ (با یا بدون streaming)"""
+    exploration_mode = (mode or message_data.mode or "auto").strip().lower()
     # بررسی دسترسی
     session_repo = AIChatSessionRepository(db)
     session = session_repo.get_by_id(session_id)
@@ -794,6 +800,7 @@ async def send_message(
                 message_content=message_data.content,
                 approve_writes=approve_writes,
                 approved_write_calls=approved_write_calls,
+                exploration_mode=exploration_mode,
             ),
             media_type="text/event-stream",
             headers={
@@ -944,6 +951,7 @@ async def _stream_message_response(
     message_content: str,
     approve_writes: bool = False,
     approved_write_calls: Optional[List[Dict[str, Any]]] = None,
+    exploration_mode: str = "auto",
 ):
     """Generator برای streaming response
     
@@ -982,6 +990,8 @@ async def _stream_message_response(
                     session_id=session_id,
                     approve_writes=approve_writes,
                     approved_write_calls=approved_write_calls,
+                    exploration_mode=exploration_mode,
+                    user_query=message_content,
                 ):
                     yield chunk
 

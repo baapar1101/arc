@@ -6976,7 +6976,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taxGuideStep4Bullet2 =>
-      'Paste the PEM private key and optionally store the Public Key and CSR.';
+      'Use Generate new keys to create private key, public key, and CSR; register the CSR with your CA and save the issued certificate (.crt) here.';
 
   @override
   String get taxGuideStep4Bullet3 =>
@@ -7114,10 +7114,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taxPersonTypeLegal => 'Legal entity';
 
   @override
-  String get taxNationalIdLabel => 'Taxpayer national ID';
+  String get taxNationalIdLabel => 'National ID (10 digits)';
+
+  @override
+  String get taxNationalIdLegalLabel => 'Company national ID (11 digits)';
+
+  @override
+  String get taxNationalIdNaturalInvalid => 'National ID must be 10 digits';
+
+  @override
+  String get taxNationalIdLegalInvalid =>
+      'Company national ID must be 11 digits';
+
+  @override
+  String get taxNaturalNameFaLabel => 'Full name (Persian)';
 
   @override
   String get taxLegalNameFaLabel => 'Persian company name';
+
+  @override
+  String get taxGenerateKeysCsrMissing =>
+      'CSR was not generated. Check taxpayer type and identity fields.';
+
+  @override
+  String get taxGenerateKeysCsrHint =>
+      'After generation, submit the CSR to your certificate authority and upload the issued certificate to the Modian portal.';
 
   @override
   String get taxLegalNameEnLabel => 'English company name';
@@ -10167,6 +10188,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiTraceComposingAnswer => 'Composing final answer';
+
+  @override
+  String get aiTraceExploring => 'Exploring…';
+
+  @override
+  String get aiTraceExploringDone => 'Exploration complete';
+
+  @override
+  String aiTraceExploringTarget(String target) {
+    return 'Exploring: $target';
+  }
+
+  @override
+  String aiTraceExploredTarget(String target) {
+    return 'Explored: $target';
+  }
+
+  @override
+  String aiTraceExplored(String title, String count) {
+    return 'Explored · $title ($count sources)';
+  }
+
+  @override
+  String aiTraceThought(String count) {
+    return 'Thought · $count findings';
+  }
+
+  @override
+  String get aiChatExploreMode => 'Deep analysis';
+
+  @override
+  String get aiChatExploreModeHint =>
+      'Multi-step exploration with key findings (Cursor-style)';
 
   @override
   String get settingsCategoryExternalServices => 'External Services';

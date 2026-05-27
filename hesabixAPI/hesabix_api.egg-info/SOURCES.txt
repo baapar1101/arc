@@ -551,6 +551,7 @@ app/services/year_end_closing_service.py
 app/services/zohal_service.py
 app/services/ai/__init__.py
 app/services/ai/ai_attachment_service.py
+app/services/ai/ai_citation_service.py
 app/services/ai/ai_connector_service.py
 app/services/ai/ai_constants.py
 app/services/ai/ai_db_helpers.py
@@ -573,8 +574,10 @@ app/services/ai/ai_provider.py
 app/services/ai/ai_query_phase2_service.py
 app/services/ai/ai_query_phase3_service.py
 app/services/ai/ai_query_service.py
+app/services/ai/ai_scheduled_task_service.py
 app/services/ai/ai_service.py
 app/services/ai/ai_stream_helpers.py
+app/services/ai/ai_tool_cache.py
 app/services/ai/ai_tool_intent.py
 app/services/ai/ai_tool_keys.py
 app/services/ai/ai_trace.py
@@ -756,12 +759,14 @@ migrations/versions/20260626_000001_ai_phase6_eval_connectors_feedback.py
 migrations/versions/20260626_000002_ai_pgvector_optional.py
 migrations/versions/20260627_000001_ai_phase7_schedule.py
 tests/__init__.py
+tests/test_ai_connector_security.py
 tests/test_ai_embedding_service.py
 tests/test_ai_eval_service.py
 tests/test_ai_feedback_analytics.py
 tests/test_ai_json_safe.py
 tests/test_ai_knowledge_service.py
 tests/test_ai_tool_intent.py
+tests/test_ai_write_guard.py
 tests/test_basalam_currency.py
 tests/test_basalam_dlq.py
 tests/test_basalam_observability.py

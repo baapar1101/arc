@@ -472,7 +472,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     final t = AppLocalizations.of(context);
     final result = await showDialog<_GenerateKeysRequest>(
       context: context,
-      builder: (context) => _GenerateKeysDialog(t: t),
+      builder: (context) => _GenerateKeysDialog(
+        t: t,
+        initialPersonType: _settings?.suggestedPersonType ?? 'legal',
+      ),
     );
     if (result == null) return;
 
@@ -492,10 +495,15 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       if (!mounted) return;
       _privateKeyController.text = generated.privateKey;
       _publicKeyController.text = generated.publicKey;
-      if (generated.csr != null) {
+      if (generated.csr != null && generated.csr!.trim().isNotEmpty) {
         _certificateRequestController.text = generated.csr!;
       }
-      SnackBarHelper.show(context, message: t.taxKeysGenerated);
+      if (!mounted) return;
+      if (generated.csr == null || generated.csr!.trim().isEmpty) {
+        SnackBarHelper.showWarning(context, message: t.taxGenerateKeysCsrMissing);
+      } else {
+        SnackBarHelper.show(context, message: t.taxKeysGenerated);
+      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
@@ -1765,8 +1773,12 @@ class _TaxGuideStep {
 
 class _GenerateKeysDialog extends StatefulWidget {
   final AppLocalizations t;
+  final String initialPersonType;
 
-  const _GenerateKeysDialog({required this.t});
+  const _GenerateKeysDialog({
+    required this.t,
+    this.initialPersonType = 'legal',
+  });
 
   @override
   State<_GenerateKeysDialog> createState() => _GenerateKeysDialogState();
@@ -1778,7 +1790,13 @@ class _GenerateKeysDialogState extends State<_GenerateKeysDialog> {
   final _nameFaController = TextEditingController();
   final _nameEnController = TextEditingController();
   final _emailController = TextEditingController();
-  String _personType = 'natural';
+  late String _personType;
+
+  @override
+  void initState() {
+    super.initState();
+    _personType = widget.initialPersonType == 'natural' ? 'natural' : 'legal';
+  }
 
   @override
   void dispose() {
@@ -1820,10 +1838,43 @@ class _GenerateKeysDialogState extends State<_GenerateKeysDialog> {
                 },
                 decoration: InputDecoration(labelText: t.taxPersonTypeLabel),
               ),
+              const SizedBox(height: 8),
+              Text(
+                t.taxGenerateKeysCsrHint,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _nationalIdController,
-                decoration: InputDecoration(labelText: t.taxNationalIdLabel),
+                decoration: InputDecoration(
+                  labelText: isLegal
+                      ? t.taxNationalIdLegalLabel
+                      : t.taxNationalIdLabel,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return t.requiredField;
+                  }
+                  final digits = value.replaceAll(RegExp(r'\D'), '');
+                  if (_personType == 'natural' && digits.length != 10) {
+                    return t.taxNationalIdNaturalInvalid;
+                  }
+                  if (_personType == 'legal' && digits.length != 11) {
+                    return t.taxNationalIdLegalInvalid;
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _nameFaController,
+                decoration: InputDecoration(
+                  labelText: isLegal
+                      ? t.taxLegalNameFaLabel
+                      : t.taxNaturalNameFaLabel,
+                ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return t.requiredField;
@@ -1832,18 +1883,6 @@ class _GenerateKeysDialogState extends State<_GenerateKeysDialog> {
                 },
               ),
               if (isLegal) ...[
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _nameFaController,
-                  decoration: InputDecoration(labelText: t.taxLegalNameFaLabel),
-                  validator: (value) {
-                    if (_personType == 'legal' &&
-                        (value == null || value.trim().isEmpty)) {
-                      return t.requiredField;
-                    }
-                    return null;
-                  },
-                ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _nameEnController,

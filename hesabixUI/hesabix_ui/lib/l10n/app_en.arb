@@ -2593,7 +2593,7 @@
   "taxGuideStep4Title": "4) Complete the connection form in Hesabix",
   "taxGuideStep4Description": "Tax memory ID, economic code and private key are mandatory under the Connection tab.",
   "taxGuideStep4Bullet1": "Enter the ID and economic code without extra spaces.",
-  "taxGuideStep4Bullet2": "Paste the PEM private key and optionally store the Public Key and CSR.",
+  "taxGuideStep4Bullet2": "Use Generate new keys to create private key, public key, and CSR; register the CSR with your CA and save the issued certificate (.crt) here.",
   "taxGuideStep4Bullet3": "Enable sandbox mode only for staging/testing environments.",
   "taxGuideStep5Title": "5) Request the intermediate certificate via CSR",
   "taxGuideStep5Description": "Legal entities must submit the CSR to the national certificate authority.",
@@ -2639,8 +2639,14 @@
   "taxPersonTypeLabel": "Taxpayer type",
   "taxPersonTypeNatural": "Individual",
   "taxPersonTypeLegal": "Legal entity",
-  "taxNationalIdLabel": "Taxpayer national ID",
+  "taxNationalIdLabel": "National ID (10 digits)",
+  "taxNationalIdLegalLabel": "Company national ID (11 digits)",
+  "taxNationalIdNaturalInvalid": "National ID must be 10 digits",
+  "taxNationalIdLegalInvalid": "Company national ID must be 11 digits",
+  "taxNaturalNameFaLabel": "Full name (Persian)",
   "taxLegalNameFaLabel": "Persian company name",
+  "taxGenerateKeysCsrMissing": "CSR was not generated. Check taxpayer type and identity fields.",
+  "taxGenerateKeysCsrHint": "After generation, submit the CSR to your certificate authority and upload the issued certificate to the Modian portal.",
   "taxLegalNameEnLabel": "English company name",
   "taxLegalEmailLabel": "Corporate email",
   "taxDataQualityTitle": "Data quality check",
@@ -3923,6 +3929,29 @@
     "placeholders": { "toolName": { "type": "String" } }
   },
   "aiTraceComposingAnswer": "Composing final answer",
+  "aiTraceExploring": "Exploring…",
+  "aiTraceExploringDone": "Exploration complete",
+  "aiTraceExploringTarget": "Exploring: {target}",
+  "@aiTraceExploringTarget": {
+    "placeholders": { "target": { "type": "String" } }
+  },
+  "aiTraceExploredTarget": "Explored: {target}",
+  "@aiTraceExploredTarget": {
+    "placeholders": { "target": { "type": "String" } }
+  },
+  "aiTraceExplored": "Explored · {title} ({count} sources)",
+  "@aiTraceExplored": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "count": { "type": "String" }
+    }
+  },
+  "aiTraceThought": "Thought · {count} findings",
+  "@aiTraceThought": {
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "aiChatExploreMode": "Deep analysis",
+  "aiChatExploreModeHint": "Multi-step exploration with key findings (Cursor-style)",
   "settingsCategoryExternalServices": "External Services",
   "settingsCategoryExternalServicesDescription": "External service integrations",
   "settingsCategoryMonitoringLogs": "Monitoring & Logs",

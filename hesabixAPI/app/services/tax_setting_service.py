@@ -100,6 +100,8 @@ def serialize_tax_setting(
     سریالایز کردن تنظیمات مالیاتی برای API response
     کلید خصوصی به صورت خودکار رمزگشایی می‌شود
     """
+    suggested_person_type = _resolve_suggested_person_type(db, business_id)
+
     if setting is None:
         return {
             "business_id": int(business_id),
@@ -114,6 +116,7 @@ def serialize_tax_setting(
             "updated_at": None,
             "configuration_warnings": [],
             "identity_check": None,
+            "suggested_person_type": suggested_person_type,
         }
 
     # رمزگشایی کلید خصوصی برای نمایش
@@ -147,6 +150,19 @@ def serialize_tax_setting(
         "updated_at": setting.updated_at.isoformat() if setting.updated_at else None,
         "configuration_warnings": warnings,
         "identity_check": identity_check,
+        "suggested_person_type": suggested_person_type,
     }
+
+
+def _resolve_suggested_person_type(db: Session | None, business_id: int) -> str:
+    if db is None:
+        return "legal"
+    from adapters.db.models.business import Business
+    from app.services.tax_key_material_service import suggested_moadian_person_type
+
+    business = db.query(Business).filter(Business.id == int(business_id)).first()
+    if not business:
+        return "legal"
+    return suggested_moadian_person_type(business.business_type)
 
 

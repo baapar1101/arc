@@ -39,23 +39,23 @@ class TaxSettingsResponse(BaseModel):
 
 
 class GenerateKeysRequest(BaseModel):
-    person_type: Literal["natural", "legal"] = Field(default="natural", description="نوع شخصیت")
+    person_type: Literal["natural", "legal"] = Field(default="legal", description="نوع شخصیت")
     national_id: str = Field(..., min_length=5, max_length=20, description="شناسه ملی")
-    name_fa: Optional[str] = Field(default=None, description="نام فارسی (برای اشخاص حقوقی)")
+    name_fa: str = Field(..., min_length=2, max_length=255, description="نام فارسی (برای CSR)")
     name_en: Optional[str] = Field(default=None, description="نام انگلیسی (برای اشخاص حقوقی)")
     email: Optional[str] = Field(default=None, description="ایمیل (برای اشخاص حقوقی)")
 
-    @field_validator("national_id", mode="before")
+    @field_validator("national_id", "name_fa", mode="before")
     @classmethod
-    def _clean_national_id(cls, value: str) -> str:
+    def _trim_required(cls, value: str) -> str:
         if isinstance(value, str):
             cleaned = value.strip()
             if not cleaned:
-                raise ValueError("شناسه ملی الزامی است")
+                raise ValueError("این مقدار نمی‌تواند خالی باشد")
             return cleaned
-        raise ValueError("شناسه ملی نامعتبر است")
+        raise ValueError("رشته معتبر وارد کنید")
 
-    @field_validator("name_fa", "name_en", "email", mode="after")
+    @field_validator("name_en", "email", mode="after")
     @classmethod
     def _validate_legal_fields(cls, value: Optional[str], info: FieldValidationInfo):
         person_type = info.data.get("person_type")

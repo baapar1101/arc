@@ -107,27 +107,22 @@ def build_configuration_warnings(
     *,
     jwt_claims: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
-    warnings: List[Dict[str, Any]] = []
+    from app.services.encryption_service import decrypt_private_key
+    from app.services.tax_key_material_service import key_material_warnings
 
-    if not (tax_setting.certificate or "").strip():
-        warnings.append({
-            "code": "CERTIFICATE_MISSING",
-            "level": "warning",
-            "message": (
-                "گواهی دیجیتال صادرشده از کارپوشه مودیان در تنظیمات ذخیره نشده است. "
-                "پس از تأیید CSR، فایل گواهی (.crt) را در همین صفحه بارگذاری کنید."
-            ),
-        })
+    private_key = tax_setting.private_key
+    if private_key:
+        try:
+            private_key = decrypt_private_key(private_key)
+        except Exception:
+            pass
 
-    if (tax_setting.private_key or "").strip() and not (tax_setting.certificate_request or "").strip():
-        warnings.append({
-            "code": "CSR_NOT_SAVED",
-            "level": "info",
-            "message": (
-                "درخواست CSR در سیستم ذخیره نشده است. "
-                "اگر کلید را خارج از حسابیکس ساخته‌اید، مطمئن شوید همان کلید در مودیان ثبت شده است."
-            ),
-        })
+    warnings: List[Dict[str, Any]] = key_material_warnings(
+        private_key=private_key,
+        public_key=tax_setting.public_key,
+        certificate=tax_setting.certificate,
+        certificate_request=tax_setting.certificate_request,
+    )
 
     economic = (tax_setting.economic_code or "").strip()
     memory_id = (tax_setting.tax_memory_id or "").strip()
@@ -160,15 +155,6 @@ def build_configuration_warnings(
                     f"({economic}) هم‌خوان نیست."
                 ),
             })
-
-    cert_serial = extract_certificate_serial_number(tax_setting.certificate)
-    if cert_serial:
-        warnings.append({
-            "code": "CERTIFICATE_SERIAL",
-            "level": "info",
-            "message": f"کد ملی/شناسه داخل گواهی ذخیره‌شده: {cert_serial}",
-            "meta": {"serial_number": cert_serial},
-        })
 
     return warnings
 

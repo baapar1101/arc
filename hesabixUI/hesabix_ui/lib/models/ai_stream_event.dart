@@ -60,6 +60,12 @@ class AIAgentTraceStep {
   final int? elapsedMs;       // زمان اجرای tool به میلی‌ثانیه
   final int? resultCount;     // تعداد رکوردهای برگشتی
   final List<String>? citations; // منابع/رکوردهای مرجع
+  final String? bundleId;
+  final String? exploreTarget;
+  final List<Map<String, dynamic>>? entityRefs;
+  final int? findingsCount;
+  final String? hypothesis;
+  final String? confidence;
 
   const AIAgentTraceStep({
     required this.stepId,
@@ -74,6 +80,12 @@ class AIAgentTraceStep {
     this.elapsedMs,
     this.resultCount,
     this.citations,
+    this.bundleId,
+    this.exploreTarget,
+    this.entityRefs,
+    this.findingsCount,
+    this.hypothesis,
+    this.confidence,
   });
 
   bool get isActive => state == 'active';
@@ -89,6 +101,7 @@ class AIAgentTraceStep {
 
   factory AIAgentTraceStep.fromJson(Map<String, dynamic> json) {
     final rawCitations = json['citations'];
+    final rawRefs = json['entity_refs'];
     return AIAgentTraceStep(
       stepId: json['step_id'] as String? ?? '',
       kind: json['kind'] as String? ?? 'plan',
@@ -106,6 +119,17 @@ class AIAgentTraceStep {
       citations: rawCitations is List
           ? rawCitations.whereType<String>().toList()
           : null,
+      bundleId: json['bundle_id'] as String?,
+      exploreTarget: json['explore_target'] as String?,
+      entityRefs: rawRefs is List
+          ? rawRefs
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : null,
+      findingsCount: json['findings_count'] as int?,
+      hypothesis: json['hypothesis'] as String?,
+      confidence: json['confidence'] as String?,
     );
   }
 
@@ -122,6 +146,12 @@ class AIAgentTraceStep {
         if (elapsedMs != null) 'elapsed_ms': elapsedMs,
         if (resultCount != null) 'result_count': resultCount,
         if (citations != null) 'citations': citations,
+        if (bundleId != null) 'bundle_id': bundleId,
+        if (exploreTarget != null) 'explore_target': exploreTarget,
+        if (entityRefs != null) 'entity_refs': entityRefs,
+        if (findingsCount != null) 'findings_count': findingsCount,
+        if (hypothesis != null) 'hypothesis': hypothesis,
+        if (confidence != null) 'confidence': confidence,
       };
 
   AIAgentTraceStep copyWith({

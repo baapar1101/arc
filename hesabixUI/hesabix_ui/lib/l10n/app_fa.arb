@@ -2637,7 +2637,7 @@
   "taxGuideStep4Title": "۴) تکمیل فرم اتصال در حسابیکس",
   "taxGuideStep4Description": "شناسه حافظه، کد اقتصادی و کلید خصوصی باید در تب «اتصال و اطلاعات پایه» ثبت شوند.",
   "taxGuideStep4Bullet1": "شناسه یکتا و کد اقتصادی را بدون فاصله اضافی وارد کنید.",
-  "taxGuideStep4Bullet2": "کلید خصوصی (PEM) را در فیلد مربوطه جای‌گذاری و در صورت نیاز Public Key و CSR را نیز ذخیره کنید.",
+  "taxGuideStep4Bullet2": "با «تولید کلید جدید»، کلید خصوصی، کلید عمومی و CSR ساخته می‌شود؛ CSR را در مرکز میانی ثبت و گواهی (.crt) را پس از صدور در همین صفحه ذخیره کنید.",
   "taxGuideStep4Bullet3": "در صورت استفاده از محیط تست، گزینه حالت سندباکس را فعال کنید.",
   "taxGuideStep5Title": "۵) دریافت گواهی میانی با CSR",
   "taxGuideStep5Description": "برای اشخاص حقوقی لازم است CSR تولید شده را در مرکز صدور گواهی میانی ثبت کنید.",
@@ -2683,8 +2683,14 @@
   "taxPersonTypeLabel": "نوع مودی",
   "taxPersonTypeNatural": "شخص حقیقی",
   "taxPersonTypeLegal": "شخص حقوقی",
-  "taxNationalIdLabel": "شناسه ملی مودی",
+  "taxNationalIdLabel": "کد ملی (۱۰ رقم)",
+  "taxNationalIdLegalLabel": "شناسه ملی شرکت (۱۱ رقم)",
+  "taxNationalIdNaturalInvalid": "کد ملی باید ۱۰ رقم باشد",
+  "taxNationalIdLegalInvalid": "شناسه ملی باید ۱۱ رقم باشد",
+  "taxNaturalNameFaLabel": "نام و نام خانوادگی",
   "taxLegalNameFaLabel": "نام فارسی شرکت",
+  "taxGenerateKeysCsrMissing": "CSR ساخته نشد. نوع مودی و اطلاعات هویتی را بررسی کنید.",
+  "taxGenerateKeysCsrHint": "پس از تولید، CSR را در مرکز صدور گواهی ثبت کنید و فایل گواهی را در کارپوشه مودیان بارگذاری نمایید.",
   "taxLegalNameEnLabel": "نام انگلیسی شرکت",
   "taxLegalEmailLabel": "ایمیل سازمانی",
   "taxDataQualityTitle": "کنترل کیفیت داده",
@@ -3965,6 +3971,29 @@
     "placeholders": { "toolName": { "type": "String" } }
   },
   "aiTraceComposingAnswer": "نوشتن پاسخ نهایی",
+  "aiTraceExploring": "در حال کاوش…",
+  "aiTraceExploringDone": "کاوش انجام شد",
+  "aiTraceExploringTarget": "کاوش: {target}",
+  "@aiTraceExploringTarget": {
+    "placeholders": { "target": { "type": "String" } }
+  },
+  "aiTraceExploredTarget": "بررسی شد: {target}",
+  "@aiTraceExploredTarget": {
+    "placeholders": { "target": { "type": "String" } }
+  },
+  "aiTraceExplored": "Explored · {title} ({count} منبع)",
+  "@aiTraceExplored": {
+    "placeholders": {
+      "title": { "type": "String" },
+      "count": { "type": "String" }
+    }
+  },
+  "aiTraceThought": "Thought · {count} یافته",
+  "@aiTraceThought": {
+    "placeholders": { "count": { "type": "String" } }
+  },
+  "aiChatExploreMode": "تحلیل عمیق",
+  "aiChatExploreModeHint": "کاوش چندمرحله‌ای با یافته‌های مهم (شبیه Cursor)",
   "settingsCategoryExternalServices": "سرویس‌های خارجی",
   "settingsCategoryExternalServicesDescription": "ادغام‌های سرویس‌های خارجی",
   "settingsCategoryMonitoringLogs": "مانیتورینگ و لاگ‌ها",

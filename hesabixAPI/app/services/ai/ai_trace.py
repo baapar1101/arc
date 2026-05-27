@@ -20,7 +20,7 @@ CONTEXT_STEP_TITLE_KEYS: Dict[str, str] = {
     "loading_connectors": "aiStatusLoadingConnectors",
 }
 
-TraceKind = str  # plan | narrative | tool | observation | plan_next | answer
+TraceKind = str  # context | explore | explored | thought | plan | narrative | tool | observation | plan_next | answer
 TraceState = str  # active | done | error
 
 
@@ -38,6 +38,12 @@ def trace_step(
     elapsed_ms: Optional[int] = None,
     result_count: Optional[int] = None,
     citations: Optional[List[str]] = None,
+    bundle_id: Optional[str] = None,
+    explore_target: Optional[str] = None,
+    entity_refs: Optional[List[Dict[str, Any]]] = None,
+    findings_count: Optional[int] = None,
+    hypothesis: Optional[str] = None,
+    confidence: Optional[str] = None,
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "event": "trace_step",
@@ -63,6 +69,18 @@ def trace_step(
         payload["result_count"] = result_count
     if citations:
         payload["citations"] = citations
+    if bundle_id:
+        payload["bundle_id"] = bundle_id
+    if explore_target:
+        payload["explore_target"] = explore_target
+    if entity_refs:
+        payload["entity_refs"] = entity_refs
+    if findings_count is not None:
+        payload["findings_count"] = findings_count
+    if hypothesis:
+        payload["hypothesis"] = hypothesis
+    if confidence:
+        payload["confidence"] = confidence
     return payload
 
 

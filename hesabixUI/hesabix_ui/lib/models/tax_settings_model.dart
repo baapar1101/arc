@@ -11,6 +11,7 @@ class TaxSettingsModel {
   final DateTime? updatedAt;
   final List<TaxConfigurationWarning> configurationWarnings;
   final TaxIdentityCheck? identityCheck;
+  final String? suggestedPersonType;
 
   const TaxSettingsModel({
     required this.businessId,
@@ -25,6 +26,7 @@ class TaxSettingsModel {
     this.updatedAt,
     this.configurationWarnings = const [],
     this.identityCheck,
+    this.suggestedPersonType,
   });
 
   factory TaxSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -47,6 +49,7 @@ class TaxSettingsModel {
       identityCheck: json['identity_check'] is Map<String, dynamic>
           ? TaxIdentityCheck.fromJson(json['identity_check'] as Map<String, dynamic>)
           : null,
+      suggestedPersonType: json['suggested_person_type']?.toString(),
     );
   }
 
@@ -82,6 +85,7 @@ class TaxSettingsModel {
     DateTime? updatedAt,
     List<TaxConfigurationWarning>? configurationWarnings,
     TaxIdentityCheck? identityCheck,
+    String? suggestedPersonType,
   }) {
     return TaxSettingsModel(
       businessId: businessId,
@@ -96,6 +100,7 @@ class TaxSettingsModel {
       updatedAt: updatedAt ?? this.updatedAt,
       configurationWarnings: configurationWarnings ?? this.configurationWarnings,
       identityCheck: identityCheck ?? this.identityCheck,
+      suggestedPersonType: suggestedPersonType ?? this.suggestedPersonType,
     );
   }
 }

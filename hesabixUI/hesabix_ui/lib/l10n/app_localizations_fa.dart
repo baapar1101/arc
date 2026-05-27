@@ -6929,7 +6929,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get taxGuideStep4Bullet2 =>
-      'کلید خصوصی (PEM) را در فیلد مربوطه جای‌گذاری و در صورت نیاز Public Key و CSR را نیز ذخیره کنید.';
+      'با «تولید کلید جدید»، کلید خصوصی، کلید عمومی و CSR ساخته می‌شود؛ CSR را در مرکز میانی ثبت و گواهی (.crt) را پس از صدور در همین صفحه ذخیره کنید.';
 
   @override
   String get taxGuideStep4Bullet3 =>
@@ -7065,10 +7065,30 @@ class AppLocalizationsFa extends AppLocalizations {
   String get taxPersonTypeLegal => 'شخص حقوقی';
 
   @override
-  String get taxNationalIdLabel => 'شناسه ملی مودی';
+  String get taxNationalIdLabel => 'کد ملی (۱۰ رقم)';
+
+  @override
+  String get taxNationalIdLegalLabel => 'شناسه ملی شرکت (۱۱ رقم)';
+
+  @override
+  String get taxNationalIdNaturalInvalid => 'کد ملی باید ۱۰ رقم باشد';
+
+  @override
+  String get taxNationalIdLegalInvalid => 'شناسه ملی باید ۱۱ رقم باشد';
+
+  @override
+  String get taxNaturalNameFaLabel => 'نام و نام خانوادگی';
 
   @override
   String get taxLegalNameFaLabel => 'نام فارسی شرکت';
+
+  @override
+  String get taxGenerateKeysCsrMissing =>
+      'CSR ساخته نشد. نوع مودی و اطلاعات هویتی را بررسی کنید.';
+
+  @override
+  String get taxGenerateKeysCsrHint =>
+      'پس از تولید، CSR را در مرکز صدور گواهی ثبت کنید و فایل گواهی را در کارپوشه مودیان بارگذاری نمایید.';
 
   @override
   String get taxLegalNameEnLabel => 'نام انگلیسی شرکت';
@@ -10112,6 +10132,39 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiTraceComposingAnswer => 'نوشتن پاسخ نهایی';
+
+  @override
+  String get aiTraceExploring => 'در حال کاوش…';
+
+  @override
+  String get aiTraceExploringDone => 'کاوش انجام شد';
+
+  @override
+  String aiTraceExploringTarget(String target) {
+    return 'کاوش: $target';
+  }
+
+  @override
+  String aiTraceExploredTarget(String target) {
+    return 'بررسی شد: $target';
+  }
+
+  @override
+  String aiTraceExplored(String title, String count) {
+    return 'Explored · $title ($count منبع)';
+  }
+
+  @override
+  String aiTraceThought(String count) {
+    return 'Thought · $count یافته';
+  }
+
+  @override
+  String get aiChatExploreMode => 'تحلیل عمیق';
+
+  @override
+  String get aiChatExploreModeHint =>
+      'کاوش چندمرحله‌ای با یافته‌های مهم (شبیه Cursor)';
 
   @override
   String get settingsCategoryExternalServices => 'سرویس‌های خارجی';

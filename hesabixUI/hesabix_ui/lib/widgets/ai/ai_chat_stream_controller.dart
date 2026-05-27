@@ -103,6 +103,9 @@ class AIChatStreamController extends ChangeNotifier {
           statusStep = '$iteration/$maxIterations';
         }
       }
+      if (chunk.statusEvent!.phase == 'exploring') {
+        statusPhase = 'exploring';
+      }
       notifyListeners();
       return;
     }

@@ -27,6 +27,8 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             data["iteration"] = chunk["iteration"]
         if chunk.get("max_iterations") is not None:
             data["max_iterations"] = chunk["max_iterations"]
+        if chunk.get("exploration"):
+            data["exploration"] = chunk.get("exploration")
         return [data]
 
     if event_type == "trace_step":
@@ -44,6 +46,15 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             "tool",
             "tool_key",
             "iteration",
+            "elapsed_ms",
+            "result_count",
+            "citations",
+            "bundle_id",
+            "explore_target",
+            "entity_refs",
+            "findings_count",
+            "hypothesis",
+            "confidence",
         ):
             if chunk.get(key) is not None:
                 data[key] = chunk.get(key)

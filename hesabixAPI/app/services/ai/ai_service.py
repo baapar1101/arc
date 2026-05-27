@@ -48,9 +48,26 @@ from app.services.ai.ai_db_helpers import (
     safe_db_rollback,
 )
 from app.services.ai.ai_constants import (
+    EXPLORATION_COMPLEXITY_ITERATIONS,
+    EXPLORATION_LLM_THOUGHT_MIN_TOOLS,
     KNOWLEDGE_LOAD_TIMEOUT_SEC,
     MAX_AGENT_ITERATIONS,
     PLANNING_STEP_MIN_CHARS,
+)
+from app.services.ai.ai_exploration_service import (
+    EXPLORATION_MODE_EXPLORE,
+    ObservationStore,
+    ExplorationBundle,
+    ThoughtRecord,
+    ToolObservation,
+    build_explored_body_markdown,
+    build_thought_markdown_rule_based,
+    bundle_title_from_calls,
+    explore_target_for_call,
+    extract_entity_refs_from_calls,
+    new_bundle_id,
+    resolve_exploration_enabled,
+    synthesize_thought_with_llm,
 )
 from app.services.ai.ai_tool_cache import (
     get_cached,
@@ -62,6 +79,7 @@ from app.services.ai.ai_message_budget import (
     trim_system_prompt,
 )
 from app.services.ai.ai_tool_intent import (
+    estimate_query_complexity,
     filter_function_definitions,
     iterations_for_query,
     query_needs_knowledge,
@@ -1244,6 +1262,7 @@ class AIService:
         approved_write_calls: Optional[List[Dict[str, Any]]] = None,
         max_iterations: int = MAX_AGENT_ITERATIONS,
         user_query: Optional[str] = None,
+        exploration_mode: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال streaming با چند نوبت tool calling (مثل chat_completion).
 
@@ -1255,15 +1274,32 @@ class AIService:
         """
         self._validate_messages(messages)
         effective_user_query = user_query or self._last_user_query(messages)
+        exploration_enabled = resolve_exploration_enabled(
+            exploration_mode, effective_user_query, messages
+        )
 
         # تنظیم خودکار max_iterations بر اساس پیچیدگی
-        adaptive_max_iterations = iterations_for_query(
-            effective_user_query, messages
-        )
+        if exploration_enabled:
+            complexity = estimate_query_complexity(effective_user_query, messages)
+            adaptive_max_iterations = EXPLORATION_COMPLEXITY_ITERATIONS.get(
+                complexity, MAX_AGENT_ITERATIONS
+            )
+        else:
+            adaptive_max_iterations = iterations_for_query(
+                effective_user_query, messages
+            )
         # اگر caller مقدار غیر پیش‌فرض داد، max بگیر
         if max_iterations != MAX_AGENT_ITERATIONS:
             adaptive_max_iterations = max(adaptive_max_iterations, max_iterations)
         max_iterations = adaptive_max_iterations
+
+        observation_store: Optional[ObservationStore] = (
+            ObservationStore() if exploration_enabled else None
+        )
+        use_llm_thought = (
+            exploration_enabled
+            and (exploration_mode or "").strip().lower() == EXPLORATION_MODE_EXPLORE
+        )
 
         accumulated_function_calls: List[Dict[str, Any]] = []
         accumulated_function_results: Dict[str, Any] = {}
@@ -1371,6 +1407,21 @@ class AIService:
                     iteration=0,
                 )
                 await asyncio.sleep(0)
+
+            if exploration_enabled:
+                yield _emit_trace(
+                    step_id="explore_root",
+                    kind="explore",
+                    state="active",
+                    title_key="aiTraceExploring",
+                    body_markdown=effective_user_query[:240] if effective_user_query else None,
+                    iteration=0,
+                )
+                yield {
+                    "event": "status",
+                    "phase": "exploring",
+                    "done": False,
+                }
 
             while iteration < max_iterations:
                 iteration += 1
@@ -1493,6 +1544,28 @@ class AIService:
                     accumulated_function_calls.extend(function_calls)
                     yield status_event("planning_tools")
 
+                    bundle_id: Optional[str] = None
+                    entity_refs: List[Dict[str, Any]] = []
+                    if exploration_enabled and observation_store is not None:
+                        bundle_id = new_bundle_id(iteration)
+                        entity_refs = extract_entity_refs_from_calls(function_calls)
+                        for idx, call in enumerate(function_calls):
+                            target = explore_target_for_call(
+                                call.get("name", "unknown"),
+                                call.get("arguments", {}),
+                            )
+                            yield _emit_trace(
+                                step_id=f"explore_{bundle_id}_{idx}",
+                                kind="explore",
+                                state="active",
+                                title_key="aiTraceExploringTarget",
+                                title_params={"target": target},
+                                explore_target=target,
+                                bundle_id=bundle_id,
+                                entity_refs=entity_refs if idx == 0 else None,
+                                iteration=iteration,
+                            )
+
                     if narrative_started:
                         yield _emit_trace(
                             step_id=narrative_step_id,
@@ -1610,6 +1683,144 @@ class AIService:
                             tool_key=tool_l10n_key(fname),
                             iteration=iteration,
                             citations=citations,
+                            bundle_id=bundle_id,
+                        )
+
+                    # --- Exploration: Explored + Thought ---
+                    if (
+                        exploration_enabled
+                        and observation_store is not None
+                        and bundle_id
+                    ):
+                        bundle_observations: List[ToolObservation] = []
+                        for idx, call in enumerate(function_calls):
+                            fname = call.get("name", "unknown")
+                            tc_id = _tool_call_id_for(call, iteration, idx)
+                            result = _lookup_tool_result(function_results, call)
+                            success_obs = not (
+                                isinstance(result, dict) and result.get("error")
+                            )
+                            elapsed_obs = (
+                                result.get("_elapsed_ms")
+                                if isinstance(result, dict)
+                                else None
+                            )
+                            rc = (
+                                extract_result_count(result)
+                                if isinstance(result, dict)
+                                else None
+                            )
+                            cites = (
+                                extract_citations_from_result(result)
+                                if rc and rc > 0
+                                else None
+                            )
+                            bundle_observations.append(
+                                ToolObservation(
+                                    tool_name=fname,
+                                    arguments=call.get("arguments", {}) or {},
+                                    result=result,
+                                    success=success_obs,
+                                    elapsed_ms=elapsed_obs,
+                                    citations=cites,
+                                )
+                            )
+                            yield _emit_trace(
+                                step_id=f"explore_{bundle_id}_{idx}",
+                                kind="explore",
+                                state="done",
+                                title_key="aiTraceExploredTarget",
+                                title_params={
+                                    "target": explore_target_for_call(
+                                        fname, call.get("arguments", {})
+                                    ),
+                                },
+                                explore_target=explore_target_for_call(
+                                    fname, call.get("arguments", {})
+                                ),
+                                bundle_id=bundle_id,
+                                iteration=iteration,
+                            )
+
+                        bundle = ExplorationBundle(
+                            bundle_id=bundle_id,
+                            iteration=iteration,
+                            title=bundle_title_from_calls(function_calls),
+                            explore_targets=[
+                                explore_target_for_call(
+                                    c.get("name", "unknown"),
+                                    c.get("arguments", {}),
+                                )
+                                for c in function_calls
+                            ],
+                            observations=bundle_observations,
+                        )
+                        observation_store.add_bundle(bundle)
+                        explored_body = build_explored_body_markdown(bundle)
+                        yield _emit_trace(
+                            step_id=f"explored_{bundle_id}",
+                            kind="explored",
+                            state="done",
+                            title_key="aiTraceExplored",
+                            title_params={
+                                "title": bundle.title,
+                                "count": str(bundle.tool_count),
+                            },
+                            body_markdown=explored_body,
+                            bundle_id=bundle_id,
+                            entity_refs=entity_refs,
+                            result_count=bundle.tool_count,
+                            iteration=iteration,
+                        )
+
+                        thought_body, hypothesis, confidence, open_qs = (
+                            build_thought_markdown_rule_based(
+                                bundle, effective_user_query
+                            )
+                        )
+                        if (
+                            use_llm_thought
+                            and bundle.tool_count >= EXPLORATION_LLM_THOUGHT_MIN_TOOLS
+                        ):
+                            llm_thought = await synthesize_thought_with_llm(
+                                provider,
+                                self.config.model_name,
+                                max_tokens_override or self.config.max_tokens,
+                                float(self.config.temperature),
+                                bundle,
+                                effective_user_query,
+                                explored_body,
+                            )
+                            if llm_thought:
+                                thought_body = llm_thought
+
+                        findings_count = thought_body.count("\n1.") + (
+                            1 if "\n1." in thought_body else 0
+                        )
+                        thought_id = f"thought_{bundle_id}"
+                        thought_rec = ThoughtRecord(
+                            thought_id=thought_id,
+                            bundle_id=bundle_id,
+                            iteration=iteration,
+                            body_markdown=thought_body,
+                            hypothesis=hypothesis,
+                            confidence=confidence,
+                            open_questions=open_qs,
+                        )
+                        observation_store.add_thought(thought_rec)
+
+                        yield _emit_trace(
+                            step_id=thought_id,
+                            kind="thought",
+                            state="done",
+                            title_key="aiTraceThought",
+                            title_params={"count": str(max(findings_count, 1))},
+                            body_markdown=thought_body,
+                            bundle_id=bundle_id,
+                            findings_count=max(findings_count, 1),
+                            hypothesis=hypothesis,
+                            confidence=confidence,
+                            iteration=iteration,
                         )
 
                     assistant_msg: Dict[str, Any] = {
@@ -1655,6 +1866,16 @@ class AIService:
                                 ),
                             }
                         )
+
+                    if observation_store is not None:
+                        thought_ctx = observation_store.context_for_llm()
+                        if thought_ctx:
+                            full_messages.append(
+                                {
+                                    "role": "user",
+                                    "content": thought_ctx,
+                                }
+                            )
                     continue
 
                 if round_text.strip():
@@ -1681,6 +1902,15 @@ class AIService:
                     "usage": None,
                     "done": False,
                 }
+
+            if exploration_enabled:
+                yield _emit_trace(
+                    step_id="explore_root",
+                    kind="explore",
+                    state="done",
+                    title_key="aiTraceExploringDone",
+                    iteration=iteration,
+                )
 
             # ساخت citations از نتایج tool calls
             citations_context: Optional[str] = None

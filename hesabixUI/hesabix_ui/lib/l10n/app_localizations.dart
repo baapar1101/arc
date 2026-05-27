@@ -13059,7 +13059,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideStep4Bullet2.
   ///
   /// In en, this message translates to:
-  /// **'Paste the PEM private key and optionally store the Public Key and CSR.'**
+  /// **'Use Generate new keys to create private key, public key, and CSR; register the CSR with your CA and save the issued certificate (.crt) here.'**
   String get taxGuideStep4Bullet2;
 
   /// No description provided for @taxGuideStep4Bullet3.
@@ -13293,14 +13293,50 @@ abstract class AppLocalizations {
   /// No description provided for @taxNationalIdLabel.
   ///
   /// In en, this message translates to:
-  /// **'Taxpayer national ID'**
+  /// **'National ID (10 digits)'**
   String get taxNationalIdLabel;
+
+  /// No description provided for @taxNationalIdLegalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Company national ID (11 digits)'**
+  String get taxNationalIdLegalLabel;
+
+  /// No description provided for @taxNationalIdNaturalInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'National ID must be 10 digits'**
+  String get taxNationalIdNaturalInvalid;
+
+  /// No description provided for @taxNationalIdLegalInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Company national ID must be 11 digits'**
+  String get taxNationalIdLegalInvalid;
+
+  /// No description provided for @taxNaturalNameFaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Full name (Persian)'**
+  String get taxNaturalNameFaLabel;
 
   /// No description provided for @taxLegalNameFaLabel.
   ///
   /// In en, this message translates to:
   /// **'Persian company name'**
   String get taxLegalNameFaLabel;
+
+  /// No description provided for @taxGenerateKeysCsrMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'CSR was not generated. Check taxpayer type and identity fields.'**
+  String get taxGenerateKeysCsrMissing;
+
+  /// No description provided for @taxGenerateKeysCsrHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After generation, submit the CSR to your certificate authority and upload the issued certificate to the Modian portal.'**
+  String get taxGenerateKeysCsrHint;
 
   /// No description provided for @taxLegalNameEnLabel.
   ///
@@ -18983,6 +19019,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Composing final answer'**
   String get aiTraceComposingAnswer;
+
+  /// No description provided for @aiTraceExploring.
+  ///
+  /// In en, this message translates to:
+  /// **'Exploring…'**
+  String get aiTraceExploring;
+
+  /// No description provided for @aiTraceExploringDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Exploration complete'**
+  String get aiTraceExploringDone;
+
+  /// No description provided for @aiTraceExploringTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Exploring: {target}'**
+  String aiTraceExploringTarget(String target);
+
+  /// No description provided for @aiTraceExploredTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Explored: {target}'**
+  String aiTraceExploredTarget(String target);
+
+  /// No description provided for @aiTraceExplored.
+  ///
+  /// In en, this message translates to:
+  /// **'Explored · {title} ({count} sources)'**
+  String aiTraceExplored(String title, String count);
+
+  /// No description provided for @aiTraceThought.
+  ///
+  /// In en, this message translates to:
+  /// **'Thought · {count} findings'**
+  String aiTraceThought(String count);
+
+  /// No description provided for @aiChatExploreMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Deep analysis'**
+  String get aiChatExploreMode;
+
+  /// No description provided for @aiChatExploreModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-step exploration with key findings (Cursor-style)'**
+  String get aiChatExploreModeHint;
 
   /// No description provided for @settingsCategoryExternalServices.
   ///

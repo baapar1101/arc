@@ -16,6 +16,7 @@
 | Progress فقط spinner | نوار وضعیت + **تایم‌لاین Agent Trace** (زنجیره مراحل) |
 | لغو بدون ذخیره partial | ذخیره محتوای نیمه‌کاره + trace در `_stopGenerating` |
 | نبود زنجیره تفکر مرئی | `trace_step` SSE + `AIAgentTraceTimeline` + ذخیره در `_agent_trace` |
+| Exploration (Cursor-style) | `explore` / `explored` / `thought` trace + `ai_exploration_service` + `mode=explore\|auto\|off` |
 
 ## 🟡 باقی‌مانده (متوسط)
 
@@ -52,4 +53,14 @@
 | `content` | delta متن |
 | `done: true` | پایان + usage + `agent_trace` |
 
-انواع `kind` در trace: `context`, `narrative`, `plan`, `tool`, `observation`, `plan_next`, `answer`
+انواع `kind` در trace: `context`, `explore`, `explored`, `thought`, `narrative`, `plan`, `tool`, `observation`, `plan_next`, `answer`
+
+### حالت Exploration
+
+| پارامتر | معنی |
+|---------|------|
+| `mode=auto` (پیش‌فرض) | برای سوال medium/complex فعال می‌شود |
+| `mode=explore` | همیشه + Thought با LLM برای bundleهای ≥۲ ابزار |
+| `mode=off` | فقط حلقهٔ agent کلاسیک |
+
+فیلدهای اضافه در `trace_step`: `bundle_id`, `explore_target`, `entity_refs`, `findings_count`, `hypothesis`, `confidence`

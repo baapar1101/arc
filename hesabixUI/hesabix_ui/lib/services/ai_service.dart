@@ -318,16 +318,24 @@ class AIService {
     required int sessionId,
     required String content,
     bool approveWrites = false,
+    String? explorationMode,
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
     CancelToken? cancelToken,
   }) async* {
     try {
+      final query = <String, dynamic>{'stream': true};
+      if (explorationMode != null && explorationMode.isNotEmpty) {
+        query['mode'] = explorationMode;
+      }
       final response = await _api.post<ResponseBody>(
-        '/api/v1/ai/chat/sessions/$sessionId/messages?stream=true',
+        '/api/v1/ai/chat/sessions/$sessionId/messages',
+        queryParameters: query,
         data: {
           'content': content,
           'approve_writes': approveWrites,
+          if (explorationMode != null && explorationMode.isNotEmpty)
+            'mode': explorationMode,
         },
         responseType: ResponseType.stream,
         options: Options(

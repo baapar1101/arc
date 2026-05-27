@@ -341,6 +341,27 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       return l10n.aiTraceObservation(name);
     case 'aiTraceComposingAnswer':
       return l10n.aiTraceComposingAnswer;
+    case 'aiTraceExploring':
+      return l10n.aiTraceExploring;
+    case 'aiTraceExploringDone':
+      return l10n.aiTraceExploringDone;
+    case 'aiTraceExploringTarget':
+      return l10n.aiTraceExploringTarget(
+        params['target'] as String? ?? step.exploreTarget ?? '…',
+      );
+    case 'aiTraceExploredTarget':
+      return l10n.aiTraceExploredTarget(
+        params['target'] as String? ?? step.exploreTarget ?? '…',
+      );
+    case 'aiTraceExplored':
+      return l10n.aiTraceExplored(
+        params['title'] as String? ?? '…',
+        params['count'] as String? ?? '${step.resultCount ?? 0}',
+      );
+    case 'aiTraceThought':
+      return l10n.aiTraceThought(
+        params['count'] as String? ?? '${step.findingsCount ?? 0}',
+      );
     case 'aiStatusThinking':
       return l10n.aiStatusThinking;
     case 'aiStatusLoadingPrompt':
@@ -363,6 +384,17 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       }
       if (step.kind == 'plan') {
         return l10n.aiTracePlanningAction;
+      }
+      if (step.kind == 'explore') {
+        return step.exploreTarget != null
+            ? l10n.aiTraceExploringTarget(step.exploreTarget!)
+            : l10n.aiTraceExploring;
+      }
+      if (step.kind == 'explored') {
+        return l10n.aiTraceExplored('…', '${step.resultCount ?? 0}');
+      }
+      if (step.kind == 'thought') {
+        return l10n.aiTraceThought('${step.findingsCount ?? 0}');
       }
       if (step.tool != null) {
         return aiToolLabel(l10n, step.tool!, toolKey: step.toolKey);

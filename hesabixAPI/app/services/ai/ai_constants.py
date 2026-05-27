@@ -38,3 +38,11 @@ TOOL_CACHE_MAX_ENTRIES = 200
 
 # حداقل طول سوال برای فعال‌سازی planning step
 PLANNING_STEP_MIN_CHARS = 30
+
+# Exploration mode (Cursor-style)
+EXPLORATION_COMPLEXITY_ITERATIONS: dict[str, int] = {
+    "simple": 4,
+    "medium": 8,
+    "complex": 15,
+}
+EXPLORATION_LLM_THOUGHT_MIN_TOOLS = 2
