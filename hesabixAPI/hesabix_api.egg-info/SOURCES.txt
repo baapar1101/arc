@@ -523,6 +523,7 @@ app/services/tax_background_jobs.py
 app/services/tax_data_quality_service.py
 app/services/tax_dead_letter_queue.py
 app/services/tax_health_check.py
+app/services/tax_key_material_service.py
 app/services/tax_logging.py
 app/services/tax_payload_builder.py
 app/services/tax_product_code_service.py
@@ -558,6 +559,7 @@ app/services/ai/ai_db_helpers.py
 app/services/ai/ai_embedding_service.py
 app/services/ai/ai_eval_schedule_service.py
 app/services/ai/ai_eval_service.py
+app/services/ai/ai_exploration_service.py
 app/services/ai/ai_feedback_analytics_service.py
 app/services/ai/ai_feedback_service.py
 app/services/ai/ai_function_extensions.py
@@ -762,6 +764,7 @@ tests/__init__.py
 tests/test_ai_connector_security.py
 tests/test_ai_embedding_service.py
 tests/test_ai_eval_service.py
+tests/test_ai_exploration_service.py
 tests/test_ai_feedback_analytics.py
 tests/test_ai_json_safe.py
 tests/test_ai_knowledge_service.py
@@ -787,3 +790,4 @@ tests/test_product_inventory_tracking_sync.py
 tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
 tests/test_stock_count.py
+tests/test_tax_key_material_service.py

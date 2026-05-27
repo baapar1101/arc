@@ -330,7 +330,7 @@ class AIService {
       }
       final response = await _api.post<ResponseBody>(
         '/api/v1/ai/chat/sessions/$sessionId/messages',
-        queryParameters: query,
+        query: query,
         data: {
           'content': content,
           'approve_writes': approveWrites,
