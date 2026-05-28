@@ -135,12 +135,15 @@ class Settings(BaseSettings):
 	voice_stt_compute_type: str = "int8"
 
 	# TTS (متن‌باز)
-	# engine: "coqui" | "dummy"
+	# engine: "piper" | "coqui" (فقط Python<3.12) | "dummy"
 	voice_tts_engine: str = "dummy"
 	voice_tts_language: str = "fa"
 	voice_tts_model_name: str | None = None
 	voice_tts_model_path: str | None = None
-	# مدل Coqui پیش‌فرض فارسی (محلی، بدون API) وقتی model_name خالی است
+	# Piper (پیش‌فرض برای Python 3.12+)
+	voice_tts_piper_voice_fa: str = "fa_IR-ganji-medium"
+	voice_tts_piper_models_dir: str = "/var/lib/hesabix/voice-data/piper"
+	# Coqui (legacy؛ روی Python 3.12 در PyPI موجود نیست)
 	voice_tts_coqui_model_fa: str = "tts_models/fa/cv/vits/glow-tts"
 	voice_tts_output_sample_rate_hz: int = 16000
 	voice_tts_frame_ms: int = 20

@@ -8,10 +8,5 @@ ctranslate2
 onnxruntime
 tokenizers
 huggingface-hub
-TTS
-torch
-torchaudio
-soundfile
-librosa
-scipy
-cffi
+piper-tts
+pathvalidate

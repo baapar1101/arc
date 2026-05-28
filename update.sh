@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Hesabix update script: pull from repo, migrate backend, restart services, rebuild frontend, reload nginx.
-# pip: Hesabix mirror only (https://p.mirror.hesabix.ir/simple) — configure_pip_hesabix_mirror before backend pip install. Nginx نصب: scripts/install_pip_mirror_nginx.sh
-# Flutter: فقط f.mirror.hesabix.ir (pub + gcs؛ upstream pub-azs.ir) — hesabixAPI/f.mirror.hesabix.ir.conf
+# pip: Hesabix mirror only (https://p.mirror.hesabix.ir/simple) — configure_pip_hesabix_mirror before backend pip install. Nginx install: scripts/install_pip_mirror_nginx.sh
+# Flutter: f.mirror.hesabix.ir only (pub + gcs; upstream pub-azs.ir) — hesabixAPI/f.mirror.hesabix.ir.conf
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # PostgreSQL pgvector: scripts/ensure_pgvector.sh (idempotent, non-fatal) before Alembic migrations.
 # AI voice (local STT/TTS): scripts/ensure_voice_chat.sh — prompts if deps missing (INSTALL_VOICE in .deploy_env).
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
-# آدرس API در بیلد وب: https اگر /etc/letsencrypt/live/<API_DOMAIN> وجود داشته باشد؛ وگرنه http مگر API_PUBLIC_SCHEME در محیط ست شود (TLS سفارشی).
+# Web build API URL: https if /etc/letsencrypt/live/<API_DOMAIN> exists; else http unless API_PUBLIC_SCHEME is set in env (custom TLS).
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
@@ -18,12 +18,12 @@ log_info() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"; }
 log_ok()   { echo "${CHECK_MARK} $*" | tee -a "${LOG_FILE}"; }
 log_err()  { echo "${CROSS_MARK} $*" >&2; echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >> "${LOG_FILE}"; }
 
-# اگر checkout/pull معمولی شکست بخورد (فایل جنریت لوکال، merge، شاخهٔ منحرف)، کلون را با remote هم‌راستا می‌کند.
+# If normal checkout/pull fails (local generated file, merge, diverged branch), realign the clone with remote.
 hesabix_force_sync_origin() {
-  log_info "هم‌راستاسازی اجباری با origin/${BRANCH}: git reset --hard (تغییرات و commitهای لوکال این clone از بین می‌روند)."
+  log_info "Force sync with origin/${BRANCH}: git reset --hard (local changes and commits in this clone will be discarded)."
   git fetch origin --prune
   if ! git show-ref -q "origin/${BRANCH}"; then
-    log_err "origin/${BRANCH} بعد از fetch پیدا نشد."
+    log_err "origin/${BRANCH} not found after fetch."
     return 1
   fi
   if git show-ref -q "refs/heads/${BRANCH}"; then
@@ -32,13 +32,13 @@ hesabix_force_sync_origin() {
     git checkout -b "${BRANCH}" "origin/${BRANCH}"
   fi
   if ! git reset --hard "origin/${BRANCH}"; then
-    log_err "git reset --hard origin/${BRANCH} ناموفق بود."
+    log_err "git reset --hard origin/${BRANCH} failed."
     return 1
   fi
   return 0
 }
 
-# همان منطق deploy.sh: PATH فلاتر برای شِل‌های جدید (/etc/profile.d + خط idempotent در bash.bashrc)
+# Same logic as deploy.sh: Flutter PATH for new shells (/etc/profile.d + idempotent line in bash.bashrc)
 persist_flutter_path_in_profile_d() {
   local f="/etc/profile.d/hesabix-flutter.sh"
   if [[ ! -x /opt/flutter/bin/flutter && ! -x /snap/bin/flutter ]]; then

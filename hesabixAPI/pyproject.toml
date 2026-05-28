@@ -57,14 +57,14 @@ dev = [
 ]
 
 # Optional dependencies for Voice Chat (STT/TTS/VAD)
-# نصب این گروه باعث نصب وابستگی‌های سنگین (torch) می‌شود؛ بهتر است فقط در سرورهای voice فعال شود.
+# Piper (ONNX) به‌جای Coqui TTS — سازگار با Python 3.12، بدون torch.
 voice = [
   # webrtcvad اصلی برای Python 3.12+ wheel ندارد؛ webrtcvad-wheels همان import webrtcvad را می‌دهد.
   "webrtcvad-wheels>=2.0.11.post1",
   "numpy>=1.26.0",
   "faster-whisper>=1.0.3",
-  "TTS>=0.22.0",
-  "av>=12.0.0"
+  "piper-tts>=1.3.0",
+  "av>=12.0.0",
 ]
 
 [build-system]

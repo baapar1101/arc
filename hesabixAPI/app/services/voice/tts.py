@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import AsyncGenerator, Optional
 import asyncio
 import audioop
@@ -11,10 +12,11 @@ import re
 class TTSConfig:
 	"""
 	TTS engine config.
-	- engine: "coqui" | "dummy"
-	- model_name / model_path: برای Coqui
+	- engine: "piper" | "coqui" | "dummy"
+	- model_name: شناسه مدل Piper (مثلاً fa_IR-ganji-medium) یا نام مدل Coqui
+	- model_path: مسیر فایل .onnx (Piper) یا دایرکتوری مدل Coqui
 	"""
-	engine: str = "coqui"
+	engine: str = "piper"
 	language: str = "fa"
 	model_name: str | None = None
 	model_path: str | None = None
@@ -40,7 +42,105 @@ class DummyTTSEngine(TTSEngineBase):
 		return (b"\x00\x00" * samples, self.sample_rate_hz)
 
 
+class PiperTTSEngine(TTSEngineBase):
+	"""TTS محلی با Piper (ONNX) — سازگار با Python 3.12، بدون torch."""
+
+	def __init__(self, cfg: TTSConfig) -> None:
+		self.cfg = cfg
+		self._voice = None
+		self._lock = asyncio.Lock()
+
+	def _resolve_voice_id(self) -> str:
+		if self.cfg.model_name:
+			return self.cfg.model_name.strip()
+		from app.core.settings import get_settings
+
+		settings = get_settings()
+		if (self.cfg.language or "").startswith("fa"):
+			voice_id = (settings.voice_tts_piper_voice_fa or "").strip()
+			if voice_id:
+				return voice_id
+		raise RuntimeError(
+			"شناسه مدل Piper تنظیم نشده است. "
+			"VOICE_TTS_MODEL_NAME یا VOICE_TTS_PIPER_VOICE_FA را در env تنظیم کنید."
+		)
+
+	def _resolve_model_path(self) -> Path:
+		if self.cfg.model_path:
+			p = Path(self.cfg.model_path)
+			if p.is_dir():
+				onnx = p / f"{p.name}.onnx"
+				if onnx.is_file():
+					return onnx
+				candidates = sorted(p.glob("*.onnx"))
+				if candidates:
+					return candidates[0]
+			if p.suffix == ".onnx" or p.with_suffix(".onnx").is_file():
+				return p if p.suffix == ".onnx" else p.with_suffix(".onnx")
+			raise RuntimeError(f"فایل مدل Piper یافت نشد: {p}")
+
+		from app.core.settings import get_settings
+
+		settings = get_settings()
+		models_dir = Path(settings.voice_tts_piper_models_dir)
+		voice_id = self._resolve_voice_id()
+		onnx = models_dir / f"{voice_id}.onnx"
+		if onnx.is_file():
+			return onnx
+		self._download_voice(voice_id, models_dir)
+		if not onnx.is_file():
+			raise RuntimeError(f"مدل Piper پس از دانلود یافت نشد: {onnx}")
+		return onnx
+
+	@staticmethod
+	def _download_voice(voice_id: str, models_dir: Path) -> None:
+		try:
+			from piper.download_voices import download_voice  # type: ignore
+		except Exception as exc:
+			raise RuntimeError(
+				"ماژول piper-tts نصب نیست. pip install -e \".[voice]\" را اجرا کنید."
+			) from exc
+		models_dir.mkdir(parents=True, exist_ok=True)
+		download_voice(voice_id, models_dir)
+
+	async def _ensure_loaded(self):
+		async with self._lock:
+			if self._voice is not None:
+				return self._voice
+			try:
+				from piper import PiperVoice  # type: ignore
+			except Exception as exc:
+				raise RuntimeError(
+					"پکیج piper-tts نصب نیست. برای TTS محلی، optional-deps صوت را نصب کنید."
+				) from exc
+
+			model_path = self._resolve_model_path()
+			self._voice = PiperVoice.load(model_path)
+			return self._voice
+
+	async def synthesize_pcm16_async(self, text: str) -> tuple[bytes, int]:
+		voice = await self._ensure_loaded()
+		loop = asyncio.get_event_loop()
+		return await loop.run_in_executor(None, lambda: self._synth_sync(voice, text))
+
+	def _synth_sync(self, voice, text: str) -> tuple[bytes, int]:
+		chunks = list(voice.synthesize(text))
+		if not chunks:
+			return (b"", self.cfg.output_sample_rate_hz)
+		pcm_parts: list[bytes] = []
+		sr = int(chunks[0].sample_rate)
+		for chunk in chunks:
+			pcm_parts.append(chunk.audio_int16_bytes)
+			sr = int(chunk.sample_rate)
+		return (b"".join(pcm_parts), sr)
+
+	def synthesize_pcm16(self, text: str) -> tuple[bytes, int]:
+		raise RuntimeError("Use synthesize_pcm16_async for PiperTTSEngine")
+
+
 class CoquiTTSEngine(TTSEngineBase):
+	"""Coqui TTS — فقط Python <3.12؛ برای سازگاری قدیمی نگه داشته شده."""
+
 	def __init__(self, cfg: TTSConfig) -> None:
 		self.cfg = cfg
 		self._tts = None  # lazy
@@ -54,7 +154,7 @@ class CoquiTTSEngine(TTSEngineBase):
 				from TTS.api import TTS  # type: ignore
 			except Exception as exc:
 				raise RuntimeError(
-					"پکیج Coqui TTS نصب نیست. برای TTS رایگان، optional-deps صوت را نصب کنید."
+					"پکیج Coqui TTS نصب نیست (روی Python 3.12+ از engine=piper استفاده کنید)."
 				) from exc
 
 			if self.cfg.model_path:
@@ -71,7 +171,7 @@ class CoquiTTSEngine(TTSEngineBase):
 				else:
 					raise RuntimeError(
 						"TTS model_name/model_path تنظیم نشده است. "
-						"برای فارسی می‌توانید VOICE_TTS_COQUI_MODEL_FA را در env تنظیم کنید."
+						"برای فارسی VOICE_TTS_COQUI_MODEL_FA یا engine=piper را تنظیم کنید."
 					)
 			return self._tts
 
@@ -92,9 +192,7 @@ class CoquiTTSEngine(TTSEngineBase):
 		return await loop.run_in_executor(None, lambda: self._synth_sync(tts, text))
 
 	def _synth_sync(self, tts, text: str) -> tuple[bytes, int]:
-		# Coqui API: tts.tts returns waveform float32 array
 		wav = tts.tts(text=text)
-		# output sample rate
 		sr = getattr(getattr(tts, "synthesizer", None), "output_sample_rate", None) or getattr(
 			tts, "output_sample_rate", None
 		)
@@ -102,7 +200,6 @@ class CoquiTTSEngine(TTSEngineBase):
 		return self._float_to_pcm16(wav, sr)
 
 	def synthesize_pcm16(self, text: str) -> tuple[bytes, int]:
-		# sync wrapper (برای interface) - ولی بهتر است از async استفاده شود
 		raise RuntimeError("Use synthesize_pcm16_async for CoquiTTSEngine")
 
 
@@ -120,17 +217,14 @@ class StreamingTTS:
 		if not text:
 			return
 
-		# Coqui async
-		if isinstance(self.engine, CoquiTTSEngine):
+		if isinstance(self.engine, (CoquiTTSEngine, PiperTTSEngine)):
 			pcm, sr = await self.engine.synthesize_pcm16_async(text)
 		else:
 			pcm, sr = self.engine.synthesize_pcm16(text)
 
-		# resample to target output sample rate (PCM16 mono)
 		if sr != self.cfg.output_sample_rate_hz:
 			pcm = _resample_pcm16_mono(pcm, sr, self.cfg.output_sample_rate_hz)
 
-		# chunk to frames
 		for i in range(0, len(pcm), self._frame_bytes):
 			if cancel_event.is_set():
 				break
@@ -140,9 +234,11 @@ class StreamingTTS:
 class TTSFactory:
 	@staticmethod
 	def create(cfg: TTSConfig) -> StreamingTTS:
-		engine_name = (cfg.engine or "coqui").strip().lower()
+		engine_name = (cfg.engine or "piper").strip().lower()
 		if engine_name == "dummy":
 			engine: TTSEngineBase = DummyTTSEngine(cfg.output_sample_rate_hz)
+		elif engine_name == "piper":
+			engine = PiperTTSEngine(cfg)
 		elif engine_name == "coqui":
 			engine = CoquiTTSEngine(cfg)
 		else:
@@ -156,7 +252,6 @@ def _resample_pcm16_mono(pcm: bytes, src_rate: int, dst_rate: int) -> bytes:
 	"""
 	if src_rate == dst_rate:
 		return pcm
-	# audioop.ratecv returns (converted, state)
 	converted, _state = audioop.ratecv(pcm, 2, 1, src_rate, dst_rate, None)
 	return converted
 
@@ -181,7 +276,6 @@ class TextChunker:
 			return out
 		self._buf += delta
 
-		# تکه‌بندی بر اساس انتهای جمله
 		while True:
 			cut = _find_chunk_cut(self._buf, self.max_chars)
 			if cut is None:
@@ -204,15 +298,10 @@ _END_RE = re.compile(r"([.!؟\n])")
 def _find_chunk_cut(buf: str, max_chars: int) -> int | None:
 	if not buf:
 		return None
-	# اگر طول خیلی زیاد شد، قطع در نزدیک‌ترین فاصله
 	if len(buf) >= max_chars:
-		# cut at last whitespace before max_chars, otherwise hard cut
 		ws = buf.rfind(" ", 0, max_chars)
 		return ws if ws > 30 else max_chars
-	# اگر پایان جمله داریم
 	m = _END_RE.search(buf)
 	if m:
 		return m.end()
 	return None
-
-

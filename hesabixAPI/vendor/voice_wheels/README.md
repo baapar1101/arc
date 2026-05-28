@@ -20,7 +20,7 @@ INSTALL_VOICE=Y bash scripts/ensure_voice_chat.sh --non-interactive
 
 ## روش ۲ — آپلود به آینه Nexus
 
-فهرست نام پکیج‌ها: `scripts/pypi_voice_packages.txt`
+فهرست نام پکیج‌ها: `scripts/pypi_voice_packages.txt` (شامل `piper-tts` به‌جای `TTS`/torch)
 
 ## روش ۳ — ایندکس کمکی (اگر سرور به PyPI دسترسی دارد)
 

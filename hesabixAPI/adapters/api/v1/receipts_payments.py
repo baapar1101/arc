@@ -29,8 +29,8 @@ from app.core.responses import success_response, format_datetime_fields, ApiErro
 from app.core.cache import get_cache
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.services.receipt_payment_service import DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT
-from adapters.api.v1.schemas import QueryInfo
-from adapters.api.v1.list_query_common import DocumentListQueryBody, document_list_query_to_dict, SuccessResponse
+from adapters.api.v1.schemas import QueryInfo, SuccessResponse
+from adapters.api.v1.list_query_common import DocumentListQueryBody, document_list_query_to_dict
 from adapters.api.v1.schema_models.receipt_payment import (
     ReceiptPaymentCreateRequest,
     ReceiptPaymentResponse,

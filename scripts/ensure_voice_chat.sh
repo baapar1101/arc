@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # نصب idempotent پیش‌نیازهای مکالمه صوتی AI (محلی — بدون API ابری).
 # - بسته‌های سیستمی libav برای PyAV
-# - pip install -e ".[voice]" (webrtcvad-wheels, faster-whisper, TTS, torch, av)
+# - pip install -e ".[voice]" (webrtcvad-wheels, faster-whisper, piper-tts, av)
 # - اگر پکیج روی p.mirror نبود: vendor/voice_wheels یا VOICE_PIP_EXTRA_INDEX_URL
 # - دایرکتوری ذخیره opt-in و تنظیمات .env
 #
@@ -114,6 +114,7 @@ import webrtcvad  # noqa: F401  # from webrtcvad-wheels
 import numpy  # noqa: F401
 import av  # noqa: F401
 from faster_whisper import WhisperModel  # noqa: F401
+from piper import PiperVoice  # noqa: F401
 print("ok")
 PY
 }
@@ -228,7 +229,7 @@ install_voice_pip_extras() {
 
   log_warn "pip install -e \".[voice]\" failed; retrying core packages individually..."
   local pkg
-  for pkg in numpy av "faster-whisper>=1.0.3" "TTS>=0.22.0"; do
+  for pkg in numpy av "faster-whisper>=1.0.3" "piper-tts>=1.3.0"; do
     if ! pip install --no-cache-dir "${shell_extra[@]}" "${pkg}"; then
       log_warn "Failed to install: ${pkg}"
     fi
@@ -240,6 +241,28 @@ install_voice_pip_extras() {
 
   log_warn "Voice install incomplete. See vendor/voice_wheels/README.md and scripts/pypi_voice_packages.txt"
   return 1
+}
+
+ensure_piper_voice_model() {
+  activate_venv || return 0
+  local piper_dir="${VOICE_DATA_DIR}/piper"
+  local voice_id="${VOICE_TTS_PIPER_VOICE_FA:-fa_IR-ganji-medium}"
+  local onnx="${piper_dir}/${voice_id}.onnx"
+  if [[ -f "${onnx}" ]]; then
+    log_ok "Piper voice model present: ${onnx}"
+    return 0
+  fi
+  log_info "Downloading Piper voice '${voice_id}' to ${piper_dir} (one-time, ~50MB)..."
+  mkdir -p "${piper_dir}"
+  if python3 -m piper.download_voices "${voice_id}" --download-dir "${piper_dir}"; then
+    if id -u www-data >/dev/null 2>&1; then
+      chown -R www-data:www-data "${piper_dir}" 2>/dev/null || true
+    fi
+    log_ok "Piper voice model downloaded."
+    return 0
+  fi
+  log_warn "Piper voice download failed (TTS may download on first use if HuggingFace is reachable)."
+  return 0
 }
 
 merge_voice_env_file() {
@@ -257,10 +280,12 @@ def fmt_val(v: str) -> str:
         return '"' + v.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return v
 
+piper_dir = os.path.join(os.environ.get("VOICE_DATA_DIR", "/var/lib/hesabix/voice-data"), "piper")
 updates = {
     "VOICE_ENABLED": "true",
-    "VOICE_TTS_ENGINE": "coqui",
-    "VOICE_TTS_COQUI_MODEL_FA": "tts_models/fa/cv/vits/glow-tts",
+    "VOICE_TTS_ENGINE": "piper",
+    "VOICE_TTS_PIPER_VOICE_FA": "fa_IR-ganji-medium",
+    "VOICE_TTS_PIPER_MODELS_DIR": piper_dir,
     "VOICE_DATA_COLLECTION_DIR": os.environ.get("VOICE_DATA_DIR", "/var/lib/hesabix/voice-data"),
     "VOICE_DATA_COLLECTION_ENABLED": "false",
 }
@@ -294,7 +319,7 @@ warn_voice_resources() {
   mem_kb=$(grep -E '^MemAvailable:' /proc/meminfo 2>/dev/null | awk '{print $2}' || echo "0")
   avail_mb=$((mem_kb / 1024))
   if [[ "${avail_mb}" -lt 4096 ]]; then
-    log_warn "Available RAM ~${avail_mb}MB — voice (Whisper+TTS) needs ~4GB+ for stable use."
+    log_warn "Available RAM ~${avail_mb}MB — voice (Whisper+Piper) needs ~2GB+ for stable use."
   fi
 }
 
@@ -314,8 +339,8 @@ should_install_voice() {
     return 1
   fi
   echo
-  echo "مکالمه صوتی AI (پردازش محلی — Whisper + Coqui، بدون سرویس ابری):"
-  echo "  • نیاز به RAM/CPU و چند گیگابایت فضای دیسک (torch و مدل‌ها)"
+  echo "مکالمه صوتی AI (پردازش محلی — Whisper + Piper TTS، بدون سرویس ابری):"
+  echo "  • نیاز به RAM/CPU و فضای دیسک برای مدل‌های STT/TTS (~۱–۲ گیگ)"
   echo "  • کتابخانه‌های سیستمی libav + pip optional [voice]"
   warn_voice_resources
   local ans
@@ -344,6 +369,7 @@ main() {
   fi
 
   merge_voice_env_file
+  ensure_piper_voice_model || true
   log_ok "AI voice chat prerequisites ready (local STT/TTS)."
 }
 

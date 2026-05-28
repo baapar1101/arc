@@ -10,7 +10,7 @@
 | **۴ — کیفیت** | تست‌های کمکی، مستندات، هشدار TTS dummy | ✅ |
 | **۵ — وب** | AudioWorklet + WS باینری PCM (بدون base64) | ✅ |
 | **۶ — فشرده‌سازی** | WebM/Opus با MediaRecorder مرورگر + PyAV محلی | ✅ |
-| **۷ — TTS فارسی** | مدل پیش‌فرض Coqui محلی (`voice_tts_coqui_model_fa`) | ✅ |
+| **۷ — TTS فارسی** | Piper ONNX محلی (`voice_tts_piper_voice_fa`) — سازگار Python 3.12 | ✅ |
 
 > همه مراحل STT/VAD/TTS/فشرده‌سازی روی **سرور و مرورگر خودتان** اجرا می‌شوند؛ API ابری صوتی استفاده نمی‌شود.
 
@@ -45,8 +45,11 @@
 
 - `voice_enabled`
 - `voice_*` برای VAD/STT/TTS
-- `voice_tts_engine`: `dummy` (آزمایش) یا `coqui` (تولید)
-- `voice_tts_model_name` / `voice_tts_model_path`: الزامی برای coqui
+- `voice_tts_engine`: `dummy` (آزمایش) یا `piper` (تولید، Python 3.12+)
+- `voice_tts_piper_voice_fa`: شناسه مدل، مثلاً `fa_IR-ganji-medium`
+- `voice_tts_piper_models_dir`: مسیر ذخیره فایل‌های `.onnx`
+- `voice_tts_model_name` / `voice_tts_model_path`: override اختیاری Piper
+- `coqui`: فقط Python <3.12 (legacy)
 - `voice_data_collection_enabled` + `voice_data_collection_dir` برای ذخیره PCM با opt-in
 
 ## نصب وابستگی‌ها
@@ -99,15 +102,22 @@ pip install -e ".[voice]"
 - `web/hesabix_voice_capture.js` — پل ضبط (Worklet یا MediaRecorder)
 - `web/voice_capture_processor.js` — AudioWorklet PCM16 @ 16kHz
 
-## TTS فارسی (محلی)
+## TTS فارسی (محلی — Piper)
 
 ```bash
 # env نمونه
-VOICE_TTS_ENGINE=coqui
-VOICE_TTS_COQUI_MODEL_FA=tts_models/fa/cv/vits/glow-tts
+VOICE_TTS_ENGINE=piper
+VOICE_TTS_PIPER_VOICE_FA=fa_IR-ganji-medium
+VOICE_TTS_PIPER_MODELS_DIR=/var/lib/hesabix/voice-data/piper
 ```
 
-مدل‌ها با Coqui TTS یک‌بار دانلود و روی دیسک کش می‌شوند (بدون هزینه per-request).
+مدل‌های فارسی Piper: `fa_IR-ganji-medium`, `fa_IR-amir-medium`, `fa_IR-gyro-medium`, …
+
+```bash
+python3 -m piper.download_voices fa_IR-ganji-medium --download-dir /var/lib/hesabix/voice-data/piper
+```
+
+یا در نصب voice: `INSTALL_VOICE=Y bash scripts/ensure_voice_chat.sh` (دانلود خودکار).
 
 ## گام‌های بعدی (اختیاری)
 
