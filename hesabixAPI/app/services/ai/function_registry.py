@@ -122,6 +122,11 @@ class AIFunctionRegistry:
         from app.services.ai.ai_function_extensions_memory import register_memory_functions
 
         register_memory_functions(self)
+        from app.services.ai.ai_function_extensions_workflow import (
+            register_workflow_ai_functions,
+        )
+
+        register_workflow_ai_functions(self)
         # External HTTP connectors
         self._register_connector_functions()
     

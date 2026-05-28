@@ -6,6 +6,7 @@ from adapters.db.models.ai_prompt import AIPrompt, PromptRole, PromptType
 from adapters.db.repositories.ai_prompt_repository import AIPromptRepository
 from app.services.ai.ai_query_filter_prompt import ADVANCED_QUERY_PROMPT_BLOCK
 from app.services.ai.ai_visualization_prompt import VISUALIZATION_PROMPT_BLOCK
+from app.services.ai.ai_workflow_prompt import AI_WORKFLOW_PROMPT_BLOCK
 
 
 def get_prompt(
@@ -59,6 +60,8 @@ _USER_DEFAULT_PROMPT = (
 """
     + ADVANCED_QUERY_PROMPT_BLOCK
     + VISUALIZATION_PROMPT_BLOCK
+    + "\n\n"
+    + AI_WORKFLOW_PROMPT_BLOCK
 )
 
 

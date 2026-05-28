@@ -1754,6 +1754,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 Expanded(
                                   child: AIChatThreadView(
                                 key: ValueKey('thread-${_currentSession?.id}'),
+                                businessId: widget.businessId,
                                 messages: _messages,
                                 messageKeys: _messageKeys,
                                 streamingContent: _stream.content,

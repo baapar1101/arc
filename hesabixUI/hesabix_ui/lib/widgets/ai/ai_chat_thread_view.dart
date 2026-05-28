@@ -55,9 +55,11 @@ class AIChatThreadView extends StatelessWidget {
   final double? contextUsagePercent;
   final bool contextHistorySummarized;
   final List<GlobalKey>? messageKeys;
+  final int? businessId;
 
   const AIChatThreadView({
     super.key,
+    this.businessId,
     required this.messages,
     required this.streamingContent,
     this.streamingToolActivities = const [],
@@ -119,6 +121,7 @@ class AIChatThreadView extends StatelessWidget {
           return KeyedSubtree(
             key: rowKey,
             child: _MessageRow(
+              businessId: businessId,
               message: messages[index],
               formatTime: formatTime,
               onLongPress: () => onMessageLongPress(messages[index]),
@@ -138,6 +141,7 @@ class AIChatThreadView extends StatelessWidget {
           );
         }
         return _StreamingRow(
+          businessId: businessId,
           content: streamingContent ?? '',
           toolActivities: streamingToolActivities,
           traceSteps: streamingTraceSteps,
@@ -246,6 +250,7 @@ class AIChatThreadView extends StatelessWidget {
 }
 
 class _MessageRow extends StatelessWidget {
+  final int? businessId;
   final AIChatMessage message;
   final String Function(DateTime?) formatTime;
   final VoidCallback onLongPress;
@@ -255,6 +260,7 @@ class _MessageRow extends StatelessWidget {
   final VoidCallback? onRegenerate;
 
   const _MessageRow({
+    this.businessId,
     required this.message,
     required this.formatTime,
     required this.onLongPress,
@@ -352,6 +358,7 @@ class _MessageRow extends StatelessWidget {
                     child: AIChatMessageBody(
                       content: message.content,
                       isUser: false,
+                      businessId: businessId,
                       functionCalls: message.functionCalls,
                       functionResults: message.functionResults,
                     ),
@@ -383,6 +390,7 @@ class _MessageRow extends StatelessWidget {
 }
 
 class _StreamingRow extends StatelessWidget {
+  final int? businessId;
   final String content;
   final List<AIToolActivity> toolActivities;
   final List<AIAgentTraceStep> traceSteps;
@@ -394,6 +402,7 @@ class _StreamingRow extends StatelessWidget {
   final String formatTime;
 
   const _StreamingRow({
+    this.businessId,
     required this.content,
     this.toolActivities = const [],
     this.traceSteps = const [],
@@ -444,6 +453,7 @@ class _StreamingRow extends StatelessWidget {
                   AIChatToolActivityList(activities: toolActivities),
                 if (content.isNotEmpty)
                   _StreamingAnswerCard(
+                    businessId: businessId,
                     content: content,
                     theme: theme,
                     scheme: scheme,
@@ -497,12 +507,14 @@ class _StreamingRow extends StatelessWidget {
 
 /// کارت پاسخ نهایی در حالت استریم (جدا از پنل استدلال).
 class _StreamingAnswerCard extends StatelessWidget {
+  final int? businessId;
   final String content;
   final ThemeData theme;
   final ColorScheme scheme;
   final bool showReasoningAbove;
 
   const _StreamingAnswerCard({
+    this.businessId,
     required this.content,
     required this.theme,
     required this.scheme,
@@ -555,6 +567,7 @@ class _StreamingAnswerCard extends StatelessWidget {
           child: AIChatMessageBody(
             content: content,
             isUser: false,
+            businessId: businessId,
             suppressAnswerLabel: true,
           ),
         ),

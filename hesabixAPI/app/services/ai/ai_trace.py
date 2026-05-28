@@ -217,8 +217,35 @@ def summarize_tool_result(function_name: str, result: Any) -> str:
         if "error" in result:
             return f"خطا: {result.get('error')}"
 
+        # workflow / اتوماسیون
+        if function_name in (
+            "create_workflow",
+            "update_workflow",
+            "get_workflow",
+            "test_workflow",
+        ):
+            parts: List[str] = []
+            if result.get("name"):
+                parts.append(f"**{result['name']}**")
+            wid = result.get("id") or result.get("workflow_id")
+            if wid is not None:
+                parts.append(f"شناسه: `{wid}`")
+            if result.get("status"):
+                parts.append(f"وضعیت: {result['status']}")
+            if result.get("editor_path"):
+                parts.append(f"ادیتور: `{result['editor_path']}`")
+            if result.get("sandbox_used"):
+                parts.append("_(تست روی پیش‌نمایش sandbox)_")
+            if result.get("summary") and isinstance(result["summary"], dict):
+                s = result["summary"]
+                parts.append(
+                    f"نتیجه اجرا: {s.get('status', '—')} — خطاهای نود: {s.get('failed_node_count', 0)}"
+                )
+            if parts:
+                return "\n".join(parts)
+
         # پیام مستقیم
-        for key in ("message", "summary", "description"):
+        for key in ("message", "summary", "description", "note"):
             if isinstance(result.get(key), str) and result[key].strip():
                 return result[key].strip()[:1200]
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/core/business_nav.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_reasoning_panel.dart';
@@ -8,10 +10,12 @@ import 'ai_chat_l10n.dart';
 import 'ai_chat_table_widget.dart';
 import 'ai_markdown_table_parser.dart';
 import 'ai_visualization_spec.dart';
+import 'ai_workflow_chat_actions.dart';
 
 class AIChatMessageBody extends StatelessWidget {
   final String content;
   final bool isUser;
+  final int? businessId;
   final Object? functionCalls;
   final Object? functionResults;
   final bool suppressAnswerLabel;
@@ -20,6 +24,7 @@ class AIChatMessageBody extends StatelessWidget {
     super.key,
     required this.content,
     required this.isUser,
+    this.businessId,
     this.functionCalls,
     this.functionResults,
     this.suppressAnswerLabel = false,
@@ -62,7 +67,23 @@ class AIChatMessageBody extends StatelessWidget {
                   content,
                   style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
                 )
-              : _AssistantRichContent(content: content, theme: theme, scheme: scheme),
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _AssistantRichContent(
+                      content: content,
+                      theme: theme,
+                      scheme: scheme,
+                      businessId: businessId,
+                    ),
+                    if (!isUser)
+                      AIWorkflowChatActions(
+                        businessId: businessId,
+                        functionResults: functionResults,
+                        assistantContent: content,
+                      ),
+                  ],
+                ),
         ],
       ],
     );
@@ -161,11 +182,13 @@ class _AssistantRichContent extends StatelessWidget {
   final String content;
   final ThemeData theme;
   final ColorScheme scheme;
+  final int? businessId;
 
   const _AssistantRichContent({
     required this.content,
     required this.theme,
     required this.scheme,
+    this.businessId,
   });
 
   @override
@@ -184,10 +207,38 @@ class _AssistantRichContent extends StatelessWidget {
               data: seg.text.trim(),
               selectable: true,
               styleSheet: _markdownStyle(theme, scheme),
+              onTapLink: businessId != null
+                  ? (text, href, title) => _onMarkdownLink(context, businessId!, text, href)
+                  : null,
             ),
       ],
     );
   }
+
+  static void _onMarkdownLink(
+    BuildContext context,
+    int businessId,
+    String text,
+    String? href,
+  ) {
+    final target = (href ?? text).trim();
+    if (target.isEmpty) return;
+    final workflowMatch = _editorPathInMarkdown.firstMatch(target);
+    if (workflowMatch != null) {
+      final wid = int.tryParse(workflowMatch.group(1)!);
+      if (wid != null) {
+        openWorkflowInEditor(context, businessId, wid);
+        return;
+      }
+    }
+    if (target.startsWith('/business/')) {
+      context.go(target);
+    }
+  }
+
+  static final _editorPathInMarkdown = RegExp(
+    r'(?:/business/\d+/tab\d+/)?workflows/(\d+)/edit',
+  );
 
   static MarkdownStyleSheet _markdownStyle(ThemeData theme, ColorScheme scheme) {
     return MarkdownStyleSheet(

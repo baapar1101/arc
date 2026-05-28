@@ -32,6 +32,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/workflow/workflow_publish_to_marketplace_dialog.dart';
+import '../../widgets/ai/ai_workflow_chat_actions.dart';
 import 'business_shell_side_nav_scope.dart';
 
 
@@ -282,6 +283,21 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         },
         appBar: AppBar(
           title: Text(title),
+          bottom: _workflow != null && isAiSandboxWorkflow(_workflow!)
+              ? PreferredSize(
+                  preferredSize: const Size.fromHeight(44),
+                  child: MaterialBanner(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    content: Text(
+                      'این پیش‌نمایش AI است؛ پس از تأیید در چت، اتوماسیون واقعی در لیست ظاهر می‌شود.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    leading: const Icon(Icons.science_outlined, size: 22),
+                    backgroundColor: Theme.of(context).colorScheme.tertiaryContainer,
+                    actions: const [SizedBox.shrink()],
+                  ),
+                )
+              : null,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new),
             onPressed: _goBackToWorkflowsList,

@@ -16,6 +16,7 @@ import '../../services/workflow_service.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/workflow/workflow_analytics_dialog.dart';
+import '../../widgets/ai/ai_workflow_chat_actions.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/workflow_log_clipboard.dart';
 
@@ -134,7 +135,9 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
       );
       if (!mounted) return;
       setState(() {
-        _workflows = (workflowsMap['items'] as List<Map<String, dynamic>>?) ?? const [];
+        final raw =
+            (workflowsMap['items'] as List<Map<String, dynamic>>?) ?? const [];
+        _workflows = raw.where((w) => !isAiSandboxWorkflow(w)).toList();
       });
     } catch (e, stackTrace) {
       debugPrint('خطا در بارگذاری workflows: $e');

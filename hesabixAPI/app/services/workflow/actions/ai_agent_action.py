@@ -120,7 +120,10 @@ class AIAgentAction(ActionHandler):
                 },
                 "tools_denylist": {
                     "type": "string",
-                    "description": "لیست توابع غیرمجاز (جدا شده با کاما)",
+                    "description": (
+                        "لیست توابع غیرمجاز (جدا شده با کاما). "
+                        "ابزارهای workflow (create_workflow و …) به‌طور پیش‌فرض مسدودند."
+                    ),
                     "required": False,
                 },
                 "max_iterations": {
@@ -282,9 +285,17 @@ class AIAgentAction(ActionHandler):
                 if allow_names:
                     tools = [t for t in tools if t.get("function", {}).get("name") in allow_names]
 
-            if config.get("tools_denylist") and tools:
-                denylist = {n.strip() for n in config["tools_denylist"].split(",") if n.strip()}
-                tools = [t for t in tools if t.get("function", {}).get("name") not in denylist]
+            from app.services.ai.ai_workflow_agent_policy import merge_workflow_agent_denylist
+
+            user_deny = None
+            if config.get("tools_denylist"):
+                user_deny = {n.strip() for n in config["tools_denylist"].split(",") if n.strip()}
+            denylist = merge_workflow_agent_denylist(user_deny)
+            if tools and denylist:
+                tools = [
+                    t for t in tools
+                    if t.get("function", {}).get("name") not in denylist
+                ]
         else:
             use_function_calling = False
 
