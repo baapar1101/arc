@@ -42,7 +42,6 @@ class AIChatMessageBody extends StatelessWidget {
             steps: agentTrace,
             compact: true,
             initiallyExpanded: false,
-            collapseWhenDone: true,
           ),
           const SizedBox(height: 12),
         ],

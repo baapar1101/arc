@@ -177,6 +177,7 @@ adapters/db/models/ai_eval_schedule.py
 adapters/db/models/ai_invoice.py
 adapters/db/models/ai_knowledge_chunk.py
 adapters/db/models/ai_knowledge_document.py
+adapters/db/models/ai_memory_item.py
 adapters/db/models/ai_message_feedback.py
 adapters/db/models/ai_plan.py
 adapters/db/models/ai_prompt.py
@@ -590,6 +591,7 @@ app/services/ai/ai_knowledge_service.py
 app/services/ai/ai_mcp_service.py
 app/services/ai/ai_memory_feedback_service.py
 app/services/ai/ai_memory_hooks.py
+app/services/ai/ai_memory_item_service.py
 app/services/ai/ai_memory_proactive_service.py
 app/services/ai/ai_memory_service.py
 app/services/ai/ai_memory_structured.py
@@ -606,6 +608,7 @@ app/services/ai/ai_query_phase4_service.py
 app/services/ai/ai_query_service.py
 app/services/ai/ai_reports_catalog.py
 app/services/ai/ai_reports_service.py
+app/services/ai/ai_retry_policy.py
 app/services/ai/ai_scheduled_task_service.py
 app/services/ai/ai_service.py
 app/services/ai/ai_stream_helpers.py
@@ -756,6 +759,7 @@ migrations/versions/20260528_000001_distribution_phase3_advanced.py
 migrations/versions/20260528_000001_firewall_rate_policies.py
 migrations/versions/20260529_000001_crm_chat_message_read_at.py
 migrations/versions/20260530_000001_ai_memory_structured.py
+migrations/versions/20260531_000001_ai_memory_items.py
 migrations/versions/20260601_000001_crm_chat_message_deleted_at.py
 migrations/versions/20260602_000001_messenger_operator_sessions.py
 migrations/versions/20260602_000002_merge_heads_document_invoice_tags_and_messenger_operator_sessions.py
@@ -809,6 +813,7 @@ tests/test_ai_memory_service.py
 tests/test_ai_memory_structured.py
 tests/test_ai_permission_map.py
 tests/test_ai_reports_catalog.py
+tests/test_ai_retry_policy.py
 tests/test_ai_tool_intent.py
 tests/test_ai_write_guard.py
 tests/test_basalam_currency.py

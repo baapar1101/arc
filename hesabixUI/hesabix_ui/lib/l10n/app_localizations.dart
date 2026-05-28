@@ -19062,24 +19062,64 @@ abstract class AppLocalizations {
   /// **'Planning next step…'**
   String get aiTracePlanningNext;
 
+  /// No description provided for @aiTraceRetrying.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying ({attempt} of {max})…'**
   String aiTraceRetrying(String attempt, String max);
 
+  /// No description provided for @aiTraceNeedMoreExploration.
+  ///
+  /// In en, this message translates to:
+  /// **'More analysis needed before final answer'**
   String get aiTraceNeedMoreExploration;
 
+  /// No description provided for @aiReasoningPanelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reasoning & analysis steps'**
   String get aiReasoningPanelTitle;
 
+  /// No description provided for @aiAnswerPanelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Final answer'**
   String get aiAnswerPanelTitle;
 
+  /// No description provided for @aiErrorRecoveryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not complete the response'**
   String get aiErrorRecoveryTitle;
 
+  /// No description provided for @aiErrorRecoveryRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
   String get aiErrorRecoveryRetry;
 
+  /// No description provided for @aiErrorRecoveryDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss'**
   String get aiErrorRecoveryDismiss;
 
+  /// No description provided for @aiConversationNavTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages ({count})'**
   String aiConversationNavTitle(int count);
 
+  /// No description provided for @aiConversationNavUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Your message'**
   String get aiConversationNavUser;
 
+  /// No description provided for @aiConversationNavAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant reply'**
   String get aiConversationNavAssistant;
 
   /// No description provided for @aiTraceRunningTool.

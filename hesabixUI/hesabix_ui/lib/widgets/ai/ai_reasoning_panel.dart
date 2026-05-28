@@ -9,14 +9,12 @@ class AIReasoningPanel extends StatefulWidget {
   final List<AIAgentTraceStep> steps;
   final bool compact;
   final bool initiallyExpanded;
-  final bool collapseWhenDone;
 
   const AIReasoningPanel({
     super.key,
     required this.steps,
     this.compact = false,
     this.initiallyExpanded = true,
-    this.collapseWhenDone = false,
   });
 
   static List<AIAgentTraceStep> reasoningOnly(List<AIAgentTraceStep> all) {
@@ -38,6 +36,8 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
     with SingleTickerProviderStateMixin {
   late bool _expanded;
   late AnimationController _pulseCtrl;
+  /// کاربر دستی باز/بسته کرده — دیگر auto-collapse اعمال نشود.
+  bool _userControlledExpansion = false;
 
   @override
   void initState() {
@@ -50,19 +50,19 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
     if (_hasActiveStep) {
       _pulseCtrl.repeat(reverse: true);
     }
-    _maybeCollapseWhenDone();
   }
 
   @override
   void didUpdateWidget(covariant AIReasoningPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.compact) _expanded = true;
+    if (widget.compact && !_userControlledExpansion) {
+      _expanded = true;
+    }
     if (_hasActiveStep && !_pulseCtrl.isAnimating) {
       _pulseCtrl.repeat(reverse: true);
     } else if (!_hasActiveStep && _pulseCtrl.isAnimating) {
       _pulseCtrl.stop();
     }
-    _maybeCollapseWhenDone();
   }
 
   @override
@@ -73,17 +73,6 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
 
   bool get _hasActiveStep =>
       widget.steps.any((s) => s.isActive && s.layer != 'answer');
-
-  void _maybeCollapseWhenDone() {
-    if (!widget.collapseWhenDone || widget.initiallyExpanded) return;
-    final allDone = widget.steps.isNotEmpty &&
-        widget.steps.every((s) => !s.isActive);
-    if (allDone && _expanded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _expanded = false);
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +91,10 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
           borderRadius: BorderRadius.circular(12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => setState(() => _expanded = !_expanded),
+            onTap: () => setState(() {
+              _userControlledExpansion = true;
+              _expanded = !_expanded;
+            }),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
               child: Row(
@@ -174,14 +166,25 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
           duration: AIChatDesign.layoutTransition,
           firstChild: Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: DecoratedBox(
-              decoration: AIChatDesign.subtlePanel(theme, accent: scheme.primary),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                child: AIAgentTraceTimeline(
-                  steps: reasoning,
-                  compact: widget.compact,
-                  initiallyExpanded: true,
+            child: NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                // اسکرول داخل پنل استدلال به ListView والد نرسد (پرش به پاسخ نهایی).
+                if (notification is ScrollUpdateNotification ||
+                    notification is OverscrollNotification) {
+                  return true;
+                }
+                return false;
+              },
+              child: DecoratedBox(
+                decoration:
+                    AIChatDesign.subtlePanel(theme, accent: scheme.primary),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                  child: AIAgentTraceTimeline(
+                    steps: reasoning,
+                    compact: widget.compact,
+                    initiallyExpanded: true,
+                  ),
                 ),
               ),
             ),

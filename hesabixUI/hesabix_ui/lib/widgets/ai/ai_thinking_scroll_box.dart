@@ -101,16 +101,25 @@ class _AIThinkingScrollBoxState extends State<AIThinkingScrollBox> {
               Scrollbar(
                 controller: _scroll,
                 thumbVisibility: widget.markdown.length > 280,
-                child: SingleChildScrollView(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
-                  child: MarkdownBody(
-                    data: widget.markdown,
-                    selectable: true,
-                    styleSheet: MarkdownStyleSheet(
-                      p: widget.theme.textTheme.bodySmall?.copyWith(
-                        color: widget.scheme.onSurfaceVariant,
-                        height: 1.5,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification is ScrollUpdateNotification ||
+                        notification is OverscrollNotification) {
+                      return true;
+                    }
+                    return false;
+                  },
+                  child: SingleChildScrollView(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
+                    child: MarkdownBody(
+                      data: widget.markdown,
+                      selectable: true,
+                      styleSheet: MarkdownStyleSheet(
+                        p: widget.theme.textTheme.bodySmall?.copyWith(
+                          color: widget.scheme.onSurfaceVariant,
+                          height: 1.5,
+                        ),
                       ),
                     ),
                   ),
