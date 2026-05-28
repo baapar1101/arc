@@ -170,16 +170,39 @@ class AIService {
   Future<Map<String, dynamic>> updateAIMemory({
     required String content,
     int? businessId,
+    Map<String, dynamic>? structured,
   }) async {
     final res = await _api.put<Map<String, dynamic>>(
       '/api/v1/ai/chat/memory',
       data: {
         'content': content,
         if (businessId != null) 'business_id': businessId,
+        if (structured != null && structured.isNotEmpty) 'structured': structured,
       },
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getAIMemoryDigest({int? businessId}) async {
+    final query = <String, dynamic>{
+      if (businessId != null) 'business_id': businessId.toString(),
+    };
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory/digest',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<void> deleteAIMemory({int? businessId}) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory',
+      query: {
+        if (businessId != null) 'business_id': businessId.toString(),
+      },
+    );
   }
 
   Future<List<Map<String, dynamic>>> listSessionAttachments(int sessionId) async {
@@ -458,6 +481,11 @@ class AIService {
     if (eventType == 'trace_step') {
       final step = AIAgentTraceStep.fromJson(data);
       return AIStreamChunk(traceStep: step);
+    }
+    if (eventType == 'context_usage') {
+      return AIStreamChunk(
+        contextUsage: AIStreamContextUsage.fromJson(data),
+      );
     }
 
     final done = data['done'] as bool? ?? false;

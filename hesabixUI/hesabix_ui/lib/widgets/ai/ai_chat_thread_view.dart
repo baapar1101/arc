@@ -10,6 +10,8 @@ import 'ai_agent_trace_timeline.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_message_body.dart';
 import 'ai_chat_message_actions.dart';
+import 'ai_chat_context_bar.dart';
+import 'ai_chat_context_meter.dart';
 
 typedef MessageActionCallback = void Function(AIChatMessage message);
 
@@ -49,6 +51,9 @@ class AIChatThreadView extends StatelessWidget {
   final void Function(AIChatMessage message, int rating) onFeedback;
   final VoidCallback? onRegenerateLast;
   final int? lastAssistantMessageId;
+  final double? contextUsageRatio;
+  final double? contextUsagePercent;
+  final bool contextHistorySummarized;
 
   const AIChatThreadView({
     super.key,
@@ -87,6 +92,9 @@ class AIChatThreadView extends StatelessWidget {
     required this.onFeedback,
     this.onRegenerateLast,
     this.lastAssistantMessageId,
+    this.contextUsageRatio,
+    this.contextUsagePercent,
+    this.contextHistorySummarized = false,
   });
 
   @override
@@ -152,6 +160,11 @@ class AIChatThreadView extends StatelessWidget {
                 ),
             ],
           ),
+        ),
+        AIChatContextBar(
+          usageRatio: contextUsageRatio,
+          usagePercent: contextUsagePercent,
+          historySummarized: contextHistorySummarized,
         ),
         AIChatComposer(
           controller: messageController,

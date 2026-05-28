@@ -1724,6 +1724,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                             MessageRole.assistant
                                     ? _messages.last.id
                                     : null,
+                                contextUsageRatio: _stream.contextUsageRatio,
+                                contextUsagePercent: _stream.contextUsagePercent,
+                                contextHistorySummarized:
+                                    _stream.contextHistorySummarized,
                                 messagesLoading: _messagesLoading,
                                 sending: _sending,
                                 disabled: !_canUseAi,

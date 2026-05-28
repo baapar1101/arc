@@ -414,6 +414,9 @@ async def ai_voice_ws(websocket: WebSocket):
 					db_commit.commit()
 					db_commit.refresh(assistant_message)
 					assistant_message_id = assistant_message.id
+					from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+					schedule_memory_update_after_chat(session_id, business_id, ctx_commit)
 			except Exception:
 				logger.exception("Failed to commit assistant voice message")
 

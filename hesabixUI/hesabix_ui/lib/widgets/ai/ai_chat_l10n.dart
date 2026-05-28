@@ -282,6 +282,8 @@ String _toolNameToKey(String name) {
     'adjust_customer_club_points': 'aiToolAdjustCustomerClubPoints',
     'recalculate_customer_club_rfm': 'aiToolRecalculateCustomerClubRfm',
     'update_customer_club_settings': 'aiToolUpdateCustomerClubSettings',
+    'get_user_memory': 'aiToolGeneric',
+    'update_user_memory': 'aiToolGeneric',
   };
   return map[name] ?? 'aiToolGeneric';
 }
@@ -317,6 +319,8 @@ const _toolLabelFallbackFa = <String, String>{
   'adjust_customer_club_points': 'تنظیم امتیاز باشگاه',
   'recalculate_customer_club_rfm': 'محاسبه مجدد RFM',
   'update_customer_club_settings': 'تنظیمات باشگاه مشتری',
+  'get_user_memory': 'خواندن حافظه دستیار',
+  'update_user_memory': 'به‌روزرسانی حافظه دستیار',
 };
 
 /// متن وضعیت استریم AI از phase/step.

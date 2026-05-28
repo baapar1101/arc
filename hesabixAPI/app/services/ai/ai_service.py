@@ -75,9 +75,10 @@ from app.services.ai.ai_tool_cache import (
     invalidate_session,
     set_cached,
 )
-from app.services.ai.ai_message_budget import (
-    trim_messages_for_llm,
-    trim_system_prompt,
+from app.services.ai.ai_message_budget import trim_system_prompt
+from app.services.ai.ai_context_budget import (
+    is_context_overflow_error,
+    prepare_messages_for_context,
 )
 from app.services.ai.ai_tool_intent import (
     estimate_query_complexity,
@@ -167,6 +168,76 @@ class AIService:
         """دریافت تنظیمات AI"""
         repo = AIConfigRepository(self.db)
         return repo.get_active_config()
+
+    def _make_provider(self):
+        """ساخت provider فعال برای تخمین توکن و فراخوانی مدل."""
+        from app.services.ai.ai_provider import create_provider
+        from app.services.ai.encryption import decrypt_api_key
+
+        if not self.config:
+            raise ApiError("AI_NOT_CONFIGURED", "تنظیمات AI یافت نشد", http_status=400)
+        api_key = (
+            decrypt_api_key(self.config.api_key) if self.config.api_key else None
+        )
+        if not api_key:
+            raise ApiError("INVALID_API_KEY", "API Key تنظیم نشده است", http_status=400)
+        return create_provider(
+            provider_type=self.config.provider,
+            api_key=api_key,
+            api_base_url=self.config.api_base_url,
+        )
+
+    def _prepare_llm_messages(
+        self,
+        system_prompt: str,
+        messages: List[Dict[str, Any]],
+        provider: Any = None,
+        *,
+        force_summarize: bool = False,
+        use_llm_summary: bool = False,
+    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        from app.services.ai.ai_history_summarizer import (
+            build_rule_based_history_summary,
+            summarize_history_with_llm,
+        )
+
+        if provider is None:
+            provider = self._make_provider()
+
+        def summarize_fn(middle_msgs: List[Dict[str, Any]]) -> str:
+            if use_llm_summary and self.config:
+                from app.services.ai.ai_summarize_quota import (
+                    can_use_llm_summarize,
+                    record_llm_summarize,
+                )
+
+                bid = self.business_id
+                uid = self.ctx.get_user_id()
+                if bid and uid and can_use_llm_summarize(uid, int(bid)):
+                    text = summarize_history_with_llm(
+                        provider,
+                        self.config.model_name,
+                        middle_msgs,
+                    )
+                    if text:
+                        record_llm_summarize(uid, int(bid))
+                        from app.services.ai.ai_ops_metrics import log_ai_event
+
+                        log_ai_event(
+                            "context_llm_summarized",
+                            business_id=int(bid),
+                            user_id=uid,
+                        )
+                        return text
+            return build_rule_based_history_summary(middle_msgs)
+
+        return prepare_messages_for_context(
+            system_prompt,
+            messages,
+            provider,
+            summarize_fn=summarize_fn,
+            force_summarize=force_summarize,
+        )
 
     def _use_tools_for_request(self, use_function_calling: bool) -> bool:
         """
@@ -476,7 +547,13 @@ class AIService:
                     )
 
                     insights = get_business_insights_cached(self.db, bid, self.ctx)
-                    return format_insights_for_prompt(insights)
+                    uid = self.ctx.get_user_id()
+                    return format_insights_for_prompt(
+                        insights,
+                        db=self.db,
+                        business_id=bid,
+                        user_id=uid,
+                    )
                 except Exception as exc:
                     logger.warning("Failed to load AI insights for prompt: %s", exc)
                     safe_db_rollback(self.db)
@@ -610,7 +687,13 @@ class AIService:
                     )
 
                     insights = get_business_insights_cached(loader_db, bid, self.ctx)
-                    return format_insights_for_prompt(insights)
+                    uid = self.ctx.get_user_id()
+                    return format_insights_for_prompt(
+                        insights,
+                        db=loader_db,
+                        business_id=bid,
+                        user_id=uid,
+                    )
                 except Exception as exc:
                     logger.warning("Failed to load AI insights for prompt: %s", exc)
                     safe_db_rollback(loader_db)
@@ -1091,24 +1174,18 @@ class AIService:
         if not api_key:
             raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
         
-        # ایجاد provider
-        from app.services.ai.ai_provider import create_provider
-        provider = create_provider(
-            provider_type=self.config.provider,
-            api_key=api_key,
-            api_base_url=self.config.api_base_url
-        )
-        
         # اضافه کردن system prompt با business_id از session
         system_prompt = self.get_system_prompt(
             session_business_id=session_business_id,
             session_id=session_id,
             user_query=effective_user_query,
         )
-        full_messages = trim_messages_for_llm([
-            {"role": "system", "content": trim_system_prompt(system_prompt)},
-            *messages,
-        ])
+        provider = self._make_provider()
+        full_messages, _context_meta = self._prepare_llm_messages(
+            system_prompt,
+            messages,
+            provider,
+        )
         
         eff_tools = self._use_tools_for_request(use_function_calling)
         if eff_tools and tools is None:
@@ -1119,29 +1196,54 @@ class AIService:
         elif not eff_tools:
             tools = None
         
-        try:
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                _executor,
-                lambda: provider.chat_completion(
-                messages=full_messages,
-                model=self.config.model_name,
-                max_tokens=max_tokens_override or self.config.max_tokens,
-                temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
-                tools=tools if tools else None
+        context_retried = False
+        loop = asyncio.get_event_loop()
+        while True:
+            try:
+                response = await loop.run_in_executor(
+                    _executor,
+                    lambda msgs=full_messages: provider.chat_completion(
+                        messages=msgs,
+                        model=self.config.model_name,
+                        max_tokens=max_tokens_override or self.config.max_tokens,
+                        temperature=float(
+                            temperature_override
+                            if temperature_override is not None
+                            else self.config.temperature
+                        ),
+                        tools=tools if tools else None,
+                    ),
                 )
-            )
-        except ApiError:
-            # خطاهای ApiError را مستقیماً propagate کنیم
-            raise
-        except Exception as e:
-            # خطاهای دیگر را به ApiError تبدیل کنیم
-            logger.error(f"Unexpected error in AI service: {e}", exc_info=True)
-            raise ApiError(
-                "AI_SERVICE_ERROR",
-                f"خطا در سرویس AI: {str(e)}",
-                http_status=500
-            )
+                break
+            except ApiError as api_exc:
+                if not context_retried and is_context_overflow_error(api_exc):
+                    context_retried = True
+                    full_messages, _ = self._prepare_llm_messages(
+                        system_prompt,
+                        messages,
+                        provider,
+                        force_summarize=True,
+                        use_llm_summary=True,
+                    )
+                    continue
+                raise
+            except Exception as e:
+                if not context_retried and is_context_overflow_error(e):
+                    context_retried = True
+                    full_messages, _ = self._prepare_llm_messages(
+                        system_prompt,
+                        messages,
+                        provider,
+                        force_summarize=True,
+                        use_llm_summary=True,
+                    )
+                    continue
+                logger.error(f"Unexpected error in AI service: {e}", exc_info=True)
+                raise ApiError(
+                    "AI_SERVICE_ERROR",
+                    f"خطا در سرویس AI: {str(e)}",
+                    http_status=500,
+                )
         
         # پردازش function calls در یک حلقه (multi-round agent)
         iteration = 0
@@ -1328,13 +1430,8 @@ class AIService:
         if not api_key:
             raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
 
-        from app.services.ai.ai_provider import create_provider
-
-        provider = create_provider(
-            provider_type=self.config.provider,
-            api_key=api_key,
-            api_base_url=self.config.api_base_url,
-        )
+        provider = self._make_provider()
+        context_compress_retried = False
 
         try:
             accumulated_content = ""
@@ -1396,10 +1493,21 @@ class AIService:
                 title_key="aiStatusThinking",
             )
 
-            full_messages = trim_messages_for_llm([
-                {"role": "system", "content": trim_system_prompt(system_prompt)},
-                *messages,
-            ])
+            full_messages, context_meta = self._prepare_llm_messages(
+                system_prompt,
+                messages,
+                provider,
+            )
+            yield {
+                "event": "context_usage",
+                "estimated_tokens": context_meta.get("estimated_tokens"),
+                "budget_tokens": context_meta.get("budget_tokens"),
+                "usage_ratio": context_meta.get("usage_ratio"),
+                "usage_percent": context_meta.get("usage_percent"),
+                "history_summarized": context_meta.get("history_summarized", False),
+                "done": False,
+            }
+            await asyncio.sleep(0)
 
             eff_tools = self._use_tools_for_request(use_function_calling)
             if eff_tools and tools is None:
@@ -1475,63 +1583,97 @@ class AIService:
                 narrative_started = False
                 last_narrative_emit = 0.0
 
-                async for chunk in provider.chat_completion_stream(
-                    messages=full_messages,
-                    model=self.config.model_name,
-                    max_tokens=max_tokens_override or self.config.max_tokens,
-                    temperature=float(self.config.temperature),
-                    tools=tools if use_tools else None,
-                ):
-                    if chunk.get("event") == "tool_planning":
-                        yield status_event("planning_tools")
-                        await asyncio.sleep(0)
-                        continue
-                    if chunk.get("usage"):
-                        final_usage = chunk["usage"]
-                    if chunk.get("function_calls"):
-                        function_calls = chunk["function_calls"]
-                        tool_call_id_map = chunk.get("tool_call_id_map", {}) or {}
+                llm_round_complete = False
+                while not llm_round_complete:
+                    try:
+                        async for chunk in provider.chat_completion_stream(
+                            messages=full_messages,
+                            model=self.config.model_name,
+                            max_tokens=max_tokens_override or self.config.max_tokens,
+                            temperature=float(self.config.temperature),
+                            tools=tools if use_tools else None,
+                        ):
+                            if chunk.get("event") == "tool_planning":
+                                yield status_event("planning_tools")
+                                await asyncio.sleep(0)
+                                continue
+                            if chunk.get("usage"):
+                                final_usage = chunk["usage"]
+                            if chunk.get("function_calls"):
+                                function_calls = chunk["function_calls"]
+                                tool_call_id_map = chunk.get("tool_call_id_map", {}) or {}
 
-                    delta = chunk.get("delta", {})
-                    content_chunk = delta.get("content", "")
-                    if content_chunk:
-                        round_text += content_chunk
-                        if not function_calls:
-                            if not writing_status_sent:
-                                writing_status_sent = True
-                                yield status_event("writing")
-                                yield _emit_trace(
-                                    step_id=llm_step_id,
-                                    kind="context",
-                                    state="done",
-                                    title_key="aiStatusThinking",
-                                    iteration=iteration,
-                                )
-                            if round_text.strip():
-                                if not narrative_started:
-                                    narrative_started = True
-                                now_mono = time.monotonic()
-                                if (
-                                    now_mono - last_narrative_emit >= 0.04
-                                    or len(content_chunk) > 64
-                                ):
-                                    last_narrative_emit = now_mono
-                                    yield _emit_trace(
-                                        step_id=narrative_step_id,
-                                        kind="narrative",
-                                        state="active",
-                                        body_markdown=round_text,
-                                        iteration=iteration,
-                                    )
-                                    await asyncio.sleep(0)
+                            delta = chunk.get("delta", {})
+                            content_chunk = delta.get("content", "")
+                            if content_chunk:
+                                round_text += content_chunk
+                                if not function_calls:
+                                    if not writing_status_sent:
+                                        writing_status_sent = True
+                                        yield status_event("writing")
+                                        yield _emit_trace(
+                                            step_id=llm_step_id,
+                                            kind="context",
+                                            state="done",
+                                            title_key="aiStatusThinking",
+                                            iteration=iteration,
+                                        )
+                                    if round_text.strip():
+                                        if not narrative_started:
+                                            narrative_started = True
+                                        now_mono = time.monotonic()
+                                        if (
+                                            now_mono - last_narrative_emit >= 0.04
+                                            or len(content_chunk) > 64
+                                        ):
+                                            last_narrative_emit = now_mono
+                                            yield _emit_trace(
+                                                step_id=narrative_step_id,
+                                                kind="narrative",
+                                                state="active",
+                                                body_markdown=round_text,
+                                                iteration=iteration,
+                                            )
+                                            await asyncio.sleep(0)
+                                    yield {
+                                        "delta": {"content": content_chunk},
+                                        "usage": None,
+                                        "done": False,
+                                    }
+
+                            if chunk.get("done", False):
+                                break
+                        llm_round_complete = True
+                    except (ApiError, Exception) as stream_exc:
+                        if (
+                            not context_compress_retried
+                            and is_context_overflow_error(stream_exc)
+                        ):
+                            context_compress_retried = True
+                            full_messages, context_meta = self._prepare_llm_messages(
+                                system_prompt,
+                                messages,
+                                provider,
+                                force_summarize=True,
+                                use_llm_summary=True,
+                            )
                             yield {
-                                "delta": {"content": content_chunk},
-                                "usage": None,
+                                "event": "context_usage",
+                                "estimated_tokens": context_meta.get("estimated_tokens"),
+                                "budget_tokens": context_meta.get("budget_tokens"),
+                                "usage_ratio": context_meta.get("usage_ratio"),
+                                "usage_percent": context_meta.get("usage_percent"),
+                                "history_summarized": True,
+                                "context_retried": True,
                                 "done": False,
                             }
-
-                    if chunk.get("done", False):
-                        break
+                            await asyncio.sleep(0)
+                            round_text = ""
+                            function_calls = None
+                            writing_status_sent = False
+                            narrative_started = False
+                            continue
+                        raise
 
                 if narrative_started and round_text.strip():
                     yield _emit_trace(

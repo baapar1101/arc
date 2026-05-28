@@ -34,6 +34,7 @@ WRITE_FUNCTIONS: Set[str] = {
     "adjust_customer_club_points",
     "recalculate_customer_club_rfm",
     "update_customer_club_settings",
+    "update_user_memory",
 }
 
 WRITE_FUNCTION_LABELS_FA: Dict[str, str] = {

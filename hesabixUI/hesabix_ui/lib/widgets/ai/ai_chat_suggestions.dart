@@ -34,6 +34,12 @@ class AIChatSuggestion {
         return Icons.inventory_2_outlined;
       case 'warning':
         return Icons.warning_amber_rounded;
+      case 'psychology':
+        return Icons.psychology_outlined;
+      case 'track_changes':
+        return Icons.track_changes_outlined;
+      case 'menu_book':
+        return Icons.menu_book_outlined;
       default:
         return Icons.auto_awesome_outlined;
     }

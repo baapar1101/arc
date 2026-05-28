@@ -117,9 +117,21 @@ class CheckAvailabilityRequest(BaseModel):
     estimated_tokens: int = 1000
 
 
+class AIMemoryStructuredPatch(BaseModel):
+    sales_goal_monthly: Optional[float] = None
+    sales_goal_unit: Optional[str] = None
+    currency_display: Optional[str] = None
+    report_style: Optional[str] = None
+    preferred_language: Optional[str] = None
+    business_role: Optional[str] = None
+    internal_terms: Optional[List[Dict[str, str]]] = None
+    knowledge_hints: Optional[List[str]] = None
+
+
 class AIMemoryUpdateRequest(BaseModel):
     business_id: Optional[int] = None
     content: str = ""
+    structured: Optional[AIMemoryStructuredPatch] = None
 
 
 class AIKnowledgeCreateRequest(BaseModel):
@@ -208,9 +220,19 @@ async def get_chat_suggestions(
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
 
     from app.services.ai.ai_insight_service import get_dynamic_suggestions
+    from app.services.ai.ai_memory_proactive_service import get_memory_proactive_suggestions
 
-    items = get_dynamic_suggestions(db, int(effective_business_id), ctx)
-    return success_response(items, request)
+    bid = int(effective_business_id)
+    items = get_dynamic_suggestions(db, bid, ctx)
+    memory_items = get_memory_proactive_suggestions(db, bid, ctx)
+    seen = {i.get("label") for i in items}
+    for m in memory_items:
+        if m.get("label") not in seen:
+            items.insert(0, m)
+            seen.add(m.get("label"))
+        if len(items) >= 8:
+            break
+    return success_response(items[:8], request)
 
 
 @router.get("/alerts", summary="هشدارهای پیشگیرانه کسب‌وکار")
@@ -227,8 +249,11 @@ async def get_proactive_alerts(
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
 
     from app.services.ai.ai_insight_service import get_proactive_alerts as load_alerts
+    from app.services.ai.ai_memory_proactive_service import get_memory_enriched_alerts
 
-    alerts = load_alerts(db, int(effective_business_id), ctx)
+    bid = int(effective_business_id)
+    base_alerts = load_alerts(db, bid, ctx)
+    alerts = get_memory_enriched_alerts(db, bid, ctx, base_alerts=base_alerts)
     return success_response({"alerts": alerts}, request)
 
 
@@ -271,6 +296,25 @@ async def get_ai_memory(
     return success_response(memory_to_dict(row), request)
 
 
+@router.delete("/memory", summary="پاک کردن حافظه دستیار")
+async def delete_ai_memory(
+    request: Request,
+    business_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    effective_business_id = business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+
+    from app.services.ai.ai_memory_service import clear_memory, memory_to_dict
+
+    clear_memory(db, int(effective_business_id), ctx.get_user_id())
+    return success_response(memory_to_dict(None), request, "حافظه پاک شد")
+
+
 @router.put("/memory", summary="ذخیره حافظه دستیار")
 async def update_ai_memory(
     request: Request,
@@ -286,8 +330,36 @@ async def update_ai_memory(
 
     from app.services.ai.ai_memory_service import upsert_memory, memory_to_dict
 
-    row = upsert_memory(db, int(effective_business_id), ctx.get_user_id(), params.content)
+    structured_patch = (
+        params.structured.model_dump(exclude_none=True) if params.structured else None
+    )
+    row = upsert_memory(
+        db,
+        int(effective_business_id),
+        ctx.get_user_id(),
+        params.content,
+        structured=structured_patch,
+    )
     return success_response(memory_to_dict(row), request, "حافظه ذخیره شد")
+
+
+@router.get("/memory/digest", summary="خلاصهٔ خواندنی حافظه دستیار")
+async def get_ai_memory_digest(
+    request: Request,
+    business_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    effective_business_id = business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+
+    from app.services.ai.ai_memory_service import get_memory_digest
+
+    digest = get_memory_digest(db, int(effective_business_id), ctx.get_user_id())
+    return success_response(digest, request)
 
 
 @router.get("/knowledge", summary="لیست اسناد دانشنامه کسب‌وکار")
@@ -492,6 +564,7 @@ async def post_message_feedback(
         raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
 
     from app.services.ai.ai_feedback_service import feedback_to_dict, upsert_feedback
+    from app.services.ai.ai_memory_feedback_service import apply_feedback_to_memory
 
     row = upsert_feedback(
         db,
@@ -500,7 +573,16 @@ async def post_message_feedback(
         params.rating,
         params.comment,
     )
-    return success_response(feedback_to_dict(row), request, "بازخورد ثبت شد")
+    memory_updated = apply_feedback_to_memory(
+        db,
+        message_id,
+        ctx.get_user_id(),
+        params.rating,
+        params.comment,
+    )
+    payload = feedback_to_dict(row)
+    payload["memory_updated"] = memory_updated
+    return success_response(payload, request, "بازخورد ثبت شد")
 
 
 @router.get("/sessions/{session_id}/attachments", summary="لیست پیوست‌های گفت‌وگو")
@@ -906,6 +988,10 @@ async def send_message(
                 ctx,
                 business_id,
             )
+
+        from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+        schedule_memory_update_after_chat(session_id, business_id, ctx)
     
     return success_response({
         "message": {
@@ -1148,6 +1234,14 @@ async def _stream_message_response(
                         ctx,
                         updated_session.business_id or business_id,
                     )
+
+                from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+                schedule_memory_update_after_chat(
+                    session_id,
+                    updated_session.business_id or business_id,
+                    ctx,
+                )
             
             yield _sse_payload({
                 "content": "",
@@ -1645,6 +1739,10 @@ async def delete_chat_session(
     
     if not session or session.user_id != ctx.get_user_id():
         raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+
+    from app.services.ai.ai_memory_hooks import schedule_memory_update_on_session_delete
+
+    schedule_memory_update_on_session_delete(session.business_id, ctx, session_id)
     
     db.delete(session)
     db.commit()

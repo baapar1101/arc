@@ -299,7 +299,13 @@ def get_business_insights(
     }
 
 
-def format_insights_for_prompt(insights: Dict[str, Any]) -> str:
+def format_insights_for_prompt(
+    insights: Dict[str, Any],
+    *,
+    db: Any = None,
+    business_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+) -> str:
     """متن فشرده برای system prompt."""
     if insights.get("error"):
         return ""
@@ -342,6 +348,17 @@ def format_insights_for_prompt(insights: Dict[str, Any]) -> str:
             lines.append(f"```chart\n{chart_json}\n```")
         except (TypeError, ValueError):
             pass
+
+    if db is not None and business_id is not None and user_id is not None:
+        try:
+            from app.services.ai.ai_memory_service import format_memory_goal_hint_for_insights
+
+            hint = format_memory_goal_hint_for_insights(db, int(business_id), int(user_id), insights)
+            if hint:
+                lines.append(hint)
+        except Exception as exc:
+            logger.debug("memory goal hint for insights skipped: %s", exc)
+
     return "\n".join(lines)
 
 

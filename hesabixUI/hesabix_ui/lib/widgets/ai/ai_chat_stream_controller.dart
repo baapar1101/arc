@@ -14,6 +14,9 @@ class AIChatStreamController extends ChangeNotifier {
   int? iteration;
   int? maxIterations;
   int elapsedSeconds = 0;
+  double? contextUsageRatio;
+  double? contextUsagePercent;
+  bool contextHistorySummarized = false;
   DateTime? startedAt;
   DateTime? timestamp;
   bool pendingWriteApproval = false;
@@ -50,6 +53,7 @@ class AIChatStreamController extends ChangeNotifier {
     maxIterations = null;
     elapsedSeconds = 0;
     startedAt = null;
+    // contextUsage* بین پیام‌ها حفظ می‌شود
     timestamp = null;
     pendingWriteApproval = false;
     _lastUiUpdate = null;
@@ -88,6 +92,13 @@ class AIChatStreamController extends ChangeNotifier {
     AIStreamChunk chunk, {
     required AIChatToolLabelResolver resolveToolLabel,
   }) {
+    if (chunk.contextUsage != null) {
+      contextUsageRatio = chunk.contextUsage!.usageRatio;
+      contextUsagePercent = chunk.contextUsage!.usagePercent;
+      contextHistorySummarized = chunk.contextUsage!.historySummarized;
+      notifyListeners();
+      return;
+    }
     if (chunk.traceStep != null) {
       _applyTraceStep(chunk.traceStep!);
       notifyListeners();

@@ -19,6 +19,7 @@ class AIStreamChunk {
   final AIStreamStatusEvent? statusEvent;
   final AIAgentTraceStep? traceStep;
   final AIAgentTraceStep? traceStepUpdate;
+  final AIStreamContextUsage? contextUsage;
   final int? heartbeatElapsedMs;
   final bool done;
   final Map<String, dynamic>? usage;
@@ -34,6 +35,7 @@ class AIStreamChunk {
     this.statusEvent,
     this.traceStep,
     this.traceStepUpdate,
+    this.contextUsage,
     this.heartbeatElapsedMs,
     this.done = false,
     this.usage,
@@ -173,6 +175,36 @@ class AIAgentTraceStep {
       elapsedMs: elapsedMs ?? this.elapsedMs,
       resultCount: resultCount ?? this.resultCount,
       citations: citations,
+    );
+  }
+}
+
+/// وضعیت پر شدن context گفت‌وگو (تخمینی).
+class AIStreamContextUsage {
+  final int? estimatedTokens;
+  final int? budgetTokens;
+  final double? usageRatio;
+  final double? usagePercent;
+  final bool historySummarized;
+  final bool contextRetried;
+
+  const AIStreamContextUsage({
+    this.estimatedTokens,
+    this.budgetTokens,
+    this.usageRatio,
+    this.usagePercent,
+    this.historySummarized = false,
+    this.contextRetried = false,
+  });
+
+  factory AIStreamContextUsage.fromJson(Map<String, dynamic> json) {
+    return AIStreamContextUsage(
+      estimatedTokens: json['estimated_tokens'] as int?,
+      budgetTokens: json['budget_tokens'] as int?,
+      usageRatio: (json['usage_ratio'] as num?)?.toDouble(),
+      usagePercent: (json['usage_percent'] as num?)?.toDouble(),
+      historySummarized: json['history_summarized'] as bool? ?? false,
+      contextRetried: json['context_retried'] as bool? ?? false,
     );
   }
 }

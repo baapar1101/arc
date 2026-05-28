@@ -31,6 +31,20 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             data["exploration"] = chunk.get("exploration")
         return [data]
 
+    if event_type == "context_usage":
+        return [
+            {
+                "type": "context_usage",
+                "estimated_tokens": chunk.get("estimated_tokens"),
+                "budget_tokens": chunk.get("budget_tokens"),
+                "usage_ratio": chunk.get("usage_ratio"),
+                "usage_percent": chunk.get("usage_percent"),
+                "history_summarized": chunk.get("history_summarized", False),
+                "context_retried": chunk.get("context_retried", False),
+                "done": False,
+            }
+        ]
+
     if event_type == "trace_step":
         data = {
             "type": "trace_step",
