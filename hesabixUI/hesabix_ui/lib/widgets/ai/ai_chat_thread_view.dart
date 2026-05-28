@@ -56,10 +56,12 @@ class AIChatThreadView extends StatelessWidget {
   final bool contextHistorySummarized;
   final List<GlobalKey>? messageKeys;
   final int? businessId;
+  final bool suppressApprovalToolChips;
 
   const AIChatThreadView({
     super.key,
     this.businessId,
+    this.suppressApprovalToolChips = false,
     required this.messages,
     required this.streamingContent,
     this.streamingToolActivities = const [],
@@ -122,6 +124,7 @@ class AIChatThreadView extends StatelessWidget {
             key: rowKey,
             child: _MessageRow(
               businessId: businessId,
+              suppressApprovalToolChips: suppressApprovalToolChips,
               message: messages[index],
               formatTime: formatTime,
               onLongPress: () => onMessageLongPress(messages[index]),
@@ -142,6 +145,7 @@ class AIChatThreadView extends StatelessWidget {
         }
         return _StreamingRow(
           businessId: businessId,
+          suppressApprovalToolChips: suppressApprovalToolChips,
           content: streamingContent ?? '',
           toolActivities: streamingToolActivities,
           traceSteps: streamingTraceSteps,
@@ -251,6 +255,7 @@ class AIChatThreadView extends StatelessWidget {
 
 class _MessageRow extends StatelessWidget {
   final int? businessId;
+  final bool suppressApprovalToolChips;
   final AIChatMessage message;
   final String Function(DateTime?) formatTime;
   final VoidCallback onLongPress;
@@ -261,6 +266,7 @@ class _MessageRow extends StatelessWidget {
 
   const _MessageRow({
     this.businessId,
+    this.suppressApprovalToolChips = false,
     required this.message,
     required this.formatTime,
     required this.onLongPress,
@@ -308,6 +314,7 @@ class _MessageRow extends StatelessWidget {
                       isUser: true,
                       functionCalls: message.functionCalls,
                       functionResults: message.functionResults,
+                      suppressApprovalToolChips: suppressApprovalToolChips,
                     ),
                     if (timeText.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -361,6 +368,7 @@ class _MessageRow extends StatelessWidget {
                       businessId: businessId,
                       functionCalls: message.functionCalls,
                       functionResults: message.functionResults,
+                      suppressApprovalToolChips: suppressApprovalToolChips,
                     ),
                   ),
                   AIChatMessageActions(
@@ -391,6 +399,7 @@ class _MessageRow extends StatelessWidget {
 
 class _StreamingRow extends StatelessWidget {
   final int? businessId;
+  final bool suppressApprovalToolChips;
   final String content;
   final List<AIToolActivity> toolActivities;
   final List<AIAgentTraceStep> traceSteps;
@@ -403,6 +412,7 @@ class _StreamingRow extends StatelessWidget {
 
   const _StreamingRow({
     this.businessId,
+    this.suppressApprovalToolChips = false,
     required this.content,
     this.toolActivities = const [],
     this.traceSteps = const [],
@@ -450,7 +460,10 @@ class _StreamingRow extends StatelessWidget {
                   const SizedBox(height: 10),
                 ],
                 if (toolActivities.isNotEmpty && traceSteps.isEmpty)
-                  AIChatToolActivityList(activities: toolActivities),
+                  AIChatToolActivityList(
+                    activities: toolActivities,
+                    hideApprovalPending: suppressApprovalToolChips,
+                  ),
                 if (content.isNotEmpty)
                   _StreamingAnswerCard(
                     businessId: businessId,

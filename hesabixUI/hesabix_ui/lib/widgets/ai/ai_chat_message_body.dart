@@ -18,6 +18,7 @@ class AIChatMessageBody extends StatelessWidget {
   final Object? functionCalls;
   final Object? functionResults;
   final bool suppressAnswerLabel;
+  final bool suppressApprovalToolChips;
 
   const AIChatMessageBody({
     super.key,
@@ -27,6 +28,7 @@ class AIChatMessageBody extends StatelessWidget {
     this.functionCalls,
     this.functionResults,
     this.suppressAnswerLabel = false,
+    this.suppressApprovalToolChips = false,
   });
 
   @override
@@ -34,8 +36,16 @@ class AIChatMessageBody extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
-    final agentTrace = extractAgentTraceFromResults(functionResults);
-    final toolActivities = _buildToolActivities(l10n);
+    var agentTrace = extractAgentTraceFromResults(functionResults);
+    if (suppressApprovalToolChips) {
+      agentTrace =
+          agentTrace.where((s) => s.kind != 'approval').toList();
+    }
+    var toolActivities = _buildToolActivities(l10n);
+    if (suppressApprovalToolChips) {
+      toolActivities =
+          toolActivities.where((a) => !a.approvalRequired).toList();
+    }
 
     return Column(
       crossAxisAlignment:
@@ -359,16 +369,24 @@ class _ContentSegment {
 
 class AIChatToolActivityList extends StatelessWidget {
   final List<AIToolActivity> activities;
+  final bool hideApprovalPending;
 
-  const AIChatToolActivityList({super.key, required this.activities});
+  const AIChatToolActivityList({
+    super.key,
+    required this.activities,
+    this.hideApprovalPending = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    if (activities.isEmpty) return const SizedBox.shrink();
+    final visible = hideApprovalPending
+        ? activities.where((a) => !a.approvalRequired).toList()
+        : activities;
+    if (visible.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final a in activities)
+        for (final a in visible)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: _ToolActivityChip(activity: a),

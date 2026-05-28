@@ -28,6 +28,7 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
 import 'package:hesabix_ui/widgets/ai/ai_error_recovery_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
 import 'package:hesabix_ui/widgets/ai/ai_write_approval_banner.dart';
+import 'package:hesabix_ui/widgets/ai/ai_write_approval_helpers.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_l10n.dart';
 import 'package:share_plus/share_plus.dart';
@@ -88,6 +89,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   List<AIChatMessage> _messages = [];
   final AIChatStreamController _stream = AIChatStreamController();
   bool _pendingWriteApproval = false;
+  int? _pendingApprovalSessionId;
   final TextEditingController _messageCtrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
@@ -119,8 +121,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
 
-  bool get _showWriteApprovalBanner =>
-      _pendingWriteApproval || _stream.pendingWriteApproval;
+  bool get _showWriteApprovalBanner {
+    if (_currentSession?.id == null) return false;
+    if (_pendingApprovalSessionId != null &&
+        _pendingApprovalSessionId != _currentSession!.id) {
+      return false;
+    }
+    return _collectPendingApprovalOps().isNotEmpty;
+  }
+
+  bool get _canConfirmWriteApproval =>
+      _showWriteApprovalBanner &&
+      !_sending &&
+      _currentSession?.id != null &&
+      messagesHavePendingWriteApproval(_messages);
   bool get _isHomeMode =>
       !_messagesLoading && _messages.isEmpty && !_stream.isActive && !_sending;
 
@@ -133,6 +147,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
     while (_messageKeys.length > _messages.length) {
       _messageKeys.removeLast();
     }
+  }
+
+  void _clearWriteApprovalState() {
+    _pendingWriteApproval = false;
+    _pendingApprovalSessionId = null;
+    _stream.pendingWriteApproval = false;
+    _stream.pendingApprovalOps = [];
+  }
+
+  void _syncPendingWriteApprovalFromMessages() {
+    final ops = extractPendingApprovalOpsFromMessages(_messages);
+    _pendingWriteApproval = ops.isNotEmpty;
+    _pendingApprovalSessionId =
+        ops.isNotEmpty ? _currentSession?.id : null;
   }
 
   String? get _aiBlockReason {
@@ -522,7 +550,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       if (!mounted) return false;
       setState(() {
         _currentSession = session;
-        _messages = [];
+        _clearWriteApprovalState();
       });
       unawaited(_loadSessions());
       return true;
@@ -547,6 +575,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _currentSession = session;
       _messages = [];
       _messagesLoading = true;
+      _clearWriteApprovalState();
     });
     try {
       final msgs = await _aiService.getSessionMessages(sessionId: session.id!);
@@ -555,6 +584,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _messages = msgs;
         _messagesLoading = false;
         _syncMessageKeys();
+        _syncPendingWriteApprovalFromMessages();
       });
       _scrollToBottom(force: true);
       await _checkAvailability();
@@ -805,6 +835,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _messagesLoading = false;
       _stream.clear();
       _attachments = [];
+      _clearWriteApprovalState();
     });
     _messageCtrl.clear();
     _focusNode.requestFocus();
@@ -935,7 +966,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       } else {
         _messages = List<AIChatMessage>.from(_messages.sublist(0, idx));
       }
-      _pendingWriteApproval = false;
+      _clearWriteApprovalState();
       _stream.begin(phase: 'connecting');
       _sending = true;
     });
@@ -1099,9 +1130,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
               ),
             );
         }
-        _pendingWriteApproval = _stream.pendingWriteApproval ||
-            _stream.toolActivities.any((t) => t.approvalRequired) ||
-            _stream.pendingApprovalOps.isNotEmpty;
+        _syncPendingWriteApprovalFromMessages();
+        if (!_pendingWriteApproval &&
+            (_stream.pendingWriteApproval ||
+                _stream.pendingApprovalOps.isNotEmpty)) {
+          _pendingWriteApproval = true;
+          _pendingApprovalSessionId = _currentSession?.id;
+        }
         _stream.clear();
         _sending = false;
         _streamErrorMessage = null;
@@ -1140,7 +1175,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
     setState(() {
       _messages = List<AIChatMessage>.from(_messages)..removeLast();
-      _pendingWriteApproval = false;
+      _clearWriteApprovalState();
       _stream.begin(phase: 'connecting');
       _sending = true;
     });
@@ -1166,36 +1201,37 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   List<Map<String, dynamic>> _collectPendingApprovalOps() {
-    if (_stream.pendingApprovalOps.isNotEmpty) {
+    final sessionId = _currentSession?.id;
+    if (sessionId == null) return [];
+
+    final fromMessages = extractPendingApprovalOpsFromMessages(_messages);
+    if (fromMessages.isNotEmpty) return fromMessages;
+
+    if ((_sending || _stream.pendingWriteApproval) &&
+        (_pendingApprovalSessionId == null ||
+            _pendingApprovalSessionId == sessionId) &&
+        _stream.pendingApprovalOps.isNotEmpty) {
       return List<Map<String, dynamic>>.from(_stream.pendingApprovalOps);
     }
-    final ops = <Map<String, dynamic>>[];
-    if (_messages.isEmpty) return ops;
-    final lastMsg = _messages.last;
-    final fnResults = lastMsg.functionResults;
-    if (fnResults is Map) {
-      for (final entry in fnResults.entries) {
-        if (entry.key.toString().startsWith('_')) continue;
-        final val = entry.value;
-        if (val is Map && val['error'] == 'APPROVAL_REQUIRED') {
-          ops.add(Map<String, dynamic>.from(val));
-        } else if (val is Map &&
-            val['result'] is Map &&
-            (val['result'] as Map)['error'] == 'APPROVAL_REQUIRED') {
-          ops.add(Map<String, dynamic>.from(val['result'] as Map));
-        }
-      }
-    }
-    return ops;
+    return [];
   }
 
   Future<void> _confirmWriteApproval() async {
-    if (_sending || !_showWriteApprovalBanner) return;
+    if (_sending) return;
+    if (!_canConfirmWriteApproval) {
+      _showSnackbar(
+        'گفت‌وگوی فعال یا عملیات در انتظار تأیید یافت نشد. همان گفت‌وگویی را باز کنید که دستیار در آن درخواست تأیید کرده است.',
+      );
+      _clearWriteApprovalState();
+      return;
+    }
+    setState(_clearWriteApprovalState);
     await _sendMessage(
       contentOverride:
           'کاربر عملیات پیشنهادی را تأیید کرد. لطفاً همان عملیات را اجرا کن.',
       approveWrites: true,
       skipUserBubble: true,
+      requireExistingSession: true,
     );
   }
 
@@ -1203,6 +1239,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     String? contentOverride,
     bool approveWrites = false,
     bool skipUserBubble = false,
+    bool requireExistingSession = false,
   }) async {
     if (_voice != null) {
       _showSnackbar(AppLocalizations.of(context).aiVoiceTextBlockedWhileActive);
@@ -1219,7 +1256,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
     setState(() => _sending = true);
     _scrollToBottom(force: true);
 
-    if (!await _ensureSession()) {
+    if (requireExistingSession || approveWrites) {
+      if (_currentSession?.id == null) {
+        if (!mounted) return;
+        setState(() => _sending = false);
+        _showSnackbar(
+          'برای تأیید عملیات، ابتدا همان گفت‌وگویی را باز کنید که دستیار در آن درخواست تأیید کرده است.',
+        );
+        return;
+      }
+    } else if (!await _ensureSession()) {
       if (!mounted) return;
       setState(() => _sending = false);
       return;
@@ -1725,14 +1771,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
                       AIWriteApprovalBanner(
                         pendingOps: _collectPendingApprovalOps(),
                         loading: _sending,
+                        canConfirm: _canConfirmWriteApproval,
+                        blockedReason: _canConfirmWriteApproval
+                            ? null
+                            : 'برای تأیید، همان گفت‌وگویی را از تاریخچه باز کنید که دستیار در آن درخواست تأیید کرده است.',
                         onConfirm: _confirmWriteApproval,
-                        onDismiss: () {
-                          setState(() {
-                            _pendingWriteApproval = false;
-                            _stream.pendingWriteApproval = false;
-                            _stream.pendingApprovalOps = [];
-                          });
-                        },
+                        onDismiss: () => setState(_clearWriteApprovalState),
                       ),
                     if (_attachments.isNotEmpty && !_isHomeMode)
                       _buildAttachmentsBar(theme),
@@ -1794,6 +1838,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                   child: AIChatThreadView(
                                 key: ValueKey('thread-${_currentSession?.id}'),
                                 businessId: widget.businessId,
+                                suppressApprovalToolChips: _showWriteApprovalBanner,
                                 messages: _messages,
                                 messageKeys: _messageKeys,
                                 streamingContent: _stream.content,

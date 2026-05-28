@@ -5,6 +5,8 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
 class AIWriteApprovalBanner extends StatelessWidget {
   final List<Map<String, dynamic>> pendingOps;
   final bool loading;
+  final bool canConfirm;
+  final String? blockedReason;
   final VoidCallback onConfirm;
   final VoidCallback onDismiss;
 
@@ -12,6 +14,8 @@ class AIWriteApprovalBanner extends StatelessWidget {
     super.key,
     required this.pendingOps,
     required this.loading,
+    this.canConfirm = true,
+    this.blockedReason,
     required this.onConfirm,
     required this.onDismiss,
   });
@@ -107,6 +111,35 @@ class AIWriteApprovalBanner extends StatelessWidget {
                 ],
               ),
             ),
+            if (!canConfirm && blockedReason != null) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: scheme.errorContainer.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.info_outline_rounded,
+                          size: 18, color: scheme.error),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          blockedReason!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onErrorContainer,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
             if (pendingOps.isNotEmpty)
               ...pendingOps.map(
                 (op) => Padding(
@@ -114,7 +147,7 @@ class AIWriteApprovalBanner extends StatelessWidget {
                   child: WriteApprovalOpCard(op: op),
                 ),
               )
-            else
+            else if (canConfirm)
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
                 child: _SecurityNote(scheme: scheme, theme: theme),
@@ -148,7 +181,7 @@ class AIWriteApprovalBanner extends StatelessWidget {
                   Expanded(
                     flex: 2,
                     child: FilledButton.icon(
-                      onPressed: loading ? null : onConfirm,
+                      onPressed: (loading || !canConfirm) ? null : onConfirm,
                       icon: loading
                           ? SizedBox(
                               width: 18,
