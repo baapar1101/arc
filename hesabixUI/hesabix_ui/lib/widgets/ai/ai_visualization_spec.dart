@@ -211,6 +211,23 @@ class AITableSpec {
     }
   }
 
+  /// JSON کامل یا زیررشتهٔ `{...}` داخل متن اضافی.
+  static AITableSpec? tryParseJsonLoose(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    final direct = tryParse(trimmed);
+    if (direct != null && direct.hasData) return direct;
+
+    final start = trimmed.indexOf('{');
+    final end = trimmed.lastIndexOf('}');
+    if (start >= 0 && end > start) {
+      final sub = tryParse(trimmed.substring(start, end + 1));
+      if (sub != null && sub.hasData) return sub;
+    }
+    return null;
+  }
+
   String cellText(AITableColumn col, Map<String, dynamic> row) {
     final v = row[col.key];
     if (v == null) return '—';

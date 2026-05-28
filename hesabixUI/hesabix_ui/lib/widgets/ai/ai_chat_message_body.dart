@@ -6,6 +6,7 @@ import 'ai_reasoning_panel.dart';
 import 'ai_chat_chart_widget.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_table_widget.dart';
+import 'ai_markdown_table_parser.dart';
 import 'ai_visualization_spec.dart';
 
 class AIChatMessageBody extends StatelessWidget {
@@ -170,7 +171,7 @@ class _AssistantRichContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final segments = _splitVisualizationBlocks(content);
+    final segments = _expandMarkdownTables(_splitVisualizationBlocks(content));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -210,10 +211,11 @@ class _AssistantRichContent extends StatelessWidget {
     );
   }
 
-  /// جدا کردن بلوک‌های ```chart و ```table از متن Markdown.
+  /// جدا کردن بلوک‌های ```chart / ```table / ```json از متن.
   static List<_ContentSegment> _splitVisualizationBlocks(String raw) {
     final pattern = RegExp(
-      r'```(chart|table)\s*([\s\S]*?)```',
+      r'```(chart|table|json)\s*([\s\S]*?)```',
+      caseSensitive: false,
       multiLine: true,
     );
     final segments = <_ContentSegment>[];
@@ -223,22 +225,27 @@ class _AssistantRichContent extends StatelessWidget {
       if (match.start > start) {
         segments.add(_ContentSegment(text: raw.substring(start, match.start)));
       }
-      final kind = match.group(1);
+      final kind = (match.group(1) ?? '').toLowerCase();
       final body = match.group(2) ?? '';
+      final fenced = match.group(0) ?? '';
+
       if (kind == 'chart') {
         final spec = AIChartSpec.tryParse(body);
         if (spec != null && spec.hasData) {
           segments.add(_ContentSegment.chart(spec));
         } else {
-          segments.add(_ContentSegment(text: match.group(0) ?? ''));
+          segments.add(_ContentSegment(text: fenced));
         }
       } else if (kind == 'table') {
-        final spec = AITableSpec.tryParse(body);
-        if (spec != null && spec.hasData) {
+        final spec = AIMarkdownTableParser.tryParseLoose(body);
+        if (spec != null) {
           segments.add(_ContentSegment.table(spec));
         } else {
-          segments.add(_ContentSegment(text: match.group(0) ?? ''));
+          segments.add(_ContentSegment(text: fenced));
         }
+      } else if (kind == 'json') {
+        final segment = _segmentFromJsonFence(body, fenced);
+        segments.add(segment);
       }
       start = match.end;
     }
@@ -250,6 +257,40 @@ class _AssistantRichContent extends StatelessWidget {
       segments.add(_ContentSegment(text: raw));
     }
     return segments;
+  }
+
+  static _ContentSegment _segmentFromJsonFence(String body, String fenced) {
+    final table = AIMarkdownTableParser.tryParseLoose(body);
+    if (table != null) return _ContentSegment.table(table);
+
+    final chart = AIChartSpec.tryParse(body);
+    if (chart != null && chart.hasData) return _ContentSegment.chart(chart);
+
+    return _ContentSegment(text: fenced);
+  }
+
+  /// استخراج جدول‌های pipe از قطعات متنی باقی‌مانده.
+  static List<_ContentSegment> _expandMarkdownTables(List<_ContentSegment> input) {
+    final out = <_ContentSegment>[];
+    for (final seg in input) {
+      if (seg.chartSpec != null || seg.tableSpec != null) {
+        out.add(seg);
+        continue;
+      }
+      final parts = AIMarkdownTableParser.splitText(seg.text);
+      if (parts.isEmpty) {
+        if (seg.text.trim().isNotEmpty) out.add(seg);
+        continue;
+      }
+      for (final part in parts) {
+        if (part.tableSpec != null) {
+          out.add(_ContentSegment.table(part.tableSpec!));
+        } else if (part.text != null && part.text!.trim().isNotEmpty) {
+          out.add(_ContentSegment(text: part.text!));
+        }
+      }
+    }
+    return out.isEmpty ? input : out;
   }
 }
 
