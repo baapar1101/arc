@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, Iterable, Optional, Set
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set
 
 from app.services.ai.ai_tool_keys import TOOL_LABELS_FA
 
@@ -98,6 +98,45 @@ def write_call_is_approved(
     return False
 
 
+def is_approval_required_result(result: Any) -> bool:
+    return isinstance(result, dict) and result.get("error") == "APPROVAL_REQUIRED"
+
+
+def is_write_guard_stop_result(result: Any) -> bool:
+    """نتیجه‌ای که باید حلقه agent متوقف شود (منتظر تأیید یا عدم تطابق)."""
+    if not isinstance(result, dict):
+        return False
+    return result.get("error") in ("APPROVAL_REQUIRED", "APPROVAL_MISMATCH")
+
+
+def build_approval_pause_content(
+    function_calls: List[Dict[str, Any]],
+    lookup_result: Callable[[Dict[str, Any]], Any],
+) -> str:
+    """متن کوتاه برای نمایش به کاربر هنگام توقف agent برای تأیید."""
+    labels: List[str] = []
+    for call in function_calls:
+        result = lookup_result(call)
+        if is_approval_required_result(result):
+            label = result.get("label") or result.get("function") or call.get("name") or "عملیات"
+            labels.append(str(label))
+    if not labels:
+        return (
+            "برای ادامه، لطفاً عملیات پیشنهادی را در کارت زیر بررسی کرده و تأیید یا رد کنید."
+        )
+    if len(labels) == 1:
+        return (
+            f"عملیات «{labels[0]}» آماده اجراست. "
+            "جزئیات را بررسی کنید و در صورت موافقت، تأیید کنید."
+        )
+    joined = "، ".join(f"«{l}»" for l in labels[:4])
+    suffix = f" و {len(labels) - 4} مورد دیگر" if len(labels) > 4 else ""
+    return (
+        f"{len(labels)} عملیات ({joined}{suffix}) نیاز به تأیید شما دارند. "
+        "لطفاً موارد را بررسی کرده و تأیید کنید."
+    )
+
+
 def build_approval_required_result(function_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     label = WRITE_FUNCTION_LABELS_FA.get(function_name, function_name)
     return {
@@ -111,6 +150,117 @@ def build_approval_required_result(function_name: str, arguments: Dict[str, Any]
             "خلاصهٔ درخواست را برای کاربر توضیح دهید و از او بخواهید تأیید کند."
         ),
     }
+
+
+def is_approval_block_result(result: Any) -> bool:
+    """نتیجه‌ای که agent باید برای آن منتظر تأیید/هماهنگی کاربر بماند."""
+    return isinstance(result, dict) and result.get("error") in (
+        "APPROVAL_REQUIRED",
+        "APPROVAL_MISMATCH",
+    )
+
+
+def resolve_tool_result(function_results: Dict[str, Any], call: Dict[str, Any]) -> Any:
+    """یافتن نتیجه tool (سازگار با ai_service._lookup_tool_result)."""
+    tc_id = call.get("id")
+    if tc_id and tc_id in function_results:
+        val = function_results[tc_id]
+        if isinstance(val, dict) and "result" in val:
+            return val["result"]
+        return val
+    name = call.get("name")
+    if name and name in function_results:
+        val = function_results[name]
+        if isinstance(val, dict) and "result" in val and "name" in val:
+            return val.get("result")
+        return val
+    return {}
+
+
+def round_needs_approval_pause(function_results: Dict[str, Any]) -> bool:
+    """آیا این round باید agent loop را متوقف کند تا کاربر تأیید کند؟"""
+    seen: set[str] = set()
+    for key, val in function_results.items():
+        if str(key).startswith("_"):
+            continue
+        if isinstance(val, dict) and "result" in val and "name" in val:
+            dedupe = str(key)
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            if is_approval_block_result(val.get("result")):
+                return True
+        elif is_approval_block_result(val):
+            dedupe = str(key)
+            if dedupe in seen:
+                continue
+            seen.add(dedupe)
+            return True
+    return False
+
+
+def collect_approval_block_results(
+    function_results: Dict[str, Any],
+    function_calls: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """استخراج نتایج APPROVAL_* از یک round (بدون تکرار)."""
+    out: List[Dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    calls = function_calls or []
+    if calls:
+        for call in calls:
+            result = resolve_tool_result(function_results, call)
+            if not is_approval_block_result(result):
+                continue
+            fn = call.get("name") or result.get("function")
+            key = f"{fn}:{_canonical_json(result.get('arguments'))}"
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            out.append(result if isinstance(result, dict) else {})
+        return out
+    for val in function_results.values():
+        result = val.get("result") if isinstance(val, dict) and "result" in val else val
+        if not is_approval_block_result(result):
+            continue
+        fn = result.get("function") if isinstance(result, dict) else None
+        key = f"{fn}:{_canonical_json(result.get('arguments') if isinstance(result, dict) else {})}"
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        out.append(result if isinstance(result, dict) else {})
+    return out
+
+
+def build_approval_pause_message(
+    function_results: Dict[str, Any],
+    function_calls: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    """پیام کوتاه برای نمایش در چت هنگام توقف برای تأیید."""
+    blocks = collect_approval_block_results(function_results, function_calls)
+    if not blocks:
+        return (
+            "برای ادامه، عملیات پیشنهادی نیاز به تأیید شما دارد. "
+            "لطفاً در کارت بالای صفحه تأیید یا لغو کنید."
+        )
+    lines: List[str] = [
+        "برای اجرای عملیات زیر به تأیید شما نیاز دارم:",
+        "",
+    ]
+    for entry in blocks:
+        label = entry.get("label") or entry.get("function") or "عملیات"
+        hint = entry.get("message")
+        if hint:
+            lines.append(f"- **{label}**: {hint}")
+        else:
+            lines.append(f"- **{label}**")
+    lines.extend(
+        [
+            "",
+            "پس از بررسی، با دکمه **تأیید و اجرا** موافقت کنید یا **لغو** را بزنید.",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def build_approval_mismatch_result(function_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:

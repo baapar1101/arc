@@ -22,6 +22,8 @@ from app.services.wallet_service import charge_wallet_for_service
 from app.services.ai.prompt_service import get_prompt, PromptRole
 from app.services.ai.ai_write_guard import (
     is_write_function,
+    is_write_guard_stop_result,
+    build_approval_pause_content,
     build_approval_required_result,
     build_approval_mismatch_result,
     write_call_is_approved,
@@ -1306,6 +1308,14 @@ class AIService:
                 })
             
             full_messages.extend(function_messages)
+            round_needs_write_approval = any(
+                is_write_guard_stop_result(
+                    _lookup_tool_result(function_results, call)
+                )
+                for call in current_calls
+            )
+            if round_needs_write_approval:
+                break
             try:
                 loop = asyncio.get_event_loop()
                 response = await loop.run_in_executor(
@@ -1833,7 +1843,7 @@ class AIService:
                             if result_count and result_count > 0:
                                 citations = extract_citations_from_result(result)
 
-                        yield {
+                        tool_end_payload: Dict[str, Any] = {
                             "event": "tool_end",
                             "tool": fname,
                             "tool_key": tool_l10n_key(fname),
@@ -1843,6 +1853,16 @@ class AIService:
                             "elapsed_ms": elapsed_ms,
                             "result_count": result_count,
                         }
+                        if needs_approval and isinstance(result, dict):
+                            tool_end_payload["approval_detail"] = {
+                                "function": fname,
+                                "label": result.get("label") or tool_label_fa(fname),
+                                "arguments": result.get("arguments")
+                                or call.get("arguments", {}),
+                                "message": result.get("message"),
+                                "error": result.get("error"),
+                            }
+                        yield tool_end_payload
                         yield _emit_trace(
                             step_id=tool_step_id,
                             kind="tool",
@@ -1868,6 +1888,80 @@ class AIService:
                             citations=citations,
                             bundle_id=bundle_id,
                         )
+
+                    round_needs_write_approval = any(
+                        is_write_guard_stop_result(
+                            _lookup_tool_result(function_results, call)
+                        )
+                        for call in function_calls
+                    )
+
+                    assistant_msg: Dict[str, Any] = {
+                        "role": "assistant",
+                        "tool_calls": [],
+                    }
+                    if round_text:
+                        assistant_msg["content"] = round_text
+
+                    for idx, call in enumerate(function_calls):
+                        tc_id = _tool_call_id_for(call, iteration, idx)
+                        if not call.get("id"):
+                            call["id"] = tc_id
+                        assistant_msg["tool_calls"].append(
+                            {
+                                "id": tc_id,
+                                "type": "function",
+                                "function": {
+                                    "name": call.get("name"),
+                                    "arguments": json.dumps(
+                                        call.get("arguments", {}),
+                                        ensure_ascii=False,
+                                    ),
+                                },
+                            }
+                        )
+                    if not assistant_msg.get("content"):
+                        assistant_msg.pop("content", None)
+
+                    full_messages.append(assistant_msg)
+
+                    for idx, call in enumerate(function_calls):
+                        function_name = call.get("name") or "unknown"
+                        result = _lookup_tool_result(function_results, call)
+                        serialized = self._serialize_for_json(result)
+                        tc_id = _tool_call_id_for(call, iteration, idx)
+                        full_messages.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tc_id,
+                                "content": summarize_tool_result_for_llm(
+                                    function_name, serialized
+                                ),
+                            }
+                        )
+
+                    if round_needs_write_approval:
+                        pause_content = build_approval_pause_content(
+                            function_calls,
+                            lambda c: _lookup_tool_result(function_results, c),
+                        )
+                        yield _emit_trace(
+                            step_id=f"approval_{iteration}",
+                            kind="approval",
+                            state="active",
+                            body_markdown=pause_content,
+                            iteration=iteration,
+                        )
+                        yield status_event("awaiting_approval")
+                        if not accumulated_content.strip():
+                            accumulated_content = pause_content
+                            yield {
+                                "delta": {"content": pause_content},
+                                "usage": None,
+                                "done": False,
+                            }
+                            await asyncio.sleep(0)
+                        break
 
                     # --- Exploration: Explored + Thought ---
                     if (
@@ -2006,50 +2100,6 @@ class AIService:
                             iteration=iteration,
                         )
 
-                    assistant_msg: Dict[str, Any] = {
-                        "role": "assistant",
-                        "tool_calls": [],
-                    }
-                    if round_text:
-                        assistant_msg["content"] = round_text
-
-                    for idx, call in enumerate(function_calls):
-                        tc_id = _tool_call_id_for(call, iteration, idx)
-                        if not call.get("id"):
-                            call["id"] = tc_id
-                        assistant_msg["tool_calls"].append(
-                            {
-                                "id": tc_id,
-                                "type": "function",
-                                "function": {
-                                    "name": call.get("name"),
-                                    "arguments": json.dumps(
-                                        call.get("arguments", {}),
-                                        ensure_ascii=False,
-                                    ),
-                                },
-                            }
-                        )
-                    if not assistant_msg.get("content"):
-                        assistant_msg.pop("content", None)
-
-                    full_messages.append(assistant_msg)
-
-                    for idx, call in enumerate(function_calls):
-                        function_name = call.get("name") or "unknown"
-                        result = _lookup_tool_result(function_results, call)
-                        serialized = self._serialize_for_json(result)
-                        tc_id = _tool_call_id_for(call, iteration, idx)
-                        full_messages.append(
-                            {
-                                "role": "tool",
-                                "tool_call_id": tc_id,
-                                "content": summarize_tool_result_for_llm(
-                                    function_name, serialized
-                                ),
-                            }
-                        )
-
                     if observation_store is not None:
                         thought_ctx = observation_store.context_for_llm()
                         if thought_ctx:
@@ -2147,10 +2197,20 @@ class AIService:
                 except Exception:
                     pass
 
+            def _approval_result_value(entry: Any) -> Any:
+                if isinstance(entry, dict) and "result" in entry and "name" in entry:
+                    return entry.get("result")
+                return entry
+
+            awaiting_approval = any(
+                is_write_guard_stop_result(_approval_result_value(v))
+                for v in (accumulated_function_results or {}).values()
+            )
             yield {
                 "delta": {"content": ""},
                 "usage": final_usage,
                 "done": True,
+                "awaiting_approval": awaiting_approval,
                 "function_calls": accumulated_function_calls or None,
                 "function_results": (
                     json_safe_value(accumulated_function_results)

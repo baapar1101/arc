@@ -583,6 +583,7 @@ app/services/ai/ai_function_extensions_phase5.py
 app/services/ai/ai_function_extensions_phase6.py
 app/services/ai/ai_function_extensions_phase7.py
 app/services/ai/ai_function_extensions_phase8.py
+app/services/ai/ai_function_extensions_workflow.py
 app/services/ai/ai_helpers.py
 app/services/ai/ai_history_summarizer.py
 app/services/ai/ai_insight_service.py
@@ -619,6 +620,10 @@ app/services/ai/ai_tool_keys.py
 app/services/ai/ai_tool_query_params.py
 app/services/ai/ai_trace.py
 app/services/ai/ai_visualization_prompt.py
+app/services/ai/ai_workflow_agent_policy.py
+app/services/ai/ai_workflow_catalog_service.py
+app/services/ai/ai_workflow_prompt.py
+app/services/ai/ai_workflow_service.py
 app/services/ai/ai_write_guard.py
 app/services/ai/chat_message_builder.py
 app/services/ai/encryption.py
@@ -662,6 +667,7 @@ app/services/workflow/logging_decorators.py
 app/services/workflow/schedule_cron_resolution.py
 app/services/workflow/trigger_registry.py
 app/services/workflow/workflow_background_jobs.py
+app/services/workflow/workflow_builtin_node_registry.py
 app/services/workflow/workflow_engine.py
 app/services/workflow/workflow_entity_validation.py
 app/services/workflow/workflow_marketplace_service.py

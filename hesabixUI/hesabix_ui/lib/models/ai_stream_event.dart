@@ -258,6 +258,7 @@ class AIStreamToolEvent {
   final String? label;
   final bool? success;
   final bool approvalRequired;
+  final Map<String, dynamic>? approvalDetail;
 
   const AIStreamToolEvent({
     required this.type,
@@ -266,6 +267,7 @@ class AIStreamToolEvent {
     this.label,
     this.success,
     this.approvalRequired = false,
+    this.approvalDetail,
   });
 
   bool get isStart => type == 'tool_start';

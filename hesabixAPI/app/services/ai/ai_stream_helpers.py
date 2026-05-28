@@ -100,6 +100,8 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
         if event_type == "tool_end":
             data["success"] = chunk.get("success")
             data["approval_required"] = chunk.get("approval_required", False)
+            if chunk.get("approval_detail"):
+                data["approval_detail"] = chunk.get("approval_detail")
         return [data]
 
     delta = chunk.get("delta", {})

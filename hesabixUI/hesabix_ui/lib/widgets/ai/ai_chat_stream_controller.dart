@@ -20,6 +20,7 @@ class AIChatStreamController extends ChangeNotifier {
   DateTime? startedAt;
   DateTime? timestamp;
   bool pendingWriteApproval = false;
+  List<Map<String, dynamic>> pendingApprovalOps = [];
 
   DateTime? _lastUiUpdate;
   static const _contentThrottleMs = 16;
@@ -39,6 +40,7 @@ class AIChatStreamController extends ChangeNotifier {
     traceSteps = [];
     timestamp = DateTime.now();
     pendingWriteApproval = false;
+    pendingApprovalOps = [];
     _lastUiUpdate = null;
     notifyListeners();
   }
@@ -56,6 +58,7 @@ class AIChatStreamController extends ChangeNotifier {
     // contextUsage* بین پیام‌ها حفظ می‌شود
     timestamp = null;
     pendingWriteApproval = false;
+    pendingApprovalOps = [];
     _lastUiUpdate = null;
     notifyListeners();
   }
@@ -116,6 +119,10 @@ class AIChatStreamController extends ChangeNotifier {
       }
       if (chunk.statusEvent!.phase == 'exploring') {
         statusPhase = 'exploring';
+      }
+      if (chunk.statusEvent!.phase == 'awaiting_approval') {
+        statusPhase = 'awaiting_approval';
+        pendingWriteApproval = true;
       }
       notifyListeners();
       return;
@@ -241,6 +248,18 @@ class AIChatStreamController extends ChangeNotifier {
       }
       if (event.approvalRequired) {
         pendingWriteApproval = true;
+        if (event.approvalDetail != null) {
+          final detail = Map<String, dynamic>.from(event.approvalDetail!);
+          final fn = detail['function'] as String?;
+          final exists = pendingApprovalOps.any(
+            (o) =>
+                o['function'] == fn &&
+                o['arguments'].toString() == detail['arguments'].toString(),
+          );
+          if (!exists) {
+            pendingApprovalOps = [...pendingApprovalOps, detail];
+          }
+        }
       }
     }
   }

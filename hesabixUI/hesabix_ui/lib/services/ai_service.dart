@@ -481,6 +481,9 @@ class AIService {
           label: data['label'] as String?,
           success: data['success'] as bool?,
           approvalRequired: data['approval_required'] as bool? ?? false,
+          approvalDetail: data['approval_detail'] is Map
+              ? Map<String, dynamic>.from(data['approval_detail'] as Map)
+              : null,
         ),
       );
     }
