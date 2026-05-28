@@ -8,6 +8,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo
+from adapters.api.v1.list_query_common import QueryInfoBody, query_info_to_service_dict, apply_fiscal_year_from_request
 from app.services.cash_register_service import (
     create_cash_register,
     update_cash_register,
@@ -32,32 +33,13 @@ router = APIRouter(prefix="/cash-registers", tags=["مدیریت مالی"])
 async def list_cash_registers_endpoint(
     request: Request,
     business_id: int,
-    query_info: QueryInfo,
+    query_info: QueryInfoBody,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    # دریافت سال مالی از header یا query
-    fiscal_year_id = None
-    fy_header = request.headers.get('X-Fiscal-Year-ID')
-    if fy_header:
-        try:
-            fiscal_year_id = int(fy_header)
-        except (ValueError, TypeError):
-            pass
-    
-    query_dict: Dict[str, Any] = {
-        "take": query_info.take,
-        "skip": query_info.skip,
-        "sort_by": query_info.sort_by,
-        "sort_desc": query_info.sort_desc,
-        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
-        "search": query_info.search,
-        "search_fields": query_info.search_fields,
-        "filters": query_info.filters,
-    }
-    
-    if fiscal_year_id:
-        query_dict["fiscal_year_id"] = fiscal_year_id
+    query_dict = query_info_to_service_dict(query_info)
+    apply_fiscal_year_from_request(request, query_dict)
+    fiscal_year_id = query_dict.get("fiscal_year_id")
 
     # کش لیست صندوق‌ها
     cache = get_cache()

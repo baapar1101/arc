@@ -28,7 +28,8 @@ from app.core.permissions import (
 )
 from app.core.responses import success_response, format_datetime_fields
 from app.core.cache import get_cache
-from adapters.api.v1.schemas import QueryInfo
+from adapters.api.v1.schemas import QueryInfo, InvoiceListQuery
+from adapters.api.v1.list_query_common import model_to_legacy_body
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.account import Account
@@ -2515,7 +2516,7 @@ def _apply_invoice_list_text_search(
 async def search_invoices_endpoint(
 	request: Request,
 	business_id: int,
-	body_data: Dict[str, Any] = Body(...),
+	body_data: InvoiceListQuery = Body(...),
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
 	_: None = Depends(require_business_permission_dep("invoices", "view")),
@@ -2527,14 +2528,8 @@ async def search_invoices_endpoint(
 	locale = negotiate_locale(request.headers.get("Accept-Language"))
 	is_fa = locale == "fa"
 
-	# Parse QueryInfo from body_data
-	try:
-		query_info = QueryInfo(**{k: v for k, v in body_data.items() if k in ['take', 'skip', 'sort_by', 'sort_desc', 'sort', 'search', 'search_fields', 'filters', 'include_inventory', 'inventory_as_of_date']})
-	except Exception as e:
-		raise ApiError("INVALID_QUERY", "پارامترهای جستجو معتبر نیستند.", http_status=400)
-
-	# Extract additional fields for filtering
-	body = body_data
+	query_info = body_data
+	body = model_to_legacy_body(body_data)
 	
 	# کش نتایج جستجوی فاکتورها
 	cache = get_cache()

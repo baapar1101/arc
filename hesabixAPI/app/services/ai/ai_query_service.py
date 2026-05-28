@@ -63,11 +63,17 @@ def _clamp_pagination(filters: Dict[str, Any], *, default_take: int = 50, max_ta
     return out
 
 
-def _build_list_query(filters: Dict[str, Any]) -> Dict[str, Any]:
-    """نگاشت filters عمومی به query dict سرویس‌ها."""
-    q = _clamp_pagination(filters or {})
+def _build_list_query(filters: Dict[str, Any], *, entity: Optional[str] = None) -> Dict[str, Any]:
+    """نگاشت filters عمومی به query dict سرویس‌ها (شامل filters[] پیشرفته)."""
+    from app.services.ai.ai_query_filter_service import merge_into_query_dict
+
+    merged = merge_into_query_dict(filters or {}, entity=entity)
+    q = _clamp_pagination(merged)
     for key in (
         "search",
+        "search_fields",
+        "filters",
+        "sort",
         "from_date",
         "to_date",
         "document_type",
@@ -83,10 +89,8 @@ def _build_list_query(filters: Dict[str, Any]) -> Dict[str, Any]:
         "account_type",
         "type",
     ):
-        if filters.get(key) is not None:
-            q[key] = filters[key]
-    if filters.get("search") and not filters.get("search_fields"):
-        q["search_fields"] = filters.get("search_fields")
+        if merged.get(key) is not None:
+            q[key] = merged[key]
     return q
 
 
@@ -120,18 +124,22 @@ def query_business_data(
         )
 
     perms = ENTITY_READ_PERMISSIONS.get(entity_key, [])
-    if perms and not user_context.is_superadmin():
-        if user_context.is_business_owner(business_id):
-            pass
-        elif not any(
-            user_context.has_business_permission(perm.split(".")[0], perm.split(".")[1])
-            if "." in perm
-            else user_context.has_app_permission(perm)
-            for perm in perms
+    if perms:
+        from app.services.ai.ai_permission_map import has_any_ai_tool_permission
+
+        if not has_any_ai_tool_permission(
+            user_context, perms, business_id=business_id
         ):
             raise PermissionError(f"دسترسی به {entity_key} وجود ندارد")
 
     flt = dict(filters or {})
+    try:
+        from app.services.ai.ai_query_filter_service import merge_into_query_dict
+
+        flt = merge_into_query_dict(flt, entity=entity_key)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
+
     rid = record_id if record_id is not None else _to_int(flt.get("id") or flt.get("record_id"))
 
     if action_key == "get":
@@ -154,6 +162,8 @@ def _entity_search(
     filters: Dict[str, Any],
     user_context: Optional[AuthContext] = None,
 ) -> Any:
+    if entity in _PHASE4_ENTITIES:
+        return _phase4_entity_search(db, business_id, entity, filters, user_context)
     if entity in _PHASE3_ENTITIES:
         return _phase3_entity_search(db, business_id, entity, filters, user_context)
     if entity in _PHASE2_ENTITIES:
@@ -163,7 +173,7 @@ def _entity_search(
             _search_warehouse_documents_internal,
         )
 
-        body = _build_list_query(filters)
+        body = _build_list_query(filters, entity=entity)
         return _search_warehouse_documents_internal(db, business_id, body)
 
     if entity == "warehouse":
@@ -174,7 +184,7 @@ def _entity_search(
     if entity == "check":
         from app.services.check_service import list_checks
 
-        q = _build_list_query(filters)
+        q = _build_list_query(filters, entity=entity)
         if q.get("search") and not q.get("search_fields"):
             q["search_fields"] = [
                 "check_number",
@@ -188,7 +198,7 @@ def _entity_search(
     if entity == "transfer":
         from app.services.transfer_service import list_transfers
 
-        q = _build_list_query(filters)
+        q = _build_list_query(filters, entity=entity)
         if q.get("search") and not q.get("search_fields"):
             q["search_fields"] = ["code", "description", "created_by_name"]
         return list_transfers(db, business_id, q)
@@ -196,7 +206,7 @@ def _entity_search(
     if entity == "expense_income":
         from app.services.expense_income_service import list_expense_income
 
-        q = _build_list_query(filters)
+        q = _build_list_query(filters, entity=entity)
         if q.get("search") and not q.get("search_fields"):
             q["search_fields"] = ["code", "description", "created_by_name"]
         return list_expense_income(db, business_id, q)
@@ -204,7 +214,7 @@ def _entity_search(
     if entity == "document":
         from app.services.document_service import list_documents
 
-        q = _build_list_query(filters)
+        q = _build_list_query(filters, entity=entity)
         return list_documents(db, business_id, q)
 
     if entity == "invoice":
@@ -212,12 +222,12 @@ def _entity_search(
             _list_invoices_workflow,
         )
 
-        return _list_invoices_workflow(db, business_id, _build_list_query(filters))
+        return _list_invoices_workflow(db, business_id, _build_list_query(filters, entity=entity))
 
     if entity == "bank_account":
         from app.services.bank_account_service import list_bank_accounts
 
-        q = _build_list_query(filters)
+        q = _build_list_query(filters, entity=entity)
         if q.get("search") and not q.get("search_fields"):
             q["search_fields"] = ["code", "name", "branch", "account_number", "owner_name"]
         return list_bank_accounts(db, business_id, q)
@@ -225,7 +235,7 @@ def _entity_search(
     if entity == "cash_register":
         from app.services.cash_register_service import list_cash_registers
 
-        q = _build_list_query(filters)
+        q = _build_list_query(filters, entity=entity)
         if q.get("search") and not q.get("search_fields"):
             q["search_fields"] = ["code", "name"]
         return list_cash_registers(db, business_id, q)
@@ -266,6 +276,8 @@ def _entity_get(
     filters: Dict[str, Any],
     user_context: Optional[AuthContext] = None,
 ) -> Any:
+    if entity in _PHASE4_ENTITIES:
+        return _phase4_entity_get(db, business_id, entity, record_id, filters, user_context)
     if entity in _PHASE3_ENTITIES:
         return _phase3_entity_get(db, business_id, entity, record_id, filters, user_context)
     if entity in _PHASE2_ENTITIES:
@@ -461,9 +473,19 @@ from app.services.ai.ai_query_phase3_service import (  # noqa: E402
     phase3_entity_search as _phase3_entity_search,
 )
 
-SUPPORTED_ENTITIES = _SUPPORTED_ENTITIES_PHASE1 | _PHASE2_ENTITIES | _PHASE3_ENTITIES
+from app.services.ai.ai_query_phase4_service import (  # noqa: E402
+    PHASE4_ENTITIES as _PHASE4_ENTITIES,
+    PHASE4_ENTITY_PERMISSIONS,
+    phase4_entity_get as _phase4_entity_get,
+    phase4_entity_search as _phase4_entity_search,
+)
+
+SUPPORTED_ENTITIES = (
+    _SUPPORTED_ENTITIES_PHASE1 | _PHASE2_ENTITIES | _PHASE3_ENTITIES | _PHASE4_ENTITIES
+)
 ENTITY_READ_PERMISSIONS = {
     **ENTITY_READ_PERMISSIONS,
     **PHASE2_ENTITY_PERMISSIONS,
     **PHASE3_ENTITY_PERMISSIONS,
+    **PHASE4_ENTITY_PERMISSIONS,
 }

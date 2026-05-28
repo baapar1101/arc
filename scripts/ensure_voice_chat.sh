@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # نصب idempotent پیش‌نیازهای مکالمه صوتی AI (محلی — بدون API ابری).
 # - بسته‌های سیستمی libav برای PyAV
-# - pip install -e ".[voice]" (faster-whisper, webrtcvad, TTS, torch, av)
+# - pip install -e ".[voice]" (webrtcvad-wheels, faster-whisper, TTS, torch, av)
+# - اگر پکیج روی p.mirror نبود: vendor/voice_wheels یا VOICE_PIP_EXTRA_INDEX_URL
 # - دایرکتوری ذخیره opt-in و تنظیمات .env
 #
 # Usage:
@@ -27,7 +28,8 @@ Usage: ensure_voice_chat.sh [--update] [--non-interactive]
   INSTALL_VOICE     y/Y to install, n/N to skip (prompt if unset and not --non-interactive)
   APP_ROOT          default /opt/hesabix
   API_DIR           default ${APP_ROOT}/app/hesabixAPI
-  PIP_INDEX_URL     Hesabix mirror (optional)
+  PIP_INDEX_URL              Hesabix mirror (default p.mirror.hesabix.ir)
+  VOICE_PIP_EXTRA_INDEX_URL  Optional PyPI fallback (e.g. https://pypi.org/simple)
 EOF
 }
 
@@ -103,10 +105,12 @@ activate_venv() {
   return 0
 }
 
+VOICE_WHEEL_DIR="${API_DIR}/vendor/voice_wheels"
+
 voice_python_ready() {
   activate_venv || return 1
   python3 - <<'PY' >/dev/null 2>&1
-import webrtcvad  # noqa: F401
+import webrtcvad  # noqa: F401  # from webrtcvad-wheels
 import numpy  # noqa: F401
 import av  # noqa: F401
 from faster_whisper import WhisperModel  # noqa: F401
@@ -114,25 +118,127 @@ print("ok")
 PY
 }
 
-install_voice_pip_extras() {
-  activate_venv || return 1
-  configure_pip() {
-    if command -v python3 >/dev/null 2>&1; then
-      python3 -m pip config --user set global.index-url "${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}" 2>/dev/null || true
-      python3 -m pip config --user set global.trusted-host "${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}" 2>/dev/null || true
-    fi
-  }
-  configure_pip
+configure_voice_pip() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -m pip config --user set global.index-url "${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}" 2>/dev/null || true
+    python3 -m pip config --user set global.trusted-host "${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}" 2>/dev/null || true
+  fi
   export PIP_INDEX_URL="${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}"
   export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}"
+}
+
+voice_pip_extra_args() {
+  if [[ -n "${VOICE_PIP_EXTRA_INDEX_URL:-}" ]]; then
+    echo "--extra-index-url" "${VOICE_PIP_EXTRA_INDEX_URL}"
+  fi
+}
+
+ensure_voice_python_build_deps() {
+  if ! command -v apt-get >/dev/null 2>&1; then
+    return 0
+  fi
+  export DEBIAN_FRONTEND=noninteractive
+  local pkgs=(python3-dev build-essential)
+  local missing=()
+  local p
+  for p in "${pkgs[@]}"; do
+    if ! dpkg-query -W -f='${Status}' "${p}" 2>/dev/null | grep -q "install ok installed"; then
+      missing+=("${p}")
+    fi
+  done
+  [[ ${#missing[@]} -eq 0 ]] && return 0
+  log_info "Installing build tools for voice wheels: ${missing[*]}"
+  apt-get update -qq
+  apt-get install -y -qq "${missing[@]}" || log_warn "build-essential/python3-dev install failed."
+}
+
+install_vendor_voice_wheels() {
+  [[ -d "${VOICE_WHEEL_DIR}" ]] || return 1
+  local wheels=()
+  local w
+  shopt -s nullglob
+  for w in "${VOICE_WHEEL_DIR}"/*.whl; do
+    wheels+=("${w}")
+  done
+  shopt -u nullglob
+  [[ ${#wheels[@]} -gt 0 ]] || return 1
+  log_info "Installing ${#wheels[@]} wheel(s) from ${VOICE_WHEEL_DIR}..."
+  # shellcheck disable=SC2068
+  pip install --no-cache-dir ${wheels[@]} || return 1
+  log_ok "Vendor voice wheels installed."
+  return 0
+}
+
+install_webrtcvad_package() {
+  activate_venv || return 1
+  if python3 -c "import webrtcvad" 2>/dev/null; then
+    return 0
+  fi
+
+  local extra
+  extra=$(voice_pip_extra_args)
+
+  shopt -s nullglob
+  local vad_wheels=("${VOICE_WHEEL_DIR}"/webrtcvad*.whl)
+  shopt -u nullglob
+  if [[ ${#vad_wheels[@]} -gt 0 ]]; then
+    pip install --no-cache-dir "${vad_wheels[@]}" && return 0
+  fi
+
+  log_info "Installing webrtcvad-wheels (Python 3.12+ compatible VAD)..."
+  # shellcheck disable=SC2086
+  if pip install --no-cache-dir ${extra} "webrtcvad-wheels>=2.0.11.post1"; then
+    return 0
+  fi
+
+  ensure_voice_python_build_deps
+  log_info "Trying to build webrtcvad-wheels from source (needs sdist on mirror)..."
+  # shellcheck disable=SC2086
+  if pip install --no-cache-dir ${extra} "webrtcvad-wheels>=2.0.11.post1" --no-binary=webrtcvad-wheels; then
+    return 0
+  fi
+
+  log_warn "webrtcvad-wheels not found on ${PIP_INDEX_URL}."
+  log_warn "Fix: (1) bash scripts/populate_voice_wheels_vendor.sh && rsync vendor/voice_wheels to server"
+  log_warn "     (2) upload packages in scripts/pypi_voice_packages.txt to p.mirror"
+  log_warn "     (3) export VOICE_PIP_EXTRA_INDEX_URL=https://pypi.org/simple if PyPI is reachable"
+  return 1
+}
+
+install_voice_pip_extras() {
+  activate_venv || return 1
+  configure_voice_pip
   cd "${API_DIR}"
-  log_info "Installing Python voice extras (pip install -e \".[voice]\") — may take several minutes..."
   pip install --upgrade pip setuptools wheel -q
-  if pip install -e ".[voice]"; then
+
+  install_vendor_voice_wheels || true
+
+  install_webrtcvad_package || return 1
+
+  local extra shell_extra=()
+  if [[ -n "${VOICE_PIP_EXTRA_INDEX_URL:-}" ]]; then
+    shell_extra=(--extra-index-url "${VOICE_PIP_EXTRA_INDEX_URL}")
+  fi
+
+  log_info "Installing Python voice extras (pip install -e \".[voice]\") — may take several minutes..."
+  if pip install --no-cache-dir "${shell_extra[@]}" -e ".[voice]"; then
     log_ok "Voice Python dependencies installed."
     return 0
   fi
-  log_warn "pip install -e \".[voice]\" failed."
+
+  log_warn "pip install -e \".[voice]\" failed; retrying core packages individually..."
+  local pkg
+  for pkg in numpy av "faster-whisper>=1.0.3" "TTS>=0.22.0"; do
+    if ! pip install --no-cache-dir "${shell_extra[@]}" "${pkg}"; then
+      log_warn "Failed to install: ${pkg}"
+    fi
+  done
+  if pip install --no-cache-dir "${shell_extra[@]}" -e ".[voice]"; then
+    log_ok "Voice Python dependencies installed (staged)."
+    return 0
+  fi
+
+  log_warn "Voice install incomplete. See vendor/voice_wheels/README.md and scripts/pypi_voice_packages.txt"
   return 1
 }
 

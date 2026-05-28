@@ -18,6 +18,22 @@ WRITE_FUNCTIONS: Set[str] = {
     "create_person",
     "update_person",
     "create_receipt_payment",
+    "delete_person",
+    "create_product",
+    "update_product",
+    "create_check",
+    "create_transfer",
+    "create_expense_income",
+    "update_invoice",
+    "delete_invoice",
+    "create_lead",
+    "execute_workflow",
+    "export_business_data",
+    "set_default_report_template",
+    "publish_report_template",
+    "adjust_customer_club_points",
+    "recalculate_customer_club_rfm",
+    "update_customer_club_settings",
 }
 
 WRITE_FUNCTION_LABELS_FA: Dict[str, str] = {

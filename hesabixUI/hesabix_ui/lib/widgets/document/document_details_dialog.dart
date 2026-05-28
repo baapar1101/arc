@@ -1946,9 +1946,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctx = navigatorKey.currentContext;
       if (ctx == null || !ctx.mounted) return;
-      ctx.go('/business/$bid/reports/kardex', extra: <String, dynamic>{
-        'person_ids': [id],
-      });
+      ctx.go('/business/$bid/reports/kardex?person_ids=$id');
     });
   }
 

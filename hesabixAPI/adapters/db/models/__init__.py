@@ -180,4 +180,6 @@ from .distribution import (  # noqa: F401
 	DistributionRouteAssignment,
 	DistributionFieldVisit,
 	DistributionReturnRequest,
+	DistributionVan,
+	DistributionOfflineSyncBatch,
 )

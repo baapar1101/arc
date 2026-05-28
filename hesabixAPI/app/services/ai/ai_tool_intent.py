@@ -12,6 +12,7 @@ from app.services.ai.ai_constants import MAX_TOOLS_PER_REQUEST, QUERY_COMPLEXITY
 # همیشه در دسترس (پرس‌وجو و دادهٔ پایه)
 _CORE_TOOL_NAMES: frozenset[str] = frozenset({
     "query_business_data",
+    "list_queryable_fields",
     "get_business_info",
     "get_business_dashboard",
     "search_persons",
@@ -49,6 +50,9 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "get_check_details",
         "search_transfers",
         "search_expense_income",
+        "create_expense_income",
+        "update_invoice",
+        "delete_invoice",
     }),
     "warehouse": frozenset({
         "search_warehouse_documents",
@@ -71,6 +75,7 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "get_crm_summary",
         "get_pipeline_report",
         "get_lead_funnel_report",
+        "create_lead",
     }),
     "customer_club": frozenset({
         "get_customer_club_settings",
@@ -78,6 +83,9 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "list_customer_club_ledger",
         "get_customer_club_rfm_summary",
         "search_customer_club_rfm_persons",
+        "adjust_customer_club_points",
+        "recalculate_customer_club_rfm",
+        "update_customer_club_settings",
     }),
     "tax": frozenset({
         "get_tax_settings",
@@ -94,6 +102,8 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "list_woocommerce_products",
         "list_basalam_synced_invoices",
         "list_basalam_product_conflicts",
+        "get_basalam_overview",
+        "list_basalam_dead_letter",
     }),
     "misc": frozenset({
         "get_quick_sales_settings",
@@ -101,12 +111,67 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "search_activity_logs",
         "list_workflows",
         "list_workflow_executions",
+        "execute_workflow",
         "search_repair_orders",
         "get_repair_order_details",
         "list_distribution_routes",
         "search_warranty_codes",
         "list_petty_cash",
         "get_person_transactions",
+    }),
+    "people": frozenset({
+        "search_persons",
+        "get_customer_info",
+        "get_person_balance",
+        "get_person_transactions",
+        "create_person",
+        "update_person",
+        "delete_person",
+        "list_person_groups",
+    }),
+    "products_write": frozenset({
+        "search_products",
+        "get_product_info",
+        "create_product",
+        "update_product",
+        "search_categories",
+    }),
+    "query": frozenset({
+        "query_business_data",
+        "list_queryable_fields",
+        "batch_query_business_data",
+        "search_invoices",
+        "search_persons",
+        "search_products",
+        "search_checks",
+        "search_transfers",
+        "search_expense_income",
+        "search_documents",
+        "search_receipts_payments",
+        "search_warehouse_documents",
+    }),
+    "reports_meta": frozenset({
+        "get_report",
+        "list_available_reports",
+        "batch_query_business_data",
+        "export_business_data",
+        "get_debtors_report",
+        "get_creditors_report",
+        "get_sales_report",
+        "get_purchase_report",
+        "get_inventory_valuation",
+        "get_cash_flow",
+    }),
+    "report_templates": frozenset({
+        "list_report_templates",
+        "get_report_template",
+        "get_report_template_scope_catalog",
+        "set_default_report_template",
+        "publish_report_template",
+    }),
+    "marketplace": frozenset({
+        "list_marketplace_plugins",
+        "list_business_plugins",
     }),
 }
 
@@ -120,10 +185,21 @@ _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"پروژه|project", "projects"),
     (r"ووکامرس|woocommerce|باسلام|basalam|کانکتور|connector|یکپارچه", "integration"),
     (r"فروش\s*سریع|quick\s*sales|لیست\s*قیمت|price\s*list|لاگ|فعالیت\s*سیستم|workflow|تعمیر|گارانتی|توزیع|صندوق\s*خرد", "misc"),
+    (r"شخص|مشتری|تامین|تأمین|supplier|customer|people|گروه\s*اشخاص", "people"),
+    (r"دسته\s*بندی|category|ویژگی\s*کالا|attribute", "products_write"),
+    (r"فیلتر\s*پیشرفته|عملگر|بزرگتر\s*از|کمتر\s*از|شامل|list_queryable|query_business", "query"),
+    (r"گزارش\s*یکپارچه|get_report|batch_query|list_available_reports", "reports_meta"),
+    (r"خروجی|export|اکسل|excel|دانلود\s*لیست", "reports_meta"),
+    (r"تراز\s*آزمایشی|دفتر\s*کل|دفتر\s*روزنامه|سود\s*و\s*زیان|مرور\s*حساب|trial\s*balance|ledger", "reports_meta"),
+    (r"قالب\s*گزارش|قالب\s*فاکتور|قالب\s*چاپ|report\s*template", "report_templates"),
+    (r"بازار\s*افزونه|افزونه\s*فعال|plugin\s*marketplace|marketplace", "marketplace"),
+    (r"dead\s*letter|صف\s*خطا|خلاصه\s*باسلام", "integration"),
+    (r"هزینه|درآمد|expense|income", "financial"),
+    (r"workflow|گردش\s*کار|اجرای\s*workflow", "misc"),
 ]
 
 _WRITE_KEYWORDS = re.compile(
-    r"ثبت|ایجاد|بساز|بزن|ویرایش|حذف|create|update|add\s+invoice|new\s+invoice",
+    r"ثبت|ایجاد|اضافه|بساز|بزن|ویرایش|حذف|create|update|add|new\s+invoice|مشتری\s+جدید|کالای\s+جدید",
     re.IGNORECASE,
 )
 
@@ -132,7 +208,28 @@ _WRITE_TOOLS = frozenset({
     "create_person",
     "update_person",
     "create_receipt_payment",
+    "delete_person",
+    "create_product",
+    "update_product",
+    "create_check",
+    "create_transfer",
+    "create_expense_income",
+    "update_invoice",
+    "delete_invoice",
+    "create_lead",
+    "execute_workflow",
+    "export_business_data",
+    "set_default_report_template",
+    "publish_report_template",
+    "adjust_customer_club_points",
+    "recalculate_customer_club_rfm",
+    "update_customer_club_settings",
 })
+
+_PEOPLE_KEYWORDS = re.compile(
+    r"شخص|مشتری|تامین|تأمین|supplier|customer|people|person|علی|نام\s+",
+    re.IGNORECASE,
+)
 
 
 def _normalize_query(q: Optional[str]) -> str:
@@ -299,6 +396,9 @@ def select_tool_names(
 
     if _WRITE_KEYWORDS.search(user_query or ""):
         selected |= _WRITE_TOOLS & available
+
+    if _PEOPLE_KEYWORDS.search(user_query or ""):
+        selected |= _CATEGORY_TOOLS.get("people", frozenset()) & available
 
     # اگر هنوز کم است، ابزارهای پرکاربرد اضافه
     if len(selected) < 12:

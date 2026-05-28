@@ -94,6 +94,8 @@ class Hesabix_V2
 		 */
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-invoice-helper.php';
 
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-gateway-fee.php';
+
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-invoice-warehouse-service.php';
 
 		/**

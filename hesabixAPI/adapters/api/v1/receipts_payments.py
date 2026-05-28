@@ -29,7 +29,8 @@ from app.core.responses import success_response, format_datetime_fields, ApiErro
 from app.core.cache import get_cache
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.services.receipt_payment_service import DOCUMENT_TYPE_RECEIPT, DOCUMENT_TYPE_PAYMENT
-from adapters.api.v1.schemas import QueryInfo, SuccessResponse
+from adapters.api.v1.schemas import QueryInfo
+from adapters.api.v1.list_query_common import DocumentListQueryBody, document_list_query_to_dict, SuccessResponse
 from adapters.api.v1.schema_models.receipt_payment import (
     ReceiptPaymentCreateRequest,
     ReceiptPaymentResponse,
@@ -61,66 +62,12 @@ router = APIRouter(tags=["دریافت و پرداخت", "مدیریت مالی"
 async def list_receipts_payments_endpoint(
     request: Request,
     business_id: int,
-    query_info: QueryInfo = Body(...),
+    body: DocumentListQueryBody,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    """
-    لیست اسناد دریافت و پرداخت
-    
-    پارامترهای اضافی در body:
-    - document_type: "receipt" یا "payment" (اختیاری)
-    - from_date: تاریخ شروع (اختیاری)
-    - to_date: تاریخ پایان (اختیاری)
-    """
-    query_dict: Dict[str, Any] = {
-        "take": query_info.take,
-        "skip": query_info.skip,
-        "sort_by": query_info.sort_by,
-        "sort_desc": query_info.sort_desc,
-        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
-        "search": query_info.search,
-    }
-    if getattr(query_info, "search_fields", None):
-        query_dict["search_fields"] = list(query_info.search_fields)
-    if getattr(query_info, "filters", None):
-        query_dict["filters"] = [f.model_dump() for f in query_info.filters]
-
-    # ادغام کل بدنهٔ درخواست (فیلدهایی که در QueryInfo نیستند مثل fiscal_year_id، project_id، person_id)
-    body_json: Dict[str, Any] = {}
-    try:
-        raw = await request.json()
-        if isinstance(raw, dict):
-            body_json = raw
-    except Exception:
-        body_json = {}
-
-    merge_keys = (
-        "document_type",
-        "from_date",
-        "to_date",
-        "sort",
-        "sort_by",
-        "sort_desc",
-        "fiscal_year_id",
-        "project_id",
-        "person_id",
-        "search_fields",
-        "filters",
-        "search",
-    )
-    for key in merge_keys:
-        if key in body_json:
-            query_dict[key] = body_json[key]
-
-    # سال مالی: در صورت نبود در بدنه، از هدر استفاده کن (بدنه اولویت دارد)
-    if query_dict.get("fiscal_year_id") is None:
-        try:
-            fy_header = request.headers.get("X-Fiscal-Year-ID")
-            if fy_header:
-                query_dict["fiscal_year_id"] = int(fy_header)
-        except Exception:
-            pass
+    """لیست اسناد دریافت و پرداخت با QueryInfo و فیلترهای تخت."""
+    query_dict = document_list_query_to_dict(body, request=request)
 
     # کش نتایج لیست دریافت/پرداخت
     cache = get_cache()

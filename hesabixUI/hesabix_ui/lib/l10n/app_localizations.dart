@@ -23826,6 +23826,384 @@ abstract class AppLocalizations {
   /// **'Field distribution add-on is not active. Enable it from the marketplace.'**
   String get distributionPluginInactive;
 
+  /// No description provided for @distributionPluginInactiveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Field distribution add-on is not active'**
+  String get distributionPluginInactiveTitle;
+
+  /// No description provided for @distributionPluginInactiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Activate or purchase this add-on from the marketplace to use routes, daily plans, field visits, and returns.'**
+  String get distributionPluginInactiveMessage;
+
+  /// No description provided for @distributionPluginGoToMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to marketplace'**
+  String get distributionPluginGoToMarketplace;
+
+  /// No description provided for @distributionTabField.
+  ///
+  /// In en, this message translates to:
+  /// **'Field'**
+  String get distributionTabField;
+
+  /// No description provided for @distributionTabManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage'**
+  String get distributionTabManage;
+
+  /// No description provided for @distributionActiveVisitBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit in progress'**
+  String get distributionActiveVisitBanner;
+
+  /// No description provided for @distributionCancelVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel visit'**
+  String get distributionCancelVisit;
+
+  /// No description provided for @distributionCancelVisitConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel this visit?'**
+  String get distributionCancelVisitConfirm;
+
+  /// No description provided for @distributionCreateSalesInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Create sales invoice'**
+  String get distributionCreateSalesInvoice;
+
+  /// No description provided for @distributionTerritoryCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New territory'**
+  String get distributionTerritoryCreate;
+
+  /// No description provided for @distributionRouteCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New route'**
+  String get distributionRouteCreate;
+
+  /// No description provided for @distributionRouteCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Route code'**
+  String get distributionRouteCode;
+
+  /// No description provided for @distributionRouteName.
+  ///
+  /// In en, this message translates to:
+  /// **'Route name'**
+  String get distributionRouteName;
+
+  /// No description provided for @distributionTerritoryCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Territory code'**
+  String get distributionTerritoryCode;
+
+  /// No description provided for @distributionTerritoryName.
+  ///
+  /// In en, this message translates to:
+  /// **'Territory name'**
+  String get distributionTerritoryName;
+
+  /// No description provided for @distributionAddStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Add stop'**
+  String get distributionAddStop;
+
+  /// No description provided for @distributionAssignVisitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign visitor'**
+  String get distributionAssignVisitor;
+
+  /// No description provided for @distributionSelectPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'Select customer'**
+  String get distributionSelectPerson;
+
+  /// No description provided for @distributionSelectProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Select product'**
+  String get distributionSelectProduct;
+
+  /// No description provided for @distributionReturnQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get distributionReturnQuantity;
+
+  /// No description provided for @distributionReturnReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Return reason'**
+  String get distributionReturnReason;
+
+  /// No description provided for @distributionReturnAddLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Add line'**
+  String get distributionReturnAddLine;
+
+  /// No description provided for @distributionApproveReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve return'**
+  String get distributionApproveReturn;
+
+  /// No description provided for @distributionRejectReturn.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject return'**
+  String get distributionRejectReturn;
+
+  /// No description provided for @distributionResolveReturnTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolve return request'**
+  String get distributionResolveReturnTitle;
+
+  /// No description provided for @distributionStatusInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'In progress'**
+  String get distributionStatusInProgress;
+
+  /// No description provided for @distributionStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get distributionStatusCompleted;
+
+  /// No description provided for @distributionStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get distributionStatusCancelled;
+
+  /// No description provided for @distributionWeekdayAny.
+  ///
+  /// In en, this message translates to:
+  /// **'Any day'**
+  String get distributionWeekdayAny;
+
+  /// No description provided for @distributionWeekdayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekday'**
+  String get distributionWeekdayLabel;
+
+  /// No description provided for @distributionSortOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort order'**
+  String get distributionSortOrder;
+
+  /// No description provided for @distributionTeamPlanUserId.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor user ID (supervisor)'**
+  String get distributionTeamPlanUserId;
+
+  /// No description provided for @distributionLocationCapturing.
+  ///
+  /// In en, this message translates to:
+  /// **'Getting location…'**
+  String get distributionLocationCapturing;
+
+  /// No description provided for @distributionLocationCaptured.
+  ///
+  /// In en, this message translates to:
+  /// **'Location recorded'**
+  String get distributionLocationCaptured;
+
+  /// No description provided for @distributionLocationSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Location unavailable'**
+  String get distributionLocationSkipped;
+
+  /// No description provided for @distributionReportsVisitsTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total visits'**
+  String get distributionReportsVisitsTotal;
+
+  /// No description provided for @distributionReportsOutcomeBreakdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Outcome breakdown'**
+  String get distributionReportsOutcomeBreakdown;
+
+  /// No description provided for @distributionReportsReturnsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Returns'**
+  String get distributionReportsReturnsSummary;
+
+  /// No description provided for @distributionDeleteRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete route'**
+  String get distributionDeleteRoute;
+
+  /// No description provided for @distributionDeleteRouteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this route? Stops and assignments will be removed.'**
+  String get distributionDeleteRouteConfirm;
+
+  /// No description provided for @distributionTabVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Van'**
+  String get distributionTabVan;
+
+  /// No description provided for @distributionTabTeamMap.
+  ///
+  /// In en, this message translates to:
+  /// **'Team map'**
+  String get distributionTabTeamMap;
+
+  /// No description provided for @distributionOptimizeRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Optimize order'**
+  String get distributionOptimizeRoute;
+
+  /// No description provided for @distributionOfflinePending.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline actions queued'**
+  String get distributionOfflinePending;
+
+  /// No description provided for @distributionOfflineSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync now'**
+  String get distributionOfflineSync;
+
+  /// No description provided for @distributionOfflineSynced.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline queue cleared'**
+  String get distributionOfflineSynced;
+
+  /// No description provided for @distributionGeofenceOverride.
+  ///
+  /// In en, this message translates to:
+  /// **'Record despite distance'**
+  String get distributionGeofenceOverride;
+
+  /// No description provided for @distributionChecklistTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit checklist'**
+  String get distributionChecklistTitle;
+
+  /// No description provided for @distributionVanLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Load van'**
+  String get distributionVanLoad;
+
+  /// No description provided for @distributionVanStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Van stock'**
+  String get distributionVanStock;
+
+  /// No description provided for @distributionVanSaleLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Van sale'**
+  String get distributionVanSaleLines;
+
+  /// No description provided for @distributionShelfPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf photo'**
+  String get distributionShelfPhoto;
+
+  /// No description provided for @distributionOpenInMaps.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in maps'**
+  String get distributionOpenInMaps;
+
+  /// No description provided for @distributionSetPersonLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer map location'**
+  String get distributionSetPersonLocation;
+
+  /// No description provided for @distributionSearchPlace.
+  ///
+  /// In en, this message translates to:
+  /// **'Search address or place'**
+  String get distributionSearchPlace;
+
+  /// No description provided for @distributionLocationSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer location saved'**
+  String get distributionLocationSaved;
+
+  /// No description provided for @distributionTapMapToSetLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the map to set the location'**
+  String get distributionTapMapToSetLocation;
+
+  /// No description provided for @distributionUseCurrentLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use my current location'**
+  String get distributionUseCurrentLocation;
+
+  /// No description provided for @distributionGeofenceRadius.
+  ///
+  /// In en, this message translates to:
+  /// **'Geofence radius (meters)'**
+  String get distributionGeofenceRadius;
+
+  /// No description provided for @distributionRequireGeofence.
+  ///
+  /// In en, this message translates to:
+  /// **'Require on-site geofence'**
+  String get distributionRequireGeofence;
+
+  /// No description provided for @distributionEnableVanSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Van sales'**
+  String get distributionEnableVanSales;
+
+  /// No description provided for @distributionEnableGeofence.
+  ///
+  /// In en, this message translates to:
+  /// **'Require geofence'**
+  String get distributionEnableGeofence;
+
+  /// No description provided for @distributionChecklistTemplateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Template JSON array in settings API (id, label, required fields).'**
+  String get distributionChecklistTemplateHint;
+
   /// No description provided for @distributionSettingsSubtitle.
   ///
   /// In en, this message translates to:

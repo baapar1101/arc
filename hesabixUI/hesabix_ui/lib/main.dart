@@ -124,6 +124,7 @@ import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
+import 'widgets/marketplace/distribution_plugin_gate.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
 import 'pages/business/basalam/basalam_settings_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
@@ -2119,10 +2120,15 @@ class _MyAppState extends State<MyApp> {
               path: 'distribution',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return hesabixNoTransitionPage(state, DistributionMainPage(
+                return hesabixNoTransitionPage(
+                  state,
+                  DistributionPluginGate(
                     businessId: businessId,
-                    authStore: _authStore!,
-                    calendarController: _calendarController!,
+                    child: DistributionMainPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                      calendarController: _calendarController!,
+                    ),
                   ),
                 );
               },
@@ -2380,11 +2386,17 @@ class _MyAppState extends State<MyApp> {
                     copyFromRaw != null && copyFromRaw.trim().isNotEmpty
                         ? int.tryParse(copyFromRaw.trim())
                         : null;
+                final personIdRaw = state.uri.queryParameters['person_id'];
+                final initialPersonId =
+                    personIdRaw != null && personIdRaw.trim().isNotEmpty
+                        ? int.tryParse(personIdRaw.trim())
+                        : null;
                 return hesabixNoTransitionPage(state, NewInvoicePage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
                     copyFromInvoiceId: copyFromId,
+                    initialPersonId: initialPersonId,
                   ),
                 );
               },
@@ -2428,6 +2440,13 @@ class _MyAppState extends State<MyApp> {
                     .map((e) => int.tryParse(e))
                     .whereType<int>();
                 initialPersonIds.addAll(multi);
+                final personIdsCsv = qp['person_ids'];
+                if (personIdsCsv != null && personIdsCsv.trim().isNotEmpty) {
+                  for (final part in personIdsCsv.split(',')) {
+                    final p = int.tryParse(part.trim());
+                    if (p != null) initialPersonIds.add(p);
+                  }
+                }
                 // Also parse from extra
                 try {
                   if (state.extra is Map) {
@@ -2679,9 +2698,14 @@ class _MyAppState extends State<MyApp> {
               path: 'reports/distribution-dashboard',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return hesabixNoTransitionPage(state, DistributionReportsDashboardPage(
+                return hesabixNoTransitionPage(
+                  state,
+                  DistributionPluginGate(
                     businessId: businessId,
-                    calendarController: _calendarController!,
+                    child: DistributionReportsDashboardPage(
+                      businessId: businessId,
+                      calendarController: _calendarController!,
+                    ),
                   ),
                 );
               },

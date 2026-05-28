@@ -86,7 +86,9 @@ class Person(Base):
     fax: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="فکس")
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="پست الکترونیکی")
     website: Mapped[str | None] = mapped_column(String(255), nullable=True, comment="وب‌سایت")
-    
+    latitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True, comment="عرض جغرافیایی برای مسیریابی")
+    longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True, comment="طول جغرافیایی برای مسیریابی")
+
     # زمان‌بندی
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

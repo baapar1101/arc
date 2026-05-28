@@ -33,6 +33,13 @@ class AIFunction:
     is_readonly: bool = True          # قابل کش شدن — عملیات read-only
 
 
+def _has_filter_property(query: Dict[str, Any], prop: str) -> bool:
+    for item in query.get("filters") or []:
+        if isinstance(item, dict) and str(item.get("property")) == prop:
+            return True
+    return False
+
+
 class AIFunctionRegistry:
     """
     Registry مرکزی برای تمام function های AI
@@ -82,6 +89,36 @@ class AIFunctionRegistry:
         )
 
         register_phase3_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase4 import (
+            register_phase4_business_functions,
+        )
+
+        register_phase4_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase5 import (
+            register_phase5_business_functions,
+        )
+
+        register_phase5_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase6 import (
+            register_phase6_business_functions,
+        )
+
+        register_phase6_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase7 import (
+            register_phase7_business_functions,
+        )
+
+        register_phase7_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase8 import (
+            register_phase8_business_functions,
+        )
+
+        register_phase8_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase10 import (
+            register_phase10_business_functions,
+        )
+
+        register_phase10_business_functions(self)
         # External HTTP connectors
         self._register_connector_functions()
     
@@ -110,69 +147,44 @@ class AIFunctionRegistry:
     def _register_invoice_functions(self):
         """ثبت function های مربوط به فاکتورها"""
         def search_invoices_wrapper(db, business_id, user_id, **kwargs):
-            """Wrapper برای جستجوی فاکتورها"""
+            """Wrapper برای جستجوی فاکتورها با QueryInfo کامل."""
+            from app.services.ai.ai_tool_query_params import build_ai_list_query
             from app.services.document_service import list_documents
-            
-            # فیلتر کردن فقط فاکتورها
-            invoice_types = [
-                "invoice_sales", "invoice_sales_return",
-                "invoice_purchase", "invoice_purchase_return",
-                "invoice_direct_consumption", "invoice_production", "invoice_waste"
-            ]
-            
-            # ساخت query dict برای list_documents
-            query = {}
-            
-            # document_type
-            if "document_type" in kwargs:
+
+            query = build_ai_list_query(kwargs, entity="invoice")
+            if kwargs.get("document_type"):
                 query["document_type"] = kwargs["document_type"]
-            elif "document_types" in kwargs:
-                # اگر لیست document_types داده شده، از اولین استفاده کن
-                doc_types = kwargs["document_types"]
-                if isinstance(doc_types, list) and doc_types:
-                    query["document_type"] = doc_types[0]
-            else:
-                # پیش‌فرض: اولین نوع فاکتور
-                query["document_type"] = invoice_types[0]
-            
-            # سایر فیلترها
-            if "fiscal_year_id" in kwargs:
-                query["fiscal_year_id"] = kwargs["fiscal_year_id"]
-            if "from_date" in kwargs:
-                query["from_date"] = kwargs["from_date"]
-            if "to_date" in kwargs:
-                query["to_date"] = kwargs["to_date"]
-            if "search" in kwargs:
-                query["search"] = kwargs["search"]
-            if "person_id" in kwargs:
+            elif not query.get("document_type"):
+                query["document_type"] = "invoice_sales"
+            if kwargs.get("person_id") is not None:
                 query["person_id"] = kwargs["person_id"]
-            
-            # Pagination
-            query["take"] = kwargs.get("take", 50)
-            query["skip"] = kwargs.get("skip", 0)
-            
             return list_documents(db, business_id, query)
-        
+
+        from app.services.ai.ai_tool_query_params import ai_list_parameters_schema
+
         self.register(AIFunction(
             name="search_invoices",
-            description="جستجو و فیلتر کردن فاکتورها بر اساس تاریخ، نوع، مشتری و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود. نتیجه شامل لیست فاکتورها در 'items' و تعداد کل فاکتورها در 'pagination.total' است. برای دریافت تعداد کل فاکتورها، از 'pagination.total' استفاده کنید.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"},
-                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع (اختیاری)"},
-                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان (اختیاری)"},
+            description=(
+                "جستجو و فیلتر فاکتورها (QueryInfo: search, search_fields, filters با عملگر = > < * in). "
+                "list_queryable_fields(entity=invoice) برای ستون‌های مجاز. "
+                "نتیجه: items + pagination.total."
+            ),
+            parameters_schema=ai_list_parameters_schema(
+                extra_properties={
                     "document_type": {
                         "type": "string",
-                        "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return"],
-                        "description": "نوع فاکتور (اختیاری)"
+                        "enum": [
+                            "invoice_sales",
+                            "invoice_purchase",
+                            "invoice_sales_return",
+                            "invoice_purchase_return",
+                        ],
+                        "description": "نوع فاکتور (اختیاری؛ پیش‌فرض invoice_sales)",
                     },
-                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده (اختیاری)"},
-                    "take": {"type": "integer", "description": "تعداد نتایج (اختیاری، پیش‌فرض: 50)"},
-                    "skip": {"type": "integer", "description": "تعداد نتایج صرف‌نظر شده (اختیاری، پیش‌فرض: 0)"}
+                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده"},
+                    "is_proforma": {"type": "boolean", "description": "فقط پیش‌فاکتور"},
                 },
-                "required": []
-            },
+            ),
             handler=self._create_handler(search_invoices_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["invoices.read"],
@@ -363,22 +375,48 @@ class AIFunctionRegistry:
     
     def _register_product_functions(self):
         """ثبت function های مربوط به محصولات"""
-        from app.services.product_service import list_products, get_product
-        
+        from app.services.product_service import get_product, list_products
+
+        def search_products_wrapper(db, business_id, user_id, **kwargs):
+            from app.services.ai.ai_tool_query_params import build_ai_list_query
+
+            q = build_ai_list_query(kwargs, entity="product")
+            if kwargs.get("category_id") is not None:
+                q["category_ids"] = [int(kwargs["category_id"])]
+            if kwargs.get("item_type") and not _has_filter_property(q, "item_type"):
+                flt = list(q.get("filters") or [])
+                flt.append(
+                    {"property": "item_type", "operator": "=", "value": kwargs["item_type"]}
+                )
+                q["filters"] = flt
+            if kwargs.get("track_inventory"):
+                q["include_inventory"] = True
+            return list_products(db, business_id, q)
+
+        from app.services.ai.ai_tool_query_params import ai_list_parameters_schema
+
         self.register(AIFunction(
             name="search_products",
-            description="جستجو در محصولات و کالاها بر اساس نام، کد، دسته‌بندی و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "search": {"type": "string", "description": "متن جستجو (اختیاری)"},
-                    "category_id": {"type": "integer", "description": "شناسه دسته‌بندی (اختیاری)"},
-                    "item_type": {"type": "string", "enum": ["product", "service"], "description": "نوع کالا (اختیاری)"},
-                    "track_inventory": {"type": "boolean", "description": "فقط کالاهای با موجودی (اختیاری)"}
+            description=(
+                "جستجو در کالا/خدمات با QueryInfo (filters, search_fields). "
+                "list_queryable_fields(entity=product)."
+            ),
+            parameters_schema=ai_list_parameters_schema(
+                extra_properties={
+                    "category_id": {"type": "integer", "description": "فیلتر دسته‌بندی"},
+                    "item_type": {
+                        "type": "string",
+                        "enum": ["product", "service"],
+                        "description": "نوع (یا در filters)",
+                    },
+                    "track_inventory": {
+                        "type": "boolean",
+                        "description": "محاسبه موجودی در پاسخ",
+                    },
+                    "include_inventory": {"type": "boolean"},
                 },
-                "required": []
-            },
-            handler=self._create_handler(list_products),
+            ),
+            handler=self._create_handler(search_products_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["inventory.read"],
             category="products"
@@ -476,6 +514,7 @@ class AIFunctionRegistry:
     
     def _register_person_functions(self):
         """ثبت function های مربوط به اشخاص (مشتریان/تامین‌کنندگان)"""
+        from app.services.ai.ai_tool_query_params import ai_list_parameters_schema
         from app.services.person_service import get_person_by_id, search_persons, calculate_person_balance
         from app.services.person_service import get_debtors_report, get_creditors_report
         from app.services.person_service import create_person, update_person
@@ -503,37 +542,45 @@ class AIFunctionRegistry:
         
         # اضافه کردن search_persons
         def search_persons_wrapper(db, business_id, user_id, **kwargs):
-            """Wrapper برای جستجوی اشخاص"""
-            from app.services.person_service import _person_to_dict
-            
-            search_query = kwargs.get("search")
-            page = kwargs.get("page", 1)
-            limit = kwargs.get("limit", 20)
-            
-            persons = search_persons(db, business_id, search_query, page, limit)
-            
-            # تبدیل به dict با استفاده از helper function
-            result = []
-            for person in persons:
-                person_dict = _person_to_dict(person)
-                result.append(person_dict)
-            
-            return result
-        
+            """Wrapper برای جستجوی اشخاص با get_persons_by_business + QueryInfo."""
+            from app.services.ai.ai_tool_query_params import build_ai_list_query
+            from app.services.person_service import get_persons_by_business
+
+            q = build_ai_list_query(kwargs, entity="person")
+            if kwargs.get("page") and "skip" not in kwargs:
+                limit = int(kwargs.get("limit") or q.get("take") or 20)
+                page = max(1, int(kwargs["page"]))
+                q["skip"] = (page - 1) * limit
+                q["take"] = limit
+            pt = kwargs.get("person_type")
+            if pt and pt != "both" and not _has_filter_property(q, "person_types"):
+                flt = list(q.get("filters") or [])
+                flt.append({"property": "person_types", "operator": "*", "value": pt})
+                q["filters"] = flt
+            return get_persons_by_business(
+                db,
+                business_id,
+                q,
+                fiscal_year_id=kwargs.get("fiscal_year_id"),
+            )
+
         self.register(AIFunction(
             name="search_persons",
-            description="جستجو در مشتریان و تامین‌کنندگان بر اساس نام، کد، تلفن و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "search": {"type": "string", "description": "متن جستجو در نام، کد، تلفن یا ایمیل (اختیاری)"},
-                    "person_type": {"type": "string", "enum": ["customer", "supplier", "both"], "description": "نوع شخص (اختیاری)"},
-                    "city": {"type": "string", "description": "شهر (اختیاری)"},
-                    "page": {"type": "integer", "description": "شماره صفحه (اختیاری، پیش‌فرض: 1)"},
-                    "limit": {"type": "integer", "description": "تعداد نتایج (اختیاری، پیش‌فرض: 20)"}
+            description=(
+                "جستجو در اشخاص با QueryInfo (filters, search_fields). "
+                "list_queryable_fields(entity=person). پاسخ: items + pagination."
+            ),
+            parameters_schema=ai_list_parameters_schema(
+                extra_properties={
+                    "person_type": {
+                        "type": "string",
+                        "enum": ["customer", "supplier", "both"],
+                        "description": "نوع شخص (یا فیلتر person_types)",
+                    },
+                    "page": {"type": "integer", "description": "شماره صفحه (جایگزین skip)"},
+                    "limit": {"type": "integer", "description": "تعداد در صفحه"},
                 },
-                "required": []
-            },
+            ),
             handler=self._create_handler(search_persons_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.read"],
@@ -693,6 +740,7 @@ class AIFunctionRegistry:
     
     def _register_financial_functions(self):
         """ثبت function های مربوط به امور مالی"""
+        from app.services.ai.ai_tool_query_params import ai_list_parameters_schema
         from app.services.business_dashboard_service import get_business_dashboard_data
         from app.services.person_service import get_debtors_report, get_creditors_report
         from app.services.receipt_payment_service import list_receipts_payments, create_receipt_payment
@@ -795,35 +843,39 @@ class AIFunctionRegistry:
         
         # اضافه کردن search_receipts_payments
         def search_receipts_payments_wrapper(db, business_id, user_id, **kwargs):
-            """Wrapper برای جستجوی دریافت/پرداخت‌ها"""
-            query = {
-                "fiscal_year_id": kwargs.get("fiscal_year_id"),
-                "document_type": kwargs.get("type"),  # "receipt" or "payment"
-                "from_date": kwargs.get("from_date"),
-                "to_date": kwargs.get("to_date"),
-                "person_id": kwargs.get("person_id"),
-                "account_type": kwargs.get("account_type"),  # "bank", "cash", "petty_cash"
-                "take": kwargs.get("take", 50),
-                "skip": kwargs.get("skip", 0)
-            }
-            
+            """Wrapper برای جستجوی دریافت/پرداخت با QueryInfo."""
+            from app.services.ai.ai_tool_query_params import build_ai_list_query
+
+            query = build_ai_list_query(kwargs, entity="document")
+            if kwargs.get("type"):
+                query["document_type"] = kwargs["type"]
+            if kwargs.get("account_type"):
+                query["account_type"] = kwargs["account_type"]
+            if kwargs.get("person_id") is not None:
+                query["person_id"] = kwargs["person_id"]
             return list_receipts_payments(db, business_id, query)
-        
+
         self.register(AIFunction(
             name="search_receipts_payments",
-            description="جستجو در دریافت/پرداخت‌ها بر اساس تاریخ، نوع، شخص و سایر فیلترها. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "from_date": {"type": "string", "format": "date", "description": "تاریخ شروع (اختیاری)"},
-                    "to_date": {"type": "string", "format": "date", "description": "تاریخ پایان (اختیاری)"},
-                    "person_id": {"type": "integer", "description": "شناسه شخص (اختیاری)"},
-                    "type": {"type": "string", "enum": ["receipt", "payment"], "description": "نوع: دریافت یا پرداخت (اختیاری)"},
-                    "account_type": {"type": "string", "enum": ["bank", "cash", "petty_cash"], "description": "نوع حساب: بانکی، نقدی یا خرد (اختیاری)"},
-                    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"}
+            description=(
+                "جستجو در دریافت/پرداخت با QueryInfo (filters, search_fields). "
+                "type=receipt|payment. فیلترهای ستونی در filters[]"
+            ),
+            parameters_schema=ai_list_parameters_schema(
+                extra_properties={
+                    "type": {
+                        "type": "string",
+                        "enum": ["receipt", "payment"],
+                        "description": "نوع سند",
+                    },
+                    "account_type": {
+                        "type": "string",
+                        "enum": ["bank", "cash", "petty_cash"],
+                        "description": "نوع حساب طرف",
+                    },
+                    "person_id": {"type": "integer"},
                 },
-                "required": []
-            },
+            ),
             handler=self._create_handler(search_receipts_payments_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["receipts_payments.read"],
@@ -1725,13 +1777,11 @@ class AIFunctionRegistry:
             
             # بررسی دسترسی‌های دقیق‌تر
             if func.required_permissions:
-                has_access = any(
-                    user_context.has_business_permission(perm.split(".")[0], perm.split(".")[1])
-                    if "." in perm and business_id else
-                    user_context.has_app_permission(perm)
-                    for perm in func.required_permissions
-                )
-                if not has_access:
+                from app.services.ai.ai_permission_map import has_any_ai_tool_permission
+
+                if not has_any_ai_tool_permission(
+                    user_context, func.required_permissions, business_id=business_id
+                ):
                     continue
             
             # بررسی نیاز به business context
@@ -1802,13 +1852,13 @@ class AIFunctionRegistry:
         
         # بررسی دسترسی‌های دقیق‌تر
         if func.required_permissions:
-            has_access = any(
-                user_context.has_business_permission(perm.split(".")[0], perm.split(".")[1])
-                if "." in perm and effective_business_id else
-                user_context.has_app_permission(perm)
-                for perm in func.required_permissions
-            )
-            if not has_access:
+            from app.services.ai.ai_permission_map import has_any_ai_tool_permission
+
+            if not has_any_ai_tool_permission(
+                user_context,
+                func.required_permissions,
+                business_id=effective_business_id,
+            ):
                 raise PermissionError(f"User does not have required permissions for {name}")
         
         # بررسی business context

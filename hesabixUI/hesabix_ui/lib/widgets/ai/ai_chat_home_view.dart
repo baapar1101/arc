@@ -82,20 +82,15 @@ class AIChatHomeView extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: AIChatDesign.subtitleStyle(theme),
                     ),
-                    SizedBox(height: compact ? 20 : 28),
-                    _CapabilityCards(
-                      enabled: canUseAi && !disabled,
-                      onSelected: onSuggestionSelected,
-                    ),
                     if (!canUseAi && blockReason != null) ...[
-                      const SizedBox(height: 20),
+                      SizedBox(height: compact ? 20 : 28),
                       _BlockedBanner(
                         message: blockReason!,
                         onUpgrade: onUpgradePlan,
                       ),
                     ],
                     if (proactiveAlerts.isNotEmpty && canUseAi) ...[
-                      const SizedBox(height: 20),
+                      SizedBox(height: compact ? 20 : 28),
                       ...proactiveAlerts.take(3).map(
                             (a) => Padding(
                               padding: const EdgeInsets.only(bottom: 8),
@@ -182,142 +177,6 @@ class _HeroIcon extends StatelessWidget {
         Icons.auto_awesome_rounded,
         size: 36,
         color: scheme.onPrimary,
-      ),
-    );
-  }
-}
-
-class _CapabilityCards extends StatelessWidget {
-  final bool enabled;
-  final ValueChanged<AIChatSuggestion> onSelected;
-
-  const _CapabilityCards({
-    required this.enabled,
-    required this.onSelected,
-  });
-
-  static const _items = [
-    AIChatSuggestion(
-      label: 'گزارش مدیریتی',
-      prompt: 'یک گزارش مدیریتی کوتاه از فروش، هزینه‌ها، بدهکاران و نقدینگی کسب‌وکار تهیه کن.',
-      icon: Icons.query_stats_rounded,
-    ),
-    AIChatSuggestion(
-      label: 'هشدارهای امروز',
-      prompt: 'هشدارهای مهم امروز کسب‌وکار مثل موجودی کم، بدهی‌ها و خطاهای احتمالی را بررسی کن.',
-      icon: Icons.crisis_alert_rounded,
-    ),
-    AIChatSuggestion(
-      label: 'تحلیل مالیات',
-      prompt: 'وضعیت مالیاتی و خطاهای احتمالی ارسال فاکتورهای مالیاتی را بررسی کن.',
-      icon: Icons.verified_outlined,
-    ),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final compact = AIChatDesign.isCompactWidth(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final cardWidth = compact
-            ? constraints.maxWidth
-            : (constraints.maxWidth - 24) / 3;
-        return Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final item in _items)
-              SizedBox(
-                width: cardWidth.clamp(190.0, 260.0).toDouble(),
-                child: _CapabilityCard(
-                  item: item,
-                  enabled: enabled,
-                  onTap: () => onSelected(item),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _CapabilityCard extends StatefulWidget {
-  final AIChatSuggestion item;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  const _CapabilityCard({
-    required this.item,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  @override
-  State<_CapabilityCard> createState() => _CapabilityCardState();
-}
-
-class _CapabilityCardState extends State<_CapabilityCard> {
-  bool _hovered = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedScale(
-        scale: _hovered && widget.enabled ? 1.015 : 1,
-        duration: const Duration(milliseconds: 160),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: widget.enabled ? widget.onTap : null,
-            borderRadius: BorderRadius.circular(AIChatDesign.cardRadius),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.all(16),
-              decoration: AIChatDesign.elevatedCard(
-                theme,
-                alpha: _hovered ? 0.96 : 0.78,
-                accent: _hovered ? scheme.primary : null,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: scheme.primaryContainer.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(widget.item.icon, color: scheme.primary),
-                  ),
-                  const SizedBox(height: 14),
-                  Text(
-                    widget.item.label,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    widget.item.prompt,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      height: 1.45,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

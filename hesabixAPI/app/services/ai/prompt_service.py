@@ -4,6 +4,8 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from adapters.db.models.ai_prompt import AIPrompt, PromptRole, PromptType
 from adapters.db.repositories.ai_prompt_repository import AIPromptRepository
+from app.services.ai.ai_query_filter_prompt import ADVANCED_QUERY_PROMPT_BLOCK
+from app.services.ai.ai_visualization_prompt import VISUALIZATION_PROMPT_BLOCK
 
 
 def get_prompt(
@@ -35,15 +37,8 @@ def get_prompt(
     return _get_default_prompt(role)
 
 
-def _get_default_prompt(role: PromptRole) -> str:
-    """Prompt های پیش‌فرض سخت‌کد شده"""
-    defaults = {
-        PromptRole.OPERATOR: """شما یک دستیار هوشمند برای اپراتورهای پشتیبانی هستید.
-وظیفه شما کمک به اپراتورها در پاسخ به تیکت‌های کاربران است.
-باید پاسخ‌های حرفه‌ای، مفید و دقیق ارائه دهید.
-از اطلاعات کسب‌وکار کاربر برای ارائه پاسخ بهتر استفاده کنید.""",
-        
-        PromptRole.USER: """شما دستیار تحلیلی و عملیاتی حسابیکس برای مدیران و حسابداران هستید.
+_USER_DEFAULT_PROMPT = (
+    """شما دستیار تحلیلی و عملیاتی حسابیکس برای مدیران و حسابداران هستید.
 
 فازهای کار (همان مدل، بدون API جدا):
 1. **درک**: در یک جمله intent کاربر را روشن کن (در متن یا قبل از اولین tool).
@@ -61,10 +56,21 @@ def _get_default_prompt(role: PromptRole) -> str:
 
 از ابزارهای موجود برای گزارش فروش، موجودی، بدهکاران، جریان نقدی و CRM استفاده کن.
 
-برای نمایش روند عددی از بلوک نمودار استفاده کن (فقط JSON معتبر):
-```chart
-{"type":"bar","title":"عنوان","labels":["برچسب۱"],"values":[100],"unit":"اختیاری"}
-```""",
+"""
+    + ADVANCED_QUERY_PROMPT_BLOCK
+    + VISUALIZATION_PROMPT_BLOCK
+)
+
+
+def _get_default_prompt(role: PromptRole) -> str:
+    """Prompt های پیش‌فرض سخت‌کد شده"""
+    defaults = {
+        PromptRole.OPERATOR: """شما یک دستیار هوشمند برای اپراتورهای پشتیبانی هستید.
+وظیفه شما کمک به اپراتورها در پاسخ به تیکت‌های کاربران است.
+باید پاسخ‌های حرفه‌ای، مفید و دقیق ارائه دهید.
+از اطلاعات کسب‌وکار کاربر برای ارائه پاسخ بهتر استفاده کنید.""",
+        
+        PromptRole.USER: _USER_DEFAULT_PROMPT,
         
         PromptRole.ADMIN: """شما یک دستیار هوشمند برای مدیران سیستم هستید.
 می‌توانید به تمام بخش‌های سیستم دسترسی داشته باشید.

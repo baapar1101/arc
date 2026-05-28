@@ -12756,6 +12756,199 @@ class AppLocalizationsFa extends AppLocalizations {
       'افزونه پخش مویرگی فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
 
   @override
+  String get distributionPluginInactiveTitle => 'افزونه پخش مویرگی فعال نیست';
+
+  @override
+  String get distributionPluginInactiveMessage =>
+      'برای استفاده از مسیرها، برنامه روز، ویزیت میدانی و مرجوعی، این افزونه را از بازار افزونه‌ها فعال یا خریداری کنید.';
+
+  @override
+  String get distributionPluginGoToMarketplace => 'رفتن به بازار افزونه‌ها';
+
+  @override
+  String get distributionTabField => 'میدان';
+
+  @override
+  String get distributionTabManage => 'مدیریت';
+
+  @override
+  String get distributionActiveVisitBanner => 'ویزیت در جریان';
+
+  @override
+  String get distributionCancelVisit => 'لغو ویزیت';
+
+  @override
+  String get distributionCancelVisitConfirm => 'این ویزیت لغو شود؟';
+
+  @override
+  String get distributionCreateSalesInvoice => 'ثبت فاکتور فروش';
+
+  @override
+  String get distributionTerritoryCreate => 'قلمرو جدید';
+
+  @override
+  String get distributionRouteCreate => 'مسیر جدید';
+
+  @override
+  String get distributionRouteCode => 'کد مسیر';
+
+  @override
+  String get distributionRouteName => 'نام مسیر';
+
+  @override
+  String get distributionTerritoryCode => 'کد قلمرو';
+
+  @override
+  String get distributionTerritoryName => 'نام قلمرو';
+
+  @override
+  String get distributionAddStop => 'افزودن توقف';
+
+  @override
+  String get distributionAssignVisitor => 'تخصیص ویزیتور';
+
+  @override
+  String get distributionSelectPerson => 'انتخاب مشتری';
+
+  @override
+  String get distributionSelectProduct => 'انتخاب کالا';
+
+  @override
+  String get distributionReturnQuantity => 'تعداد';
+
+  @override
+  String get distributionReturnReason => 'دلیل مرجوعی';
+
+  @override
+  String get distributionReturnAddLine => 'افزودن قلم';
+
+  @override
+  String get distributionApproveReturn => 'تأیید مرجوعی';
+
+  @override
+  String get distributionRejectReturn => 'رد مرجوعی';
+
+  @override
+  String get distributionResolveReturnTitle => 'رسیدگی به مرجوعی';
+
+  @override
+  String get distributionStatusInProgress => 'در جریان';
+
+  @override
+  String get distributionStatusCompleted => 'تکمیل‌شده';
+
+  @override
+  String get distributionStatusCancelled => 'لغوشده';
+
+  @override
+  String get distributionWeekdayAny => 'هر روز';
+
+  @override
+  String get distributionWeekdayLabel => 'روز هفته';
+
+  @override
+  String get distributionSortOrder => 'ترتیب';
+
+  @override
+  String get distributionTeamPlanUserId => 'شناسه ویزیتور (سرپرست)';
+
+  @override
+  String get distributionLocationCapturing => 'دریافت موقعیت…';
+
+  @override
+  String get distributionLocationCaptured => 'موقعیت ثبت شد';
+
+  @override
+  String get distributionLocationSkipped => 'موقعیت در دسترس نبود';
+
+  @override
+  String get distributionReportsVisitsTotal => 'کل ویزیت‌ها';
+
+  @override
+  String get distributionReportsOutcomeBreakdown => 'توزیع نتیجه';
+
+  @override
+  String get distributionReportsReturnsSummary => 'مرجوعی‌ها';
+
+  @override
+  String get distributionDeleteRoute => 'حذف مسیر';
+
+  @override
+  String get distributionDeleteRouteConfirm =>
+      'این مسیر حذف شود؟ توقف‌ها و تخصیص‌ها نیز حذف می‌شوند.';
+
+  @override
+  String get distributionTabVan => 'ون';
+
+  @override
+  String get distributionTabTeamMap => 'نقشه تیم';
+
+  @override
+  String get distributionOptimizeRoute => 'بهینه‌سازی ترتیب';
+
+  @override
+  String get distributionOfflinePending => 'اقدامات آفلاین در صف';
+
+  @override
+  String get distributionOfflineSync => 'همگام‌سازی';
+
+  @override
+  String get distributionOfflineSynced => 'صف آفلاین خالی شد';
+
+  @override
+  String get distributionGeofenceOverride => 'ثبت با فاصلهٔ غیرمجاز';
+
+  @override
+  String get distributionChecklistTitle => 'چک‌لیست ویزیت';
+
+  @override
+  String get distributionVanLoad => 'بارگیری ون';
+
+  @override
+  String get distributionVanStock => 'موجودی ون';
+
+  @override
+  String get distributionVanSaleLines => 'فروش از ون';
+
+  @override
+  String get distributionShelfPhoto => 'عکس ویترین';
+
+  @override
+  String get distributionOpenInMaps => 'باز کردن در نقشه';
+
+  @override
+  String get distributionSetPersonLocation => 'موقعیت مشتری روی نقشه';
+
+  @override
+  String get distributionSearchPlace => 'جستجوی آدرس یا مکان';
+
+  @override
+  String get distributionLocationSaved => 'موقعیت مشتری ذخیره شد';
+
+  @override
+  String get distributionTapMapToSetLocation =>
+      'روی نقشه بزنید تا موقعیت را تنظیم کنید';
+
+  @override
+  String get distributionUseCurrentLocation => 'موقعیت فعلی من';
+
+  @override
+  String get distributionGeofenceRadius => 'شعاع مجاز geofence (متر)';
+
+  @override
+  String get distributionRequireGeofence => 'الزام حضور در محدوده مشتری';
+
+  @override
+  String get distributionEnableVanSales => 'فروش از ون';
+
+  @override
+  String get distributionEnableGeofence => 'اجبار geofence';
+
+  @override
+  String get distributionChecklistTemplateHint =>
+      'قالب چک‌لیست را در API تنظیمات (فیلد visit_checklist_template) به‌صورت آرایه JSON تعریف کنید.';
+
+  @override
   String get distributionSettingsSubtitle =>
       'مسیرها، برنامه روز، ویزیت میدانی و مرجوعی';
 

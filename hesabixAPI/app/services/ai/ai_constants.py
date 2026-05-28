@@ -14,7 +14,7 @@ QUERY_COMPLEXITY_ITERATIONS: dict[str, int] = {
 }
 
 # حداکثر ابزار ارسالی به مدل در هر درخواست (پس از intent filter)
-MAX_TOOLS_PER_REQUEST = 32
+MAX_TOOLS_PER_REQUEST = 48
 
 # محدودیت پیام‌ها برای context
 MAX_HISTORY_MESSAGES = 40

@@ -777,6 +777,34 @@ class Hesabix_V2_Admin
 			'shipping_adjustment_account_id' => isset($_POST['shipping_adjustment_account_id'])
 				? absint(wp_unslash($_POST['shipping_adjustment_account_id']))
 				: 0,
+			'fee_line_mode' => isset($_POST['fee_line_mode'])
+				? sanitize_key(wp_unslash($_POST['fee_line_mode']))
+				: 'service',
+			'fee_negative_mode' => isset($_POST['fee_negative_mode'])
+				? sanitize_key(wp_unslash($_POST['fee_negative_mode']))
+				: 'line_discount',
+			'fee_adjustment_account_id' => isset($_POST['fee_adjustment_account_id'])
+				? absint(wp_unslash($_POST['fee_adjustment_account_id']))
+				: 0,
+			'fee_deduction_account_id' => isset($_POST['fee_deduction_account_id'])
+				? absint(wp_unslash($_POST['fee_deduction_account_id']))
+				: 0,
+			'fee_exclude_from_profit' => isset($_POST['fee_exclude_from_profit']),
+			'gateway_settlement_mode' => isset($_POST['gateway_settlement_mode'])
+				? sanitize_key(wp_unslash($_POST['gateway_settlement_mode']))
+				: 'off',
+			'gateway_settlement_percent' => isset($_POST['gateway_settlement_percent'])
+				? (float) wp_unslash($_POST['gateway_settlement_percent'])
+				: 0,
+			'gateway_settlement_fixed' => isset($_POST['gateway_settlement_fixed'])
+				? (float) wp_unslash($_POST['gateway_settlement_fixed'])
+				: 0,
+			'gateway_settlement_rules' => isset($_POST['gateway_settlement_rules'])
+				? sanitize_textarea_field(wp_unslash($_POST['gateway_settlement_rules']))
+				: '',
+			'gateway_settlement_meta_key' => isset($_POST['gateway_settlement_meta_key'])
+				? sanitize_key(wp_unslash($_POST['gateway_settlement_meta_key']))
+				: '_gateway_settlement_fee',
 			'order_fiscal_year_date_policy' => isset($_POST['order_fiscal_year_date_policy'])
 				? sanitize_key(wp_unslash($_POST['order_fiscal_year_date_policy']))
 				: 'keep',
@@ -796,6 +824,10 @@ class Hesabix_V2_Admin
 		}
 		if (!in_array($sync_settings['shipping_line_mode'], array('service', 'account_adjustment'), true)) {
 			$sync_settings['shipping_line_mode'] = 'service';
+		}
+
+		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {
+			$sync_settings = Hesabix_V2_Gateway_Fee_Service::normalize_sync_settings($sync_settings);
 		}
 
 		update_option('hesabix_v2_sync_settings', $sync_settings);

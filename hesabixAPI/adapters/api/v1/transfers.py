@@ -17,6 +17,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
+from adapters.api.v1.list_query_common import DocumentListQueryBody, document_list_query_to_dict
 from adapters.api.v1.schema_models.transfer import (
     TransferCreateRequest,
     TransferUpdateRequest,
@@ -132,31 +133,12 @@ router = APIRouter(tags=["اسناد انتقال", "مدیریت مالی"])
 @require_business_access("business_id")
 async def list_transfers_endpoint(
     request: Request,
+    body: DocumentListQueryBody,
     business_id: int = Path(
         ..., 
         description="شناسه کسب‌وکار",
         examples={"example": {"value": 1}},
         gt=0
-    ),
-    query_info: QueryInfo = Body(
-        ...,
-        description="پارامترهای جستجو، فیلتر و صفحه‌بندی",
-        examples={
-            "example": {
-                "take": 20,
-                "skip": 0,
-                "sort_by": "document_date",
-                "sort_desc": True,
-                "search": "بانک ملت",
-                "filters": [
-                    {
-                        "property": "total_amount",
-                        "operator": ">=",
-                        "value": 1000000
-                    }
-                ]
-            }
-        }
     ),
     x_fiscal_year_id: Optional[int] = Query(
         None,
@@ -173,53 +155,7 @@ async def list_transfers_endpoint(
     این endpoint برای نمایش لیست اسناد انتقال با قابلیت‌های پیشرفته استفاده می‌شود.
     شامل جستجو، فیلتر، مرتب‌سازی و صفحه‌بندی.
     """
-    query_dict: Dict[str, Any] = {
-        "take": query_info.take,
-        "skip": query_info.skip,
-        "sort_by": query_info.sort_by,
-        "sort_desc": query_info.sort_desc,
-        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
-        "search": query_info.search,
-    }
-    if getattr(query_info, "search_fields", None):
-        query_dict["search_fields"] = list(query_info.search_fields)
-    if getattr(query_info, "filters", None):
-        query_dict["filters"] = [f.model_dump() for f in query_info.filters]
-
-    body_json: Dict[str, Any] = {}
-    try:
-        raw = await request.json()
-        if isinstance(raw, dict):
-            body_json = raw
-    except Exception:
-        body_json = {}
-
-    merge_keys = (
-        "from_date",
-        "to_date",
-        "sort",
-        "sort_by",
-        "sort_desc",
-        "fiscal_year_id",
-        "project_id",
-        "bank_account_id",
-        "cash_register_id",
-        "petty_cash_id",
-        "search_fields",
-        "filters",
-        "search",
-    )
-    for key in merge_keys:
-        if key in body_json:
-            query_dict[key] = body_json[key]
-
-    if query_dict.get("fiscal_year_id") is None:
-        try:
-            fy_header = request.headers.get("X-Fiscal-Year-ID")
-            if fy_header:
-                query_dict["fiscal_year_id"] = int(fy_header)
-        except Exception:
-            pass
+    query_dict = document_list_query_to_dict(body, request=request)
 
     # کش نتایج لیست انتقال‌ها
     cache = get_cache()

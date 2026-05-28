@@ -131,6 +131,15 @@ class DistributionService {
     return _dataMap(res.data);
   }
 
+  Future<void> deleteRoute({
+    required int businessId,
+    required int routeId,
+  }) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/routes/$routeId',
+    );
+  }
+
   Future<Map<String, dynamic>> createRoute({
     required int businessId,
     required Map<String, dynamic> payload,
@@ -252,5 +261,102 @@ class DistributionService {
       query: q,
     );
     return _dataMap(res.data);
+  }
+
+  Future<List<dynamic>> listVans({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/distribution/business/$businessId/vans');
+    final m = _dataMap(res.data);
+    final items = m['items'];
+    return items is List ? items : const [];
+  }
+
+  Future<Map<String, dynamic>> createVan({
+    required int businessId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/vans',
+      data: payload,
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> getMyVanStock({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/vans/my-stock',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> loadVan({
+    required int businessId,
+    required int vanId,
+    required List<Map<String, dynamic>> lines,
+    int? sourceWarehouseId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/vans/$vanId/load',
+      data: <String, dynamic>{
+        'lines': lines,
+        if (sourceWarehouseId != null) 'source_warehouse_id': sourceWarehouseId,
+      },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> optimizeRoute({
+    required int businessId,
+    required int routeId,
+    String? planDate,
+    double? startLatitude,
+    double? startLongitude,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/routes/$routeId/optimize',
+      query: <String, dynamic>{
+        if (planDate != null) 'plan_date': planDate,
+        if (startLatitude != null) 'start_latitude': '$startLatitude',
+        if (startLongitude != null) 'start_longitude': '$startLongitude',
+      },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> getTeamMap({
+    required int businessId,
+    String? planDate,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/reports/team-map',
+      query: <String, dynamic>{if (planDate != null) 'plan_date': planDate},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> syncOffline({
+    required int businessId,
+    required String clientBatchId,
+    required List<Map<String, dynamic>> actions,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/sync-offline',
+      data: <String, dynamic>{
+        'client_batch_id': clientBatchId,
+        'actions': actions,
+      },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<void> setPersonLocation({
+    required int businessId,
+    required int personId,
+    required double latitude,
+    required double longitude,
+  }) async {
+    await _api.put<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/persons/$personId/location',
+      data: <String, dynamic>{'latitude': latitude, 'longitude': longitude},
+    );
   }
 }

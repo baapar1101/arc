@@ -19,14 +19,10 @@ from app.services.ai.function_registry import AIRole, AIFunction
 if TYPE_CHECKING:
     from app.services.ai.function_registry import AIFunctionRegistry
 
-_COMMON_LIST_PROPS = {
-    "search": {"type": "string", "description": "متن جستجو (اختیاری)"},
-    "from_date": {"type": "string", "format": "date", "description": "از تاریخ (اختیاری)"},
-    "to_date": {"type": "string", "format": "date", "description": "تا تاریخ (اختیاری)"},
-    "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"},
-    "take": {"type": "integer", "description": "تعداد نتایج (پیش‌فرض ۵۰، حداکثر ۲۰۰)"},
-    "skip": {"type": "integer", "description": "ردیف شروع (پیش‌فرض ۰)"},
-}
+from app.services.ai.ai_tool_query_params import (
+    COMMON_LIST_QUERY_PROPERTIES as _COMMON_LIST_PROPS,
+    ai_list_parameters_schema,
+)
 
 
 def register_extended_business_functions(registry: "AIFunctionRegistry") -> None:
@@ -58,8 +54,8 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
                 "ابزار جنریک برای خواندن داده‌های کسب‌وکار. "
                 f"entityهای مجاز: {', '.join(sorted(SUPPORTED_ENTITIES))}. "
                 f"action: {', '.join(sorted(SUPPORTED_ACTIONS))}. "
-                "برای get، record_id یا id در filters بدهید. "
-                "ترجیحاً برای موجودیت‌های تخصصی از functionهای اختصاصی استفاده کن."
+                "فیلتر پیشرفته: filters.filters = [{property, operator, value}] — از list_queryable_fields کمک بگیر. "
+                "برای get، record_id یا id در filters بدهید."
             ),
             parameters_schema={
                 "type": "object",
@@ -80,7 +76,12 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
                     },
                     "filters": {
                         "type": "object",
-                        "description": "فیلترها: search, from_date, to_date, document_type, person_id, ...",
+                        "description": (
+                            "QueryInfo: take, skip, search, search_fields, sort_by, sort_desc, "
+                            "from_date, to_date, document_type, person_id, "
+                            "و filters (آرایه {property, operator, value} با عملگرهای =, >, <, *, in). "
+                            "ابتدا list_queryable_fields(entity) را ببین."
+                        ),
                     },
                 },
                 "required": ["entity"],
@@ -96,7 +97,7 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
     registry.register(
         AIFunction(
             name="search_warehouse_documents",
-            description="جستجو و لیست حواله‌های انبار (ورود، خروج، انتقال). شناسه کسب‌وکار خودکار است.",
+            description="جستجوی حواله انبار با QueryInfo (filters, search_fields). شناسه کسب‌وکار خودکار.",
             parameters_schema={
                 "type": "object",
                 "properties": {
@@ -169,7 +170,7 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
     registry.register(
         AIFunction(
             name="search_checks",
-            description="جستجو در چک‌های دریافتی و پرداختی.",
+            description="جستجوی چک با QueryInfo (filters, search_fields). list_queryable_fields(entity=check).",
             parameters_schema={
                 "type": "object",
                 "properties": {
@@ -388,7 +389,9 @@ def _wh_doc_search(db, business_id, user_id, **kwargs):
     )
     from app.services.ai.ai_query_service import _build_list_query
 
-    return _search_warehouse_documents_internal(db, business_id, _build_list_query(kwargs))
+    return _search_warehouse_documents_internal(
+        db, business_id, _build_list_query(kwargs, entity="warehouse_document")
+    )
 
 
 def _wh_doc_get(db, business_id, user_id, warehouse_document_id, **kwargs):
@@ -422,7 +425,7 @@ def _search_checks(db, business_id, user_id, **kwargs):
     from app.services.check_service import list_checks
     from app.services.ai.ai_query_service import _build_list_query
 
-    q = _build_list_query(kwargs)
+    q = _build_list_query(kwargs, entity="check")
     if q.get("search") and not q.get("search_fields"):
         q["search_fields"] = [
             "check_number",
@@ -448,7 +451,7 @@ def _search_transfers(db, business_id, user_id, **kwargs):
     from app.services.transfer_service import list_transfers
     from app.services.ai.ai_query_service import _build_list_query
 
-    q = _build_list_query(kwargs)
+    q = _build_list_query(kwargs, entity="transfer")
     if q.get("search") and not q.get("search_fields"):
         q["search_fields"] = ["code", "description", "created_by_name"]
     return list_transfers(db, business_id, q)
@@ -458,7 +461,7 @@ def _search_expense_income(db, business_id, user_id, **kwargs):
     from app.services.expense_income_service import list_expense_income
     from app.services.ai.ai_query_service import _build_list_query
 
-    q = _build_list_query(kwargs)
+    q = _build_list_query(kwargs, entity="expense_income")
     if q.get("search") and not q.get("search_fields"):
         q["search_fields"] = ["code", "description", "created_by_name"]
     return list_expense_income(db, business_id, q)
@@ -468,7 +471,7 @@ def _search_documents(db, business_id, user_id, **kwargs):
     from app.services.document_service import list_documents
     from app.services.ai.ai_query_service import _build_list_query
 
-    return list_documents(db, business_id, _build_list_query(kwargs))
+    return list_documents(db, business_id, _build_list_query(kwargs, entity="document"))
 
 
 def _get_document(db, business_id, user_id, document_id, **kwargs):

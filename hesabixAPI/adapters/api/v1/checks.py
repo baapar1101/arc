@@ -8,6 +8,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from adapters.api.v1.schemas import QueryInfo
+from adapters.api.v1.list_query_common import DocumentListQueryBody, document_list_query_to_dict
 from adapters.api.v1.schema_models.check import (
     CheckCreateRequest,
     CheckUpdateRequest,
@@ -55,37 +56,16 @@ router = APIRouter(prefix="/checks", tags=["مدیریت مالی", "دریاف�
 async def list_checks_endpoint(
     request: Request,
     business_id: int,
-    query_info: QueryInfo,
+    body: DocumentListQueryBody,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    query_dict: Dict[str, Any] = {
-        "take": query_info.take,
-        "skip": query_info.skip,
-        "sort_by": query_info.sort_by,
-        "sort_desc": query_info.sort_desc,
-        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
-        "search": query_info.search,
-        "search_fields": query_info.search_fields,
-        "filters": query_info.filters,
-    }
-    # additional params: person_id (accept from query params or body)
-    # from query params
-    if request.query_params.get("person_id"):
+    query_dict = document_list_query_to_dict(body, request=request, fiscal_year_from_header=False)
+    if query_dict.get("person_id") is None and request.query_params.get("person_id"):
         try:
             query_dict["person_id"] = int(request.query_params.get("person_id"))
-        except Exception:
+        except (TypeError, ValueError):
             pass
-    # from request body (DataTable additionalParams)
-    try:
-        body_json = await request.json()
-        if isinstance(body_json, dict) and body_json.get("person_id") is not None:
-            try:
-                query_dict["person_id"] = int(body_json.get("person_id"))
-            except Exception:
-                pass
-    except Exception:
-        pass
     result = list_checks(db, business_id, query_dict)
     result["items"] = [format_datetime_fields(item, request) for item in result.get("items", [])]
     return success_response(data=result, request=request, message="CHECKS_LIST_FETCHED")

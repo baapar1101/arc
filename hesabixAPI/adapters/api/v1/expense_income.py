@@ -12,6 +12,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_management_dep, require_business_access, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields
 from adapters.api.v1.schemas import QueryInfo
+from adapters.api.v1.list_query_common import DocumentListQueryBody, document_list_query_to_dict
 from app.core.cache import get_cache
 from app.services.expense_income_service import (
     create_expense_income,
@@ -58,58 +59,11 @@ async def create_expense_income_endpoint(
 async def list_expense_income_endpoint(
     request: Request,
     business_id: int,
-    query_info: QueryInfo = Body(...),
+    body: DocumentListQueryBody,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    query_dict: Dict[str, Any] = {
-        "take": query_info.take,
-        "skip": query_info.skip,
-        "sort_by": query_info.sort_by,
-        "sort_desc": query_info.sort_desc,
-        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
-        "search": query_info.search,
-    }
-    if getattr(query_info, "search_fields", None):
-        query_dict["search_fields"] = list(query_info.search_fields)
-    if getattr(query_info, "filters", None):
-        query_dict["filters"] = [f.model_dump() for f in query_info.filters]
-
-    body_json: Dict[str, Any] = {}
-    try:
-        raw = await request.json()
-        if isinstance(raw, dict):
-            body_json = raw
-    except Exception:
-        body_json = {}
-
-    merge_keys = (
-        "document_type",
-        "from_date",
-        "to_date",
-        "sort",
-        "sort_by",
-        "sort_desc",
-        "take",
-        "skip",
-        "search",
-        "fiscal_year_id",
-        "project_id",
-        "account_id",
-        "search_fields",
-        "filters",
-    )
-    for key in merge_keys:
-        if key in body_json:
-            query_dict[key] = body_json[key]
-
-    if query_dict.get("fiscal_year_id") is None:
-        try:
-            fy_header = request.headers.get("X-Fiscal-Year-ID")
-            if fy_header:
-                query_dict["fiscal_year_id"] = int(fy_header)
-        except Exception:
-            pass
+    query_dict = document_list_query_to_dict(body, request=request)
 
     # کش نتایج لیست هزینه/درآمد
     cache = get_cache()

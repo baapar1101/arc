@@ -49,6 +49,35 @@ for ($iwp = 0; $iwp < 12; $iwp++) {
 $saved_cash_register_id = get_option('hesabix_v2_default_cash_register_id', '');
 $saved_currency_id = (int) get_option('hesabix_v2_currency_id', 0);
 $saved_shipping_adjustment_account_id = isset($sync_settings['shipping_adjustment_account_id']) ? (int) $sync_settings['shipping_adjustment_account_id'] : 0;
+$saved_fee_adjustment_account_id = isset($sync_settings['fee_adjustment_account_id']) ? (int) $sync_settings['fee_adjustment_account_id'] : 0;
+$saved_fee_deduction_account_id = isset($sync_settings['fee_deduction_account_id']) ? (int) $sync_settings['fee_deduction_account_id'] : 0;
+$fee_line_mode = isset($sync_settings['fee_line_mode']) ? (string) $sync_settings['fee_line_mode'] : 'service';
+$fee_negative_mode = isset($sync_settings['fee_negative_mode']) ? (string) $sync_settings['fee_negative_mode'] : 'line_discount';
+$fee_exclude_from_profit = !empty($sync_settings['fee_exclude_from_profit']);
+$gateway_settlement_mode = isset($sync_settings['gateway_settlement_mode']) ? (string) $sync_settings['gateway_settlement_mode'] : 'off';
+$gateway_settlement_percent = isset($sync_settings['gateway_settlement_percent']) ? (float) $sync_settings['gateway_settlement_percent'] : 0;
+$gateway_settlement_fixed = isset($sync_settings['gateway_settlement_fixed']) ? (float) $sync_settings['gateway_settlement_fixed'] : 0;
+$gateway_settlement_rules = '';
+if (isset($sync_settings['gateway_settlement_rules'])) {
+	if (is_array($sync_settings['gateway_settlement_rules'])) {
+		foreach ($sync_settings['gateway_settlement_rules'] as $rule) {
+			if (!is_array($rule) || empty($rule['payment_method'])) {
+				continue;
+			}
+			$gateway_settlement_rules .= sprintf(
+				"%s|%s|%s\n",
+				$rule['payment_method'],
+				isset($rule['percent']) ? $rule['percent'] : 0,
+				isset($rule['fixed']) ? $rule['fixed'] : 0
+			);
+		}
+	} else {
+		$gateway_settlement_rules = (string) $sync_settings['gateway_settlement_rules'];
+	}
+}
+$gateway_settlement_meta_key = isset($sync_settings['gateway_settlement_meta_key'])
+	? (string) $sync_settings['gateway_settlement_meta_key']
+	: '_gateway_settlement_fee';
 $hesabix_v2_upd_defaults = array(
 	'current_version' => defined('HESABIX_V2_VERSION') ? HESABIX_V2_VERSION : '',
 	'remote_version' => '',
@@ -603,6 +632,97 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				</td>
 			</tr>
 			<tr>
+				<th scope="row"><?php _e('ثبت Fee / کارمزد سفارش ووکامرس', 'hesabix-v2'); ?></th>
+				<td>
+					<p class="description" style="margin-top:0;"><?php _e('برای کارمزدهایی که روی سفارش به مشتری اضافه می‌شود (مثل اقساطی). کارمزد تسویه درگاه در بخش بعدی تنظیم می‌شود.', 'hesabix-v2'); ?></p>
+					<label style="display:block;margin:8px 0 6px;">
+						<input type="radio" name="fee_line_mode" value="service" <?php checked($fee_line_mode, 'service'); ?>>
+						<?php _e('خط خدمت «کارمزد و هزینه سفارش» (پیش‌فرض، رفتار قبلی)', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:block;margin-bottom:8px;">
+						<input type="radio" name="fee_line_mode" value="account_adjustment" <?php checked($fee_line_mode, 'account_adjustment'); ?>>
+						<?php _e('اضافات فاکتور — حساب درآمد خدمات (60101)', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:block;margin-bottom:6px;">
+						<?php _e('Fee منفی ووکامرس:', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:inline-block;margin-left:12px;">
+						<input type="radio" name="fee_negative_mode" value="line_discount" <?php checked($fee_negative_mode, 'line_discount'); ?>>
+						<?php _e('تخفیف خط (رفتار قبلی)', 'hesabix-v2'); ?>
+					</label>
+					<label style="display:inline-block;margin-right:12px;">
+						<input type="radio" name="fee_negative_mode" value="deduction_adjustment" <?php checked($fee_negative_mode, 'deduction_adjustment'); ?>>
+						<?php _e('کسورات فاکتور — هزینه کارمزد بانکی (70902)', 'hesabix-v2'); ?>
+					</label>
+					<p style="margin:10px 0 6px;">
+						<label>
+							<input type="checkbox" name="fee_exclude_from_profit" value="1" <?php checked($fee_exclude_from_profit); ?>>
+							<?php _e('خارج از محاسبه سود فاکتور (توصیه‌شده برای کارمزد درگاه/اقساط)', 'hesabix-v2'); ?>
+						</label>
+					</p>
+				</td>
+			</tr>
+			<tr class="hesabix-v2-fee-income-account-row">
+				<th scope="row"><?php _e('حساب درآمد کارمزد سفارش', 'hesabix-v2'); ?></th>
+				<td>
+					<select name="fee_adjustment_account_id" id="hesabix_v2_fee_adjustment_account_id" class="regular-text">
+						<option value="0"><?php _e('— انتخاب حساب —', 'hesabix-v2'); ?></option>
+						<?php if ($saved_fee_adjustment_account_id > 0) : ?>
+							<option value="<?php echo esc_attr((string) $saved_fee_adjustment_account_id); ?>" selected><?php echo esc_html(sprintf(__('حساب ذخیره‌شده #%d', 'hesabix-v2'), $saved_fee_adjustment_account_id)); ?></option>
+						<?php endif; ?>
+					</select>
+					<button type="button" id="hesabix_v2_load_fee_accounts" class="button button-secondary" style="margin-right:8px;"><?php _e('بارگذاری حساب‌ها', 'hesabix-v2'); ?></button>
+					<span id="hesabix_v2_fee_account_status" class="description" style="margin-right:8px;" aria-live="polite"></span>
+					<p class="description"><?php _e('پیش‌فرض: 60101 — درآمد حاصل از فروش خدمات.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr class="hesabix-v2-fee-deduction-account-row">
+				<th scope="row"><?php _e('حساب کسورات Fee منفی', 'hesabix-v2'); ?></th>
+				<td>
+					<select name="fee_deduction_account_id" id="hesabix_v2_fee_deduction_account_id" class="regular-text">
+						<option value="0"><?php _e('— انتخاب حساب —', 'hesabix-v2'); ?></option>
+						<?php if ($saved_fee_deduction_account_id > 0) : ?>
+							<option value="<?php echo esc_attr((string) $saved_fee_deduction_account_id); ?>" selected><?php echo esc_html(sprintf(__('حساب ذخیره‌شده #%d', 'hesabix-v2'), $saved_fee_deduction_account_id)); ?></option>
+						<?php endif; ?>
+					</select>
+					<p class="description"><?php _e('پیش‌فرض: 70902 — کارمزد خدمات بانکی.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+			<tr>
+				<th scope="row"><?php _e('کارمزد تسویه درگاه (سند دریافت)', 'hesabix-v2'); ?></th>
+				<td>
+					<p class="description" style="margin-top:0;"><?php _e('مبلغی که درگاه از واریز پذیرنده کسر می‌کند؛ در سند دریافت همراه فاکتور با حساب 70902 ثبت می‌شود. مبلغ دریافتی مشتری تغییر نمی‌کند.', 'hesabix-v2'); ?></p>
+					<select name="gateway_settlement_mode" id="hesabix_v2_gateway_settlement_mode" class="regular-text">
+						<option value="off" <?php selected($gateway_settlement_mode, 'off'); ?>><?php _e('غیرفعال', 'hesabix-v2'); ?></option>
+						<option value="percent" <?php selected($gateway_settlement_mode, 'percent'); ?>><?php _e('درصد ثابت از مبلغ سفارش', 'hesabix-v2'); ?></option>
+						<option value="fixed" <?php selected($gateway_settlement_mode, 'fixed'); ?>><?php _e('مبلغ ثابت', 'hesabix-v2'); ?></option>
+						<option value="rules" <?php selected($gateway_settlement_mode, 'rules'); ?>><?php _e('قواعد بر اساس روش پرداخت', 'hesabix-v2'); ?></option>
+						<option value="order_meta" <?php selected($gateway_settlement_mode, 'order_meta'); ?>><?php _e('خواندن از متای سفارش', 'hesabix-v2'); ?></option>
+					</select>
+					<p class="hesabix-v2-gateway-settle-percent" style="margin-top:10px;">
+						<label><?php _e('درصد کارمزد (۰–۱۰۰):', 'hesabix-v2'); ?>
+							<input type="number" name="gateway_settlement_percent" class="small-text" min="0" max="100" step="0.01" value="<?php echo esc_attr((string) $gateway_settlement_percent); ?>">
+						</label>
+					</p>
+					<p class="hesabix-v2-gateway-settle-fixed" style="margin-top:10px;">
+						<label><?php _e('مبلغ ثابت کارمزد:', 'hesabix-v2'); ?>
+							<input type="number" name="gateway_settlement_fixed" class="regular-text" min="0" step="1" value="<?php echo esc_attr((string) $gateway_settlement_fixed); ?>">
+						</label>
+					</p>
+					<p class="hesabix-v2-gateway-settle-rules" style="margin-top:10px;">
+						<label for="hesabix_v2_gateway_settlement_rules"><?php _e('قواعد (هر خط: payment_method|درصد|مبلغ_ثابت)', 'hesabix-v2'); ?></label><br>
+						<textarea name="gateway_settlement_rules" id="hesabix_v2_gateway_settlement_rules" rows="4" class="large-text code" dir="ltr"><?php echo esc_textarea($gateway_settlement_rules); ?></textarea>
+						<span class="description"><?php _e('مثال: digipay|2.5|0 یا zarinpal|1|5000', 'hesabix-v2'); ?></span>
+					</p>
+					<p class="hesabix-v2-gateway-settle-meta" style="margin-top:10px;">
+						<label><?php _e('کلید متای سفارش:', 'hesabix-v2'); ?>
+							<input type="text" name="gateway_settlement_meta_key" class="regular-text" value="<?php echo esc_attr($gateway_settlement_meta_key); ?>" dir="ltr">
+						</label>
+						<span class="description"><?php _e('در صورت خالی بودن، کلیدهای رایج (_gateway_settlement_fee, _transaction_fee, …) امتحان می‌شوند.', 'hesabix-v2'); ?></span>
+					</p>
+				</td>
+			</tr>
+			<tr>
 				<th scope="row"><?php _e('ارز فاکتور (حسابیکس)', 'hesabix-v2'); ?></th>
 				<td>
 					<select name="hesabix_v2_currency_id" id="hesabix_v2_currency_id" class="regular-text">
@@ -759,6 +879,8 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			var savedCashRegister = '<?php echo esc_js((string) $saved_cash_register_id); ?>';
 			var savedCurrency = '<?php echo esc_js((string) $saved_currency_id); ?>';
 			var savedShippingAdjustmentAccountId = <?php echo (int) $saved_shipping_adjustment_account_id; ?>;
+			var savedFeeAdjustmentAccountId = <?php echo (int) $saved_fee_adjustment_account_id; ?>;
+			var savedFeeDeductionAccountId = <?php echo (int) $saved_fee_deduction_account_id; ?>;
 			var savedStockPullWhIds = <?php echo wp_json_encode(array_values(array_map('intval', isset($stock_pull_opts['warehouse_ids']) ? $stock_pull_opts['warehouse_ids'] : array()))); ?>;
 			var savedInvoiceWhRuleIds = <?php echo wp_json_encode(array_map('intval', $inv_wh_saved_wids)); ?>;
 			var savedInvoiceExtraTagIds = <?php echo wp_json_encode(array_values(array_map('intval', $saved_invoice_extra_tag_ids))); ?>;
@@ -868,6 +990,88 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				hesabixV2LoadShippingAccounts(false);
 			});
 
+			function hesabixV2ToggleFeeAccountRows() {
+				var feeMode = $('input[name="fee_line_mode"]:checked').val() || 'service';
+				var negMode = $('input[name="fee_negative_mode"]:checked').val() || 'line_discount';
+				$('.hesabix-v2-fee-income-account-row').toggle(feeMode === 'account_adjustment');
+				$('.hesabix-v2-fee-deduction-account-row').toggle(negMode === 'deduction_adjustment');
+			}
+			$('input[name="fee_line_mode"], input[name="fee_negative_mode"]').on('change', hesabixV2ToggleFeeAccountRows);
+			hesabixV2ToggleFeeAccountRows();
+
+			function hesabixV2FillFeeAccountSelect($sel, accounts, savedId, defaultCode) {
+				if (!$sel.length) {
+					return;
+				}
+				var keep = $sel.val();
+				var desired = (keep && keep !== '0') ? keep : (savedId > 0 ? String(savedId) : '');
+				$sel.empty().append($('<option></option>').val('0').text('<?php echo esc_js(__('— انتخاب حساب —', 'hesabix-v2')); ?>'));
+				(accounts || []).forEach(function(a){
+					if (!a || !a.id) {
+						return;
+					}
+					var label = a.label || (((a.code || '') ? String(a.code) + ' — ' : '') + (a.name || String(a.id)));
+					var $opt = $('<option></option>').val(String(a.id)).text(label);
+					if (a.code) {
+						$opt.attr('data-code', String(a.code));
+					}
+					$sel.append($opt);
+				});
+				if (desired !== '') {
+					$sel.val(desired);
+				}
+				if (($sel.val() === null || $sel.val() === '0') && defaultCode) {
+					var $def = $sel.find('option[data-code="' + defaultCode + '"]').first();
+					if ($def.length) {
+						$sel.val($def.val());
+					}
+				}
+			}
+
+			function hesabixV2LoadFeeAccounts(isAuto) {
+				var $btn = $('#hesabix_v2_load_fee_accounts');
+				var $st = $('#hesabix_v2_fee_account_status');
+				if (!$btn.length) {
+					return;
+				}
+				if (!isAuto) {
+					$btn.prop('disabled', true);
+					$st.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>').css('color', '');
+				}
+				$.post(hesabix_v2_ajax.ajax_url, {
+					action: 'hesabix_v2_opening_inventory_accounts',
+					nonce: hesabix_v2_ajax.nonce
+				}).done(function(res){
+					var accounts = (res && res.success && res.data && res.data.accounts) ? res.data.accounts : [];
+					hesabixV2FillFeeAccountSelect($('#hesabix_v2_fee_adjustment_account_id'), accounts, savedFeeAdjustmentAccountId, '60101');
+					hesabixV2FillFeeAccountSelect($('#hesabix_v2_fee_deduction_account_id'), accounts, savedFeeDeductionAccountId, '70902');
+					if (!isAuto) {
+						$st.text(accounts.length ? '<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>' : '<?php echo esc_js(__('حسابی برنگشت.', 'hesabix-v2')); ?>').css('color', accounts.length ? 'green' : 'red');
+					}
+				}).fail(function(){
+					if (!isAuto) {
+						$st.text('<?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?>').css('color', 'red');
+					}
+				}).always(function(){
+					if (!isAuto) {
+						$btn.prop('disabled', false);
+					}
+				});
+			}
+			$('#hesabix_v2_load_fee_accounts').on('click', function(){
+				hesabixV2LoadFeeAccounts(false);
+			});
+
+			function hesabixV2ToggleGatewaySettlementFields() {
+				var mode = $('#hesabix_v2_gateway_settlement_mode').val() || 'off';
+				$('.hesabix-v2-gateway-settle-percent').toggle(mode === 'percent');
+				$('.hesabix-v2-gateway-settle-fixed').toggle(mode === 'fixed');
+				$('.hesabix-v2-gateway-settle-rules').toggle(mode === 'rules');
+				$('.hesabix-v2-gateway-settle-meta').toggle(mode === 'order_meta');
+			}
+			$('#hesabix_v2_gateway_settlement_mode').on('change', hesabixV2ToggleGatewaySettlementFields);
+			hesabixV2ToggleGatewaySettlementFields();
+
 			function hesabixV2LoadWarehousesBanksCurrencies(isAuto) {
 				var $btn = $('#hesabix_v2_load_warehouses_banks');
 				var $status = $('#hesabix_v2_wh_bank_status');
@@ -956,6 +1160,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			$(function(){
 				hesabixV2LoadWarehousesBanksCurrencies(true);
 				hesabixV2LoadShippingAccounts(true);
+				hesabixV2LoadFeeAccounts(true);
 			});
 
 			$('#hesabix_v2_stock_pull_now_btn').on('click', function(){

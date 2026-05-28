@@ -38,6 +38,13 @@ class DistributionBusinessSettings(Base):
 		Boolean, nullable=False, default=False,
 		comment="شروع ویزیت فقط برای اشخاص موجود در برنامهٔ روز.",
 	)
+	geofence_radius_meters: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+	require_geofence: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	visit_checklist_template: Mapped[list | dict | None] = mapped_column(JSON, nullable=True)
+	enable_van_sales: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	default_source_warehouse_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("warehouses.id", ondelete="SET NULL"), nullable=True,
+	)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -147,6 +154,10 @@ class DistributionFieldVisit(Base):
 	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 	start_latitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
 	start_longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
+	end_latitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
+	end_longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
+	checklist_answers: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+	shelf_photo_file_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -168,3 +179,34 @@ class DistributionReturnRequest(Base):
 	resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DistributionVan(Base):
+	"""ون توزیع — هر رکورد به یک انبار (موجودی ون) متصل است."""
+
+	__tablename__ = "distribution_vans"
+	__table_args__ = (UniqueConstraint("business_id", "code", name="uq_distribution_vans_business_code"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	warehouse_id: Mapped[int] = mapped_column(Integer, ForeignKey("warehouses.id", ondelete="RESTRICT"), index=True)
+	user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+	code: Mapped[str] = mapped_column(String(50), nullable=False)
+	name: Mapped[str] = mapped_column(String(255), nullable=False)
+	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DistributionOfflineSyncBatch(Base):
+	__tablename__ = "distribution_offline_sync_batches"
+	__table_args__ = (UniqueConstraint("business_id", "client_batch_id", name="uq_distribution_offline_batch"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+	client_batch_id: Mapped[str] = mapped_column(String(64), nullable=False)
+	actions: Mapped[Any] = mapped_column(JSON, nullable=False)
+	results: Mapped[Any] = mapped_column(JSON, nullable=True)
+	status: Mapped[str] = mapped_column(String(32), nullable=False, default="completed")
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

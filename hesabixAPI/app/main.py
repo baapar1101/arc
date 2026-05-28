@@ -165,6 +165,12 @@ def _try_acquire_background_jobs_lock() -> bool:
         return False
 
 
+def _openapi_query_filter_section() -> str:
+    from app.openapi_query_filter_docs import OPENAPI_QUERY_FILTER_SECTION
+
+    return OPENAPI_QUERY_FILTER_SECTION
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
@@ -483,7 +489,9 @@ def create_app() -> FastAPI:
 
         - مسیر پایه نسخه فعلی: `/api/v1/...`
         - در این محیط، آدرس سرور را از بالای صفحه (Servers) یا از آدرس بار مرورگر بردارید؛ مثال‌های `curl` فقط الگو هستند.
-
+        """
+        + _openapi_query_filter_section()
+        + """
         ---
 
         ## احراز هویت (مهم)
@@ -1017,6 +1025,8 @@ def create_app() -> FastAPI:
     application.include_router(activity_logs_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_activity_logs_router, prefix=settings.api_v1_prefix)
     application.include_router(kardex_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.query_schema import router as query_schema_router
+    application.include_router(query_schema_router, prefix=settings.api_v1_prefix)
     application.include_router(opening_balance_router, prefix=settings.api_v1_prefix)
     application.include_router(business_currency_rates_router, prefix=settings.api_v1_prefix)
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
@@ -1384,7 +1394,37 @@ def create_app() -> FastAPI:
             separate_input_output_schemas=application.separate_input_output_schemas,
             external_docs=application.openapi_external_docs,
         )
-        
+
+        # اسکیمای QueryInfo و مدل‌های لیست (فاز ۱۲)
+        try:
+            from adapters.api.v1.schemas import (
+                DocumentListQuery,
+                FilterItem,
+                InvoiceListQuery,
+                KardexListQuery,
+                QueryInfo,
+                WarehouseDocListQuery,
+            )
+            from app.openapi_list_query_patch import apply_list_query_openapi_patch
+
+            ref = "#/components/schemas/{model}"
+            components = openapi_schema.setdefault("components", {})
+            schemas = components.setdefault("schemas", {})
+            for name, model in (
+                ("FilterItem", FilterItem),
+                ("QueryInfo", QueryInfo),
+                ("DocumentListQuery", DocumentListQuery),
+                ("InvoiceListQuery", InvoiceListQuery),
+                ("KardexListQuery", KardexListQuery),
+                ("WarehouseDocListQuery", WarehouseDocListQuery),
+            ):
+                schemas[name] = model.model_json_schema(ref_template=ref)
+            apply_list_query_openapi_patch(openapi_schema)
+        except Exception as exc:
+            logging.getLogger(__name__).warning(
+                "Could not inject QueryInfo schemas into OpenAPI: %s", exc
+            )
+
         # یک طرح امنیتی؛ مقدار کامل هدر: "ApiKey <token>" (Bearer پشتیبانی نمی‌شود)
         openapi_schema["components"]["securitySchemes"] = {
             "ApiKeyAuth": {

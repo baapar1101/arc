@@ -942,6 +942,7 @@ class _ReportsPageState extends State<ReportsPage> {
             route: '/business/$b/reports/distribution-dashboard',
             keywords: const ['ویزیت', 'پخش', 'مرجوعی', 'distribution'],
             permissionSection: 'distribution',
+            marketplacePluginCode: 'distribution',
           ),
         ],
       ),

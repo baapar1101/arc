@@ -5,6 +5,8 @@ import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_agent_trace_timeline.dart';
 import 'ai_chat_chart_widget.dart';
 import 'ai_chat_l10n.dart';
+import 'ai_chat_table_widget.dart';
+import 'ai_visualization_spec.dart';
 
 class AIChatMessageBody extends StatelessWidget {
   final String content;
@@ -161,13 +163,15 @@ class _AssistantRichContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final segments = _splitChartBlocks(content);
+    final segments = _splitVisualizationBlocks(content);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final seg in segments)
-          if (seg.isChart && seg.chartSpec != null)
+          if (seg.chartSpec != null)
             AIChatChartWidget(spec: seg.chartSpec!)
+          else if (seg.tableSpec != null)
+            AIChatTableWidget(spec: seg.tableSpec!)
           else if (seg.text.trim().isNotEmpty)
             MarkdownBody(
               data: seg.text.trim(),
@@ -199,22 +203,39 @@ class _AssistantRichContent extends StatelessWidget {
     );
   }
 
-  static List<_ContentSegment> _splitChartBlocks(String raw) {
-    final pattern = RegExp(r'```chart\s*([\s\S]*?)```', multiLine: true);
+  /// جدا کردن بلوک‌های ```chart و ```table از متن Markdown.
+  static List<_ContentSegment> _splitVisualizationBlocks(String raw) {
+    final pattern = RegExp(
+      r'```(chart|table)\s*([\s\S]*?)```',
+      multiLine: true,
+    );
     final segments = <_ContentSegment>[];
     var start = 0;
+
     for (final match in pattern.allMatches(raw)) {
       if (match.start > start) {
         segments.add(_ContentSegment(text: raw.substring(start, match.start)));
       }
-      final spec = AIChartSpec.tryParse(match.group(1) ?? '');
-      if (spec != null) {
-        segments.add(_ContentSegment.chart(spec));
-      } else {
-        segments.add(_ContentSegment(text: match.group(0) ?? ''));
+      final kind = match.group(1);
+      final body = match.group(2) ?? '';
+      if (kind == 'chart') {
+        final spec = AIChartSpec.tryParse(body);
+        if (spec != null && spec.hasData) {
+          segments.add(_ContentSegment.chart(spec));
+        } else {
+          segments.add(_ContentSegment(text: match.group(0) ?? ''));
+        }
+      } else if (kind == 'table') {
+        final spec = AITableSpec.tryParse(body);
+        if (spec != null && spec.hasData) {
+          segments.add(_ContentSegment.table(spec));
+        } else {
+          segments.add(_ContentSegment(text: match.group(0) ?? ''));
+        }
       }
       start = match.end;
     }
+
     if (start < raw.length) {
       segments.add(_ContentSegment(text: raw.substring(start)));
     }
@@ -228,13 +249,15 @@ class _AssistantRichContent extends StatelessWidget {
 class _ContentSegment {
   final String text;
   final AIChartSpec? chartSpec;
+  final AITableSpec? tableSpec;
 
-  bool get isChart => chartSpec != null;
-
-  _ContentSegment({this.text = '', this.chartSpec});
+  _ContentSegment({this.text = '', this.chartSpec, this.tableSpec});
 
   factory _ContentSegment.chart(AIChartSpec spec) =>
       _ContentSegment(chartSpec: spec);
+
+  factory _ContentSegment.table(AITableSpec spec) =>
+      _ContentSegment(tableSpec: spec);
 }
 
 class AIChatToolActivityList extends StatelessWidget {

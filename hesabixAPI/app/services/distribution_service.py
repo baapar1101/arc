@@ -17,10 +17,14 @@ from adapters.db.models.distribution import (
 	DistributionRouteStop,
 	DistributionTerritory,
 )
+from adapters.db.models.document import Document
 from adapters.db.models.person import Person
+from adapters.db.models.product import Product
 from app.core.auth_dependency import AuthContext
+from app.core.business_calendar import business_today
 from app.core.distribution_plugin_dependency import check_distribution_plugin_active
 from app.core.responses import ApiError
+from app.services.distribution_geo import person_coords
 
 
 def _ensure_plugin(db: Session, business_id: int) -> None:
@@ -34,12 +38,14 @@ def _ensure_plugin(db: Session, business_id: int) -> None:
 
 
 def _scope_visit_user_id(ctx: AuthContext, business_id: int) -> Optional[int]:
-	"""فیلتر بازدیدها: None = همه، وگرنه فقط این کاربر."""
+	"""فیلتر بازدیدها: None = همهٔ تیم، وگرنه فقط ویزیت‌های خود کاربر."""
 	if ctx.is_superadmin():
 		return None
 	if ctx.db and ctx.is_business_owner(business_id):
 		return None
-	if ctx.has_business_permission("distribution", "manage") or ctx.has_business_permission("distribution", "reports_team"):
+	if ctx.has_business_permission("distribution", "manage"):
+		return None
+	if ctx.has_business_permission("distribution", "reports_team"):
 		return None
 	return ctx.get_user_id()
 
@@ -56,8 +62,16 @@ def _can_see_full_distribution_catalog(ctx: AuthContext, business_id: int) -> bo
 	return False
 
 
+def get_distribution_settings_row(db: Session, business_id: int) -> Optional[DistributionBusinessSettings]:
+	return (
+		db.query(DistributionBusinessSettings)
+		.filter(DistributionBusinessSettings.business_id == business_id)
+		.first()
+	)
+
+
 def get_or_create_distribution_settings(db: Session, business_id: int) -> DistributionBusinessSettings:
-	row = db.query(DistributionBusinessSettings).filter(DistributionBusinessSettings.business_id == business_id).first()
+	row = get_distribution_settings_row(db, business_id)
 	if row:
 		return row
 	row = DistributionBusinessSettings(
@@ -73,11 +87,20 @@ def get_or_create_distribution_settings(db: Session, business_id: int) -> Distri
 	return row
 
 
+def settings_for_read(db: Session, business_id: int) -> Dict[str, Any]:
+	"""خواندن تنظیمات بدون ایجاد رکورد در دیتابیس."""
+	row = get_distribution_settings_row(db, business_id)
+	if not row:
+		from app.services.distribution_phase3_service import extend_settings_dict
+
+		return extend_settings_dict(None)
+	return settings_to_dict(row)
+
+
 def settings_to_dict(s: DistributionBusinessSettings) -> Dict[str, Any]:
-	return {
-		"shared_routing_catalog": bool(s.shared_routing_catalog),
-		"require_visit_in_daily_plan": bool(s.require_visit_in_daily_plan),
-	}
+	from app.services.distribution_phase3_service import extend_settings_dict
+
+	return extend_settings_dict(s)
 
 
 def _use_strict_catalog_for_field_user(db: Session, business_id: int, ctx: AuthContext) -> bool:
@@ -87,14 +110,63 @@ def _use_strict_catalog_for_field_user(db: Session, business_id: int, ctx: AuthC
 	return not bool(s.shared_routing_catalog)
 
 
-def _assigned_route_ids_for_user(db: Session, business_id: int, user_id: int) -> List[int]:
-	rows = (
-		db.query(DistributionRouteAssignment.route_id)
-		.filter(DistributionRouteAssignment.business_id == business_id, DistributionRouteAssignment.user_id == user_id)
-		.distinct()
-		.all()
+def _assigned_route_ids_for_user(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	on_date: Optional[date] = None,
+) -> List[int]:
+	q = db.query(DistributionRouteAssignment.route_id).filter(
+		DistributionRouteAssignment.business_id == business_id,
+		DistributionRouteAssignment.user_id == user_id,
 	)
+	if on_date is not None:
+		q = q.filter(
+			DistributionRouteAssignment.valid_from <= on_date,
+			or_(DistributionRouteAssignment.valid_to.is_(None), DistributionRouteAssignment.valid_to >= on_date),
+		)
+	rows = q.distinct().all()
 	return [int(r[0]) for r in rows]
+
+
+def _validate_document_for_business(db: Session, business_id: int, document_id: int, person_id: Optional[int] = None) -> None:
+	doc = db.query(Document).filter(Document.id == document_id, Document.business_id == business_id).first()
+	if not doc:
+		raise ApiError("VALIDATION_ERROR", "document_id not found in this business", http_status=400)
+	if person_id is not None:
+		ex = doc.extra_info or {}
+		doc_person = ex.get("person_id")
+		if doc_person is not None and int(doc_person) != int(person_id):
+			raise ApiError("VALIDATION_ERROR", "document does not belong to this person", http_status=400)
+
+
+def _validate_return_lines(db: Session, business_id: int, lines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+	out: List[Dict[str, Any]] = []
+	for i, ln in enumerate(lines):
+		if not isinstance(ln, dict):
+			raise ApiError("VALIDATION_ERROR", f"lines[{i}] must be object", http_status=400)
+		pid = int(ln.get("product_id") or 0)
+		if pid <= 0:
+			raise ApiError("VALIDATION_ERROR", f"lines[{i}].product_id required", http_status=400)
+		product = db.query(Product).filter(Product.id == pid, Product.business_id == business_id).first()
+		if not product:
+			raise ApiError("NOT_FOUND", f"Product {pid} not found", http_status=404)
+		try:
+			qty = float(ln.get("quantity") or 0)
+		except (TypeError, ValueError):
+			raise ApiError("VALIDATION_ERROR", f"lines[{i}].quantity invalid", http_status=400) from None
+		if qty <= 0:
+			raise ApiError("VALIDATION_ERROR", f"lines[{i}].quantity must be positive", http_status=400)
+		out.append(
+			{
+				"product_id": pid,
+				"product_name": getattr(product, "name", None) or getattr(product, "title", None),
+				"quantity": qty,
+				"reason": (str(ln.get("reason")).strip() if ln.get("reason") else None),
+				"unit": (str(ln.get("unit")).strip() if ln.get("unit") else None),
+			}
+		)
+	return out
 
 
 def _ensure_route_allowed_for_strict(db: Session, business_id: int, ctx: AuthContext, route_id: int) -> None:
@@ -103,7 +175,7 @@ def _ensure_route_allowed_for_strict(db: Session, business_id: int, ctx: AuthCon
 	uid = ctx.get_user_id()
 	if uid is None:
 		return
-	if route_id not in _assigned_route_ids_for_user(db, business_id, uid):
+	if route_id not in _assigned_route_ids_for_user(db, business_id, uid, on_date=business_today(business_id)):
 		raise ApiError("FORBIDDEN", "مسیر به شما تخصیص داده نشده است.", http_status=403)
 
 
@@ -162,6 +234,10 @@ def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) 
 		"extra_info": v.extra_info,
 		"start_latitude": _num(getattr(v, "start_latitude", None)),
 		"start_longitude": _num(getattr(v, "start_longitude", None)),
+		"end_latitude": _num(getattr(v, "end_latitude", None)),
+		"end_longitude": _num(getattr(v, "end_longitude", None)),
+		"checklist_answers": getattr(v, "checklist_answers", None),
+		"shelf_photo_file_id": getattr(v, "shelf_photo_file_id", None),
 	}
 
 
@@ -173,7 +249,7 @@ def get_summary(db: Session, business_id: int, ctx: AuthContext) -> Dict[str, An
 	if scope_uid is not None:
 		vq = vq.filter(DistributionFieldVisit.user_id == scope_uid)
 
-	today = datetime.utcnow().date()
+	today = business_today(business_id)
 	start_today = datetime.combine(today, datetime.min.time())
 	end_today = datetime.combine(today, datetime.max.time())
 	visits_today = vq.filter(
@@ -205,7 +281,7 @@ def get_summary(db: Session, business_id: int, ctx: AuthContext) -> Dict[str, An
 	strict_cat = _use_strict_catalog_for_field_user(db, business_id, ctx)
 	uid_summary = ctx.get_user_id()
 	if strict_cat and uid_summary is not None:
-		assigned = _assigned_route_ids_for_user(db, business_id, uid_summary)
+		assigned = _assigned_route_ids_for_user(db, business_id, uid_summary, on_date=business_today(business_id))
 		if assigned:
 			routes_active = (
 				db.query(func.count(DistributionRoute.id))
@@ -230,7 +306,7 @@ def get_summary(db: Session, business_id: int, ctx: AuthContext) -> Dict[str, An
 		"completed_visits_today": completed_today,
 		"pending_return_requests": int(pending_returns or 0),
 		"active_routes": int(routes_active or 0),
-		"distribution_settings": settings_to_dict(get_or_create_distribution_settings(db, business_id)),
+		"distribution_settings": settings_for_read(db, business_id),
 	}
 
 
@@ -241,7 +317,7 @@ def list_territories(db: Session, business_id: int, ctx: AuthContext) -> List[Di
 		uid = ctx.get_user_id()
 		if uid is None:
 			return []
-		route_ids = _assigned_route_ids_for_user(db, business_id, uid)
+		route_ids = _assigned_route_ids_for_user(db, business_id, uid, on_date=business_today(business_id))
 		if not route_ids:
 			return []
 		tids = (
@@ -329,7 +405,7 @@ def list_routes(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[st
 		uid = ctx.get_user_id()
 		if uid is None:
 			return []
-		route_ids = _assigned_route_ids_for_user(db, business_id, uid)
+		route_ids = _assigned_route_ids_for_user(db, business_id, uid, on_date=business_today(business_id))
 		if not route_ids:
 			return []
 		q = q.filter(DistributionRoute.id.in_(route_ids))
@@ -375,6 +451,26 @@ def create_route(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict
 		tr = db.query(DistributionTerritory).filter(DistributionTerritory.id == row.territory_id).first()
 		tname = tr.name if tr else None
 	return route_to_dict(row, tname)
+
+
+def delete_route(db: Session, business_id: int, route_id: int) -> None:
+	_ensure_plugin(db, business_id)
+	row = db.query(DistributionRoute).filter(DistributionRoute.id == route_id, DistributionRoute.business_id == business_id).first()
+	if not row:
+		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	in_progress = (
+		db.query(DistributionFieldVisit.id)
+		.filter(
+			DistributionFieldVisit.business_id == business_id,
+			DistributionFieldVisit.route_id == route_id,
+			DistributionFieldVisit.status == "in_progress",
+		)
+		.first()
+	)
+	if in_progress:
+		raise ApiError("CONFLICT", "Cannot delete route with visits in progress", http_status=409)
+	db.delete(row)
+	db.commit()
 
 
 def update_route(db: Session, business_id: int, route_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -611,6 +707,7 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 				continue
 			person = db.query(Person).filter(Person.id == s.person_id).first()
 			pname = (person.alias_name or "").strip() if person else None
+			plats = person_coords(person) if person else (None, None)
 			items.append(
 				{
 					"route_id": route.id,
@@ -621,6 +718,8 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 					"person_id": s.person_id,
 					"person_name": pname or str(s.person_id),
 					"weekday": s.weekday,
+					"latitude": plats[0],
+					"longitude": plats[1],
 				}
 			)
 	items.sort(key=lambda x: (x["route_code"], x["sort_order"], x["person_id"]))
@@ -645,6 +744,7 @@ def start_visit(
 	business_id: int,
 	user_id: int,
 	payload: Dict[str, Any],
+	ctx: Optional[AuthContext] = None,
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	if _active_visit(db, business_id, user_id):
@@ -655,9 +755,10 @@ def start_visit(
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	today = business_today(business_id)
 	settings_sv = get_or_create_distribution_settings(db, business_id)
 	if settings_sv.require_visit_in_daily_plan:
-		_plan = get_daily_plan(db, business_id, user_id, datetime.utcnow().date())
+		_plan = get_daily_plan(db, business_id, user_id, today)
 		_allowed_pids = {int(it["person_id"]) for it in _plan["items"]}
 		if person_id not in _allowed_pids:
 			raise ApiError(
@@ -667,13 +768,45 @@ def start_visit(
 			)
 	route_id = payload.get("route_id")
 	route_stop_id = payload.get("route_stop_id")
+	if ctx is not None and route_id:
+		_ensure_route_allowed_for_strict(db, business_id, ctx, int(route_id))
+	if ctx is not None and _use_strict_catalog_for_field_user(db, business_id, ctx):
+		allowed_routes = _assigned_route_ids_for_user(db, business_id, user_id, on_date=today)
+		if not allowed_routes:
+			raise ApiError("FORBIDDEN", "هیچ مسیری به شما تخصیص داده نشده است.", http_status=403)
+		if route_id and int(route_id) not in allowed_routes:
+			raise ApiError("FORBIDDEN", "مسیر به شما تخصیص داده نشده است.", http_status=403)
+		if not route_id:
+			_plan = get_daily_plan(db, business_id, user_id, today)
+			plan_person_routes = {int(it["person_id"]): int(it["route_id"]) for it in _plan["items"]}
+			if person_id not in plan_person_routes:
+				raise ApiError(
+					"FORBIDDEN",
+					"این مشتری در مسیرهای تخصیص‌یافتهٔ شما برای امروز نیست.",
+					http_status=403,
+				)
 	_lat = payload.get("start_latitude")
 	_lng = payload.get("start_longitude")
 	_slat = float(_lat) if _lat is not None and str(_lat).strip() != "" else None
 	_slng = float(_lng) if _lng is not None and str(_lng).strip() != "" else None
+	from app.services.distribution_phase3_service import validate_geofence_on_start
+
+	geo = validate_geofence_on_start(
+		db,
+		business_id,
+		person_id,
+		_slat,
+		_slng,
+		allow_override=bool(payload.get("geofence_override")),
+	)
 	_extra = payload.get("extra_info")
 	if _extra is not None and not isinstance(_extra, dict):
 		raise ApiError("VALIDATION_ERROR", "extra_info must be an object", http_status=400)
+	_extra = dict(_extra) if isinstance(_extra, dict) else {}
+	if geo.get("geofence_warning"):
+		_extra["geofence_warning"] = geo["geofence_warning"]
+	if geo.get("distance_meters") is not None:
+		_extra["geofence_distance_meters"] = geo["distance_meters"]
 	v = DistributionFieldVisit(
 		business_id=business_id,
 		person_id=person_id,
@@ -685,7 +818,7 @@ def start_visit(
 		notes=payload.get("notes"),
 		start_latitude=_slat,
 		start_longitude=_slng,
-		extra_info=_extra if isinstance(_extra, dict) else None,
+		extra_info=_extra or None,
 	)
 	db.add(v)
 	db.commit()
@@ -711,16 +844,24 @@ def complete_visit(
 	if v.status != "in_progress":
 		raise ApiError("VALIDATION_ERROR", "Visit is not in progress", http_status=400)
 	outcome = str(payload.get("outcome") or "").strip()
-	if outcome not in ("order", "no_order", "cancelled"):
-		raise ApiError("VALIDATION_ERROR", "outcome must be order | no_order | cancelled", http_status=400)
+	if outcome not in ("order", "no_order"):
+		raise ApiError("VALIDATION_ERROR", "outcome must be order | no_order", http_status=400)
 	v.status = "completed"
 	v.ended_at = datetime.utcnow()
 	v.outcome = outcome
 	v.no_order_reason = (payload.get("no_order_reason") or None)
 	if payload.get("document_id"):
-		v.document_id = int(payload["document_id"])
+		doc_id = int(payload["document_id"])
+		_validate_document_for_business(db, business_id, doc_id, v.person_id)
+		v.document_id = doc_id
 	if payload.get("deal_id"):
-		v.deal_id = int(payload["deal_id"])
+		from adapters.db.models.crm import CrmDeal
+
+		deal_id = int(payload["deal_id"])
+		deal = db.query(CrmDeal).filter(CrmDeal.id == deal_id, CrmDeal.business_id == business_id).first()
+		if not deal:
+			raise ApiError("VALIDATION_ERROR", "deal_id not found in this business", http_status=400)
+		v.deal_id = deal_id
 	if payload.get("notes"):
 		v.notes = str(payload["notes"])
 	if "extra_info" in payload:
@@ -730,6 +871,30 @@ def complete_visit(
 		_base = dict(v.extra_info or {})
 		_base.update(_ex or {})
 		v.extra_info = _base
+	_elat = payload.get("end_latitude")
+	_elng = payload.get("end_longitude")
+	if _elat is not None and str(_elat).strip() != "":
+		v.end_latitude = float(_elat)
+	if _elng is not None and str(_elng).strip() != "":
+		v.end_longitude = float(_elng)
+	if "checklist_answers" in payload:
+		_ans = payload.get("checklist_answers")
+		if _ans is not None and not isinstance(_ans, (dict, list)):
+			raise ApiError("VALIDATION_ERROR", "checklist_answers must be object or list", http_status=400)
+		v.checklist_answers = _ans
+	if payload.get("shelf_photo_file_id"):
+		v.shelf_photo_file_id = int(payload["shelf_photo_file_id"])
+	van_lines = payload.get("van_sale_lines")
+	if van_lines and outcome == "order":
+		settings_v = get_or_create_distribution_settings(db, business_id)
+		if getattr(settings_v, "enable_van_sales", False) and isinstance(van_lines, list):
+			from app.services.distribution_phase3_service import record_van_sale_issue
+
+			wh_doc_id = record_van_sale_issue(db, business_id, user_id, v, van_lines)
+			if wh_doc_id:
+				_base = dict(v.extra_info or {})
+				_base["van_issue_warehouse_document_id"] = wh_doc_id
+				v.extra_info = _base
 	v.updated_at = datetime.utcnow()
 
 	summary_parts = [f"ویزیت میدانی — نتیجه: {outcome}"]
@@ -854,12 +1019,10 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
 	if not person:
 		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
-	lines = payload.get("lines") or []
-	if not isinstance(lines, list) or not lines:
+	raw_lines = payload.get("lines") or []
+	if not isinstance(raw_lines, list) or not raw_lines:
 		raise ApiError("VALIDATION_ERROR", "lines must be a non-empty list", http_status=400)
-	for _i, _ln in enumerate(lines):
-		if not isinstance(_ln, dict):
-			raise ApiError("VALIDATION_ERROR", f"lines[{_i}] must be object", http_status=400)
+	lines = _validate_return_lines(db, business_id, raw_lines)
 	vid = payload.get("visit_id")
 	row = DistributionReturnRequest(
 		business_id=business_id,
@@ -933,7 +1096,9 @@ def resolve_return_request(
 	row.resolved_by_user_id = resolver_user_id
 	row.resolved_at = datetime.utcnow()
 	if payload.get("resolved_document_id"):
-		row.resolved_document_id = int(payload["resolved_document_id"])
+		doc_id = int(payload["resolved_document_id"])
+		_validate_document_for_business(db, business_id, doc_id, row.person_id)
+		row.resolved_document_id = doc_id
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
@@ -952,6 +1117,18 @@ def update_distribution_settings(db: Session, business_id: int, payload: Dict[st
 		row.shared_routing_catalog = bool(payload["shared_routing_catalog"])
 	if "require_visit_in_daily_plan" in payload:
 		row.require_visit_in_daily_plan = bool(payload["require_visit_in_daily_plan"])
+	if "geofence_radius_meters" in payload:
+		row.geofence_radius_meters = max(0, int(payload["geofence_radius_meters"] or 0))
+	if "require_geofence" in payload:
+		row.require_geofence = bool(payload["require_geofence"])
+	if "visit_checklist_template" in payload:
+		tpl = payload["visit_checklist_template"]
+		row.visit_checklist_template = tpl if isinstance(tpl, list) else []
+	if "enable_van_sales" in payload:
+		row.enable_van_sales = bool(payload["enable_van_sales"])
+	if "default_source_warehouse_id" in payload:
+		v = payload.get("default_source_warehouse_id")
+		row.default_source_warehouse_id = int(v) if v else None
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)

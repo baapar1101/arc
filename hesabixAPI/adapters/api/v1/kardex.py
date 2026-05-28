@@ -8,6 +8,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, format_datetime_fields
 from app.core.permissions import require_business_access
 from adapters.api.v1.schemas import QueryInfo
+from adapters.api.v1.list_query_common import KardexListQueryBody, kardex_list_query_to_dict
 from app.services.kardex_service import list_kardex_lines
 from app.services.pdf.template_renderer import render_template
 from app.core.i18n import negotiate_locale
@@ -27,45 +28,13 @@ router = APIRouter(prefix="/kardex", tags=["گزارش‌ها", "انباردا�
 async def list_kardex_lines_endpoint(
     request: Request,
     business_id: int,
-    query_info: QueryInfo,
+    body: KardexListQueryBody,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    # Compose query dict from QueryInfo and additional parameters from body
-    query_dict: Dict[str, Any] = {
-        "take": query_info.take,
-        "skip": query_info.skip,
-        "sort_by": query_info.sort_by or "document_date",
-        "sort_desc": query_info.sort_desc,
-        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
-        "search": query_info.search,
-        "search_fields": query_info.search_fields,
-        "filters": query_info.filters,
-    }
-
-    # Additional params from body (DataTable additionalParams)
-    try:
-        body_json = await request.json()
-        if isinstance(body_json, dict):
-            for key in (
-                "from_date",
-                "to_date",
-                "fiscal_year_id",
-                "person_ids",
-                "product_ids",
-                "bank_account_ids",
-                "cash_register_ids",
-                "petty_cash_ids",
-                "account_ids",
-                "check_ids",
-                "warehouse_ids",
-                "match_mode",
-                "result_scope",
-            ):
-                if key in body_json and body_json.get(key) is not None:
-                    query_dict[key] = body_json.get(key)
-    except Exception:
-        pass
+    query_dict = kardex_list_query_to_dict(body, request=request)
+    if not query_dict.get("sort_by"):
+        query_dict["sort_by"] = "document_date"
 
     # کش نتایج لیست کاردکس (خطوط اسناد)
     cache = get_cache()

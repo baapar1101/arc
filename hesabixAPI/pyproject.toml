@@ -59,7 +59,8 @@ dev = [
 # Optional dependencies for Voice Chat (STT/TTS/VAD)
 # نصب این گروه باعث نصب وابستگی‌های سنگین (torch) می‌شود؛ بهتر است فقط در سرورهای voice فعال شود.
 voice = [
-  "webrtcvad>=2.0.10",
+  # webrtcvad اصلی برای Python 3.12+ wheel ندارد؛ webrtcvad-wheels همان import webrtcvad را می‌دهد.
+  "webrtcvad-wheels>=2.0.11.post1",
   "numpy>=1.26.0",
   "faster-whisper>=1.0.3",
   "TTS>=0.22.0",

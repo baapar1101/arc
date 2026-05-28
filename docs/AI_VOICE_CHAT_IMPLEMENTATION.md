@@ -72,6 +72,16 @@ sudo apt install -y libavformat-dev libavcodec-dev libavutil-dev libswresample-d
 pip install -e ".[voice]"
 ```
 
+### خطای `webrtcvad` روی آینه PyPI
+
+پکیج قدیمی `webrtcvad` برای Python 3.12 wheel ندارد و اغلب روی `p.mirror.hesabix.ir` نیست. پروژه از **`webrtcvad-wheels`** استفاده می‌کند.
+
+| راه‌حل | دستور |
+|--------|--------|
+| wheel آفلاین | `bash scripts/populate_voice_wheels_vendor.sh` → rsync به `hesabixAPI/vendor/voice_wheels/` |
+| آپلود به Nexus | `scripts/pypi_voice_packages.txt` |
+| PyPI مستقیم | `export VOICE_PIP_EXTRA_INDEX_URL=https://pypi.org/simple` |
+
 ## دیتابیس
 
 - جدول `ai_voice_interactions` (بازخورد + opt-in صوتی)

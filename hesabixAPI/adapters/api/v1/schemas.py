@@ -246,6 +246,129 @@ class QueryInfo(BaseModel):
 		return v
 
 
+class DocumentListQuery(QueryInfo):
+	"""
+	QueryInfo به‌همراه فیلترهای تخت رایج endpointهای لیست (سند، فاکتور، دریافت/پرداخت، …).
+	فیلدهای `filters[]` و فیلدهای تخت می‌توانند همزمان ارسال شوند.
+	"""
+
+	model_config = ConfigDict(
+		populate_by_name=True,
+		json_schema_extra={
+			"example": {
+				"take": 20,
+				"skip": 0,
+				"sort_by": "document_date",
+				"sort_desc": True,
+				"document_type": "invoice_sales",
+				"from_date": "2024-01-01",
+				"to_date": "2024-12-31",
+				"search": "تهران",
+				"filters": [
+					{"property": "description", "operator": "*", "value": "تهران"},
+				],
+			}
+		},
+	)
+
+	document_type: Optional[str] = Field(
+		default=None,
+		description="نوع سند (مثلاً invoice_sales، receipt، payment، transfer، expense)",
+	)
+	from_date: Optional[str] = Field(default=None, description="از تاریخ (ISO یا YYYY-MM-DD)")
+	to_date: Optional[str] = Field(default=None, description="تا تاریخ")
+	currency_id: Optional[int] = Field(default=None, description="شناسه ارز")
+	is_proforma: Optional[bool] = Field(default=None, description="پیش‌فاکتور (true) یا قطعی (false)")
+	fiscal_year_id: Optional[int] = Field(default=None, description="سال مالی؛ در صورت نبود از هدر X-Fiscal-Year-ID")
+	project_id: Optional[int] = Field(default=None, description="شناسه پروژه")
+	person_id: Optional[int] = Field(default=None, description="شناسه شخص / طرف‌حساب")
+	account_id: Optional[int] = Field(default=None, description="شناسه حساب (هزینه/درآمد)")
+	bank_account_id: Optional[int] = Field(default=None, description="فیلتر انتقال — حساب بانکی")
+	cash_register_id: Optional[int] = Field(default=None, description="فیلتر انتقال — صندوق")
+	petty_cash_id: Optional[int] = Field(default=None, description="فیلتر انتقال — تنخواه")
+	tag_ids: Optional[List[int]] = Field(default=None, description="برچسب‌های فاکتور (لیست شناسه)")
+	tag_match: Optional[str] = Field(default=None, description="any یا all برای tag_ids")
+	is_installment_sale: Optional[bool] = Field(default=None, description="فاکتور اقساطی")
+
+
+class InvoiceListQuery(DocumentListQuery):
+	"""همان DocumentListQuery با مثال Swagger مخصوص فاکتور."""
+
+	model_config = ConfigDict(
+		populate_by_name=True,
+		json_schema_extra={
+			"example": {
+				"take": 30,
+				"skip": 0,
+				"document_type": "invoice_sales",
+				"from_date": "2024-01-01",
+				"to_date": "2024-12-31",
+				"filters": [
+					{"property": "total_amount", "operator": ">=", "value": 5000000},
+				],
+			}
+		},
+	)
+
+
+class KardexListQuery(QueryInfo):
+	"""QueryInfo + فیلترهای تخت گزارش کاردکس."""
+
+	model_config = ConfigDict(
+		populate_by_name=True,
+		json_schema_extra={
+			"example": {
+				"take": 50,
+				"skip": 0,
+				"from_date": "2024-01-01",
+				"to_date": "2024-12-31",
+				"person_ids": [1, 2],
+				"match_mode": "any",
+			}
+		},
+	)
+
+	from_date: Optional[str] = None
+	to_date: Optional[str] = None
+	fiscal_year_id: Optional[int] = None
+	person_ids: Optional[List[int]] = None
+	product_ids: Optional[List[int]] = None
+	bank_account_ids: Optional[List[int]] = None
+	cash_register_ids: Optional[List[int]] = None
+	petty_cash_ids: Optional[List[int]] = None
+	account_ids: Optional[List[int]] = None
+	check_ids: Optional[List[int]] = None
+	warehouse_ids: Optional[List[int]] = None
+	match_mode: Optional[str] = Field(default="any", description="any | all")
+	result_scope: Optional[str] = Field(default="lines_matching", description="دامنه نتیجه کاردکس")
+	include_running_balance: Optional[bool] = False
+
+
+class WarehouseDocListQuery(QueryInfo):
+	"""QueryInfo + فیلترهای حواله انبار."""
+
+	model_config = ConfigDict(
+		populate_by_name=True,
+		json_schema_extra={
+			"example": {
+				"take": 20,
+				"skip": 0,
+				"doc_type": "issue",
+				"status": "posted",
+				"filters": [{"property": "code", "operator": "*", "value": "WH"}],
+			}
+		},
+	)
+
+	doc_type: Optional[Union[str, List[str]]] = None
+	status: Optional[Union[str, List[str]]] = None
+	warehouse_id: Optional[int] = None
+	warehouse_ids: Optional[List[int]] = None
+	from_date: Optional[str] = None
+	to_date: Optional[str] = None
+	fiscal_year_id: Optional[int] = None
+
+
 class CaptchaSolve(BaseModel):
 	captcha_id: str = Field(..., min_length=8)
 	captcha_code: str = Field(..., min_length=3, max_length=8)

@@ -16,6 +16,7 @@ from adapters.api.v1.schema_models.person import (
     PersonShareLinkCreateRequest,
 )
 from adapters.api.v1.schemas import QueryInfo, SuccessResponse
+from adapters.api.v1.list_query_common import QueryInfoBody, query_info_to_service_dict
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.core.cache import get_cache
 from app.core.auth_dependency import get_current_user, AuthContext
@@ -269,7 +270,7 @@ async def create_person_endpoint(
 async def get_persons_endpoint(
     request: Request,
     business_id: int,
-    query_info: QueryInfo,
+    query_info: QueryInfoBody,
     db: Session = Depends(get_db),
     auth_context: AuthContext = Depends(get_current_user),
 ):
@@ -294,16 +295,7 @@ async def get_persons_endpoint(
         if fiscal_year:
             fiscal_year_id = fiscal_year.id
     
-    query_dict = {
-        "take": query_info.take,
-        "skip": query_info.skip,
-        "sort_by": query_info.sort_by,
-        "sort_desc": query_info.sort_desc,
-        "sort": [s.model_dump() for s in query_info.sort] if query_info.sort else None,
-        "search": query_info.search,
-        "search_fields": query_info.search_fields,
-        "filters": query_info.filters,
-    }
+    query_dict = query_info_to_service_dict(query_info)
 
     # کش نتایج لیست اشخاص بر اساس پارامترها (با بهینه‌سازی tag-based)
     cache = get_cache()

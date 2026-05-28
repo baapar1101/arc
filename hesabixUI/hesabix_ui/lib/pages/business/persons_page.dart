@@ -263,10 +263,7 @@ class _PersonsPageState extends State<PersonsPage> {
               onTap: () {
                 if (person.id != null) {
                   context.go(
-                    '/business/${widget.businessId}/reports/kardex',
-                    extra: {
-                      'person_ids': [person.id]
-                    },
+                    '/business/${widget.businessId}/reports/kardex?person_ids=${person.id}',
                   );
                 }
               },
@@ -560,19 +557,13 @@ class _PersonsPageState extends State<PersonsPage> {
               onTap: (person) {
                 if (person is Person && person.id != null) {
                   context.go(
-                    '/business/${widget.businessId}/reports/kardex',
-                    extra: {
-                      'person_ids': [person.id]
-                    },
+                    '/business/${widget.businessId}/reports/kardex?person_ids=${person.id}',
                   );
                 } else if (person is Map<String, dynamic>) {
                   final id = person['id'];
                   if (id is int) {
                     context.go(
-                      '/business/${widget.businessId}/reports/kardex',
-                      extra: {
-                        'person_ids': [id]
-                      },
+                      '/business/${widget.businessId}/reports/kardex?person_ids=$id',
                     );
                   }
                 }

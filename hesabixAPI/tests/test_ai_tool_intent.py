@@ -35,3 +35,19 @@ def test_query_needs_knowledge_long_question():
     assert query_needs_knowledge(
         "لطفاً وضعیت موجودی انبار مرکزی و کالاهای کم‌موجود را با جزئیات بررسی کن"
     ) is True
+
+
+def test_select_tools_includes_write_on_add_keyword():
+    all_names = {
+        "query_business_data",
+        "create_person",
+        "update_person",
+        "search_invoices",
+    }
+    selected = select_tool_names(all_names, "یک مشتری به نام علی اضافه کن")
+    assert "create_person" in selected
+
+
+def test_detect_people_category():
+    cats = detect_categories("لیست مشتریان و گروه اشخاص")
+    assert "people" in cats

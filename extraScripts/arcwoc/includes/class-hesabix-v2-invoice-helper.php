@@ -102,6 +102,10 @@ class Hesabix_V2_Invoice_Helper
 		}
 		$sync['queue_items_per_cron_run'] = max(1, min(500, absint($sync['queue_items_per_cron_run'])));
 
+		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {
+			$sync = Hesabix_V2_Gateway_Fee_Service::normalize_sync_settings($sync);
+		}
+
 		return $sync;
 	}
 

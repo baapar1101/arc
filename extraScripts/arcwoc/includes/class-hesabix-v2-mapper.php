@@ -568,6 +568,8 @@ class Hesabix_V2_Mapper
 		$invoice_adjustments = array();
 		$shipping_adjustment_net = 0.0;
 		$shipping_adjustment_tax = 0.0;
+		$fee_adjustment_net = 0.0;
+		$fee_adjustment_tax = 0.0;
 		$db_service = new Hesabix_V2_DB_Service();
 		$warehouse_id = Hesabix_V2_Invoice_Warehouse_Service::resolve_warehouse_id_for_order($order);
 
@@ -695,72 +697,14 @@ class Hesabix_V2_Mapper
 
 		// کارمزد درگاه، هزینه‌های اضافی و سایر Feeهای ووکامرس
 		foreach ($order->get_items('fee') as $fee_item) {
-			if (!is_object($fee_item) || !method_exists($fee_item, 'get_total')) {
-				continue;
-			}
-			$fee_total = Hesabix_V2_Validation::sanitize_price((float) $fee_item->get_total() * $f);
-			$fee_tax = method_exists($fee_item, 'get_total_tax')
-				? Hesabix_V2_Validation::sanitize_price((float) $fee_item->get_total_tax() * $f)
-				: 0.0;
-			if (abs($fee_total) < 0.00001 && abs($fee_tax) < 0.00001) {
-				continue;
-			}
-
-			$fee_product_id = self::get_or_create_fee_product();
-			if (!$fee_product_id) {
-				Hesabix_V2_Log_Service::warning('Fee line skipped — could not resolve fee service product in Hesabix', array(
-					'order_id' => $order->get_id(),
-					'fee_name' => method_exists($fee_item, 'get_name') ? $fee_item->get_name() : '',
-				));
-				continue;
-			}
-
-			$fee_label = method_exists($fee_item, 'get_name') ? trim((string) $fee_item->get_name()) : '';
-			if ($fee_label === '') {
-				$fee_label = __('کارمزد / هزینه سفارش', 'hesabix-v2');
-			}
-
-			// کارمزد منفی ووکامرس: بدون unit_price منفی؛ با line_discount برای هم‌خوانی بهتر گزارش‌ها
-			if ($fee_total < 0) {
-				$line_extra = array(
-					'unit_price' => 0,
-					'line_discount' => Hesabix_V2_Validation::sanitize_price(-(float) $fee_total),
-					'tax_amount' => $fee_tax,
-					'line_total' => $fee_total + $fee_tax,
-					'unit' => 'عدد',
-					'unit_price_source' => 'base',
-					'discount_type' => 'amount',
-					'discount_value' => 0,
-					'tax_rate' => 0,
-					'movement' => 'out',
-					'wc_fee_label' => $fee_label,
-					'wc_fee_negative' => true,
-				);
-			} else {
-				$line_extra = array(
-					'unit_price' => $fee_total,
-					'line_discount' => 0,
-					'tax_amount' => $fee_tax,
-					'line_total' => $fee_total + $fee_tax,
-					'unit' => 'عدد',
-					'unit_price_source' => 'base',
-					'discount_type' => 'amount',
-					'discount_value' => 0,
-					'tax_rate' => 0,
-					'movement' => 'out',
-					'wc_fee_label' => $fee_label,
-				);
-			}
-
-			if ($warehouse_id !== null && $warehouse_id !== '') {
-				$line_extra['warehouse_id'] = (int) $warehouse_id;
-			}
-
-			$lines[] = array(
-				'product_id' => $fee_product_id,
-				'quantity' => 1,
-				'description' => sanitize_text_field(mb_substr($fee_label, 0, 500)),
-				'extra_info' => $line_extra,
+			Hesabix_V2_Gateway_Fee_Service::apply_wc_fee_item_to_invoice(
+				$order,
+				$fee_item,
+				$f,
+				$lines,
+				$invoice_adjustments,
+				$fee_adjustment_net,
+				$fee_adjustment_tax
 			);
 		}
 
@@ -769,11 +713,18 @@ class Hesabix_V2_Mapper
 		$order_discount = (float) $order->get_discount_total() * $f;
 
 		$target_net_rounded = (int) round($order_total, 0);
-		$lines_target_net_rounded = (int) round($order_total - $shipping_adjustment_net - $shipping_adjustment_tax, 0);
+		$lines_target_net_rounded = (int) round(
+			$order_total
+				- $shipping_adjustment_net
+				- $shipping_adjustment_tax
+				- $fee_adjustment_net
+				- $fee_adjustment_tax,
+			0
+		);
 		self::adjust_invoice_lines_rounding_to_order_net($lines, $lines_target_net_rounded, $order->get_id());
 
-		$gross = $order_total + $order_discount - $order_tax - $shipping_adjustment_net;
-		$header_tax_total = $order_tax - $shipping_adjustment_tax;
+		$gross = $order_total + $order_discount - $order_tax - $shipping_adjustment_net - $fee_adjustment_net;
+		$header_tax_total = $order_tax - $shipping_adjustment_tax - $fee_adjustment_tax;
 		if ($header_tax_total < 0) {
 			$header_tax_total = 0;
 		}
@@ -783,8 +734,8 @@ class Hesabix_V2_Mapper
 		$gross_r = (int) round($gross, 0);
 		$discount_r = (int) round($order_discount, 0);
 		$tax_r = (int) round($header_tax_total, 0);
-		$adj_net_r = (int) round($shipping_adjustment_net, 0);
-		$adj_tax_r = (int) round($shipping_adjustment_tax, 0);
+		$adj_net_r = (int) round($shipping_adjustment_net + $fee_adjustment_net, 0);
+		$adj_tax_r = (int) round($shipping_adjustment_tax + $fee_adjustment_tax, 0);
 		$from_header = $gross_r - $discount_r + $tax_r + $adj_net_r + $adj_tax_r;
 		$hdr_delta = $target_net_rounded - $from_header;
 		if ($hdr_delta !== 0) {
@@ -1005,6 +956,12 @@ class Hesabix_V2_Mapper
 			return apply_filters('hesabix_v2_invoice_payments', $payments, $order, $amount_factor);
 		}
 
+		$settlement_commission = 0.0;
+		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {
+			$settlement_commission = Hesabix_V2_Gateway_Fee_Service::resolve_settlement_commission($order, (float) $amount, $f);
+		}
+		$settlement_commission = (int) round((float) $settlement_commission, 0);
+
 		$date_paid = $order->get_date_paid();
 		if (is_string($payment_date_ymd) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $payment_date_ymd)) {
 			$time_part = $date_paid ? $date_paid->format('H:i:s.v') : current_time('H:i:s.v');
@@ -1029,7 +986,7 @@ class Hesabix_V2_Mapper
 		if ($destination === 'cash_register') {
 			$cash_id = get_option('hesabix_v2_default_cash_register_id', '');
 			if ($cash_id !== '' && $cash_id !== null && (int) $cash_id > 0) {
-				$payments[] = array(
+				$payment_row = array(
 					'type' => 'cash_register',
 					'transaction_type' => 'cash_register',
 					'cash_register_id' => (string) (int) $cash_id,
@@ -1037,6 +994,10 @@ class Hesabix_V2_Mapper
 					'transaction_date' => $transaction_date,
 					'description' => $desc,
 				);
+				if ($settlement_commission > 0) {
+					$payment_row['commission'] = $settlement_commission;
+				}
+				$payments[] = $payment_row;
 			} else {
 				Hesabix_V2_Log_Service::warning(
 					'Paid order: cash_register selected for invoice payments but no cash register configured.',
@@ -1046,7 +1007,7 @@ class Hesabix_V2_Mapper
 		} else {
 			$bank_id = get_option('hesabix_v2_default_bank_id', '');
 			if ($bank_id !== '' && $bank_id !== null) {
-				$payments[] = array(
+				$payment_row = array(
 					'type' => 'bank',
 					'transaction_type' => 'bank',
 					'bank_id' => (string) $bank_id,
@@ -1054,6 +1015,10 @@ class Hesabix_V2_Mapper
 					'transaction_date' => $transaction_date,
 					'description' => $desc,
 				);
+				if ($settlement_commission > 0) {
+					$payment_row['commission'] = $settlement_commission;
+				}
+				$payments[] = $payment_row;
 			} else {
 				Hesabix_V2_Log_Service::warning(
 					'Paid order: bank selected for invoice payments but no bank account configured.',
@@ -1644,6 +1609,23 @@ class Hesabix_V2_Mapper
 	 * @param array $res
 	 * @return array<int, array<string, mixed>>
 	 */
+	/**
+	 * @param array $res
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function extract_accounts_items_from_api_response_public($res)
+	{
+		return self::extract_accounts_items_from_api_response($res);
+	}
+
+	/**
+	 * @return int|null
+	 */
+	public static function get_or_create_fee_product_public()
+	{
+		return self::get_or_create_fee_product();
+	}
+
 	private static function extract_accounts_items_from_api_response($res)
 	{
 		if (!is_array($res)) {

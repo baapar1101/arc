@@ -22,6 +22,7 @@ from app.services.invoice_service import (
 	INVOICE_PRODUCTION,
 	INVOICE_WASTE,
 )
+from adapters.api.v1.list_query_common import WarehouseDocListQueryBody, warehouse_doc_list_to_dict
 from app.services.warehouse_service import (
 	apply_warehouse_documents_sort,
 	bulk_delete_warehouse_documents,
@@ -543,7 +544,7 @@ def update_warehouse_doc_line(
 def search_warehouse_docs(
 	request: Request,
 	business_id: int,
-	body: Dict[str, Any] = Body(default={}),
+	body: WarehouseDocListQueryBody,
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -551,33 +552,28 @@ def search_warehouse_docs(
 	if not ctx.can_read_section("inventory"):
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.read", http_status=403)
 	from app.core.cache import get_cache
+
+	body_dict = warehouse_doc_list_to_dict(body, request=request)
 	
 	# استخراج پارامترهای فیلتر برای tag
-	doc_type = body.get("doc_type")
+	doc_type = body_dict.get("doc_type")
 	if isinstance(doc_type, list) and doc_type:
 		doc_type = doc_type[0]  # برای tag فقط اولین نوع را می‌گیریم
 	elif not isinstance(doc_type, str):
 		doc_type = None
 	
-	status = body.get("status")
+	status = body_dict.get("status")
 	if isinstance(status, list) and status:
 		status = status[0]  # برای tag فقط اولین status را می‌گیریم
 	elif not isinstance(status, str):
 		status = None
 	
-	warehouse_id = body.get("warehouse_id")
-	warehouse_ids = body.get("warehouse_ids")
+	warehouse_id = body_dict.get("warehouse_id")
+	warehouse_ids = body_dict.get("warehouse_ids")
 	if not warehouse_id and isinstance(warehouse_ids, list) and warehouse_ids:
 		warehouse_id = warehouse_ids[0]  # برای tag فقط اولین انبار را می‌گیریم
 	
-	# دریافت fiscal_year_id از header یا body
-	fiscal_year_id = None
-	try:
-		fy_header = request.headers.get("X-Fiscal-Year-ID")
-		if fy_header:
-			fiscal_year_id = int(fy_header)
-	except Exception:
-		pass
+	fiscal_year_id = body_dict.get("fiscal_year_id")
 	
 	# کش نتایج جستجوی اسناد انبار
 	cache = get_cache()
@@ -587,7 +583,7 @@ def search_warehouse_docs(
 		import json, hashlib
 		key_payload = {
 			"business_id": business_id,
-			"query": body,
+			"query": body_dict,
 		}
 		key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
 		key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
@@ -596,12 +592,12 @@ def search_warehouse_docs(
 		if cached is not None:
 			return success_response(data=cached, request=request)
 	
-	q = warehouse_documents_filtered_query(db, business_id, body)
-	q = apply_warehouse_documents_sort(q, body)
+	q = warehouse_documents_filtered_query(db, business_id, body_dict)
+	q = apply_warehouse_documents_sort(q, body_dict)
 
 	# Pagination
-	take = int(body.get("take") or 20)
-	skip = int(body.get("skip") or 0)
+	take = int(body_dict.get("take") or 20)
+	skip = int(body_dict.get("skip") or 0)
 	total = q.count()
 	items = q.offset(skip).limit(take).all()
 	

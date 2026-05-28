@@ -166,7 +166,7 @@ String aiToolLabel(AppLocalizations l10n, String toolName, {String? toolKey}) {
     case 'aiToolListBasalamProductConflicts':
       return l10n.aiToolListBasalamProductConflicts;
     default:
-      return l10n.aiToolGeneric;
+      return _toolLabelFallbackFa[toolName] ?? l10n.aiToolGeneric;
   }
 }
 
@@ -252,9 +252,72 @@ String _toolNameToKey(String name) {
     'list_woocommerce_products': 'aiToolListWooCommerceProducts',
     'list_basalam_synced_invoices': 'aiToolListBasalamSyncedInvoices',
     'list_basalam_product_conflicts': 'aiToolListBasalamProductConflicts',
+    'batch_query_business_data': 'aiToolBatchQueryBusinessData',
+    'get_report': 'aiToolGetReport',
+    'search_categories': 'aiToolSearchCategories',
+    'list_person_groups': 'aiToolListPersonGroups',
+    'list_currencies': 'aiToolListCurrencies',
+    'delete_person': 'aiToolDeletePerson',
+    'create_product': 'aiToolCreateProduct',
+    'update_product': 'aiToolUpdateProduct',
+    'create_check': 'aiToolCreateCheck',
+    'create_transfer': 'aiToolCreateTransfer',
+    'create_expense_income': 'aiToolCreateExpenseIncome',
+    'update_invoice': 'aiToolUpdateInvoice',
+    'delete_invoice': 'aiToolDeleteInvoice',
+    'create_lead': 'aiToolCreateLead',
+    'execute_workflow': 'aiToolExecuteWorkflow',
+    'export_business_data': 'aiToolExportBusinessData',
+    'list_queryable_fields': 'aiToolListQueryableFields',
+    'list_available_reports': 'aiToolListAvailableReports',
+    'list_report_templates': 'aiToolListReportTemplates',
+    'get_report_template': 'aiToolGetReportTemplate',
+    'get_report_template_scope_catalog': 'aiToolGetReportTemplateScopeCatalog',
+    'set_default_report_template': 'aiToolSetDefaultReportTemplate',
+    'publish_report_template': 'aiToolPublishReportTemplate',
+    'list_marketplace_plugins': 'aiToolListMarketplacePlugins',
+    'list_business_plugins': 'aiToolListBusinessPlugins',
+    'get_basalam_overview': 'aiToolGetBasalamOverview',
+    'list_basalam_dead_letter': 'aiToolListBasalamDeadLetter',
+    'adjust_customer_club_points': 'aiToolAdjustCustomerClubPoints',
+    'recalculate_customer_club_rfm': 'aiToolRecalculateCustomerClubRfm',
+    'update_customer_club_settings': 'aiToolUpdateCustomerClubSettings',
   };
   return map[name] ?? 'aiToolGeneric';
 }
+
+const _toolLabelFallbackFa = <String, String>{
+  'batch_query_business_data': 'پرس‌وجوی دسته‌ای',
+  'get_report': 'گزارش یکپارچه',
+  'search_categories': 'جستجوی دسته‌بندی',
+  'list_person_groups': 'گروه‌های اشخاص',
+  'list_currencies': 'لیست ارزها',
+  'delete_person': 'حذف شخص',
+  'create_product': 'ایجاد کالا',
+  'update_product': 'ویرایش کالا',
+  'create_check': 'ثبت چک',
+  'create_transfer': 'ثبت انتقال',
+  'create_expense_income': 'ثبت هزینه/درآمد',
+  'update_invoice': 'ویرایش فاکتور',
+  'delete_invoice': 'حذف فاکتور',
+  'create_lead': 'ایجاد سرنخ CRM',
+  'execute_workflow': 'اجرای workflow',
+  'export_business_data': 'خروجی داده',
+  'list_queryable_fields': 'فیلدهای قابل جستجو',
+  'list_available_reports': 'فهرست گزارش‌های مجاز',
+  'list_report_templates': 'لیست قالب گزارش',
+  'get_report_template': 'جزئیات قالب گزارش',
+  'get_report_template_scope_catalog': 'کاتالوگ scope قالب',
+  'set_default_report_template': 'قالب پیش‌فرض',
+  'publish_report_template': 'انتشار قالب گزارش',
+  'list_marketplace_plugins': 'کاتالوگ افزونه‌ها',
+  'list_business_plugins': 'افزونه‌های کسب‌وکار',
+  'get_basalam_overview': 'خلاصه باسلام',
+  'list_basalam_dead_letter': 'خطاهای باسلام',
+  'adjust_customer_club_points': 'تنظیم امتیاز باشگاه',
+  'recalculate_customer_club_rfm': 'محاسبه مجدد RFM',
+  'update_customer_club_settings': 'تنظیمات باشگاه مشتری',
+};
 
 /// متن وضعیت استریم AI از phase/step.
 String aiStreamStatusLabel(

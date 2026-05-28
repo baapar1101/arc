@@ -12827,6 +12827,200 @@ class AppLocalizationsEn extends AppLocalizations {
       'Field distribution add-on is not active. Enable it from the marketplace.';
 
   @override
+  String get distributionPluginInactiveTitle =>
+      'Field distribution add-on is not active';
+
+  @override
+  String get distributionPluginInactiveMessage =>
+      'Activate or purchase this add-on from the marketplace to use routes, daily plans, field visits, and returns.';
+
+  @override
+  String get distributionPluginGoToMarketplace => 'Go to marketplace';
+
+  @override
+  String get distributionTabField => 'Field';
+
+  @override
+  String get distributionTabManage => 'Manage';
+
+  @override
+  String get distributionActiveVisitBanner => 'Visit in progress';
+
+  @override
+  String get distributionCancelVisit => 'Cancel visit';
+
+  @override
+  String get distributionCancelVisitConfirm => 'Cancel this visit?';
+
+  @override
+  String get distributionCreateSalesInvoice => 'Create sales invoice';
+
+  @override
+  String get distributionTerritoryCreate => 'New territory';
+
+  @override
+  String get distributionRouteCreate => 'New route';
+
+  @override
+  String get distributionRouteCode => 'Route code';
+
+  @override
+  String get distributionRouteName => 'Route name';
+
+  @override
+  String get distributionTerritoryCode => 'Territory code';
+
+  @override
+  String get distributionTerritoryName => 'Territory name';
+
+  @override
+  String get distributionAddStop => 'Add stop';
+
+  @override
+  String get distributionAssignVisitor => 'Assign visitor';
+
+  @override
+  String get distributionSelectPerson => 'Select customer';
+
+  @override
+  String get distributionSelectProduct => 'Select product';
+
+  @override
+  String get distributionReturnQuantity => 'Quantity';
+
+  @override
+  String get distributionReturnReason => 'Return reason';
+
+  @override
+  String get distributionReturnAddLine => 'Add line';
+
+  @override
+  String get distributionApproveReturn => 'Approve return';
+
+  @override
+  String get distributionRejectReturn => 'Reject return';
+
+  @override
+  String get distributionResolveReturnTitle => 'Resolve return request';
+
+  @override
+  String get distributionStatusInProgress => 'In progress';
+
+  @override
+  String get distributionStatusCompleted => 'Completed';
+
+  @override
+  String get distributionStatusCancelled => 'Cancelled';
+
+  @override
+  String get distributionWeekdayAny => 'Any day';
+
+  @override
+  String get distributionWeekdayLabel => 'Weekday';
+
+  @override
+  String get distributionSortOrder => 'Sort order';
+
+  @override
+  String get distributionTeamPlanUserId => 'Visitor user ID (supervisor)';
+
+  @override
+  String get distributionLocationCapturing => 'Getting location…';
+
+  @override
+  String get distributionLocationCaptured => 'Location recorded';
+
+  @override
+  String get distributionLocationSkipped => 'Location unavailable';
+
+  @override
+  String get distributionReportsVisitsTotal => 'Total visits';
+
+  @override
+  String get distributionReportsOutcomeBreakdown => 'Outcome breakdown';
+
+  @override
+  String get distributionReportsReturnsSummary => 'Returns';
+
+  @override
+  String get distributionDeleteRoute => 'Delete route';
+
+  @override
+  String get distributionDeleteRouteConfirm =>
+      'Delete this route? Stops and assignments will be removed.';
+
+  @override
+  String get distributionTabVan => 'Van';
+
+  @override
+  String get distributionTabTeamMap => 'Team map';
+
+  @override
+  String get distributionOptimizeRoute => 'Optimize order';
+
+  @override
+  String get distributionOfflinePending => 'Offline actions queued';
+
+  @override
+  String get distributionOfflineSync => 'Sync now';
+
+  @override
+  String get distributionOfflineSynced => 'Offline queue cleared';
+
+  @override
+  String get distributionGeofenceOverride => 'Record despite distance';
+
+  @override
+  String get distributionChecklistTitle => 'Visit checklist';
+
+  @override
+  String get distributionVanLoad => 'Load van';
+
+  @override
+  String get distributionVanStock => 'Van stock';
+
+  @override
+  String get distributionVanSaleLines => 'Van sale';
+
+  @override
+  String get distributionShelfPhoto => 'Shelf photo';
+
+  @override
+  String get distributionOpenInMaps => 'Open in maps';
+
+  @override
+  String get distributionSetPersonLocation => 'Customer map location';
+
+  @override
+  String get distributionSearchPlace => 'Search address or place';
+
+  @override
+  String get distributionLocationSaved => 'Customer location saved';
+
+  @override
+  String get distributionTapMapToSetLocation =>
+      'Tap the map to set the location';
+
+  @override
+  String get distributionUseCurrentLocation => 'Use my current location';
+
+  @override
+  String get distributionGeofenceRadius => 'Geofence radius (meters)';
+
+  @override
+  String get distributionRequireGeofence => 'Require on-site geofence';
+
+  @override
+  String get distributionEnableVanSales => 'Van sales';
+
+  @override
+  String get distributionEnableGeofence => 'Require geofence';
+
+  @override
+  String get distributionChecklistTemplateHint =>
+      'Template JSON array in settings API (id, label, required fields).';
+
+  @override
   String get distributionSettingsSubtitle =>
       'Routes, daily plan, field visits and returns';
 

@@ -34,6 +34,7 @@ from app.services.journal_ledger_service import get_journal_ledger_report
 from app.core.cache import get_cache
 from app.core.i18n import negotiate_locale
 from app.services.pdf.template_renderer import render_template, load_farsi_font_data_uris
+from adapters.api.v1.list_query_common import DocumentListQueryBody, document_list_query_to_dict
 from adapters.api.v1.schema_models.document import (
     CreateManualDocumentRequest,
     UpdateManualDocumentRequest,
@@ -52,60 +53,16 @@ router = APIRouter(tags=["حسابداری"])
 async def list_documents_endpoint(
     request: Request,
     business_id: int,
-    body: Dict[str, Any] = Body(...),
+    body: DocumentListQueryBody,
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    """
-    لیست اسناد حسابداری
-    
-    Body parameters:
-        - document_type: نوع سند (expense, income, receipt, payment, transfer, manual)
-        - fiscal_year_id: شناسه سال مالی
-        - from_date: از تاریخ (ISO format)
-        - to_date: تا تاریخ (ISO format)
-        - currency_id: شناسه ارز
-        - is_proforma: پیش‌فاکتور یا قطعی
-        - search: جستجو در کد سند و توضیحات
-        - sort_by: فیلد مرتب‌سازی (document_date, code, document_type, created_at)
-        - sort_desc: ترتیب نزولی (true/false)
-        - take: تعداد رکورد (1-1000)
-        - skip: تعداد رکورد صرف‌نظر شده
-    """
-    query_dict: Dict[str, Any] = {
-        "take": body.get("take", 50),
-        "skip": body.get("skip", 0),
-        "sort_by": body.get("sort_by", "document_date"),
-        "sort_desc": body.get("sort_desc", True),
-        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
-        "search": body.get("search"),
-    }
-
-    # فیلترهای اضافی
-    for key in [
-        "document_type",
-        "from_date",
-        "to_date",
-        "currency_id",
-        "is_proforma",
-        "project_id",
-        "person_id",
-        "search_fields",
-        "filters",
-    ]:
-        if key in body:
-            query_dict[key] = body[key]
-
-    # سال مالی: بدنهٔ درخواست اولویت دارد، سپس هدر
-    try:
-        if body.get("fiscal_year_id") is not None:
-            query_dict["fiscal_year_id"] = int(body["fiscal_year_id"])
-        else:
-            fy_header = request.headers.get("X-Fiscal-Year-ID")
-            if fy_header:
-                query_dict["fiscal_year_id"] = int(fy_header)
-    except Exception:
-        pass
+    """لیست اسناد حسابداری با QueryInfo و فیلترهای تخت (document_type، بازه تاریخ، …)."""
+    query_dict = document_list_query_to_dict(body, request=request)
+    if query_dict.get("sort_by") is None:
+        query_dict["sort_by"] = "document_date"
+    if "sort_desc" not in query_dict or query_dict.get("sort_desc") is None:
+        query_dict["sort_desc"] = True
 
     # کش نتایج لیست اسناد بر اساس پارامترها
     cache = get_cache()

@@ -1,0 +1,17 @@
+# بسته‌هایی که باید روی p.mirror.hesabix.ir (یا آینه داخلی) موجود باشند تا voice chat نصب شود.
+# پس از آپلود به Nexus، روی سرور: INSTALL_VOICE=Y bash scripts/ensure_voice_chat.sh
+webrtcvad-wheels
+numpy
+av
+faster-whisper
+ctranslate2
+onnxruntime
+tokenizers
+huggingface-hub
+TTS
+torch
+torchaudio
+soundfile
+librosa
+scipy
+cffi

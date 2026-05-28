@@ -618,6 +618,7 @@ app/services/voice/__init__.py
 app/services/voice/stt.py
 app/services/voice/tts.py
 app/services/voice/vad.py
+app/services/voice/webm_decode.py
 app/services/workflow/__init__.py
 app/services/workflow/action_registry.py
 app/services/workflow/dry_run.py
@@ -791,3 +792,5 @@ tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
 tests/test_stock_count.py
 tests/test_tax_key_material_service.py
+tests/test_voice_ws_helpers.py
+tests/test_webm_decode.py

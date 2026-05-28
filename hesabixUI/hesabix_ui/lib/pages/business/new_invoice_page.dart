@@ -65,6 +65,8 @@ class NewInvoicePage extends StatefulWidget {
   final CalendarController calendarController;
   /// پر کردن فرم با دادهٔ این فاکتور؛ ذخیره، سند تازه می‌سازد.
   final int? copyFromInvoiceId;
+  /// پیش‌انتخاب مشتری (مثلاً از ویزیت میدانی).
+  final int? initialPersonId;
 
   const NewInvoicePage({
     super.key,
@@ -72,6 +74,7 @@ class NewInvoicePage extends StatefulWidget {
     required this.authStore,
     required this.calendarController,
     this.copyFromInvoiceId,
+    this.initialPersonId,
   });
 
   @override
@@ -332,9 +335,34 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (widget.copyFromInvoiceId != null) {
         await _loadInvoiceCopyFrom(widget.copyFromInvoiceId!);
+      } else if (widget.initialPersonId != null) {
+        await _loadInitialPerson(widget.initialPersonId!);
       }
       await _applySavedInvoiceLineDiscountType();
     });
+  }
+
+  Future<void> _loadInitialPerson(int personId) async {
+    try {
+      final person = await PersonService().getPerson(personId);
+      if (!mounted || person.id == null) return;
+      setState(() {
+        _selectedCustomer = Customer(
+          id: person.id!,
+          name: person.aliasName,
+          code: person.code?.toString(),
+          phone: person.mobile ?? person.phone,
+          email: person.email,
+          address: person.address,
+          isActive: person.isActive,
+        );
+        _selectedInvoiceType = InvoiceType.sales;
+      });
+      await _loadCustomerBalance();
+      await _loadCustomerCreditIfNeeded();
+    } catch (_) {
+      // کاربر می‌تواند دستی انتخاب کند.
+    }
   }
 
   DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);

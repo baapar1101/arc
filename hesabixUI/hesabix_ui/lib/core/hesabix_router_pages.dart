@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 /// به موتور مسیر کمک می‌کند همان مسیر را با هویت پایدارتر بازشناسی کند.
 NoTransitionPage<void> hesabixNoTransitionPage(GoRouterState state, Widget child) {
   return NoTransitionPage<void>(
-    key: ValueKey<String>('hesabix_${state.uri.path}'),
+    // pageKey شامل query است؛ فقط path باعث می‌شد صفحاتی مثل کاردکس با تغییر فیلتر دوباره ساخته نشوند.
+    key: state.pageKey,
     name: state.name,
     child: child,
   );
