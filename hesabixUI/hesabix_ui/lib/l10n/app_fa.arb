@@ -3972,6 +3972,27 @@
   },
   "aiTracePlanningAction": "برنامه‌ریزی اقدام",
   "aiTracePlanningNext": "در حال برنامه‌ریزی مرحله بعد…",
+  "aiTraceRetrying": "تلاش مجدد ({attempt} از {max})…",
+  "@aiTraceRetrying": {
+    "placeholders": {
+      "attempt": { "type": "String" },
+      "max": { "type": "String" }
+    }
+  },
+  "aiTraceNeedMoreExploration": "نیاز به بررسی بیشتر قبل از پاسخ نهایی",
+  "aiReasoningPanelTitle": "استدلال و مراحل تحلیل",
+  "aiAnswerPanelTitle": "پاسخ نهایی",
+  "aiErrorRecoveryTitle": "خطا در دریافت پاسخ",
+  "aiErrorRecoveryRetry": "تلاش مجدد",
+  "aiErrorRecoveryDismiss": "بستن",
+  "aiConversationNavTitle": "فهرست پیام‌ها ({count})",
+  "@aiConversationNavTitle": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "aiConversationNavUser": "پیام شما",
+  "aiConversationNavAssistant": "پاسخ دستیار",
   "aiTraceRunningTool": "در حال {toolName}",
   "@aiTraceRunningTool": {
     "placeholders": { "toolName": { "type": "String" } }

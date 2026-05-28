@@ -86,6 +86,50 @@ class OpenAIProvider(AIProviderBase):
             )
         except ImportError:
             raise ImportError("openai package is required. Install it with: pip install openai")
+
+    def _raise_mapped_api_error(self, e: Exception, *, model: str) -> None:
+        from app.core.responses import ApiError
+
+        error_message = str(e)
+        el = error_message.lower()
+        if (
+            "max_model_len" in el
+            or "max_total_tokens" in el
+            or (
+                "max_tokens" in el
+                and ("cannot" in el or "greater than" in el or "exceed" in el or "invalid" in el)
+            )
+            or ("context length" in el and ("exceed" in el or "exceeds" in el))
+        ):
+            raise ApiError(
+                "AI_INVALID_MAX_TOKENS",
+                "مقدار «حداکثر توکن» در تنظیمات AI برای این سرویس بیش‌ازحد مجاز است. "
+                f"لطفاً مقدار را به عددی معقول (مثلاً ۴۰۰۰ تا {_MAX_SAFE_CHAT_OUTPUT_TOKENS}) کاهش دهید.",
+                http_status=400,
+            ) from e
+        if _is_openai_model_unavailable_error(error_message):
+            raise ApiError(
+                "MODEL_NOT_AVAILABLE",
+                f"مدل '{model}' در دسترس نیست. لطفاً مدل دیگری را در تنظیمات AI انتخاب کنید.",
+                http_status=400,
+            ) from e
+        if "api_key" in el or "authentication" in el:
+            raise ApiError(
+                "INVALID_API_KEY",
+                "API Key نامعتبر است. لطفاً API Key را در تنظیمات AI بررسی کنید.",
+                http_status=400,
+            ) from e
+        if "rate_limit" in el or "quota" in el:
+            raise ApiError(
+                "RATE_LIMIT_EXCEEDED",
+                "محدودیت استفاده از API رسیده است. لطفاً بعداً تلاش کنید.",
+                http_status=429,
+            ) from e
+        raise ApiError(
+            "AI_PROVIDER_ERROR",
+            f"خطا در ارتباط با AI Provider: {error_message}",
+            http_status=500,
+        ) from e
     
     def chat_completion(
         self,
@@ -97,15 +141,21 @@ class OpenAIProvider(AIProviderBase):
     ) -> Dict[str, Any]:
         """ارسال درخواست به OpenAI"""
         try:
+            from app.services.ai.ai_retry_policy import sync_retry_llm
+
             if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
                 max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
-            response = self.client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                tools=tools if tools else None
-            )
+
+            def _call():
+                return self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    tools=tools if tools else None,
+                )
+
+            response = sync_retry_llm(_call)
             
             message = response.choices[0].message
             usage = response.usage
@@ -132,50 +182,7 @@ class OpenAIProvider(AIProviderBase):
             return result
         except Exception as e:
             logger.error(f"OpenAI API error: {e}", exc_info=True)
-            # تبدیل خطاهای OpenAI به ApiError
-            error_message = str(e)
-            el = error_message.lower()
-            if (
-                "max_model_len" in el
-                or "max_total_tokens" in el
-                or ("max_tokens" in el and ("cannot" in el or "greater than" in el or "exceed" in el or "invalid" in el))
-                or ("context length" in el and ("exceed" in el or "exceeds" in el))
-            ):
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "AI_INVALID_MAX_TOKENS",
-                    "مقدار «حداکثر توکن» در تنظیمات AI برای این سرویس بیش‌ازحد مجاز است. "
-                    f"لطفاً مقدار را به عددی معقول (مثلاً ۴۰۰۰ تا {_MAX_SAFE_CHAT_OUTPUT_TOKENS}) کاهش دهید و دوباره تلاش کنید.",
-                    http_status=400
-                )
-            if _is_openai_model_unavailable_error(error_message):
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "MODEL_NOT_AVAILABLE",
-                    f"مدل '{model}' در دسترس نیست. لطفاً مدل دیگری را در تنظیمات AI انتخاب کنید.",
-                    http_status=400
-                )
-            elif "api_key" in error_message.lower() or "authentication" in error_message.lower():
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "INVALID_API_KEY",
-                    "API Key نامعتبر است. لطفاً API Key را در تنظیمات AI بررسی کنید.",
-                    http_status=400
-                )
-            elif "rate_limit" in error_message.lower() or "quota" in error_message.lower():
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "RATE_LIMIT_EXCEEDED",
-                    "محدودیت استفاده از API رسیده است. لطفاً بعداً تلاش کنید.",
-                    http_status=429
-                )
-            else:
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "AI_PROVIDER_ERROR",
-                    f"خطا در ارتباط با AI Provider: {error_message}",
-                    http_status=500
-                )
+            self._raise_mapped_api_error(e, model=model)
     
     def estimate_tokens(self, text: str) -> int:
         """تخمین تعداد توکن (تقریبی: 4 کاراکتر = 1 توکن)"""
@@ -191,17 +198,22 @@ class OpenAIProvider(AIProviderBase):
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به OpenAI به صورت streaming با async client"""
         try:
+            from app.services.ai.ai_retry_policy import async_retry_llm
+
             if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
                 max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
-            # استفاده از async client برای streaming
-            stream = await self.async_client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                tools=tools if tools else None,
-                stream=True
-            )
+
+            async def _open_stream():
+                return await self.async_client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    tools=tools if tools else None,
+                    stream=True,
+                )
+
+            stream = await async_retry_llm(_open_stream)
             
             accumulated_content = ""
             final_usage = None
@@ -307,50 +319,7 @@ class OpenAIProvider(AIProviderBase):
             
         except Exception as e:
             logger.error(f"OpenAI streaming API error: {e}", exc_info=True)
-            # تبدیل خطاهای OpenAI به ApiError
-            error_message = str(e)
-            el = error_message.lower()
-            if (
-                "max_model_len" in el
-                or "max_total_tokens" in el
-                or ("max_tokens" in el and ("cannot" in el or "greater than" in el or "exceed" in el or "invalid" in el))
-                or ("context length" in el and ("exceed" in el or "exceeds" in el))
-            ):
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "AI_INVALID_MAX_TOKENS",
-                    "مقدار «حداکثر توکن» در تنظیمات AI برای این سرویس بیش‌ازحد مجاز است. "
-                    f"لطفاً مقدار را به عددی معقول (مثلاً ۴۰۰۰ تا {_MAX_SAFE_CHAT_OUTPUT_TOKENS}) کاهش دهید و دوباره تلاش کنید.",
-                    http_status=400
-                )
-            if _is_openai_model_unavailable_error(error_message):
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "MODEL_NOT_AVAILABLE",
-                    f"مدل '{model}' در دسترس نیست. لطفاً مدل دیگری را در تنظیمات AI انتخاب کنید.",
-                    http_status=400
-                )
-            elif "api_key" in error_message.lower() or "authentication" in error_message.lower():
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "INVALID_API_KEY",
-                    "API Key نامعتبر است. لطفاً API Key را در تنظیمات AI بررسی کنید.",
-                    http_status=400
-                )
-            elif "rate_limit" in error_message.lower() or "quota" in error_message.lower():
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "RATE_LIMIT_EXCEEDED",
-                    "محدودیت استفاده از API رسیده است. لطفاً بعداً تلاش کنید.",
-                    http_status=429
-                )
-            else:
-                from app.core.responses import ApiError
-                raise ApiError(
-                    "AI_PROVIDER_ERROR",
-                    f"خطا در ارتباط با AI Provider: {error_message}",
-                    http_status=500
-                )
+            self._raise_mapped_api_error(e, model=model)
 
 
 def _openai_tools_to_anthropic(tools: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:

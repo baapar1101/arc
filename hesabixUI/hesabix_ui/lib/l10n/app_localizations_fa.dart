@@ -10153,6 +10153,41 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiTracePlanningNext => 'در حال برنامه‌ریزی مرحله بعد…';
 
   @override
+  String aiTraceRetrying(String attempt, String max) {
+    return 'تلاش مجدد ($attempt از $max)…';
+  }
+
+  @override
+  String get aiTraceNeedMoreExploration =>
+      'نیاز به بررسی بیشتر قبل از پاسخ نهایی';
+
+  @override
+  String get aiReasoningPanelTitle => 'استدلال و مراحل تحلیل';
+
+  @override
+  String get aiAnswerPanelTitle => 'پاسخ نهایی';
+
+  @override
+  String get aiErrorRecoveryTitle => 'خطا در دریافت پاسخ';
+
+  @override
+  String get aiErrorRecoveryRetry => 'تلاش مجدد';
+
+  @override
+  String get aiErrorRecoveryDismiss => 'بستن';
+
+  @override
+  String aiConversationNavTitle(int count) {
+    return 'فهرست پیام‌ها ($count)';
+  }
+
+  @override
+  String get aiConversationNavUser => 'پیام شما';
+
+  @override
+  String get aiConversationNavAssistant => 'پاسخ دستیار';
+
+  @override
   String aiTraceRunningTool(String toolName) {
     return 'در حال $toolName';
   }

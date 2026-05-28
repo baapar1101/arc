@@ -48,9 +48,12 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
     if event_type == "trace_step":
         data = {
             "type": "trace_step",
+            "trace_id": chunk.get("trace_id"),
             "step_id": chunk.get("step_id"),
             "kind": chunk.get("kind"),
             "state": chunk.get("state", "done"),
+            "layer": chunk.get("layer"),
+            "visibility": chunk.get("visibility"),
             "done": False,
         }
         for key in (
@@ -69,10 +72,22 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             "findings_count",
             "hypothesis",
             "confidence",
+            "retry_attempt",
         ):
             if chunk.get(key) is not None:
                 data[key] = chunk.get(key)
         return [data]
+
+    if event_type == "stream_error":
+        return [
+            {
+                "type": "error",
+                "error": chunk.get("error"),
+                "recoverable": chunk.get("recoverable", False),
+                "suggested_action": chunk.get("suggested_action"),
+                "done": False,
+            }
+        ]
 
     if event_type in ("tool_start", "tool_end"):
         data = {

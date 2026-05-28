@@ -3930,6 +3930,27 @@
   },
   "aiTracePlanningAction": "Planning action",
   "aiTracePlanningNext": "Planning next step…",
+  "aiTraceRetrying": "Retrying ({attempt} of {max})…",
+  "@aiTraceRetrying": {
+    "placeholders": {
+      "attempt": { "type": "String" },
+      "max": { "type": "String" }
+    }
+  },
+  "aiTraceNeedMoreExploration": "More analysis needed before final answer",
+  "aiReasoningPanelTitle": "Reasoning & analysis steps",
+  "aiAnswerPanelTitle": "Final answer",
+  "aiErrorRecoveryTitle": "Could not complete the response",
+  "aiErrorRecoveryRetry": "Try again",
+  "aiErrorRecoveryDismiss": "Dismiss",
+  "aiConversationNavTitle": "Messages ({count})",
+  "@aiConversationNavTitle": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "aiConversationNavUser": "Your message",
+  "aiConversationNavAssistant": "Assistant reply",
   "aiTraceRunningTool": "Running {toolName}",
   "@aiTraceRunningTool": {
     "placeholders": { "toolName": { "type": "String" } }

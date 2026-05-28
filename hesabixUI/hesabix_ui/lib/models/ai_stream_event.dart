@@ -28,6 +28,8 @@ class AIStreamChunk {
   final Object? functionResults;
   final List<AIAgentTraceStep>? agentTrace;
   final String? error;
+  final bool recoverable;
+  final String? suggestedAction;
 
   const AIStreamChunk({
     this.contentDelta,
@@ -44,14 +46,20 @@ class AIStreamChunk {
     this.functionResults,
     this.agentTrace,
     this.error,
+    this.recoverable = false,
+    this.suggestedAction,
   });
 }
 
 /// یک گام در زنجیرهٔ agent (نمایش تایم‌لاین).
 class AIAgentTraceStep {
+  final String? traceId;
   final String stepId;
   final String kind;
   final String state;
+  final String? layer;
+  final String? visibility;
+  final int? retryAttempt;
   final String? titleKey;
   final Map<String, dynamic>? titleParams;
   final String? bodyMarkdown;
@@ -70,9 +78,13 @@ class AIAgentTraceStep {
   final String? confidence;
 
   const AIAgentTraceStep({
+    this.traceId,
     required this.stepId,
     required this.kind,
     this.state = 'done',
+    this.layer,
+    this.visibility,
+    this.retryAttempt,
     this.titleKey,
     this.titleParams,
     this.bodyMarkdown,
@@ -92,6 +104,12 @@ class AIAgentTraceStep {
 
   bool get isActive => state == 'active';
   bool get isError => state == 'error';
+  bool get isReasoningLayer =>
+      layer == 'reasoning' ||
+      (layer == null &&
+          kind != 'answer' &&
+          kind != 'system');
+  bool get isAnswerLayer => layer == 'answer' || kind == 'answer';
 
   /// نمایش زمان اجرا به صورت خوانا
   String? get elapsedLabel {
@@ -105,9 +123,13 @@ class AIAgentTraceStep {
     final rawCitations = json['citations'];
     final rawRefs = json['entity_refs'];
     return AIAgentTraceStep(
+      traceId: json['trace_id'] as String?,
       stepId: json['step_id'] as String? ?? '',
       kind: json['kind'] as String? ?? 'plan',
       state: json['state'] as String? ?? 'done',
+      layer: json['layer'] as String?,
+      visibility: json['visibility'] as String?,
+      retryAttempt: json['retry_attempt'] as int?,
       titleKey: json['title_key'] as String?,
       titleParams: json['title_params'] is Map
           ? Map<String, dynamic>.from(json['title_params'] as Map)
@@ -136,9 +158,13 @@ class AIAgentTraceStep {
   }
 
   Map<String, dynamic> toJson() => {
+        if (traceId != null) 'trace_id': traceId,
         'step_id': stepId,
         'kind': kind,
         'state': state,
+        if (layer != null) 'layer': layer,
+        if (visibility != null) 'visibility': visibility,
+        if (retryAttempt != null) 'retry_attempt': retryAttempt,
         if (titleKey != null) 'title_key': titleKey,
         if (titleParams != null) 'title_params': titleParams,
         if (bodyMarkdown != null) 'body_markdown': bodyMarkdown,

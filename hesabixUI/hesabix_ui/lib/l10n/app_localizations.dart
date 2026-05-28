@@ -19062,6 +19062,26 @@ abstract class AppLocalizations {
   /// **'Planning next step…'**
   String get aiTracePlanningNext;
 
+  String aiTraceRetrying(String attempt, String max);
+
+  String get aiTraceNeedMoreExploration;
+
+  String get aiReasoningPanelTitle;
+
+  String get aiAnswerPanelTitle;
+
+  String get aiErrorRecoveryTitle;
+
+  String get aiErrorRecoveryRetry;
+
+  String get aiErrorRecoveryDismiss;
+
+  String aiConversationNavTitle(int count);
+
+  String get aiConversationNavUser;
+
+  String get aiConversationNavAssistant;
+
   /// No description provided for @aiTraceRunningTool.
   ///
   /// In en, this message translates to:

@@ -182,17 +182,24 @@ def format_memory_goal_hint_for_insights(
 
 def format_memory_for_prompt(db: Session, business_id: int, user_id: int) -> str:
     row = get_memory(db, business_id, user_id)
-    if not row:
-        return ""
-
     parts: List[str] = []
-    structured_block = structured_to_prompt_block(parse_structured(row.structured))
-    if structured_block:
-        parts.append(structured_block)
 
-    content = (row.content or "").strip()[:MAX_MEMORY_CHARS]
-    if content:
-        parts.append(content)
+    if row:
+        structured_block = structured_to_prompt_block(parse_structured(row.structured))
+        if structured_block:
+            parts.append(structured_block)
+        content = (row.content or "").strip()[:MAX_MEMORY_CHARS]
+        if content:
+            parts.append(content)
+
+    try:
+        from app.services.ai.ai_memory_item_service import format_memory_items_for_prompt
+
+        items_block = format_memory_items_for_prompt(db, business_id, user_id)
+        if items_block:
+            parts.append(items_block)
+    except Exception:
+        pass
 
     if not parts:
         return ""
@@ -201,6 +208,7 @@ def format_memory_for_prompt(db: Session, business_id: int, user_id: int) -> str
     return (
         "\n\n--- حافظهٔ ترجیحات کاربر (رعایت کن مگر خلاف دستور صریح باشد) ---\n"
         "حقایق پایدار از این بخش؛ اسناد طولانی در knowledge؛ دادهٔ لحظه‌ای با ابزار.\n"
+        "برای ویرایش دقیق از ابزارهای list_memory_items / upsert_memory_item / delete_memory_item.\n"
         f"{body}"
     )
 

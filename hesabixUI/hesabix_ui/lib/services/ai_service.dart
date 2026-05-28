@@ -443,13 +443,19 @@ class AIService {
       return null;
     }
 
-    if (data.containsKey('error') && (data['done'] as bool? ?? false)) {
+    final eventType = data['type'] as String?;
+
+    if (data.containsKey('error') &&
+        ((data['done'] as bool? ?? false) || eventType == 'error')) {
       final errorMessage = data['error'] as String? ?? 'خطای نامشخص';
       onError?.call(errorMessage);
-      return AIStreamChunk(error: errorMessage, done: true);
+      return AIStreamChunk(
+        error: errorMessage,
+        done: data['done'] as bool? ?? true,
+        recoverable: data['recoverable'] as bool? ?? false,
+        suggestedAction: data['suggested_action'] as String?,
+      );
     }
-
-    final eventType = data['type'] as String?;
     if (eventType == 'status') {
       return AIStreamChunk(
         statusEvent: AIStreamStatusEvent(

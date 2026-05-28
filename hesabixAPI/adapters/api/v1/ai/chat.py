@@ -1288,9 +1288,15 @@ async def _stream_message_response(
         # ارسال خطا به صورت SSE
         import traceback
         logger.error(f"Error in streaming response: {e}", exc_info=True)
+        from app.services.ai.ai_retry_policy import is_retryable_error
+
+        recoverable = is_retryable_error(e)
         error_data = {
+            "type": "error",
             "error": str(e),
-            "done": True
+            "recoverable": recoverable,
+            "suggested_action": "retry" if recoverable else "dismiss",
+            "done": True,
         }
         yield _sse_payload(error_data)
 

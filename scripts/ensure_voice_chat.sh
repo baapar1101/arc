@@ -28,8 +28,9 @@ Usage: ensure_voice_chat.sh [--update] [--non-interactive]
   INSTALL_VOICE     y/Y to install, n/N to skip (prompt if unset and not --non-interactive)
   APP_ROOT          default /opt/hesabix
   API_DIR           default ${APP_ROOT}/app/hesabixAPI
-  PIP_INDEX_URL              Hesabix mirror (default p.mirror.hesabix.ir)
-  VOICE_PIP_EXTRA_INDEX_URL  Optional PyPI fallback (e.g. https://pypi.org/simple)
+  PIP_INDEX_URL                   Hesabix mirror (default p.mirror.hesabix.ir)
+  VOICE_PIP_EXTRA_INDEX_URL       Optional extra PyPI index
+  VOICE_PIP_FALLBACK_INDEX_URL    Fallback when numpy needs legacy CPU wheel (default: pypi.devneeds.ir)
 EOF
 }
 
@@ -106,6 +107,49 @@ activate_venv() {
 }
 
 VOICE_WHEEL_DIR="${API_DIR}/vendor/voice_wheels"
+# آینهٔ ایرانی برای wheelهای numpy سازگار با CPU بدون x86-64-v2 (KVM قدیمی)
+VOICE_PIP_FALLBACK_INDEX_URL="${VOICE_PIP_FALLBACK_INDEX_URL:-https://pypi.devneeds.ir/simple/}"
+VOICE_PIP_FALLBACK_TRUSTED_HOST="${VOICE_PIP_FALLBACK_TRUSTED_HOST:-pypi.devneeds.ir}"
+VOICE_NUMPY_SPEC="${VOICE_NUMPY_SPEC:-numpy>=1.26.0,<2}"
+
+voice_numpy_import_ok() {
+  activate_venv || return 1
+  python3 -c "import numpy" 2>/dev/null
+}
+
+voice_numpy_needs_legacy_cpu_fix() {
+  activate_venv || return 1
+  local err
+  err=$(python3 -c "import numpy" 2>&1 || true)
+  echo "${err}" | grep -qE 'X86_V2|baseline optimizations'
+}
+
+ensure_voice_numpy_legacy_cpu() {
+  activate_venv || return 1
+  if voice_numpy_import_ok; then
+    return 0
+  fi
+  if ! voice_numpy_needs_legacy_cpu_fix; then
+    log_warn "numpy import failed (not an X86_V2 baseline issue)."
+    return 1
+  fi
+  log_warn "numpy wheel from ${PIP_INDEX_URL:-p.mirror.hesabix.ir} needs CPU x86-64-v2; reinstalling ${VOICE_NUMPY_SPEC} from ${VOICE_PIP_FALLBACK_INDEX_URL}"
+  if ! pip install --force-reinstall --no-cache-dir \
+    --index-url "${VOICE_PIP_FALLBACK_INDEX_URL}" \
+    --trusted-host "${VOICE_PIP_FALLBACK_TRUSTED_HOST}" \
+    "${VOICE_NUMPY_SPEC}"; then
+    log_warn "Failed to install ${VOICE_NUMPY_SPEC} from ${VOICE_PIP_FALLBACK_INDEX_URL}"
+    return 1
+  fi
+  if ! voice_numpy_import_ok; then
+    log_warn "numpy still not importable after legacy-CPU reinstall."
+    return 1
+  fi
+  local ver
+  ver=$(python3 -c "import numpy; print(numpy.__version__)")
+  log_ok "numpy ${ver} installed (compatible with this CPU)."
+  return 0
+}
 
 voice_python_ready() {
   activate_venv || return 1
@@ -202,7 +246,7 @@ install_webrtcvad_package() {
   log_warn "webrtcvad-wheels not found on ${PIP_INDEX_URL}."
   log_warn "Fix: (1) bash scripts/populate_voice_wheels_vendor.sh && rsync vendor/voice_wheels to server"
   log_warn "     (2) upload packages in scripts/pypi_voice_packages.txt to p.mirror"
-  log_warn "     (3) export VOICE_PIP_EXTRA_INDEX_URL=https://pypi.org/simple if PyPI is reachable"
+  log_warn "     (3) export VOICE_PIP_FALLBACK_INDEX_URL=https://pypi.devneeds.ir/simple/ for legacy CPU numpy"
   return 1
 }
 
@@ -223,21 +267,25 @@ install_voice_pip_extras() {
 
   log_info "Installing Python voice extras (pip install -e \".[voice]\") — may take several minutes..."
   if pip install --no-cache-dir "${shell_extra[@]}" -e ".[voice]"; then
+    ensure_voice_numpy_legacy_cpu || true
     log_ok "Voice Python dependencies installed."
     return 0
   fi
 
   log_warn "pip install -e \".[voice]\" failed; retrying core packages individually..."
   local pkg
-  for pkg in numpy av "faster-whisper>=1.0.3" "piper-tts>=1.3.0"; do
+  for pkg in "${VOICE_NUMPY_SPEC}" av "faster-whisper>=1.0.3" "piper-tts>=1.3.0"; do
     if ! pip install --no-cache-dir "${shell_extra[@]}" "${pkg}"; then
       log_warn "Failed to install: ${pkg}"
     fi
   done
   if pip install --no-cache-dir "${shell_extra[@]}" -e ".[voice]"; then
+    ensure_voice_numpy_legacy_cpu || true
     log_ok "Voice Python dependencies installed (staged)."
     return 0
   fi
+
+  ensure_voice_numpy_legacy_cpu || true
 
   log_warn "Voice install incomplete. See vendor/voice_wheels/README.md and scripts/pypi_voice_packages.txt"
   return 1
@@ -361,10 +409,19 @@ main() {
   if voice_python_ready 2>/dev/null; then
     log_ok "Voice Python stack already importable."
   else
-    install_voice_pip_extras || exit 1
-    if ! voice_python_ready 2>/dev/null; then
-      log_warn "Voice imports still failing after pip install."
-      exit 1
+    if ! voice_numpy_import_ok 2>/dev/null; then
+      ensure_voice_numpy_legacy_cpu || true
+    fi
+    if voice_python_ready 2>/dev/null; then
+      log_ok "Voice Python stack ready after numpy CPU fix."
+    else
+      install_voice_pip_extras || exit 1
+      ensure_voice_numpy_legacy_cpu || true
+      if ! voice_python_ready 2>/dev/null; then
+        log_warn "Voice imports still failing after pip install."
+        log_warn "Try: VOICE_PIP_FALLBACK_INDEX_URL=https://pypi.devneeds.ir/simple/ INSTALL_VOICE=Y $0 --non-interactive"
+        exit 1
+      fi
     fi
   fi
 

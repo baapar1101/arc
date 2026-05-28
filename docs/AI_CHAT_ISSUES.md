@@ -23,8 +23,9 @@
 ### DB همچنان sync
 - عملیات SQLAlchemy در `run_in_executor` اجرا می‌شود؛ migration به async DB در صورت نیاز مقیاس بالا.
 
-### بدون retry LLM
-- خطای گذرا / rate limit فقط به کلاینت برمی‌گردد.
+### ~~بدون retry LLM~~ (بهبود ۲۰۲۶-۰۵)
+- retry خودکار در `ai_retry_policy` + OpenAI provider (۳ بار، backoff)
+- trace `kind=system` + بنر بازیابی Flutter
 
 ### Anthropic / Local provider
 - map خطای ضعیف‌تر؛ Ollama tools ناقص در streaming.

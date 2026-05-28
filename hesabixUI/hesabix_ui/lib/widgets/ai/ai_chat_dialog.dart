@@ -25,6 +25,7 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_memory_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_knowledge_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_connectors_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
+import 'package:hesabix_ui/widgets/ai/ai_error_recovery_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_l10n.dart';
@@ -109,6 +110,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
   String _sessionSearch = '';
   Timer? _sessionSearchDebounce;
   List<Map<String, dynamic>> _attachments = [];
+  final List<GlobalKey> _messageKeys = [];
+  String? _streamErrorMessage;
+  bool _streamErrorRecoverable = false;
+  VoidCallback? _pendingStreamRetry;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
@@ -116,6 +121,15 @@ class _AIChatDialogState extends State<AIChatDialog> {
       !_messagesLoading && _messages.isEmpty && !_stream.isActive && !_sending;
 
   bool get _canUseAi => _availabilityInfo?['can_use'] as bool? ?? true;
+
+  void _syncMessageKeys() {
+    while (_messageKeys.length < _messages.length) {
+      _messageKeys.add(GlobalKey());
+    }
+    while (_messageKeys.length > _messages.length) {
+      _messageKeys.removeLast();
+    }
+  }
 
   String? get _aiBlockReason {
     if (_canUseAi) return null;
@@ -536,6 +550,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       setState(() {
         _messages = msgs;
         _messagesLoading = false;
+        _syncMessageKeys();
       });
       _scrollToBottom(force: true);
       await _checkAvailability();
@@ -1022,6 +1037,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     Stream<AIStreamChunk> Function(CancelToken cancelToken) streamFactory, {
     String errorLabel = 'پاسخ',
   }) async {
+    _pendingStreamRetry = () {
+      unawaited(_runAssistantStream(streamFactory, errorLabel: errorLabel));
+    };
     _streamCancelToken?.cancel('replaced');
     final cancelToken = CancelToken();
     _streamCancelToken = cancelToken;
@@ -1032,7 +1050,15 @@ class _AIChatDialogState extends State<AIChatDialog> {
       int? assistantMessageId;
 
       await for (final chunk in streamFactory(cancelToken)) {
-        if (chunk.error != null) return;
+        if (chunk.error != null) {
+          if (!mounted) return;
+          setState(() {
+            _streamErrorMessage = chunk.error;
+            _streamErrorRecoverable = chunk.recoverable;
+            _sending = false;
+          });
+          return;
+        }
         _stream.applyChunk(chunk, resolveToolLabel: _resolveToolLabel);
         if (chunk.contentDelta != null && chunk.contentDelta!.isNotEmpty) {
           accumulatedContent += chunk.contentDelta!;
@@ -1074,6 +1100,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
         );
         _stream.clear();
         _sending = false;
+        _streamErrorMessage = null;
+        _streamErrorRecoverable = false;
+        _syncMessageKeys();
       });
       _scrollToBottom(force: true);
       _scheduleSessionsRefreshForTitle();
@@ -1184,6 +1213,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       if (!mounted) return;
       setState(() {
         _messages = List<AIChatMessage>.from(_messages)..add(userMessage);
+        _syncMessageKeys();
       });
     }
 
@@ -1699,9 +1729,33 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                     ? _navigateToSubscription
                                     : null,
                               )
-                            : AIChatThreadView(
+                            : Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (_streamErrorMessage != null)
+                                  AIErrorRecoveryBanner(
+                                    message: _streamErrorMessage!,
+                                    recoverable: _streamErrorRecoverable,
+                                    onRetry: _streamErrorRecoverable &&
+                                            _pendingStreamRetry != null
+                                        ? () {
+                                            setState(() {
+                                              _streamErrorMessage = null;
+                                              _streamErrorRecoverable = false;
+                                            });
+                                            _pendingStreamRetry!();
+                                          }
+                                        : null,
+                                    onDismiss: () => setState(() {
+                                      _streamErrorMessage = null;
+                                      _streamErrorRecoverable = false;
+                                    }),
+                                  ),
+                                Expanded(
+                                  child: AIChatThreadView(
                                 key: ValueKey('thread-${_currentSession?.id}'),
                                 messages: _messages,
+                                messageKeys: _messageKeys,
                                 streamingContent: _stream.content,
                                 streamingToolActivities: _stream.toolActivities,
                                 streamingTraceSteps: _stream.traceSteps,
@@ -1749,7 +1803,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                     _scrollToBottom(force: true),
                                 onMessageLongPress: _showMessageActions,
                                 onAttach: _pickAndUploadAttachment,
-                              ),
+                                  ),
+                                ),
+                              ],
+                            ),
                       ),
                     ),
                   ],

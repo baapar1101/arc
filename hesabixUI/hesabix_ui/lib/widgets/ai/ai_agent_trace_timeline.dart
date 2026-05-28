@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_design.dart';
+import 'ai_thinking_scroll_box.dart';
 
 /// تایم‌لاین عمودی مراحل agent — پیش‌فرض جمع‌شده.
 class AIAgentTraceTimeline extends StatefulWidget {
@@ -146,6 +147,8 @@ class _TraceStepTileState extends State<_TraceStepTile> {
         return Icons.fact_check_outlined;
       case 'thought':
         return Icons.psychology_outlined;
+      case 'system':
+        return Icons.refresh_rounded;
       case 'plan':
       case 'plan_next':
         return Icons.route_outlined;
@@ -370,27 +373,29 @@ class _BodyContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = MarkdownBody(
-      data: body,
-      selectable: true,
-      styleSheet: MarkdownStyleSheet(
-        p: theme.textTheme.bodySmall?.copyWith(
-          color: scheme.onSurfaceVariant,
-          height: 1.5,
+    if (kind != 'thought' && kind != 'explored' && kind != 'system') {
+      return MarkdownBody(
+        data: body,
+        selectable: true,
+        styleSheet: MarkdownStyleSheet(
+          p: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            height: 1.5,
+          ),
+          listBullet: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
         ),
-        listBullet: theme.textTheme.bodySmall?.copyWith(
-          color: scheme.onSurfaceVariant,
-        ),
-      ),
-    );
-    if (kind != 'thought' && kind != 'explored') {
-      return content;
+      );
     }
-    final accent = kind == 'thought' ? scheme.primary : scheme.secondary;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: AIChatDesign.subtlePanel(theme, accent: accent),
-      child: content,
+    final accent = kind == 'thought' || kind == 'system'
+        ? scheme.primary
+        : scheme.secondary;
+    return AIThinkingScrollBox(
+      markdown: body,
+      theme: theme,
+      scheme: scheme,
+      accent: accent,
     );
   }
 }

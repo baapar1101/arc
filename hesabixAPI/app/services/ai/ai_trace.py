@@ -4,11 +4,21 @@ Agent trace — زنجیرهٔ مراحل قابل نمایش برای کارب�
 from __future__ import annotations
 
 import json
+import uuid
 from typing import Any, Dict, List, Optional
 
 from app.services.ai.ai_tool_keys import tool_label_fa, tool_l10n_key
 
 TRACE_AGENT_KEY = "_agent_trace"
+TRACE_REASONING_KEY = "_reasoning_trace"
+
+# لایهٔ نمایش / ذخیره
+TRACE_LAYER_REASONING = "reasoning"
+TRACE_LAYER_ANSWER = "answer"
+TRACE_LAYER_SYSTEM = "system"
+
+TRACE_VISIBILITY_USER = "user"
+TRACE_VISIBILITY_INTERNAL = "internal"
 
 # نگاشت step آماده‌سازی context به کلید l10n
 CONTEXT_STEP_TITLE_KEYS: Dict[str, str] = {
@@ -20,8 +30,21 @@ CONTEXT_STEP_TITLE_KEYS: Dict[str, str] = {
     "loading_connectors": "aiStatusLoadingConnectors",
 }
 
-TraceKind = str  # context | explore | explored | thought | plan | narrative | tool | observation | plan_next | answer
+TraceKind = str  # context | explore | explored | thought | plan | narrative | tool | observation | plan_next | answer | system
 TraceState = str  # active | done | error
+TraceLayer = str  # reasoning | answer | system
+
+
+def new_trace_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
+def layer_for_kind(kind: TraceKind) -> TraceLayer:
+    if kind == "answer":
+        return TRACE_LAYER_ANSWER
+    if kind == "system":
+        return TRACE_LAYER_SYSTEM
+    return TRACE_LAYER_REASONING
 
 
 def trace_step(
@@ -44,13 +67,23 @@ def trace_step(
     findings_count: Optional[int] = None,
     hypothesis: Optional[str] = None,
     confidence: Optional[str] = None,
+    layer: Optional[TraceLayer] = None,
+    trace_id: Optional[str] = None,
+    visibility: str = TRACE_VISIBILITY_USER,
+    retry_attempt: Optional[int] = None,
 ) -> Dict[str, Any]:
+    resolved_layer = layer or layer_for_kind(kind)
     payload: Dict[str, Any] = {
         "event": "trace_step",
+        "trace_id": trace_id or new_trace_id(),
         "step_id": step_id,
         "kind": kind,
         "state": state,
+        "layer": resolved_layer,
+        "visibility": visibility,
     }
+    if retry_attempt is not None:
+        payload["retry_attempt"] = retry_attempt
     if title_key:
         payload["title_key"] = title_key
     if title_params:
@@ -303,6 +336,19 @@ def extract_citations_from_result(result: Any) -> List[str]:
     return citations
 
 
+def split_trace_layers(
+    trace_steps: List[Dict[str, Any]],
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """جداسازی trace استدلال از trace کامل برای ذخیره."""
+    reasoning: List[Dict[str, Any]] = []
+    for step in trace_steps:
+        layer = step.get("layer") or layer_for_kind(step.get("kind", ""))
+        if layer == TRACE_LAYER_ANSWER:
+            continue
+        reasoning.append(step)
+    return trace_steps, reasoning
+
+
 def merge_trace_into_function_results(
     function_results: Optional[Dict[str, Any]],
     trace_steps: List[Dict[str, Any]],
@@ -310,6 +356,9 @@ def merge_trace_into_function_results(
     merged = dict(function_results or {})
     if trace_steps:
         merged[TRACE_AGENT_KEY] = trace_steps
+        _, reasoning = split_trace_layers(trace_steps)
+        if reasoning:
+            merged[TRACE_REASONING_KEY] = reasoning
     return merged
 
 

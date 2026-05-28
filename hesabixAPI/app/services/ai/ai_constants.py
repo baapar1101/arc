@@ -50,6 +50,14 @@ TOOL_CACHE_MAX_ENTRIES = 200
 # حداقل طول سوال برای فعال‌سازی planning step
 PLANNING_STEP_MIN_CHARS = 30
 
+# Retry LLM
+MAX_LLM_RETRIES = 3
+
+# حافظه item-based (v2)
+MAX_MEMORY_ITEMS_PER_USER = 200
+MAX_MEMORY_ITEM_CONTENT_CHARS = 2048
+MEMORY_AUTO_APPROVE_CATEGORIES = frozenset({"fact", "term", "preference"})
+
 # Exploration mode
 EXPLORATION_COMPLEXITY_ITERATIONS: dict[str, int] = {
     "simple": 4,

@@ -398,6 +398,13 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       return l10n.aiTracePlanningAction;
     case 'aiTracePlanningNext':
       return l10n.aiTracePlanningNext;
+    case 'aiTraceRetrying':
+      return l10n.aiTraceRetrying(
+        params['attempt'] as String? ?? '1',
+        params['max'] as String? ?? '3',
+      );
+    case 'aiTraceNeedMoreExploration':
+      return l10n.aiTraceNeedMoreExploration;
     case 'aiTraceRunningTool':
       final name = params['toolName'] as String? ??
           aiToolLabel(l10n, step.tool ?? '', toolKey: step.toolKey);

@@ -28,10 +28,10 @@ from app.services.warehouse_service import create_manual_warehouse_document, get
 
 
 def extend_settings_dict(row: Any) -> Dict[str, Any]:
-	base = dist_svc.settings_to_dict(row) if row else {}
 	if not row:
 		return {
-			**base,
+			"shared_routing_catalog": False,
+			"require_visit_in_daily_plan": False,
 			"geofence_radius_meters": 0,
 			"require_geofence": False,
 			"visit_checklist_template": [],
@@ -39,7 +39,8 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 			"default_source_warehouse_id": None,
 		}
 	return {
-		**base,
+		"shared_routing_catalog": bool(row.shared_routing_catalog),
+		"require_visit_in_daily_plan": bool(row.require_visit_in_daily_plan),
 		"geofence_radius_meters": int(getattr(row, "geofence_radius_meters", 0) or 0),
 		"require_geofence": bool(getattr(row, "require_geofence", False)),
 		"visit_checklist_template": getattr(row, "visit_checklist_template", None) or [],

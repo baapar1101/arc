@@ -10,6 +10,12 @@ from app.services.ai.ai_memory_service import (
     memory_to_dict,
     upsert_memory,
 )
+from app.services.ai.ai_memory_item_service import (
+    list_memory_items,
+    memory_item_to_dict,
+    soft_delete_memory_item,
+    upsert_memory_item,
+)
 from app.services.ai.function_registry import AIRole, AIFunction
 
 if TYPE_CHECKING:
@@ -139,5 +145,138 @@ def register_memory_functions(registry: "AIFunctionRegistry") -> None:
             is_readonly=False,
             requires_approval=True,
             risk_level="medium",
+        )
+    )
+
+    def list_memory_items_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from sqlalchemy.orm import Session
+
+        db: Session = context["db"]
+        business_id = int(args.get("business_id") or context.get("business_id"))
+        user_id = context["user_context"].get_user_id()
+        category = args.get("category")
+        limit = int(args.get("limit") or 40)
+        rows = list_memory_items(
+            db, business_id, user_id, category=category, limit=limit
+        )
+        return {
+            "items": [memory_item_to_dict(r) for r in rows],
+            "count": len(rows),
+        }
+
+    def upsert_memory_item_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from sqlalchemy.orm import Session
+
+        db: Session = context["db"]
+        business_id = int(args.get("business_id") or context.get("business_id"))
+        user_id = context["user_context"].get_user_id()
+        category = str(args.get("category") or "fact").strip().lower()
+        content = str(args.get("content") or "").strip()
+        if not content:
+            raise ValueError("پارامتر content الزامی است")
+        row = upsert_memory_item(
+            db,
+            business_id,
+            user_id,
+            item_key=args.get("item_key"),
+            category=category,
+            content=content,
+            structured=args.get("structured") if isinstance(args.get("structured"), dict) else None,
+            source="assistant",
+            confidence=args.get("confidence"),
+        )
+        return {"success": True, "item": memory_item_to_dict(row)}
+
+    def delete_memory_item_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from sqlalchemy.orm import Session
+
+        db: Session = context["db"]
+        business_id = int(args.get("business_id") or context.get("business_id"))
+        user_id = context["user_context"].get_user_id()
+        ok = soft_delete_memory_item(
+            db,
+            business_id,
+            user_id,
+            item_id=args.get("item_id"),
+            item_key=args.get("item_key"),
+        )
+        if not ok:
+            raise ValueError("آیتم حافظه یافت نشد")
+        return {"success": True, "deleted": True}
+
+    registry.register(
+        AIFunction(
+            name="list_memory_items",
+            description="فهرست آیتم‌های حافظهٔ بلندمدت (ترجیحات، اصطلاحات، حقایق).",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "business_id": {"type": "integer"},
+                    "category": {
+                        "type": "string",
+                        "enum": ["fact", "term", "preference", "goal", "hint"],
+                    },
+                    "limit": {"type": "integer", "description": "حداکثر ۵۰"},
+                },
+            },
+            handler=create_handler(list_memory_items_handler),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=[],
+            category="memory",
+            is_readonly=True,
+        )
+    )
+
+    registry.register(
+        AIFunction(
+            name="upsert_memory_item",
+            description=(
+                "ذخیره یا به‌روزرسانی یک آیتم حافظه (کلید یکتا). "
+                "برای fact/term/preference بدون تأیید کاربر. goal نیاز تأیید دارد."
+            ),
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "item_key": {"type": "string", "description": "کلید یکتا (اختیاری)"},
+                    "category": {
+                        "type": "string",
+                        "enum": ["fact", "term", "preference", "goal", "hint"],
+                    },
+                    "content": {"type": "string"},
+                    "structured": {"type": "object"},
+                    "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "business_id": {"type": "integer"},
+                },
+                "required": ["content"],
+            },
+            handler=create_handler(upsert_memory_item_handler),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=[],
+            category="memory",
+            is_readonly=False,
+            requires_approval=False,
+            risk_level="safe",
+        )
+    )
+
+    registry.register(
+        AIFunction(
+            name="delete_memory_item",
+            description="حذف نرم یک آیتم حافظه با item_id یا item_key.",
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "item_id": {"type": "integer"},
+                    "item_key": {"type": "string"},
+                    "business_id": {"type": "integer"},
+                },
+            },
+            handler=create_handler(delete_memory_item_handler),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=[],
+            category="memory",
+            is_readonly=False,
+            requires_approval=False,
+            risk_level="safe",
         )
     )

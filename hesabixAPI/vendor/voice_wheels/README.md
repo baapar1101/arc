@@ -25,6 +25,7 @@ INSTALL_VOICE=Y bash scripts/ensure_voice_chat.sh --non-interactive
 ## روش ۳ — ایندکس کمکی (اگر سرور به PyPI دسترسی دارد)
 
 ```bash
+export VOICE_PIP_FALLBACK_INDEX_URL=https://pypi.devneeds.ir/simple/
 export VOICE_PIP_EXTRA_INDEX_URL=https://pypi.org/simple
 INSTALL_VOICE=Y bash scripts/ensure_voice_chat.sh
 ```

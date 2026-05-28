@@ -10209,6 +10209,41 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiTracePlanningNext => 'Planning next step…';
 
   @override
+  String aiTraceRetrying(String attempt, String max) {
+    return 'Retrying ($attempt of $max)…';
+  }
+
+  @override
+  String get aiTraceNeedMoreExploration =>
+      'More analysis needed before final answer';
+
+  @override
+  String get aiReasoningPanelTitle => 'Reasoning & analysis steps';
+
+  @override
+  String get aiAnswerPanelTitle => 'Final answer';
+
+  @override
+  String get aiErrorRecoveryTitle => 'Could not complete the response';
+
+  @override
+  String get aiErrorRecoveryRetry => 'Try again';
+
+  @override
+  String get aiErrorRecoveryDismiss => 'Dismiss';
+
+  @override
+  String aiConversationNavTitle(int count) {
+    return 'Messages ($count)';
+  }
+
+  @override
+  String get aiConversationNavUser => 'Your message';
+
+  @override
+  String get aiConversationNavAssistant => 'Assistant reply';
+
+  @override
   String aiTraceRunningTool(String toolName) {
     return 'Running $toolName';
   }

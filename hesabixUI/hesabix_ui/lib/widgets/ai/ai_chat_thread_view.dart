@@ -6,13 +6,13 @@ import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
-import 'ai_agent_trace_timeline.dart';
+import 'ai_conversation_nav_sheet.dart';
+import 'ai_conversation_rail.dart';
+import 'ai_reasoning_panel.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_message_body.dart';
 import 'ai_chat_message_actions.dart';
 import 'ai_chat_context_bar.dart';
-import 'ai_chat_context_meter.dart';
-
 typedef MessageActionCallback = void Function(AIChatMessage message);
 
 class AIChatThreadView extends StatelessWidget {
@@ -54,6 +54,7 @@ class AIChatThreadView extends StatelessWidget {
   final double? contextUsageRatio;
   final double? contextUsagePercent;
   final bool contextHistorySummarized;
+  final List<GlobalKey>? messageKeys;
 
   const AIChatThreadView({
     super.key,
@@ -95,7 +96,120 @@ class AIChatThreadView extends StatelessWidget {
     this.contextUsageRatio,
     this.contextUsagePercent,
     this.contextHistorySummarized = false,
+    this.messageKeys,
   });
+
+  Widget _buildMessageList(BuildContext context) {
+    return ListView.builder(
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        AIChatDesign.showConversationRail(context) ? 40 : 16,
+        8,
+      ),
+      itemCount: messages.length +
+          ((streamingContent != null || streamingTraceSteps.isNotEmpty) ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index < messages.length) {
+          final rowKey =
+              messageKeys != null && index < messageKeys!.length
+                  ? messageKeys![index]
+                  : null;
+          return KeyedSubtree(
+            key: rowKey,
+            child: _MessageRow(
+              message: messages[index],
+              formatTime: formatTime,
+              onLongPress: () => onMessageLongPress(messages[index]),
+              onCopy: () => onCopyMessage(messages[index].content),
+              onFeedback: messages[index].id != null
+                  ? (r) => onFeedback(messages[index], r)
+                  : null,
+              feedbackRating: messages[index].id != null
+                  ? messageFeedbackRatings[messages[index].id!]
+                  : null,
+              onRegenerate: messages[index].id != null &&
+                      messages[index].id == lastAssistantMessageId &&
+                      messages[index].role == MessageRole.assistant
+                  ? onRegenerateLast
+                  : null,
+            ),
+          );
+        }
+        return _StreamingRow(
+          content: streamingContent ?? '',
+          toolActivities: streamingToolActivities,
+          traceSteps: streamingTraceSteps,
+          statusPhase: streamingStatusPhase,
+          statusStep: streamingStatusStep,
+          iteration: streamingIteration,
+          maxIterations: streamingMaxIterations,
+          elapsedSeconds: streamingElapsedSeconds,
+          formatTime: formatTime(streamingTimestamp),
+        );
+      },
+    );
+  }
+
+  Widget _buildMessageStack(BuildContext context) {
+    if (messagesLoading) {
+      return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+    }
+
+    final canSync = messageKeys != null &&
+        messageKeys!.length == messages.length &&
+        messages.isNotEmpty;
+
+    Widget stackContent(int activeIndex, void Function(int) jumpToIndex) {
+      return Stack(
+        children: [
+          _buildMessageList(context),
+          if (showScrollToBottom)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 12,
+              child: Center(child: _ScrollFab(onPressed: onScrollToBottom)),
+            ),
+          if (AIChatDesign.showConversationRail(context) && canSync)
+            AIConversationRail(
+              messages: messages,
+              scrollController: scrollController,
+              messageKeys: messageKeys!,
+              activeIndex: activeIndex,
+              onJumpToIndex: jumpToIndex,
+            ),
+          if (AIChatDesign.showConversationNavFab(context) &&
+              canSync &&
+              messages.length >= 2)
+            AIConversationNavFab(
+              messageCount: messages.length,
+              activeIndex: activeIndex,
+              onTap: () => showAIConversationNavSheet(
+                context: context,
+                messages: messages,
+                messageKeys: messageKeys!,
+                activeIndex: activeIndex,
+                onJumpToIndex: jumpToIndex,
+              ),
+            ),
+        ],
+      );
+    }
+
+    if (!canSync) {
+      return stackContent(0, (_) {});
+    }
+
+    return AIConversationScrollScope(
+      scrollController: scrollController,
+      messageKeys: messageKeys!,
+      messageCount: messages.length,
+      builder: (ctx, activeIndex, jumpToIndex) =>
+          stackContent(activeIndex, jumpToIndex),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,63 +217,7 @@ class AIChatThreadView extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
-          child: Stack(
-            children: [
-              if (messagesLoading)
-                const Center(child: CircularProgressIndicator(strokeWidth: 2))
-              else
-                ListView.builder(
-                  controller: scrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  itemCount: messages.length +
-                      ((streamingContent != null ||
-                              streamingTraceSteps.isNotEmpty)
-                          ? 1
-                          : 0),
-                  itemBuilder: (context, index) {
-                    if (index < messages.length) {
-                      return _MessageRow(
-                        message: messages[index],
-                        formatTime: formatTime,
-                        onLongPress: () => onMessageLongPress(messages[index]),
-                        onCopy: () => onCopyMessage(messages[index].content),
-                        onFeedback: messages[index].id != null
-                            ? (r) => onFeedback(messages[index], r)
-                            : null,
-                        feedbackRating: messages[index].id != null
-                            ? messageFeedbackRatings[messages[index].id!]
-                            : null,
-                        onRegenerate: messages[index].id != null &&
-                                messages[index].id == lastAssistantMessageId &&
-                                messages[index].role == MessageRole.assistant
-                            ? onRegenerateLast
-                            : null,
-                      );
-                    }
-                    return _StreamingRow(
-                      content: streamingContent ?? '',
-                      toolActivities: streamingToolActivities,
-                      traceSteps: streamingTraceSteps,
-                      statusPhase: streamingStatusPhase,
-                      statusStep: streamingStatusStep,
-                      iteration: streamingIteration,
-                      maxIterations: streamingMaxIterations,
-                      elapsedSeconds: streamingElapsedSeconds,
-                      formatTime: formatTime(streamingTimestamp),
-                    );
-                  },
-                ),
-              if (showScrollToBottom)
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 12,
-                  child: Center(
-                    child: _ScrollFab(onPressed: onScrollToBottom),
-                  ),
-                ),
-            ],
-          ),
+          child: _buildMessageStack(context),
         ),
         AIChatContextBar(
           usageRatio: contextUsageRatio,
@@ -376,30 +434,20 @@ class _StreamingRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (traceSteps.isNotEmpty) ...[
-                  AIAgentTraceTimeline(steps: traceSteps),
+                  AIReasoningPanel(
+                    steps: traceSteps,
+                    initiallyExpanded: true,
+                  ),
                   const SizedBox(height: 10),
                 ],
                 if (toolActivities.isNotEmpty && traceSteps.isEmpty)
                   AIChatToolActivityList(activities: toolActivities),
                 if (content.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-                    decoration: AIChatDesign.elevatedCard(
-                      theme,
-                      alpha: theme.brightness == Brightness.dark ? 0.42 : 0.66,
-                    ).copyWith(
-                      boxShadow: [
-                        BoxShadow(
-                          color: scheme.shadow.withValues(alpha: 0.04),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: AIChatMessageBody(
-                      content: content,
-                      isUser: false,
-                    ),
+                  _StreamingAnswerCard(
+                    content: content,
+                    theme: theme,
+                    scheme: scheme,
+                    showReasoningAbove: traceSteps.isNotEmpty,
                   )
                 else if (showStatusLine)
                   _StreamingStatusPulse(
@@ -447,7 +495,74 @@ class _StreamingRow extends StatelessWidget {
   }
 }
 
-/// انیمیشن ملایم برای نمایش وضعیت در انتظار پاسخ.
+/// کارت پاسخ نهایی در حالت استریم (جدا از پنل استدلال).
+class _StreamingAnswerCard extends StatelessWidget {
+  final String content;
+  final ThemeData theme;
+  final ColorScheme scheme;
+  final bool showReasoningAbove;
+
+  const _StreamingAnswerCard({
+    required this.content,
+    required this.theme,
+    required this.scheme,
+    required this.showReasoningAbove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showReasoningAbove) const SizedBox(height: 4),
+        Row(
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              l10n.aiAnswerPanelTitle,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.primary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+          decoration: AIChatDesign.elevatedCard(
+            theme,
+            alpha: theme.brightness == Brightness.dark ? 0.42 : 0.66,
+            accent: scheme.primary,
+          ).copyWith(
+            boxShadow: [
+              BoxShadow(
+                color: scheme.shadow.withValues(alpha: 0.04),
+                blurRadius: 18,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: AIChatMessageBody(
+            content: content,
+            isUser: false,
+            suppressAnswerLabel: true,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _StreamingStatusPulse extends StatefulWidget {
   final String label;
   final ThemeData theme;

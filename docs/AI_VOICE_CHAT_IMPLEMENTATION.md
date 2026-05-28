@@ -83,6 +83,7 @@ pip install -e ".[voice]"
 |--------|--------|
 | wheel آفلاین | `bash scripts/populate_voice_wheels_vendor.sh` → rsync به `hesabixAPI/vendor/voice_wheels/` |
 | آپلود به Nexus | `scripts/pypi_voice_packages.txt` |
+| CPU قدیمی (بدون x86-64-v2) | خودکار: `numpy<2` از `https://pypi.devneeds.ir/simple/` (`VOICE_PIP_FALLBACK_INDEX_URL`) |
 | PyPI مستقیم | `export VOICE_PIP_EXTRA_INDEX_URL=https://pypi.org/simple` |
 
 ## دیتابیس

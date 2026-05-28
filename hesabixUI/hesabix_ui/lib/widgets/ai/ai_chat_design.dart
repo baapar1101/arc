@@ -7,14 +7,30 @@ abstract final class AIChatDesign {
   static const double composerRadius = 26;
   static const double chipRadius = 20;
   static const double cardRadius = 22;
+  static const double timelineRailWidth = 20;
   static const Duration layoutTransition = Duration(milliseconds: 380);
   static const Duration fadeTransition = Duration(milliseconds: 280);
+
+  /// ارتفاع باکس اسکرول تفکر (desktop / mobile).
+  static double reasoningBoxMaxHeight(BuildContext context) {
+    final h = MediaQuery.sizeOf(context).height;
+    if (h < 700) return 140;
+    return 200;
+  }
 
   static bool showPersistentSidebar(BuildContext context) =>
       MediaQuery.sizeOf(context).width >= 1024;
 
   static bool isCompactWidth(BuildContext context) =>
       MediaQuery.sizeOf(context).width < 720;
+
+  /// Rail عمودی دسکتاپ (۶۰۰px+ و نه موبایل فشرده).
+  static bool showConversationRail(BuildContext context) =>
+      MediaQuery.sizeOf(context).width >= 600;
+
+  /// FAB + bottom sheet موبایل.
+  static bool showConversationNavFab(BuildContext context) =>
+      MediaQuery.sizeOf(context).width < 600;
 
   static BoxDecoration pageBackground(ThemeData theme, {required bool isDark}) {
     final scheme = theme.colorScheme;

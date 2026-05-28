@@ -68,8 +68,11 @@ from app.services.ai.ai_exploration_service import (
     extract_entity_refs_from_calls,
     new_bundle_id,
     resolve_exploration_enabled,
+    should_continue_exploring,
     synthesize_thought_with_llm,
 )
+from app.services.ai.ai_retry_policy import is_retryable_error
+from app.services.ai.ai_constants import MAX_LLM_RETRIES
 from app.services.ai.ai_tool_cache import (
     get_cached,
     invalidate_session,
@@ -1582,6 +1585,7 @@ class AIService:
                 narrative_step_id = f"narrative_{iteration}"
                 narrative_started = False
                 last_narrative_emit = 0.0
+                llm_stream_retry_count = 0
 
                 llm_round_complete = False
                 while not llm_round_complete:
@@ -1607,39 +1611,34 @@ class AIService:
                             content_chunk = delta.get("content", "")
                             if content_chunk:
                                 round_text += content_chunk
-                                if not function_calls:
-                                    if not writing_status_sent:
-                                        writing_status_sent = True
-                                        yield status_event("writing")
+                                if not writing_status_sent:
+                                    writing_status_sent = True
+                                    yield status_event("writing")
+                                    yield _emit_trace(
+                                        step_id=llm_step_id,
+                                        kind="context",
+                                        state="done",
+                                        title_key="aiStatusThinking",
+                                        iteration=iteration,
+                                    )
+                                if round_text.strip():
+                                    if not narrative_started:
+                                        narrative_started = True
+                                    now_mono = time.monotonic()
+                                    if (
+                                        now_mono - last_narrative_emit >= 0.04
+                                        or len(content_chunk) > 64
+                                    ):
+                                        last_narrative_emit = now_mono
                                         yield _emit_trace(
-                                            step_id=llm_step_id,
-                                            kind="context",
-                                            state="done",
-                                            title_key="aiStatusThinking",
+                                            step_id=narrative_step_id,
+                                            kind="narrative",
+                                            state="active",
+                                            body_markdown=round_text,
                                             iteration=iteration,
+                                            layer="reasoning",
                                         )
-                                    if round_text.strip():
-                                        if not narrative_started:
-                                            narrative_started = True
-                                        now_mono = time.monotonic()
-                                        if (
-                                            now_mono - last_narrative_emit >= 0.04
-                                            or len(content_chunk) > 64
-                                        ):
-                                            last_narrative_emit = now_mono
-                                            yield _emit_trace(
-                                                step_id=narrative_step_id,
-                                                kind="narrative",
-                                                state="active",
-                                                body_markdown=round_text,
-                                                iteration=iteration,
-                                            )
-                                            await asyncio.sleep(0)
-                                    yield {
-                                        "delta": {"content": content_chunk},
-                                        "usage": None,
-                                        "done": False,
-                                    }
+                                        await asyncio.sleep(0)
 
                             if chunk.get("done", False):
                                 break
@@ -1668,6 +1667,29 @@ class AIService:
                                 "done": False,
                             }
                             await asyncio.sleep(0)
+                            round_text = ""
+                            function_calls = None
+                            writing_status_sent = False
+                            narrative_started = False
+                            continue
+                        if (
+                            llm_stream_retry_count < MAX_LLM_RETRIES - 1
+                            and is_retryable_error(stream_exc)
+                        ):
+                            llm_stream_retry_count += 1
+                            yield _emit_trace(
+                                step_id=f"retry_{iteration}_{llm_stream_retry_count}",
+                                kind="system",
+                                state="active",
+                                title_key="aiTraceRetrying",
+                                title_params={
+                                    "attempt": str(llm_stream_retry_count),
+                                    "max": str(MAX_LLM_RETRIES - 1),
+                                },
+                                retry_attempt=llm_stream_retry_count,
+                                iteration=iteration,
+                            )
+                            await asyncio.sleep(0.5 * llm_stream_retry_count)
                             round_text = ""
                             function_calls = None
                             writing_status_sent = False
@@ -2040,6 +2062,37 @@ class AIService:
                     continue
 
                 if round_text.strip():
+                    if (
+                        exploration_enabled
+                        and observation_store is not None
+                        and iteration < max_iterations
+                        and should_continue_exploring(
+                            observation_store, iteration, max_iterations
+                        )
+                    ):
+                        yield _emit_trace(
+                            step_id=f"continue_explore_{iteration}",
+                            kind="plan_next",
+                            state="done",
+                            title_key="aiTraceNeedMoreExploration",
+                            iteration=iteration,
+                        )
+                        full_messages.append(
+                            {"role": "assistant", "content": round_text.strip()}
+                        )
+                        full_messages.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    "[agent_continue]\n"
+                                    "بر اساس یافته‌های تا اینجا، هنوز نیاز به بررسی "
+                                    "یا ابزار بیشتر است. قبل از پاسخ نهایی، "
+                                    "دادهٔ لازم را جمع‌آوری کن."
+                                ),
+                            }
+                        )
+                        continue
+
                     yield _emit_trace(
                         kind="answer",
                         state="done",
@@ -2048,7 +2101,17 @@ class AIService:
                         if len(round_text.strip()) < 400
                         else None,
                         iteration=iteration,
+                        layer="answer",
                     )
+                    _answer_chunk_size = 48
+                    for offset in range(0, len(round_text), _answer_chunk_size):
+                        piece = round_text[offset : offset + _answer_chunk_size]
+                        yield {
+                            "delta": {"content": piece},
+                            "usage": None,
+                            "done": False,
+                        }
+                        await asyncio.sleep(0)
                 accumulated_content = round_text
                 break
 

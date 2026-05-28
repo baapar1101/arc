@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
-import 'ai_agent_trace_timeline.dart';
+import 'ai_reasoning_panel.dart';
 import 'ai_chat_chart_widget.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_table_widget.dart';
@@ -13,6 +13,7 @@ class AIChatMessageBody extends StatelessWidget {
   final bool isUser;
   final Object? functionCalls;
   final Object? functionResults;
+  final bool suppressAnswerLabel;
 
   const AIChatMessageBody({
     super.key,
@@ -20,6 +21,7 @@ class AIChatMessageBody extends StatelessWidget {
     required this.isUser,
     this.functionCalls,
     this.functionResults,
+    this.suppressAnswerLabel = false,
   });
 
   @override
@@ -35,7 +37,12 @@ class AIChatMessageBody extends StatelessWidget {
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
         if (agentTrace.isNotEmpty) ...[
-          AIAgentTraceTimeline(steps: agentTrace, compact: true),
+          AIReasoningPanel(
+            steps: agentTrace,
+            compact: true,
+            initiallyExpanded: false,
+            collapseWhenDone: true,
+          ),
           const SizedBox(height: 12),
         ],
         if (toolActivities.isNotEmpty) ...[
@@ -46,7 +53,7 @@ class AIChatMessageBody extends StatelessWidget {
             ),
         ],
         if (content.trim().isNotEmpty) ...[
-          if (!isUser) ...[
+          if (!isUser && !suppressAnswerLabel) ...[
             const _ResponseLabel(),
             const SizedBox(height: 10),
           ],
@@ -139,7 +146,7 @@ class _ResponseLabel extends StatelessWidget {
         ),
         const SizedBox(width: 7),
         Text(
-          'پاسخ تحلیلی',
+          AppLocalizations.of(context).aiAnswerPanelTitle,
           style: theme.textTheme.labelMedium?.copyWith(
             color: scheme.primary,
             fontWeight: FontWeight.w800,
