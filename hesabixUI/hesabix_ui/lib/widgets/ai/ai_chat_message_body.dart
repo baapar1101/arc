@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hesabix_ui/core/business_nav.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_reasoning_panel.dart';

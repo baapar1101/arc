@@ -14,6 +14,6 @@ AI_WORKFLOW_PROMPT_BLOCK = """
 - تست ذخیره‌شده: test_workflow با workflow_id؛ نتیجه شامل debug و summary است
 - فعال‌سازی (status=فعال) فقط با تأیید صریح کاربر
 - اجرای واقعی بدون dry_run از execute_workflow (با تأیید)
-- پس از create/update مسیر editor_path را به کاربر بده (باز کردن در ادیتور بصری)
+- پس از create/update مسیر editor_path را بده؛ در UI چت دکمه «باز کردن در ادیتور» نمایش داده می‌شود
 - مقادیر پویا: $nodeId.field و {{ trigger_data.x }}
 """.strip()

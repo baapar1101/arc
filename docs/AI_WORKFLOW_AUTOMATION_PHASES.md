@@ -50,6 +50,17 @@
 
 فایل‌ها: `ai_workflow_agent_policy.py`، به‌روزرسانی `ai_workflow_service.py`, `ai_agent_action.py`
 
+## فاز ۵ — UX چت و ادیتور (پیاده‌سازی شده)
+
+| قابلیت | توضیح |
+|--------|--------|
+| دکمه در چت | `AIWorkflowChatActions` — «باز کردن در ادیتور» / «مشاهده پیش‌نمایش» |
+| لینک در markdown | کلیک روی `workflows/{id}/edit` در متن پاسخ |
+| مخفی‌سازی sandbox | `[AI] پیش‌نمایش آزمایشی` در لیست اتوماسیون‌ها نمایش داده نمی‌شود |
+| بنر در ادیتور | هنگام باز کردن sandbox، بنر توضیح پیش‌نمایش AI |
+
+**آیا کاربر همان صفحهٔ ادیتور را می‌بیند؟** بله — `WorkflowVisualEditorPage` همان UI است؛ تفاوت فقط در `workflow_id` و دادهٔ گراف (sandbox vs اتوماسیون واقعی پس از `create_workflow`).
+
 ## جریان گفتگوی پیشنهادی
 
 1. `get_workflow_design_rules`
