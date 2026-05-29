@@ -41,6 +41,7 @@ import 'pages/admin/system_monitoring_page.dart';
 import 'pages/admin/service_logs_page.dart';
 import 'pages/admin/business_activity_logs_admin_page.dart';
 import 'pages/admin/database_backup_page.dart';
+import 'pages/admin/legacy_database_import_page.dart';
 import 'pages/admin/system_scripts_page.dart';
 import 'pages/admin/announcements_admin_page.dart';
 import 'pages/admin/businesses_list_page.dart';
@@ -1778,6 +1779,19 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const DatabaseBackupPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'legacy-import',
+                  name: 'system_settings_legacy_import',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    if (!_authStore!.isSuperAdmin) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const LegacyDatabaseImportPage();
                   },
                 ),
                 GoRoute(

@@ -181,7 +181,7 @@ def guard_new_business_import(
     import_mode: str,
 ) -> None:
     """قفل + بررسی تکرار قبل از ایجاد کسب‌وکار جدید."""
-    if import_mode != "new_business":
+    if import_mode not in ("new_business", "legacy_api"):
         return
     acquire_backup_import_lock(db, user_id, backup_checksum)
     assert_backup_import_allowed(
@@ -202,14 +202,14 @@ def assert_backup_import_allowed(
     """قبل از ایجاد کسب‌وکار جدید: همان فایل نباید قبلاً import شده باشد."""
     from adapters.db.models.business_backup_import_log import BusinessBackupImportLog
 
-    if import_mode != "new_business":
+    if import_mode not in ("new_business", "legacy_api"):
         return
     existing = (
         db.query(BusinessBackupImportLog)
         .filter(
             BusinessBackupImportLog.user_id == int(user_id),
             BusinessBackupImportLog.backup_checksum == backup_checksum,
-            BusinessBackupImportLog.import_mode == "new_business",
+            BusinessBackupImportLog.import_mode == import_mode,
         )
         .first()
     )
@@ -236,7 +236,7 @@ def register_backup_import(
     """ثبت موفقیت‌آمیز ایمپورت new_business (با گارد IntegrityError)."""
     from adapters.db.models.business_backup_import_log import BusinessBackupImportLog
 
-    if import_mode != "new_business":
+    if import_mode not in ("new_business", "legacy_api"):
         return
     try:
         db.add(

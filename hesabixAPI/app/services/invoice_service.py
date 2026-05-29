@@ -30,7 +30,7 @@ from adapters.db.models.tax_unit import TaxUnit
 from adapters.db.models.product_bom import ProductBOM, ProductBOMOutput
 from adapters.db.models.business import Business
 from app.core.calendar import CalendarConverter, CalendarType
-from app.core.responses import ApiError
+from app.core.responses import ApiError, success_response
 from app.services.document_monetization_service import ensure_document_policy_allows_creation
 from app.services.credit_service import get_business_credit_settings
 import jdatetime
@@ -3695,6 +3695,9 @@ def create_invoice(
     data: Dict[str, Any],
     user_can_select_fx_rate: bool = False,
     user_can_change_invoice_unit_price: bool = True,
+    *,
+    commit: bool = True,
+    skip_post_commit_hooks: bool = False,
 ) -> Dict[str, Any]:
     logger.info("=== شروع ایجاد فاکتور ===")
 
@@ -4925,8 +4928,17 @@ def create_invoice(
         )
         db.flush()
 
-    db.commit()
-    db.refresh(document)
+    if commit:
+        db.commit()
+        db.refresh(document)
+    else:
+        db.flush()
+
+    if skip_post_commit_hooks or not commit:
+        return success_response(
+            message="Invoice created",
+            data={"id": document.id, "code": document.code, "document_type": document.document_type},
+        )
 
     # فراخوانی workflow triggers برای فاکتور ایجاد شده
     try:

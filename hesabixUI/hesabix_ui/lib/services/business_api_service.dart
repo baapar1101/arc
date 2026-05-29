@@ -22,6 +22,51 @@ class BusinessApiService {
     }
   }
 
+  /// پیش‌نمایش انتقال از نسخه قدیم حسابیکس (API)
+  static Future<Map<String, dynamic>> previewLegacyImport({
+    required String serverUrl,
+    required String apiKey,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '$_basePath/import-from-legacy-api/preview',
+      data: {
+        'server_url': serverUrl.trim(),
+        'api_key': apiKey.trim(),
+      },
+    );
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    }
+    throw Exception(data?['message'] ?? 'خطا در پیش‌نمایش انتقال از نسخه قدیم');
+  }
+
+  /// ایجاد کسب‌وکار از نسخه قدیم با کلید API
+  static Future<Map<String, dynamic>> importBusinessFromLegacyApi({
+    required String serverUrl,
+    required String apiKey,
+    String? businessNameOverride,
+    bool asyncMode = true,
+  }) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '$_basePath/import-from-legacy-api',
+      data: {
+        'server_url': serverUrl.trim(),
+        'api_key': apiKey.trim(),
+        if (businessNameOverride != null && businessNameOverride.trim().isNotEmpty)
+          'options': {
+            'business_name_override': businessNameOverride.trim(),
+          },
+      },
+      query: {'async_mode': asyncMode},
+    );
+    final data = response.data;
+    if (data != null && data['success'] == true) {
+      return (data['data'] as Map).cast<String, dynamic>();
+    }
+    throw Exception(data?['message'] ?? 'خطا در انتقال از نسخه قدیم');
+  }
+
   // ایجاد کسب و کار جدید از فایل پشتیبان (.hbx)
   static Future<Map<String, dynamic>> importBusinessFromBackup({
     required String filename,

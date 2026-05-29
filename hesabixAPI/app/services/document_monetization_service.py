@@ -684,6 +684,13 @@ def ensure_document_policy_allows_creation(
 	document_date: Any,
 	amount: Any,
 ) -> Dict[str, Any]:
+	try:
+		from app.services.legacy_import.context import is_legacy_import_active
+
+		if is_legacy_import_active():
+			return {"allowed": True, "legacy_import": True}
+	except ImportError:
+		pass
 	result = evaluate_document_policy_for_amount(
 		db,
 		business_id=business_id,

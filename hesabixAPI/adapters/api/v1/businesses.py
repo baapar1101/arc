@@ -50,6 +50,10 @@ from app.services.file_storage_service import FileStorageService
 from adapters.db.models.business import Business
 from starlette.responses import StreamingResponse
 from app.services.job_manager import JobManager
+from adapters.api.v1.schema_models.legacy_import import (
+    LegacyImportExecuteRequest,
+    LegacyImportPreviewRequest,
+)
 
 
 router = APIRouter(prefix="/businesses", tags=["کسب‌وکارها"])
@@ -463,6 +467,121 @@ async def import_business_from_backup(
     else:
         # مسیر هم‌زمان (برای تست - توصیه نمی‌شود برای فایل‌های بزرگ)
         raise ApiError("SYNC_DISABLED", "لطفاً از async_mode=true استفاده کنید", http_status=400)
+
+
+@router.post(
+    "/import-from-legacy-api/preview",
+    summary="پیش‌نمایش انتقال از نسخه قدیم (API)",
+    description="اعتبارسنجی کلید API و نمایش حجم داده‌های قابل انتقال از حسابیکس نسخه قدیم",
+    response_model=SuccessResponse,
+)
+def preview_import_from_legacy_api(
+    request: Request,
+    payload: LegacyImportPreviewRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    from app.services.business_service import check_business_creation_permission
+    from app.services.legacy_import.preview_service import preview_legacy_import
+    can_create, error_message = check_business_creation_permission(db, ctx.get_user_id())
+    if not can_create:
+        raise ApiError(
+            "BUSINESS_CREATION_NOT_ALLOWED",
+            error_message or "شما اجازه ایجاد کسب و کار را ندارید",
+            http_status=403,
+        )
+    data = preview_legacy_import(payload.server_url, payload.api_key)
+    return success_response(format_datetime_fields(data, request), request, message="پیش‌نمایش انتقال")
+
+
+@router.post(
+    "/import-from-legacy-api",
+    summary="ایجاد کسب و کار از نسخه قدیم (API)",
+    description="دانلود آرشیو از سرور نسخه قدیم و ایجاد کسب‌وکار جدید در پنل کاربر",
+    response_model=SuccessResponse,
+)
+async def import_business_from_legacy_api(
+    request: Request,
+    payload: LegacyImportExecuteRequest,
+    async_mode: bool = True,
+    background: BackgroundTasks = None,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    from app.services.business_service import check_business_creation_permission
+    from app.services.legacy_import.importer import LegacyBusinessImporter
+    from app.services.legacy_import.preview_service import LegacyImportOptions
+    can_create, error_message = check_business_creation_permission(db, ctx.get_user_id())
+    if not can_create:
+        raise ApiError(
+            "BUSINESS_CREATION_NOT_ALLOWED",
+            error_message or "شما اجازه ایجاد کسب و کار را ندارید",
+            http_status=403,
+        )
+
+    if not async_mode:
+        raise ApiError(
+            "SYNC_DISABLED",
+            "لطفاً از async_mode=true استفاده کنید",
+            http_status=400,
+        )
+
+    opts_schema = payload.options
+    options = LegacyImportOptions(
+        business_name_override=opts_schema.business_name_override if opts_schema else None,
+        business_name_suffix=(opts_schema.business_name_suffix if opts_schema else "") or "",
+        import_persons=opts_schema.import_persons if opts_schema else True,
+        import_products=opts_schema.import_products if opts_schema else True,
+        import_banks=opts_schema.import_banks if opts_schema else True,
+        import_warehouses=opts_schema.import_warehouses if opts_schema else True,
+        import_documents=opts_schema.import_documents if opts_schema else True,
+        import_files=opts_schema.import_files if opts_schema else True,
+    )
+
+    jm = JobManager.instance()
+    job_id = jm.create("Legacy API import queued")
+    owner_id = ctx.get_user_id()
+    server_url = payload.server_url
+    api_key = payload.api_key
+
+    def task():
+        from adapters.db.session import get_db_session
+
+        with get_db_session() as task_db:
+            try:
+                jm.start(job_id, "Starting legacy import")
+
+                def on_progress(pct: int, msg: str) -> None:
+                    jm.update(job_id, pct, msg)
+
+                importer = LegacyBusinessImporter(
+                    task_db,
+                    owner_id,
+                    server_url,
+                    api_key,
+                    options=options,
+                    progress_callback=on_progress,
+                )
+                result = importer.run()
+                jm.succeed(job_id, result, "Legacy import completed")
+            except Exception as e:
+                error_msg = str(e)
+                error_code = None
+                if isinstance(e, ApiError) and isinstance(e.detail, dict):
+                    err = e.detail.get("error", e.detail)
+                    if isinstance(err, dict):
+                        error_code = err.get("code")
+                        error_msg = err.get("message", error_msg)
+                final_error = f"{error_code}: {error_msg}" if error_code else error_msg
+                jm.fail(job_id, final_error, "Legacy import failed")
+                raise
+
+    background.add_task(task)
+    return success_response(
+        {"job_id": job_id},
+        request=request,
+        message="انتقال از نسخه قدیم شروع شد",
+    )
 
 
 @router.post("/list", 

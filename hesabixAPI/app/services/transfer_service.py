@@ -113,6 +113,8 @@ def create_transfer(
     business_id: int,
     user_id: int,
     data: Dict[str, Any],
+    *,
+    commit: bool = True,
 ) -> Dict[str, Any]:
     logger.info("=== شروع ایجاد سند انتقال ===")
 
@@ -310,11 +312,17 @@ def create_transfer(
         )
         db.add(commission_credit_line)
 
-    db.commit()
-    db.refresh(document)
-    
+    if commit:
+        db.commit()
+        db.refresh(document)
+    else:
+        db.flush()
+
     result = transfer_document_to_dict(db, document)
-    
+
+    if not commit:
+        return result
+
     # Invalidate cache بعد از ایجاد موفق سند انتقال
     from app.services.document_service import invalidate_documents_cache
     invalidate_documents_cache(
@@ -323,7 +331,7 @@ def create_transfer(
         document_id=document.id,
         document_type=DOCUMENT_TYPE_TRANSFER
     )
-    
+
     return result
 
 

@@ -137,6 +137,9 @@ def create_expense_income(
     business_id: int,
     user_id: int,
     data: Dict[str, Any],
+    *,
+    commit: bool = True,
+    skip_post_commit_hooks: bool = False,
 ) -> Dict[str, Any]:
     """
     ایجاد سند هزینه/درآمد با چند سطر حساب و چند سطر طرف‌حساب
@@ -542,17 +545,24 @@ def create_expense_income(
         except Exception as e:
             logger.error(f"خطا در تغییر وضعیت چک {check_id}: {e}", exc_info=True)
     
-    db.commit()
-    db.refresh(document)
+    if commit:
+        db.commit()
+        db.refresh(document)
+    else:
+        db.flush()
+
     result = document_to_dict(db, document)
-    
+
+    if skip_post_commit_hooks or not commit:
+        return result
+
     # Invalidate cache بعد از ایجاد موفق سند هزینه/درآمد
     invalidate_expense_income_cache(
         business_id=business_id,
         fiscal_year_id=document.fiscal_year_id,
         document_id=document.id
     )
-    
+
     # همچنین اسناد عمومی را هم invalidate کن
     from app.services.document_service import invalidate_documents_cache
     invalidate_documents_cache(

@@ -16,6 +16,7 @@ import '../../utils/snackbar_helper.dart';
 import 'package:dio/dio.dart';
 import '../../services/errors/api_error.dart';
 import '../../services/job_service.dart';
+import '../../widgets/profile/legacy_business_import_panel.dart';
 
 class NewBusinessPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -1097,6 +1098,13 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+                LegacyBusinessImportPanel(
+                  isLoading: _isLoading,
+                  onLoadingChanged: (v) {
+                    if (mounted) setState(() => _isLoading = v);
+                  },
+                ),
+                SizedBox(height: spacing),
                 // دکمه ایمپورت از فایل پشتیبان
                 Card(
                   elevation: 2,
