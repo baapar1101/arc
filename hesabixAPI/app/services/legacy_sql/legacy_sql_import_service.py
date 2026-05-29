@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonType
 from adapters.api.v1.schema_models.product import ProductCreateRequest
-from adapters.db.models.business import Business, BusinessCurrency
-from adapters.db.models.currency import Currency
+from adapters.db.models.business import Business
+from adapters.db.models.currency import BusinessCurrency, Currency
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.user import User
