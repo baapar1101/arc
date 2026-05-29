@@ -13,8 +13,13 @@ class LegacyIdMap:
     categories: Dict[int, int] = field(default_factory=dict)
     warehouses: Dict[int, int] = field(default_factory=dict)
     bank_accounts: Dict[int, int] = field(default_factory=dict)
+    cash_registers: Dict[int, int] = field(default_factory=dict)
+    petty_cash: Dict[int, int] = field(default_factory=dict)
     fiscal_years: Dict[int, int] = field(default_factory=dict)
     documents: Dict[int, int] = field(default_factory=dict)
+    walk_in_person_id: Optional[int] = None
+    default_cash_register_id: Optional[int] = None
+    default_bank_id: Optional[int] = None
 
     def set(self, bucket: str, old_id: int | None, new_id: int | None) -> None:
         if old_id is None or new_id is None:
@@ -26,6 +31,20 @@ class LegacyIdMap:
             return None
         return getattr(self, bucket).get(int(old_id))
 
+    def get_default_bank_id(self) -> Optional[int]:
+        if self.default_bank_id:
+            return self.default_bank_id
+        if self.bank_accounts:
+            return next(iter(self.bank_accounts.values()))
+        return None
+
+    def get_default_cash_register_id(self) -> Optional[int]:
+        if self.default_cash_register_id:
+            return self.default_cash_register_id
+        if self.cash_registers:
+            return next(iter(self.cash_registers.values()))
+        return None
+
     def summary(self) -> Dict[str, int]:
         return {
             "persons": len(self.persons),
@@ -33,6 +52,8 @@ class LegacyIdMap:
             "categories": len(self.categories),
             "warehouses": len(self.warehouses),
             "bank_accounts": len(self.bank_accounts),
+            "cash_registers": len(self.cash_registers),
+            "petty_cash": len(self.petty_cash),
             "fiscal_years": len(self.fiscal_years),
             "documents": len(self.documents),
         }
@@ -49,6 +70,7 @@ class LegacyImportStats:
     categories_imported: int = 0
     warehouses_imported: int = 0
     bank_accounts_imported: int = 0
+    cash_registers_imported: int = 0
     documents_imported: int = 0
     documents_skipped: int = 0
     files_imported: int = 0
@@ -68,6 +90,7 @@ class LegacyImportStats:
             "categories_imported": self.categories_imported,
             "warehouses_imported": self.warehouses_imported,
             "bank_accounts_imported": self.bank_accounts_imported,
+            "cash_registers_imported": self.cash_registers_imported,
             "documents_imported": self.documents_imported,
             "documents_skipped": self.documents_skipped,
             "files_imported": self.files_imported,

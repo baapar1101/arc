@@ -39,6 +39,11 @@ LEGACY_DOC_TYPE_TO_EXPENSE_INCOME: dict[str, str] = {
     "income": "income",
 }
 
+# انواعی که عمداً رد می‌شوند (پیام اختصاصی)
+LEGACY_DOC_TYPE_SKIP_MESSAGES: dict[str, str] = {
+    "open_balance": "مانده افتتاحیه — در نسخه جدید از مسیر دیگری تنظیم می‌شود",
+}
+
 # Archive JSON file names inside ZIP
 ARCHIVE_MANIFEST = "manifest.json"
 ARCHIVE_DATA_PREFIX = "data/"

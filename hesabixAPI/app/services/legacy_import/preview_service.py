@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.services.legacy_import.archive import parse_legacy_archive
 from app.services.legacy_import.client import LegacyApiClient
 from app.services.legacy_import.mappers import mask_api_key, normalize_server_url
+from app.services.legacy_import.preview_risks import compute_import_risks
 
 
 @dataclass
@@ -35,6 +36,7 @@ def preview_legacy_import(
     archive_size = 0
     counts: Dict[str, int] = {}
     manifest: Dict[str, Any] = {}
+    import_risks: list[Dict[str, Any]] = []
 
     if download_archive:
         raw = client.download_archive()
@@ -42,6 +44,7 @@ def preview_legacy_import(
         archive = parse_legacy_archive(raw)
         counts = archive.counts()
         manifest = archive.manifest
+        import_risks = compute_import_risks(archive)
 
     biz = connection.get("business") or {}
     return {
@@ -53,6 +56,7 @@ def preview_legacy_import(
         "archive_size_bytes": archive_size,
         "manifest": manifest,
         "counts": counts,
+        "import_risks": import_risks,
         "warnings": [
             "کلید API فقط به یک کسب‌وکار در نسخه قدیم متصل است.",
             "داده‌های کیف پول، اشتراک AI و مارکت‌پلیس منتقل نمی‌شوند.",

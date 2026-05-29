@@ -549,7 +549,7 @@ async def import_business_from_legacy_api(
 
         with get_db_session() as task_db:
             try:
-                jm.start(job_id, "Starting legacy import")
+                jm.start(job_id, "شروع انتقال از نسخه قدیم")
 
                 def on_progress(pct: int, msg: str) -> None:
                     jm.update(job_id, pct, msg)

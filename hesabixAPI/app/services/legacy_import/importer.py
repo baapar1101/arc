@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from adapters.api.v1.schemas import BusinessCreateRequest, FiscalYearCreate
 from adapters.db.models.bank_account import BankAccount
+from adapters.db.models.cash_register import CashRegister
+from adapters.db.models.petty_cash import PettyCash
 from adapters.db.models.business import Business
 from adapters.db.models.category import BusinessCategory
 from adapters.db.models.currency import Currency
@@ -78,11 +80,11 @@ class LegacyBusinessImporter:
             reset_legacy_import_active(token)
 
     def _run_import(self, *, archive_bytes: Optional[bytes] = None) -> Dict[str, Any]:
-        self.progress(5, "Connecting to legacy server")
+        self.progress(5, "اتصال به سرور نسخه قدیم")
         connection = self.client.test_connection()
         self.person_type_map = self.client.fetch_person_type_map()
 
-        self.progress(10, "Downloading archive")
+        self.progress(10, "دانلود آرشیو کسب‌وکار")
         raw = archive_bytes if archive_bytes is not None else self.client.download_archive()
         archive = parse_legacy_archive(raw)
         checksum = compute_backup_checksum(raw)
@@ -94,28 +96,37 @@ class LegacyBusinessImporter:
             import_mode=IMPORT_MODE_LEGACY_API,
         )
 
-        self.progress(15, "Creating business")
+        self.progress(15, "ایجاد کسب‌وکار جدید")
         business_id, currency_id = self._create_business(archive, connection)
         self._currency_id = currency_id
 
         if self.options.import_persons:
-            self.progress(35, "Importing persons")
+            self.progress(35, "انتقال اشخاص")
             self._import_persons(business_id, archive)
 
         if self.options.import_products:
-            self.progress(45, "Importing products")
+            self.progress(45, "انتقال کالا و خدمات")
             self._import_categories_and_products(business_id, archive)
 
         if self.options.import_banks:
-            self.progress(52, "Importing bank accounts")
+            self.progress(52, "انتقال حساب‌های بانکی")
             self._import_bank_accounts(business_id, archive)
 
+        if self.options.import_documents or self.options.import_banks:
+            self.progress(55, "ایجاد صندوق‌ها")
+            self._import_cash_registers(business_id, archive)
+            self.progress(56, "ایجاد تنخواه‌ها")
+            self._import_petty_cash(business_id, archive)
+
+        if self.options.import_documents:
+            self._ensure_walk_in_person(business_id)
+
         if self.options.import_warehouses:
-            self.progress(58, "Importing warehouses")
+            self.progress(58, "انتقال انبارها")
             self._import_warehouses(business_id, archive)
 
         if self.options.import_documents:
-            self.progress(70, "Importing accounting documents")
+            self.progress(70, "انتقال اسناد حسابداری")
             LegacyDocumentImporter(
                 self.db,
                 business_id,
@@ -127,10 +138,10 @@ class LegacyBusinessImporter:
             ).import_all(archive)
 
         if self.options.import_files:
-            self.progress(88, "Importing logo and seal")
+            self.progress(88, "انتقال لوگو و مهر")
             self._import_files(business_id, archive)
 
-        self.progress(92, "Finalizing financial state")
+        self.progress(92, "نهایی‌سازی وضعیت مالی")
         finalize_financial_state_after_restore(self.db, business_id)
 
         register_backup_import(
@@ -142,7 +153,7 @@ class LegacyBusinessImporter:
             target_business_id=business_id,
         )
 
-        self.progress(100, "Import completed")
+        self.progress(100, "انتقال تکمیل شد")
         return {
             "business_id": business_id,
             "source_business_id": archive.source_business_id,
@@ -375,8 +386,9 @@ class LegacyBusinessImporter:
         for row in archive.data.get("bank_accounts.json") or []:
             old_id = row.get("id")
             name = str(row.get("name") or "بانک").strip()
-            code = str(row.get("code") or old_id or "")
-            if not code.isdigit() or len(code) < 3:
+            if old_id is not None:
+                code = f"L{int(old_id):05d}"
+            else:
                 code = str(next_auto_code)
                 next_auto_code += 1
 
@@ -388,6 +400,8 @@ class LegacyBusinessImporter:
             if exists:
                 if old_id is not None:
                     self.id_map.set("bank_accounts", int(old_id), int(exists.id))
+                if self.id_map.default_bank_id is None:
+                    self.id_map.default_bank_id = int(exists.id)
                 continue
 
             bank = BankAccount(
@@ -404,7 +418,110 @@ class LegacyBusinessImporter:
             self.db.flush()
             if old_id is not None:
                 self.id_map.set("bank_accounts", int(old_id), int(bank.id))
+            if self.id_map.default_bank_id is None:
+                self.id_map.default_bank_id = int(bank.id)
             self.stats.bank_accounts_imported += 1
+
+    def _import_cash_registers(self, business_id: int, archive) -> None:
+        currency_id = self._currency_id
+        cashdesk_ids: set[int] = set()
+        for row in archive.data.get("hesabdari_rows.json") or []:
+            cid = row.get("cashdesk_id")
+            if cid is not None:
+                try:
+                    cashdesk_ids.add(int(cid))
+                except (TypeError, ValueError):
+                    pass
+        if not cashdesk_ids:
+            cashdesk_ids.add(0)
+
+        first_new: int | None = None
+        for old_id in sorted(cashdesk_ids):
+            code = f"CR{old_id:05d}"
+            exists = (
+                self.db.query(CashRegister)
+                .filter(
+                    and_(CashRegister.business_id == business_id, CashRegister.code == code)
+                )
+                .first()
+            )
+            if exists:
+                self.id_map.set("cash_registers", old_id, int(exists.id))
+                first_new = first_new or int(exists.id)
+                continue
+            cr = CashRegister(
+                business_id=business_id,
+                name="صندوق انتقال" if old_id == 0 else f"صندوق {old_id}",
+                code=code,
+                currency_id=currency_id,
+                is_active=True,
+                is_default=(first_new is None),
+            )
+            self.db.add(cr)
+            self.db.flush()
+            self.id_map.set("cash_registers", old_id, int(cr.id))
+            first_new = first_new or int(cr.id)
+            self.stats.cash_registers_imported += 1
+        if first_new:
+            self.id_map.default_cash_register_id = first_new
+
+    def _import_petty_cash(self, business_id: int, archive) -> None:
+        currency_id = self._currency_id
+        salary_ids: set[int] = set()
+        for row in archive.data.get("hesabdari_rows.json") or []:
+            sid = row.get("salary_id")
+            if sid is not None:
+                try:
+                    salary_ids.add(int(sid))
+                except (TypeError, ValueError):
+                    pass
+        if not salary_ids:
+            salary_ids.add(0)
+
+        for old_id in sorted(salary_ids):
+            code = f"PC{old_id:05d}"
+            exists = (
+                self.db.query(PettyCash)
+                .filter(and_(PettyCash.business_id == business_id, PettyCash.code == code))
+                .first()
+            )
+            if exists:
+                self.id_map.set("petty_cash", old_id, int(exists.id))
+                continue
+            pc = PettyCash(
+                business_id=business_id,
+                name="تنخواه انتقال" if old_id == 0 else f"تنخواه {old_id}",
+                code=code,
+                currency_id=currency_id,
+                is_active=True,
+            )
+            self.db.add(pc)
+            self.db.flush()
+            self.id_map.set("petty_cash", old_id, int(pc.id))
+
+    def _ensure_walk_in_person(self, business_id: int) -> None:
+        if self.id_map.walk_in_person_id:
+            return
+        walk_code = 999999
+        exists = (
+            self.db.query(Person)
+            .filter(and_(Person.business_id == business_id, Person.code == walk_code))
+            .first()
+        )
+        if exists:
+            self.id_map.walk_in_person_id = int(exists.id)
+            return
+        person = Person(
+            business_id=business_id,
+            code=walk_code,
+            alias_name="مشتری نقدی انتقال",
+            first_name="مشتری",
+            last_name="نقدی",
+            person_types=person_types_json(["مشتری"]),
+        )
+        self.db.add(person)
+        self.db.flush()
+        self.id_map.walk_in_person_id = int(person.id)
 
     def _import_warehouses(self, business_id: int, archive) -> None:
         default_set = False

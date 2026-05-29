@@ -10,10 +10,12 @@ from app.core.responses import ApiError
 from app.services.invoice_service import create_invoice
 from app.services.expense_income_service import create_expense_income
 from app.services.legacy_import.constants import (
+    LEGACY_DOC_TYPE_SKIP_MESSAGES,
     LEGACY_DOC_TYPE_TO_EXPENSE_INCOME,
     LEGACY_DOC_TYPE_TO_INVOICE,
     LEGACY_DOC_TYPE_TO_RECEIPT_PAYMENT,
 )
+from app.services.legacy_import.document_rows import build_receipt_payment_lines, row_amount
 from app.services.legacy_import.expense_income_rows import (
     build_expense_income_payload,
     normalize_api_document_rows,
@@ -82,6 +84,11 @@ class LegacyDocumentImporter:
                         rows_by_doc.get(int(doc_id), []),
                         chart=chart,
                     )
+                elif doc_type in LEGACY_DOC_TYPE_SKIP_MESSAGES:
+                    self.stats.documents_skipped += 1
+                    self.stats.add_warning(
+                        f"سند {doc_type} #{doc.get('code')}: {LEGACY_DOC_TYPE_SKIP_MESSAGES[doc_type]}"
+                    )
                 else:
                     self.stats.documents_skipped += 1
                     self.stats.add_warning(
@@ -102,7 +109,7 @@ class LegacyDocumentImporter:
 
     def _import_invoice(self, doc: Dict[str, Any], rows: List[Dict[str, Any]]) -> None:
         invoice_type = LEGACY_DOC_TYPE_TO_INVOICE[str(doc["type"])]
-        person_id = self._resolve_person_from_rows(rows)
+        person_id = self._resolve_person_for_doc(doc, rows)
         if not person_id:
             raise ApiError("LEGACY_DOC_NO_PERSON", "شخص سند یافت نشد", http_status=400)
 
@@ -141,53 +148,36 @@ class LegacyDocumentImporter:
 
     def _import_receipt_payment(self, doc: Dict[str, Any], rows: List[Dict[str, Any]]) -> None:
         document_type = LEGACY_DOC_TYPE_TO_RECEIPT_PAYMENT[str(doc["type"])]
-        person_rows = [r for r in rows if r.get("person_id")]
-        bank_rows = [r for r in rows if r.get("bank_id")]
-        if not person_rows:
-            raise ApiError("LEGACY_DOC_NO_PERSON", "شخص سند یافت نشد", http_status=400)
 
-        person_lines: List[Dict[str, Any]] = []
-        for r in person_rows:
-            pid = self.id_map.get("persons", r.get("person_id"))
-            if not pid:
-                continue
-            amt = safe_decimal(r.get("bs"))
-            if amt <= 0:
-                amt = safe_decimal(r.get("bd"))
-            if amt <= 0:
-                amt = safe_decimal(doc.get("amount"))
-            person_lines.append(
-                {"person_id": pid, "amount": float(amt), "description": r.get("des")}
-            )
+        person_lines, account_lines = build_receipt_payment_lines(
+            rows,
+            id_map=self.id_map,
+            doc_amount=doc.get("amount"),
+        )
+
         if not person_lines:
-            raise ApiError("LEGACY_DOC_NO_PERSON", "نگاشت شخص ناموفق", http_status=400)
+            walk_in = self.id_map.walk_in_person_id
+            if walk_in:
+                amt = safe_decimal(doc.get("amount"))
+                if amt <= 0:
+                    for r in rows:
+                        a = row_amount(r)
+                        if a > 0:
+                            amt = a
+                            break
+                if amt > 0:
+                    person_lines = [
+                        {
+                            "person_id": int(walk_in),
+                            "amount": float(amt),
+                            "description": doc.get("des"),
+                        }
+                    ]
 
-        account_lines: List[Dict[str, Any]] = []
-        if bank_rows:
-            for r in bank_rows:
-                bid = self.id_map.get("bank_accounts", r.get("bank_id"))
-                if not bid:
-                    continue
-                amt = safe_decimal(r.get("bd") or r.get("bs") or doc.get("amount"))
-                account_lines.append(
-                    {
-                        "bank_id": bid,
-                        "amount": float(amt),
-                        "description": r.get("des"),
-                    }
-                )
-        else:
-            # Counterparty row without bank_id: use first business bank if any
-            default_bank = next(iter(self.id_map.bank_accounts.values()), None)
-            if not default_bank:
-                raise ApiError("LEGACY_DOC_NO_BANK", "حساب بانکی برای سند یافت نشد", http_status=400)
-            account_lines.append(
-                {
-                    "bank_id": default_bank,
-                    "amount": float(person_lines[0]["amount"]),
-                    "description": doc.get("des"),
-                }
-            )
+        if not person_lines:
+            raise ApiError("LEGACY_DOC_NO_PERSON", "شخص سند یافت نشد", http_status=400)
+        if not account_lines:
+            raise ApiError("LEGACY_DOC_NO_BANK", "حساب بانکی/صندوق برای سند یافت نشد", http_status=400)
 
         payload = {
             "document_type": document_type,
@@ -329,7 +319,29 @@ class LegacyDocumentImporter:
         for r in rows:
             pid = self.id_map.get("persons", r.get("person_id"))
             if pid:
-                return pid
+                return int(pid)
+        return None
+
+    def _resolve_person_for_doc(
+        self, doc: Dict[str, Any], rows: List[Dict[str, Any]]
+    ) -> Optional[int]:
+        header_pid = doc.get("person_id") or doc.get("personId")
+        if header_pid is not None:
+            mapped = self.id_map.get("persons", header_pid)
+            if mapped:
+                return int(mapped)
+        found = self._resolve_person_from_rows(rows)
+        if found:
+            return found
+        for r in rows:
+            if r.get("person_id") is not None:
+                mapped = self.id_map.get("persons", r.get("person_id"))
+                if mapped:
+                    return int(mapped)
+        if self.id_map.walk_in_person_id:
+            return int(self.id_map.walk_in_person_id)
+        if self.id_map.persons:
+            return int(next(iter(self.id_map.persons.values())))
         return None
 
     def _build_invoice_lines(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

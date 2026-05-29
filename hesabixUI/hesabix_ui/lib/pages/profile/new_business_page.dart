@@ -197,56 +197,55 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   
   Future<void> _pollImportJob(String jobId) async {
     final jobService = JobService();
-    
-    while (mounted && _importJobId == jobId) {
-      await Future.delayed(const Duration(seconds: 1));
-      
-      try {
-        final status = await jobService.getJobStatus(jobId);
-        final progress = status['progress'] as int? ?? 0;
-        final message = status['message'] as String? ?? '';
-        final state = status['state'] as String? ?? '';
-        
-        if (mounted) {
+    try {
+      final poll = await jobService.pollUntilComplete(
+        jobId,
+        onProgress: (progress, message) {
+          if (!mounted) return;
           setState(() {
             _importProgress = progress;
-            _importMessage = message;
-          });
-        }
-        
-        if (state == 'completed') {
-          final result = status['result'];
-          if (result != null && result['business_id'] != null) {
-            if (mounted) {
-              SnackBarHelper.showSuccess(context, message: 'کسب‌وکار با موفقیت از فایل پشتیبان ایجاد شد');
-              context.goNamed('profile_businesses');
+            if (message != null && message.isNotEmpty) {
+              _importMessage = message;
             }
-          }
-          break;
-        } else if (state == 'failed') {
-          final error = status['error'] as String? ?? 'خطا در ایمپورت';
-          if (mounted) {
-            SnackBarHelper.showError(context, message: error);
-          }
-          break;
+          });
+        },
+      );
+
+      if (!mounted) return;
+
+      if (poll.isSuccess) {
+        final businessId = poll.result?['business_id'];
+        final stats = poll.result?['stats'];
+        final skipped = stats is Map ? stats['documents_skipped'] : null;
+        final msg = skipped != null && (skipped as num) > 0
+            ? 'ایمپورت انجام شد؛ برخی اسناد منتقل نشدند ($skipped مورد)'
+            : 'کسب‌وکار با موفقیت از فایل پشتیبان ایجاد شد';
+        SnackBarHelper.showSuccess(context, message: msg);
+        if (businessId != null) {
+          context.goNamed('profile_businesses');
         }
-      } catch (e) {
-        if (mounted) {
-          SnackBarHelper.showError(
-            context,
-            message:
-                'خطا در بررسی وضعیت: ${ErrorExtractor.forContext(e, context)}',
-          );
-        }
-        break;
+      } else {
+        SnackBarHelper.showError(
+          context,
+          message: poll.errorMessage ?? 'خطا در ایمپورت',
+        );
       }
-    }
-    
-    if (mounted) {
-      setState(() {
-        _importJobId = null;
-        _isLoading = false;
-      });
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message:
+              'خطا در بررسی وضعیت: ${ErrorExtractor.forContext(e, context)}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _importJobId = null;
+          _isLoading = false;
+          _importMessage = null;
+        });
+      }
     }
   }
 
@@ -622,7 +621,9 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         centerTitle: true,
         elevation: 0,
       ) : null,
-      body: Column(
+      body: Stack(
+        children: [
+          Column(
         children: [
           // Progress indicator
           Container(
@@ -862,6 +863,46 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                     ],
                   ),
           ),
+        ],
+      ),
+          if (_isLoading && _importJobId != null) ...[
+            ModalBarrier(
+              color: Colors.black.withValues(alpha: 0.45),
+              dismissible: false,
+            ),
+            Center(
+              child: Card(
+                margin: const EdgeInsets.all(32),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: CircularProgressIndicator(
+                          value: _importProgress > 0 ? _importProgress / 100 : null,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _importMessage ?? 'در حال ایمپورت از فایل پشتیبان...',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text('$_importProgress%'),
+                      const SizedBox(height: 8),
+                      Text(
+                        'لطفاً صبر کنید',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

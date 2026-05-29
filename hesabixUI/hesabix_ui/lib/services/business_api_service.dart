@@ -46,6 +46,12 @@ class BusinessApiService {
     required String serverUrl,
     required String apiKey,
     String? businessNameOverride,
+    bool importPersons = true,
+    bool importProducts = true,
+    bool importBanks = true,
+    bool importWarehouses = true,
+    bool importDocuments = true,
+    bool importFiles = true,
     bool asyncMode = true,
   }) async {
     final response = await _apiClient.post<Map<String, dynamic>>(
@@ -53,10 +59,17 @@ class BusinessApiService {
       data: {
         'server_url': serverUrl.trim(),
         'api_key': apiKey.trim(),
-        if (businessNameOverride != null && businessNameOverride.trim().isNotEmpty)
-          'options': {
+        'options': {
+          if (businessNameOverride != null &&
+              businessNameOverride.trim().isNotEmpty)
             'business_name_override': businessNameOverride.trim(),
-          },
+          'import_persons': importPersons,
+          'import_products': importProducts,
+          'import_banks': importBanks,
+          'import_warehouses': importWarehouses,
+          'import_documents': importDocuments,
+          'import_files': importFiles,
+        },
       },
       query: {'async_mode': asyncMode},
     );
