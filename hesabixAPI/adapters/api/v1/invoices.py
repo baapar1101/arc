@@ -2616,7 +2616,7 @@ async def search_invoices_endpoint(
 		if cached is not None:
 			return success_response(data=cached, request=request)
 
-	requested_doc_type = body_data.get("document_type")
+	requested_doc_type = body.get("document_type")
 	allowed_doc_types = allowed_invoice_types_for_business(ctx, db, business_id, "view")
 	if not allowed_doc_types:
 		raise ApiError("FORBIDDEN", "No invoice type access", http_status=403)
