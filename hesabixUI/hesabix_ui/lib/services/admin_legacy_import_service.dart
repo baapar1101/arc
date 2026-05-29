@@ -36,7 +36,7 @@ class AdminLegacyImportService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/admin/legacy-import/run',
       data: formData,
-      queryParameters: params.toQuery(),
+      query: params.toQuery(),
       options: Options(
         headers: {'Content-Type': 'multipart/form-data'},
         receiveTimeout: const Duration(seconds: 30),

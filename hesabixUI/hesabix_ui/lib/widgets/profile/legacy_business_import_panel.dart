@@ -28,7 +28,7 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
   final _apiKeyController = TextEditingController();
   final _nameOverrideController = TextEditingController();
 
-  Map<String, dynamic>? _preview;
+  Map<String, dynamic>? _previewData;
   String? _importJobId;
   int _importProgress = 0;
   String? _importMessage;
@@ -48,7 +48,7 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
     widget.onLoadingChanged?.call(value);
   }
 
-  Future<void> _preview() async {
+  Future<void> _fetchPreview() async {
     final key = _apiKeyController.text.trim();
     if (key.length < 8) {
       SnackBarHelper.showError(context, message: 'کلید API را وارد کنید');
@@ -62,7 +62,7 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
       );
       if (!mounted) return;
       setState(() {
-        _preview = data;
+        _previewData = data;
         final name = data['business_name'] as String?;
         if (name != null && name.isNotEmpty && _nameOverrideController.text.isEmpty) {
           _nameOverrideController.text = name;
@@ -228,9 +228,9 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
                     ),
                     enabled: !_busy,
                   ),
-                  if (_preview != null) ...[
+                  if (_previewData != null) ...[
                     const SizedBox(height: 16),
-                    _PreviewSummary(preview: _preview!),
+                    _PreviewSummary(preview: _previewData!),
                   ],
                   if (_importMessage != null) ...[
                     const SizedBox(height: 12),
@@ -253,7 +253,7 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
               child: const Text('بستن'),
             ),
             OutlinedButton(
-              onPressed: _busy ? null : _preview,
+              onPressed: _busy ? null : _fetchPreview,
               child: const Text('تست اتصال'),
             ),
             FilledButton(
