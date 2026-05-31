@@ -33,6 +33,20 @@ def _vector_extension_available(conn) -> bool:
         return False
 
 
+def _vector_extension_installed(conn) -> bool:
+    try:
+        row = conn.execute(
+            text(
+                "SELECT 1 FROM pg_extension "
+                "WHERE extname = 'vector' LIMIT 1"
+            )
+        ).first()
+        return row is not None
+    except Exception as exc:
+        logger.warning("Could not check pg_extension: %s", exc)
+        return False
+
+
 def upgrade() -> None:
     conn = op.get_bind()
     if not _vector_extension_available(conn):
@@ -42,10 +56,17 @@ def upgrade() -> None:
         )
         return
 
-    # CREATE EXTENSION باید خارج از تراکنش DDL معمولی باشد
-    # از یک اتصال جدید با autocommit استفاده می‌کنیم تا SQLAlchemy transaction فعلی را تحت تأثیر قرار ندهیم.
-    with conn.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
-        autocommit_conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    if not _vector_extension_installed(conn):
+        try:
+            with conn.engine.connect().execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
+                autocommit_conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        except Exception as exc:
+            logger.warning(
+                "pgvector extension cannot be created by this user; skipping "
+                "embedding_vector migration (semantic search will use JSON embeddings only): %s",
+                exc,
+            )
+            return
 
     conn.execute(
         text(
