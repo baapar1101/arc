@@ -159,8 +159,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   void _syncPendingWriteApprovalFromMessages() {
     final ops = extractPendingApprovalOpsFromMessages(_messages);
     _pendingWriteApproval = ops.isNotEmpty;
-    _pendingApprovalSessionId =
-        ops.isNotEmpty ? _currentSession?.id : null;
+    _pendingApprovalSessionId = ops.isNotEmpty ? _currentSession?.id : null;
   }
 
   String? get _aiBlockReason {
@@ -1362,9 +1361,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _setVoicePhase(VoicePhase.listening);
         final tts = event['tts'] as Map<String, dynamic>?;
         if (tts?['dummy_warning'] == true) {
-          _showSnackbar(
-            AppLocalizations.of(context).aiVoiceDummyTtsWarning,
-          );
+          _showSnackbar(AppLocalizations.of(context).aiVoiceDummyTtsWarning);
         }
         return;
       case 'speech_start':
@@ -1436,6 +1433,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
           );
           setState(() {
             _messages = List<AIChatMessage>.from(_messages)..add(userMsg);
+            _syncMessageKeys();
           });
           _scrollToBottom();
           return;
@@ -1456,8 +1454,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
           final interactionId = event['interaction_id'] as int?;
           final inputTokens = usage?['input_tokens'] as int? ?? 0;
           final outputTokens = usage?['output_tokens'] as int? ?? 0;
-          final totalTokens = usage?['total_tokens'] as int? ??
-              (inputTokens + outputTokens);
+          final totalTokens =
+              usage?['total_tokens'] as int? ?? (inputTokens + outputTokens);
           setState(() {
             if (text.trim().isNotEmpty) {
               _messages = List<AIChatMessage>.from(_messages)
@@ -1470,6 +1468,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                     createdAt: _stream.timestamp ?? DateTime.now(),
                   ),
                 );
+              _syncMessageKeys();
             }
             _stream.clear();
           });
@@ -1813,85 +1812,94 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                     : null,
                               )
                             : Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                if (_streamErrorMessage != null)
-                                  AIErrorRecoveryBanner(
-                                    message: _streamErrorMessage!,
-                                    recoverable: _streamErrorRecoverable,
-                                    onRetry: _streamErrorRecoverable &&
-                                            _pendingStreamRetry != null
-                                        ? () {
-                                            setState(() {
-                                              _streamErrorMessage = null;
-                                              _streamErrorRecoverable = false;
-                                            });
-                                            _pendingStreamRetry!();
-                                          }
-                                        : null,
-                                    onDismiss: () => setState(() {
-                                      _streamErrorMessage = null;
-                                      _streamErrorRecoverable = false;
-                                    }),
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_streamErrorMessage != null)
+                                    AIErrorRecoveryBanner(
+                                      message: _streamErrorMessage!,
+                                      recoverable: _streamErrorRecoverable,
+                                      onRetry:
+                                          _streamErrorRecoverable &&
+                                              _pendingStreamRetry != null
+                                          ? () {
+                                              setState(() {
+                                                _streamErrorMessage = null;
+                                                _streamErrorRecoverable = false;
+                                              });
+                                              _pendingStreamRetry!();
+                                            }
+                                          : null,
+                                      onDismiss: () => setState(() {
+                                        _streamErrorMessage = null;
+                                        _streamErrorRecoverable = false;
+                                      }),
+                                    ),
+                                  Expanded(
+                                    child: AIChatThreadView(
+                                      key: ValueKey(
+                                        'thread-${_currentSession?.id}',
+                                      ),
+                                      businessId: widget.businessId,
+                                      suppressApprovalToolChips:
+                                          _showWriteApprovalBanner,
+                                      messages: _messages,
+                                      messageKeys: _messageKeys,
+                                      streamingContent: _stream.content,
+                                      streamingToolActivities:
+                                          _stream.toolActivities,
+                                      streamingTraceSteps: _stream.traceSteps,
+                                      streamingStatusPhase: _stream.statusPhase,
+                                      streamingStatusStep: _stream.statusStep,
+                                      streamingIteration: _stream.iteration,
+                                      streamingMaxIterations:
+                                          _stream.maxIterations,
+                                      streamingElapsedSeconds:
+                                          _stream.elapsedSeconds > 0
+                                          ? _stream.elapsedSeconds
+                                          : null,
+                                      streamingTimestamp: _stream.timestamp,
+                                      messageFeedbackRatings:
+                                          _messageFeedbackRatings,
+                                      onCopyMessage: _copyToClipboard,
+                                      onFeedback: _submitFeedback,
+                                      onRegenerateLast: _regenerateLastResponse,
+                                      lastAssistantMessageId:
+                                          _messages.isNotEmpty &&
+                                              _messages.last.role ==
+                                                  MessageRole.assistant
+                                          ? _messages.last.id
+                                          : null,
+                                      contextUsageRatio:
+                                          _stream.contextUsageRatio,
+                                      contextUsagePercent:
+                                          _stream.contextUsagePercent,
+                                      contextHistorySummarized:
+                                          _stream.contextHistorySummarized,
+                                      messagesLoading: _messagesLoading,
+                                      sending: _sending,
+                                      disabled: !_canUseAi,
+                                      voiceStarting: _voiceStarting,
+                                      voiceActive: _voice != null,
+                                      voicePhase: _voicePhase,
+                                      voiceStatusEvent: _voiceStatusEvent,
+                                      showScrollToBottom: !_autoScrollEnabled,
+                                      isGenerating: _isGenerating,
+                                      scrollController: _scrollController,
+                                      messageController: _messageCtrl,
+                                      focusNode: _focusNode,
+                                      formatTime: _formatMessageTime,
+                                      onSend: () => _sendMessage(),
+                                      onMic: _toggleVoice,
+                                      onStopVoice: _stopVoiceSession,
+                                      onStopGenerating: _stopGenerating,
+                                      onScrollToBottom: () =>
+                                          _scrollToBottom(force: true),
+                                      onMessageLongPress: _showMessageActions,
+                                      onAttach: _pickAndUploadAttachment,
+                                    ),
                                   ),
-                                Expanded(
-                                  child: AIChatThreadView(
-                                key: ValueKey('thread-${_currentSession?.id}'),
-                                businessId: widget.businessId,
-                                suppressApprovalToolChips: _showWriteApprovalBanner,
-                                messages: _messages,
-                                messageKeys: _messageKeys,
-                                streamingContent: _stream.content,
-                                streamingToolActivities: _stream.toolActivities,
-                                streamingTraceSteps: _stream.traceSteps,
-                                streamingStatusPhase: _stream.statusPhase,
-                                streamingStatusStep: _stream.statusStep,
-                                streamingIteration: _stream.iteration,
-                                streamingMaxIterations: _stream.maxIterations,
-                                streamingElapsedSeconds:
-                                    _stream.elapsedSeconds > 0
-                                    ? _stream.elapsedSeconds
-                                    : null,
-                                streamingTimestamp: _stream.timestamp,
-                                messageFeedbackRatings: _messageFeedbackRatings,
-                                onCopyMessage: _copyToClipboard,
-                                onFeedback: _submitFeedback,
-                                onRegenerateLast: _regenerateLastResponse,
-                                lastAssistantMessageId:
-                                    _messages.isNotEmpty &&
-                                        _messages.last.role ==
-                                            MessageRole.assistant
-                                    ? _messages.last.id
-                                    : null,
-                                contextUsageRatio: _stream.contextUsageRatio,
-                                contextUsagePercent: _stream.contextUsagePercent,
-                                contextHistorySummarized:
-                                    _stream.contextHistorySummarized,
-                                messagesLoading: _messagesLoading,
-                                sending: _sending,
-                                disabled: !_canUseAi,
-                                voiceStarting: _voiceStarting,
-                                voiceActive: _voice != null,
-                                voicePhase: _voicePhase,
-                                voiceStatusEvent: _voiceStatusEvent,
-                                showScrollToBottom: !_autoScrollEnabled,
-                                isGenerating: _isGenerating,
-                                scrollController: _scrollController,
-                                messageController: _messageCtrl,
-                                focusNode: _focusNode,
-                                formatTime: _formatMessageTime,
-                                onSend: () => _sendMessage(),
-                                onMic: _toggleVoice,
-                                onStopVoice: _stopVoiceSession,
-                                onStopGenerating: _stopGenerating,
-                                onScrollToBottom: () =>
-                                    _scrollToBottom(force: true),
-                                onMessageLongPress: _showMessageActions,
-                                onAttach: _pickAndUploadAttachment,
-                                  ),
-                                ),
-                              ],
-                            ),
+                                ],
+                              ),
                       ),
                     ),
                   ],
@@ -2181,15 +2189,24 @@ class _AiMoreMenu extends StatelessWidget {
         if (!isHomeMode && hasSession) ...[
           const PopupMenuItem(
             value: _AiMenuAction.search,
-            child: _AiMenuItem(icon: Icons.search_rounded, label: 'جستجو در پیام‌ها'),
+            child: _AiMenuItem(
+              icon: Icons.search_rounded,
+              label: 'جستجو در پیام‌ها',
+            ),
           ),
           const PopupMenuItem(
             value: _AiMenuAction.memory,
-            child: _AiMenuItem(icon: Icons.psychology_outlined, label: 'حافظه دستیار'),
+            child: _AiMenuItem(
+              icon: Icons.psychology_outlined,
+              label: 'حافظه دستیار',
+            ),
           ),
           const PopupMenuItem(
             value: _AiMenuAction.export,
-            child: _AiMenuItem(icon: Icons.ios_share_outlined, label: 'خروجی گفت‌وگو'),
+            child: _AiMenuItem(
+              icon: Icons.ios_share_outlined,
+              label: 'خروجی گفت‌وگو',
+            ),
           ),
         ],
         if (hasBusiness) ...[
@@ -2199,7 +2216,10 @@ class _AiMoreMenu extends StatelessWidget {
           ),
           const PopupMenuItem(
             value: _AiMenuAction.knowledge,
-            child: _AiMenuItem(icon: Icons.menu_book_outlined, label: 'دانشنامه'),
+            child: _AiMenuItem(
+              icon: Icons.menu_book_outlined,
+              label: 'دانشنامه',
+            ),
           ),
         ],
         const PopupMenuItem(

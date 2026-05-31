@@ -60,7 +60,9 @@ class AIService {
   }
 
   Future<AIPlan> getAIPlan(int planId) async {
-    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/ai/plans/$planId');
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/plans/$planId',
+    );
     final body = res.data as Map<String, dynamic>;
     return AIPlan.fromJson(body['data'] as Map<String, dynamic>);
   }
@@ -99,7 +101,9 @@ class AIService {
     );
     final body = res.data as Map<String, dynamic>;
     final data = body['data'] as List;
-    return data.map((e) => AIPrompt.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => AIPrompt.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<AIPrompt> createDefaultPrompt(Map<String, dynamic> data) async {
@@ -111,7 +115,10 @@ class AIService {
     return AIPrompt.fromJson(body['data'] as Map<String, dynamic>);
   }
 
-  Future<AIPrompt> updateDefaultPrompt(int promptId, Map<String, dynamic> data) async {
+  Future<AIPrompt> updateDefaultPrompt(
+    int promptId,
+    Map<String, dynamic> data,
+  ) async {
     final res = await _api.put<Map<String, dynamic>>(
       '/api/v1/admin/ai/prompts/default/$promptId',
       data: data,
@@ -125,7 +132,7 @@ class AIService {
   }
 
   // ========== User: Chat ==========
-  
+
   /// بررسی امکان استفاده از AI (چک پیشگیرانه)
   Future<Map<String, dynamic>> checkAvailability({
     int? businessId,
@@ -141,8 +148,10 @@ class AIService {
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
   }
-  
-  Future<List<Map<String, dynamic>>> getChatSuggestions({int? businessId}) async {
+
+  Future<List<Map<String, dynamic>>> getChatSuggestions({
+    int? businessId,
+  }) async {
     final query = <String, dynamic>{
       if (businessId != null) 'business_id': businessId.toString(),
     };
@@ -177,7 +186,8 @@ class AIService {
       data: {
         'content': content,
         if (businessId != null) 'business_id': businessId,
-        if (structured != null && structured.isNotEmpty) 'structured': structured,
+        if (structured != null && structured.isNotEmpty)
+          'structured': structured,
       },
     );
     final body = res.data as Map<String, dynamic>;
@@ -199,13 +209,13 @@ class AIService {
   Future<void> deleteAIMemory({int? businessId}) async {
     await _api.delete<Map<String, dynamic>>(
       '/api/v1/ai/chat/memory',
-      query: {
-        if (businessId != null) 'business_id': businessId.toString(),
-      },
+      query: {if (businessId != null) 'business_id': businessId.toString()},
     );
   }
 
-  Future<List<Map<String, dynamic>>> listSessionAttachments(int sessionId) async {
+  Future<List<Map<String, dynamic>>> listSessionAttachments(
+    int sessionId,
+  ) async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions/$sessionId/attachments',
     );
@@ -287,17 +297,15 @@ class AIService {
     );
     final body = res.data as Map<String, dynamic>;
     final data = body['data'] as List;
-    return data.map((e) => AIChatSession.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => AIChatSession.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
-  Future<AIChatSession> createChatSession({
-    int? businessId,
-  }) async {
+  Future<AIChatSession> createChatSession({int? businessId}) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions',
-      data: {
-        if (businessId != null) 'business_id': businessId,
-      },
+      data: {if (businessId != null) 'business_id': businessId},
     );
     final body = res.data as Map<String, dynamic>;
     return AIChatSession.fromJson(body['data'] as Map<String, dynamic>);
@@ -318,7 +326,9 @@ class AIService {
     );
     final body = res.data as Map<String, dynamic>;
     final data = body['data'] as List;
-    return data.map((e) => AIChatMessage.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => AIChatMessage.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<Map<String, dynamic>> sendMessage({
@@ -381,10 +391,7 @@ class AIService {
         options: Options(
           receiveTimeout: const Duration(minutes: 10),
           sendTimeout: const Duration(seconds: 60),
-          headers: {
-            'Accept': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-          },
+          headers: {'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'},
         ),
         cancelToken: cancelToken,
       );
@@ -406,7 +413,11 @@ class AIService {
         final line = rawLine.trimRight();
         if (line.isEmpty) {
           if (eventBuffer.isEmpty) continue;
-          final chunk = _parseSsePayload(eventBuffer.join('\n'), onError, onComplete);
+          final chunk = _parseSsePayload(
+            eventBuffer.join('\n'),
+            onError,
+            onComplete,
+          );
           eventBuffer.clear();
           if (chunk != null) yield chunk;
           continue;
@@ -420,7 +431,11 @@ class AIService {
       }
 
       if (eventBuffer.isNotEmpty) {
-        final chunk = _parseSsePayload(eventBuffer.join('\n'), onError, onComplete);
+        final chunk = _parseSsePayload(
+          eventBuffer.join('\n'),
+          onError,
+          onComplete,
+        );
         if (chunk != null) yield chunk;
       }
     } catch (e, stack) {
@@ -468,9 +483,7 @@ class AIService {
       );
     }
     if (eventType == 'heartbeat') {
-      return AIStreamChunk(
-        heartbeatElapsedMs: data['elapsed_ms'] as int? ?? 0,
-      );
+      return AIStreamChunk(heartbeatElapsedMs: data['elapsed_ms'] as int? ?? 0);
     }
     if (eventType == 'tool_start' || eventType == 'tool_end') {
       return AIStreamChunk(
@@ -487,14 +500,12 @@ class AIService {
         ),
       );
     }
-    if (eventType == 'trace_step') {
+    if (eventType == 'trace_step' || eventType == 'trace_step_update') {
       final step = AIAgentTraceStep.fromJson(data);
       return AIStreamChunk(traceStep: step);
     }
     if (eventType == 'context_usage') {
-      return AIStreamChunk(
-        contextUsage: AIStreamContextUsage.fromJson(data),
-      );
+      return AIStreamChunk(contextUsage: AIStreamContextUsage.fromJson(data));
     }
 
     final done = data['done'] as bool? ?? false;
@@ -567,7 +578,9 @@ class AIService {
     return body['data'] as Map<String, dynamic>;
   }
 
-  Future<List<Map<String, dynamic>>> getProactiveAlerts({int? businessId}) async {
+  Future<List<Map<String, dynamic>>> getProactiveAlerts({
+    int? businessId,
+  }) async {
     final query = <String, dynamic>{
       if (businessId != null) 'business_id': businessId.toString(),
     };
@@ -648,7 +661,9 @@ class AIService {
 
   // ========== Admin: AI Eval ==========
   Future<List<Map<String, dynamic>>> listEvalCases() async {
-    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/ai/eval/cases');
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/eval/cases',
+    );
     final body = res.data as Map<String, dynamic>;
     final data = body['data'] as List;
     return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -658,7 +673,10 @@ class AIService {
     await _api.post('/api/v1/admin/ai/eval/cases/seed-defaults');
   }
 
-  Future<Map<String, dynamic>> runEvalSuite({int? businessId, List<int>? caseIds}) async {
+  Future<Map<String, dynamic>> runEvalSuite({
+    int? businessId,
+    List<int>? caseIds,
+  }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/admin/ai/eval/runs',
       data: {
@@ -691,12 +709,16 @@ class AIService {
   }
 
   Future<Map<String, dynamic>> getEvalSchedule() async {
-    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/ai/eval/schedule');
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/eval/schedule',
+    );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> updateEvalSchedule(Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> updateEvalSchedule(
+    Map<String, dynamic> data,
+  ) async {
     final res = await _api.put<Map<String, dynamic>>(
       '/api/v1/admin/ai/eval/schedule',
       data: data,
@@ -714,7 +736,9 @@ class AIService {
   }
 
   Future<List<Map<String, dynamic>>> listEvalRuns() async {
-    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/ai/eval/runs');
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/eval/runs',
+    );
     final body = res.data as Map<String, dynamic>;
     final data = body['data'] as List;
     return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -780,7 +804,9 @@ class AIService {
     return body['data'] as Map<String, dynamic>;
   }
 
-  Future<List<Map<String, dynamic>>> listKnowledgeDocuments({int? businessId}) async {
+  Future<List<Map<String, dynamic>>> listKnowledgeDocuments({
+    int? businessId,
+  }) async {
     final query = <String, dynamic>{
       if (businessId != null) 'business_id': businessId.toString(),
     };
@@ -878,10 +904,7 @@ class AIService {
         options: Options(
           receiveTimeout: const Duration(minutes: 10),
           sendTimeout: const Duration(seconds: 60),
-          headers: {
-            'Accept': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-          },
+          headers: {'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'},
         ),
         cancelToken: cancelToken,
       );
@@ -902,7 +925,11 @@ class AIService {
         final line = rawLine.trimRight();
         if (line.isEmpty) {
           if (eventBuffer.isEmpty) continue;
-          final chunk = _parseSsePayload(eventBuffer.join('\n'), onError, onComplete);
+          final chunk = _parseSsePayload(
+            eventBuffer.join('\n'),
+            onError,
+            onComplete,
+          );
           eventBuffer.clear();
           if (chunk != null) yield chunk;
           continue;
@@ -915,7 +942,11 @@ class AIService {
         }
       }
       if (eventBuffer.isNotEmpty) {
-        final chunk = _parseSsePayload(eventBuffer.join('\n'), onError, onComplete);
+        final chunk = _parseSsePayload(
+          eventBuffer.join('\n'),
+          onError,
+          onComplete,
+        );
         if (chunk != null) yield chunk;
       }
     } catch (e, stack) {
@@ -940,7 +971,8 @@ class AIService {
       '/api/v1/ai/voice/interactions/$interactionId/feedback',
       data: {
         'rating': rating,
-        if (feedbackText != null && feedbackText.trim().isNotEmpty) 'feedback_text': feedbackText.trim(),
+        if (feedbackText != null && feedbackText.trim().isNotEmpty)
+          'feedback_text': feedbackText.trim(),
       },
     );
   }
@@ -1051,7 +1083,9 @@ class AIService {
     final res = await _api.get<Map<String, dynamic>>('/api/v1/ai/prompts/my');
     final body = res.data as Map<String, dynamic>;
     final data = body['data'] as List;
-    return data.map((e) => AIPrompt.fromJson(e as Map<String, dynamic>)).toList();
+    return data
+        .map((e) => AIPrompt.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<AIPrompt> createMyPrompt(Map<String, dynamic> data) async {
@@ -1063,7 +1097,10 @@ class AIService {
     return AIPrompt.fromJson(body['data'] as Map<String, dynamic>);
   }
 
-  Future<AIPrompt> updateMyPrompt(int promptId, Map<String, dynamic> data) async {
+  Future<AIPrompt> updateMyPrompt(
+    int promptId,
+    Map<String, dynamic> data,
+  ) async {
     final res = await _api.put<Map<String, dynamic>>(
       '/api/v1/ai/prompts/my/$promptId',
       data: data,
@@ -1098,19 +1135,25 @@ class AIService {
     );
     final body = res.data as Map<String, dynamic>;
     debugPrint('[AIService] getUsageStats - Response body: $body');
-    
+
     final data = body['data'];
-    debugPrint('[AIService] getUsageStats - data field: $data (type: ${data.runtimeType})');
-    
+    debugPrint(
+      '[AIService] getUsageStats - data field: $data (type: ${data.runtimeType})',
+    );
+
     if (data == null || data is! Map<String, dynamic>) {
       debugPrint('[AIService] getUsageStats - Invalid data format!');
-      throw Exception('Invalid response format: data field is missing or invalid. Got: ${data.runtimeType}');
+      throw Exception(
+        'Invalid response format: data field is missing or invalid. Got: ${data.runtimeType}',
+      );
     }
-    
+
     debugPrint('[AIService] getUsageStats - Parsing AIUsageStats from: $data');
     try {
       final stats = AIUsageStats.fromJson(data);
-      debugPrint('[AIService] getUsageStats - Successfully parsed AIUsageStats');
+      debugPrint(
+        '[AIService] getUsageStats - Successfully parsed AIUsageStats',
+      );
       return stats;
     } catch (e, stackTrace) {
       debugPrint('[AIService] getUsageStats - Error parsing AIUsageStats: $e');
@@ -1178,9 +1221,7 @@ class AIService {
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/support/tickets/$ticketId/ai-suggest-reply',
-      data: {
-        if (context != null) 'context': context,
-      },
+      data: {if (context != null) 'context': context},
       options: Options(
         receiveTimeout: _kLongAiHttpTimeout,
         sendTimeout: const Duration(seconds: 60),
@@ -1195,9 +1236,7 @@ class AIService {
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/support/tickets/$ticketId/ai-auto-reply',
-      data: {
-        if (context != null) 'context': context,
-      },
+      data: {if (context != null) 'context': context},
       options: Options(
         receiveTimeout: _kLongAiHttpTimeout,
         sendTimeout: const Duration(seconds: 60),
@@ -1206,4 +1245,3 @@ class AIService {
     return res.data as Map<String, dynamic>;
   }
 }
-

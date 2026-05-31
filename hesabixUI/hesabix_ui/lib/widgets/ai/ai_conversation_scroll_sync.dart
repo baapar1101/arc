@@ -13,10 +13,14 @@ abstract final class AIConversationScrollSync {
     if (!scrollController.hasClients || messageKeys.isEmpty) return 0;
 
     final position = scrollController.position;
-    final anchor = position.pixels + position.viewportDimension * anchorViewportFraction;
+    final viewportStart = position.pixels;
+    final viewportEnd = position.pixels + position.viewportDimension;
+    final anchor =
+        viewportStart + position.viewportDimension * anchorViewportFraction;
 
     var bestIndex = 0;
-    var bestOffset = -double.infinity;
+    var bestScore = -1.0;
+    var bestDistance = double.infinity;
 
     for (var i = 0; i < messageKeys.length; i++) {
       final ctx = messageKeys[i].currentContext;
@@ -28,10 +32,22 @@ abstract final class AIConversationScrollSync {
       if (viewport == null) continue;
 
       final revealed = viewport.getOffsetToReveal(renderObject, 0.0);
-      final offset = revealed.offset;
+      final start = revealed.offset;
+      final height = renderObject.paintBounds.height;
+      if (height <= 0) continue;
+      final end = start + height;
+      final overlap = (viewportEnd < start || viewportStart > end)
+          ? 0.0
+          : (viewportEnd < end ? viewportEnd : end) -
+                (viewportStart > start ? viewportStart : start);
+      final visibility = overlap / height;
+      final center = start + height / 2;
+      final distance = (center - anchor).abs();
 
-      if (offset <= anchor && offset >= bestOffset) {
-        bestOffset = offset;
+      if (visibility > bestScore ||
+          (visibility == bestScore && distance < bestDistance)) {
+        bestScore = visibility;
+        bestDistance = distance;
         bestIndex = i;
       }
     }

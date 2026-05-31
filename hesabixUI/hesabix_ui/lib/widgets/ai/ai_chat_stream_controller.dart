@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 
 /// برچسب ابزار برای رویدادهای استریم (معمولاً از l10n).
-typedef AIChatToolLabelResolver = String Function(String toolName, String? toolKey);
+typedef AIChatToolLabelResolver =
+    String Function(String toolName, String? toolKey);
 
 /// مدیریت state استریم چت AI — جدا از [AIChatDialog] برای خوانایی و تست.
 class AIChatStreamController extends ChangeNotifier {
@@ -69,7 +70,8 @@ class AIChatStreamController extends ChangeNotifier {
     List<AIToolActivity> tools,
     List<AIAgentTraceStep> trace,
     DateTime? createdAt,
-  })? snapshotForCancel() {
+  })?
+  snapshotForCancel() {
     final partial = content?.trim() ?? '';
     if (partial.isEmpty && toolActivities.isEmpty && traceSteps.isEmpty) {
       return null;
@@ -151,7 +153,8 @@ class AIChatStreamController extends ChangeNotifier {
 
   /// به‌روزرسانی متن انباشته — throttle برای content delta.
   bool updateAccumulatedContent(String accumulated, AIStreamChunk chunk) {
-    final immediate = chunk.traceStep != null ||
+    final immediate =
+        chunk.traceStep != null ||
         chunk.statusEvent != null ||
         chunk.toolEvent != null ||
         chunk.heartbeatElapsedMs != null;
@@ -167,7 +170,8 @@ class AIChatStreamController extends ChangeNotifier {
     }
 
     final now = DateTime.now();
-    final shouldUpdate = _lastUiUpdate == null ||
+    final shouldUpdate =
+        _lastUiUpdate == null ||
         now.difference(_lastUiUpdate!) >=
             const Duration(milliseconds: _contentThrottleMs);
     if (!shouldUpdate) return false;
@@ -179,10 +183,35 @@ class AIChatStreamController extends ChangeNotifier {
   }
 
   void mergeAgentTraceFromDone(List<AIAgentTraceStep>? agentTrace) {
-    if (agentTrace != null && agentTrace.isNotEmpty && traceSteps.isEmpty) {
+    if (agentTrace == null || agentTrace.isEmpty) return;
+    if (traceSteps.isEmpty) {
       traceSteps = List<AIAgentTraceStep>.from(agentTrace);
       notifyListeners();
+      return;
     }
+
+    final existingById = <String, AIAgentTraceStep>{};
+    for (final step in traceSteps) {
+      if (step.stepId.isNotEmpty) {
+        existingById[step.stepId] = step;
+      }
+    }
+
+    final merged = <AIAgentTraceStep>[];
+    for (final step in agentTrace) {
+      if (step.stepId.isNotEmpty && existingById.containsKey(step.stepId)) {
+        merged.add(step);
+        existingById.remove(step.stepId);
+      } else {
+        merged.add(step);
+      }
+    }
+    if (existingById.isNotEmpty) {
+      merged.addAll(existingById.values);
+    }
+
+    traceSteps = merged;
+    notifyListeners();
   }
 
   void _applyTraceStep(AIAgentTraceStep step) {
