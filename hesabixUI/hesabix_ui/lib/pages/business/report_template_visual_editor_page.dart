@@ -97,7 +97,9 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
   
   // View mode: 'list' or 'canvas'
   String _viewMode = 'list';
-  
+  String? _selectedSection;
+  int? _selectedBlockIndex;
+
   // Canvas zoom and pan
   double _canvasZoom = 1.0;
   Offset _canvasPan = Offset.zero;
@@ -137,6 +139,306 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
   bool get _hasUnsavedChanges {
     if (_lastSavedFingerprint.isEmpty) return false;
     return _fingerprint() != _lastSavedFingerprint;
+  }
+
+  void _selectBlock(String section, int index) {
+    setState(() {
+      _selectedSection = section;
+      _selectedBlockIndex = index;
+    });
+  }
+
+  void _clearBlockSelection() {
+    setState(() {
+      _selectedSection = null;
+      _selectedBlockIndex = null;
+    });
+  }
+
+  Widget _buildSelectedBlockInspector(String section) {
+    if (_selectedSection != section || _selectedBlockIndex == null) {
+      return const SizedBox.shrink();
+    }
+    final blocks = List<Map<String, dynamic>>.from((_design[section] as List?) ?? const []);
+    if (_selectedBlockIndex! < 0 || _selectedBlockIndex! >= blocks.length) {
+      return const SizedBox.shrink();
+    }
+    final block = blocks[_selectedBlockIndex!];
+    final type = (block['type'] ?? '').toString();
+    final props = (block['props'] as Map?)?.cast<String, dynamic>() ?? {};
+    return Card(
+      margin: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(_getBlockIcon(type), color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${_getBlockTitle(type)} • بخش ${section.toUpperCase()} #${_selectedBlockIndex! + 1}',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.clear),
+                  tooltip: 'لغو انتخاب',
+                  onPressed: _clearBlockSelection,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _editBlock(block, _selectedBlockIndex!, section),
+                  icon: const Icon(Icons.edit, size: 18),
+                  label: const Text('ویرایش'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    final copy = Map<String, dynamic>.from(block);
+                    setState(() {
+                      blocks.insert(_selectedBlockIndex! + 1, copy);
+                      _design[section] = blocks;
+                      _pushHistory();
+                    });
+                  },
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: const Text('کپی'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _selectedBlockIndex! > 0
+                      ? () {
+                          setState(() {
+                            final current = blocks.removeAt(_selectedBlockIndex!);
+                            blocks.insert(_selectedBlockIndex! - 1, current);
+                            _design[section] = blocks;
+                            _selectedBlockIndex = _selectedBlockIndex! - 1;
+                            _pushHistory();
+                          });
+                        }
+                      : null,
+                  icon: const Icon(Icons.arrow_upward, size: 18),
+                  label: const Text('بالا'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _selectedBlockIndex! < blocks.length - 1
+                      ? () {
+                          setState(() {
+                            final current = blocks.removeAt(_selectedBlockIndex!);
+                            blocks.insert(_selectedBlockIndex! + 1, current);
+                            _design[section] = blocks;
+                            _selectedBlockIndex = _selectedBlockIndex! + 1;
+                            _pushHistory();
+                          });
+                        }
+                      : null,
+                  icon: const Icon(Icons.arrow_downward, size: 18),
+                  label: const Text('پایین'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      blocks.removeAt(_selectedBlockIndex!);
+                      _design[section] = blocks;
+                      _clearBlockSelection();
+                      _pushHistory();
+                    });
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('حذف'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text('پیش‌نمایش سریع', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            _buildBlockPreviewContent(type, props),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInspectorPane() {
+    if (_selectedSection == null || _selectedBlockIndex == null) {
+      return _buildInspectorEmptyState();
+    }
+
+    final section = _selectedSection!;
+    final index = _selectedBlockIndex!;
+    final blocks = List<Map<String, dynamic>>.from((_design[section] as List?) ?? const []);
+    if (index < 0 || index >= blocks.length) {
+      return _buildInspectorEmptyState();
+    }
+
+    final block = blocks[index];
+    final type = (block['type'] ?? '').toString();
+    final props = (block['props'] as Map?)?.cast<String, dynamic>() ?? {};
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('بازرس بلوک', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Card(
+            elevation: 1,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(_getBlockIcon(type), size: 28, color: Theme.of(context).colorScheme.primary),
+                    title: Text(_getBlockTitle(type), style: Theme.of(context).textTheme.titleMedium),
+                    subtitle: Text('بخش ${section.toUpperCase()} • آیتم ${index + 1}'),
+                  ),
+                  const SizedBox(height: 8),
+                  if (props.isNotEmpty)
+                    ...props.entries.map(
+                      (entry) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(width: 90, child: Text('${entry.key}:', style: Theme.of(context).textTheme.bodySmall)),
+                            Expanded(
+                              child: Text(
+                                entry.value?.toString() ?? '—',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text('این بلوک در حال حاضر هیچ ویژگی قابل مشاهده‌ای ندارد.', style: Theme.of(context).textTheme.bodySmall),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: () => _editBlock(block, index, section),
+                icon: const Icon(Icons.edit, size: 18),
+                label: const Text('ویرایش'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  final copy = Map<String, dynamic>.from(block);
+                  setState(() {
+                    blocks.insert(index + 1, copy);
+                    _design[section] = blocks;
+                    _pushHistory();
+                  });
+                },
+                icon: const Icon(Icons.copy, size: 18),
+                label: const Text('کپی'),
+              ),
+              OutlinedButton.icon(
+                onPressed: index > 0
+                    ? () {
+                        setState(() {
+                          final current = blocks.removeAt(index);
+                          blocks.insert(index - 1, current);
+                          _design[section] = blocks;
+                          _selectedBlockIndex = index - 1;
+                          _pushHistory();
+                        });
+                      }
+                    : null,
+                icon: const Icon(Icons.arrow_upward, size: 18),
+                label: const Text('بالا'),
+              ),
+              OutlinedButton.icon(
+                onPressed: index < blocks.length - 1
+                    ? () {
+                        setState(() {
+                          final current = blocks.removeAt(index);
+                          blocks.insert(index + 1, current);
+                          _design[section] = blocks;
+                          _selectedBlockIndex = index + 1;
+                          _pushHistory();
+                        });
+                      }
+                    : null,
+                icon: const Icon(Icons.arrow_downward, size: 18),
+                label: const Text('پایین'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    blocks.removeAt(index);
+                    _design[section] = blocks;
+                    _clearBlockSelection();
+                    _pushHistory();
+                  });
+                },
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('حذف'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_selectedSection != null)
+            Card(
+              elevation: 1,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text('راهنمای سریع', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    const Text('برای ویرایش، روی هر بلوک کلیک کنید. از پالت بلوک‌ها برای افزودن عناصر جدید استفاده کنید.'),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInspectorEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(Icons.info_outline, size: 52, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            Text('یک بلوک انتخاب کنید', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('برای دسترسی سریع به عملیات ویرایش، یک بلوک را در لیست یا canvas انتخاب کنید.'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  int _sectionBlockCount(String section) {
+    return List<Map<String, dynamic>>.from((_design[section] as List?) ?? const []).length;
   }
 
   Future<bool> _confirmDiscardIfDirty() async {
@@ -1072,6 +1374,14 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                 ],
               ),
               const SizedBox(width: 4),
+              if (_hasUnsavedChanges)
+                Chip(
+                  visualDensity: VisualDensity.compact,
+                  backgroundColor: Colors.orange.withOpacity(0.16),
+                  avatar: const Icon(Icons.circle, size: 12, color: Colors.orange),
+                  label: const Text('ذخیره نشده'),
+                ),
+              const SizedBox(width: 4),
               ToggleButtons(
                 isSelected: [_viewMode == 'list', _viewMode == 'canvas'],
                 onPressed: (index) {
@@ -1171,11 +1481,11 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                   child: Column(
                     children: [
                       TabBar(
-                        tabs: const [
-                          Tab(text: 'Header'),
-                          Tab(text: 'Body'),
-                          Tab(text: 'Footer'),
-                          Tab(text: 'CSS'),
+                        tabs: [
+                          Tab(text: 'Header (${_sectionBlockCount('header')})'),
+                          Tab(text: 'Body (${_sectionBlockCount('blocks')})'),
+                          Tab(text: 'Footer (${_sectionBlockCount('footer')})'),
+                          const Tab(text: 'CSS'),
                         ],
                       ),
                       Expanded(
@@ -1197,6 +1507,14 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
                     ],
                   ),
                 ),
+              ),
+              Container(
+                width: 320,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  border: Border(left: BorderSide(color: Theme.of(context).dividerColor)),
+                ),
+                child: _buildInspectorPane(),
               ),
             ],
           ),
@@ -1583,6 +1901,7 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
 
   Widget _buildBlockCard(Map<String, dynamic> block, int index, String section) {
     final type = (block['type'] ?? '').toString();
+    final selected = _selectedSection == section && _selectedBlockIndex == index;
     final props = (block['props'] as Map?)?.cast<String, dynamic>() ?? {};
     final blocks = List<Map<String, dynamic>>.from(
       (_design[section] as List?) ?? const [],
@@ -1591,7 +1910,16 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
     return Card(
       key: ValueKey('${section}_$index'),
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      color: selected ? Theme.of(context).colorScheme.primary.withOpacity(0.08) : null,
+      elevation: selected ? 2 : 0,
+      shape: selected
+          ? RoundedRectangleBorder(
+              side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+              borderRadius: BorderRadius.circular(8),
+            )
+          : null,
       child: ListTile(
+        onTap: () => _selectBlock(section, index),
         leading: Icon(_getBlockIcon(type)),
         title: Text(_getBlockTitle(type)),
         subtitle: Text(_getBlockPreview(type, props), maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -2872,12 +3200,20 @@ class _ReportTemplateVisualEditorPageState extends State<ReportTemplateVisualEdi
       (_design[section] as List?) ?? const [],
     );
 
+    final selected = _selectedSection == section && _selectedBlockIndex == index;
     return Card(
       key: ValueKey('canvas_${section}_$index'),
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
+      elevation: selected ? 4 : 2,
+      shape: selected
+          ? RoundedRectangleBorder(
+              side: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5),
+              borderRadius: BorderRadius.circular(12),
+            )
+          : null,
       child: InkWell(
-        onTap: () => _editBlock(block, index, section),
+        onTap: () => _selectBlock(section, index),
+        onLongPress: () => _editBlock(block, index, section),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

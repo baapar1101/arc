@@ -33,6 +33,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   late final ReportTemplateService _service;
   final _moduleCtrl = TextEditingController(text: 'invoices');
   final _subtypeCtrl = TextEditingController(text: 'list');
+  final _searchCtrl = TextEditingController();
   String? _statusFilter; // draft/published/null
 
   bool _loading = false;
@@ -372,6 +373,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   void dispose() {
     _moduleCtrl.dispose();
     _subtypeCtrl.dispose();
+    _searchCtrl.dispose();
     _nameCtrl.dispose();
     _descCtrl.dispose();
     _htmlCtrl.dispose();
@@ -384,6 +386,15 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     _marginLeftCtrl.dispose();
     _paperCustomCtrl.dispose();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _filteredItems {
+    final query = _searchCtrl.text.trim().toLowerCase();
+    if (query.isEmpty) return _items;
+    return _items.where((item) {
+      final text = '${item['name'] ?? ''} ${item['description'] ?? ''} ${item['module_key'] ?? ''} ${item['subtype'] ?? ''}'.toLowerCase();
+      return text.contains(query);
+    }).toList();
   }
 
   Future<void> _fetch() async {
@@ -2120,6 +2131,32 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
               ],
             ),
             const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchCtrl,
+                    decoration: InputDecoration(
+                      labelText: t.search,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                      suffixIcon: _searchCtrl.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _searchCtrl.clear();
+                                });
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
               child: Wrap(
@@ -2169,19 +2206,237 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             Expanded(
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
-                  : _items.isEmpty
-                      ? Center(child: Text(t.reportTemplatesEmptyList))
+                  : _filteredItems.isEmpty
+                      ? Center(child: Text(_searchCtrl.text.trim().isEmpty ? t.reportTemplatesEmptyList : t.reportTemplatesEmptyList))
                       : Card(
                           clipBehavior: Clip.antiAlias,
                           child: ListView.separated(
-                            itemCount: _items.length,
+                            itemCount: _filteredItems.length,
                             separatorBuilder: (_, _) => const Divider(height: 1),
                             itemBuilder: (ctx, idx) {
-                              final it = _items[idx];
+                              final it = _filteredItems[idx];
                               final isDefault = it['is_default'] == true;
                               final status = (it['status'] ?? '').toString();
                               final updated = it['updated_at']?.toString() ?? '';
-                              return ListTile(
+                              return Card(
+                                margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                                elevation: 1,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Icon(
+                                            isDefault ? Icons.star : Icons.description,
+                                            color: isDefault ? Colors.amber : Theme.of(context).colorScheme.primary,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  it['name']?.toString() ?? '-',
+                                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                                                ),
+                                                const SizedBox(height: 6),
+                                                Wrap(
+                                                  spacing: 6,
+                                                  runSpacing: 4,
+                                                  children: [
+                                                    Chip(
+                                                      visualDensity: VisualDensity.compact,
+                                                      label: Text(_statusLabel(t, status)),
+                                                    ),
+                                                    if (isDefault)
+                                                      Chip(
+                                                        visualDensity: VisualDensity.compact,
+                                                        avatar: const Icon(Icons.star, size: 16),
+                                                        label: Text(t.reportTemplateDefaultBadge),
+                                                      ),
+                                                    Chip(
+                                                      visualDensity: VisualDensity.compact,
+                                                      label: Text(_scopeLabel(t, (it['module_key'] ?? '-').toString(), it['subtype']?.toString())),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        it['description']?.toString() ?? '',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              'v${it['version'] ?? '-'}${updated.isNotEmpty ? ' · $updated' : ''}',
+                                              style: Theme.of(context).textTheme.bodySmall,
+                                            ),
+                                          ),
+                                          PopupMenuButton<String>(
+                                            tooltip: t.reportTemplateRowActions,
+                                            itemBuilder: (pmCtx) => [
+                                              PopupMenuItem(
+                                                value: 'preview',
+                                                child: ListTile(
+                                                  leading: const Icon(Icons.visibility),
+                                                  title: Text(t.reportTemplatePreview),
+                                                  dense: true,
+                                                  contentPadding: EdgeInsets.zero,
+                                                ),
+                                              ),
+                                              const PopupMenuItem(
+                                                value: 'history',
+                                                child: ListTile(
+                                                  leading: Icon(Icons.history),
+                                                  title: Text('تاریخچه وضعیت'),
+                                                  dense: true,
+                                                  contentPadding: EdgeInsets.zero,
+                                                ),
+                                              ),
+                                              PopupMenuItem(
+                                                value: 'edit',
+                                                child: ListTile(
+                                                  leading: const Icon(Icons.edit),
+                                                  title: Text(t.reportTemplateEdit),
+                                                  dense: true,
+                                                  contentPadding: EdgeInsets.zero,
+                                                ),
+                                              ),
+                                              if (status == 'published' || _canApprove)
+                                                PopupMenuItem(
+                                                  value: 'publish',
+                                                  child: ListTile(
+                                                    leading: Icon(status == 'published' ? Icons.visibility_off : Icons.publish),
+                                                    title: Text(status == 'published' ? t.reportTemplateUnpublish : t.reportTemplatePublish),
+                                                    dense: true,
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                              if (status == 'draft')
+                                                const PopupMenuItem(
+                                                  value: 'submit_review',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.rate_review_outlined),
+                                                    title: Text('ارسال برای بررسی'),
+                                                    dense: true,
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                              if (status == 'in_review' && _canApprove)
+                                                const PopupMenuItem(
+                                                  value: 'approve',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.verified_outlined),
+                                                    title: Text('تایید قالب'),
+                                                    dense: true,
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                              if (status != 'deprecated')
+                                                const PopupMenuItem(
+                                                  value: 'deprecate',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.archive_outlined),
+                                                    title: Text('منسوخ کردن'),
+                                                    dense: true,
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                              if (status == 'in_review' || status == 'approved' || status == 'deprecated')
+                                                const PopupMenuItem(
+                                                  value: 'back_to_draft',
+                                                  child: ListTile(
+                                                    leading: Icon(Icons.edit_note_outlined),
+                                                    title: Text('بازگشت به پیش‌نویس'),
+                                                    dense: true,
+                                                    contentPadding: EdgeInsets.zero,
+                                                  ),
+                                                ),
+                                              PopupMenuItem(
+                                                value: 'default',
+                                                child: ListTile(
+                                                  leading: const Icon(Icons.star_outline),
+                                                  title: Text(t.reportTemplateSetDefault),
+                                                  dense: true,
+                                                  contentPadding: EdgeInsets.zero,
+                                                ),
+                                              ),
+                                              PopupMenuItem(
+                                                value: 'export',
+                                                child: ListTile(
+                                                  leading: const Icon(Icons.file_download_outlined),
+                                                  title: Text(t.reportTemplateExportThis),
+                                                  dense: true,
+                                                  contentPadding: EdgeInsets.zero,
+                                                ),
+                                              ),
+                                              PopupMenuItem(
+                                                value: 'delete',
+                                                child: ListTile(
+                                                  leading: const Icon(Icons.delete_outline),
+                                                  title: Text(t.reportTemplateDelete),
+                                                  dense: true,
+                                                  contentPadding: EdgeInsets.zero,
+                                                ),
+                                              ),
+                                            ],
+                                            onSelected: (v) {
+                                              switch (v) {
+                                                case 'preview':
+                                                  _previewTemplate(it);
+                                                  break;
+                                                case 'history':
+                                                  _showStatusHistory(it);
+                                                  break;
+                                                case 'edit':
+                                                  _editDialog(it);
+                                                  break;
+                                                case 'publish':
+                                                  _togglePublish(it);
+                                                  break;
+                                                case 'default':
+                                                  _setDefault(it);
+                                                  break;
+                                                case 'submit_review':
+                                                  _transitionStatus(it, 'in_review');
+                                                  break;
+                                                case 'approve':
+                                                  _transitionStatus(it, 'approved');
+                                                  break;
+                                                case 'deprecate':
+                                                  _transitionStatus(it, 'deprecated');
+                                                  break;
+                                                case 'back_to_draft':
+                                                  _transitionStatus(it, 'draft');
+                                                  break;
+                                                case 'export':
+                                                  _exportTemplateJson(it, t);
+                                                  break;
+                                                case 'delete':
+                                                  _delete(it);
+                                                  break;
+                                              }
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
                                 title: Text(it['name']?.toString() ?? '-'),
                                 isThreeLine: true,
                                 subtitle: Column(
