@@ -808,7 +808,7 @@ async def create_database_restore_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ):
-	if not ctx.has_any_permission("superadmin"):
+	if not ctx.is_superadmin():
 		raise ApiError("FORBIDDEN", "فقط superadmin می‌تواند ریستور دیتابیس انجام دهد.", http_status=403)
 
 	confirmation_clean = (confirmation or "").strip()

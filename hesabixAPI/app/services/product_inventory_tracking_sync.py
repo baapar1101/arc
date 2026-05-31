@@ -18,6 +18,8 @@ from app.services.invoice_service import (
     _remove_old_invoice_warehouse_documents,
 )
 
+logger = logging.getLogger(__name__)
+
 def _invoice_lines_for_product(
     db: Session,
     *,

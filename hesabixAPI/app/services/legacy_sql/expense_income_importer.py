@@ -9,13 +9,14 @@ from sqlalchemy.orm import Session
 
 from app.services.expense_income_service import create_expense_income
 from app.services.legacy_sql.legacy_account_resolver import (
+	LegacySqlAccountResolver,
 	build_ref_id_index,
-	resolve_account_id_for_ref,
 )
 from app.services.legacy_sql.mappers import (
 	convert_amount,
 	convert_persian_date_to_date,
 	convert_timestamp_to_datetime,
+	is_valid_mapped_id,
 )
 from app.services.legacy_sql.sql_dump_reader import LegacySqlData
 
@@ -35,7 +36,8 @@ class LegacyExpenseIncomeImporter:
 		self.db = db
 		self.data = data
 		self.dry_run = dry_run
-		self.ref_index = build_ref_id_index(data)
+		self.ref_index = build_ref_id_index(data.rows("hesabdari_table"))
+		self._account_resolvers: Dict[int, LegacySqlAccountResolver] = {}
 		self.stats = {
 			"processed": 0,
 			"migrated": 0,
@@ -45,6 +47,13 @@ class LegacyExpenseIncomeImporter:
 		}
 		self._rows_by_doc: Dict[int, List[Dict[str, Any]]] | None = None
 		self._migrated_old_ids: Set[int] = set()
+
+	def _account_resolver(self, business_id: int) -> LegacySqlAccountResolver:
+		resolver = self._account_resolvers.get(business_id)
+		if resolver is None:
+			resolver = LegacySqlAccountResolver(self.db, business_id, self.ref_index)
+			self._account_resolvers[business_id] = resolver
+		return resolver
 
 	def _build_rows_index(self) -> Dict[int, List[Dict[str, Any]]]:
 		index: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
@@ -148,6 +157,8 @@ class LegacyExpenseIncomeImporter:
 
 		item_lines: List[Dict[str, Any]] = []
 		counterparty_lines: List[Dict[str, Any]] = []
+		account_resolver = self._account_resolver(new_bid)
+		is_income = document_type == "income"
 
 		for row in rows:
 			d = convert_amount(row.get("bs"))
@@ -162,7 +173,7 @@ class LegacyExpenseIncomeImporter:
 
 			if row.get("person_id") and ref_id in (3, 8):
 				pid = person_id_map.get((old_bid, int(row["person_id"])))
-				if pid and pid > 0:
+				if is_valid_mapped_id(pid, dry_run=self.dry_run):
 					counterparty_lines.append({
 						"transaction_type": "person",
 						"amount": amount,
@@ -173,7 +184,7 @@ class LegacyExpenseIncomeImporter:
 
 			if row.get("bank_id"):
 				nb = bank_id_map.get((old_bid, int(row["bank_id"])))
-				if nb and nb > 0:
+				if is_valid_mapped_id(nb, dry_run=self.dry_run):
 					counterparty_lines.append({
 						"transaction_type": "bank",
 						"amount": amount,
@@ -184,7 +195,7 @@ class LegacyExpenseIncomeImporter:
 
 			if row.get("cashdesk_id"):
 				nc = cashdesk_id_map.get((old_bid, int(row["cashdesk_id"])))
-				if nc and nc > 0:
+				if is_valid_mapped_id(nc, dry_run=self.dry_run):
 					counterparty_lines.append({
 						"transaction_type": "cash_register",
 						"amount": amount,
@@ -195,7 +206,7 @@ class LegacyExpenseIncomeImporter:
 
 			if row.get("salary_id"):
 				ns = petty_id_map.get((old_bid, int(row["salary_id"])))
-				if ns and ns > 0:
+				if is_valid_mapped_id(ns, dry_run=self.dry_run):
 					counterparty_lines.append({
 						"transaction_type": "petty_cash",
 						"amount": amount,
@@ -207,8 +218,10 @@ class LegacyExpenseIncomeImporter:
 			if ref_id in _SKIP_REF_IDS or row.get("commodity_id"):
 				continue
 
-			account_id = resolve_account_id_for_ref(
-				self.db, ref_id, self.ref_index, fallback_expense=True
+			account_id = account_resolver.resolve_account_id_for_ref(
+				ref_id,
+				is_income=is_income,
+				fallback_expense=True,
 			)
 			if account_id:
 				item_lines.append({

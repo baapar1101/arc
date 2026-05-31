@@ -9,13 +9,14 @@ from sqlalchemy.orm import Session
 
 from app.services.expense_income_service import _get_fixed_account_by_code
 from app.services.legacy_sql.legacy_account_resolver import (
+	LegacySqlAccountResolver,
 	build_ref_id_index,
-	resolve_account_id_for_ref,
 )
 from app.services.legacy_sql.mappers import (
 	convert_amount,
 	convert_persian_date_to_date,
 	convert_timestamp_to_datetime,
+	is_valid_mapped_id,
 )
 from app.services.legacy_sql.sql_dump_reader import LegacySqlData
 from app.services.opening_balance_service import upsert_opening_balance
@@ -81,7 +82,7 @@ class LegacyOpeningBalanceImporter:
 		on_progress: ProgressCb = None,
 	) -> Dict[str, Any]:
 		self._rows_by_doc = self._build_rows_index()
-		ref_index = build_ref_id_index(self.data)
+		ref_index = build_ref_id_index(self.data.rows("hesabdari_table"))
 		docs = [d for d in self.data.rows("hesabdari_doc") if str(d.get("type") or "") == "open_balance"]
 		total = len(docs) or 1
 
@@ -179,7 +180,7 @@ class LegacyOpeningBalanceImporter:
 					nb = bank_id_map.get((old_bid, int(row["bank_id"])))
 				except (TypeError, ValueError):
 					nb = None
-				if nb and nb > 0:
+				if is_valid_mapped_id(nb, dry_run=self.dry_run):
 					account_lines.append({
 						"bank_account_id": nb,
 						"debit": float(debit),
@@ -193,7 +194,7 @@ class LegacyOpeningBalanceImporter:
 					nc = cashdesk_id_map.get((old_bid, int(row["cashdesk_id"])))
 				except (TypeError, ValueError):
 					nc = None
-				if nc and nc > 0:
+				if is_valid_mapped_id(nc, dry_run=self.dry_run):
 					account_lines.append({
 						"cash_register_id": nc,
 						"debit": float(debit),
@@ -207,7 +208,7 @@ class LegacyOpeningBalanceImporter:
 					np = petty_id_map.get((old_bid, int(row["salary_id"])))
 				except (TypeError, ValueError):
 					np = None
-				if np and np > 0:
+				if is_valid_mapped_id(np, dry_run=self.dry_run):
 					account_lines.append({
 						"petty_cash_id": np,
 						"debit": float(debit),
@@ -221,7 +222,7 @@ class LegacyOpeningBalanceImporter:
 					pp = person_id_map.get((old_bid, int(row["person_id"])))
 				except (TypeError, ValueError):
 					pp = None
-				if pp and pp > 0:
+				if is_valid_mapped_id(pp, dry_run=self.dry_run):
 					account_lines.append({
 						"person_id": pp,
 						"debit": float(debit),
@@ -231,7 +232,8 @@ class LegacyOpeningBalanceImporter:
 					continue
 
 			ref_id = row.get("ref_id")
-			acc_id = resolve_account_id_for_ref(self.db, ref_id, ref_index)
+			account_resolver = LegacySqlAccountResolver(self.db, new_bid, ref_index)
+			acc_id = account_resolver.resolve_account_id_for_ref(ref_id)
 			if acc_id:
 				account_lines.append({
 					"account_id": acc_id,

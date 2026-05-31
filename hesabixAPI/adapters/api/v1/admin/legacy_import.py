@@ -24,7 +24,7 @@ _ALLOWED_EXTENSIONS = (".sql", ".sql.gz", ".gz", ".hs60", ".zip")
 
 
 def _require_superadmin(ctx: AuthContext) -> None:
-	if not ctx.has_any_permission("superadmin"):
+	if not ctx.is_superadmin():
 		raise ApiError("FORBIDDEN", "فقط superadmin مجاز است.", http_status=403)
 
 

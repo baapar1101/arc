@@ -11,6 +11,7 @@ from app.services.legacy_sql.mappers import (
 	convert_amount,
 	convert_persian_date_to_date,
 	convert_timestamp_to_datetime,
+	is_valid_mapped_id,
 )
 from app.services.legacy_sql.sql_dump_reader import LegacySqlData
 from app.services.receipt_payment_service import create_receipt_payment
@@ -190,7 +191,7 @@ class LegacyReceiptPaymentImporter:
 					new_pid = person_id_map.get((old_bid, int(pid)))
 				except (TypeError, ValueError):
 					new_pid = None
-				if new_pid and new_pid > 0:
+				if is_valid_mapped_id(new_pid, dry_run=self.dry_run):
 					person_lines.append({
 						"person_id": new_pid,
 						"amount": amount,
@@ -208,19 +209,19 @@ class LegacyReceiptPaymentImporter:
 				if tx_type == "bank":
 					ob = row.get("bank_id")
 					nb = bank_id_map.get((old_bid, int(ob))) if ob is not None else None
-					if not nb or nb < 0:
+					if not is_valid_mapped_id(nb, dry_run=self.dry_run):
 						continue
 					acc_line["bank_id"] = nb
 				elif tx_type == "cash_register":
 					oc = row.get("cashdesk_id")
 					nc = cashdesk_id_map.get((old_bid, int(oc))) if oc is not None else None
-					if not nc or nc < 0:
+					if not is_valid_mapped_id(nc, dry_run=self.dry_run):
 						continue
 					acc_line["cash_register_id"] = nc
 				elif tx_type == "petty_cash":
 					os = row.get("salary_id")
 					ns = petty_id_map.get((old_bid, int(os))) if os is not None else None
-					if not ns or ns < 0:
+					if not is_valid_mapped_id(ns, dry_run=self.dry_run):
 						continue
 					acc_line["petty_cash_id"] = ns
 				else:

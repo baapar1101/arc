@@ -111,6 +111,15 @@ INVOICE_TYPE_MAP = {
 }
 
 
+def is_valid_mapped_id(mapped_id: int | None, *, dry_run: bool = False) -> bool:
+	"""شناسه نگاشت‌شده معتبر است (در dry_run شناسه‌های منفی placeholder هم پذیرفته می‌شوند)."""
+	if mapped_id is None:
+		return False
+	if mapped_id > 0:
+		return True
+	return dry_run and mapped_id < 0
+
+
 def convert_warehouse_doc_type(old_type: str | None, type_string: str | None = None) -> str:
 	"""تبدیل type قدیمی storeroom_ticket به doc_type جدید."""
 	if not old_type:

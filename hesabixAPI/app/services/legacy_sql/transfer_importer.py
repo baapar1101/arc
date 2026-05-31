@@ -11,6 +11,7 @@ from app.services.legacy_sql.mappers import (
 	convert_amount,
 	convert_persian_date_to_date,
 	convert_timestamp_to_datetime,
+	is_valid_mapped_id,
 )
 from app.services.legacy_sql.sql_dump_reader import LegacySqlData
 from app.services.transfer_service import create_transfer
@@ -86,21 +87,21 @@ class LegacyTransferImporter:
 				nb = bank_id_map.get((old_bid, int(row["bank_id"])))
 			except (TypeError, ValueError):
 				nb = None
-			if nb and nb > 0:
+			if is_valid_mapped_id(nb, dry_run=self.dry_run):
 				return side, {"type": "bank", "id": nb}, amount
 		if row.get("cashdesk_id") is not None:
 			try:
 				nc = cashdesk_id_map.get((old_bid, int(row["cashdesk_id"])))
 			except (TypeError, ValueError):
 				nc = None
-			if nc and nc > 0:
+			if is_valid_mapped_id(nc, dry_run=self.dry_run):
 				return side, {"type": "cash_register", "id": nc}, amount
 		if row.get("salary_id") is not None:
 			try:
 				np = petty_id_map.get((old_bid, int(row["salary_id"])))
 			except (TypeError, ValueError):
 				np = None
-			if np and np > 0:
+			if is_valid_mapped_id(np, dry_run=self.dry_run):
 				return side, {"type": "petty_cash", "id": np}, amount
 		return None
 

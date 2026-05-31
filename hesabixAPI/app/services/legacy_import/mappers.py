@@ -100,10 +100,11 @@ def parse_legacy_date(value: Any) -> date:
         parts = s.split("/")
         try:
             y, m, d = int(parts[0]), int(parts[1]), int(parts[2])
-            if y > 1500:
+            # سال‌های ۱۰۰۰–۱۷۹۹ در دادهٔ قدیمی معمولاً شمسی هستند؛ ۱۹۰۰+ میلادی
+            if y < 1800:
                 return jdatetime.date(y, m, d).togregorian()
             return date(y, m, d)
-        except (ValueError, jdatetime.JalaliDateError):
+        except ValueError:
             pass
 
     try:
@@ -143,7 +144,7 @@ def map_business_field(old_field: str | None) -> BusinessField:
     if any(k in low for k in ("تولید", "ساخت")):
         return BusinessField.MANUFACTURING
     if any(k in low for k in ("بازرگانی", "فروش", "خرید", "تجارت")):
-        return BusinessField.TRADING
+        return BusinessField.COMMERCIAL
     if any(k in low for k in ("خدمات", "خدماتی", "مشاوره", "آموزش")):
         return BusinessField.SERVICE
     return BusinessField.OTHER

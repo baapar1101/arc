@@ -87,10 +87,6 @@ class LegacyChartResolver:
                 continue
             if code in self._by_code:
                 return int(self._by_code[code].id)
-            # کد قدیم گاهی طولانی‌تر است؛ تطبیق پسوند (مثلاً ...0203 با 70401)
-            for acc_code, acc in self._by_code.items():
-                if acc_code.endswith(code) or code.endswith(acc_code):
-                    return int(acc.id)
 
         norm_hint = _normalize_name(hint_name)
         if norm_hint:
@@ -98,6 +94,15 @@ class LegacyChartResolver:
                 return int(self._by_name_norm[norm_hint].id)
             for name, acc in self._by_name_norm.items():
                 if norm_hint in name or name in norm_hint:
+                    return int(acc.id)
+
+        for code in candidates:
+            if not code or len(code) < 3:
+                continue
+            for acc_code, acc in self._by_code.items():
+                if len(acc_code) < 3:
+                    continue
+                if acc_code.endswith(code) or code.endswith(acc_code):
                     return int(acc.id)
 
         fb = self._fallback_income if is_income else self._fallback_expense
