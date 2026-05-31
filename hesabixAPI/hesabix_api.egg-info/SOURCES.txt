@@ -868,6 +868,7 @@ tests/test_health.py
 tests/test_hs60_loader.py
 tests/test_invoice_profit_costing.py
 tests/test_legacy_import.py
+tests/test_legacy_sql_account_resolver.py
 tests/test_legacy_sql_dump_reader.py
 tests/test_moadian_plugin_license_gate.py
 tests/test_permissions.py

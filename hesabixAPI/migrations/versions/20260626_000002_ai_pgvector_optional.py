@@ -43,8 +43,13 @@ def upgrade() -> None:
         return
 
     # CREATE EXTENSION باید خارج از تراکنش DDL معمولی باشد
-    with op.get_context().autocommit_block():
+    # استفاده از isolation_level برای جایگزینی autocommit_block
+    old_isolation_level = conn.get_isolation_level()
+    try:
+        conn.execution_options(isolation_level="AUTOCOMMIT")
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    finally:
+        conn.execution_options(isolation_level=old_isolation_level)
 
     conn.execute(
         text(
