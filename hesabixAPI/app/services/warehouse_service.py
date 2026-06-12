@@ -470,6 +470,20 @@ def create_from_invoice(
 	
 	# آماده‌سازی extra_info با فیلدهای ارسال
 	extra_data = extra_data or {}
+	document_date_raw = extra_data.get("document_date")
+	if document_date_raw:
+		try:
+			document_date = (
+				date.fromisoformat(document_date_raw)
+				if isinstance(document_date_raw, str)
+				else document_date_raw
+			)
+		except Exception:
+			raise ApiError("INVALID_DATE", "فرمت تاریخ حواله معتبر نیست", http_status=400)
+	else:
+		# تاریخ صدور حواله؛ در صورت عدم ارسال، روز جاری (زمان عملیات صدور)
+		document_date = date.today()
+
 	delivery_fields = {
 		"description": extra_data.get("description"),
 		"delivery_method": extra_data.get("delivery_method"),
@@ -487,14 +501,14 @@ def create_from_invoice(
 	# و تراکنش اصلی ساخت فاکتور از بین نرود.
 	wh: Optional[WarehouseDocument] = None
 	for attempt in range(10):
-		code = _generate_warehouse_document_code(db, business_id, invoice.document_date)
+		code = _generate_warehouse_document_code(db, business_id, document_date)
 		try:
 			with db.begin_nested():
 				wh = WarehouseDocument(
 					business_id=business_id,
 					fiscal_year_id=fy.id,
 					code=code,
-					document_date=invoice.document_date,
+					document_date=document_date,
 					status="draft",
 					doc_type=wh_doc_type,
 					warehouse_id_from=warehouse_id_from,
@@ -623,7 +637,7 @@ def create_from_invoice(
 						warehouse_id=int(instance_warehouse_id) if instance_warehouse_id else None,
 						status="available",
 						custom_attributes=custom_attributes if custom_attributes else None,
-						entry_date=invoice.document_date,
+						entry_date=document_date,
 					)
 					db.add(instance)
 					db.flush()  # برای دریافت ID
@@ -663,7 +677,7 @@ def create_from_invoice(
 					# به‌روزرسانی instance
 					instance.warehouse_id = None  # از انبار خارج می‌شود
 					instance.status = "sold"  # یا می‌توانیم status دیگری استفاده کنیم
-					instance.last_movement_date = invoice.document_date
+					instance.last_movement_date = document_date
 					instance_ids.append(instance.id)  # برای ذخیره در خط
 
 		# پیوند به ردیف فاکتور برای شناسایی بهای تمام‌شده قطعی و گزارش‌ها

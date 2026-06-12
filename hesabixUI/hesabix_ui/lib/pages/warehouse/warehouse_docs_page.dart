@@ -159,9 +159,6 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         );
         return;
       }
-      final dateStr = invoiceItem['document_date']?.toString();
-      final initialDate = dateStr == null ? null : DateTime.tryParse(dateStr);
-
       await showDialog(
         context: context,
         builder: (_) => WarehouseDocumentFormDialog(
@@ -169,7 +166,6 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           calendarController: _calendarController,
           initialDocType: wizardResult.docType,
           lockDocType: true,
-          initialDocumentDate: initialDate,
           initialLines: initialLines,
           sourceInvoiceId: wizardResult.invoiceId,
           sourceInvoiceCode: wizardResult.invoiceCode,

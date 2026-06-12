@@ -3020,9 +3020,6 @@ class _BusinessShellState extends State<BusinessShell> {
         return;
       }
       
-      final dateStr = invoiceItem['document_date']?.toString();
-      final initialDate = dateStr == null ? null : DateTime.tryParse(dateStr);
-
         final calendarController = widget.calendarController ?? await CalendarController.load();
         await showDialog(
           context: context,
@@ -3031,7 +3028,6 @@ class _BusinessShellState extends State<BusinessShell> {
             calendarController: calendarController,
             initialDocType: wizardResult.docType,
             lockDocType: true,
-            initialDocumentDate: initialDate,
             initialLines: initialLines,
             sourceInvoiceId: wizardResult.invoiceId,
             sourceInvoiceCode: wizardResult.invoiceCode,

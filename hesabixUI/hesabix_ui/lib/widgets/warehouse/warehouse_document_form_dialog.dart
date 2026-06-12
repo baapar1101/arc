@@ -1961,6 +1961,7 @@ class _WarehouseDocumentFormDialogState
   Future<void> _saveFromInvoice() async {
     final payload = {
       'doc_type': _docType,
+      'document_date': _documentDate?.toIso8601String().split('T')[0],
       'lines': _buildLinePayloads(),
       // فیلدهای ارسال
       if (_description != null && _description!.isNotEmpty)

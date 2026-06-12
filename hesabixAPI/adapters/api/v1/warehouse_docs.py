@@ -235,8 +235,9 @@ def create_warehouse_doc_from_invoice(
 	doc_type_override = payload.get("doc_type")
 	wh_type = _resolve_doc_type(inv.document_type, movement_filter or None, doc_type_override)
 
-	# استخراج فیلدهای ارسال از payload
+	# استخراج فیلدهای ارسال و تاریخ حواله از payload
 	extra_data = {
+		"document_date": payload.get("document_date"),
 		"description": payload.get("description"),
 		"delivery_method": payload.get("delivery_method"),
 		"carrier_name": payload.get("carrier_name"),
