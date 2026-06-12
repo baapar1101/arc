@@ -8,7 +8,7 @@
  * Plugin Name:       Hesabix V2: WooCommerce
  * Plugin URI:        https://hesabix.ir/
  * Description:       اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید
- * Version:           4.5.9
+ * Version:           4.6.1
  * Author:            Hesabix Team
  * Author URI:        https://hesabix.ir
  * License:           GPL-3.0+
