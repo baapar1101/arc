@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import json
+from dataclasses import dataclass
 from datetime import datetime, date
 from typing import Any, Dict, List, Optional
 from decimal import Decimal
@@ -51,6 +52,17 @@ from app.utils.phone_utils import normalize_phone_number
 from app.core.responses import ApiError
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ResolvedNotificationTemplate:
+    """قالب حل‌شده برای ارسال — از کسب‌وکار یا پیش‌فرض سیستم."""
+
+    body: str
+    subject: Optional[str]
+    source: str  # business | system_default
+    template_id: Optional[int]
+    template_name: str
 
 
 def calculate_sms_count(text: str) -> int:
@@ -626,6 +638,60 @@ class BusinessNotificationService:
             self.db.rollback()
             raise
 
+    def _resolve_template(
+        self,
+        business_id: int,
+        event_type: str,
+        channel: str,
+    ) -> Optional[ResolvedNotificationTemplate]:
+        """
+        زنجیره اولویت: قالب تأییدشده کسب‌وکار → قالب پیش‌فرض سیستم (notification_event_types).
+        """
+        business_template = self.template_repo.find_active_template(
+            business_id=business_id,
+            event_type=event_type,
+            channel=channel,
+        )
+        if business_template:
+            return ResolvedNotificationTemplate(
+                body=business_template.body,
+                subject=business_template.subject,
+                source="business",
+                template_id=business_template.id,
+                template_name=business_template.name,
+            )
+
+        event_type_row = self.event_type_repo.get_by_code(event_type)
+        if not event_type_row or not event_type_row.is_active:
+            return None
+
+        if channel == "sms":
+            body = (event_type_row.default_sms_template or "").strip()
+            if not body:
+                return None
+            return ResolvedNotificationTemplate(
+                body=body,
+                subject=None,
+                source="system_default",
+                template_id=None,
+                template_name=f"پیش‌فرض سیستم — {event_type_row.name}",
+            )
+
+        if channel == "email":
+            body = (event_type_row.default_email_template or "").strip()
+            if not body:
+                return None
+            subject = (event_type_row.default_email_subject or "پیام از {{ business_name }}").strip()
+            return ResolvedNotificationTemplate(
+                body=body,
+                subject=subject,
+                source="system_default",
+                template_id=None,
+                template_name=f"پیش‌فرض سیستم — {event_type_row.name}",
+            )
+
+        return None
+
     def send_to_person(
         self,
         business_id: int,
@@ -700,41 +766,39 @@ class BusinessNotificationService:
         
         for ch in channels_to_send:
             try:
-                # پیدا کردن قالب فعال
-                template = self.template_repo.find_active_template(
+                resolved = self._resolve_template(
                     business_id=business_id,
                     event_type=event_type,
-                    channel=ch
+                    channel=ch,
                 )
-                
-                if not template:
+
+                if not resolved:
                     logger.warning(
-                        f"No active template found for business={business_id}, "
-                        f"event={event_type}, channel={ch}"
+                        f"No template found for business={business_id}, "
+                        f"event={event_type}, channel={ch} (business or system default)"
                     )
                     results[ch] = {
                         "success": False,
-                        "error": "قالب فعالی یافت نشد"
+                        "error": "قالب فعالی یافت نشد و قالب پیش‌فرض سیستم برای این رویداد تعریف نشده است",
                     }
                     continue
-                
-                # بررسی محدودیت روزانه
-                if not self._check_daily_limit(business_id, template.id, ch):
+
+                if resolved.template_id is not None and not self._check_daily_limit(
+                    business_id, resolved.template_id, ch
+                ):
                     results[ch] = {
                         "success": False,
-                        "error": "محدودیت ارسال روزانه"
+                        "error": "محدودیت ارسال روزانه",
                     }
                     continue
-                
-                # رندر قالب
-                rendered_body = self.template_renderer.render(template.body, context)
+
+                rendered_body = self.template_renderer.render(resolved.body, context)
                 rendered_subject = None
-                if template.subject and ch == 'email':
-                    rendered_subject = self.template_renderer.render(template.subject, context)
-                
-                # محاسبه هزینه و بررسی موجودی (فقط برای SMS)
+                if resolved.subject and ch == "email":
+                    rendered_subject = self.template_renderer.render(resolved.subject, context)
+
                 wallet_charge_result = None
-                if ch == 'sms':
+                if ch == "sms":
                     try:
                         # محاسبه تعداد پیامک
                         sms_count = calculate_sms_count(rendered_body)
@@ -776,14 +840,15 @@ class BusinessNotificationService:
                                 user_id=triggered_by_user_id,
                                 required_amount=total_cost,
                                 available_amount=available_balance,
-                                template_name=template.name,
+                                template_name=resolved.template_name,
                                 event_type=event_type,
-                                template_id=template.id,
+                                template_id=resolved.template_id,
                                 person_id=person_id,
                                 person=person,
                                 channel=ch,
                                 rendered_body=rendered_body,
-                                context=context
+                                context=context,
+                                template_source=resolved.source,
                             )
                             continue
                         
@@ -795,8 +860,8 @@ class BusinessNotificationService:
                             amount=total_cost,
                             sms_count=sms_count,
                             event_type=event_type,
-                            template_id=template.id,
-                            template_name=template.name
+                            template_id=resolved.template_id,
+                            template_name=resolved.template_name,
                         )
                     except ApiError as e:
                         if e.code == "INSUFFICIENT_FUNDS":
@@ -805,14 +870,15 @@ class BusinessNotificationService:
                                 user_id=triggered_by_user_id,
                                 required_amount=total_cost,
                                 available_amount=Decimal('0'),
-                                template_name=template.name,
+                                template_name=resolved.template_name,
                                 event_type=event_type,
-                                template_id=template.id,
+                                template_id=resolved.template_id,
                                 person_id=person_id,
                                 person=person,
                                 channel=ch,
                                 rendered_body=rendered_body,
-                                context=context
+                                context=context,
+                                template_source=resolved.source,
                             )
                             continue
                         raise
@@ -882,7 +948,7 @@ class BusinessNotificationService:
                 recipient_identifier = (sms_destination if ch == 'sms' else None) or (person.mobile if ch == 'sms' else person.email)
                 log = self._create_log(
                     business_id=business_id,
-                    template_id=template.id,
+                    template_id=resolved.template_id,
                     recipient_type='person',
                     recipient_id=person_id,
                     recipient_identifier=recipient_identifier,
@@ -892,14 +958,14 @@ class BusinessNotificationService:
                     context_data=context,
                     event_type=event_type,
                     triggered_by_user_id=triggered_by_user_id,
-                    send_result=send_result
+                    send_result=send_result,
+                    template_source=resolved.source,
                 )
-                
-                # به‌روزرسانی آمار
+
                 if send_result['success']:
                     self.stat_repo.increment_sent(
                         business_id=business_id,
-                        template_id=template.id,
+                        template_id=resolved.template_id,
                         target_date=date.today(),
                         channel=ch,
                         cost=send_result.get('cost', Decimal('0'))
@@ -907,14 +973,16 @@ class BusinessNotificationService:
                 else:
                     self.stat_repo.increment_failed(
                         business_id=business_id,
-                        template_id=template.id,
+                        template_id=resolved.template_id,
                         target_date=date.today(),
                         channel=ch
                     )
-                
+
                 results[ch] = {
                     "success": send_result['success'],
                     "log_id": log.id,
+                    "template_source": resolved.source,
+                    "used_system_default": resolved.source == "system_default",
                     "message": "ارسال با موفقیت انجام شد" if send_result['success'] else send_result.get('error')
                 }
                 
@@ -1041,7 +1109,7 @@ class BusinessNotificationService:
     def _create_log(
         self,
         business_id: int,
-        template_id: int,
+        template_id: Optional[int],
         recipient_type: str,
         recipient_id: int,
         recipient_identifier: Optional[str],
@@ -1051,9 +1119,12 @@ class BusinessNotificationService:
         context_data: Dict[str, Any],
         event_type: str,
         triggered_by_user_id: Optional[int],
-        send_result: Dict[str, Any]
+        send_result: Dict[str, Any],
+        template_source: str = "business",
     ) -> NotificationSendLog:
         """ثبت لاگ ارسال"""
+        enriched_context = dict(context_data)
+        enriched_context["template_source"] = template_source
         log_data = {
             "business_id": business_id,
             "template_id": template_id,
@@ -1063,7 +1134,7 @@ class BusinessNotificationService:
             "channel": channel,
             "subject": subject,
             "body": body,
-            "context_data": context_data,
+            "context_data": enriched_context,
             "event_type": event_type,
             "triggered_by_user_id": triggered_by_user_id,
             "status": "sent" if send_result['success'] else "failed",
@@ -1133,12 +1204,13 @@ class BusinessNotificationService:
         available_amount: Decimal,
         template_name: str,
         event_type: str,
-        template_id: int,
+        template_id: Optional[int],
         person_id: int,
         person: Person,
         channel: str,
         rendered_body: str,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        template_source: str = "business",
     ) -> Dict[str, Any]:
         """
         مدیریت موجودی ناکافی:
@@ -1207,7 +1279,8 @@ class BusinessNotificationService:
                 "success": False,
                 "error": "INSUFFICIENT_FUNDS",
                 "cost": float(required_amount)
-            }
+            },
+            template_source=template_source,
         )
         log.status = "rejected"
         log.failure_reason = f"موجودی کافی نیست. مورد نیاز: {required_amount}, موجود: {available_amount}"

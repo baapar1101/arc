@@ -7,6 +7,7 @@ import 'pages/profile/notifications_settings_page.dart';
 import 'pages/profile/user_notifications_page.dart';
 import 'pages/profile/notification_history_page.dart';
 import 'pages/profile/notification_templates_admin_page.dart';
+import 'pages/profile/notification_event_types_admin_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'l10n/app_localizations.dart';
@@ -1615,6 +1616,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const NotificationTemplatesAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'notification-event-defaults',
+                  name: 'system_settings_notification_event_defaults',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const NotificationEventTypesAdminPage();
                   },
                 ),
                 GoRoute(

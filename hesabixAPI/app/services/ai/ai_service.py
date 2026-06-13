@@ -169,6 +169,17 @@ class AIService:
             user_id=self.ctx.get_user_id(),
             business_id=self.business_id
         )
+
+    def _lock_subscription_for_update(self) -> None:
+        """قفل ردیف اشتراک برای به‌روزرسانی اتمی tokens_used."""
+        if not self.subscription or not self.subscription.id:
+            return
+        from adapters.db.repositories.ai_subscription_repository import AISubscriptionRepository
+
+        repo = AISubscriptionRepository(self.db)
+        locked = repo.get_by_id_for_update(int(self.subscription.id))
+        if locked is not None:
+            self.subscription = locked
     
     def _get_ai_config(self):
         """دریافت تنظیمات AI"""
@@ -436,61 +447,74 @@ class AIService:
                 }
             }
         
-        # بررسی سهمیه و موجودی
-        tokens_used = self.subscription.tokens_used or 0
-        tokens_limit = self.subscription.tokens_limit or 0
-        tokens_remaining = tokens_limit - tokens_used
-        
+        from app.services.ai.ai_quota_helpers import (
+            quota_allows_tokens,
+            subscription_quota_info,
+        )
+
+        quota = subscription_quota_info(self.subscription)
         subscription_info = {
             "plan_name": plan.name,
             "plan_type": plan.plan_type,
-            "tokens_used": tokens_used,
-            "tokens_limit": tokens_limit,
-            "tokens_remaining": tokens_remaining,
-            "usage_percentage": round((tokens_used / tokens_limit * 100) if tokens_limit > 0 else 0, 1)
+            "tokens_used": quota["tokens_used"],
+            "tokens_limit": quota["tokens_limit"],
+            "tokens_remaining": quota["tokens_remaining"],
+            "usage_percentage": quota["usage_percentage"],
+            "is_unlimited": not quota["has_token_cap"],
         }
         
         suggestions = []
-        wallet_info = None  # فقط برای pay_as_go / hybrid مقداردهی می‌شود
+        wallet_info = None
         
         # بررسی بر اساس نوع پلن
         if plan.plan_type == "free":
-            if tokens_remaining < estimated_tokens:
+            if quota["has_token_cap"] and not quota_allows_tokens(
+                quota["tokens_used"], self.subscription.tokens_limit, estimated_tokens
+            ):
+                remaining = quota["tokens_remaining"] or 0
+                cap = quota["tokens_limit"] or 0
                 return {
                     "can_use": False,
                     "reason": "QUOTA_EXCEEDED",
                     "details": {
-                        "message": f"سهمیه رایگان تمام شده است. باقیمانده: {tokens_remaining} توکن",
+                        "message": f"سهمیه رایگان تمام شده است. باقیمانده: {remaining} توکن",
                         "subscription": subscription_info,
                         "suggestions": [
-                            f"شما {tokens_used:,} از {tokens_limit:,} توکن رایگان خود را استفاده کرده‌اید",
+                            f"شما {quota['tokens_used']:,} از {cap:,} توکن رایگان خود را استفاده کرده‌اید",
                             "برای استفاده بیشتر، به پلن پولی ارتقا دهید"
                         ]
                     }
                 }
             
-            # هشدار اگر کمتر از 20% باقی مانده
-            if tokens_remaining < tokens_limit * 0.2:
-                suggestions.append(f"⚠️ تنها {tokens_remaining:,} توکن رایگان باقی مانده است")
-                suggestions.append("پیشنهاد می‌کنیم به پلن بالاتر ارتقا دهید")
+            if quota["has_token_cap"] and quota["tokens_remaining"] is not None:
+                cap = quota["tokens_limit"] or 0
+                if cap > 0 and quota["tokens_remaining"] < cap * 0.2:
+                    suggestions.append(f"⚠️ تنها {quota['tokens_remaining']:,} توکن رایگان باقی مانده است")
+                    suggestions.append("پیشنهاد می‌کنیم به پلن بالاتر ارتقا دهید")
         
         elif plan.plan_type == "subscription":
-            if tokens_remaining < estimated_tokens:
+            if quota["has_token_cap"] and not quota_allows_tokens(
+                quota["tokens_used"], self.subscription.tokens_limit, estimated_tokens
+            ):
+                remaining = quota["tokens_remaining"] or 0
+                cap = quota["tokens_limit"] or 0
                 return {
                     "can_use": False,
                     "reason": "QUOTA_EXCEEDED",
                     "details": {
-                        "message": f"سهمیه اشتراک تمام شده است. باقیمانده: {tokens_remaining:,} توکن",
+                        "message": f"سهمیه اشتراک تمام شده است. باقیمانده: {remaining:,} توکن",
                         "subscription": subscription_info,
                         "suggestions": [
-                            f"شما {tokens_used:,} از {tokens_limit:,} توکن ماهانه خود را استفاده کرده‌اید",
+                            f"شما {quota['tokens_used']:,} از {cap:,} توکن ماهانه خود را استفاده کرده‌اید",
                             "منتظر تمدید ماهانه بمانید یا به پلن بالاتر ارتقا دهید"
                         ]
                     }
                 }
             
-            if tokens_remaining < tokens_limit * 0.2:
-                suggestions.append(f"⚠️ {tokens_remaining:,} توکن از سهمیه ماهانه شما باقی مانده")
+            if quota["has_token_cap"] and quota["tokens_remaining"] is not None:
+                cap = quota["tokens_limit"] or 0
+                if cap > 0 and quota["tokens_remaining"] < cap * 0.2:
+                    suggestions.append(f"⚠️ {quota['tokens_remaining']:,} توکن از سهمیه ماهانه شما باقی مانده")
         
         elif plan.plan_type in ["pay_as_go", "hybrid"]:
             # بررسی الزامی بودن business_id چون کیف پول‌ها business-specific هستند
@@ -507,12 +531,19 @@ class AIService:
                     }
                 }
             
-            # محاسبه هزینه تخمینی بر اساس مدل
             from app.services.ai.ai_model_service import estimate_cost_for_tokens
 
-            estimated_cost = estimate_cost_for_tokens(plan, effective_model, estimated_tokens)
+            if plan.plan_type == "hybrid" and quota["has_token_cap"]:
+                remaining = quota["tokens_remaining"] or 0
+                billable_tokens = max(0, estimated_tokens - remaining)
+            else:
+                billable_tokens = estimated_tokens
+            estimated_cost = (
+                estimate_cost_for_tokens(plan, effective_model, billable_tokens)
+                if billable_tokens > 0
+                else Decimal(0)
+            )
             
-            # بررسی موجودی کیف پول
             from app.services.wallet_service import get_wallet_overview
             try:
                 wallet = get_wallet_overview(self.db, self.business_id)
@@ -532,7 +563,7 @@ class AIService:
                 ).strip()
                 cur_suffix = f" {cur_label}" if cur_label else ""
 
-                if available_balance < estimated_cost:
+                if billable_tokens > 0 and available_balance < estimated_cost:
                     return {
                         "can_use": False,
                         "reason": "INSUFFICIENT_FUNDS",
@@ -548,18 +579,23 @@ class AIService:
                         }
                     }
                 
-                if available_balance < estimated_cost * 10:  # هشدار اگر کمتر از 10 بار استفاده باقی مانده
+                if billable_tokens > 0 and available_balance < estimated_cost * 10:
                     suggestions.append(f"💰 موجودی کیف پول: {available_balance:,.0f}{cur_suffix}")
                     suggestions.append("پیشنهاد می‌کنیم کیف پول خود را شارژ کنید")
                 
             except Exception as e:
                 logger.warning(f"Error checking wallet balance: {e}")
-                # در صورت خطا در دریافت موجودی، اجازه استفاده بده
-                wallet_info = {
-                    "balance": 0,
-                    "estimated_cost": float(estimated_cost),
-                    "sufficient": True,  # فرض می‌کنیم کافی است
-                    "error": "خطا در دریافت موجودی"
+                return {
+                    "can_use": False,
+                    "reason": "WALLET_CHECK_FAILED",
+                    "details": {
+                        "message": "خطا در بررسی موجودی کیف پول",
+                        "subscription": subscription_info,
+                        "suggestions": [
+                            "لطفاً چند لحظه دیگر دوباره تلاش کنید",
+                            "در صورت تکرار، با پشتیبانی تماس بگیرید",
+                        ],
+                    },
                 }
         
         # همه چیز OK است
@@ -995,50 +1031,69 @@ class AIService:
                     "plan_name": self.subscription.plan.name if self.subscription.plan else "نامشخص"
                 }
             )
+
+        self._lock_subscription_for_update()
+        if not self.subscription.is_active:
+            raise ApiError(
+                "SUBSCRIPTION_INACTIVE",
+                "اشتراک شما منقضی شده است. لطفاً اشتراک خود را تمدید کنید.",
+                http_status=400,
+            )
         
         plan = self.subscription.plan
         if not plan:
             raise ApiError("PLAN_NOT_FOUND", "پلن اشتراک یافت نشد", http_status=404)
         
+        from app.services.ai.ai_quota_helpers import (
+            compute_tokens_remaining,
+            effective_tokens_limit,
+            has_token_cap,
+            quota_allows_tokens,
+            renewal_date_iso,
+        )
+
         total_tokens = input_tokens + output_tokens
         
         if total_tokens == 0:
             return {"payment_method": "free", "cost": 0, "wallet_transaction_id": None, "document_id": None}
         
         if plan.plan_type == "free":
-            # بررسی سهمیه رایگان
             tokens_used = self.subscription.tokens_used or 0
-            tokens_limit = self.subscription.tokens_limit or 0
-            tokens_remaining = tokens_limit - tokens_used
-            
-            if tokens_used + total_tokens > tokens_limit:
+            if has_token_cap(self.subscription.tokens_limit) and not quota_allows_tokens(
+                tokens_used, self.subscription.tokens_limit, total_tokens
+            ):
+                remaining = compute_tokens_remaining(tokens_used, self.subscription.tokens_limit) or 0
+                cap = effective_tokens_limit(self.subscription.tokens_limit) or 0
                 raise ApiError(
                     "QUOTA_EXCEEDED",
-                    f"سهمیه رایگان تمام شده است. باقیمانده: {tokens_remaining:,} توکن",
+                    f"سهمیه رایگان تمام شده است. باقیمانده: {remaining:,} توکن",
                     http_status=400,
                     extra_data={
                         "tokens_used": tokens_used,
-                        "tokens_limit": tokens_limit,
-                        "tokens_remaining": tokens_remaining,
+                        "tokens_limit": cap,
+                        "tokens_remaining": remaining,
                         "tokens_required": total_tokens,
                         "suggestion": "برای استفاده بیشتر، به پلن پولی ارتقا دهید"
                     }
                 )
             
-            # به‌روزرسانی استفاده
             self.subscription.tokens_used += total_tokens
             self.db.commit()
             return {"payment_method": "free", "cost": 0, "wallet_transaction_id": None, "document_id": None}
         
         elif plan.plan_type == "subscription":
-            # بررسی سهمیه اشتراک
             tokens_used = self.subscription.tokens_used or 0
-            tokens_limit = self.subscription.tokens_limit or 0
-            remaining = tokens_limit - tokens_used
             needed = total_tokens
+
+            if not has_token_cap(self.subscription.tokens_limit):
+                self.subscription.tokens_used += needed
+                self.db.commit()
+                return {"payment_method": "subscription", "cost": 0, "wallet_transaction_id": None, "document_id": None}
+
+            remaining = compute_tokens_remaining(tokens_used, self.subscription.tokens_limit) or 0
+            cap = effective_tokens_limit(self.subscription.tokens_limit) or 0
             
             if needed <= remaining:
-                # استفاده از سهمیه اشتراک
                 self.subscription.tokens_used += needed
                 self.db.commit()
                 return {"payment_method": "subscription", "cost": 0, "wallet_transaction_id": None, "document_id": None}
@@ -1049,11 +1104,11 @@ class AIService:
                     http_status=400,
                     extra_data={
                         "tokens_used": tokens_used,
-                        "tokens_limit": tokens_limit,
+                        "tokens_limit": cap,
                         "tokens_remaining": remaining,
                         "tokens_required": needed,
                         "suggestion": "منتظر تمدید ماهانه بمانید یا به پلن بالاتر ارتقا دهید",
-                        "renewal_date": self.subscription.expires_at.isoformat() if self.subscription.expires_at else None
+                        "renewal_date": renewal_date_iso(self.subscription),
                     }
                 )
         
@@ -1071,7 +1126,6 @@ class AIService:
             return self._charge_from_wallet(cost, input_tokens, output_tokens)
         
         elif plan.plan_type == "hybrid":
-            # بررسی الزامی بودن business_id چون کیف پول‌ها business-specific هستند
             if not self.business_id:
                 raise ApiError(
                     "BUSINESS_REQUIRED",
@@ -1079,19 +1133,22 @@ class AIService:
                     http_status=400
                 )
             
-            # ترکیبی: ابتدا از سهمیه، سپس از کیف پول
             tokens_used = self.subscription.tokens_used or 0
-            tokens_limit = self.subscription.tokens_limit or 0
-            remaining = tokens_limit - tokens_used
             needed = total_tokens
+
+            if not has_token_cap(self.subscription.tokens_limit):
+                cost = self._calculate_cost(plan, input_tokens, output_tokens, model_code=model_code)
+                return self._charge_from_wallet(cost, input_tokens, output_tokens)
+
+            remaining = compute_tokens_remaining(tokens_used, self.subscription.tokens_limit) or 0
+            cap = effective_tokens_limit(self.subscription.tokens_limit) or 0
             
             if needed <= remaining:
                 self.subscription.tokens_used += needed
                 self.db.commit()
                 return {"payment_method": "subscription", "cost": 0, "wallet_transaction_id": None, "document_id": None}
             else:
-                # استفاده از سهمیه + پرداخت اضافی
-                self.subscription.tokens_used = tokens_limit
+                self.subscription.tokens_used = tokens_used + remaining
                 extra_tokens = needed - remaining
                 cost = self._calculate_cost(
                     plan, input_tokens, output_tokens, extra_tokens, model_code=model_code

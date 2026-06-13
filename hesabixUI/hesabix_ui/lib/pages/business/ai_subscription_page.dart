@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/business_route_paths.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
@@ -32,6 +33,8 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
   List<AIPlan> _availablePlans = [];
   Map<String, dynamic> _usageStats = {};
   bool _isRefreshing = false;
+  bool _actionInProgress = false;
+  String _billingPeriod = 'monthly';
 
   @override
   void initState() {
@@ -41,16 +44,6 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
     _load();
   }
 
-  Future<Map<String, dynamic>> _loadUsageStatsSafe() async {
-    try {
-      return await _aiService.getSubscriptionUsageStats(
-        businessId: widget.businessId,
-      );
-    } catch (_) {
-      return {};
-    }
-  }
-
   Future<void> _load() async {
     if (_isRefreshing) return;
     setState(() {
@@ -58,37 +51,114 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       _isRefreshing = true;
       _loadError = null;
     });
+    UserAISubscription? subscription;
+    List<AIPlan> plans = [];
+    Map<String, dynamic> usageStats = {};
+    String? loadError;
+
     try {
-      final results = await Future.wait([
-        _aiService.getCurrentSubscription(businessId: widget.businessId),
-        _aiService.listPublicAIPlans(businessId: widget.businessId),
-        _loadUsageStatsSafe(),
-      ]);
-      if (!mounted) return;
-      setState(() {
-        _currentSubscription = results[0] as UserAISubscription?;
-        _availablePlans = results[1] as List<AIPlan>;
-        _usageStats = results[2] as Map<String, dynamic>;
-        _loading = false;
-        _isRefreshing = false;
-        _loadError = null;
-      });
+      subscription = await _aiService.getCurrentSubscription(
+        businessId: widget.businessId,
+      );
     } catch (e) {
-      if (!mounted) return;
-      final t = AppLocalizations.of(context);
-      setState(() {
-        _loading = false;
-        _isRefreshing = false;
-        _loadError = ErrorExtractor.extractErrorMessage(e, t);
-      });
+      if (mounted) {
+        loadError = ErrorExtractor.extractErrorMessage(
+          e,
+          AppLocalizations.of(context),
+        );
+      }
+    }
+
+    try {
+      plans = await _aiService.listPublicAIPlans(
+        businessId: widget.businessId,
+      );
+    } catch (e) {
+      if (mounted) {
+        loadError ??= ErrorExtractor.extractErrorMessage(
+          e,
+          AppLocalizations.of(context),
+        );
+      }
+    }
+
+    usageStats = await _loadUsageStatsSafe(
+      periodStart: subscription?.periodStart,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _currentSubscription = subscription;
+      _availablePlans = plans;
+      _usageStats = usageStats;
+      _loading = false;
+      _isRefreshing = false;
+      _loadError = loadError;
+    });
+  }
+
+  Future<Map<String, dynamic>> _loadUsageStatsSafe({
+    DateTime? periodStart,
+  }) async {
+    try {
+      return await _aiService.getSubscriptionUsageStats(
+        businessId: widget.businessId,
+        fromDate: periodStart,
+      );
+    } catch (_) {
+      return {};
     }
   }
 
+  bool _planRequiresPayment(AIPlan plan) {
+    if (plan.planType == AIPlanType.free ||
+        plan.planType == AIPlanType.payAsGo) {
+      return false;
+    }
+    final pc = plan.pricingConfig;
+    final sub = pc['subscription'];
+    if (sub is! Map) return false;
+    final key = _billingPeriod == 'yearly' ? 'yearly_price' : 'monthly_price';
+    final raw = sub[key];
+    final n = raw is num ? raw.toDouble() : double.tryParse('$raw');
+    return n != null && n > 0;
+  }
+
+  Future<bool> _confirmPlanAction(AIPlan plan, {required bool isUpgrade}) async {
+    if (!_planRequiresPayment(plan)) return true;
+    final periodLabel = _billingPeriod == 'yearly' ? 'سالانه' : 'ماهانه';
+    final action = isUpgrade ? 'ارتقا به' : 'فعال‌سازی';
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('$action ${plan.name}'),
+            content: Text(
+              'مبلغ دوره $periodLabel از کیف پول کسب‌وکار کسر می‌شود. ادامه می‌دهید؟',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('انصراف'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('تأیید و پرداخت'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
   Future<void> _subscribeToPlan(AIPlan plan) async {
+    if (_actionInProgress) return;
+    if (!await _confirmPlanAction(plan, isUpgrade: false)) return;
+    setState(() => _actionInProgress = true);
     try {
       await _aiService.subscribeToPlan(
         planId: plan.id!,
         businessId: widget.businessId,
+        period: _billingPeriod,
       );
       if (mounted) {
         SnackBarHelper.show(context, message: 'اشتراک با موفقیت فعال شد');
@@ -102,14 +172,20 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
           message: ErrorExtractor.extractErrorMessage(e, t),
         );
       }
+    } finally {
+      if (mounted) setState(() => _actionInProgress = false);
     }
   }
 
   Future<void> _upgradeSubscription(AIPlan newPlan) async {
+    if (_actionInProgress) return;
+    if (!await _confirmPlanAction(newPlan, isUpgrade: true)) return;
+    setState(() => _actionInProgress = true);
     try {
       await _aiService.upgradeSubscription(
         newPlanId: newPlan.id!,
         businessId: widget.businessId,
+        period: _billingPeriod,
       );
       if (mounted) {
         SnackBarHelper.show(context, message: 'اشتراک با موفقیت ارتقا یافت');
@@ -123,6 +199,8 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
           message: ErrorExtractor.extractErrorMessage(e, t),
         );
       }
+    } finally {
+      if (mounted) setState(() => _actionInProgress = false);
     }
   }
 
@@ -135,11 +213,11 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('لغو'),
+                child: const Text('انصراف'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('لغو اشتراک'),
+                child: const Text('بله، غیرفعال شود'),
               ),
             ],
           ),
@@ -173,7 +251,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
 
     if (_loading && _loadError == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('اشتراک AI')),
+        appBar: AppBar(title: const Text('اشتراک هوش مصنوعی')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -239,6 +317,22 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
           },
         ),
         actions: [
+          if (widget.businessId != null)
+            IconButton(
+              icon: const Icon(Icons.bar_chart_outlined),
+              tooltip: 'آمار استفاده',
+              onPressed: () {
+                final bid = widget.businessId!;
+                try {
+                  final prefix = BusinessRoutePaths.prefixFromRouterState(
+                    GoRouter.of(context).state,
+                  );
+                  context.go('$prefix/ai/usage');
+                } catch (_) {
+                  context.go('/business/$bid/tab0/ai/usage');
+                }
+              },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _load,
@@ -270,6 +364,17 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
                 ),
               ),
             ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                child: _BillingPeriodSelector(
+                  value: _billingPeriod,
+                  onChanged: _actionInProgress
+                      ? null
+                      : (v) => setState(() => _billingPeriod = v),
+                ),
+              ),
+            ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               sliver: SliverToBoxAdapter(
@@ -286,6 +391,8 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
                     _PlanGrid(
                       plans: _availablePlans,
                       currentSubscription: _currentSubscription,
+                      billingPeriod: _billingPeriod,
+                      actionInProgress: _actionInProgress,
                       onSelect: _subscribeToPlan,
                       onUpgrade: _upgradeSubscription,
                     ),
@@ -537,7 +644,7 @@ class _UsageSummary extends StatelessWidget {
             if (hasAnyLog) ...[
               const SizedBox(height: 16),
               Text(
-                'ثبت در لاگ (تمام زمانه)',
+                'ثبت در لاگ (دوره جاری)',
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
@@ -581,15 +688,43 @@ class _UsageSummary extends StatelessWidget {
   }
 }
 
+class _BillingPeriodSelector extends StatelessWidget {
+  final String value;
+  final ValueChanged<String>? onChanged;
+
+  const _BillingPeriodSelector({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment(value: 'monthly', label: Text('ماهانه')),
+        ButtonSegment(value: 'yearly', label: Text('سالانه')),
+      ],
+      selected: {value},
+      onSelectionChanged: onChanged == null
+          ? null
+          : (selection) => onChanged!(selection.first),
+    );
+  }
+}
+
 class _PlanGrid extends StatelessWidget {
   final List<AIPlan> plans;
   final UserAISubscription? currentSubscription;
+  final String billingPeriod;
+  final bool actionInProgress;
   final void Function(AIPlan plan) onSelect;
   final void Function(AIPlan plan) onUpgrade;
 
   const _PlanGrid({
     required this.plans,
     required this.currentSubscription,
+    required this.billingPeriod,
+    required this.actionInProgress,
     required this.onSelect,
     required this.onUpgrade,
   });
@@ -624,6 +759,8 @@ class _PlanGrid extends StatelessWidget {
                 plan: plan,
                 isCurrent: isCurrentPlan,
                 canUpgrade: canUpgrade,
+                billingPeriod: billingPeriod,
+                actionInProgress: actionInProgress,
                 onSelect: () => onSelect(plan),
                 onUpgrade: () => onUpgrade(plan),
               ),
@@ -639,6 +776,8 @@ class _PlanCard extends StatelessWidget {
   final AIPlan plan;
   final bool isCurrent;
   final bool canUpgrade;
+  final String billingPeriod;
+  final bool actionInProgress;
   final VoidCallback onSelect;
   final VoidCallback onUpgrade;
 
@@ -646,6 +785,8 @@ class _PlanCard extends StatelessWidget {
     required this.plan,
     required this.isCurrent,
     required this.canUpgrade,
+    required this.billingPeriod,
+    required this.actionInProgress,
     required this.onSelect,
     required this.onUpgrade,
   });
@@ -653,7 +794,7 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final priceText = _planPriceText(plan);
+    final priceText = _planPriceText(plan, billingPeriod);
     return Card(
       elevation: isCurrent ? 6 : 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -755,14 +896,26 @@ class _PlanCard extends StatelessWidget {
                   )
                 else if (canUpgrade)
                   FilledButton.icon(
-                    onPressed: onUpgrade,
-                    icon: const Icon(Icons.trending_up),
+                    onPressed: actionInProgress ? null : onUpgrade,
+                    icon: actionInProgress
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.trending_up),
                     label: const Text('ارتقا'),
                   )
                 else
                   FilledButton.icon(
-                    onPressed: onSelect,
-                    icon: const Icon(Icons.playlist_add_check),
+                    onPressed: actionInProgress ? null : onSelect,
+                    icon: actionInProgress
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.playlist_add_check),
                     label: const Text('فعال‌سازی'),
                   ),
               ],
@@ -773,7 +926,7 @@ class _PlanCard extends StatelessWidget {
     );
   }
 
-  String? _planPriceText(AIPlan plan) {
+  String? _planPriceText(AIPlan plan, String billingPeriod) {
     final pc = plan.pricingConfig;
     if (pc.isEmpty) return null;
     if (plan.planType == AIPlanType.free) {
@@ -782,17 +935,16 @@ class _PlanCard extends StatelessWidget {
     if (plan.planType == AIPlanType.subscription || plan.planType == AIPlanType.hybrid) {
       final sub = pc['subscription'];
       if (sub is Map) {
-        final m = sub['monthly_price'];
-        final y = sub['yearly_price'];
         final parts = <String>[];
-        if (m != null) {
-          final n = m is num ? m.toDouble() : double.tryParse(m.toString());
+        if (billingPeriod == 'monthly') {
+          final m = sub['monthly_price'];
+          final n = m is num ? m.toDouble() : double.tryParse(m?.toString() ?? '');
           if (n != null && n > 0) {
             parts.add('${formatWithThousands(n)} تومان / ماه');
           }
-        }
-        if (y != null) {
-          final n = y is num ? y.toDouble() : double.tryParse(y.toString());
+        } else {
+          final y = sub['yearly_price'];
+          final n = y is num ? y.toDouble() : double.tryParse(y?.toString() ?? '');
           if (n != null && n > 0) {
             parts.add('${formatWithThousands(n)} تومان / سال');
           }
@@ -802,13 +954,24 @@ class _PlanCard extends StatelessWidget {
         }
       }
     }
-    if (plan.planType == AIPlanType.payAsGo) {
+    if (plan.planType == AIPlanType.payAsGo || plan.planType == AIPlanType.hybrid) {
       final p = pc['pay_as_go'];
       if (p is Map) {
         final inP = p['price_per_1k_input_tokens'];
         final outP = p['price_per_1k_output_tokens'];
-        if (inP != null || outP != null) {
-          return 'پرداخت بر اساس مصرف (هر ۱۰۰۰ توکن: ورودی/خروجی متفاوت)';
+        final inN = inP is num ? inP.toDouble() : double.tryParse(inP?.toString() ?? '');
+        final outN = outP is num ? outP.toDouble() : double.tryParse(outP?.toString() ?? '');
+        if (inN != null || outN != null) {
+          final chunks = <String>[];
+          if (inN != null && inN > 0) {
+            chunks.add('ورودی: ${formatWithThousands(inN)}');
+          }
+          if (outN != null && outN > 0) {
+            chunks.add('خروجی: ${formatWithThousands(outN)}');
+          }
+          if (chunks.isNotEmpty) {
+            return 'هر ۱۰۰۰ توکن — ${chunks.join('، ')} تومان';
+          }
         }
       }
     }

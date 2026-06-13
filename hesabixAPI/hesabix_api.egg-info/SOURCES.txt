@@ -852,6 +852,7 @@ migrations/versions/20260628_000001_ai_models_catalog.py
 migrations/versions/20260629_000001_ai_provider_credentials.py
 migrations/versions/20260630_000001_invoice_share_link_notification_event.py
 migrations/versions/20260630_000002_quick_sales_share_defaults.py
+migrations/versions/20260630_000003_merge_heads_ai_memory_items_and_quick_sales_share_defaults.py
 tests/__init__.py
 tests/test_ai_connector_security.py
 tests/test_ai_context_budget.py

@@ -1159,11 +1159,13 @@ class AIService {
   Future<UserAISubscription> subscribeToPlan({
     required int planId,
     int? businessId,
+    String period = 'monthly',
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/subscription/subscribe',
       data: {
         'plan_id': planId,
+        'period': period,
         if (businessId != null) 'business_id': businessId,
       },
     );
@@ -1180,11 +1182,13 @@ class AIService {
   Future<UserAISubscription> upgradeSubscription({
     required int newPlanId,
     int? businessId,
+    String period = 'monthly',
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/subscription/upgrade',
       data: {
         'plan_id': newPlanId,
+        'period': period,
         if (businessId != null) 'business_id': businessId,
       },
     );

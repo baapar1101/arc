@@ -89,9 +89,14 @@ def calculate_usage_cost(
     *,
     extra_tokens: Optional[int] = None,
 ) -> Decimal:
+    from app.services.ai.ai_quota_helpers import split_tokens_proportionally
+
     input_price, output_price = get_model_pricing_rates(plan, model_code)
-    if extra_tokens:
-        return Decimal(extra_tokens) * input_price
+    if extra_tokens and extra_tokens > 0:
+        over_in, over_out = split_tokens_proportionally(
+            input_tokens, output_tokens, int(extra_tokens)
+        )
+        return (Decimal(over_in) * input_price) + (Decimal(over_out) * output_price)
     return (Decimal(input_tokens) * input_price) + (Decimal(output_tokens) * output_price)
 
 

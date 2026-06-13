@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 from app.core.settings import get_settings
 from app.services.providers.behin_sms_provider import BehinSmsProvider
+from app.services.providers.sunway_sms_provider import SunwaySmsProvider
 from app.utils.phone_utils import normalize_phone_number
+
+_SMS_PANEL_PROVIDERS = frozenset({"behinsms", "behin_sms", "sunwaysms", "sunway_sms"})
 
 
 class SmsProvider:
@@ -26,8 +29,8 @@ class SmsProvider:
 		self.is_flash = is_flash
 		
 		# مقداردهی Provider واقعی
-		self._provider: Optional[BehinSmsProvider] = None
-		if self.provider_name == "behinsms" or self.provider_name == "behin_sms":
+		self._provider: Optional[Union[BehinSmsProvider, SunwaySmsProvider]] = None
+		if self.provider_name in ("behinsms", "behin_sms"):
 			if self.username and self.password and self.sender:
 				try:
 					self._provider = BehinSmsProvider(
@@ -40,9 +43,21 @@ class SmsProvider:
 					import structlog
 					logger = structlog.get_logger()
 					logger.error("failed_to_init_behinsms", error=str(e))
+		elif self.provider_name in ("sunwaysms", "sunway_sms"):
+			if self.username and self.password and self.sender:
+				try:
+					self._provider = SunwaySmsProvider(
+						username=self.username,
+						password=self.password,
+						sender=self.sender
+					)
+				except Exception as e:
+					import structlog
+					logger = structlog.get_logger()
+					logger.error("failed_to_init_sunwaysms", error=str(e))
 
 	def is_configured(self) -> bool:
-		if self.provider_name in ("behinsms", "behin_sms"):
+		if self.provider_name in _SMS_PANEL_PROVIDERS:
 			return bool(self.username and self.password and self.sender)
 		return bool(self.provider_name and self.api_key and self.sender)
 
@@ -104,7 +119,7 @@ class SmsProvider:
 		if not text or not text.strip():
 			return False, None, "متن پیامک خالی است"
 		
-		# استفاده از BehinSmsProvider
+		# استفاده از provider پیکربندی‌شده
 		if self._provider:
 			try:
 				success, message_id, error_msg = self._provider.send_text(

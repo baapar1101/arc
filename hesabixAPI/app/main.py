@@ -93,6 +93,7 @@ from adapters.api.v1.basalam_integration import router as basalam_integration_ro
 from adapters.api.v1.woocommerce_integration import router as woocommerce_integration_router
 from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
+from adapters.api.v1.admin.notification_event_types import router as admin_notification_event_types_router
 from adapters.api.v1.admin.notification_moderation import router as admin_notification_moderation_router
 from adapters.api.v1.notifications_ws import router as notifications_ws_router
 from adapters.api.v1.ai.voice_ws import router as ai_voice_ws_router
@@ -1111,6 +1112,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_payment_gateways_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_announcements_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_templates_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_notification_event_types_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_notification_moderation_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_document_monetization_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_zohal_router, prefix=settings.api_v1_prefix)
@@ -1120,6 +1122,7 @@ def create_app() -> FastAPI:
     from adapters.api.v1.admin.ai_plans import router as admin_ai_plans_router
     from adapters.api.v1.admin.ai_prompts import router as admin_ai_prompts_router
     from adapters.api.v1.admin.ai_models import router as admin_ai_models_router
+    from adapters.api.v1.admin.ai_eval import router as admin_ai_eval_router
     from adapters.api.v1.admin.ai_provider_credentials import (
         router as admin_ai_provider_credentials_router,
     )

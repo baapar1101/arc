@@ -16,6 +16,7 @@ import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
 import 'package:hesabix_ui/services/voice/voice_phase.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_home_view.dart';
@@ -943,7 +944,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       return true;
     } catch (e) {
       debugPrint('[AIChatDialog] Error checking availability before send: $e');
-      return true;
+      return false;
     }
   }
 
@@ -1753,11 +1754,22 @@ class _AIChatDialogState extends State<AIChatDialog> {
         break;
       case 'QUOTA_EXCEEDED':
         final subscription = details?['subscription'] as Map<String, dynamic>?;
-        final tokensUsed = subscription?['tokens_used'] as int? ?? 0;
-        final tokensLimit = subscription?['tokens_limit'] as int? ?? 0;
+        final extra = errorData['extra'] as Map<String, dynamic>? ??
+            errorData['extra_data'] as Map<String, dynamic>?;
+        final tokensUsed = subscription?['tokens_used'] as int? ??
+            extra?['tokens_used'] as int? ??
+            0;
+        final tokensLimit = subscription?['tokens_limit'] as int? ??
+            extra?['tokens_limit'] as int? ??
+            0;
         title = 'سهمیه تمام شده';
-        message =
-            'شما ${tokensUsed.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} از ${tokensLimit.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} توکن خود را استفاده کرده‌اید.';
+        message = details?['message'] as String? ??
+            errorData['message'] as String? ??
+            'سهمیه توکن شما تمام شده است.';
+        if (tokensLimit > 0) {
+          message =
+              '$message\n\nشما ${formatWithThousands(tokensUsed)} از ${formatWithThousands(tokensLimit)} توکن خود را استفاده کرده‌اید.';
+        }
         actions = [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -2227,6 +2239,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
     final details = _availabilityInfo!['details'] as Map<String, dynamic>?;
     final subscription = details?['subscription'] as Map<String, dynamic>?;
+    final isUnlimited = subscription?['is_unlimited'] as bool? ?? false;
+    if (isUnlimited) {
+      return const SizedBox.shrink();
+    }
     final tokensRemaining = subscription?['tokens_remaining'] as int? ?? 0;
 
     return Container(

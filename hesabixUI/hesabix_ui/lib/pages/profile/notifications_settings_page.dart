@@ -53,8 +53,17 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
   // لیست provider های از پیش تعریف شده
   static const List<String> _predefinedSmsProviders = [
     'behinsms',
-    'behin_sms',
+    'sunwaysms',
   ];
+
+  /// نام‌های قدیمی که به همان provider نگاشت می‌شوند (سازگاری با تنظیمات ذخیره‌شده)
+  static const Map<String, String> _smsProviderAliases = {
+    'behin_sms': 'behinsms',
+    'sunway_sms': 'sunwaysms',
+  };
+
+  static String _normalizeSmsProviderName(String name) =>
+      _smsProviderAliases[name] ?? name;
   static const String _customProviderValue = '__custom__';
   bool _adminLoading = true;
   bool _adminSaving = false;
@@ -126,7 +135,9 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
         _baleTokenCtrl.text = '${admin['bale_bot_token'] ?? ''}';
         _baleUsernameCtrl.text = '${admin['bale_bot_username'] ?? ''}';
         _baleWebhookSecretCtrl.text = '${admin['bale_webhook_secret'] ?? ''}';
-        final providerName = '${admin['sms_provider_name'] ?? ''}';
+        final providerName = _normalizeSmsProviderName(
+          '${admin['sms_provider_name'] ?? ''}'.trim(),
+        );
         _smsApiKeyCtrl.text = '${admin['sms_api_key'] ?? ''}';
         _smsSenderCtrl.text = '${admin['sms_sender'] ?? ''}';
         _smsUsernameCtrl.text = '${admin['sms_provider_username'] ?? ''}';
@@ -905,7 +916,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
                   controller: _smsPasswordCtrl,
                   decoration: InputDecoration(
                     labelText: 'کلمه عبور SMS Provider',
-                    helperText: 'کلمه عبور حساب بهین اس ام اس',
+                    helperText: 'رمز وب‌سرویس پنل پیامک (بهین اس‌ام‌اس / سان‌وی و ...)',
                     border: const OutlineInputBorder(),
                   ),
                   textDirection: TextDirection.ltr,

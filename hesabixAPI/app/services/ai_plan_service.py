@@ -18,8 +18,9 @@ from app.services.system_settings_service import get_wallet_settings
 logger = logging.getLogger(__name__)
 
 
-def _monthly_tokens_cap_from_plan(plan: AIPlan) -> int:
-    """سقف توکن ماهانه برای اشتراک: اولویت با usage_limits سپس ستون‌های پلن."""
+def _monthly_tokens_cap_from_plan(plan: AIPlan) -> Optional[int]:
+    """سقف توکن ماهانه برای اشتراک: اولویت با usage_limits سپس ستون‌های پلن.
+    None یعنی بدون سقف معین."""
     try:
         ul = json.loads(plan.usage_limits or "{}")
     except Exception:
@@ -27,14 +28,17 @@ def _monthly_tokens_cap_from_plan(plan: AIPlan) -> int:
     v = ul.get("monthly_tokens")
     if v is not None:
         try:
-            return int(v)
+            n = int(v)
+            return n if n > 0 else None
         except (TypeError, ValueError):
             pass
     if plan.monthly_tokens_limit is not None:
-        return int(plan.monthly_tokens_limit)
+        n = int(plan.monthly_tokens_limit)
+        return n if n > 0 else None
     if plan.tokens_limit is not None:
-        return int(plan.tokens_limit)
-    return 0
+        n = int(plan.tokens_limit)
+        return n if n > 0 else None
+    return None
 
 
 def _merge_usage_limits_for_save(
@@ -215,6 +219,7 @@ def subscribe_to_plan(
         tokens_limit=tokens_limit_val,
         period_start=period_start,
         period_end=period_end,
+        expires_at=period_end,
         is_active=True,
         auto_renew=bool(getattr(plan, "auto_renew", False)),
     )
@@ -266,5 +271,163 @@ def subscribe_to_plan(
     return {
         "subscription": subscription,
         "invoice": invoice,
+        "payment": payment_info,
+    }
+
+
+def detect_billing_period(subscription: UserAISubscription) -> str:
+    """تشخیص دوره صورتحساب از طول دوره فعلی."""
+    if subscription.period_start and subscription.period_end:
+        days = (subscription.period_end - subscription.period_start).days
+        if days > 60:
+            return "yearly"
+    return "monthly"
+
+
+def get_renewal_amount(plan: AIPlan, period: str) -> Decimal:
+    """مبلغ تمدید بر اساس پلن و دوره."""
+    if plan.plan_type not in (AIPlanType.SUBSCRIPTION.value, AIPlanType.HYBRID.value):
+        return Decimal("0")
+    try:
+        pricing_config = json.loads(plan.pricing_config or "{}")
+    except Exception:
+        pricing_config = {}
+    subscription_config = pricing_config.get("subscription") or {}
+    key = "yearly_price" if period == "yearly" else "monthly_price"
+    return Decimal(str(subscription_config.get(key, 0) or 0))
+
+
+def extend_subscription_billing_period(
+    subscription: UserAISubscription,
+    period: str,
+    *,
+    now: Optional[datetime] = None,
+) -> None:
+    """تمدید دوره اشتراک و ریست سهمیه."""
+    now = now or datetime.utcnow()
+    days = 365 if period == "yearly" else 30
+    subscription.tokens_used = 0
+    subscription.period_start = now
+    subscription.period_end = now + timedelta(days=days)
+    subscription.expires_at = subscription.period_end
+    subscription.last_reset_at = now
+    subscription.is_active = True
+
+
+def renew_ai_subscription(
+    db: Session,
+    subscription_id: int,
+) -> Dict[str, Any]:
+    """
+    تمدید خودکار اشتراک AI:
+    - ایجاد فاکتور و شارژ کیف پول (در صورت مبلغ > 0)
+    - تمدید دوره و ریست سهمیه
+    در صورت ناکافی بودن موجودی، اشتراک غیرفعال می‌شود.
+    """
+    sub_repo = AISubscriptionRepository(db)
+    subscription = sub_repo.get_by_id_for_update(subscription_id)
+    if not subscription:
+        return {"renewed": False, "reason": "not_found"}
+
+    plan = subscription.plan
+    if not plan or not plan.is_active:
+        subscription.is_active = False
+        db.commit()
+        return {"renewed": False, "reason": "plan_inactive"}
+
+    if plan.plan_type not in (AIPlanType.SUBSCRIPTION.value, AIPlanType.HYBRID.value):
+        return {"renewed": False, "reason": "not_billable_plan"}
+
+    if not subscription.auto_renew:
+        return {"renewed": False, "reason": "auto_renew_disabled"}
+
+    now = datetime.utcnow()
+    if subscription.period_end and subscription.period_end > now:
+        return {"renewed": False, "reason": "not_due"}
+
+    period = detect_billing_period(subscription)
+    amount = get_renewal_amount(plan, period)
+
+    if amount <= 0:
+        extend_subscription_billing_period(subscription, period, now=now)
+        db.commit()
+        logger.info("AI subscription %s renewed (free)", subscription_id)
+        return {
+            "renewed": True,
+            "subscription_id": subscription_id,
+            "period": period,
+            "amount": 0.0,
+            "payment": None,
+        }
+
+    business_id = subscription.business_id
+    if not business_id:
+        subscription.is_active = False
+        db.commit()
+        logger.warning(
+            "AI subscription %s auto-renew failed: business_id required",
+            subscription_id,
+        )
+        return {"renewed": False, "reason": "business_id_required"}
+
+    wallet_settings = get_wallet_settings(db)
+    currency_id = wallet_settings.get("wallet_base_currency_id")
+    if not currency_id:
+        subscription.is_active = False
+        db.commit()
+        logger.warning(
+            "AI subscription %s auto-renew failed: wallet currency not set",
+            subscription_id,
+        )
+        return {"renewed": False, "reason": "currency_not_set"}
+
+    invoice = create_subscription_invoice(
+        db=db,
+        subscription_id=subscription.id,
+        business_id=int(business_id),
+        amount=amount,
+        period=period,
+        currency_id=int(currency_id),
+    )
+
+    try:
+        payment_info = pay_ai_invoice_from_wallet(
+            db=db,
+            business_id=int(business_id),
+            invoice_id=invoice.id,
+            user_id=int(subscription.user_id),
+        )
+    except ApiError as exc:
+        err_code = ""
+        if isinstance(exc.detail, dict):
+            err_code = (exc.detail.get("error") or {}).get("code", "")
+        if err_code == "INSUFFICIENT_FUNDS":
+            subscription.is_active = False
+            db.commit()
+            logger.info(
+                "AI subscription %s auto-renew failed: insufficient wallet funds",
+                subscription_id,
+            )
+            return {"renewed": False, "reason": "insufficient_funds"}
+        raise
+
+    subscription = sub_repo.get_by_id_for_update(subscription_id)
+    if not subscription:
+        return {"renewed": True, "payment": payment_info, "period_extended": False}
+
+    extend_subscription_billing_period(subscription, period, now=now)
+    db.commit()
+    logger.info(
+        "AI subscription %s auto-renewed: period=%s amount=%s",
+        subscription_id,
+        period,
+        amount,
+    )
+    return {
+        "renewed": True,
+        "subscription_id": subscription_id,
+        "period": period,
+        "amount": float(amount),
+        "invoice_id": invoice.id,
         "payment": payment_info,
     }

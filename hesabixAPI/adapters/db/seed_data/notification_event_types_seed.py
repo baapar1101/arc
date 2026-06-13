@@ -112,6 +112,12 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "سند {{ type }} به مبلغ {{ amount | format_currency }} ثبت شد. {{ business_name }}",
+        "default_email_template": """سند {{ type }} به مبلغ {{ amount | format_currency }} ثبت شد.
+
+روش پرداخت: {{ payment_method }}
+شرح: {{ description }}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "ثبت سند مالی — {{ business_name }}",
         "is_active": True,
         "requires_approval": True,
@@ -132,6 +138,15 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "پیام جدید چت وب از {{ visitor_phone }} — {{ page_url }} — {{ business_name }}",
+        "default_email_template": """پیام جدید در چت وب
+
+نام: {{ visitor_first_name }} {{ visitor_last_name }}
+تلفن: {{ visitor_phone }}
+ایمیل: {{ visitor_email }}
+صفحه: {{ page_url }}
+وضعیت مکالمه: {{ conversation_status }}
+
+{{ business_name }}""",
         "default_email_subject": "پیام جدید چت وب — {{ business_name }}",
         "is_active": True,
         "requires_approval": True,
@@ -154,6 +169,12 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "سند {{ document_type }} ثبت شد (مبلغ {{ total_amount | format_currency }}). {{ business_name }}",
+        "default_email_template": """سند {{ document_type }} ثبت شد.
+
+مبلغ کل: {{ total_amount | format_currency }}
+شرح: {{ description }}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "سند جدید — {{ business_name }}",
         "is_active": True,
         "requires_approval": True,
@@ -171,6 +192,13 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "شخص جدید در {{ business_name }} ثبت شد (شناسه {{ person_id }}).",
+        "default_email_template": """شخص جدید در {{ business_name }} ثبت شد.
+
+شناسه: {{ person_id }}
+نام: {{ person_name }}
+انواع: {{ person_types }}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "شخص جدید — {{ business_name }}",
         "is_active": True,
         "requires_approval": True,
@@ -198,6 +226,14 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "سرنخ جدید {{ name }} — مرحله {{ stage_name }}. {{ business_name }}",
+        "default_email_template": """سرنخ CRM جدید: {{ name }}
+
+کد: {{ lead_code }}
+مرحله: {{ stage_name }}
+شرکت: {{ company_name }}
+موبایل: {{ mobile }}
+
+{{ business_name }}""",
         "default_email_subject": "سرنخ CRM جدید — {{ lead_code }}",
         "is_active": True,
         "requires_approval": True,
@@ -222,6 +258,14 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "معامله {{ title }} بسته شد (برنده: {{ is_win }}). مبلغ {{ amount | format_currency }}. {{ business_name }}",
+        "default_email_template": """معامله «{{ title }}» بسته شد.
+
+کد: {{ deal_code }}
+نتیجه: {{ is_win }}
+مبلغ: {{ amount | format_currency }}
+مشتری: {{ person_name }}
+
+{{ business_name }}""",
         "default_email_subject": "بستن معامله — {{ deal_code }}",
         "is_active": True,
         "requires_approval": True,
@@ -240,6 +284,13 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "هشدار موجودی: کالا {{ product_id }} به {{ current_quantity | format_number }} رسید (حد {{ min_quantity | format_number }}). {{ business_name }}",
+        "default_email_template": """هشدار کمبود موجودی
+
+کالا: {{ product_id }}
+موجودی فعلی: {{ current_quantity | format_number }}
+حداقل: {{ min_quantity | format_number }}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "کمبود موجودی — {{ business_name }}",
         "is_active": True,
         "requires_approval": True,
@@ -261,6 +312,14 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "چک {{ check_number }} به مبلغ {{ amount | format_currency }} — {{ days_until_due }} روز تا سررسید. {{ business_name }}",
+        "default_email_template": """یادآوری سررسید چک
+
+شماره چک: {{ check_number }}
+مبلغ: {{ amount | format_currency }}
+سررسید: {{ due_date | format_date }}
+روزهای باقی‌مانده: {{ days_until_due }}
+
+{{ business_name }}""",
         "default_email_subject": "سررسید چک {{ check_number }}",
         "is_active": True,
         "requires_approval": True,
@@ -285,6 +344,14 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "ویزیت {{ visit_id }} برای مشتری {{ person_id }} تکمیل شد — {{ outcome }}. {{ business_name }}",
+        "default_email_template": """ویزیت میدانی تکمیل شد
+
+شناسه ویزیت: {{ visit_id }}
+مشتری: {{ person_id }}
+نتیجه: {{ outcome }}
+وضعیت: {{ status }}
+
+{{ business_name }}""",
         "default_email_subject": "ویزیت میدانی تکمیل شد — {{ business_name }}",
         "is_active": True,
         "requires_approval": True,
@@ -304,6 +371,12 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن تعمیرگاه"},
         ],
         "default_sms_template": "سلام {{ customer_name }} عزیز، {{ product_name }} شما با کد {{ repair_code }} دریافت شد. تاریخ تحویل تقریبی: {{ estimated_delivery | format_date }}. {{ business_name }}",
+        "default_email_template": """سلام {{ customer_name }} عزیز،
+
+{{ product_name }} شما با کد {{ repair_code }} دریافت شد.
+تاریخ تحویل تقریبی: {{ estimated_delivery | format_date }}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "دریافت کالا - {{ repair_code }}",
         "is_active": True,
         "requires_approval": True,
@@ -323,6 +396,13 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن تعمیرگاه"},
         ],
         "default_sms_template": "سلام {{ customer_name }}، {{ product_name }} شما (کد {{ repair_code }}) آماده تحویل است. هزینه: {{ final_cost | format_currency }}. {{ business_name }} - {{ business_phone }}",
+        "default_email_template": """سلام {{ customer_name }}،
+
+{{ product_name }} شما (کد {{ repair_code }}) آماده تحویل است.
+هزینه نهایی: {{ final_cost | format_currency }}
+وضعیت: {{ status }}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "کالای شما آماده تحویل است - {{ repair_code }}",
         "is_active": True,
         "requires_approval": True,
@@ -342,6 +422,15 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
         ],
         "default_sms_template": "سلام {{ customer_name }}، پرداخت شما به مبلغ {{ amount | format_currency }} با موفقیت دریافت شد. رسید: {{ receipt_number }}. با تشکر، {{ business_name }}",
+        "default_email_template": """سلام {{ customer_name }}،
+
+پرداخت شما به مبلغ {{ amount | format_currency }} با موفقیت دریافت شد.
+شماره رسید: {{ receipt_number }}
+تاریخ: {{ payment_date | format_date }}
+روش پرداخت: {{ payment_method }}
+مانده حساب: {{ remaining_balance | format_currency }}
+
+با تشکر، {{ business_name }}""",
         "default_email_subject": "رسید پرداخت - {{ receipt_number }}",
         "is_active": True,
         "requires_approval": True,
@@ -361,6 +450,14 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "سلام {{ customer_name }}، یادآوری: فاکتور {{ invoice_number }} به مبلغ {{ amount | format_currency }} در تاریخ {{ due_date | format_date }} سررسید دارد. {{ business_name }}",
+        "default_email_template": """سلام {{ customer_name }}،
+
+یادآوری پرداخت:
+فاکتور {{ invoice_number }} به مبلغ {{ amount | format_currency }}
+سررسید: {{ due_date | format_date }}
+{% if days_overdue %}تأخیر: {{ days_overdue }} روز{% endif %}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "یادآوری سررسید پرداخت - {{ invoice_number }}",
         "is_active": True,
         "requires_approval": True,
@@ -379,6 +476,14 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
         ],
         "default_sms_template": "سلام {{ customer_name }}، سفارش شما ({{ order_number }}) ارسال شد. کد رهگیری: {{ tracking_code }}. تحویل تقریبی: {{ estimated_delivery | format_date }}. {{ business_name }}",
+        "default_email_template": """سلام {{ customer_name }}،
+
+سفارش {{ order_number }} ارسال شد.
+کد رهگیری: {{ tracking_code }}
+پیک/پست: {{ courier_name }}
+تحویل تقریبی: {{ estimated_delivery | format_date }}
+
+{{ business_name }}""",
         "default_email_subject": "سفارش شما ارسال شد - {{ order_number }}",
         "is_active": True,
         "requires_approval": True,
@@ -398,6 +503,12 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "سلام {{ customer_name }}، گارانتی {{ product_name }} شما (کد {{ warranty_code }}) در تاریخ {{ expiry_date | format_date }} به پایان می‌رسد. {{ business_name }}",
+        "default_email_template": """سلام {{ customer_name }}،
+
+گارانتی {{ product_name }} (کد {{ warranty_code }}) در تاریخ {{ expiry_date | format_date }} به پایان می‌رسد.
+روزهای باقی‌مانده: {{ days_remaining }}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "یادآوری اتمام گارانتی - {{ product_name }}",
         "is_active": True,
         "requires_approval": True,
@@ -415,6 +526,12 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
             {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
         ],
         "default_sms_template": "سلام {{ customer_name }}، لینک کارت حساب شما: {{ share_link }} — {{ business_name }}",
+        "default_email_template": """سلام {{ customer_name }}،
+
+لینک مشاهده کارت حساب شما:
+{{ share_link }}
+
+{{ business_name }} — {{ business_phone }}""",
         "default_email_subject": "لینک کارت حساب — {{ business_name }}",
         "is_active": True,
         "requires_approval": True,
@@ -442,3 +559,11 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         "requires_approval": True,
     },
 ]
+
+
+def event_type_row_by_code(code: str) -> dict | None:
+    """برگرداندن ردیف seed برای یک code (برای مهاجرت و تست)."""
+    for row in NOTIFICATION_EVENT_TYPES_ROWS:
+        if row["code"] == code:
+            return row
+    return None

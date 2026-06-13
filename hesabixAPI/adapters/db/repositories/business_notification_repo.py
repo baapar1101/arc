@@ -39,13 +39,13 @@ class NotificationEventTypeRepository:
     def list_all(
         self,
         category: Optional[str] = None,
-        is_active: bool = True
+        is_active: Optional[bool] = True,
     ) -> List[NotificationEventType]:
         """لیست تمام انواع رویدادها"""
         query = self.db.query(self.model_class)
-        
-        if is_active:
-            query = query.filter(self.model_class.is_active == True)
+
+        if is_active is not None:
+            query = query.filter(self.model_class.is_active == is_active)
         
         if category:
             query = query.filter(self.model_class.category == category)

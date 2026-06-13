@@ -12,6 +12,11 @@ from sqlalchemy.orm import Session
 from adapters.db.repositories.ai_subscription_repository import AISubscriptionRepository
 from adapters.db.repositories.ai_usage_log_repository import AIUsageLogRepository
 from adapters.db.models.ai_subscription import UserAISubscription
+from app.services.ai.ai_quota_helpers import (
+    compute_tokens_remaining,
+    effective_tokens_limit,
+    has_token_cap,
+)
 
 
 def get_user_ai_quota(
@@ -39,17 +44,18 @@ def get_user_ai_quota(
     
     plan = subscription.plan
     used = subscription.tokens_used or 0
-    limit = subscription.tokens_limit or 0
-    remaining = max(0, limit - used)
+    cap = effective_tokens_limit(subscription.tokens_limit)
+    remaining = compute_tokens_remaining(used, subscription.tokens_limit)
     
     return {
         "has_subscription": True,
-        "remaining_tokens": remaining,
+        "remaining_tokens": remaining if remaining is not None else -1,
         "used_tokens": used,
-        "total_tokens": limit,
+        "total_tokens": cap if cap is not None else -1,
         "plan_name": plan.name if plan else None,
         "plan_type": plan.plan_type if plan else None,
-        "subscription_id": subscription.id
+        "subscription_id": subscription.id,
+        "is_unlimited": not has_token_cap(subscription.tokens_limit),
     }
 
 
@@ -101,10 +107,8 @@ def estimate_request_cost(
         return Decimal(0)
     
     if plan_type == "subscription":
-        # در subscription معمولاً هزینه اضافی نداریم
         return Decimal(0)
     
-    # برای pay_as_go و hybrid (هم‌خوان با ai_service._calculate_cost)
     pay_as_go = pricing_config.get("pay_as_go") or {}
     input_per_token = Decimal(str(pay_as_go.get("price_per_1k_input_tokens", 0))) / 1000
     output_per_token = Decimal(str(pay_as_go.get("price_per_1k_output_tokens", 0))) / 1000
@@ -128,23 +132,24 @@ def can_user_use_ai(
             "reason": "NO_SUBSCRIPTION",
             "message": "اشتراک فعالی وجود ندارد"
         }
+
+    if quota.get("is_unlimited"):
+        return {
+            "can_use": True,
+            "quota": quota
+        }
     
-    if quota["plan_type"] == "free" and quota["remaining_tokens"] < required_tokens:
+    remaining = quota["remaining_tokens"]
+    if remaining < required_tokens:
         return {
             "can_use": False,
             "reason": "QUOTA_EXCEEDED",
-            "message": f"سهمیه باقیمانده ({quota['remaining_tokens']}) کمتر از نیاز ({required_tokens}) است",
-            "remaining": quota["remaining_tokens"],
+            "message": f"سهمیه باقیمانده ({remaining}) کمتر از نیاز ({required_tokens}) است",
+            "remaining": remaining,
             "required": required_tokens
         }
-    
-    if quota["plan_type"] == "subscription" and quota["remaining_tokens"] < required_tokens:
-        # برای subscription باید بررسی کنیم که آیا hybrid است یا نه
-        # این بررسی در check_quota_and_charge انجام می‌شود
-        pass
     
     return {
         "can_use": True,
         "quota": quota
     }
-

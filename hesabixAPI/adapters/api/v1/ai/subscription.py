@@ -25,6 +25,7 @@ router = APIRouter(prefix="/ai/subscription", tags=["هوش مصنوعی"])
 def _build_subscription_response(subscription, request):
     import json
     from app.services.ai.ai_model_service import serialize_plan_for_user
+    from app.services.ai.ai_quota_helpers import effective_tokens_limit
 
     plan = subscription.plan
     return success_response({
@@ -36,9 +37,18 @@ def _build_subscription_response(subscription, request):
         "plan": serialize_plan_for_user(plan) if plan else None,
         "subscription_type": subscription.subscription_type,
         "tokens_used": subscription.tokens_used,
-        "tokens_limit": subscription.tokens_limit,
+        "tokens_limit": effective_tokens_limit(subscription.tokens_limit),
         "period_start": subscription.period_start.isoformat() if subscription.period_start else None,
         "period_end": subscription.period_end.isoformat() if subscription.period_end else None,
+        "expires_at": (
+            subscription.expires_at.isoformat()
+            if getattr(subscription, "expires_at", None)
+            else (
+                subscription.period_end.isoformat()
+                if subscription.period_end
+                else None
+            )
+        ),
         "is_active": subscription.is_active,
         "auto_renew": getattr(subscription, "auto_renew", False),
         "created_at": subscription.created_at.isoformat() if getattr(subscription, "created_at", None) else None,
@@ -300,6 +310,7 @@ async def cancel_subscription(
     
     subscription.is_active = False
     subscription.period_end = datetime.utcnow()
+    subscription.expires_at = datetime.utcnow()
     subscription.updated_at = datetime.utcnow()
     db.commit()
     
