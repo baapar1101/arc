@@ -27,10 +27,33 @@ router = APIRouter(prefix="/ai/chat", tags=["هوش مصنوعی"])
 DEFAULT_CHAT_TITLE = "گفت‌وگوی جدید"
 
 
+from app.services.ai.ai_constants import AI_OPERATION_CHAT
+from app.services.ai.ai_tool_intent import estimate_query_complexity
+
+
 def _prepare_ai_service_model(ai_service: AIService, model: Optional[str]) -> None:
     if model:
         ai_service.set_request_model(model)
         ai_service._validate_request_model_if_set()
+
+
+def _apply_chat_routing_context(
+    ai_service: AIService,
+    *,
+    user_query: Optional[str],
+    messages: Optional[List[Dict[str, Any]]] = None,
+    use_function_calling: bool = True,
+) -> None:
+    needs_tools = False
+    if use_function_calling and user_query:
+        complexity = estimate_query_complexity(user_query, messages)
+        needs_tools = complexity in ("medium", "complex")
+    ai_service.set_routing_context(
+        operation=AI_OPERATION_CHAT,
+        user_query=user_query,
+        history_messages=messages,
+        needs_tools=needs_tools,
+    )
 
 
 def _usage_provider_and_model(ai_service: AIService) -> tuple[str, str]:
@@ -40,6 +63,17 @@ def _usage_provider_and_model(ai_service: AIService) -> tuple[str, str]:
         provider = ai_service.config.provider if ai_service.config else "openai"
         model_name = ai_service.config.model_name if ai_service.config else "gpt-4"
         return provider, model_name
+
+
+def _usage_log_context(ai_service: AIService) -> Optional[Dict[str, Any]]:
+    try:
+        requested = ai_service.get_requested_model_code()
+        resolved = ai_service.get_effective_model_code()
+        if requested != resolved:
+            return {"requested_model": requested, "resolved_model": resolved}
+    except Exception:
+        return None
+    return None
 
 
 def _schedule_session_title_generation(
@@ -132,6 +166,7 @@ class CheckAvailabilityRequest(BaseModel):
     business_id: Optional[int] = None
     estimated_tokens: int = 1000
     model: Optional[str] = None
+    user_query: Optional[str] = None
 
 
 class AIMemoryStructuredPatch(BaseModel):
@@ -201,6 +236,7 @@ async def check_ai_availability(
     availability = ai_service.check_availability(
         estimated_tokens=params.estimated_tokens,
         model=params.model,
+        user_query=params.user_query,
     )
     
     return success_response(availability, request)
@@ -936,6 +972,7 @@ async def send_message(
             session_id=session_id,
             approve_writes=approve_writes,
             approved_write_calls=approved_write_calls,
+            user_query=message_data.content,
             request_model=message_data.model,
         )
     
@@ -962,6 +999,11 @@ async def send_message(
         
         commit_ai_service = AIService(commit_db, ctx, business_id)
         _prepare_ai_service_model(commit_ai_service, message_data.model)
+        _apply_chat_routing_context(
+            commit_ai_service,
+            user_query=message_data.content,
+            messages=messages,
+        )
         charge_result = commit_ai_service.check_quota_and_charge(
             input_tokens, output_tokens, model_code=commit_ai_service.get_effective_model_code()
         )
@@ -991,8 +1033,10 @@ async def send_message(
             cost=charge_result.get("cost", 0),
             payment_method=charge_result.get("payment_method", "free"),
             wallet_transaction_id=charge_result.get("wallet_transaction_id"),
-            document_id=charge_result.get("document_id")
+            document_id=charge_result.get("document_id"),
+            context=_usage_log_context(commit_ai_service),
         )
+        commit_ai_service.clear_routing_context()
         
         # به‌روزرسانی زمان جلسه
         from datetime import datetime
@@ -1211,6 +1255,11 @@ async def _stream_message_response(
                 
                 new_ai_service = AIService(new_db, ctx, updated_session.business_id)
                 _prepare_ai_service_model(new_ai_service, request_model)
+                _apply_chat_routing_context(
+                    new_ai_service,
+                    user_query=message_content,
+                    messages=messages,
+                )
 
                 charge_result = new_ai_service.check_quota_and_charge(
                     input_tokens,
@@ -1246,8 +1295,10 @@ async def _stream_message_response(
                     cost=charge_result.get("cost", 0),
                     payment_method=charge_result.get("payment_method", "free"),
                     wallet_transaction_id=charge_result.get("wallet_transaction_id"),
-                    document_id=charge_result.get("document_id")
+                    document_id=charge_result.get("document_id"),
+                    context=_usage_log_context(new_ai_service),
                 )
+                new_ai_service.clear_routing_context()
                 
                 # به‌روزرسانی زمان جلسه
                 from datetime import datetime
@@ -1412,6 +1463,7 @@ async def regenerate_last_response(
             session_id=session_id,
             approve_writes=approve_writes,
             approved_write_calls=approved_write_calls,
+            user_query=last_user.content,
             request_model=model,
         )
 
@@ -1425,6 +1477,11 @@ async def regenerate_last_response(
             raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
         commit_ai_service = AIService(commit_db, ctx, business_id)
         _prepare_ai_service_model(commit_ai_service, model)
+        _apply_chat_routing_context(
+            commit_ai_service,
+            user_query=last_user.content,
+            messages=messages,
+        )
         charge_result = commit_ai_service.check_quota_and_charge(
             input_tokens, output_tokens, model_code=commit_ai_service.get_effective_model_code()
         )
@@ -1450,7 +1507,9 @@ async def regenerate_last_response(
             payment_method=charge_result.get("payment_method", "free"),
             wallet_transaction_id=charge_result.get("wallet_transaction_id"),
             document_id=charge_result.get("document_id"),
+            context=_usage_log_context(commit_ai_service),
         )
+        commit_ai_service.clear_routing_context()
         from datetime import datetime
         commit_session.updated_at = datetime.utcnow()
         commit_db.commit()
@@ -1635,6 +1694,11 @@ async def edit_user_message(
             raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
         commit_ai_service = AIService(commit_db, ctx, business_id)
         _prepare_ai_service_model(commit_ai_service, params.model)
+        _apply_chat_routing_context(
+            commit_ai_service,
+            user_query=user_text,
+            messages=messages,
+        )
         charge_result = commit_ai_service.check_quota_and_charge(
             input_tokens, output_tokens, model_code=commit_ai_service.get_effective_model_code()
         )
@@ -1660,7 +1724,9 @@ async def edit_user_message(
             payment_method=charge_result.get("payment_method", "free"),
             wallet_transaction_id=charge_result.get("wallet_transaction_id"),
             document_id=charge_result.get("document_id"),
+            context=_usage_log_context(commit_ai_service),
         )
+        commit_ai_service.clear_routing_context()
         from datetime import datetime
 
         commit_session.updated_at = datetime.utcnow()

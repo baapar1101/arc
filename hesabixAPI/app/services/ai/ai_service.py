@@ -50,6 +50,10 @@ from app.services.ai.ai_db_helpers import (
     safe_db_rollback,
 )
 from app.services.ai.ai_constants import (
+    AI_OPERATION_CHAT,
+    AI_OPERATION_HISTORY_SUMMARY,
+    AI_OPERATION_TITLE,
+    AI_OPERATION_THOUGHT,
     EXPLORATION_COMPLEXITY_ITERATIONS,
     EXPLORATION_LLM_THOUGHT_MIN_TOOLS,
     KNOWLEDGE_LOAD_TIMEOUT_SEC,
@@ -151,6 +155,7 @@ class AIService:
         self.subscription = self._get_active_subscription()
         self.config = self._get_ai_config()
         self._request_model_code: Optional[str] = None
+        self._routing_context: Optional[Dict[str, Any]] = None
     
     def _get_active_subscription(self) -> Optional[UserAISubscription]:
         """دریافت اشتراک فعال کاربر"""
@@ -186,14 +191,50 @@ class AIService:
         repo = AIConfigRepository(self.db)
         return repo.get_active_config()
 
+    def set_routing_context(
+        self,
+        *,
+        operation: str = AI_OPERATION_CHAT,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
+        needs_tools: bool = False,
+    ) -> None:
+        self._routing_context = {
+            "operation": operation,
+            "user_query": user_query,
+            "history_messages": history_messages,
+            "needs_tools": needs_tools,
+        }
+
+    def clear_routing_context(self) -> None:
+        self._routing_context = None
+
+    def _resolve_routing_params(
+        self,
+        *,
+        operation: Optional[str] = None,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
+        needs_tools: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        base = self._routing_context or {}
+        return {
+            "operation": operation if operation is not None else base.get("operation", AI_OPERATION_CHAT),
+            "user_query": user_query if user_query is not None else base.get("user_query"),
+            "history_messages": (
+                history_messages if history_messages is not None else base.get("history_messages")
+            ),
+            "needs_tools": needs_tools if needs_tools is not None else bool(base.get("needs_tools", False)),
+        }
+
     def set_request_model(self, model_code: Optional[str]) -> None:
         self._request_model_code = model_code.strip() if model_code and str(model_code).strip() else None
 
-    def get_effective_model_code(self) -> str:
-        from app.services.ai.ai_model_service import resolve_effective_model_code
+    def get_requested_model_code(self) -> str:
+        from app.services.ai.ai_model_service import resolve_requested_model_code
 
         plan = self.subscription.plan if self.subscription else None
-        return resolve_effective_model_code(
+        return resolve_requested_model_code(
             self.db,
             request_model=self._request_model_code,
             subscription=self.subscription,
@@ -201,15 +242,73 @@ class AIService:
             config=self.config,
         )
 
-    def get_effective_model_api_id(self) -> str:
+    def get_effective_model_code(
+        self,
+        *,
+        operation: Optional[str] = None,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
+        needs_tools: Optional[bool] = None,
+    ) -> str:
+        from app.services.ai.ai_model_service import resolve_effective_model_code
+
+        routing = self._resolve_routing_params(
+            operation=operation,
+            user_query=user_query,
+            history_messages=history_messages,
+            needs_tools=needs_tools,
+        )
+        plan = self.subscription.plan if self.subscription else None
+        return resolve_effective_model_code(
+            self.db,
+            request_model=self._request_model_code,
+            subscription=self.subscription,
+            plan=plan,
+            config=self.config,
+            **routing,
+        )
+
+    def get_effective_model_api_id(
+        self,
+        *,
+        operation: Optional[str] = None,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
+        needs_tools: Optional[bool] = None,
+    ) -> str:
         from app.services.ai.ai_model_service import get_api_model_id
 
-        return get_api_model_id(self.db, self.get_effective_model_code(), self.config)
+        return get_api_model_id(
+            self.db,
+            self.get_effective_model_code(
+                operation=operation,
+                user_query=user_query,
+                history_messages=history_messages,
+                needs_tools=needs_tools,
+            ),
+            self.config,
+        )
 
-    def get_effective_provider_type(self) -> str:
+    def get_effective_provider_type(
+        self,
+        *,
+        operation: Optional[str] = None,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
+        needs_tools: Optional[bool] = None,
+    ) -> str:
         from app.services.ai.ai_model_service import get_model_provider
 
-        return get_model_provider(self.db, self.get_effective_model_code(), self.config)
+        return get_model_provider(
+            self.db,
+            self.get_effective_model_code(
+                operation=operation,
+                user_query=user_query,
+                history_messages=history_messages,
+                needs_tools=needs_tools,
+            ),
+            self.config,
+        )
 
     def _validate_request_model_if_set(self) -> None:
         if not self._request_model_code:
@@ -219,12 +318,29 @@ class AIService:
         plan = self.subscription.plan if self.subscription else None
         validate_model_selection(self.db, plan, self._request_model_code)
 
-    def _effective_max_tokens(self, override: Optional[int] = None) -> int:
+    def _effective_max_tokens(
+        self,
+        override: Optional[int] = None,
+        *,
+        operation: str = AI_OPERATION_CHAT,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
+        needs_tools: bool = False,
+    ) -> int:
         from app.services.ai.ai_model_service import get_max_tokens_for_model
 
         if override is not None:
             return int(override)
-        return get_max_tokens_for_model(self.db, self.get_effective_model_code(), self.config)
+        return get_max_tokens_for_model(
+            self.db,
+            self.get_effective_model_code(
+                operation=operation,
+                user_query=user_query,
+                history_messages=history_messages,
+                needs_tools=needs_tools,
+            ),
+            self.config,
+        )
 
     def _make_provider(self, provider_type: Optional[str] = None):
         """ساخت provider فعال برای تخمین توکن و فراخوانی مدل."""
@@ -288,7 +404,9 @@ class AIService:
                 if bid and uid and can_use_llm_summarize(uid, int(bid)):
                     text = summarize_history_with_llm(
                         provider,
-                        self.get_effective_model_api_id(),
+                        self.get_effective_model_api_id(
+                            operation=AI_OPERATION_HISTORY_SUMMARY,
+                        ),
                         middle_msgs,
                     )
                     if text:
@@ -311,6 +429,17 @@ class AIService:
             force_summarize=force_summarize,
         )
 
+    def _routing_needs_tools(
+        self,
+        use_function_calling: bool,
+        user_query: Optional[str],
+        history_messages: Optional[List[Dict[str, Any]]],
+    ) -> bool:
+        if not use_function_calling:
+            return False
+        complexity = estimate_query_complexity(user_query, history_messages)
+        return complexity in ("medium", "complex")
+
     def _use_tools_for_request(self, use_function_calling: bool) -> bool:
         """
         اگر در تنظیمات سراسری function_calling_enabled=False باشد،
@@ -330,6 +459,8 @@ class AIService:
         self,
         estimated_tokens: int = 1000,
         model: Optional[str] = None,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         بررسی اینکه آیا کاربر می‌تواند از AI استفاده کند
@@ -349,6 +480,18 @@ class AIService:
         if model:
             self.set_request_model(model)
         try:
+            from app.services.ai.ai_model_service import is_auto_model_code
+
+            requested_model = self.get_requested_model_code()
+            if is_auto_model_code(requested_model):
+                self.set_routing_context(
+                    operation=AI_OPERATION_CHAT,
+                    user_query=user_query,
+                    history_messages=history_messages,
+                    needs_tools=self._routing_needs_tools(
+                        True, user_query, history_messages
+                    ),
+                )
             effective_model = self.get_effective_model_code()
         except ApiError as exc:
             err = {}
@@ -531,18 +674,27 @@ class AIService:
                     }
                 }
             
-            from app.services.ai.ai_model_service import estimate_cost_for_tokens
+            from app.services.ai.ai_model_service import (
+                estimate_auto_cost_range,
+                estimate_cost_for_tokens,
+                is_auto_model_code,
+            )
 
             if plan.plan_type == "hybrid" and quota["has_token_cap"]:
                 remaining = quota["tokens_remaining"] or 0
                 billable_tokens = max(0, estimated_tokens - remaining)
             else:
                 billable_tokens = estimated_tokens
-            estimated_cost = (
-                estimate_cost_for_tokens(plan, effective_model, billable_tokens)
-                if billable_tokens > 0
-                else Decimal(0)
-            )
+            if billable_tokens > 0:
+                if is_auto_model_code(requested_model):
+                    cost_range = estimate_auto_cost_range(plan, self.db, billable_tokens)
+                    estimated_cost = Decimal(str(cost_range["max"]))
+                else:
+                    estimated_cost = estimate_cost_for_tokens(
+                        plan, effective_model, billable_tokens
+                    )
+            else:
+                estimated_cost = Decimal(0)
             
             from app.services.wallet_service import get_wallet_overview
             try:
@@ -601,20 +753,44 @@ class AIService:
         # همه چیز OK است
         from app.services.ai.ai_model_service import (
             _format_pricing_hint,
+            estimate_auto_cost_range,
             estimate_cost_for_tokens,
             get_model_pricing_rates,
+            is_auto_model_code,
             model_supports_tools,
         )
 
+        requested_model = self.get_requested_model_code()
         fce = self._provider_supports_tools() and model_supports_tools(
             self.db, effective_model, self.config
         )
         in_per_1k = out_per_1k = est_cost = 0.0
+        model_pricing: Dict[str, Any] = {}
         if plan:
-            in_p, out_p = get_model_pricing_rates(plan, effective_model)
-            in_per_1k = float(in_p * 1000)
-            out_per_1k = float(out_p * 1000)
-            est_cost = float(estimate_cost_for_tokens(plan, effective_model, estimated_tokens))
+            if is_auto_model_code(requested_model):
+                cost_range = estimate_auto_cost_range(plan, self.db, estimated_tokens)
+                est_cost = float(cost_range["max"])
+                model_pricing = {
+                    "estimated_cost": est_cost,
+                    "estimated_cost_min": cost_range["min"],
+                    "estimated_cost_max": cost_range["max"],
+                    "likely_model": cost_range.get("likely_model"),
+                    "pricing_hint": (
+                        f"از {cost_range['min']:,.0f} تا {cost_range['max']:,.0f} "
+                        f"(بسته به پیچیدگی سوال)"
+                    ),
+                }
+            else:
+                in_p, out_p = get_model_pricing_rates(plan, effective_model)
+                in_per_1k = float(in_p * 1000)
+                out_per_1k = float(out_p * 1000)
+                est_cost = float(estimate_cost_for_tokens(plan, effective_model, estimated_tokens))
+                model_pricing = {
+                    "estimated_cost": est_cost,
+                    "price_per_1k_input_tokens": in_per_1k,
+                    "price_per_1k_output_tokens": out_per_1k,
+                    "pricing_hint": _format_pricing_hint(in_per_1k, out_per_1k, est_cost),
+                }
         return {
             "can_use": True,
             "reason": None,
@@ -623,12 +799,9 @@ class AIService:
                 "wallet": wallet_info if plan.plan_type in ["pay_as_go", "hybrid"] else None,
                 "function_calling_enabled": fce,
                 "model": effective_model,
-                "model_pricing": {
-                    "estimated_cost": est_cost,
-                    "price_per_1k_input_tokens": in_per_1k,
-                    "price_per_1k_output_tokens": out_per_1k,
-                    "pricing_hint": _format_pricing_hint(in_per_1k, out_per_1k, est_cost),
-                },
+                "requested_model": requested_model,
+                "resolved_model": effective_model if is_auto_model_code(requested_model) else None,
+                "model_pricing": model_pricing,
                 "suggestions": suggestions
             }
         }
@@ -1321,184 +1494,196 @@ class AIService:
             self.set_request_model(request_model)
         self._validate_request_model_if_set()
         effective_user_query = user_query or self._last_user_query(messages)
+        self.set_routing_context(
+            operation=AI_OPERATION_CHAT,
+            user_query=effective_user_query,
+            history_messages=messages,
+            needs_tools=self._routing_needs_tools(
+                use_function_calling, effective_user_query, messages
+            ),
+        )
 
         accumulated_function_calls: List[Dict[str, Any]] = []
         accumulated_function_results: Dict[str, Any] = {}
         
         if not self.config or not self.config.is_active:
+            self.clear_routing_context()
             raise ApiError("AI_NOT_CONFIGURED", "تنظیمات AI فعال نیست", http_status=400)
         
-        # رمزگشایی API Key
-        from app.services.ai.encryption import decrypt_api_key
-        api_key = decrypt_api_key(self.config.api_key) if self.config.api_key else None
+        try:
+            # رمزگشایی API Key
+            from app.services.ai.encryption import decrypt_api_key
+            api_key = decrypt_api_key(self.config.api_key) if self.config.api_key else None
+            
+            if not api_key:
+                raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
         
-        if not api_key:
-            raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
-        
-        # اضافه کردن system prompt با business_id از session
-        system_prompt = self.get_system_prompt(
-            session_business_id=session_business_id,
-            session_id=session_id,
-            user_query=effective_user_query,
-        )
-        provider = self._make_provider()
-        full_messages, _context_meta = self._prepare_llm_messages(
-            system_prompt,
-            messages,
-            provider,
-        )
-        
-        eff_tools = self._use_tools_for_request(use_function_calling)
-        if eff_tools and tools is None:
-            tools = self.get_available_functions(
+            # اضافه کردن system prompt با business_id از session
+            system_prompt = self.get_system_prompt(
                 session_business_id=session_business_id,
+                session_id=session_id,
                 user_query=effective_user_query,
             )
-        elif not eff_tools:
-            tools = None
-        
-        context_retried = False
-        loop = asyncio.get_event_loop()
-        while True:
-            try:
-                response = await loop.run_in_executor(
-                    _executor,
-                    lambda msgs=full_messages: provider.chat_completion(
-                        messages=msgs,
-                        model=self.get_effective_model_api_id(),
-                        max_tokens=max_tokens_override or self.config.max_tokens,
-                        temperature=float(
-                            temperature_override
-                            if temperature_override is not None
-                            else self.config.temperature
+            provider = self._make_provider()
+            full_messages, _context_meta = self._prepare_llm_messages(
+                system_prompt,
+                messages,
+                provider,
+            )
+            
+            eff_tools = self._use_tools_for_request(use_function_calling)
+            if eff_tools and tools is None:
+                tools = self.get_available_functions(
+                    session_business_id=session_business_id,
+                    user_query=effective_user_query,
+                )
+            elif not eff_tools:
+                tools = None
+            
+            context_retried = False
+            loop = asyncio.get_event_loop()
+            while True:
+                try:
+                    response = await loop.run_in_executor(
+                        _executor,
+                        lambda msgs=full_messages: provider.chat_completion(
+                            messages=msgs,
+                            model=self.get_effective_model_api_id(),
+                            max_tokens=max_tokens_override or self.config.max_tokens,
+                            temperature=float(
+                                temperature_override
+                                if temperature_override is not None
+                                else self.config.temperature
+                            ),
+                            tools=tools if tools else None,
                         ),
-                        tools=tools if tools else None,
-                    ),
-                )
-                break
-            except ApiError as api_exc:
-                if not context_retried and is_context_overflow_error(api_exc):
-                    context_retried = True
-                    full_messages, _ = self._prepare_llm_messages(
-                        system_prompt,
-                        messages,
-                        provider,
-                        force_summarize=True,
-                        use_llm_summary=True,
                     )
-                    continue
-                raise
-            except Exception as e:
-                if not context_retried and is_context_overflow_error(e):
-                    context_retried = True
-                    full_messages, _ = self._prepare_llm_messages(
-                        system_prompt,
-                        messages,
-                        provider,
-                        force_summarize=True,
-                        use_llm_summary=True,
+                    break
+                except ApiError as api_exc:
+                    if not context_retried and is_context_overflow_error(api_exc):
+                        context_retried = True
+                        full_messages, _ = self._prepare_llm_messages(
+                            system_prompt,
+                            messages,
+                            provider,
+                            force_summarize=True,
+                            use_llm_summary=True,
+                        )
+                        continue
+                    raise
+                except Exception as e:
+                    if not context_retried and is_context_overflow_error(e):
+                        context_retried = True
+                        full_messages, _ = self._prepare_llm_messages(
+                            system_prompt,
+                            messages,
+                            provider,
+                            force_summarize=True,
+                            use_llm_summary=True,
+                        )
+                        continue
+                    logger.error(f"Unexpected error in AI service: {e}", exc_info=True)
+                    raise ApiError(
+                        "AI_SERVICE_ERROR",
+                        f"خطا در سرویس AI: {str(e)}",
+                        http_status=500,
                     )
-                    continue
-                logger.error(f"Unexpected error in AI service: {e}", exc_info=True)
-                raise ApiError(
-                    "AI_SERVICE_ERROR",
-                    f"خطا در سرویس AI: {str(e)}",
-                    http_status=500,
-                )
-        
-        # پردازش function calls در یک حلقه (multi-round agent)
-        iteration = 0
-        while eff_tools and response["message"].get("function_calls") and iteration < max_iterations:
-            iteration += 1
-            current_calls = response["message"]["function_calls"]
-            accumulated_function_calls.extend(current_calls)
+            
+            # پردازش function calls در یک حلقه (multi-round agent)
+            iteration = 0
+            while eff_tools and response["message"].get("function_calls") and iteration < max_iterations:
+                iteration += 1
+                current_calls = response["message"]["function_calls"]
+                accumulated_function_calls.extend(current_calls)
 
-            function_results = await self.handle_function_calls_async(
-                current_calls,
-                session_business_id=session_business_id,
-                approve_writes=approve_writes,
-                approved_write_calls=approved_write_calls,
-                iteration=iteration,
-            )
-            _merge_round_tool_results(accumulated_function_results, function_results)
-            
-            # ایجاد assistant message با tool_calls برای OpenAI API
-            assistant_msg = {
-                "role": "assistant",
-                "content": response["message"].get("content", None),
-                "tool_calls": []
-            }
-            
-            # ساخت tool_calls به فرمت OpenAI
-            for idx, call in enumerate(response["message"]["function_calls"]):
-                tool_call_id = _tool_call_id_for(call, iteration, idx)
-                if not call.get("id"):
-                    call["id"] = tool_call_id
-                assistant_msg["tool_calls"].append({
-                    "id": tool_call_id,
-                    "type": "function",
-                    "function": {
-                        "name": call.get("name"),
-                        "arguments": json.dumps(call.get("arguments", {}), ensure_ascii=False)
-                    }
-                })
-            
-            if assistant_msg["content"] is None:
-                del assistant_msg["content"]
-            
-            full_messages.append(assistant_msg)
-            
-            function_messages = []
-            for idx, call in enumerate(response["message"]["function_calls"]):
-                function_name = call.get("name")
-                result = _lookup_tool_result(function_results, call)
-                tool_call_id = _tool_call_id_for(call, iteration, idx)
-                content = summarize_tool_result_for_llm(
-                    function_name or "unknown",
-                    self._serialize_for_json(result),
+                function_results = await self.handle_function_calls_async(
+                    current_calls,
+                    session_business_id=session_business_id,
+                    approve_writes=approve_writes,
+                    approved_write_calls=approved_write_calls,
+                    iteration=iteration,
                 )
-                function_messages.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": content,
-                })
-            
-            full_messages.extend(function_messages)
-            round_needs_write_approval = any(
-                is_write_guard_stop_result(
-                    _lookup_tool_result(function_results, call)
+                _merge_round_tool_results(accumulated_function_results, function_results)
+                
+                # ایجاد assistant message با tool_calls برای OpenAI API
+                assistant_msg = {
+                    "role": "assistant",
+                    "content": response["message"].get("content", None),
+                    "tool_calls": []
+                }
+                
+                # ساخت tool_calls به فرمت OpenAI
+                for idx, call in enumerate(response["message"]["function_calls"]):
+                    tool_call_id = _tool_call_id_for(call, iteration, idx)
+                    if not call.get("id"):
+                        call["id"] = tool_call_id
+                    assistant_msg["tool_calls"].append({
+                        "id": tool_call_id,
+                        "type": "function",
+                        "function": {
+                            "name": call.get("name"),
+                            "arguments": json.dumps(call.get("arguments", {}), ensure_ascii=False)
+                        }
+                    })
+                
+                if assistant_msg["content"] is None:
+                    del assistant_msg["content"]
+                
+                full_messages.append(assistant_msg)
+                
+                function_messages = []
+                for idx, call in enumerate(response["message"]["function_calls"]):
+                    function_name = call.get("name")
+                    result = _lookup_tool_result(function_results, call)
+                    tool_call_id = _tool_call_id_for(call, iteration, idx)
+                    content = summarize_tool_result_for_llm(
+                        function_name or "unknown",
+                        self._serialize_for_json(result),
+                    )
+                    function_messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": content,
+                    })
+                
+                full_messages.extend(function_messages)
+                round_needs_write_approval = any(
+                    is_write_guard_stop_result(
+                        _lookup_tool_result(function_results, call)
+                    )
+                    for call in current_calls
                 )
-                for call in current_calls
-            )
-            if round_needs_write_approval:
-                break
-            try:
-                loop = asyncio.get_event_loop()
-                response = await loop.run_in_executor(
-                    _executor,
-                    lambda msgs=full_messages, t=tools: provider.chat_completion(
-                        messages=msgs,
-                        model=self.get_effective_model_api_id(),
-                        max_tokens=max_tokens_override or self.config.max_tokens,
-                        temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
-                        tools=t if eff_tools else None,
-                    ),
-                )
-            except ApiError:
-                raise
-            except Exception as e:
-                logger.error(f"Unexpected error in AI service (function call iteration {iteration}): {e}", exc_info=True)
-                raise ApiError(
-                    "AI_SERVICE_ERROR",
-                    f"خطا در سرویس AI: {str(e)}",
-                    http_status=500
-                )
+                if round_needs_write_approval:
+                    break
+                try:
+                    loop = asyncio.get_event_loop()
+                    response = await loop.run_in_executor(
+                        _executor,
+                        lambda msgs=full_messages, t=tools: provider.chat_completion(
+                            messages=msgs,
+                            model=self.get_effective_model_api_id(),
+                            max_tokens=max_tokens_override or self.config.max_tokens,
+                            temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
+                            tools=t if eff_tools else None,
+                        ),
+                    )
+                except ApiError:
+                    raise
+                except Exception as e:
+                    logger.error(f"Unexpected error in AI service (function call iteration {iteration}): {e}", exc_info=True)
+                    raise ApiError(
+                        "AI_SERVICE_ERROR",
+                        f"خطا در سرویس AI: {str(e)}",
+                        http_status=500
+                    )
 
-        if accumulated_function_calls:
-            response["_function_calls"] = accumulated_function_calls
-            response["_function_results"] = accumulated_function_results
-        
-        return response
+            if accumulated_function_calls:
+                response["_function_calls"] = accumulated_function_calls
+                response["_function_results"] = accumulated_function_results
+            
+            return response
+        finally:
+            self.clear_routing_context()
     
     def chat_completion_sync(
         self,
@@ -1564,6 +1749,14 @@ class AIService:
             self.set_request_model(request_model)
         self._validate_request_model_if_set()
         effective_user_query = user_query or self._last_user_query(messages)
+        self.set_routing_context(
+            operation=AI_OPERATION_CHAT,
+            user_query=effective_user_query,
+            history_messages=messages,
+            needs_tools=self._routing_needs_tools(
+                use_function_calling, effective_user_query, messages
+            ),
+        )
         exploration_enabled = resolve_exploration_enabled(
             exploration_mode, effective_user_query, messages
         )
@@ -1605,6 +1798,8 @@ class AIService:
 
         provider = self._make_provider()
         context_compress_retried = False
+        resolved_model_code = self.get_effective_model_code()
+        requested_model_code = self.get_requested_model_code()
 
         try:
             accumulated_content = ""
@@ -2221,7 +2416,9 @@ class AIService:
                         ):
                             llm_thought = await synthesize_thought_with_llm(
                                 provider,
-                                self.get_effective_model_api_id(),
+                                self.get_effective_model_api_id(
+                                    operation=AI_OPERATION_THOUGHT,
+                                ),
                                 max_tokens_override or self.config.max_tokens,
                                 float(self.config.temperature),
                                 bundle,
@@ -2379,6 +2576,8 @@ class AIService:
                 ),
                 "agent_trace": trace_steps or None,
                 "citations_context": citations_context or None,
+                "requested_model": requested_model_code,
+                "resolved_model": resolved_model_code,
             }
 
         except ApiError:
@@ -2390,6 +2589,8 @@ class AIService:
                 f"خطا در سرویس AI: {str(e)}",
                 http_status=500,
             )
+        finally:
+            self.clear_routing_context()
     
     def handle_function_calls(
         self,
@@ -2540,24 +2741,39 @@ class AIService:
         """
         تولید عنوان کوتاه و هوشمند برای گفت‌وگو بر اساس اولین پیام کاربر (async version)
         """
+        if not self.config or not self.config.is_active:
+            return None
+        self.set_routing_context(
+            operation=AI_OPERATION_TITLE,
+            user_query=user_message,
+        )
         try:
-            response = await self.chat_completion(
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "شما باید برای گفت‌وگو یک عنوان بسیار کوتاه (حداکثر 5 کلمه) "
-                            "و شفاف انتخاب کنید. از علائم نگارشی اضافه و گیومه استفاده نکنید."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": f"درخواست کاربر: {user_message}\nفقط عنوان کوتاه تولید کن."
-                    },
-                ],
-                tools=None,
-                use_function_calling=False,
-                max_tokens_override=48,
+            provider = self._make_provider()
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                _executor,
+                lambda: provider.chat_completion(
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "شما باید برای گفت‌وگو یک عنوان بسیار کوتاه (حداکثر 5 کلمه) "
+                                "و شفاف انتخاب کنید. از علائم نگارشی اضافه و گیومه استفاده نکنید."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": f"درخواست کاربر: {user_message}\nفقط عنوان کوتاه تولید کن.",
+                        },
+                    ],
+                    model=self.get_effective_model_api_id(
+                        operation=AI_OPERATION_TITLE,
+                        user_query=user_message,
+                    ),
+                    max_tokens=48,
+                    temperature=float(self.config.temperature),
+                    tools=None,
+                ),
             )
             title = response["message"]["content"].strip()
             if len(title) > 80:
@@ -2566,4 +2782,6 @@ class AIService:
         except Exception as exc:
             logger.warning(f"Failed to generate chat title: {exc}")
             return None
+        finally:
+            self.clear_routing_context()
 

@@ -121,6 +121,10 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
         }
         if chunk.get("agent_trace"):
             done_payload["agent_trace"] = chunk.get("agent_trace")
+        if chunk.get("requested_model"):
+            done_payload["requested_model"] = chunk.get("requested_model")
+        if chunk.get("resolved_model"):
+            done_payload["resolved_model"] = chunk.get("resolved_model")
         payloads.append(done_payload)
     elif not content_chunk and not event_type:
         pass

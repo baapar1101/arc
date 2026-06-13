@@ -524,6 +524,7 @@ class AIModelCatalogItem {
   final Map<String, dynamic>? pricing;
   final double? estimatedCostPer1kTokens;
   final String? pricingHint;
+  final bool isAuto;
 
   AIModelCatalogItem({
     this.id,
@@ -540,6 +541,7 @@ class AIModelCatalogItem {
     this.pricing,
     this.estimatedCostPer1kTokens,
     this.pricingHint,
+    this.isAuto = false,
   });
 
   factory AIModelCatalogItem.fromJson(Map<String, dynamic> json) {
@@ -561,6 +563,7 @@ class AIModelCatalogItem {
       estimatedCostPer1kTokens:
           (json['estimated_cost_per_1k_tokens'] as num?)?.toDouble(),
       pricingHint: json['pricing_hint'] as String?,
+      isAuto: json['is_auto'] as bool? ?? json['code'] == 'auto',
     );
   }
 

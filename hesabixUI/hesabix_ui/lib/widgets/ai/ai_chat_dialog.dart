@@ -120,6 +120,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   VoidCallback? _pendingStreamRetry;
   List<AIModelCatalogItem> _availableModels = [];
   String? _selectedModelCode;
+  String? _lastResolvedModelLabel;
   bool _modelsLoading = false;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
@@ -214,6 +215,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
           break;
         }
       }
+      selected ??= models.where((m) => m.isAuto).map((m) => m.code).firstOrNull;
       selected ??= models.isNotEmpty ? models.first.code : null;
       setState(() {
         _availableModels = models;
@@ -231,7 +233,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
   Future<void> _onModelChanged(String? code) async {
     if (code == null || code == _selectedModelCode) return;
-    setState(() => _selectedModelCode = code);
+    setState(() {
+      _selectedModelCode = code;
+      if (code != 'auto') _lastResolvedModelLabel = null;
+    });
     if (widget.businessId != null) {
       try {
         await _aiService.setPreferredModel(
@@ -256,6 +261,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       }
     }
     final hint = selected?.pricingHint ?? _selectedModelPricingHint();
+    final resolvedHint = _lastResolvedModelLabel;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
       child: Column(
@@ -300,6 +306,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 hint,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          if (resolvedHint != null && resolvedHint.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 26),
+              child: Text(
+                'آخرین پاسخ با $resolvedHint',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.primary,
                 ),
               ),
             ),
@@ -1233,6 +1249,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
           finalFunctionResults = chunk.functionResults;
           assistantMessageId = chunk.messageId;
           _stream.mergeAgentTraceFromDone(chunk.agentTrace);
+          if (chunk.resolvedModel != null && chunk.resolvedModel!.isNotEmpty) {
+            final resolvedCode = chunk.resolvedModel!;
+            final match = _availableModels.where((m) => m.code == resolvedCode);
+            _lastResolvedModelLabel = match.isNotEmpty
+                ? match.first.displayName
+                : resolvedCode;
+          }
           break;
         }
         if (_stream.updateAccumulatedContent(accumulatedContent, chunk)) {

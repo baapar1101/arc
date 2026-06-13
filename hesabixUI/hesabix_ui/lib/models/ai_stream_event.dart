@@ -30,6 +30,8 @@ class AIStreamChunk {
   final String? error;
   final bool recoverable;
   final String? suggestedAction;
+  final String? requestedModel;
+  final String? resolvedModel;
 
   const AIStreamChunk({
     this.contentDelta,
@@ -48,6 +50,8 @@ class AIStreamChunk {
     this.error,
     this.recoverable = false,
     this.suggestedAction,
+    this.requestedModel,
+    this.resolvedModel,
   });
 }
 

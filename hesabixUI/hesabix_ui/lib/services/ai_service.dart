@@ -290,6 +290,7 @@ class AIService {
     int? businessId,
     int estimatedTokens = 1000,
     String? model,
+    String? userQuery,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/check-availability',
@@ -297,6 +298,7 @@ class AIService {
         if (businessId != null) 'business_id': businessId,
         'estimated_tokens': estimatedTokens,
         if (model != null && model.isNotEmpty) 'model': model,
+        if (userQuery != null && userQuery.isNotEmpty) 'user_query': userQuery,
       },
     );
     final body = res.data as Map<String, dynamic>;
@@ -686,6 +688,8 @@ class AIService {
         functionCalls: data['function_calls'],
         functionResults: data['function_results'],
         agentTrace: agentTrace,
+        requestedModel: data['requested_model'] as String?,
+        resolvedModel: data['resolved_model'] as String?,
       );
     }
 

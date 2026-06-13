@@ -3,6 +3,21 @@
 """
 from __future__ import annotations
 
+# مدل مجازی «خودکار» — در کاتالوگ DB نیست؛ runtime resolve می‌شود.
+AUTO_MODEL_CODE = "auto"
+
+# انواع عملیات برای routing مدل auto
+AI_OPERATION_CHAT = "chat"
+AI_OPERATION_TITLE = "title"
+AI_OPERATION_HISTORY_SUMMARY = "history_summary"
+AI_OPERATION_THOUGHT = "thought_synthesis"
+
+LIGHT_AI_OPERATIONS: frozenset[str] = frozenset({
+    AI_OPERATION_TITLE,
+    AI_OPERATION_HISTORY_SUMMARY,
+    AI_OPERATION_THOUGHT,
+})
+
 # حداکثر نوبت LLM ↔ tool در یک پاسخ (پیش‌فرض)
 MAX_AGENT_ITERATIONS = 8
 
