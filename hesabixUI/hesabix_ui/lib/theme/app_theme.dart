@@ -15,28 +15,41 @@ class AppTheme {
     final isFa = locale.languageCode.toLowerCase() == 'fa';
 
     final textTheme = isFa ? faTextTheme(isDark: isDark) : enTextTheme(isDark: isDark);
+    const spacing = AppSpacing();
+    const radii = AppRadii();
+    final shellColors = AppShellColors.fromScheme(scheme, isDark: isDark);
 
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       fontFamily: isFa ? 'YekanBakhFaNum' : null,
-      // ایموجی و محدودهٔ وسیع یونیکد قبل از fallback دانلودی موتور وب (Noto از gstatic)
       fontFamilyFallback: isFa
           ? const ['Noto Color Emoji', 'Noto Sans', 'NotoSansArabic', 'Vazirmatn']
           : const ['Noto Color Emoji', 'Noto Sans', 'Roboto'],
       textTheme: textTheme,
-      // در حالت تیره، کنتراست متن‌ها را کمی تقویت می‌کنیم
-      scaffoldBackgroundColor: isDark ? scheme.surface : null,
-      inputDecorationTheme: appInputDecorationTheme(scheme),
-      elevatedButtonTheme: appElevatedButtonTheme(scheme),
+      visualDensity: VisualDensity.compact,
+      scaffoldBackgroundColor: isDark ? scheme.surface : scheme.surfaceContainerLowest,
+      inputDecorationTheme: appInputDecorationTheme(scheme, radii),
+      elevatedButtonTheme: appElevatedButtonTheme(scheme, radii),
+      filledButtonTheme: appFilledButtonTheme(scheme, radii),
+      outlinedButtonTheme: appOutlinedButtonTheme(scheme, radii),
+      textButtonTheme: appTextButtonTheme(scheme, radii),
       appBarTheme: appAppBarTheme(scheme),
-      cardTheme: appCardTheme,
-      extensions: const <ThemeExtension<dynamic>>[
-        AppSpacing(),
-        AppRadii(),
+      cardTheme: appCardTheme(scheme, radii),
+      listTileTheme: appListTileTheme(scheme),
+      navigationRailTheme: appNavigationRailTheme(scheme),
+      dividerTheme: appDividerTheme(scheme),
+      iconButtonTheme: appIconButtonTheme(scheme),
+      dialogTheme: appDialogTheme(scheme, radii),
+      tabBarTheme: appTabBarTheme(scheme),
+      chipTheme: appChipTheme(scheme, radii),
+      snackBarTheme: appSnackBarTheme(scheme, radii),
+      dataTableTheme: appDataTableTheme(scheme),
+      extensions: <ThemeExtension<dynamic>>[
+        spacing,
+        radii,
+        shellColors,
       ],
     );
   }
 }
-
-

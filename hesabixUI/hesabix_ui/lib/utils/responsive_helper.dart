@@ -75,15 +75,15 @@ class ResponsiveHelper {
       case 'xs':
         return 8.0;
       case 'sm':
-        return 12.0;
+        return 10.0;
       case 'md':
-        return 16.0;
+        return 12.0;
       case 'lg':
-        return 20.0;
-      case 'xl':
-        return 24.0;
-      default:
         return 16.0;
+      case 'xl':
+        return 20.0;
+      default:
+        return 12.0;
     }
   }
 
@@ -109,7 +109,7 @@ class ResponsiveHelper {
     if (isMobile(context)) {
       return EdgeInsets.zero;
     }
-    return const EdgeInsets.all(24.0);
+    return const EdgeInsets.all(20.0);
   }
 
   static BoxConstraints getDialogConstraints(BuildContext context) {
@@ -120,11 +120,11 @@ class ResponsiveHelper {
       );
     }
     final screenSize = MediaQuery.of(context).size;
-    final targetWidth = screenSize.width * 0.95;
+    final targetWidth = screenSize.width * 0.92;
     return BoxConstraints(
-      minWidth: 1000,
-      maxWidth: targetWidth.clamp(1000, 1400),
-      maxHeight: screenSize.height * 0.92,
+      minWidth: 480,
+      maxWidth: targetWidth.clamp(560, 1200),
+      maxHeight: screenSize.height * 0.9,
     );
   }
 
@@ -135,15 +135,15 @@ class ResponsiveHelper {
     final bp = breakpoint(context);
     switch (bp) {
       case 'sm':
-        return 520;
+        return 440;
       case 'md':
-        return 600;
+        return 480;
       case 'lg':
-        return 700;
-      case 'xl':
-        return 800;
-      default:
         return 520;
+      case 'xl':
+        return 560;
+      default:
+        return 440;
     }
   }
 

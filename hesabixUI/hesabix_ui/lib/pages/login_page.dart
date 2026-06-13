@@ -15,6 +15,7 @@ import '../core/locale_controller.dart';
 import '../core/mobile_launcher_prefs.dart';
 import '../core/referral_store.dart';
 import '../theme/theme_controller.dart';
+import '../theme/tokens/extensions.dart';
 import '../utils/number_normalizer.dart';
 import '../utils/password_validator.dart';
 import '../widgets/auth_footer.dart';
@@ -1280,7 +1281,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       elevation: 2,
                       margin: EdgeInsets.all(ResponsiveHelper.isMobile(context) ? 8 : 16),
                       child: Padding(
-                        padding: const EdgeInsets.all(24.0),
+                        padding: EdgeInsets.all(context.appSpacing.lg),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,

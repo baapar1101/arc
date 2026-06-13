@@ -19,6 +19,7 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/currency_service.dart';
 import '../../../utils/error_extractor.dart';
+import '../../../theme/tokens/extensions.dart';
 import '../../../utils/responsive_helper.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/document/document_details_dialog.dart';
@@ -104,75 +105,34 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   }
 
   // Helper methods for responsive values
-  double _getPadding(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bp = ResponsiveHelper.breakpointFromWidth(width);
-    switch (bp) {
-      case 'xs':
-        return 8.0; // موبایل
-      case 'sm':
-        return 12.0; // تبلت کوچک
-      case 'md':
-        return 16.0; // تبلت بزرگ
-      case 'lg':
-        return 20.0; // دسکتاپ کوچک
-      case 'xl':
-        return 24.0; // دسکتاپ بزرگ
-      default:
-        return 16.0;
-    }
-  }
+  double _getPadding(BuildContext context) => ResponsiveHelper.getPadding(context);
 
-  double _getGridSpacing(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bp = ResponsiveHelper.breakpointFromWidth(width);
-    switch (bp) {
-      case 'xs':
-        return 8.0;
-      case 'sm':
-        return 10.0;
-      case 'md':
-        return 12.0;
-      case 'lg':
-        return 14.0;
-      case 'xl':
-        return 16.0;
-      default:
-        return 12.0;
-    }
-  }
+  double _getGridSpacing(BuildContext context) => ResponsiveHelper.getGridSpacing(context);
 
   double _getMinTileUnit(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bp = ResponsiveHelper.breakpointFromWidth(width);
+    final bp = ResponsiveHelper.breakpoint(context);
     switch (bp) {
       case 'xs':
-        return 140.0; // موبایل
+        return 120.0;
       case 'sm':
-        return 160.0; // تبلت کوچک
+        return 135.0;
       case 'md':
-        return 180.0; // تبلت بزرگ
+        return 150.0;
       case 'lg':
-        return 200.0; // دسکتاپ کوچک
+        return 165.0;
       case 'xl':
-        return 220.0; // دسکتاپ بزرگ
-      default:
         return 180.0;
+      default:
+        return 150.0;
     }
   }
 
   TextStyle? _getHeaderTextStyle(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bp = ResponsiveHelper.breakpointFromWidth(width);
     final theme = Theme.of(context);
-    switch (bp) {
-      case 'xs':
-        return theme.textTheme.titleLarge; // موبایل
-      case 'sm':
-        return theme.textTheme.headlineSmall; // تبلت کوچک
-      default:
-        return theme.textTheme.headlineMedium; // تبلت بزرگ و دسکتاپ
+    if (_isMobile(context)) {
+      return theme.textTheme.titleMedium;
     }
+    return theme.textTheme.titleLarge;
   }
 
   bool _isMobile(BuildContext context) {
@@ -478,9 +438,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final crossAxisCount = layout.columns;
     final padding = _getPadding(context);
 
-    final dashBg = Theme.of(context).brightness == Brightness.dark
-        ? Theme.of(context).colorScheme.surface
-        : const Color(0xFFEFF6FF); // آبی خیلی ملایم پس‌زمینه
+    final dashBg = context.shellColors.dashboardBackground;
 
     return Container(
       color: dashBg,
@@ -2023,32 +1981,34 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
 
   Widget _buildCard({required String title, Widget? trailing, required Widget child}) {
     final theme = Theme.of(context);
-    const headerBlue = Color(0xFF0D47A1);
-    final onHeader = Colors.white.withValues(alpha: 0.95);
-    final titleStyle = theme.textTheme.titleMedium?.copyWith(
+    final shellColors = context.shellColors;
+    final headerBg = shellColors.topBarBackground;
+    final onHeader = shellColors.topBarForeground;
+    final titleStyle = theme.textTheme.titleSmall?.copyWith(
       color: onHeader,
       fontWeight: FontWeight.w600,
     );
-    final bodyTint = theme.brightness == Brightness.dark
-        ? theme.colorScheme.surfaceContainerLow
-        : const Color(0xFFFFFBF5); // کرم خیلی ملایم برای حس گرم‌تر
+    final bodyTint = theme.colorScheme.surface;
+    final cardRadius = context.appRadii.mdBorder;
 
     return Card(
       clipBehavior: Clip.antiAlias,
-      elevation: 1.5,
-      shadowColor: headerBlue.withValues(alpha: 0.18),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: cardRadius,
+        side: BorderSide(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.6)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: const BoxDecoration(
-              color: headerBlue,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: headerBg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(cardRadius.topLeft.x)),
             ),
             child: IconTheme.merge(
-              data: IconThemeData(color: onHeader, size: 22),
+              data: IconThemeData(color: onHeader, size: 18),
               child: DefaultTextStyle.merge(
                 style: TextStyle(color: onHeader),
                 child: Row(

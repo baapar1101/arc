@@ -14,6 +14,7 @@ import '../../widgets/theme_mode_switcher.dart';
 import '../../widgets/logout_button.dart';
 import '../../widgets/notification/notification_bell_button.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../theme/tokens/extensions.dart';
 import '../../utils/responsive_helper.dart';
 
 class ProfileShell extends StatefulWidget {
@@ -31,8 +32,6 @@ class ProfileShell extends StatefulWidget {
 class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver {
   /// هم‌تراز با [BusinessShell] — نوار بالای پنل کاربر.
   static const double _kProfileAppBarToolbarHeight = 44;
-  static const Color _kTopMenuBlueLight = Color(0xFF0D47A1);
-  static const Color _kTopMenuBlueDark = Color(0xFF1565C0);
 
   int _hoverIndex = -1;
   bool _supportTicketsEnabledForUsers = true;
@@ -148,12 +147,9 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
       context.go('/login');
     }
 
-    final Color appBarBg = isDark ? _kTopMenuBlueDark : _kTopMenuBlueLight;
-    final Brightness appBarBrightness =
-        ThemeData.estimateBrightnessForColor(appBarBg);
-    final Color appBarFg = appBarBrightness == Brightness.dark
-        ? Colors.white
-        : Colors.black;
+    final shellColors = context.shellColors;
+    final Color appBarBg = shellColors.topBarBackground;
+    final Color appBarFg = shellColors.topBarForeground;
 
     final appBar = AppBar(
       toolbarHeight: _kProfileAppBarToolbarHeight,
@@ -235,7 +231,7 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
         body: Row(
           children: [
             Container(
-              width: railExtended ? 240 : 88,
+              width: railExtended ? 240 : 72,
               height: double.infinity,
               color: sideBg,
               child: ListView.builder(

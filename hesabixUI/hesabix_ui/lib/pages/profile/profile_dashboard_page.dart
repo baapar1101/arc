@@ -94,75 +94,34 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     } catch (_) {}
   }
 
-  double _getPadding(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bp = ResponsiveHelper.breakpointFromWidth(width);
-    switch (bp) {
-      case 'xs':
-        return 8.0; // موبایل
-      case 'sm':
-        return 12.0; // تبلت کوچک
-      case 'md':
-        return 16.0; // تبلت بزرگ
-      case 'lg':
-        return 20.0; // دسکتاپ کوچک
-      case 'xl':
-        return 24.0; // دسکتاپ بزرگ
-      default:
-        return 16.0;
-    }
-  }
+  double _getPadding(BuildContext context) => ResponsiveHelper.getPadding(context);
 
-  double _getGridSpacing(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bp = ResponsiveHelper.breakpointFromWidth(width);
-    switch (bp) {
-      case 'xs':
-        return 8.0;
-      case 'sm':
-        return 10.0;
-      case 'md':
-        return 12.0;
-      case 'lg':
-        return 14.0;
-      case 'xl':
-        return 16.0;
-      default:
-        return 12.0;
-    }
-  }
+  double _getGridSpacing(BuildContext context) => ResponsiveHelper.getGridSpacing(context);
 
   double _getMinTileUnit(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bp = ResponsiveHelper.breakpointFromWidth(width);
+    final bp = ResponsiveHelper.breakpoint(context);
     switch (bp) {
       case 'xs':
-        return 140.0; // موبایل
+        return 120.0;
       case 'sm':
-        return 160.0; // تبلت کوچک
+        return 135.0;
       case 'md':
-        return 180.0; // تبلت بزرگ
+        return 150.0;
       case 'lg':
-        return 200.0; // دسکتاپ کوچک
+        return 165.0;
       case 'xl':
-        return 220.0; // دسکتاپ بزرگ
-      default:
         return 180.0;
+      default:
+        return 150.0;
     }
   }
 
   TextStyle? _getHeaderTextStyle(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final bp = ResponsiveHelper.breakpointFromWidth(width);
     final theme = Theme.of(context);
-    switch (bp) {
-      case 'xs':
-        return theme.textTheme.titleLarge; // موبایل
-      case 'sm':
-        return theme.textTheme.headlineSmall; // تبلت کوچک
-      default:
-        return theme.textTheme.headlineMedium; // تبلت بزرگ و دسکتاپ
+    if (_isMobile(context)) {
+      return theme.textTheme.titleMedium;
     }
+    return theme.textTheme.titleLarge;
   }
 
   bool _isMobile(BuildContext context) {
@@ -567,22 +526,28 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       };
 
   Widget _buildCard({required String title, Widget? trailing, required Widget child}) {
+    final theme = Theme.of(context);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              color: theme.colorScheme.surfaceContainerHighest,
               border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.08)),
+                bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.08)),
               ),
             ),
             child: Row(
               children: [
-                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
                 if (trailing != null) trailing,
               ],
             ),

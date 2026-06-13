@@ -38,6 +38,7 @@ import '../../widgets/business/business_shell_glyphs.dart';
 import '../../core/date_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
+import '../../theme/tokens/extensions.dart';
 import '../../utils/snackbar_helper.dart';
 import 'check_form_page.dart';
 import 'bank_accounts_page.dart';
@@ -78,8 +79,6 @@ class BusinessShell extends StatefulWidget {
 class _BusinessShellState extends State<BusinessShell> {
   /// ارتفاع نوار ابزار آبی (لوگو، اکشن‌ها) — فشرده‌تر از [kToolbarHeight] پیش‌فرض.
   static const double _kBizAppBarToolbarHeight = 44;
-  static const Color _kTopMenuBlueLight = Color(0xFF0D47A1);
-  static const Color _kTopMenuBlueDark = Color(0xFF1565C0);
   /// نوار دوم: تب‌ها / نام کسب‌وکار و زمان — کمی فشرده‌تر از قبل.
   static const double _kUnifiedBizTabBarHeight = 44;
   static const double _kBizTabStripVerticalPadding = 6;
@@ -2093,12 +2092,9 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
 
-    final Color appBarBg = isDark ? _kTopMenuBlueDark : _kTopMenuBlueLight;
-    final Brightness appBarBrightness =
-        ThemeData.estimateBrightnessForColor(appBarBg);
-    final Color appBarFg = appBarBrightness == Brightness.dark
-        ? Colors.white
-        : Colors.black;
+    final shellColors = context.shellColors;
+    final Color appBarBg = shellColors.topBarBackground;
+    final Color appBarFg = shellColors.topBarForeground;
 
     final appBar = AppBar(
       toolbarHeight: _kBizAppBarToolbarHeight,
@@ -2365,7 +2361,7 @@ class _BusinessShellState extends State<BusinessShell> {
           children: [
             if (_desktopRailVisible) ...[
             Container(
-              width: railExtended ? 260 : 88,
+              width: railExtended ? 240 : 72,
               height: double.infinity,
               color: sideBg,
               child: ListView.builder(
