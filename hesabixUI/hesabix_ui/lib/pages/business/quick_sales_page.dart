@@ -3,9 +3,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/quick_sales_service.dart';
 import '../../services/invoice_service.dart';
+import '../../services/payment_gateway_service.dart';
 import '../../services/product_service.dart';
 import '../../services/warehouse_service.dart';
 import '../../services/price_list_service.dart';
@@ -96,6 +98,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   static const double _compactBreakpoint = 400.0;
   final QuickSalesService _quickSalesService = QuickSalesService();
   final InvoiceService _invoiceService = InvoiceService();
+  final PaymentGatewayService _paymentGatewayService = PaymentGatewayService(ApiClient());
   final ProductService _productService = ProductService();
   final WarehouseService _warehouseService = WarehouseService();
   final PriceListService _priceListService = PriceListService(apiClient: ApiClient());
@@ -124,6 +127,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   // پرداخت
   InvoiceTransaction? _payment;
   String? _selectedCashRegisterId;
+  bool _autoCreatePaymentDocument = true;
+
+  // اشتراک‌گذاری (وقتی سند دریافت ثبت نمی‌شود)
+  bool _shareOnlinePaymentEnabled = true;
+  int? _shareGatewayId;
+  bool _shareSendSms = true;
+  bool _shareSendEmail = false;
+  bool _shareViaNativeShare = true;
+  int _shareExpiryHours = 168;
+  List<Map<String, dynamic>> _shareGateways = const [];
+  bool _loadingShareGateways = false;
   
   // تنظیمات
   int? _defaultWarehouseId;
@@ -368,7 +382,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         _showPurchasePrice = (settings['show_purchase_price'] ?? false) &&
             widget.authStore.canViewPurchasePrice();
         _printTemplateId = settings['print_template_id'];
+        _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
+        _applyShareDefaultsFromSettings(settings);
       });
+      
+      unawaited(_loadShareGatewaysAndDefaults());
       
       // اگر نمایش موجودی فعال شد و قبلاً غیرفعال بود، موجودی‌ها را بارگذاری کن
       if (_showInventory && !previousShowInventory && _cartItems.isNotEmpty) {
@@ -407,6 +425,273 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       setState(() {
         _loading = false;
       });
+    }
+  }
+
+  String? get _selectedCustomerPhone {
+    final phone = _selectedCustomer?.phone?.trim();
+    return (phone != null && phone.isNotEmpty) ? phone : null;
+  }
+
+  String? get _selectedCustomerEmail {
+    final email = _selectedCustomer?.email?.trim();
+    return (email != null && email.isNotEmpty) ? email : null;
+  }
+
+  void _syncShareChannelDefaults() {
+    final hasPhone = _selectedCustomerPhone != null;
+    final hasEmail = _selectedCustomerEmail != null;
+    if (!hasPhone) _shareSendSms = false;
+    if (!hasEmail) _shareSendEmail = false;
+  }
+
+  void _applyShareDefaultsFromSettings(Map<String, dynamic> settings) {
+    _shareOnlinePaymentEnabled = settings['default_share_online_payment'] ?? true;
+    final gatewayRaw = settings['default_share_gateway_id'];
+    if (gatewayRaw is int) {
+      _shareGatewayId = gatewayRaw;
+    } else if (gatewayRaw is num) {
+      _shareGatewayId = gatewayRaw.toInt();
+    } else {
+      _shareGatewayId = int.tryParse('$gatewayRaw');
+    }
+    _shareExpiryHours = (settings['default_share_expiry_hours'] as num?)?.toInt() ?? 168;
+    final channels = settings['default_share_channels'];
+    if (channels is List) {
+      final set = channels.map((e) => e.toString()).toSet();
+      _shareSendSms = set.contains('sms');
+      _shareSendEmail = set.contains('email');
+      _shareViaNativeShare = set.contains('native');
+    }
+    _syncShareChannelDefaults();
+  }
+
+  Future<void> _loadShareGatewaysAndDefaults() async {
+    if (!mounted) return;
+    setState(() => _loadingShareGateways = true);
+    try {
+      final gateways = await _paymentGatewayService.listBusinessGateways(widget.businessId);
+      if (!mounted) return;
+
+      // اگر در تنظیمات فروش سریع درگاه تعریف نشده، از تنظیمات عمومی اشتراک فاکتور استفاده کن
+      if (_shareGatewayId == null || _settings?['default_share_gateway_id'] == null) {
+        try {
+          final shareSettings = await BusinessApiService.getInvoiceShareSettings(widget.businessId);
+          if (_settings?['default_share_gateway_id'] == null) {
+            final g = shareSettings['default_online_payment_gateway_id'];
+            if (g is int) {
+              _shareGatewayId = g;
+            } else if (g is num) {
+              _shareGatewayId = g.toInt();
+            } else if (g != null) {
+              _shareGatewayId = int.tryParse(g.toString());
+            }
+          }
+          if (_settings?['default_share_online_payment'] == null &&
+              shareSettings['default_online_payment_enabled'] == true) {
+            _shareOnlinePaymentEnabled = true;
+          }
+        } catch (_) {}
+      }
+
+      final gatewayIds = gateways
+          .map((e) => (e['id'] as num?)?.toInt())
+          .whereType<int>()
+          .toSet();
+      setState(() {
+        _shareGateways = gateways;
+        _loadingShareGateways = false;
+        if (_shareGatewayId != null && !gatewayIds.contains(_shareGatewayId)) {
+          _shareGatewayId = null;
+        }
+        if (_shareOnlinePaymentEnabled &&
+            _shareGatewayId == null &&
+            gateways.length == 1) {
+          _shareGatewayId = (gateways.first['id'] as num?)?.toInt();
+        }
+        if (gateways.isEmpty) _shareOnlinePaymentEnabled = false;
+        _syncShareChannelDefaults();
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _shareGateways = const [];
+          _loadingShareGateways = false;
+        });
+      }
+    }
+  }
+
+  void _onAutoCreatePaymentDocumentChanged(bool value) {
+    setState(() {
+      _autoCreatePaymentDocument = value;
+      if (value) {
+        _restoreCashPaymentFromRegister();
+      } else {
+        _payment = null;
+        _syncShareChannelDefaults();
+      }
+    });
+  }
+
+  void _restoreCashPaymentFromRegister() {
+    if (_selectedCashRegisterId == null || _totalAmount <= 0) return;
+    _payment = InvoiceTransaction(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      type: TransactionType.cashRegister,
+      cashRegisterId: _selectedCashRegisterId,
+      transactionDate: DateTime.now(),
+      amount: _totalAmount,
+    );
+  }
+
+  Future<Map<String, dynamic>?> _sendInvoiceShareNotification({
+    required int personId,
+    required String shareLink,
+    required String? invoiceCode,
+    required num totalAmount,
+    required String channel,
+  }) async {
+    final api = ApiClient();
+    final response = await api.post<Map<String, dynamic>>(
+      '/api/v1/business-notifications/businesses/${widget.businessId}/send',
+      data: {
+        'person_id': personId,
+        'event_type': 'invoice_share_link',
+        'context': {
+          'share_link': shareLink,
+          'customer_name': _selectedCustomer?.name ?? '',
+          'customer_mobile': _selectedCustomerPhone ?? '',
+          'invoice_number': invoiceCode ?? '',
+          'invoice_code': invoiceCode ?? '',
+          'final_amount': totalAmount.toDouble(),
+        },
+        'channel': channel,
+        if (channel == 'sms' && _selectedCustomerPhone != null)
+          'recipient_mobile': _selectedCustomerPhone,
+      },
+    );
+    return response.data;
+  }
+
+  Future<List<String>> _createAndShareAfterSave({
+    required int invoiceId,
+    required String? invoiceCode,
+    required int personId,
+    required num totalAmount,
+  }) async {
+    final t = AppLocalizations.of(context);
+    final notes = <String>[];
+
+    if (!widget.authStore.canWriteSection('invoices')) {
+      notes.add(t.quickSalesShareNoInvoiceEditPermission);
+      return notes;
+    }
+
+    if (_shareOnlinePaymentEnabled) {
+      if (_shareGateways.isEmpty) {
+        notes.add(t.quickSalesShareNoGateway);
+        return notes;
+      }
+      if (_shareGatewayId == null) {
+        notes.add(t.quickSalesShareGatewayRequired);
+        return notes;
+      }
+    }
+
+    try {
+      final link = await _invoiceService.createInvoiceShareLink(
+        businessId: widget.businessId,
+        invoiceId: invoiceId,
+        expiresInHours: _shareExpiryHours,
+        onlinePaymentEnabled: _shareOnlinePaymentEnabled,
+        onlinePaymentGatewayId:
+            _shareOnlinePaymentEnabled ? _shareGatewayId : null,
+      );
+      final shortUrl = link['short_url']?.toString();
+      if (shortUrl == null || shortUrl.isEmpty) {
+        notes.add(t.quickSalesShareLinkFailed);
+        return notes;
+      }
+      notes.add(t.quickSalesShareLinkCreated);
+
+      final canNotify = widget.authStore.hasBusinessPermission('notifications', 'send');
+
+      if (_shareSendSms) {
+        if (_selectedCustomerPhone == null) {
+          notes.add(t.quickSalesShareSmsSkippedNoPhone);
+        } else if (!canNotify) {
+          notes.add(t.quickSalesShareNoNotificationPermission);
+        } else {
+          try {
+            final response = await _sendInvoiceShareNotification(
+              personId: personId,
+              shareLink: shortUrl,
+              invoiceCode: invoiceCode,
+              totalAmount: totalAmount,
+              channel: 'sms',
+            );
+            if (!mounted) return notes;
+            final result = response?['data'] as Map<String, dynamic>?;
+            final smsResult = (result?['results'] as Map<String, dynamic>?)?['sms'] as Map<String, dynamic>?;
+            if (smsResult?['success'] == true) {
+              notes.add(t.personShareSmsSent);
+            } else {
+              final error = smsResult?['error']?.toString() ?? '';
+              if (error.contains('قالب') || error.contains('فعال') || error.contains('template')) {
+                notes.add(t.quickSalesShareNoTemplateHint);
+              } else if (error.isNotEmpty) {
+                notes.add(error);
+              }
+            }
+          } catch (e) {
+            notes.add(ErrorExtractor.forContext(e, context));
+          }
+        }
+      }
+
+      if (_shareSendEmail) {
+        if (_selectedCustomerEmail == null) {
+          notes.add(t.quickSalesShareEmailSkippedNoEmail);
+        } else if (!canNotify) {
+          notes.add(t.quickSalesShareNoNotificationPermission);
+        } else {
+          try {
+            final response = await _sendInvoiceShareNotification(
+              personId: personId,
+              shareLink: shortUrl,
+              invoiceCode: invoiceCode,
+              totalAmount: totalAmount,
+              channel: 'email',
+            );
+            if (!mounted) return notes;
+            final result = response?['data'] as Map<String, dynamic>?;
+            final emailResult =
+                (result?['results'] as Map<String, dynamic>?)?['email'] as Map<String, dynamic>?;
+            if (emailResult?['success'] == true) {
+              notes.add(t.quickSalesShareEmailSent);
+            } else {
+              final error = emailResult?['error']?.toString() ?? '';
+              if (error.contains('قالب') || error.contains('فعال') || error.contains('template')) {
+                notes.add(t.quickSalesShareNoTemplateHint);
+              } else if (error.isNotEmpty) {
+                notes.add(error);
+              }
+            }
+          } catch (e) {
+            notes.add(ErrorExtractor.forContext(e, context));
+          }
+        }
+      }
+
+      if (_shareViaNativeShare) {
+        await Share.share(shortUrl);
+      }
+
+      return notes;
+    } catch (e) {
+      notes.add('${t.quickSalesShareLinkFailed}: ${ErrorExtractor.forContext(e, context)}');
+      return notes;
     }
   }
 
@@ -1239,20 +1524,33 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       return;
     }
     
-    // اعتبارسنجی صندوق (برای پرداخت)
-    if (_payment != null && _selectedCashRegisterId == null) {
-      SnackBarHelper.show(context, message: 'لطفاً صندوق را انتخاب کنید', isError: true);
-      return;
-    }
-    
-    // اعتبارسنجی مبلغ پرداخت
-    if (_payment != null && _payment!.amount != _totalAmount) {
-      SnackBarHelper.show(
-        context, 
-        message: 'مبلغ پرداخت (${_formatNumber(_payment!.amount)}) باید برابر با مبلغ فاکتور (${_formatNumber(_totalAmount)}) باشد',
-        isError: true,
-      );
-      return;
+    // اعتبارسنجی صندوق (برای پرداخت نقدی همراه سند دریافت)
+    if (_autoCreatePaymentDocument) {
+      if (_payment != null && _selectedCashRegisterId == null) {
+        SnackBarHelper.show(context, message: 'لطفاً صندوق را انتخاب کنید', isError: true);
+        return;
+      }
+
+      if (_payment != null && _payment!.amount != _totalAmount) {
+        SnackBarHelper.show(
+          context,
+          message: 'مبلغ پرداخت (${_formatNumber(_payment!.amount)}) باید برابر با مبلغ فاکتور (${_formatNumber(_totalAmount)}) باشد',
+          isError: true,
+        );
+        return;
+      }
+    } else {
+      final t = AppLocalizations.of(context);
+      if (_shareOnlinePaymentEnabled) {
+        if (_shareGateways.isEmpty) {
+          SnackBarHelper.show(context, message: t.quickSalesShareNoGateway, isError: true);
+          return;
+        }
+        if (_shareGatewayId == null) {
+          SnackBarHelper.show(context, message: t.quickSalesShareGatewayRequired, isError: true);
+          return;
+        }
+      }
     }
 
     final t = AppLocalizations.of(context);
@@ -1308,7 +1606,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       }).toList();
       
       final payments = <Map<String, dynamic>>[];
-      if (_payment != null && _selectedCashRegisterId != null) {
+      if (_autoCreatePaymentDocument && _payment != null && _selectedCashRegisterId != null) {
         payments.add({
           'transaction_type': 'cash_register',
           'cash_register_id': int.tryParse(_selectedCashRegisterId!),
@@ -1340,8 +1638,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         return;
       }
       
-      // دریافت تنظیمات auto_create_payment_document
-      final autoCreatePaymentDoc = _settings?['auto_create_payment_document'] ?? true;
+      // استفاده از سویچ صفحه (پیش‌فرض از تنظیمات کسب‌وکار)
+      final autoCreatePaymentDoc = _autoCreatePaymentDocument;
       
       // ساخت extra_info با person_id و تنظیمات حواله انبار
       final extraInfo = <String, dynamic>{
@@ -1405,6 +1703,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           );
         }
       }
+
+      List<String> shareNotes = const [];
+      if (!_autoCreatePaymentDocument && invoiceId != null) {
+        shareNotes = await _createAndShareAfterSave(
+          invoiceId: invoiceId,
+          invoiceCode: invoiceCode,
+          personId: personId,
+          totalAmount: _totalAmount,
+        );
+      }
       
       // پاک کردن سبد و موجودی‌ها
       setState(() {
@@ -1418,7 +1726,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       
       _barcodeFocus.requestFocus();
       
-      SnackBarHelper.show(context, message: 'فاکتور با موفقیت ثبت شد${invoiceCode != null ? ' (${invoiceCode})' : ''}');
+      final successMsg = StringBuffer('فاکتور با موفقیت ثبت شد');
+      if (invoiceCode != null) successMsg.write(' ($invoiceCode)');
+      if (shareNotes.isNotEmpty) {
+        successMsg.write('\n${shareNotes.join('\n')}');
+      }
+      SnackBarHelper.show(context, message: successMsg.toString());
       
       // به‌روزرسانی موجودی بعد از ثبت موفق (برای دفعه بعد)
       if (_defaultWarehouseId != null) {
@@ -2392,6 +2705,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                             onCustomerChanged: (customer) {
                               setState(() {
                                 _selectedCustomer = customer ?? _anonymousCustomer;
+                                _syncShareChannelDefaults();
                               });
                             },
                             businessId: widget.businessId,
@@ -3093,6 +3407,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             onCustomerChanged: (customer) {
               setState(() {
                 _selectedCustomer = customer ?? _anonymousCustomer;
+                _syncShareChannelDefaults();
               });
             },
             businessId: widget.businessId,
@@ -3402,6 +3717,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                         onCustomerChanged: (customer) {
                           setState(() {
                             _selectedCustomer = customer ?? _anonymousCustomer;
+                            _syncShareChannelDefaults();
                           });
                         },
                         businessId: widget.businessId,
@@ -3553,6 +3869,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   Widget _buildPaymentSection(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -3566,29 +3883,42 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             ),
           ),
           const SizedBox(height: 8),
-          CashRegisterComboboxWidget(
-            businessId: widget.businessId,
-            selectedRegisterId: _selectedCashRegisterId,
-            onChanged: (option) {
-              setState(() {
-                _selectedCashRegisterId = option?.id;
-                if (option != null && _totalAmount > 0) {
-                  _payment = InvoiceTransaction(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    type: TransactionType.cashRegister,
-                    cashRegisterId: option.id,
-                    cashRegisterName: option.name,
-                    transactionDate: DateTime.now(),
-                    amount: _totalAmount, // همیشه برابر با مبلغ کل فاکتور
-                  );
-                } else {
-                  _payment = null;
-                }
-              });
-            },
-            label: 'صندوق',
-            hintText: 'انتخاب صندوق',
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.quickSalesAutoCreateReceiptSwitch),
+            subtitle: Text(t.quickSalesAutoCreateReceiptSwitchHint),
+            value: _autoCreatePaymentDocument,
+            onChanged: _saving ? null : _onAutoCreatePaymentDocumentChanged,
           ),
+          if (_autoCreatePaymentDocument) ...[
+            const SizedBox(height: 8),
+            CashRegisterComboboxWidget(
+              businessId: widget.businessId,
+              selectedRegisterId: _selectedCashRegisterId,
+              onChanged: (option) {
+                setState(() {
+                  _selectedCashRegisterId = option?.id;
+                  if (option != null && _totalAmount > 0) {
+                    _payment = InvoiceTransaction(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      type: TransactionType.cashRegister,
+                      cashRegisterId: option.id,
+                      cashRegisterName: option.name,
+                      transactionDate: DateTime.now(),
+                      amount: _totalAmount,
+                    );
+                  } else {
+                    _payment = null;
+                  }
+                });
+              },
+              label: 'صندوق',
+              hintText: 'انتخاب صندوق',
+            ),
+          ] else ...[
+            const SizedBox(height: 8),
+            _buildShareSection(cs, t),
+          ],
           const SizedBox(height: 16),
           WarehouseComboboxWidget(
             businessId: widget.businessId,
@@ -3596,10 +3926,130 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             onChanged: _onWarehouseForInvoiceChanged,
             label: 'انبار اقلام',
             hintText: 'انتخاب انبار برای اقلام فاکتور',
-            isRequired: _enableWarehouseDocument, // اگر حواله فعال باشد، انبار لازم است
+            isRequired: _enableWarehouseDocument,
             selectDefaultWhenUnset: true,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildShareSection(ColorScheme cs, AppLocalizations t) {
+    final gatewayIds = _shareGateways
+        .map((g) => (g['id'] as num?)?.toInt())
+        .whereType<int>()
+        .toSet();
+    final dropdownValue =
+        _shareGatewayId != null && gatewayIds.contains(_shareGatewayId)
+            ? _shareGatewayId
+            : null;
+    final hasPhone = _selectedCustomerPhone != null;
+    final hasEmail = _selectedCustomerEmail != null;
+
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              t.quickSalesShareSectionTitle,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              t.quickSalesShareSectionHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.quickSalesShareOnlinePayment),
+              subtitle: Text(t.quickSalesShareOnlinePaymentHint),
+              value: _shareOnlinePaymentEnabled,
+              onChanged: _saving || _loadingShareGateways
+                  ? null
+                  : (v) {
+                      setState(() {
+                        _shareOnlinePaymentEnabled = v;
+                        if (!v) _shareGatewayId = null;
+                      });
+                    },
+            ),
+            if (_loadingShareGateways)
+              const LinearProgressIndicator()
+            else if (_shareOnlinePaymentEnabled && _shareGateways.isEmpty)
+              Text(
+                t.quickSalesShareNoGateway,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+              )
+            else if (_shareOnlinePaymentEnabled) ...[
+              const SizedBox(height: 4),
+              DropdownButtonFormField<int?>(
+                value: dropdownValue,
+                decoration: InputDecoration(
+                  labelText: t.quickSalesShareGatewayLabel,
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: [
+                  for (final g in _shareGateways)
+                    DropdownMenuItem<int?>(
+                      value: (g['id'] as num?)?.toInt(),
+                      child: Text(
+                        '${g['display_name'] ?? g['id']}${g['provider'] != null ? ' (${g['provider']})' : ''}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: _saving || !_shareOnlinePaymentEnabled
+                    ? null
+                    : (v) => setState(() => _shareGatewayId = v),
+              ),
+            ],
+            const Divider(height: 24),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.quickSalesShareChannelSms),
+              value: _shareSendSms,
+              onChanged: _saving || !hasPhone
+                  ? null
+                  : (v) => setState(() => _shareSendSms = v ?? false),
+            ),
+            if (!hasPhone)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  t.quickSalesShareNoPhoneHint,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+                ),
+              ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.quickSalesShareChannelEmail),
+              value: _shareSendEmail,
+              onChanged: _saving || !hasEmail
+                  ? null
+                  : (v) => setState(() => _shareSendEmail = v ?? false),
+            ),
+            if (!hasEmail)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  t.quickSalesShareNoEmailHint,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.quickSalesShareChannelNative),
+              value: _shareViaNativeShare,
+              onChanged: _saving ? null : (v) => setState(() => _shareViaNativeShare = v ?? false),
+            ),
+          ],
+        ),
       ),
     );
   }

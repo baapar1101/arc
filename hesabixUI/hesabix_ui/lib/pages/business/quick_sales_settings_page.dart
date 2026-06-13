@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/quick_sales_service.dart';
+import '../../services/payment_gateway_service.dart';
+import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -10,7 +12,6 @@ import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/price_list_combobox_widget.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../models/customer_model.dart';
-import '../../models/cash_register.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 
 class QuickSalesSettingsPage extends StatefulWidget {
@@ -52,6 +53,18 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   bool _autoCreatePaymentDocument = true;
   bool _showPurchasePrice = false;
 
+  // پیش‌فرض اشتراک‌گذاری
+  bool _defaultShareOnlinePayment = true;
+  int? _defaultShareGatewayId;
+  int _defaultShareExpiryHours = 168;
+  bool _defaultShareChannelSms = true;
+  bool _defaultShareChannelEmail = false;
+  bool _defaultShareChannelNative = true;
+  List<Map<String, dynamic>> _shareGateways = const [];
+  bool _loadingShareGateways = false;
+
+  final _gatewayService = PaymentGatewayService(ApiClient());
+
   @override
   void initState() {
     super.initState();
@@ -86,7 +99,19 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         _showInventory = settings['show_inventory'] ?? true;
         _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
         _showPurchasePrice = settings['show_purchase_price'] ?? false;
+        _defaultShareOnlinePayment = settings['default_share_online_payment'] ?? true;
+        _defaultShareGatewayId = (settings['default_share_gateway_id'] as num?)?.toInt();
+        _defaultShareExpiryHours = (settings['default_share_expiry_hours'] as num?)?.toInt() ?? 168;
+        final channels = settings['default_share_channels'];
+        if (channels is List) {
+          final set = channels.map((e) => e.toString()).toSet();
+          _defaultShareChannelSms = set.contains('sms');
+          _defaultShareChannelEmail = set.contains('email');
+          _defaultShareChannelNative = set.contains('native');
+        }
       });
+
+      await _loadShareGateways();
       
       // بارگذاری مشتری ناشناس اگر وجود دارد
       if (settings['default_anonymous_customer_id'] != null) {
@@ -101,6 +126,43 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _loadShareGateways() async {
+    setState(() => _loadingShareGateways = true);
+    try {
+      final list = await _gatewayService.listBusinessGateways(widget.businessId);
+      if (!mounted) return;
+      final gatewayIds = list.map((g) => (g['id'] as num?)?.toInt()).whereType<int>().toSet();
+      setState(() {
+        _shareGateways = list;
+        _loadingShareGateways = false;
+        if (_defaultShareGatewayId != null && !gatewayIds.contains(_defaultShareGatewayId)) {
+          _defaultShareGatewayId = null;
+        }
+        if (_defaultShareOnlinePayment &&
+            _defaultShareGatewayId == null &&
+            list.length == 1) {
+          _defaultShareGatewayId = (list.first['id'] as num?)?.toInt();
+        }
+        if (list.isEmpty) _defaultShareOnlinePayment = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _shareGateways = const [];
+          _loadingShareGateways = false;
+        });
+      }
+    }
+  }
+
+  List<String> _buildShareChannelsPayload() {
+    final channels = <String>[];
+    if (_defaultShareChannelSms) channels.add('sms');
+    if (_defaultShareChannelEmail) channels.add('email');
+    if (_defaultShareChannelNative) channels.add('native');
+    return channels.isEmpty ? ['native'] : channels;
   }
 
   Future<void> _save() async {
@@ -132,6 +194,10 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         'show_inventory': _showInventory,
         'auto_create_payment_document': _autoCreatePaymentDocument,
         'show_purchase_price': _showPurchasePrice,
+        'default_share_online_payment': _defaultShareOnlinePayment,
+        if (_defaultShareGatewayId != null) 'default_share_gateway_id': _defaultShareGatewayId,
+        'default_share_channels': _buildShareChannelsPayload(),
+        'default_share_expiry_hours': _defaultShareExpiryHours,
       };
       
       final saved = await _service.updateSettings(
@@ -391,7 +457,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                             children: [
                               SwitchListTile(
                                 title: const Text('ثبت خودکار سند پرداخت'),
-                                subtitle: const Text('سند پرداخت به صورت جداگانه و خودکار ایجاد شود'),
+                                subtitle: const Text('سند دریافت به صورت جداگانه و خودکار ایجاد شود'),
                                 value: _autoCreatePaymentDocument,
                                 onChanged: (v) {
                                   setState(() {
@@ -399,6 +465,10 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                                   });
                                 },
                               ),
+                              if (!_autoCreatePaymentDocument) ...[
+                                const SizedBox(height: 8),
+                                _buildShareDefaultsSection(t, cs),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 24),
@@ -453,6 +523,119 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                     ),
                   ),
                 ),
+    );
+  }
+
+  Widget _buildShareDefaultsSection(AppLocalizations t, ColorScheme cs) {
+    final gatewayIds = _shareGateways
+        .map((g) => (g['id'] as num?)?.toInt())
+        .whereType<int>()
+        .toSet();
+    final dropdownValue =
+        _defaultShareGatewayId != null && gatewayIds.contains(_defaultShareGatewayId)
+            ? _defaultShareGatewayId
+            : null;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outline.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            t.quickSalesSettingsShareDefaultsTitle,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            t.quickSalesSettingsShareDefaultsHint,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.quickSalesShareOnlinePayment),
+            subtitle: Text(t.quickSalesShareOnlinePaymentHint),
+            value: _defaultShareOnlinePayment,
+            onChanged: _loadingShareGateways
+                ? null
+                : (v) => setState(() {
+                      _defaultShareOnlinePayment = v;
+                      if (!v) _defaultShareGatewayId = null;
+                    }),
+          ),
+          if (_loadingShareGateways)
+            const LinearProgressIndicator()
+          else if (_defaultShareOnlinePayment && _shareGateways.isEmpty)
+            Text(
+              t.quickSalesShareNoGateway,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+            )
+          else if (_defaultShareOnlinePayment) ...[
+            DropdownButtonFormField<int?>(
+              value: dropdownValue,
+              decoration: InputDecoration(
+                labelText: t.quickSalesShareGatewayLabel,
+                border: const OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                for (final g in _shareGateways)
+                  DropdownMenuItem<int?>(
+                    value: (g['id'] as num?)?.toInt(),
+                    child: Text(
+                      '${g['display_name'] ?? g['id']}${g['provider'] != null ? ' (${g['provider']})' : ''}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: !_defaultShareOnlinePayment || _loadingShareGateways
+                  ? null
+                  : (v) => setState(() => _defaultShareGatewayId = v),
+            ),
+          ],
+          const SizedBox(height: 8),
+          DropdownButtonFormField<int>(
+            value: _defaultShareExpiryHours,
+            decoration: InputDecoration(
+              labelText: t.quickSalesSettingsShareExpiryLabel,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              DropdownMenuItem(value: 168, child: Text(t.quickSalesSettingsShareExpiry7Days)),
+              DropdownMenuItem(value: 336, child: Text(t.quickSalesSettingsShareExpiry14Days)),
+              DropdownMenuItem(value: 720, child: Text(t.quickSalesSettingsShareExpiry30Days)),
+            ],
+            onChanged: (v) {
+              if (v != null) setState(() => _defaultShareExpiryHours = v);
+            },
+          ),
+          const SizedBox(height: 8),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.quickSalesShareChannelSms),
+            value: _defaultShareChannelSms,
+            onChanged: (v) => setState(() => _defaultShareChannelSms = v ?? false),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.quickSalesShareChannelEmail),
+            value: _defaultShareChannelEmail,
+            onChanged: (v) => setState(() => _defaultShareChannelEmail = v ?? false),
+          ),
+          CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.quickSalesShareChannelNative),
+            value: _defaultShareChannelNative,
+            onChanged: (v) => setState(() => _defaultShareChannelNative = v ?? false),
+          ),
+        ],
+      ),
     );
   }
 

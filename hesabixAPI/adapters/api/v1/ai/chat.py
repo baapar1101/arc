@@ -27,6 +27,21 @@ router = APIRouter(prefix="/ai/chat", tags=["هوش مصنوعی"])
 DEFAULT_CHAT_TITLE = "گفت‌وگوی جدید"
 
 
+def _prepare_ai_service_model(ai_service: AIService, model: Optional[str]) -> None:
+    if model:
+        ai_service.set_request_model(model)
+        ai_service._validate_request_model_if_set()
+
+
+def _usage_provider_and_model(ai_service: AIService) -> tuple[str, str]:
+    try:
+        return ai_service.get_effective_provider_type(), ai_service.get_effective_model_code()
+    except ApiError:
+        provider = ai_service.config.provider if ai_service.config else "openai"
+        model_name = ai_service.config.model_name if ai_service.config else "gpt-4"
+        return provider, model_name
+
+
 def _schedule_session_title_generation(
     session_id: int,
     message_content: str,
@@ -110,11 +125,13 @@ class ChatMessageRequest(BaseModel):
     session_id: Optional[int] = None
     approve_writes: bool = False
     mode: Optional[str] = None  # explore | auto | off
+    model: Optional[str] = None
 
 
 class CheckAvailabilityRequest(BaseModel):
     business_id: Optional[int] = None
     estimated_tokens: int = 1000
+    model: Optional[str] = None
 
 
 class AIMemoryStructuredPatch(BaseModel):
@@ -144,6 +161,7 @@ class ChatEditMessageRequest(BaseModel):
     content: str
     approve_writes: bool = False
     regenerate_after: bool = True
+    model: Optional[str] = None
 
 
 class AIConnectorCreateRequest(BaseModel):
@@ -181,7 +199,8 @@ async def check_ai_availability(
     ai_service = AIService(db, ctx, business_id)
     
     availability = ai_service.check_availability(
-        estimated_tokens=params.estimated_tokens
+        estimated_tokens=params.estimated_tokens,
+        model=params.model,
     )
     
     return success_response(availability, request)
@@ -883,6 +902,7 @@ async def send_message(
                 approve_writes=approve_writes,
                 approved_write_calls=approved_write_calls,
                 exploration_mode=exploration_mode,
+                request_model=message_data.model,
             ),
             media_type="text/event-stream",
             headers={
@@ -908,6 +928,7 @@ async def send_message(
     from adapters.db.session import get_db_session
     with get_db_session() as new_db:
         new_ai_service = AIService(new_db, ctx, business_id)
+        _prepare_ai_service_model(new_ai_service, message_data.model)
         response = await new_ai_service.chat_completion(
             messages,
             use_function_calling=True,
@@ -915,6 +936,7 @@ async def send_message(
             session_id=session_id,
             approve_writes=approve_writes,
             approved_write_calls=approved_write_calls,
+            request_model=message_data.model,
         )
     
     response_content_preview = (response.get("message", {}).get("content") or "")[:500]
@@ -939,7 +961,10 @@ async def send_message(
             raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
         
         commit_ai_service = AIService(commit_db, ctx, business_id)
-        charge_result = commit_ai_service.check_quota_and_charge(input_tokens, output_tokens)
+        _prepare_ai_service_model(commit_ai_service, message_data.model)
+        charge_result = commit_ai_service.check_quota_and_charge(
+            input_tokens, output_tokens, model_code=commit_ai_service.get_effective_model_code()
+        )
         
         fc_meta = response.get("_function_calls")
         fr_meta = response.get("_function_results")
@@ -957,9 +982,10 @@ async def send_message(
         commit_db.add(assistant_message)
         
         # ثبت لاگ استفاده
+        provider_name, model_code = _usage_provider_and_model(commit_ai_service)
         commit_ai_service.log_usage(
-            provider=commit_ai_service.config.provider if commit_ai_service.config else "openai",
-            model=commit_ai_service.config.model_name if commit_ai_service.config else "gpt-4",
+            provider=provider_name,
+            model=model_code,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cost=charge_result.get("cost", 0),
@@ -1038,6 +1064,7 @@ async def _stream_message_response(
     approve_writes: bool = False,
     approved_write_calls: Optional[List[Dict[str, Any]]] = None,
     exploration_mode: str = "auto",
+    request_model: Optional[str] = None,
 ):
     """Generator برای streaming response
     
@@ -1066,6 +1093,7 @@ async def _stream_message_response(
 
         with get_db_session() as temp_db:
             temp_ai_service = AIService(temp_db, ctx, business_id)
+            _prepare_ai_service_model(temp_ai_service, request_model)
             stream_ai_config = temp_ai_service.config
 
             async def _stream_factory():
@@ -1078,6 +1106,7 @@ async def _stream_message_response(
                     approved_write_calls=approved_write_calls,
                     exploration_mode=exploration_mode,
                     user_query=message_content,
+                    request_model=request_model,
                 ):
                     yield chunk
 
@@ -1181,8 +1210,13 @@ async def _stream_message_response(
                     return
                 
                 new_ai_service = AIService(new_db, ctx, updated_session.business_id)
-                
-                charge_result = new_ai_service.check_quota_and_charge(input_tokens, output_tokens)
+                _prepare_ai_service_model(new_ai_service, request_model)
+
+                charge_result = new_ai_service.check_quota_and_charge(
+                    input_tokens,
+                    output_tokens,
+                    model_code=new_ai_service.get_effective_model_code(),
+                )
                 
                 from app.services.ai.ai_trace import merge_trace_into_function_results
 
@@ -1203,9 +1237,10 @@ async def _stream_message_response(
                 new_db.add(assistant_message)
                 
                 # ثبت لاگ استفاده
+                provider_name, model_code = _usage_provider_and_model(new_ai_service)
                 new_ai_service.log_usage(
-                    provider=new_ai_service.config.provider if new_ai_service.config else "openai",
-                    model=new_ai_service.config.model_name if new_ai_service.config else "gpt-4",
+                    provider=provider_name,
+                    model=model_code,
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                     cost=charge_result.get("cost", 0),
@@ -1307,6 +1342,7 @@ async def regenerate_last_response(
     request: Request = None,
     stream: bool = Query(True, description="استفاده از streaming"),
     approve_writes: bool = Query(False),
+    model: Optional[str] = Query(None, description="مدل AI"),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
@@ -1353,6 +1389,7 @@ async def regenerate_last_response(
                 message_content=last_user.content,
                 approve_writes=approve_writes,
                 approved_write_calls=approved_write_calls,
+                request_model=model,
             ),
             media_type="text/event-stream",
             headers={
@@ -1367,6 +1404,7 @@ async def regenerate_last_response(
 
     with get_db_session() as new_db:
         new_ai_service = AIService(new_db, ctx, business_id)
+        _prepare_ai_service_model(new_ai_service, model)
         response = await new_ai_service.chat_completion(
             messages,
             use_function_calling=True,
@@ -1374,6 +1412,7 @@ async def regenerate_last_response(
             session_id=session_id,
             approve_writes=approve_writes,
             approved_write_calls=approved_write_calls,
+            request_model=model,
         )
 
     usage = response.get("usage", {})
@@ -1385,7 +1424,10 @@ async def regenerate_last_response(
         if not commit_session:
             raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
         commit_ai_service = AIService(commit_db, ctx, business_id)
-        charge_result = commit_ai_service.check_quota_and_charge(input_tokens, output_tokens)
+        _prepare_ai_service_model(commit_ai_service, model)
+        charge_result = commit_ai_service.check_quota_and_charge(
+            input_tokens, output_tokens, model_code=commit_ai_service.get_effective_model_code()
+        )
         fc_json, fr_json = serialize_function_metadata(
             response.get("_function_calls"), response.get("_function_results")
         )
@@ -1398,9 +1440,10 @@ async def regenerate_last_response(
             tokens_used=input_tokens + output_tokens,
         )
         commit_db.add(assistant_message)
+        provider_name, model_code = _usage_provider_and_model(commit_ai_service)
         commit_ai_service.log_usage(
-            provider=commit_ai_service.config.provider if commit_ai_service.config else "openai",
-            model=commit_ai_service.config.model_name if commit_ai_service.config else "gpt-4",
+            provider=provider_name,
+            model=model_code,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cost=charge_result.get("cost", 0),
@@ -1555,6 +1598,7 @@ async def edit_user_message(
                 message_content=user_text,
                 approve_writes=params.approve_writes,
                 approved_write_calls=approved_write_calls,
+                request_model=params.model,
             ),
             media_type="text/event-stream",
             headers={
@@ -1569,6 +1613,7 @@ async def edit_user_message(
 
     with get_db_session() as new_db:
         new_ai_service = AIService(new_db, ctx, business_id)
+        _prepare_ai_service_model(new_ai_service, params.model)
         response = await new_ai_service.chat_completion(
             messages,
             use_function_calling=True,
@@ -1577,6 +1622,7 @@ async def edit_user_message(
             approve_writes=params.approve_writes,
             approved_write_calls=approved_write_calls,
             user_query=user_text,
+            request_model=params.model,
         )
 
     usage = response.get("usage", {})
@@ -1588,7 +1634,10 @@ async def edit_user_message(
         if not commit_session:
             raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
         commit_ai_service = AIService(commit_db, ctx, business_id)
-        charge_result = commit_ai_service.check_quota_and_charge(input_tokens, output_tokens)
+        _prepare_ai_service_model(commit_ai_service, params.model)
+        charge_result = commit_ai_service.check_quota_and_charge(
+            input_tokens, output_tokens, model_code=commit_ai_service.get_effective_model_code()
+        )
         fc_json, fr_json = serialize_function_metadata(
             response.get("_function_calls"), response.get("_function_results")
         )
@@ -1601,9 +1650,10 @@ async def edit_user_message(
             tokens_used=input_tokens + output_tokens,
         )
         commit_db.add(assistant_message)
+        provider_name, model_code = _usage_provider_and_model(commit_ai_service)
         commit_ai_service.log_usage(
-            provider=commit_ai_service.config.provider if commit_ai_service.config else "openai",
-            model=commit_ai_service.config.model_name if commit_ai_service.config else "gpt-4",
+            provider=provider_name,
+            model=model_code,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             cost=charge_result.get("cost", 0),

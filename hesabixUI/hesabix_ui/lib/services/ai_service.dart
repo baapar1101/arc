@@ -44,7 +44,6 @@ class AIService {
     return res.data as Map<String, dynamic>;
   }
 
-  // ========== Admin: AI Plans ==========
   Future<List<AIPlan>> listAIPlans({bool? onlyActive}) async {
     final query = <String, dynamic>{};
     if (onlyActive != null) {
@@ -87,6 +86,159 @@ class AIService {
 
   Future<void> deleteAIPlan(int planId) async {
     await _api.delete('/api/v1/admin/ai/plans/$planId');
+  }
+
+  // ========== Admin: AI Models ==========
+  Future<List<AIModelCatalogItem>> listAIModels({bool? onlyActive}) async {
+    final query = <String, dynamic>{};
+    if (onlyActive != null) query['only_active'] = onlyActive;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/models',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data
+        .map((e) => AIModelCatalogItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<AIModelCatalogItem> createAIModel(Map<String, dynamic> data) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/models',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIModelCatalogItem.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<AIModelCatalogItem> updateAIModel(
+    int modelId,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/ai/models/$modelId',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIModelCatalogItem.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAIModel(int modelId) async {
+    await _api.delete('/api/v1/admin/ai/models/$modelId');
+  }
+
+  Future<Map<String, dynamic>> seedAIModelsFromConfig({
+    bool includePresets = true,
+    bool force = false,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/models/seed-from-config',
+      data: {
+        'include_presets': includePresets,
+        'force': force,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> listAIProviderCredentials() async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/provider-credentials',
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List;
+    return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> upsertAIProviderCredential(
+    String provider,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/ai/provider-credentials/$provider',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> syncAIProviderCredentialsFromConfig() async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/provider-credentials/sync-from-config',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> testAIProviderConnection(
+    String provider, {
+    String? model,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/provider-credentials/$provider/test-connection',
+      data: {if (model != null) 'model': model},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  // ========== User: AI Models ==========
+  Future<List<AIModelCatalogItem>> listAvailableAIModels({int? businessId}) async {
+    final query = <String, dynamic>{};
+    if (businessId != null) query['business_id'] = businessId;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/models',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>;
+    final models = data['models'] as List? ?? [];
+    return models
+        .map((e) => AIModelCatalogItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<String?> getPreferredModelCode({int? businessId}) async {
+    final query = <String, dynamic>{};
+    if (businessId != null) query['business_id'] = businessId;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/models',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>;
+    return data['preferred_model_code'] as String? ??
+        data['plan_default_model'] as String?;
+  }
+
+  Future<void> setPreferredModel({
+    required String modelCode,
+    int? businessId,
+  }) async {
+    await _api.put<Map<String, dynamic>>(
+      '/api/v1/ai/subscription/preferred-model',
+      data: {
+        'model_code': modelCode,
+        if (businessId != null) 'business_id': businessId,
+      },
+    );
+  }
+
+  Future<List<AIPlan>> listPublicAIPlans({int? businessId}) async {
+    final query = <String, dynamic>{};
+    if (businessId != null) query['business_id'] = businessId;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/subscription/plans',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>;
+    final plans = data['plans'] as List? ?? [];
+    return plans
+        .map((e) => AIPlan.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   // ========== Admin: AI Prompts ==========
@@ -137,12 +289,14 @@ class AIService {
   Future<Map<String, dynamic>> checkAvailability({
     int? businessId,
     int estimatedTokens = 1000,
+    String? model,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/check-availability',
       data: {
         if (businessId != null) 'business_id': businessId,
         'estimated_tokens': estimatedTokens,
+        if (model != null && model.isNotEmpty) 'model': model,
       },
     );
     final body = res.data as Map<String, dynamic>;
@@ -353,6 +507,7 @@ class AIService {
     required String content,
     bool approveWrites = false,
     String? explorationMode,
+    String? model,
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
     CancelToken? cancelToken,
@@ -367,6 +522,7 @@ class AIService {
         'approve_writes': approveWrites,
         if (explorationMode != null && explorationMode.isNotEmpty)
           'mode': explorationMode,
+        if (model != null && model.isNotEmpty) 'model': model,
       };
       final endpoint = '/api/v1/ai/chat/sessions/$sessionId/messages';
       if (kIsWeb) {

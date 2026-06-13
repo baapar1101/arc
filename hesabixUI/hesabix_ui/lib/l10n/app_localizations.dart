@@ -19494,6 +19494,174 @@ abstract class AppLocalizations {
   /// **'Leave empty to use the number saved for this customer'**
   String get personShareSendToNumberHint;
 
+  /// No description provided for @quickSalesAutoCreateReceiptSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Create receipt document'**
+  String get quickSalesAutoCreateReceiptSwitch;
+
+  /// No description provided for @quickSalesAutoCreateReceiptSwitchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Record a separate receipt with the invoice (cash register payment)'**
+  String get quickSalesAutoCreateReceiptSwitchHint;
+
+  /// No description provided for @quickSalesShareSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get quickSalesShareSectionTitle;
+
+  /// No description provided for @quickSalesShareSectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Send the invoice with an online payment link to the customer'**
+  String get quickSalesShareSectionHint;
+
+  /// No description provided for @quickSalesShareOnlinePayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Online payment on link'**
+  String get quickSalesShareOnlinePayment;
+
+  /// No description provided for @quickSalesShareOnlinePaymentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer is redirected to your payment gateway from the link'**
+  String get quickSalesShareOnlinePaymentHint;
+
+  /// No description provided for @quickSalesShareGatewayLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment gateway'**
+  String get quickSalesShareGatewayLabel;
+
+  /// No description provided for @quickSalesShareNoGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'No payment gateway is configured for this business'**
+  String get quickSalesShareNoGateway;
+
+  /// No description provided for @quickSalesShareChannelSms.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS'**
+  String get quickSalesShareChannelSms;
+
+  /// No description provided for @quickSalesShareChannelEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email'**
+  String get quickSalesShareChannelEmail;
+
+  /// No description provided for @quickSalesShareChannelNative.
+  ///
+  /// In en, this message translates to:
+  /// **'Share (copy / other apps)'**
+  String get quickSalesShareChannelNative;
+
+  /// No description provided for @quickSalesShareNoPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer mobile is missing — SMS is disabled'**
+  String get quickSalesShareNoPhoneHint;
+
+  /// No description provided for @quickSalesShareNoEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer email is missing — email is disabled'**
+  String get quickSalesShareNoEmailHint;
+
+  /// No description provided for @quickSalesShareNoInvoiceEditPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have permission to create invoice share links'**
+  String get quickSalesShareNoInvoiceEditPermission;
+
+  /// No description provided for @quickSalesShareNoNotificationPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'No permission to send notifications — link was created'**
+  String get quickSalesShareNoNotificationPermission;
+
+  /// No description provided for @quickSalesShareGatewayRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a payment gateway for online payment'**
+  String get quickSalesShareGatewayRequired;
+
+  /// No description provided for @quickSalesShareLinkCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice link created'**
+  String get quickSalesShareLinkCreated;
+
+  /// No description provided for @quickSalesShareLinkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice saved but share link creation failed'**
+  String get quickSalesShareLinkFailed;
+
+  /// No description provided for @quickSalesShareSmsSkippedNoPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'SMS not sent (customer mobile missing)'**
+  String get quickSalesShareSmsSkippedNoPhone;
+
+  /// No description provided for @quickSalesShareEmailSkippedNoEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Email not sent (customer email missing)'**
+  String get quickSalesShareEmailSkippedNoEmail;
+
+  /// No description provided for @quickSalesShareNoTemplateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'No approved template for invoice share link. Create and approve a template for event \"Invoice share link\" in notification templates.'**
+  String get quickSalesShareNoTemplateHint;
+
+  /// No description provided for @quickSalesShareEmailSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Email sent successfully.'**
+  String get quickSalesShareEmailSent;
+
+  /// No description provided for @quickSalesSettingsShareDefaultsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Default invoice share settings'**
+  String get quickSalesSettingsShareDefaultsTitle;
+
+  /// No description provided for @quickSalesSettingsShareDefaultsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied on the quick sales page when \"Create receipt document\" is off'**
+  String get quickSalesSettingsShareDefaultsHint;
+
+  /// No description provided for @quickSalesSettingsShareExpiryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Link expiry'**
+  String get quickSalesSettingsShareExpiryLabel;
+
+  /// No description provided for @quickSalesSettingsShareExpiry7Days.
+  ///
+  /// In en, this message translates to:
+  /// **'7 days'**
+  String get quickSalesSettingsShareExpiry7Days;
+
+  /// No description provided for @quickSalesSettingsShareExpiry14Days.
+  ///
+  /// In en, this message translates to:
+  /// **'14 days'**
+  String get quickSalesSettingsShareExpiry14Days;
+
+  /// No description provided for @quickSalesSettingsShareExpiry30Days.
+  ///
+  /// In en, this message translates to:
+  /// **'30 days'**
+  String get quickSalesSettingsShareExpiry30Days;
+
   /// No description provided for @settingsRedisCache.
   ///
   /// In en, this message translates to:
@@ -20009,6 +20177,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage AI usage plans and pricing'**
   String get settingsAIPlansDescription;
+
+  /// No description provided for @settingsAIModels.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Models'**
+  String get settingsAIModels;
+
+  /// No description provided for @settingsAIModelsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage available AI models catalog'**
+  String get settingsAIModelsDescription;
+
+  /// No description provided for @settingsAIProviderCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Provider Credentials'**
+  String get settingsAIProviderCredentials;
+
+  /// No description provided for @settingsAIProviderCredentialsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Separate API keys per OpenAI, Anthropic, Local'**
+  String get settingsAIProviderCredentialsDescription;
 
   /// No description provided for @settingsAIPrompts.
   ///

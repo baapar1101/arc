@@ -10399,6 +10399,105 @@ class AppLocalizationsFa extends AppLocalizations {
       'خالی = ارسال به شماره ثبت‌شده در پرونده مشتری';
 
   @override
+  String get quickSalesAutoCreateReceiptSwitch => 'ثبت سند دریافت';
+
+  @override
+  String get quickSalesAutoCreateReceiptSwitchHint =>
+      'سند دریافت جداگانه همراه فاکتور ثبت شود (پرداخت نقدی در صندوق)';
+
+  @override
+  String get quickSalesShareSectionTitle => 'اشتراک‌گذاری';
+
+  @override
+  String get quickSalesShareSectionHint =>
+      'فاکتور با لینک پرداخت آنلاین برای مشتری ارسال شود';
+
+  @override
+  String get quickSalesShareOnlinePayment => 'پرداخت آنلاین در لینک';
+
+  @override
+  String get quickSalesShareOnlinePaymentHint =>
+      'مشتری از لینک به درگاه پرداخت هدایت می‌شود';
+
+  @override
+  String get quickSalesShareGatewayLabel => 'درگاه پرداخت';
+
+  @override
+  String get quickSalesShareNoGateway =>
+      'درگاه پرداختی برای این کسب‌وکار تعریف نشده است';
+
+  @override
+  String get quickSalesShareChannelSms => 'پیامک';
+
+  @override
+  String get quickSalesShareChannelEmail => 'ایمیل';
+
+  @override
+  String get quickSalesShareChannelNative => 'اشتراک‌گذاری (کپی / اپ‌های دیگر)';
+
+  @override
+  String get quickSalesShareNoPhoneHint =>
+      'شماره موبایل مشتری ثبت نشده — پیامک غیرفعال است';
+
+  @override
+  String get quickSalesShareNoEmailHint =>
+      'ایمیل مشتری ثبت نشده — ایمیل غیرفعال است';
+
+  @override
+  String get quickSalesShareNoInvoiceEditPermission =>
+      'دسترسی ایجاد لینک اشتراک فاکتور ندارید';
+
+  @override
+  String get quickSalesShareNoNotificationPermission =>
+      'دسترسی ارسال نوتیفیکیشن ندارید — لینک ایجاد شد';
+
+  @override
+  String get quickSalesShareGatewayRequired =>
+      'برای پرداخت آنلاین، انتخاب درگاه الزامی است';
+
+  @override
+  String get quickSalesShareLinkCreated => 'لینک فاکتور ایجاد شد';
+
+  @override
+  String get quickSalesShareLinkFailed =>
+      'فاکتور ثبت شد اما ایجاد لینک اشتراک ناموفق بود';
+
+  @override
+  String get quickSalesShareSmsSkippedNoPhone =>
+      'پیامک ارسال نشد (موبایل مشتری ثبت نشده)';
+
+  @override
+  String get quickSalesShareEmailSkippedNoEmail =>
+      'ایمیل ارسال نشد (ایمیل مشتری ثبت نشده)';
+
+  @override
+  String get quickSalesShareNoTemplateHint =>
+      'قالب تایید‌شده برای ارسال لینک فاکتور یافت نشد. از بخش قالب‌های نوتیفیکیشن یک قالب برای رویداد «ارسال لینک فاکتور» تعریف و تایید کنید.';
+
+  @override
+  String get quickSalesShareEmailSent => 'ایمیل با موفقیت ارسال شد.';
+
+  @override
+  String get quickSalesSettingsShareDefaultsTitle =>
+      'پیش‌فرض اشتراک‌گذاری فاکتور';
+
+  @override
+  String get quickSalesSettingsShareDefaultsHint =>
+      'وقتی «ثبت سند دریافت» خاموش است، این مقادیر در صفحه فروش سریع اعمال می‌شوند';
+
+  @override
+  String get quickSalesSettingsShareExpiryLabel => 'مدت اعتبار لینک';
+
+  @override
+  String get quickSalesSettingsShareExpiry7Days => '۷ روز';
+
+  @override
+  String get quickSalesSettingsShareExpiry14Days => '۱۴ روز';
+
+  @override
+  String get quickSalesSettingsShareExpiry30Days => '۳۰ روز';
+
+  @override
   String get settingsRedisCache => 'تنظیمات Redis Cache';
 
   @override
@@ -10680,6 +10779,19 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get settingsAIPlansDescription =>
       'مدیریت پلن‌های استفاده از AI و تعیین قیمت‌ها';
+
+  @override
+  String get settingsAIModels => 'مدل‌های AI';
+
+  @override
+  String get settingsAIModelsDescription => 'مدیریت کاتالوگ مدل‌های هوش مصنوعی';
+
+  @override
+  String get settingsAIProviderCredentials => 'اعتبارنامه Providerها';
+
+  @override
+  String get settingsAIProviderCredentialsDescription =>
+      'API Key جداگانه برای OpenAI، Anthropic و Local';
 
   @override
   String get settingsAIPrompts => 'Prompt های AI';

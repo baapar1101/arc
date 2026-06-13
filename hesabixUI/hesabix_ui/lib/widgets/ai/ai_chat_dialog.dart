@@ -117,6 +117,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
   String? _streamErrorMessage;
   bool _streamErrorRecoverable = false;
   VoidCallback? _pendingStreamRetry;
+  List<AIModelCatalogItem> _availableModels = [];
+  String? _selectedModelCode;
+  bool _modelsLoading = false;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
@@ -188,10 +191,132 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _loadSuggestions();
     if (widget.businessId != null) {
       unawaited(_loadProactiveAlerts());
+      unawaited(_loadAvailableModels());
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _isHomeMode) _focusNode.requestFocus();
     });
+  }
+
+  Future<void> _loadAvailableModels() async {
+    if (widget.businessId == null) return;
+    setState(() => _modelsLoading = true);
+    try {
+      final models = await _aiService.listAvailableAIModels(
+        businessId: widget.businessId,
+      );
+      if (!mounted) return;
+      String? selected = _selectedModelCode;
+      for (final m in models) {
+        if (m.isDefault) {
+          selected ??= m.code;
+          break;
+        }
+      }
+      selected ??= models.isNotEmpty ? models.first.code : null;
+      setState(() {
+        _availableModels = models;
+        _selectedModelCode = selected;
+        _modelsLoading = false;
+      });
+      if (selected != null) {
+        await _checkAvailability(model: selected);
+      }
+    } catch (e) {
+      debugPrint('[AIChatDialog] load models failed: $e');
+      if (mounted) setState(() => _modelsLoading = false);
+    }
+  }
+
+  Future<void> _onModelChanged(String? code) async {
+    if (code == null || code == _selectedModelCode) return;
+    setState(() => _selectedModelCode = code);
+    if (widget.businessId != null) {
+      try {
+        await _aiService.setPreferredModel(
+          modelCode: code,
+          businessId: widget.businessId,
+        );
+      } catch (e) {
+        debugPrint('[AIChatDialog] set preferred model failed: $e');
+      }
+    }
+    _availabilityCheckedAt = null;
+    await _checkAvailability(model: code);
+  }
+
+  Widget _buildModelSelector(ThemeData theme) {
+    if (_availableModels.isEmpty) return const SizedBox.shrink();
+    AIModelCatalogItem? selected;
+    for (final m in _availableModels) {
+      if (m.code == _selectedModelCode) {
+        selected = m;
+        break;
+      }
+    }
+    final hint = selected?.pricingHint ?? _selectedModelPricingHint();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.hub_outlined, size: 18, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text('مدل', style: theme.textTheme.labelLarge),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _selectedModelCode,
+                    hint: _modelsLoading
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('انتخاب مدل'),
+                    items: _availableModels
+                        .map(
+                          (m) => DropdownMenuItem(
+                            value: m.code,
+                            child: Text(_modelDropdownLabel(m)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: _sending ? null : _onModelChanged,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (hint != null && hint.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, right: 26),
+              child: Text(
+                hint,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _modelDropdownLabel(AIModelCatalogItem m) {
+    final hint = m.pricingHint;
+    if (hint == null || hint.isEmpty) return m.displayName;
+    return '${m.displayName} · $hint';
+  }
+
+  String? _selectedModelPricingHint() {
+    final details = _availabilityInfo?['details'] as Map<String, dynamic>?;
+    final pricing = details?['model_pricing'] as Map<String, dynamic>?;
+    return pricing?['pricing_hint'] as String?;
   }
 
   void _onStreamStateChanged() {
@@ -772,11 +897,15 @@ class _AIChatDialogState extends State<AIChatDialog> {
         const Duration(minutes: 2);
   }
 
-  Future<void> _checkAvailability({int estimatedTokens = 1000}) async {
+  Future<void> _checkAvailability({
+    int estimatedTokens = 1000,
+    String? model,
+  }) async {
     try {
       final availability = await _aiService.checkAvailability(
         businessId: widget.businessId,
         estimatedTokens: estimatedTokens,
+        model: model ?? _selectedModelCode,
       );
       if (!mounted) return;
       setState(() {
@@ -802,6 +931,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       final availability = await _aiService.checkAvailability(
         businessId: widget.businessId,
         estimatedTokens: content.length * 2,
+        model: _selectedModelCode,
       );
       if (!mounted) return false;
       _availabilityInfo = availability;
@@ -1302,6 +1432,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sessionId: _currentSession!.id!,
         content: content,
         approveWrites: approveWrites,
+        model: _selectedModelCode,
         onComplete: (usage, messageId) {
           finalUsage = usage;
         },
@@ -1765,6 +1896,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildAppBar(theme),
+                    _buildModelSelector(theme),
                     if (_showCreditWarning) _buildCreditWarning(theme),
                     if (_showWriteApprovalBanner)
                       AIWriteApprovalBanner(

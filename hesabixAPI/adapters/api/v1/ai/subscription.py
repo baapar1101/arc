@@ -8,6 +8,11 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
 from app.services.ai_plan_service import subscribe_to_plan
+from app.services.ai.ai_model_service import (
+    list_models_for_user,
+    serialize_plan_for_user,
+    validate_model_selection,
+)
 from adapters.db.repositories.ai_subscription_repository import AISubscriptionRepository
 from adapters.db.repositories.ai_plan_repository import AIPlanRepository
 from adapters.db.repositories.ai_usage_log_repository import AIUsageLogRepository
@@ -19,21 +24,16 @@ router = APIRouter(prefix="/ai/subscription", tags=["هوش مصنوعی"])
 
 def _build_subscription_response(subscription, request):
     import json
+    from app.services.ai.ai_model_service import serialize_plan_for_user
+
     plan = subscription.plan
     return success_response({
         "id": subscription.id,
         "user_id": subscription.user_id,
         "business_id": subscription.business_id,
         "plan_id": subscription.plan_id,
-        "plan": {
-            "id": plan.id,
-            "code": plan.code,
-            "name": plan.name,
-            "plan_type": plan.plan_type,
-            "pricing_config": json.loads(plan.pricing_config or "{}"),
-            "usage_limits": json.loads(plan.usage_limits or "{}"),
-            "features": json.loads(plan.features or "{}")
-        },
+        "preferred_model_code": getattr(subscription, "preferred_model_code", None),
+        "plan": serialize_plan_for_user(plan) if plan else None,
         "subscription_type": subscription.subscription_type,
         "tokens_used": subscription.tokens_used,
         "tokens_limit": subscription.tokens_limit,
@@ -67,6 +67,80 @@ async def get_subscription(
         return success_response(None, request, "اشتراک فعالی وجود ندارد")
     
     return _build_subscription_response(subscription, request)
+
+
+@router.get("/plans", summary="لیست پلن‌های فعال (عمومی)")
+async def list_public_plans(
+    request: Request,
+    business_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """دریافت پلن‌های فعال برای انتخاب توسط کاربر (بدون نیاز به دسترسی ادمین)."""
+    effective_business_id = business_id or ctx.business_id
+    if effective_business_id and not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+
+    plan_repo = AIPlanRepository(db)
+    plans = plan_repo.get_active_plans()
+    serialized = [serialize_plan_for_user(p) for p in plans]
+
+    current_plan_id = None
+    if effective_business_id:
+        sub_repo = AISubscriptionRepository(db)
+        subscription = sub_repo.get_active_subscription(
+            user_id=ctx.get_user_id(),
+            business_id=effective_business_id,
+        )
+        if subscription:
+            current_plan_id = subscription.plan_id
+
+    return success_response(
+        {
+            "plans": serialized,
+            "current_plan_id": current_plan_id,
+        },
+        request,
+    )
+
+
+@router.put("/preferred-model", summary="تنظیم مدل ترجیحی")
+async def set_preferred_model(
+    request: Request,
+    model_code: str = Body(..., embed=True),
+    business_id: Optional[int] = Body(None, embed=True),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    effective_business_id = business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+
+    sub_repo = AISubscriptionRepository(db)
+    subscription = sub_repo.get_active_subscription(
+        user_id=ctx.get_user_id(),
+        business_id=effective_business_id,
+    )
+    if not subscription:
+        raise ApiError("NO_ACTIVE_SUBSCRIPTION", "اشتراک فعالی وجود ندارد", http_status=400)
+
+    plan = subscription.plan
+    validate_model_selection(db, plan, model_code.strip())
+
+    subscription.preferred_model_code = model_code.strip()
+    db.commit()
+    db.refresh(subscription)
+
+    return success_response(
+        {
+            "preferred_model_code": subscription.preferred_model_code,
+            "available_models": list_models_for_user(db, plan, include_pricing=True),
+        },
+        request,
+        "مدل ترجیحی ذخیره شد",
+    )
 
 
 @router.get("/current", summary="دریافت اشتراک فعلی (alias)")

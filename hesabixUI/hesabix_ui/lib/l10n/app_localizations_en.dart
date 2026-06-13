@@ -10456,6 +10456,105 @@ class AppLocalizationsEn extends AppLocalizations {
       'Leave empty to use the number saved for this customer';
 
   @override
+  String get quickSalesAutoCreateReceiptSwitch => 'Create receipt document';
+
+  @override
+  String get quickSalesAutoCreateReceiptSwitchHint =>
+      'Record a separate receipt with the invoice (cash register payment)';
+
+  @override
+  String get quickSalesShareSectionTitle => 'Share';
+
+  @override
+  String get quickSalesShareSectionHint =>
+      'Send the invoice with an online payment link to the customer';
+
+  @override
+  String get quickSalesShareOnlinePayment => 'Online payment on link';
+
+  @override
+  String get quickSalesShareOnlinePaymentHint =>
+      'Customer is redirected to your payment gateway from the link';
+
+  @override
+  String get quickSalesShareGatewayLabel => 'Payment gateway';
+
+  @override
+  String get quickSalesShareNoGateway =>
+      'No payment gateway is configured for this business';
+
+  @override
+  String get quickSalesShareChannelSms => 'SMS';
+
+  @override
+  String get quickSalesShareChannelEmail => 'Email';
+
+  @override
+  String get quickSalesShareChannelNative => 'Share (copy / other apps)';
+
+  @override
+  String get quickSalesShareNoPhoneHint =>
+      'Customer mobile is missing — SMS is disabled';
+
+  @override
+  String get quickSalesShareNoEmailHint =>
+      'Customer email is missing — email is disabled';
+
+  @override
+  String get quickSalesShareNoInvoiceEditPermission =>
+      'You do not have permission to create invoice share links';
+
+  @override
+  String get quickSalesShareNoNotificationPermission =>
+      'No permission to send notifications — link was created';
+
+  @override
+  String get quickSalesShareGatewayRequired =>
+      'Select a payment gateway for online payment';
+
+  @override
+  String get quickSalesShareLinkCreated => 'Invoice link created';
+
+  @override
+  String get quickSalesShareLinkFailed =>
+      'Invoice saved but share link creation failed';
+
+  @override
+  String get quickSalesShareSmsSkippedNoPhone =>
+      'SMS not sent (customer mobile missing)';
+
+  @override
+  String get quickSalesShareEmailSkippedNoEmail =>
+      'Email not sent (customer email missing)';
+
+  @override
+  String get quickSalesShareNoTemplateHint =>
+      'No approved template for invoice share link. Create and approve a template for event \"Invoice share link\" in notification templates.';
+
+  @override
+  String get quickSalesShareEmailSent => 'Email sent successfully.';
+
+  @override
+  String get quickSalesSettingsShareDefaultsTitle =>
+      'Default invoice share settings';
+
+  @override
+  String get quickSalesSettingsShareDefaultsHint =>
+      'Applied on the quick sales page when \"Create receipt document\" is off';
+
+  @override
+  String get quickSalesSettingsShareExpiryLabel => 'Link expiry';
+
+  @override
+  String get quickSalesSettingsShareExpiry7Days => '7 days';
+
+  @override
+  String get quickSalesSettingsShareExpiry14Days => '14 days';
+
+  @override
+  String get quickSalesSettingsShareExpiry30Days => '30 days';
+
+  @override
   String get settingsRedisCache => 'Redis Cache';
 
   @override
@@ -10739,6 +10838,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsAIPlansDescription => 'Manage AI usage plans and pricing';
+
+  @override
+  String get settingsAIModels => 'AI Models';
+
+  @override
+  String get settingsAIModelsDescription =>
+      'Manage available AI models catalog';
+
+  @override
+  String get settingsAIProviderCredentials => 'AI Provider Credentials';
+
+  @override
+  String get settingsAIProviderCredentialsDescription =>
+      'Separate API keys per OpenAI, Anthropic, Local';
 
   @override
   String get settingsAIPrompts => 'AI Prompts';

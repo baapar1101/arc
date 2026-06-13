@@ -150,6 +150,7 @@ class AIService:
         self.business_id = business_id or user_context.business_id
         self.subscription = self._get_active_subscription()
         self.config = self._get_ai_config()
+        self._request_model_code: Optional[str] = None
     
     def _get_active_subscription(self) -> Optional[UserAISubscription]:
         """دریافت اشتراک فعال کاربر"""
@@ -174,23 +175,78 @@ class AIService:
         repo = AIConfigRepository(self.db)
         return repo.get_active_config()
 
-    def _make_provider(self):
+    def set_request_model(self, model_code: Optional[str]) -> None:
+        self._request_model_code = model_code.strip() if model_code and str(model_code).strip() else None
+
+    def get_effective_model_code(self) -> str:
+        from app.services.ai.ai_model_service import resolve_effective_model_code
+
+        plan = self.subscription.plan if self.subscription else None
+        return resolve_effective_model_code(
+            self.db,
+            request_model=self._request_model_code,
+            subscription=self.subscription,
+            plan=plan,
+            config=self.config,
+        )
+
+    def get_effective_model_api_id(self) -> str:
+        from app.services.ai.ai_model_service import get_api_model_id
+
+        return get_api_model_id(self.db, self.get_effective_model_code(), self.config)
+
+    def get_effective_provider_type(self) -> str:
+        from app.services.ai.ai_model_service import get_model_provider
+
+        return get_model_provider(self.db, self.get_effective_model_code(), self.config)
+
+    def _validate_request_model_if_set(self) -> None:
+        if not self._request_model_code:
+            return
+        from app.services.ai.ai_model_service import validate_model_selection
+
+        plan = self.subscription.plan if self.subscription else None
+        validate_model_selection(self.db, plan, self._request_model_code)
+
+    def _effective_max_tokens(self, override: Optional[int] = None) -> int:
+        from app.services.ai.ai_model_service import get_max_tokens_for_model
+
+        if override is not None:
+            return int(override)
+        return get_max_tokens_for_model(self.db, self.get_effective_model_code(), self.config)
+
+    def _make_provider(self, provider_type: Optional[str] = None):
         """ساخت provider فعال برای تخمین توکن و فراخوانی مدل."""
         from app.services.ai.ai_provider import create_provider
-        from app.services.ai.encryption import decrypt_api_key
+        from app.services.ai.ai_provider_service import resolve_provider_connection
 
-        if not self.config:
-            raise ApiError("AI_NOT_CONFIGURED", "تنظیمات AI یافت نشد", http_status=400)
-        api_key = (
-            decrypt_api_key(self.config.api_key) if self.config.api_key else None
+        ptype = provider_type or self.get_effective_provider_type()
+        _, api_key, api_base_url, _fce = resolve_provider_connection(
+            self.db,
+            ptype,
+            legacy_config=self.config,
         )
         if not api_key:
             raise ApiError("INVALID_API_KEY", "API Key تنظیم نشده است", http_status=400)
         return create_provider(
-            provider_type=self.config.provider,
+            provider_type=ptype,
             api_key=api_key,
-            api_base_url=self.config.api_base_url,
+            api_base_url=api_base_url,
         )
+
+    def _provider_supports_tools(self, provider_type: Optional[str] = None) -> bool:
+        from app.services.ai.ai_provider_service import resolve_provider_connection
+
+        ptype = provider_type or self.get_effective_provider_type()
+        try:
+            _, _, _, fce = resolve_provider_connection(
+                self.db, ptype, legacy_config=self.config
+            )
+            return bool(fce)
+        except ApiError:
+            if self.config and getattr(self.config, "function_calling_enabled", True) is False:
+                return False
+            return True
 
     def _prepare_llm_messages(
         self,
@@ -221,7 +277,7 @@ class AIService:
                 if bid and uid and can_use_llm_summarize(uid, int(bid)):
                     text = summarize_history_with_llm(
                         provider,
-                        self.config.model_name,
+                        self.get_effective_model_api_id(),
                         middle_msgs,
                     )
                     if text:
@@ -251,14 +307,18 @@ class AIService:
         """
         if not use_function_calling:
             return False
-        cfg = self.config
-        if cfg is not None and getattr(cfg, "function_calling_enabled", True) is False:
+        if not self._provider_supports_tools():
+            return False
+        from app.services.ai.ai_model_service import model_supports_tools
+
+        if not model_supports_tools(self.db, self.get_effective_model_code(), self.config):
             return False
         return True
     
     def check_availability(
         self,
-        estimated_tokens: int = 1000
+        estimated_tokens: int = 1000,
+        model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         بررسی اینکه آیا کاربر می‌تواند از AI استفاده کند
@@ -275,6 +335,24 @@ class AIService:
                 }
             }
         """
+        if model:
+            self.set_request_model(model)
+        try:
+            effective_model = self.get_effective_model_code()
+        except ApiError as exc:
+            err = {}
+            if isinstance(exc.detail, dict):
+                err = exc.detail.get("error") or {}
+            return {
+                "can_use": False,
+                "reason": err.get("code", "NO_AI_MODEL"),
+                "details": {
+                    "message": err.get("message", "مدل در دسترس نیست"),
+                    "suggestions": ["مدل دیگری انتخاب کنید یا با پشتیبانی تماس بگیرید"],
+                },
+            }
+        self._validate_request_model_if_set()
+
         # دسترسی‌های سیستمی (اپراتور/سوپرادمین) بدون نیاز به اشتراک
         if self.ctx.can_access_support_operator() or self.ctx.is_superadmin():
             fce = bool(getattr(self.config, "function_calling_enabled", True)) if self.config else True
@@ -429,17 +507,10 @@ class AIService:
                     }
                 }
             
-            # محاسبه هزینه تخمینی
-            import json
-            pricing_config = json.loads(plan.pricing_config or "{}")
-            pay_as_go_config = pricing_config.get("pay_as_go", {})
-            
-            input_price = Decimal(str(pay_as_go_config.get("price_per_1k_input_tokens", 0))) / 1000
-            output_price = Decimal(str(pay_as_go_config.get("price_per_1k_output_tokens", 0))) / 1000
-            
-            # تخمین: نیمی input و نیمی output
-            estimated_cost = (Decimal(estimated_tokens) / 2 * input_price) + \
-                           (Decimal(estimated_tokens) / 2 * output_price)
+            # محاسبه هزینه تخمینی بر اساس مدل
+            from app.services.ai.ai_model_service import estimate_cost_for_tokens
+
+            estimated_cost = estimate_cost_for_tokens(plan, effective_model, estimated_tokens)
             
             # بررسی موجودی کیف پول
             from app.services.wallet_service import get_wallet_overview
@@ -492,7 +563,22 @@ class AIService:
                 }
         
         # همه چیز OK است
-        fce = bool(getattr(self.config, "function_calling_enabled", True)) if self.config else True
+        from app.services.ai.ai_model_service import (
+            _format_pricing_hint,
+            estimate_cost_for_tokens,
+            get_model_pricing_rates,
+            model_supports_tools,
+        )
+
+        fce = self._provider_supports_tools() and model_supports_tools(
+            self.db, effective_model, self.config
+        )
+        in_per_1k = out_per_1k = est_cost = 0.0
+        if plan:
+            in_p, out_p = get_model_pricing_rates(plan, effective_model)
+            in_per_1k = float(in_p * 1000)
+            out_per_1k = float(out_p * 1000)
+            est_cost = float(estimate_cost_for_tokens(plan, effective_model, estimated_tokens))
         return {
             "can_use": True,
             "reason": None,
@@ -500,6 +586,13 @@ class AIService:
                 "subscription": subscription_info,
                 "wallet": wallet_info if plan.plan_type in ["pay_as_go", "hybrid"] else None,
                 "function_calling_enabled": fce,
+                "model": effective_model,
+                "model_pricing": {
+                    "estimated_cost": est_cost,
+                    "price_per_1k_input_tokens": in_per_1k,
+                    "price_per_1k_output_tokens": out_per_1k,
+                    "pricing_hint": _format_pricing_hint(in_per_1k, out_per_1k, est_cost),
+                },
                 "suggestions": suggestions
             }
         }
@@ -850,7 +943,8 @@ class AIService:
     def check_quota_and_charge(
         self,
         input_tokens: int,
-        output_tokens: int
+        output_tokens: int,
+        model_code: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         بررسی سهمیه و شارژ:
@@ -973,7 +1067,7 @@ class AIService:
                 )
             
             # محاسبه هزینه و کسر از کیف پول
-            cost = self._calculate_cost(plan, input_tokens, output_tokens)
+            cost = self._calculate_cost(plan, input_tokens, output_tokens, model_code=model_code)
             return self._charge_from_wallet(cost, input_tokens, output_tokens)
         
         elif plan.plan_type == "hybrid":
@@ -999,7 +1093,9 @@ class AIService:
                 # استفاده از سهمیه + پرداخت اضافی
                 self.subscription.tokens_used = tokens_limit
                 extra_tokens = needed - remaining
-                cost = self._calculate_cost(plan, input_tokens, output_tokens, extra_tokens)
+                cost = self._calculate_cost(
+                    plan, input_tokens, output_tokens, extra_tokens, model_code=model_code
+                )
                 result = self._charge_from_wallet(cost, input_tokens, output_tokens)
                 self.db.commit()
                 return result
@@ -1011,21 +1107,20 @@ class AIService:
         plan,
         input_tokens: int,
         output_tokens: int,
-        extra_tokens: Optional[int] = None
+        extra_tokens: Optional[int] = None,
+        model_code: Optional[str] = None,
     ) -> Decimal:
-        """محاسبه هزینه بر اساس پلن"""
-        import json
-        pricing_config = json.loads(plan.pricing_config or "{}")
-        pay_as_go_config = pricing_config.get("pay_as_go", {})
-        
-        input_price = Decimal(str(pay_as_go_config.get("price_per_1k_input_tokens", 0))) / 1000
-        output_price = Decimal(str(pay_as_go_config.get("price_per_1k_output_tokens", 0))) / 1000
-        
-        if extra_tokens:
-            # برای hybrid: فقط توکن‌های اضافی محاسبه می‌شود
-            return Decimal(extra_tokens) * input_price
-        else:
-            return (Decimal(input_tokens) * input_price) + (Decimal(output_tokens) * output_price)
+        """محاسبه هزینه بر اساس پلن و مدل"""
+        from app.services.ai.ai_model_service import calculate_usage_cost
+
+        code = model_code or self.get_effective_model_code()
+        return calculate_usage_cost(
+            plan,
+            code,
+            input_tokens,
+            output_tokens,
+            extra_tokens=extra_tokens,
+        )
     
     def _charge_from_wallet(
         self,
@@ -1159,11 +1254,15 @@ class AIService:
         approve_writes: bool = False,
         approved_write_calls: Optional[List[Dict[str, Any]]] = None,
         user_query: Optional[str] = None,
+        request_model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         ارسال درخواست به AI (async version برای جلوگیری از blocking)
         """
         self._validate_messages(messages)
+        if request_model:
+            self.set_request_model(request_model)
+        self._validate_request_model_if_set()
         effective_user_query = user_query or self._last_user_query(messages)
 
         accumulated_function_calls: List[Dict[str, Any]] = []
@@ -1209,7 +1308,7 @@ class AIService:
                     _executor,
                     lambda msgs=full_messages: provider.chat_completion(
                         messages=msgs,
-                        model=self.config.model_name,
+                        model=self.get_effective_model_api_id(),
                         max_tokens=max_tokens_override or self.config.max_tokens,
                         temperature=float(
                             temperature_override
@@ -1322,7 +1421,7 @@ class AIService:
                     _executor,
                     lambda msgs=full_messages, t=tools: provider.chat_completion(
                         messages=msgs,
-                        model=self.config.model_name,
+                        model=self.get_effective_model_api_id(),
                         max_tokens=max_tokens_override or self.config.max_tokens,
                         temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
                         tools=t if eff_tools else None,
@@ -1393,6 +1492,7 @@ class AIService:
         max_iterations: int = MAX_AGENT_ITERATIONS,
         user_query: Optional[str] = None,
         exploration_mode: Optional[str] = None,
+        request_model: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال streaming با چند نوبت tool calling (مثل chat_completion).
 
@@ -1403,6 +1503,9 @@ class AIService:
          - session caching در handle_function_calls_async
         """
         self._validate_messages(messages)
+        if request_model:
+            self.set_request_model(request_model)
+        self._validate_request_model_if_set()
         effective_user_query = user_query or self._last_user_query(messages)
         exploration_enabled = resolve_exploration_enabled(
             exploration_mode, effective_user_query, messages
@@ -1602,7 +1705,7 @@ class AIService:
                     try:
                         async for chunk in provider.chat_completion_stream(
                             messages=full_messages,
-                            model=self.config.model_name,
+                            model=self.get_effective_model_api_id(),
                             max_tokens=max_tokens_override or self.config.max_tokens,
                             temperature=float(self.config.temperature),
                             tools=tools if use_tools else None,
@@ -2061,7 +2164,7 @@ class AIService:
                         ):
                             llm_thought = await synthesize_thought_with_llm(
                                 provider,
-                                self.config.model_name,
+                                self.get_effective_model_api_id(),
                                 max_tokens_override or self.config.max_tokens,
                                 float(self.config.temperature),
                                 bundle,

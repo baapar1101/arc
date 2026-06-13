@@ -19,6 +19,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
   bool _loading = true;
   String? _error;
   List<AIPlan> _plans = [];
+  List<AIModelCatalogItem> _catalogModels = [];
   String? _walletCurrencyCode;
   String? _walletCurrencyTitle;
 
@@ -68,11 +69,14 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
       final results = await Future.wait<Object>([
         _aiService.listAIPlans(),
         _settingsService.getWalletSettings(),
+        _aiService.listAIModels(onlyActive: true),
       ]);
       final plans = results[0] as List<AIPlan>;
       final wallet = Map<String, dynamic>.from(results[1] as Map);
+      final models = results[2] as List<AIModelCatalogItem>;
       setState(() {
         _plans = plans;
+        _catalogModels = models;
         _walletCurrencyCode = wallet['wallet_base_currency_code']?.toString();
         _walletCurrencyTitle = wallet['wallet_base_currency_title']?.toString();
         _loading = false;
@@ -91,8 +95,17 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
     TextEditingController yearlyPrice,
     TextEditingController payInput,
     TextEditingController payOutput,
+    Set<String> allowedModels,
+    String? defaultModel,
+    Map<String, Map<String, double>> perModelRates,
   ) {
     final pc = <String, dynamic>{};
+    if (allowedModels.isNotEmpty) {
+      pc['allowed_models'] = allowedModels.toList();
+    }
+    if (defaultModel != null && defaultModel.isNotEmpty) {
+      pc['default_model'] = defaultModel;
+    }
     if (planType == AIPlanType.subscription || planType == AIPlanType.hybrid) {
       pc['subscription'] = <String, dynamic>{
         'monthly_price': _parseDecimal(monthlyPrice.text),
@@ -100,10 +113,22 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
       };
     }
     if (planType == AIPlanType.payAsGo || planType == AIPlanType.hybrid) {
-      pc['pay_as_go'] = <String, dynamic>{
+      final payAsGo = <String, dynamic>{
         'price_per_1k_input_tokens': _parseDecimal(payInput.text),
         'price_per_1k_output_tokens': _parseDecimal(payOutput.text),
       };
+      if (perModelRates.isNotEmpty) {
+        payAsGo['models'] = perModelRates.map(
+          (code, rates) => MapEntry(
+            code,
+            <String, dynamic>{
+              'price_per_1k_input_tokens': rates['input'] ?? 0,
+              'price_per_1k_output_tokens': rates['output'] ?? 0,
+            },
+          ),
+        );
+      }
+      pc['pay_as_go'] = payAsGo;
     }
     return pc;
   }
@@ -118,6 +143,13 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
     final s = raw.replaceAll(',', '').trim();
     if (s.isEmpty) return null;
     return int.tryParse(s);
+  }
+
+  String _modelLabel(String code) {
+    for (final m in _catalogModels) {
+      if (m.code == code) return m.displayName;
+    }
+    return code;
   }
 
   Future<void> _showPlanFormDialog({AIPlan? plan}) async {
@@ -147,6 +179,32 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
     AIPlanType selectedPlanType = plan?.planType ?? AIPlanType.free;
     bool isActive = plan?.isActive ?? true;
     bool autoRenew = plan?.autoRenew ?? false;
+
+    final existingAllowed = <String>{
+      ...((pc['allowed_models'] as List?)?.map((e) => e.toString()) ?? []),
+    };
+    if (existingAllowed.isEmpty && _catalogModels.isNotEmpty) {
+      existingAllowed.addAll(_catalogModels.map((m) => m.code));
+    }
+    var selectedAllowed = Set<String>.from(existingAllowed);
+    String? selectedDefault = pc['default_model']?.toString();
+    if (selectedDefault != null && !selectedAllowed.contains(selectedDefault)) {
+      selectedDefault = selectedAllowed.isNotEmpty ? selectedAllowed.first : null;
+    }
+
+    final modelRates = <String, Map<String, TextEditingController>>{};
+    final modelsMap = (pay['models'] as Map?) ?? const {};
+    for (final code in selectedAllowed) {
+      final rates = Map<String, dynamic>.from((modelsMap[code] as Map?) ?? const {});
+      modelRates[code] = {
+        'input': TextEditingController(
+          text: _formatNumForField(rates['price_per_1k_input_tokens']),
+        ),
+        'output': TextEditingController(
+          text: _formatNumForField(rates['price_per_1k_output_tokens']),
+        ),
+      };
+    }
 
     await showDialog<void>(
       context: context,
@@ -295,6 +353,11 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 style: Theme.of(context).textTheme.titleSmall,
                               ),
                               const SizedBox(height: 8),
+                              Text(
+                                'نرخ پیش‌فرض (اگر برای مدل خاصی نرخ جدا نباشد)',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 8),
                               TextFormField(
                                 controller: payInput1kController,
                                 decoration: InputDecoration(
@@ -315,6 +378,113 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 inputFormatters: [
                                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                                 ],
+                              ),
+                              if (modelRates.isNotEmpty) ...[
+                                const SizedBox(height: 16),
+                                Text(
+                                  'نرخ اختصاصی هر مدل',
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                ),
+                                const SizedBox(height: 8),
+                                ...modelRates.entries.map((entry) {
+                                  final label = _modelLabel(entry.key);
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(label, style: Theme.of(context).textTheme.labelLarge),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: TextFormField(
+                                                controller: entry.value['input'],
+                                                decoration: InputDecoration(
+                                                  labelText: 'ورودی / ۱k$currencySuffix',
+                                                ),
+                                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: TextFormField(
+                                                controller: entry.value['output'],
+                                                decoration: InputDecoration(
+                                                  labelText: 'خروجی / ۱k$currencySuffix',
+                                                ),
+                                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ],
+                            const SizedBox(height: 16),
+                            Text(
+                              'مدل‌های مجاز در این پلن',
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            if (_catalogModels.isEmpty)
+                              Text(
+                                'ابتدا از بخش «مدل‌های AI» حداقل یک مدل تعریف کنید.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              )
+                            else
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: _catalogModels.map((m) {
+                                  final selected = selectedAllowed.contains(m.code);
+                                  return FilterChip(
+                                    label: Text(m.displayName),
+                                    selected: selected,
+                                    onSelected: (v) {
+                                      setDialogState(() {
+                                        if (v) {
+                                          selectedAllowed.add(m.code);
+                                          modelRates.putIfAbsent(
+                                            m.code,
+                                            () => {
+                                              'input': TextEditingController(),
+                                              'output': TextEditingController(),
+                                            },
+                                          );
+                                        } else {
+                                          selectedAllowed.remove(m.code);
+                                          modelRates.remove(m.code);
+                                          if (selectedDefault == m.code) {
+                                            selectedDefault = selectedAllowed.isEmpty
+                                                ? null
+                                                : selectedAllowed.first;
+                                          }
+                                        }
+                                      });
+                                    },
+                                  );
+                                }).toList(),
+                              ),
+                            if (selectedAllowed.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                value: selectedDefault,
+                                decoration: const InputDecoration(
+                                  labelText: 'مدل پیش‌فرض پلن',
+                                ),
+                                items: selectedAllowed
+                                    .map(
+                                      (code) => DropdownMenuItem(
+                                        value: code,
+                                        child: Text(_modelLabel(code)),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (v) => setDialogState(() => selectedDefault = v),
                               ),
                             ],
                             const SizedBox(height: 16),
@@ -377,6 +547,15 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 yearlyPriceController,
                                 payInput1kController,
                                 payOutput1kController,
+                                selectedAllowed,
+                                selectedDefault,
+                                {
+                                  for (final e in modelRates.entries)
+                                    e.key: {
+                                      'input': _parseDecimal(e.value['input']!.text),
+                                      'output': _parseDecimal(e.value['output']!.text),
+                                    },
+                                },
                               );
                               final data = <String, dynamic>{
                                 'name': nameController.text.trim(),

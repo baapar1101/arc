@@ -43,6 +43,9 @@ class UserAISubscription(Base):
     auto_renew: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # برای subscription
     last_reset_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # آخرین زمان reset سهمیه
     
+    # مدل ترجیحی کاربر (کد از ai_models.code)
+    preferred_model_code: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
+
     # حداقل موجودی کیف پول (برای pay_as_go)
     wallet_balance_required: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     

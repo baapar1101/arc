@@ -61,7 +61,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
     try {
       final results = await Future.wait([
         _aiService.getCurrentSubscription(businessId: widget.businessId),
-        _aiService.listAIPlans(onlyActive: true),
+        _aiService.listPublicAIPlans(businessId: widget.businessId),
         _loadUsageStatsSafe(),
       ]);
       if (!mounted) return;

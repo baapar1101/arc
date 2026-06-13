@@ -114,6 +114,11 @@ async def update_ai_config(
     
     db.commit()
     db.refresh(config)
+
+    from app.services.ai.ai_provider_service import upsert_credential_from_legacy_config
+
+    upsert_credential_from_legacy_config(db, config)
+    db.commit()
     
     return success_response({
         "id": config.id,

@@ -95,6 +95,8 @@ from .wallet import WalletAccount, WalletTransaction, WalletPayout, WalletSettin
 from .business_backup_import_log import BusinessBackupImportLog  # noqa: F401
 # AI models
 from .ai_config import AIConfig, AIProvider  # noqa: F401
+from .ai_model import AIModel  # noqa: F401
+from .ai_provider_credential import AIProviderCredential  # noqa: F401
 from .ai_plan import AIPlan, AIPlanType  # noqa: F401
 from .ai_subscription import UserAISubscription, SubscriptionType  # noqa: F401
 from .ai_invoice import AIInvoice, AIInvoiceType, AIInvoiceStatus  # noqa: F401

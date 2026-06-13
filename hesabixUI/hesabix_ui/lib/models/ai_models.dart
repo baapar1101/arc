@@ -170,6 +170,7 @@ class UserAISubscription {
   final int? businessId;
   final int planId;
   final AIPlan? plan;
+  final String? preferredModelCode;
   final int tokensUsed;
   final int? tokensLimit;
   final bool isActive;
@@ -184,8 +185,9 @@ class UserAISubscription {
     this.id,
     required this.userId,
     this.businessId,
-    required this.planId,
+    required     this.planId,
     this.plan,
+    this.preferredModelCode,
     this.tokensUsed = 0,
     this.tokensLimit,
     this.isActive = true,
@@ -206,6 +208,7 @@ class UserAISubscription {
       plan: json['plan'] != null
           ? AIPlan.fromJson(json['plan'] as Map<String, dynamic>)
           : null,
+      preferredModelCode: json['preferred_model_code'] as String?,
       tokensUsed: json['tokens_used'] as int? ?? 0,
       tokensLimit: json['tokens_limit'] as int?,
       isActive: json['is_active'] as bool? ?? true,
@@ -503,6 +506,79 @@ class AIUsageLog {
   }
 
   int get totalTokens => inputTokens + outputTokens;
+}
+
+/// کاتالوگ مدل AI قابل انتخاب توسط کاربر
+class AIModelCatalogItem {
+  final int? id;
+  final String code;
+  final String displayName;
+  final String? description;
+  final String provider;
+  final String modelId;
+  final String? tier;
+  final bool supportsTools;
+  final int maxTokensDefault;
+  final bool isActive;
+  final bool isDefault;
+  final Map<String, dynamic>? pricing;
+  final double? estimatedCostPer1kTokens;
+  final String? pricingHint;
+
+  AIModelCatalogItem({
+    this.id,
+    required this.code,
+    required this.displayName,
+    this.description,
+    required this.provider,
+    required this.modelId,
+    this.tier,
+    this.supportsTools = true,
+    this.maxTokensDefault = 4000,
+    this.isActive = true,
+    this.isDefault = false,
+    this.pricing,
+    this.estimatedCostPer1kTokens,
+    this.pricingHint,
+  });
+
+  factory AIModelCatalogItem.fromJson(Map<String, dynamic> json) {
+    return AIModelCatalogItem(
+      id: json['id'] as int?,
+      code: json['code'] as String,
+      displayName: json['display_name'] as String? ?? json['code'] as String,
+      description: json['description'] as String?,
+      provider: json['provider'] as String? ?? 'openai',
+      modelId: json['model_id'] as String? ?? json['code'] as String,
+      tier: json['tier'] as String?,
+      supportsTools: json['supports_tools'] as bool? ?? true,
+      maxTokensDefault: json['max_tokens_default'] as int? ?? 4000,
+      isActive: json['is_active'] as bool? ?? true,
+      isDefault: json['is_default'] as bool? ?? false,
+      pricing: json['pricing'] is Map
+          ? Map<String, dynamic>.from(json['pricing'] as Map)
+          : null,
+      estimatedCostPer1kTokens:
+          (json['estimated_cost_per_1k_tokens'] as num?)?.toDouble(),
+      pricingHint: json['pricing_hint'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      if (id != null) 'id': id,
+      'code': code,
+      'display_name': displayName,
+      if (description != null) 'description': description,
+      'provider': provider,
+      'model_id': modelId,
+      if (tier != null) 'tier': tier,
+      'supports_tools': supportsTools,
+      'max_tokens_default': maxTokensDefault,
+      'is_active': isActive,
+      'sort_order': 0,
+    };
+  }
 }
 
 class AIPrompt {

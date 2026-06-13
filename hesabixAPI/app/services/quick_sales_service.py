@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 import json
 import logging
 from sqlalchemy.orm import Session
@@ -14,6 +14,85 @@ from app.core.responses import ApiError
 from app.services.person_service import create_person
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_SHARE_CHANNELS: List[str] = ["sms", "native"]
+VALID_SHARE_CHANNEL_CODES = frozenset({"sms", "email", "native"})
+DEFAULT_SHARE_EXPIRY_HOURS = 168
+MIN_SHARE_EXPIRY_HOURS = 1
+MAX_SHARE_EXPIRY_HOURS = 720
+
+
+def normalize_default_share_channels(value: Any) -> List[str]:
+    """نرمال‌سازی لیست کانال‌های اشتراک‌گذاری."""
+    if value is None:
+        return list(DEFAULT_SHARE_CHANNELS)
+    parsed = value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            return list(DEFAULT_SHARE_CHANNELS)
+    if not isinstance(parsed, list):
+        return list(DEFAULT_SHARE_CHANNELS)
+    channels = [str(c).strip().lower() for c in parsed if str(c).strip()]
+    filtered = [c for c in channels if c in VALID_SHARE_CHANNEL_CODES]
+    return filtered or list(DEFAULT_SHARE_CHANNELS)
+
+
+def normalize_share_expiry_hours(value: Any) -> int:
+    try:
+        hours = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_SHARE_EXPIRY_HOURS
+    return max(MIN_SHARE_EXPIRY_HOURS, min(MAX_SHARE_EXPIRY_HOURS, hours))
+
+
+def _share_settings_from_obj(obj: QuickSalesSetting | None) -> Dict[str, Any]:
+    if obj is None:
+        return {
+            "default_share_online_payment": True,
+            "default_share_gateway_id": None,
+            "default_share_channels": list(DEFAULT_SHARE_CHANNELS),
+            "default_share_expiry_hours": DEFAULT_SHARE_EXPIRY_HOURS,
+        }
+    return {
+        "default_share_online_payment": bool(getattr(obj, "default_share_online_payment", True)),
+        "default_share_gateway_id": (
+            int(obj.default_share_gateway_id) if obj.default_share_gateway_id else None
+        ),
+        "default_share_channels": normalize_default_share_channels(obj.default_share_channels),
+        "default_share_expiry_hours": normalize_share_expiry_hours(
+            getattr(obj, "default_share_expiry_hours", DEFAULT_SHARE_EXPIRY_HOURS)
+        ),
+    }
+
+
+def _validate_share_gateway_id(db: Session, business_id: int, gateway_id: int) -> None:
+    from adapters.db.models.payment_gateway import BusinessPaymentGateway, PaymentGateway
+
+    gw = (
+        db.query(PaymentGateway)
+        .filter(PaymentGateway.id == int(gateway_id), PaymentGateway.is_active == True)  # noqa: E712
+        .first()
+    )
+    if not gw:
+        raise ApiError("GATEWAY_NOT_FOUND", "درگاه پرداخت یافت نشد یا غیرفعال است", http_status=404)
+    links = (
+        db.query(BusinessPaymentGateway)
+        .filter(
+            BusinessPaymentGateway.business_id == int(business_id),
+            BusinessPaymentGateway.is_active == True,  # noqa: E712
+        )
+        .all()
+    )
+    if links:
+        allowed = {int(lg.gateway_id) for lg in links}
+        if int(gateway_id) not in allowed:
+            raise ApiError(
+                "GATEWAY_NOT_LINKED",
+                "این درگاه برای این کسب‌وکار فعال نیست",
+                http_status=400,
+            )
 
 
 def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
@@ -47,6 +126,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "show_inventory": True,
             "auto_create_payment_document": True,
             "show_purchase_price": False,
+            **_share_settings_from_obj(None),
         }
     
     # اگر ارز پیش‌فرض در تنظیمات تنظیم نشده باشد، از ارز پیش‌فرض کسب‌وکار استفاده می‌کنیم
@@ -69,6 +149,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         "show_inventory": bool(obj.show_inventory),
         "auto_create_payment_document": bool(obj.auto_create_payment_document),
         "show_purchase_price": bool(obj.show_purchase_price),
+        **_share_settings_from_obj(obj),
     }
 
 
@@ -188,6 +269,21 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
     
     if "show_purchase_price" in payload:
         obj.show_purchase_price = bool(payload.get("show_purchase_price"))
+
+    if "default_share_online_payment" in payload:
+        obj.default_share_online_payment = bool(payload.get("default_share_online_payment"))
+
+    if "default_share_gateway_id" in payload:
+        gateway_id = payload.get("default_share_gateway_id")
+        if gateway_id is not None:
+            _validate_share_gateway_id(db, business_id, int(gateway_id))
+        obj.default_share_gateway_id = int(gateway_id) if gateway_id is not None else None
+
+    if "default_share_channels" in payload:
+        obj.default_share_channels = normalize_default_share_channels(payload.get("default_share_channels"))
+
+    if "default_share_expiry_hours" in payload:
+        obj.default_share_expiry_hours = normalize_share_expiry_hours(payload.get("default_share_expiry_hours"))
     
     db.flush()
     db.commit()

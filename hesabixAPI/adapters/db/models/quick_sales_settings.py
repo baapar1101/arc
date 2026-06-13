@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from sqlalchemy import Integer, Boolean, ForeignKey, DateTime, String, UniqueConstraint
+from sqlalchemy import Integer, Boolean, ForeignKey, DateTime, String, UniqueConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
@@ -121,6 +121,32 @@ class QuickSalesSetting(Base):
         default=True,
         server_default="1",
         comment="ثبت خودکار سند پرداخت جداگانه"
+    )
+
+    # پیش‌فرض اشتراک‌گذاری فاکتور (وقتی سند دریافت ثبت نمی‌شود)
+    default_share_online_payment: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
+        comment="پرداخت آنلاین در لینک اشتراک فاکتور",
+    )
+    default_share_gateway_id: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="درگاه پیش‌فرض برای لینک پرداخت فاکتور",
+    )
+    default_share_channels: Mapped[list | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment='کانال‌های پیش‌فرض ارسال: sms, email, native',
+    )
+    default_share_expiry_hours: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=168,
+        server_default="168",
+        comment="مدت اعتبار لینک اشتراک (ساعت)",
     )
 
     # تنظیمات نمایش

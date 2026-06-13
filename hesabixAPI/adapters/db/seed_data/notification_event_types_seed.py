@@ -19,6 +19,12 @@ INVOICE_TEMPLATE_VARIABLES: list[dict[str, str]] = [
     {"key": "business_phone", "type": "string", "description": "تلفن کسب‌وکار"},
 ]
 
+INVOICE_SHARE_LINK_TEMPLATE_VARIABLES: list[dict[str, str]] = [
+    {"key": "share_link", "type": "string", "description": "لینک کوتاه مشاهده و پرداخت فاکتور"},
+    {"key": "customer_mobile", "type": "string", "description": "شماره موبایل مشتری"},
+    *INVOICE_TEMPLATE_VARIABLES,
+]
+
 # رویدادهای تکمیلی ورک‌فلو — مهاجرت جدا برای نصب‌هایی که قبلاً seed اولیه را داشتند
 WORKFLOW_EXTENSION_EVENT_CODES: frozenset[str] = frozenset(
     {
@@ -31,6 +37,8 @@ WORKFLOW_EXTENSION_EVENT_CODES: frozenset[str] = frozenset(
         "distribution.visit.completed",
     }
 )
+
+INVOICE_SHARE_LINK_EVENT_CODES: frozenset[str] = frozenset({"invoice_share_link"})
 
 NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
     {
@@ -408,6 +416,28 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         ],
         "default_sms_template": "سلام {{ customer_name }}، لینک کارت حساب شما: {{ share_link }} — {{ business_name }}",
         "default_email_subject": "لینک کارت حساب — {{ business_name }}",
+        "is_active": True,
+        "requires_approval": True,
+    },
+    {
+        "code": "invoice_share_link",
+        "name": "ارسال لینک فاکتور و پرداخت آنلاین",
+        "description": "ارسال لینک مشاهده فاکتور و پرداخت آنلاین به مشتری (فروش سریع و اشتراک‌گذاری فاکتور)",
+        "category": "sales",
+        "available_variables": list(INVOICE_SHARE_LINK_TEMPLATE_VARIABLES),
+        "default_sms_template": (
+            "سلام {{ customer_name }}، فاکتور {{ invoice_number }} به مبلغ "
+            "{{ final_amount | format_currency }}. لینک پرداخت: {{ share_link }} — {{ business_name }}"
+        ),
+        "default_email_template": """سلام {{ customer_name }} عزیز،
+
+فاکتور {{ invoice_number }} به مبلغ {{ final_amount | format_currency }} برای شما صادر شد.
+
+برای مشاهده و پرداخت آنلاین از لینک زیر استفاده کنید:
+{{ share_link }}
+
+{{ business_name }} — {{ business_phone }}""",
+        "default_email_subject": "فاکتور {{ invoice_number }} — لینک پرداخت",
         "is_active": True,
         "requires_approval": True,
     },
