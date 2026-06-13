@@ -14,6 +14,8 @@ from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
 
+from app.services.ai.prompt_service import get_prompt_by_key
+
 logger = logging.getLogger(__name__)
 
 
@@ -255,26 +257,15 @@ class AIContentModerationService:
             # ایجاد AI Service
             ai_service = AIService(self.db, system_ctx, business_id=None)
             
-            # ساخت prompt برای بررسی محتوا
-            user_prompt = f"""تو یک سیستم بررسی محتوای پیامک و ایمیل کسب‌وکارها هستی.
-وظیفه‌ات تشخیص محتوای تبلیغاتی، spam و نامناسب است.
-
-نوع رویداد: {event_type}
-موضوع (Email Subject): {subject or "ندارد"}
-
-محتوا برای بررسی:
-```
-{content}
-```
-
-لطفاً این محتوا را بررسی کن و به این سوالات پاسخ بده:
-1. آیا این محتوا تبلیغاتی است؟ (تخفیف، پیشنهاد ویژه، جایزه، ...)
-2. آیا spam است؟ (درخواست کلیک، لینک‌های زیاد، محتوای مزاحم)
-3. آیا حاوی محتوای نامناسب یا توهین است؟
-4. آیا با نوع رویداد "{event_type}" مطابقت دارد؟
-
-پاسخ را فقط و فقط به صورت JSON بده (بدون هیچ توضیح یا متن اضافی):
-{{"is_promotional": true/false, "is_spam": true/false, "is_inappropriate": true/false, "matches_event_type": true/false, "confidence": 0-100, "explanation": "توضیح کوتاه فارسی", "suggestions": "پیشنهاد بهبود"}}"""
+            user_prompt = get_prompt_by_key(
+                self.db,
+                "moderation.content_review",
+                {
+                    "event_type": event_type,
+                    "subject": subject or "ندارد",
+                    "content": content,
+                },
+            )
             
             messages = [
                 {"role": "user", "content": user_prompt}

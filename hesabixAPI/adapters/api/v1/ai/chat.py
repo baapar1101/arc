@@ -1882,7 +1882,7 @@ async def list_scheduled_tasks(
 ) -> Dict[str, Any]:
     """لیست task های پیش‌فرض زمان‌بندی‌شده."""
     from app.services.ai.ai_scheduled_task_service import get_built_in_tasks
-    tasks = get_built_in_tasks()
+    tasks = get_built_in_tasks(db)
     return success_response({"tasks": tasks}, request)
 
 
@@ -1896,7 +1896,7 @@ async def run_scheduled_task_now(
     """اجرای فوری یک scheduled task برای کسب‌وکار فعلی."""
     from app.services.ai.ai_scheduled_task_service import get_task_by_id, run_scheduled_task
 
-    task = get_task_by_id(task_id)
+    task = get_task_by_id(task_id, db)
     if not task:
         raise ApiError("TASK_NOT_FOUND", f"task '{task_id}' یافت نشد", http_status=404)
 

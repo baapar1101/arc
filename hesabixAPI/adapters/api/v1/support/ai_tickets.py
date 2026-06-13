@@ -7,6 +7,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.responses import success_response, ApiError
 from app.core.permissions import require_app_permission
 from app.services.ai.ai_service import AIService
+from app.services.ai.prompt_service import get_prompt_by_key
 from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.db.repositories.support.message_repository import MessageRepository
 from adapters.api.v1.schemas import QueryInfo
@@ -84,20 +85,30 @@ async def suggest_ai_reply(
         logger.warning(f"Error checking AI availability: {e}")
         # در صورت خطا، اجازه ادامه بده
     
-    # ساخت prompt برای AI
-    system_prompt = f"""شما یک دستیار هوشمند برای اپراتورهای پشتیبانی هستید.
-تیکت مربوط به کاربر {ticket.user.first_name or ''} {ticket.user.last_name or ''} است.
-موضوع تیکت: {ticket.title}
-دسته‌بندی: {ticket.category.name if ticket.category else 'نامشخص'}
-اولویت: {ticket.priority.name if ticket.priority else 'نامشخص'}
-
-لطفاً یک پاسخ حرفه‌ای و مفید برای این تیکت پیشنهاد دهید."""
+    user_name = f"{ticket.user.first_name or ''} {ticket.user.last_name or ''}".strip()
+    system_prompt = get_prompt_by_key(
+        db,
+        "support.ticket_suggest.system",
+        {
+            "user_name": user_name,
+            "ticket_title": ticket.title,
+            "category": ticket.category.name if ticket.category else "نامشخص",
+            "priority": ticket.priority.name if ticket.priority else "نامشخص",
+        },
+    )
     
     # ارسال به AI
     ai_messages = [
         {"role": "system", "content": system_prompt},
         *context_messages,
-        {"role": "user", "content": f"لطفاً برای این تیکت پاسخ مناسبی پیشنهاد دهید:\n\n{ticket.description}"}
+        {
+            "role": "user",
+            "content": get_prompt_by_key(
+                db,
+                "support.ticket_suggest.user",
+                {"ticket_description": ticket.description},
+            ),
+        },
     ]
     
     # بدون tools: بسیاری از gatewayهای OpenAI-compatible (مثلاً vLLM) بدون

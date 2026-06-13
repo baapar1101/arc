@@ -10,11 +10,13 @@ from app.core.auth_dependency import AuthContext
 from app.services.ai.ai_insight_service import get_business_insights_cached
 from app.services.ai.ai_memory_service import get_memory, get_memory_content
 from app.services.ai.ai_memory_structured import parse_structured, structured_to_prompt_block
+from app.services.ai.prompt_service import get_prompt_by_key
 
 logger = logging.getLogger(__name__)
 
 
 def _goal_progress_alert(
+    db: Session,
     insights: Dict[str, Any],
     structured: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
@@ -45,7 +47,7 @@ def _goal_progress_alert(
         "level": level,
         "title": title,
         "message": msg,
-        "action_prompt": "پیشرفت نسبت به هدف فروش ماهانه‌ام را تحلیل کن.",
+        "action_prompt": get_prompt_by_key(db, "memory.goal_progress_action"),
         "source": "memory_insights",
     }
 
@@ -63,7 +65,7 @@ def get_memory_enriched_alerts(
         insights = get_business_insights_cached(db, business_id, ctx)
         row = get_memory(db, business_id, ctx.get_user_id())
         structured = parse_structured(row.structured if row else None)
-        extra = _goal_progress_alert(insights, structured)
+        extra = _goal_progress_alert(db, insights, structured)
         if extra and extra["id"] not in seen_ids:
             alerts.append(extra)
     except Exception as exc:
@@ -88,10 +90,7 @@ def get_memory_proactive_suggestions(
             {
                 "id": "fill_memory",
                 "label": "تنظیم حافظه دستیار",
-                "prompt": (
-                    "می‌خواهم ترجیحاتم را به حافظه اضافه کنی. "
-                    "از من ۳ سوال کوتاه بپرس (هدف فروش، واحد پول، سبک گزارش)."
-                ),
+                "prompt": get_prompt_by_key(db, "memory.suggestion.fill"),
                 "icon": "psychology",
                 "kind": "memory",
             }
@@ -103,7 +102,11 @@ def get_memory_proactive_suggestions(
             {
                 "id": "track_sales_goal",
                 "label": "پیگیری هدف فروش",
-                "prompt": f"هدف فروش ماهانه من {goal:,.0f} است. وضعیت فعلی را با داده‌های کسب‌وکار مقایسه کن.",
+                "prompt": get_prompt_by_key(
+                    db,
+                    "memory.suggestion.track_goal",
+                    {"sales_goal": f"{goal:,.0f}"},
+                ),
                 "icon": "track_changes",
                 "kind": "memory",
             }

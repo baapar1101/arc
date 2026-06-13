@@ -20,6 +20,7 @@ from .business_dashboard_layout import (  # noqa: F401
 	BusinessUserDashboardLayout,
 	BusinessDashboardDefaultLayout,
 )
+from .profile_dashboard_layout import ProfileUserDashboardLayout  # noqa: F401
 from .business_user_quick_links import BusinessUserQuickLink  # noqa: F401
 from .data_table_user_column_settings import DataTableUserColumnSettings  # noqa: F401
 from .business_print_settings import BusinessPrintSettings  # noqa: F401

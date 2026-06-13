@@ -19,7 +19,7 @@ from adapters.db.repositories.ai_usage_log_repository import AIUsageLogRepositor
 from adapters.db.models.ai_usage_log import AIUsageLog, PaymentMethod
 from adapters.db.models.ai_subscription import UserAISubscription
 from app.services.wallet_service import charge_wallet_for_service
-from app.services.ai.prompt_service import get_prompt, PromptRole
+from app.services.ai.prompt_service import get_prompt, get_prompt_by_key, PromptRole
 from app.services.ai.ai_write_guard import (
     is_write_function,
     is_write_guard_stop_result,
@@ -408,6 +408,7 @@ class AIService:
                             operation=AI_OPERATION_HISTORY_SUMMARY,
                         ),
                         middle_msgs,
+                        db=self.db,
                     )
                     if text:
                         record_llm_summarize(uid, int(bid))
@@ -2424,6 +2425,7 @@ class AIService:
                                 bundle,
                                 effective_user_query,
                                 explored_body,
+                                db=self.db,
                             )
                             if llm_thought:
                                 thought_body = llm_thought
@@ -2756,14 +2758,15 @@ class AIService:
                     messages=[
                         {
                             "role": "system",
-                            "content": (
-                                "شما باید برای گفت‌وگو یک عنوان بسیار کوتاه (حداکثر 5 کلمه) "
-                                "و شفاف انتخاب کنید. از علائم نگارشی اضافه و گیومه استفاده نکنید."
-                            ),
+                            "content": get_prompt_by_key(self.db, "aux.chat_title"),
                         },
                         {
                             "role": "user",
-                            "content": f"درخواست کاربر: {user_message}\nفقط عنوان کوتاه تولید کن.",
+                            "content": get_prompt_by_key(
+                                self.db,
+                                "aux.chat_title_user",
+                                {"user_message": user_message},
+                            ),
                         },
                     ],
                     model=self.get_effective_model_api_id(

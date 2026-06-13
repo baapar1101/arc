@@ -586,21 +586,29 @@ class AIModelCatalogItem {
 
 class AIPrompt {
   final int? id;
+  final String? promptKey;
   final String role; // 'admin', 'operator', 'user'
   final String? promptType; // 'system', 'user'
+  final String? category;
+  final String? title;
   final String content;
   final int? userId;
   final bool isDefault;
+  final String? source; // 'database' | 'fallback'
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
   AIPrompt({
     this.id,
+    this.promptKey,
     required this.role,
     this.promptType,
+    this.category,
+    this.title,
     required this.content,
     this.userId,
     this.isDefault = false,
+    this.source,
     this.createdAt,
     this.updatedAt,
   });
@@ -608,11 +616,15 @@ class AIPrompt {
   factory AIPrompt.fromJson(Map<String, dynamic> json) {
     return AIPrompt(
       id: json['id'] as int?,
+      promptKey: json['prompt_key'] as String?,
       role: json['role'] as String,
       promptType: json['prompt_type'] as String?,
+      category: json['category'] as String?,
+      title: json['title'] as String?,
       content: json['content'] as String,
       userId: json['user_id'] as int?,
       isDefault: json['is_default'] as bool? ?? false,
+      source: json['source'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -625,11 +637,15 @@ class AIPrompt {
   Map<String, dynamic> toJson() {
     return {
       if (id != null) 'id': id,
+      if (promptKey != null) 'prompt_key': promptKey,
       'role': role,
       if (promptType != null) 'prompt_type': promptType,
+      if (category != null) 'category': category,
+      if (title != null) 'title': title,
       'content': content,
       if (userId != null) 'user_id': userId,
       'is_default': isDefault,
+      if (source != null) 'source': source,
     };
   }
 }

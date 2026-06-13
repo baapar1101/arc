@@ -1,14 +1,5 @@
 """
 زمان‌بندی و اجرای خودکار task های AI برای کسب‌وکار.
-
-مثال‌های پشتیبانی‌شده:
-  - weekly_sales_report: گزارش فروش هفتگی
-  - overdue_invoices: یادآوری فاکتورهای معوق
-  - low_stock_alert: هشدار موجودی کم
-  - monthly_summary: خلاصه ماهانه
-
-هر task بر اساس یک cron expression اجرا می‌شود و نتیجه را
-در session هوش مصنوعی کاربر ذخیره می‌کند (یا notification می‌فرستد).
 """
 from __future__ import annotations
 
@@ -18,21 +9,17 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
+from adapters.db.seed_data.ai_default_prompts import SCHEDULED_TASK_PROMPT_KEYS
+from app.services.ai.prompt_service import get_prompt_by_key
 
-# ---- Task definitions ----
+logger = logging.getLogger(__name__)
 
 BUILT_IN_TASKS: List[Dict[str, Any]] = [
     {
         "id": "weekly_sales_report",
         "name": "گزارش فروش هفتگی",
         "description": "هر شنبه صبح خلاصه فروش هفته گذشته تهیه می‌شود.",
-        "cron": "0 8 * * 6",  # شنبه ساعت ۸
-        "prompt": (
-            "گزارش جامع فروش هفته گذشته را تهیه کن: "
-            "تعداد فاکتور، مجموع درآمد، بهترین محصولات، "
-            "مشتریان فعال و مقایسه با هفته قبل از آن."
-        ),
+        "cron": "0 8 * * 6",
         "category": "financial",
         "enabled_by_default": True,
     },
@@ -40,11 +27,7 @@ BUILT_IN_TASKS: List[Dict[str, Any]] = [
         "id": "overdue_invoices",
         "name": "فاکتورهای پرداخت‌نشده",
         "description": "هر روز صبح فاکتورهای معوق بررسی می‌شوند.",
-        "cron": "0 9 * * *",  # هر روز ساعت ۹
-        "prompt": (
-            "لیست فاکتورهای پرداخت‌نشده و معوق را بررسی کن "
-            "و مشتریانی که بیش از ۳۰ روز بدهی دارند را مشخص کن."
-        ),
+        "cron": "0 9 * * *",
         "category": "financial",
         "enabled_by_default": False,
     },
@@ -53,10 +36,6 @@ BUILT_IN_TASKS: List[Dict[str, Any]] = [
         "name": "هشدار موجودی کم",
         "description": "هر روز صبح موجودی انبار بررسی می‌شود.",
         "cron": "0 8 * * *",
-        "prompt": (
-            "موجودی انبار را بررسی کن و کالاهایی که موجودی آن‌ها "
-            "کمتر از حد هشدار است را فهرست کن."
-        ),
         "category": "warehouse",
         "enabled_by_default": False,
     },
@@ -64,35 +43,38 @@ BUILT_IN_TASKS: List[Dict[str, Any]] = [
         "id": "monthly_summary",
         "name": "خلاصه ماهانه",
         "description": "اول هر ماه خلاصه ماه گذشته تهیه می‌شود.",
-        "cron": "0 8 1 * *",  # اول هر ماه ساعت ۸
-        "prompt": (
-            "خلاصه جامع ماه گذشته را تهیه کن: "
-            "فروش، هزینه‌ها، سود خالص، رشد نسبت به ماه قبل، "
-            "و مهم‌ترین رویدادهای مالی."
-        ),
+        "cron": "0 8 1 * *",
         "category": "financial",
         "enabled_by_default": False,
     },
 ]
 
 
-def get_built_in_tasks() -> List[Dict[str, Any]]:
-    """لیست task های پیش‌فرض."""
-    return [dict(t) for t in BUILT_IN_TASKS]
+def _resolve_task_prompt(db: Optional[Session], task_id: str) -> str:
+    prompt_key = SCHEDULED_TASK_PROMPT_KEYS.get(task_id)
+    if not prompt_key:
+        return ""
+    return get_prompt_by_key(db, prompt_key)
 
 
-def get_task_by_id(task_id: str) -> Optional[Dict[str, Any]]:
-    for t in BUILT_IN_TASKS:
-        if t["id"] == task_id:
-            return dict(t)
+def _hydrate_task(task: Dict[str, Any], db: Optional[Session] = None) -> Dict[str, Any]:
+    hydrated = dict(task)
+    hydrated["prompt"] = _resolve_task_prompt(db, hydrated.get("id", ""))
+    return hydrated
+
+
+def get_built_in_tasks(db: Optional[Session] = None) -> List[Dict[str, Any]]:
+    return [_hydrate_task(task, db) for task in BUILT_IN_TASKS]
+
+
+def get_task_by_id(task_id: str, db: Optional[Session] = None) -> Optional[Dict[str, Any]]:
+    for task in BUILT_IN_TASKS:
+        if task["id"] == task_id:
+            return _hydrate_task(task, db)
     return None
 
 
 def should_task_run(task: Dict[str, Any], now: Optional[datetime] = None) -> bool:
-    """
-    بررسی اینکه آیا task باید در لحظه فعلی اجرا شود.
-    از croniter استفاده می‌کند.
-    """
     cron_expr = task.get("cron")
     if not cron_expr:
         return False
@@ -116,12 +98,8 @@ async def run_scheduled_task(
     ai_service,
     session_id: Optional[int] = None,
 ) -> Dict[str, Any]:
-    """
-    اجرای یک scheduled task و برگرداندن نتیجه.
-    نتیجه می‌تواند به یک AI session ذخیره شود.
-    """
     task_id = task.get("id", "unknown")
-    prompt = task.get("prompt", "")
+    prompt = task.get("prompt") or _resolve_task_prompt(db, task_id)
 
     if not prompt:
         return {"task_id": task_id, "success": False, "reason": "no_prompt"}

@@ -15280,4 +15280,94 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get publicCatalogShowBaseSalesPriceSubtitle =>
       'در صورت خاموش بودن، فیلد قیمت فروش پایه در API عمومی کاتالوگ برای کالاهای منتشرشده برگردانده نمی‌شود.';
+
+  @override
+  String get profileDashboardTitle => 'داشبورد پروفایل';
+
+  @override
+  String profileDashboardLoadError(String error) {
+    return 'خطا در بارگذاری داشبورد پروفایل:\n$error';
+  }
+
+  @override
+  String get profileDashboardEditLayout => 'ویرایش چیدمان';
+
+  @override
+  String get profileDashboardExitEdit => 'خروج از ویرایش';
+
+  @override
+  String get profileDashboardYourBusinesses => 'کسب‌وکارهای شما';
+
+  @override
+  String get profileDashboardAnnouncements => 'اعلان‌ها';
+
+  @override
+  String get profileDashboardNoBusinesses => 'کسب‌وکاری یافت نشد';
+
+  @override
+  String get profileDashboardCreateBusiness => 'ایجاد کسب‌وکار';
+
+  @override
+  String get profileDashboardNoAnnouncements => 'اعلانی وجود ندارد';
+
+  @override
+  String get profileDashboardViewAllAnnouncements => 'مشاهده همه';
+
+  @override
+  String get profileDashboardAnnouncementsRefreshed => 'اعلان‌ها به‌روز شد';
+
+  @override
+  String get profileDashboardOnlyUnread => 'فقط خوانده‌نشده';
+
+  @override
+  String get profileDashboardNoTickets => 'تیکتی یافت نشد';
+
+  @override
+  String get profileDashboardViewAllTickets => 'مشاهده همه';
+
+  @override
+  String get profileDashboardHiddenWidgets => 'ویجت‌های پنهان';
+
+  @override
+  String profileDashboardUnknownWidget(String key) {
+    return 'ویجت ناشناخته: $key';
+  }
+
+  @override
+  String get profileDashboardWidgetNotRegistered => 'این ویجت ثبت نشده است';
+
+  @override
+  String get profileDashboardIncreaseWidth => 'افزایش عرض';
+
+  @override
+  String get profileDashboardDecreaseWidth => 'کاهش عرض';
+
+  @override
+  String get profileDashboardMoveUp => 'بالا';
+
+  @override
+  String get profileDashboardMoveDown => 'پایین';
+
+  @override
+  String get profileDashboardHide => 'پنهان کردن';
+
+  @override
+  String get profileDashboardMarkAsRead => 'خوانده شد';
+
+  @override
+  String get profileDashboardMarkedAsRead => 'به‌عنوان خوانده‌شده علامت خورد';
+
+  @override
+  String profileDashboardLayoutSaveFailed(String error) {
+    return 'ذخیره چیدمان ناموفق: $error';
+  }
+
+  @override
+  String get profileDashboardEnterBusiness => 'ورود';
+
+  @override
+  String get profileDashboardMemberRole => 'عضو';
+
+  @override
+  String get profileDashboardCreateTicket => 'ایجاد تیکت';
 }

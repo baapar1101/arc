@@ -13,6 +13,7 @@ from adapters.db.repositories.support.message_repository import MessageRepositor
 from app.core.auth_dependency import AuthContext
 from app.services.messenger_operator.crm_callback_map import crm_callback_data_to_command
 from app.services.messenger_operator.dispatch import dispatch_operator_messenger_message
+from app.services.ai.prompt_service import get_prompt_by_key
 
 logger = logging.getLogger(__name__)
 
@@ -483,20 +484,29 @@ async def handle_suggest_reply(
 		# توجه: برای اپراتورها نیازی به business_id نیست چون دسترسی سیستمی دارند
 		ai_service = AIService(db, user_context)
 		
-		# ساخت prompt برای AI
-		system_prompt = f"""شما یک دستیار هوشمند برای اپراتورهای پشتیبانی هستید.
-تیکت مربوط به کاربر {ticket.user.first_name or ''} {ticket.user.last_name or ''} است.
-موضوع تیکت: {ticket.title}
-دسته‌بندی: {ticket.category.name if ticket.category else 'نامشخص'}
-اولویت: {ticket.priority.name if ticket.priority else 'نامشخص'}
-
-لطفاً یک پاسخ حرفه‌ای و مفید برای این تیکت پیشنهاد دهید."""
+		user_name = f"{ticket.user.first_name or ''} {ticket.user.last_name or ''}".strip()
+		system_prompt = get_prompt_by_key(
+			db,
+			"support.ticket_suggest.system",
+			{
+				"user_name": user_name,
+				"ticket_title": ticket.title,
+				"category": ticket.category.name if ticket.category else "نامشخص",
+				"priority": ticket.priority.name if ticket.priority else "نامشخص",
+			},
+		)
 		
-		# ارسال به AI
 		ai_messages = [
 			{"role": "system", "content": system_prompt},
 			*context_messages,
-			{"role": "user", "content": f"لطفاً برای این تیکت پاسخ مناسبی پیشنهاد دهید:\n\n{ticket.description}"}
+			{
+				"role": "user",
+				"content": get_prompt_by_key(
+					db,
+					"support.ticket_suggest.user",
+					{"ticket_description": ticket.description},
+				),
+			},
 		]
 		
 		response = await ai_service.chat_completion(ai_messages, use_function_calling=True)
@@ -597,20 +607,29 @@ async def handle_auto_reply(
 		# توجه: برای اپراتورها نیازی به business_id نیست چون دسترسی سیستمی دارند
 		ai_service = AIService(db, user_context)
 		
-		# ساخت prompt برای AI
-		system_prompt = f"""شما یک دستیار هوشمند برای اپراتورهای پشتیبانی هستید.
-تیکت مربوط به کاربر {ticket.user.first_name or ''} {ticket.user.last_name or ''} است.
-موضوع تیکت: {ticket.title}
-دسته‌بندی: {ticket.category.name if ticket.category else 'نامشخص'}
-اولویت: {ticket.priority.name if ticket.priority else 'نامشخص'}
-
-لطفاً یک پاسخ حرفه‌ای و مفید برای این تیکت پیشنهاد دهید."""
+		user_name = f"{ticket.user.first_name or ''} {ticket.user.last_name or ''}".strip()
+		system_prompt = get_prompt_by_key(
+			db,
+			"support.ticket_suggest.system",
+			{
+				"user_name": user_name,
+				"ticket_title": ticket.title,
+				"category": ticket.category.name if ticket.category else "نامشخص",
+				"priority": ticket.priority.name if ticket.priority else "نامشخص",
+			},
+		)
 		
-		# ارسال به AI
 		ai_messages = [
 			{"role": "system", "content": system_prompt},
 			*context_messages,
-			{"role": "user", "content": f"لطفاً برای این تیکت پاسخ مناسبی پیشنهاد دهید:\n\n{ticket.description}"}
+			{
+				"role": "user",
+				"content": get_prompt_by_key(
+					db,
+					"support.ticket_suggest.user",
+					{"ticket_description": ticket.description},
+				),
+			},
 		]
 		
 		response = await ai_service.chat_completion(ai_messages, use_function_calling=True)

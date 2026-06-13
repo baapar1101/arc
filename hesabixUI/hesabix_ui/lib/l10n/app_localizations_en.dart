@@ -15367,4 +15367,95 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get publicCatalogShowBaseSalesPriceSubtitle =>
       'When disabled, base sales price is omitted from the public catalog API for published items.';
+
+  @override
+  String get profileDashboardTitle => 'Profile Dashboard';
+
+  @override
+  String profileDashboardLoadError(String error) {
+    return 'Failed to load profile dashboard:\n$error';
+  }
+
+  @override
+  String get profileDashboardEditLayout => 'Edit layout';
+
+  @override
+  String get profileDashboardExitEdit => 'Exit edit mode';
+
+  @override
+  String get profileDashboardYourBusinesses => 'Your businesses';
+
+  @override
+  String get profileDashboardAnnouncements => 'Announcements';
+
+  @override
+  String get profileDashboardNoBusinesses => 'No businesses found';
+
+  @override
+  String get profileDashboardCreateBusiness => 'Create business';
+
+  @override
+  String get profileDashboardNoAnnouncements => 'No announcements';
+
+  @override
+  String get profileDashboardViewAllAnnouncements => 'View all';
+
+  @override
+  String get profileDashboardAnnouncementsRefreshed => 'Announcements updated';
+
+  @override
+  String get profileDashboardOnlyUnread => 'Unread only';
+
+  @override
+  String get profileDashboardNoTickets => 'No tickets found';
+
+  @override
+  String get profileDashboardViewAllTickets => 'View all';
+
+  @override
+  String get profileDashboardHiddenWidgets => 'Hidden widgets';
+
+  @override
+  String profileDashboardUnknownWidget(String key) {
+    return 'Unknown widget: $key';
+  }
+
+  @override
+  String get profileDashboardWidgetNotRegistered =>
+      'This widget is not registered';
+
+  @override
+  String get profileDashboardIncreaseWidth => 'Increase width';
+
+  @override
+  String get profileDashboardDecreaseWidth => 'Decrease width';
+
+  @override
+  String get profileDashboardMoveUp => 'Move up';
+
+  @override
+  String get profileDashboardMoveDown => 'Move down';
+
+  @override
+  String get profileDashboardHide => 'Hide';
+
+  @override
+  String get profileDashboardMarkAsRead => 'Mark as read';
+
+  @override
+  String get profileDashboardMarkedAsRead => 'Marked as read';
+
+  @override
+  String profileDashboardLayoutSaveFailed(String error) {
+    return 'Failed to save layout: $error';
+  }
+
+  @override
+  String get profileDashboardEnterBusiness => 'Open';
+
+  @override
+  String get profileDashboardMemberRole => 'Member';
+
+  @override
+  String get profileDashboardCreateTicket => 'Create ticket';
 }

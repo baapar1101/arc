@@ -15,6 +15,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy.orm import Session
+
 from app.services.ai.ai_tool_intent import estimate_query_complexity
 from app.services.ai.ai_tool_keys import tool_label_fa
 from app.services.ai.ai_trace import summarize_tool_result
@@ -314,16 +316,14 @@ async def synthesize_thought_with_llm(
     bundle: ExplorationBundle,
     user_query: Optional[str],
     explored_markdown: str,
+    db: Optional[Session] = None,
 ) -> Optional[str]:
     """Thought غنی با LLM (اختیاری، فقط explore صریح)."""
     import asyncio
 
-    system = (
-        "You are an analyst for an Iranian accounting ERP (Hesabix). "
-        "Given tool results, write concise Important findings in Persian. "
-        "Use markdown: ### Important findings, numbered list, then **فرضیه:** one sentence. "
-        "Do not invent data. Mask secrets (show only last 4 chars of keys). Max 400 words."
-    )
+    from app.services.ai.prompt_service import get_prompt_by_key
+
+    system = get_prompt_by_key(db, "aux.exploration")
     user_content = (
         f"User question: {user_query or ''}\n\n"
         f"Tools in this bundle: {bundle.title}\n\n"

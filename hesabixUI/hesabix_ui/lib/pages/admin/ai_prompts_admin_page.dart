@@ -17,7 +17,18 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
   bool _loading = true;
   String? _error;
   List<AIPrompt> _prompts = [];
-  String? _selectedRole;
+  String? _selectedCategory;
+
+  static const _categories = <String, String>{
+    'chat': 'چت اصلی',
+    'auxiliary': 'کمکی',
+    'support': 'پشتیبانی',
+    'crm': 'CRM',
+    'moderation': 'بررسی محتوا',
+    'scheduled': 'زمان‌بندی‌شده',
+    'insight': 'بینش و پیشنهاد',
+    'memory': 'حافظه',
+  };
 
   @override
   void initState() {
@@ -27,14 +38,14 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
     _load();
   }
 
-  Future<void> _load({String? role}) async {
+  Future<void> _load({String? category}) async {
     setState(() {
       _loading = true;
       _error = null;
-      _selectedRole = role;
+      _selectedCategory = category;
     });
     try {
-      final prompts = await _aiService.listDefaultPrompts(role: role);
+      final prompts = await _aiService.listDefaultPrompts(category: category);
       setState(() {
         _prompts = prompts;
         _loading = false;
@@ -47,141 +58,134 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
     }
   }
 
-  Future<void> _showPromptFormDialog({AIPrompt? prompt}) async {
-    final isEdit = prompt != null;
+  Future<void> _showPromptFormDialog(AIPrompt prompt) async {
     final formKey = GlobalKey<FormState>();
-    final contentController = TextEditingController(text: prompt?.content ?? '');
-    
-    String? selectedRole = prompt?.role ?? _selectedRole ?? 'user';
-    String? selectedType = prompt?.promptType ?? 'system';
+    final contentController = TextEditingController(text: prompt.content);
+    final promptKey = prompt.promptKey;
+    if (promptKey == null) return;
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final theme = Theme.of(context);
-          return Dialog(
-            child: Container(
-              width: MediaQuery.of(context).size.width * 0.9,
-              constraints: const BoxConstraints(maxWidth: 800, maxHeight: 700),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
+      builder: (context) => Dialog(
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.9,
+          constraints: const BoxConstraints(maxWidth: 900, maxHeight: 760),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    topRight: Radius.circular(12),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        prompt.title ?? promptKey,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: Theme.of(context).colorScheme.onPrimary,
+                            ),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Text(
-                          isEdit ? 'ویرایش Prompt' : 'ایجاد Prompt جدید',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            color: theme.colorScheme.onPrimary,
-                          ),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close),
-                          color: theme.colorScheme.onPrimary,
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      color: Theme.of(context).colorScheme.onPrimary,
+                      onPressed: () => Navigator.pop(context),
                     ),
-                  ),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(24),
-                      child: Form(
-                        key: formKey,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            DropdownButtonFormField<String>(
-                              value: selectedRole,
-                              decoration: const InputDecoration(labelText: 'نقش'),
-                              items: const [
-                                DropdownMenuItem(value: 'admin', child: Text('مدیر سیستم')),
-                                DropdownMenuItem(value: 'operator', child: Text('اپراتور')),
-                                DropdownMenuItem(value: 'user', child: Text('کاربر')),
-                              ],
-                              onChanged: (v) => setDialogState(() => selectedRole = v),
-                              validator: (v) => v == null ? 'الزامی است' : null,
-                            ),
-                            const SizedBox(height: 16),
-                            DropdownButtonFormField<String>(
-                              value: selectedType,
-                              decoration: const InputDecoration(labelText: 'نوع'),
-                              items: const [
-                                DropdownMenuItem(value: 'system', child: Text('System Prompt')),
-                                DropdownMenuItem(value: 'user', child: Text('User Prompt')),
-                              ],
-                              onChanged: (v) => setDialogState(() => selectedType = v),
-                            ),
-                            const SizedBox(height: 16),
-                            TextFormField(
-                              controller: contentController,
-                              decoration: const InputDecoration(
-                                labelText: 'محتوای Prompt',
-                                alignLabelWithHint: true,
-                              ),
-                              maxLines: 10,
-                              validator: (v) => v?.isEmpty ?? true ? 'الزامی است' : null,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('لغو'),
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton(
-                          onPressed: () async {
-                            if (!formKey.currentState!.validate()) return;
-                            try {
-                              final data = {
-                                'role': selectedRole,
-                                'prompt_type': selectedType,
-                                'content': contentController.text.trim(),
-                                'is_default': true,
-                              };
-                              if (isEdit && prompt.id != null) {
-                                await _aiService.updateDefaultPrompt(prompt.id!, data);
-                              } else {
-                                await _aiService.createDefaultPrompt(data);
-                              }
-                              if (!context.mounted) return;
-                              Navigator.pop(context);
-                              _load(role: _selectedRole);
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
-                              );
-                            }
-                          },
-                          child: Text(isEdit ? 'ذخیره' : 'ایجاد'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text('کلید: $promptKey'),
+                        const SizedBox(height: 8),
+                        Text('دسته: ${_categories[prompt.category] ?? prompt.category ?? '-'}'),
+                        const SizedBox(height: 8),
+                        Text('منبع: ${prompt.source == 'database' ? 'دیتابیس' : 'پیش‌فرض کد'}'),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: contentController,
+                          decoration: const InputDecoration(
+                            labelText: 'محتوای Prompt',
+                            alignLabelWithHint: true,
+                            border: OutlineInputBorder(),
+                          ),
+                          maxLines: 18,
+                          validator: (v) => v?.isEmpty ?? true ? 'الزامی است' : null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('لغو'),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton(
+                      onPressed: () async {
+                        try {
+                          await _aiService.resetDefaultPrompt(promptKey);
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          _load(category: _selectedCategory);
+                          SnackBarHelper.showSuccess(context, message: 'به پیش‌فرض کد بازگردانده شد');
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          SnackBarHelper.showError(
+                            context,
+                            message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+                          );
+                        }
+                      },
+                      child: const Text('بازگشت به پیش‌فرض'),
+                    ),
+                    const SizedBox(width: 12),
+                    FilledButton(
+                      onPressed: () async {
+                        if (!formKey.currentState!.validate()) return;
+                        try {
+                          await _aiService.updateDefaultPromptByKey(
+                            promptKey,
+                            contentController.text.trim(),
+                          );
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          _load(category: _selectedCategory);
+                          SnackBarHelper.showSuccess(context, message: 'ذخیره شد');
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          SnackBarHelper.showError(
+                            context,
+                            message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+                          );
+                        }
+                      },
+                      child: const Text('ذخیره'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -200,53 +204,35 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Prompt های پیش‌فرض AI'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showPromptFormDialog(),
-            tooltip: 'ایجاد Prompt جدید',
-          ),
-        ],
       ),
       body: Column(
         children: [
-          // Filter by role
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: theme.dividerColor)),
             ),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                const Text('فیلتر بر اساس نقش:'),
-                const SizedBox(width: 16),
+                const Text('فیلتر دسته:'),
                 ChoiceChip(
                   label: const Text('همه'),
-                  selected: _selectedRole == null,
-                  onSelected: (v) => _load(),
+                  selected: _selectedCategory == null,
+                  onSelected: (_) => _load(),
                 ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('مدیر'),
-                  selected: _selectedRole == 'admin',
-                  onSelected: (v) => _load(role: 'admin'),
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('اپراتور'),
-                  selected: _selectedRole == 'operator',
-                  onSelected: (v) => _load(role: 'operator'),
-                ),
-                const SizedBox(width: 8),
-                ChoiceChip(
-                  label: const Text('کاربر'),
-                  selected: _selectedRole == 'user',
-                  onSelected: (v) => _load(role: 'user'),
+                ..._categories.entries.map(
+                  (entry) => ChoiceChip(
+                    label: Text(entry.value),
+                    selected: _selectedCategory == entry.key,
+                    onSelected: (_) => _load(category: entry.key),
+                  ),
                 ),
               ],
             ),
           ),
-          // List
           Expanded(
             child: _error != null && _prompts.isEmpty
                 ? Center(
@@ -256,110 +242,49 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
                         Text('خطا: $_error'),
                         const SizedBox(height: 16),
                         ElevatedButton(
-                          onPressed: () => _load(role: _selectedRole),
+                          onPressed: () => _load(category: _selectedCategory),
                           child: const Text('تلاش مجدد'),
                         ),
                       ],
                     ),
                   )
-                : _prompts.isEmpty
-                    ? const Center(child: Text('Promptی وجود ندارد'))
-                    : RefreshIndicator(
-                        onRefresh: () => _load(role: _selectedRole),
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _prompts.length,
-                          itemBuilder: (context, index) {
-                            final prompt = _prompts[index];
-                            String roleLabel;
-                            switch (prompt.role) {
-                              case 'admin':
-                                roleLabel = 'مدیر سیستم';
-                                break;
-                              case 'operator':
-                                roleLabel = 'اپراتور';
-                                break;
-                              case 'user':
-                                roleLabel = 'کاربر';
-                                break;
-                              default:
-                                roleLabel = prompt.role;
-                            }
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ExpansionTile(
-                                title: Text('$roleLabel - ${prompt.promptType ?? 'system'}'),
-                                subtitle: Text(
-                                  prompt.content.length > 100
-                                      ? '${prompt.content.substring(0, 100)}...'
-                                      : prompt.content,
+                : RefreshIndicator(
+                    onRefresh: () => _load(category: _selectedCategory),
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _prompts.length,
+                      itemBuilder: (context, index) {
+                        final prompt = _prompts[index];
+                        final sourceLabel =
+                            prompt.source == 'database' ? 'دیتابیس' : 'پیش‌فرض کد';
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: ExpansionTile(
+                            title: Text(prompt.title ?? prompt.promptKey ?? '-'),
+                            subtitle: Text(
+                              '${_categories[prompt.category] ?? prompt.category ?? '-'} • $sourceLabel • ${prompt.promptKey ?? ''}',
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showPromptFormDialog(prompt),
+                            ),
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Text(
+                                  prompt.content,
+                                  style: theme.textTheme.bodyMedium,
                                 ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit),
-                                      onPressed: () => _showPromptFormDialog(prompt: prompt),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete),
-                                      onPressed: () async {
-                                        if (await showDialog<bool>(
-                                              context: context,
-                                              builder: (context) => AlertDialog(
-                                                title: const Text('حذف Prompt'),
-                                                content: const Text(
-                                                    'آیا از حذف این Prompt اطمینان دارید؟'),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(context, false),
-                                                    child: const Text('لغو'),
-                                                  ),
-                                                  FilledButton(
-                                                    onPressed: () =>
-                                                        Navigator.pop(context, true),
-                                                    child: const Text('حذف'),
-                                                  ),
-                                                ],
-                                              ),
-                                            ) ??
-                                            false) {
-                                          try {
-                                            if (prompt.id != null) {
-                                              await _aiService.deleteDefaultPrompt(prompt.id!);
-                                              _load(role: _selectedRole);
-                                            }
-                                          } catch (e) {
-                                            if (mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}')),
-                                              );
-                                            }
-                                          }
-                                        }
-                                      },
-                                    ),
-                                  ],
-                                ),
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Text(
-                                      prompt.content,
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
-                                  ),
-                                ],
                               ),
-                            );
-                          },
-                        ),
-                      ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
           ),
         ],
       ),
     );
   }
 }
-

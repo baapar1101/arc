@@ -17,6 +17,7 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_permission_dep
 from app.core.responses import success_response, ApiError
 from app.services.ai.ai_service import AIService
+from app.services.ai.prompt_service import get_prompt_by_key
 
 router = APIRouter(prefix="/ai/crm", tags=["AI-CRM"])
 logger = logging.getLogger(__name__)
@@ -107,7 +108,7 @@ async def summarize_lead(
     activities = act_q.order_by(CrmActivity.activity_date.desc()).limit(5).all()
     activities_text = _activities_context(activities)
 
-    system_prompt = """شما دستیار فروش CRM هستید. بر اساس اطلاعات سرنخ و فعالیت‌ها، یک خلاصه کوتاه (۲-۳ جمله) و یک پیشنهاد برای مرحله بعد (مثلاً تماس تلفنی، ارسال پیشنهاد، جلسه حضوری) ارائه دهید. پاسخ را به صورت متن ساده و بدون فرمت خاص بنویسید."""
+    system_prompt = get_prompt_by_key(db, "crm.summarize_lead")
 
     user_content = f"""اطلاعات سرنخ:
 {lead_text}
@@ -191,7 +192,7 @@ async def summarize_deal(
     )
     activities_text = _activities_context(activities)
 
-    system_prompt = """شما دستیار فروش CRM هستید. بر اساس اطلاعات فرصت فروش و فعالیت‌ها، یک خلاصه کوتاه (۲-۳ جمله) و یک پیشنهاد برای مرحله بعد ارائه دهید. پاسخ را به صورت متن ساده بنویسید."""
+    system_prompt = get_prompt_by_key(db, "crm.summarize_deal")
 
     user_content = f"""اطلاعات فرصت:
 {deal_text}
@@ -284,7 +285,11 @@ async def suggest_activity_text(
         activity_type, "یادداشت"
     )
 
-    system_prompt = f"""شما دستیار CRM هستید. بر اساس اطلاعات شخص و فرصت فروش، یک متن کوتاه و حرفه‌ای برای ثبت فعالیت از نوع «{type_desc}» پیشنهاد دهید. متن را مستقیم بنویسید بدون مقدمه."""
+    system_prompt = get_prompt_by_key(
+        db,
+        "crm.suggest_activity",
+        {"activity_type_label": type_desc},
+    )
 
     user_content = f"""اطلاعات:
 {person_info}{deal_info}
@@ -349,7 +354,7 @@ async def suggest_deal_probability(
         )
 
     deal_text = _deal_context(deal)
-    system_prompt = """شما دستیار فروش CRM هستید. بر اساس مرحله فعلی، مبلغ، تاریخ سررسید و توضیحات فرصت فروش، یک عدد بین ۰ تا ۱۰۰ به عنوان احتمال موفقیت پیشنهاد دهید. فقط عدد را برگردانید، بدون توضیح اضافه."""
+    system_prompt = get_prompt_by_key(db, "crm.suggest_deal_probability")
 
     user_content = f"""اطلاعات فرصت:
 {deal_text}

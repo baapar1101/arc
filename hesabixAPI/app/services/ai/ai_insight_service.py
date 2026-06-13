@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.document import Document
 from app.core.auth_dependency import AuthContext
+from app.services.ai.prompt_service import get_prompt_by_key
 from app.services.invoice_service import INVOICE_SALES
 
 logger = logging.getLogger(__name__)
@@ -223,7 +224,7 @@ def get_business_insights(
                 "level": "warning",
                 "title": f"{inventory['count']} کالای کم‌موجود",
                 "message": items_preview or f"{inventory['count']} کالا کم‌موجود یا ناموجود است.",
-                "action_prompt": "لیست کامل کالاهای کم‌موجود انبار را با جزئیات نشان بده.",
+                "action_prompt": get_prompt_by_key(db, "insight.alert.low_stock_action"),
             }
         )
 
@@ -237,7 +238,7 @@ def get_business_insights(
                 "level": "info",
                 "title": "بدهکاران",
                 "message": f"مجموع بدهی: {total_debt:,.0f}" + (f" — بیشترین: {top_name}" if top_name else ""),
-                "action_prompt": "لیست بدهکاران کسب‌وکار با مانده‌حساب را نشان بده.",
+                "action_prompt": get_prompt_by_key(db, "insight.alert.debtors_action"),
             }
         )
 
@@ -248,7 +249,7 @@ def get_business_insights(
                 "level": "warning",
                 "title": "افت فروش هفتگی",
                 "message": f"فروش هفتگی {week_change_pct}% کاهش یافته.",
-                "action_prompt": "تحلیل کن چرا فروش این هفته کاهش داشته و پیشنهادات بهبود بده.",
+                "action_prompt": get_prompt_by_key(db, "insight.alert.sales_drop_action"),
             }
         )
     elif week_change_pct is not None and week_change_pct > 15:
@@ -257,7 +258,7 @@ def get_business_insights(
                 "level": "success",
                 "title": "رشد فروش هفتگی",
                 "message": f"فروش هفتگی {week_change_pct}% رشد داشته.",
-                "action_prompt": "تحلیل کن کدام محصولات یا مشتریان بیشترین سهم در رشد فروش این هفته داشتند.",
+                "action_prompt": get_prompt_by_key(db, "insight.alert.sales_growth_action"),
             }
         )
 
@@ -270,7 +271,7 @@ def get_business_insights(
                     "level": "warning",
                     "title": "هنوز فروشی ثبت نشده",
                     "message": "امروز هیچ فاکتور فروشی ثبت نشده است.",
-                    "action_prompt": "بررسی کن چه محصولاتی را باید امروز به مشتریان پیشنهاد داد.",
+                    "action_prompt": get_prompt_by_key(db, "insight.alert.no_sales_today_action"),
                 }
             )
 
@@ -371,12 +372,12 @@ def get_dynamic_suggestions(
     base = [
         {
             "label": "خلاصه وضعیت امروز",
-            "prompt": "با توجه به داده‌های لحظه‌ای، خلاصه وضعیت مالی امروز کسب‌وکارم را بده.",
+            "prompt": get_prompt_by_key(db, "insight.suggestion.daily_summary"),
             "icon": "dashboard",
         },
         {
             "label": "راهنمای ثبت فاکتور",
-            "prompt": "گام‌به‌گام نحوه ثبت فاکتور فروش در حسابیکس را توضیح بده.",
+            "prompt": get_prompt_by_key(db, "insight.suggestion.invoice_guide"),
             "icon": "receipt",
         },
     ]
@@ -394,7 +395,7 @@ def get_dynamic_suggestions(
         dynamic.append(
             {
                 "label": "تحلیل فروش هفتگی",
-                "prompt": "فروش ۷ روز اخیر را تحلیل کن و روند را با نمودار نشان بده.",
+                "prompt": get_prompt_by_key(db, "insight.suggestion.weekly_sales"),
                 "icon": "trending_up",
             }
         )
@@ -404,7 +405,7 @@ def get_dynamic_suggestions(
         dynamic.append(
             {
                 "label": "پیگیری بدهکاران",
-                "prompt": "مهم‌ترین بدهکاران و پیشنهاد پیگیری را ارائه کن.",
+                "prompt": get_prompt_by_key(db, "insight.suggestion.debtors"),
                 "icon": "people",
             }
         )
@@ -414,7 +415,7 @@ def get_dynamic_suggestions(
         dynamic.append(
             {
                 "label": "هشدار موجودی",
-                "prompt": "کالاهای کم‌موجود را لیست کن و پیشنهاد سفارش مجدد بده.",
+                "prompt": get_prompt_by_key(db, "insight.suggestion.low_stock"),
                 "icon": "inventory",
             }
         )
@@ -424,7 +425,7 @@ def get_dynamic_suggestions(
         dynamic.append(
             {
                 "label": "علت افت فروش",
-                "prompt": "چرا فروش هفتگی افت کرده؟ علل محتمل و اقدامات اصلاحی را بگو.",
+                "prompt": get_prompt_by_key(db, "insight.suggestion.sales_drop"),
                 "icon": "warning",
             }
         )
@@ -484,7 +485,7 @@ def get_proactive_alerts(
                 "level": "info",
                 "title": "امروز هنوز فاکتور فروشی ثبت نشده",
                 "message": "در ۷ روز اخیر فروش داشته‌اید؛ وضعیت امروز را بررسی کنید.",
-                "action_prompt": "وضعیت فروش امروز را با فروش هفتگی مقایسه کن.",
+                "action_prompt": get_prompt_by_key(db, "insight.proactive.no_sales_today"),
             }
         )
 
@@ -495,7 +496,7 @@ def get_proactive_alerts(
                 "level": "warning",
                 "title": "بدهی مشتریان بالا است",
                 "message": f"مجموع بدهی: {debtors.get('total_debt', 0):,.0f}",
-                "action_prompt": "لیست بدهکاران مهم و پیشنهاد پیگیری را بده.",
+                "action_prompt": get_prompt_by_key(db, "insight.proactive.high_receivables"),
             }
         )
 
@@ -506,7 +507,7 @@ def get_proactive_alerts(
                 "level": "warning",
                 "title": f"{inventory['count']} کالا نیاز به تأمین دارد",
                 "message": "موجودی چند کالا به نقطه سفارش رسیده یا تمام شده.",
-                "action_prompt": "کالاهای کم‌موجود را اولویت‌بندی و پیشنهاد سفارش بده.",
+                "action_prompt": get_prompt_by_key(db, "insight.proactive.critical_stock"),
             }
         )
 
@@ -518,7 +519,7 @@ def get_proactive_alerts(
                 "level": "success",
                 "title": "رشد قوی فروش هفتگی",
                 "message": f"فروش هفتگی {wow}% نسبت به هفته قبل رشد کرده.",
-                "action_prompt": "علت رشد فروش را تحلیل کن.",
+                "action_prompt": get_prompt_by_key(db, "insight.proactive.sales_surge"),
             }
         )
 

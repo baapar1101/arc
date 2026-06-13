@@ -134,8 +134,8 @@ class ProfileDashboardService {
         permissionsRequired: const <String>[],
         defaults: {
           'xs': {'colSpan': 1, 'rowSpan': 2},
-          'sm': {'colSpan': 2, 'rowSpan': 2},
-          'md': {'colSpan': 4, 'rowSpan': 2},
+          'sm': {'colSpan': 4, 'rowSpan': 2},
+          'md': {'colSpan': 8, 'rowSpan': 2},
           'lg': {'colSpan': 4, 'rowSpan': 2},
           'xl': {'colSpan': 4, 'rowSpan': 2},
         },
@@ -148,8 +148,8 @@ class ProfileDashboardService {
         permissionsRequired: const <String>[],
         defaults: {
           'xs': {'colSpan': 1, 'rowSpan': 2},
-          'sm': {'colSpan': 2, 'rowSpan': 2},
-          'md': {'colSpan': 4, 'rowSpan': 2},
+          'sm': {'colSpan': 4, 'rowSpan': 2},
+          'md': {'colSpan': 8, 'rowSpan': 2},
           'lg': {'colSpan': 4, 'rowSpan': 2},
           'xl': {'colSpan': 4, 'rowSpan': 2},
         },
@@ -162,8 +162,8 @@ class ProfileDashboardService {
         permissionsRequired: const <String>[],
         defaults: {
           'xs': {'colSpan': 1, 'rowSpan': 2},
-          'sm': {'colSpan': 2, 'rowSpan': 2},
-          'md': {'colSpan': 4, 'rowSpan': 2},
+          'sm': {'colSpan': 4, 'rowSpan': 2},
+          'md': {'colSpan': 8, 'rowSpan': 2},
           'lg': {'colSpan': 4, 'rowSpan': 2},
           'xl': {'colSpan': 4, 'rowSpan': 2},
         },
@@ -227,30 +227,11 @@ class ProfileDashboardService {
         };
       } else if (k == 'profile_announcements') {
         out[k] = {
-          'items': <Map<String, dynamic>>[
-            {
-              'title': 'به حسابیکس خوش آمدید',
-              'body': 'به‌زودی تجربه داشبورد شخصی‌سازی‌شده را خواهید داشت.',
-              'time': DateTime.now().toIso8601String(),
-            },
-          ],
+          'items': <Map<String, dynamic>>[],
         };
       } else if (k == 'profile_support_tickets') {
         out[k] = {
-          'items': <Map<String, dynamic>>[
-            {
-              'id': 1001,
-              'subject': 'سؤال درباره صدور فاکتور',
-              'status': 'باز',
-              'updated_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
-            },
-            {
-              'id': 1000,
-              'subject': 'مشکل ورود به حساب',
-              'status': 'بسته',
-              'updated_at': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-            },
-          ],
+          'items': <Map<String, dynamic>>[],
         };
       }
     }
@@ -260,8 +241,9 @@ class ProfileDashboardService {
   // کمک‌متد برای تأمین داده واقعی برخی ویجت‌ها (مثل لیست کسب‌وکارها)
   Future<Map<String, dynamic>> hydrateSpecialWidgets(
     Map<String, dynamic> currentData,
-    List<String> keys,
-  ) async {
+    List<String> keys, {
+    bool onlyUnread = false,
+  }) async {
     final out = Map<String, dynamic>.from(currentData);
     if (keys.contains('profile_recent_businesses')) {
       try {
@@ -310,7 +292,7 @@ class ProfileDashboardService {
     if (keys.contains('profile_announcements')) {
       try {
         final ann = AnnouncementsService(_apiClient);
-        final res = await ann.listAnnouncements(page: 1, limit: 5);
+        final res = await ann.listAnnouncements(page: 1, limit: 5, onlyUnread: onlyUnread);
         final items = (res['items'] as List? ?? const <dynamic>[])
             .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
             .toList();

@@ -28323,6 +28323,174 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'When disabled, base sales price is omitted from the public catalog API for published items.'**
   String get publicCatalogShowBaseSalesPriceSubtitle;
+
+  /// No description provided for @profileDashboardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile Dashboard'**
+  String get profileDashboardTitle;
+
+  /// No description provided for @profileDashboardLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load profile dashboard:\n{error}'**
+  String profileDashboardLoadError(String error);
+
+  /// No description provided for @profileDashboardEditLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit layout'**
+  String get profileDashboardEditLayout;
+
+  /// No description provided for @profileDashboardExitEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exit edit mode'**
+  String get profileDashboardExitEdit;
+
+  /// No description provided for @profileDashboardYourBusinesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Your businesses'**
+  String get profileDashboardYourBusinesses;
+
+  /// No description provided for @profileDashboardAnnouncements.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements'**
+  String get profileDashboardAnnouncements;
+
+  /// No description provided for @profileDashboardNoBusinesses.
+  ///
+  /// In en, this message translates to:
+  /// **'No businesses found'**
+  String get profileDashboardNoBusinesses;
+
+  /// No description provided for @profileDashboardCreateBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Create business'**
+  String get profileDashboardCreateBusiness;
+
+  /// No description provided for @profileDashboardNoAnnouncements.
+  ///
+  /// In en, this message translates to:
+  /// **'No announcements'**
+  String get profileDashboardNoAnnouncements;
+
+  /// No description provided for @profileDashboardViewAllAnnouncements.
+  ///
+  /// In en, this message translates to:
+  /// **'View all'**
+  String get profileDashboardViewAllAnnouncements;
+
+  /// No description provided for @profileDashboardAnnouncementsRefreshed.
+  ///
+  /// In en, this message translates to:
+  /// **'Announcements updated'**
+  String get profileDashboardAnnouncementsRefreshed;
+
+  /// No description provided for @profileDashboardOnlyUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'Unread only'**
+  String get profileDashboardOnlyUnread;
+
+  /// No description provided for @profileDashboardNoTickets.
+  ///
+  /// In en, this message translates to:
+  /// **'No tickets found'**
+  String get profileDashboardNoTickets;
+
+  /// No description provided for @profileDashboardViewAllTickets.
+  ///
+  /// In en, this message translates to:
+  /// **'View all'**
+  String get profileDashboardViewAllTickets;
+
+  /// No description provided for @profileDashboardHiddenWidgets.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden widgets'**
+  String get profileDashboardHiddenWidgets;
+
+  /// No description provided for @profileDashboardUnknownWidget.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown widget: {key}'**
+  String profileDashboardUnknownWidget(String key);
+
+  /// No description provided for @profileDashboardWidgetNotRegistered.
+  ///
+  /// In en, this message translates to:
+  /// **'This widget is not registered'**
+  String get profileDashboardWidgetNotRegistered;
+
+  /// No description provided for @profileDashboardIncreaseWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase width'**
+  String get profileDashboardIncreaseWidth;
+
+  /// No description provided for @profileDashboardDecreaseWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease width'**
+  String get profileDashboardDecreaseWidth;
+
+  /// No description provided for @profileDashboardMoveUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Move up'**
+  String get profileDashboardMoveUp;
+
+  /// No description provided for @profileDashboardMoveDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Move down'**
+  String get profileDashboardMoveDown;
+
+  /// No description provided for @profileDashboardHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get profileDashboardHide;
+
+  /// No description provided for @profileDashboardMarkAsRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as read'**
+  String get profileDashboardMarkAsRead;
+
+  /// No description provided for @profileDashboardMarkedAsRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Marked as read'**
+  String get profileDashboardMarkedAsRead;
+
+  /// No description provided for @profileDashboardLayoutSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save layout: {error}'**
+  String profileDashboardLayoutSaveFailed(String error);
+
+  /// No description provided for @profileDashboardEnterBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get profileDashboardEnterBusiness;
+
+  /// No description provided for @profileDashboardMemberRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get profileDashboardMemberRole;
+
+  /// No description provided for @profileDashboardCreateTicket.
+  ///
+  /// In en, this message translates to:
+  /// **'Create ticket'**
+  String get profileDashboardCreateTicket;
 }
 
 class _AppLocalizationsDelegate

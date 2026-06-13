@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:reorderables/reorderables.dart';
 import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../utils/date_formatters.dart';
 import '../../services/profile_dashboard_service.dart';
 import '../../services/support_tickets_public_config.dart';
 import '../../services/announcements_service.dart';
+import '../../services/support_service.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
@@ -16,6 +18,8 @@ import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import '../../theme/tokens/extensions.dart';
+import '../../widgets/support/ticket_details_dialog.dart';
 
 class ProfileDashboardPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -30,7 +34,12 @@ class ProfileDashboardPage extends StatefulWidget {
   State<ProfileDashboardPage> createState() => _ProfileDashboardPageState();
 }
 
-typedef ProfileWidgetBuilder = Widget Function(BuildContext, dynamic, DashboardLayoutItem, {VoidCallback? onRefresh});
+typedef ProfileWidgetBuilder = Widget Function(
+  BuildContext,
+  dynamic,
+  DashboardLayoutItem, {
+  VoidCallback? onRefresh,
+});
 
 class _ProfileDashboardPageState extends State<ProfileDashboardPage> with WidgetsBindingObserver {
   late final ProfileDashboardService _service;
@@ -39,7 +48,6 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
   bool _loading = true;
   String? _error;
   bool _editMode = false;
-  // Announcements state
   final Set<int> _annBusyIds = <int>{};
   bool _annOnlyUnread = false;
   SupportTicketsPublicConfig _supportPublic = const SupportTicketsPublicConfig();
@@ -66,7 +74,6 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     super.didChangeAppLifecycleState(state);
   }
 
-  /// بازخوانی وضعیت تیکت و دادهٔ ویجت‌ها پس از برگشت اپ به پیش‌زمینه (بدون اسکلتون بارگذاری اولیه).
   Future<void> _refreshAfterAppResume() async {
     if (!mounted || _loading) return;
     if (_error != null) {
@@ -80,8 +87,15 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       Map<String, dynamic> nextData = _data;
       if (layout != null) {
         final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-        var data = await _service.getWidgetsBatchData(widgetKeys: keys);
-        data = await _service.hydrateSpecialWidgets(data, keys);
+        var data = await _service.getWidgetsBatchData(
+          widgetKeys: keys,
+          filters: _dashboardFilters(keys),
+        );
+        data = await _service.hydrateSpecialWidgets(
+          data,
+          keys,
+          onlyUnread: _annOnlyUnread,
+        );
         if (!mounted) return;
         nextData = data;
       }
@@ -116,6 +130,17 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     }
   }
 
+  /// عرض هر ستون گرید — بدون floor اجباری که باعث فضای خالی کناری می‌شود.
+  double _computeColumnUnit(double totalWidth, int crossAxisCount, BuildContext context) {
+    final spacing = _getGridSpacing(context);
+    final minTileUnit = _getMinTileUnit(context);
+    if (crossAxisCount <= 0 || totalWidth <= 0) return minTileUnit;
+    final naturalUnit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
+    if (naturalUnit <= 0) return minTileUnit;
+    if (_isMobile(context)) return naturalUnit;
+    return naturalUnit;
+  }
+
   TextStyle? _getHeaderTextStyle(BuildContext context) {
     final theme = Theme.of(context);
     if (_isMobile(context)) {
@@ -127,6 +152,14 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
   bool _isMobile(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
     return ResponsiveHelper.breakpointFromWidth(width) == 'xs';
+  }
+
+  Map<String, dynamic> _dashboardFilters(List<String> keys) {
+    final filters = <String, dynamic>{};
+    if (keys.contains('profile_announcements')) {
+      filters['only_unread'] = _annOnlyUnread;
+    }
+    return filters;
   }
 
   Future<void> _openBusinessFromDashboard(int businessId) async {
@@ -188,6 +221,24 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     );
   }
 
+  Future<void> _openTicketDetail(int ticketId) async {
+    try {
+      final ticket = await SupportService(ApiClient()).getTicket(ticketId);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => TicketDetailsDialog(
+          ticket: ticket,
+          calendarController: widget.calendarController,
+          onTicketUpdated: () => _reloadWidget('profile_support_tickets'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
   Future<void> _loadAll() async {
     try {
       setState(() {
@@ -200,7 +251,6 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       final ctx = context;
       final bp = ResponsiveHelper.breakpointFromWidth(MediaQuery.of(ctx).size.width);
       var layout = await _service.getLayoutProfile(breakpoint: bp);
-      // اطمینان از حضور ویجت‌های جدید پیش‌فرض در چیدمان
       final existingKeys = layout.items.map((e) => e.key).toSet();
       final missingDefaults = defs.items.where((d) => !existingKeys.contains(d.key)).toList();
       if (missingDefaults.isNotEmpty) {
@@ -212,13 +262,18 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
           final rowSpan = dflt['rowSpan'] ?? 2;
           items.add(DashboardLayoutItem(key: d.key, order: ++maxOrder, colSpan: colSpan, rowSpan: rowSpan, hidden: false));
         }
-        // ذخیره و جایگزینی layout
         layout = await _service.putLayoutProfile(breakpoint: bp, items: items);
       }
       final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-      var data = await _service.getWidgetsBatchData(widgetKeys: keys);
-      // هیدرات خاص برای برخی ویجت‌ها
-      data = await _service.hydrateSpecialWidgets(data, keys);
+      var data = await _service.getWidgetsBatchData(
+        widgetKeys: keys,
+        filters: _dashboardFilters(keys),
+      );
+      data = await _service.hydrateSpecialWidgets(
+        data,
+        keys,
+        onlyUnread: _annOnlyUnread,
+      );
       if (!mounted) return;
       setState(() {
         _layout = layout;
@@ -240,8 +295,15 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       final layout = _layout;
       if (layout == null) return;
       final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-      var data = await _service.getWidgetsBatchData(widgetKeys: keys);
-      data = await _service.hydrateSpecialWidgets(data, keys);
+      var data = await _service.getWidgetsBatchData(
+        widgetKeys: keys,
+        filters: _dashboardFilters(keys),
+      );
+      data = await _service.hydrateSpecialWidgets(
+        data,
+        keys,
+        onlyUnread: _annOnlyUnread,
+      );
       if (!mounted) return;
       setState(() {
         _data = data;
@@ -249,10 +311,32 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     } catch (_) {}
   }
 
+  Future<void> _reloadWidget(String key) async {
+    try {
+      var data = await _service.getWidgetsBatchData(
+        widgetKeys: [key],
+        filters: _dashboardFilters([key]),
+      );
+      data = await _service.hydrateSpecialWidgets(
+        data,
+        [key],
+        onlyUnread: _annOnlyUnread,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (data.containsKey(key)) {
+          _data[key] = data[key];
+        }
+      });
+    } catch (_) {
+      await _reloadDataOnly();
+    }
+  }
+
   Future<void> _reloadAnnouncements({required bool onlyUnread}) async {
     try {
       final ann = await AnnouncementsService(ApiClient()).listAnnouncements(page: 1, limit: 5, onlyUnread: onlyUnread);
-      final items = (ann['items'] as List? ?? const <dynamic>[]) 
+      final items = (ann['items'] as List? ?? const <dynamic>[])
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
           .toList();
       if (!mounted) return;
@@ -260,26 +344,71 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
         _data['profile_announcements'] = {'items': items};
       });
     } catch (_) {
-      await _reloadDataOnly();
+      await _reloadWidget('profile_announcements');
     }
+  }
+
+  List<Widget> _buildGridChildren({
+    required List<DashboardLayoutItem> visible,
+    required int crossAxisCount,
+    required double totalWidth,
+    required double unit,
+    required double spacing,
+  }) {
+    final children = <Widget>[];
+    for (final it in visible) {
+      final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
+      final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
+      children.add(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
+          key: ValueKey('profile_dash_${it.key}'),
+          width: cw,
+          child: _buildGridTile(it, crossAxisCount),
+        ),
+      );
+    }
+    return children;
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
+    final padding = _getPadding(context);
+    final dashBg = context.shellColors.dashboardBackground;
+
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return Container(
+        color: dashBg,
+        child: Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ProfileDashboardSkeleton.header(context),
+              SizedBox(height: _isMobile(context) ? 12 : 16),
+              Expanded(child: _ProfileDashboardSkeleton.grid(context)),
+            ],
+          ),
+        ),
+      );
     }
+
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error, size: 56, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 12),
-            Text('خطا در بارگذاری داشبورد پروفایل:\n$_error', textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: _loadAll, child: const Text('تلاش مجدد')),
-          ],
+      return Container(
+        color: dashBg,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error, size: 56, color: Theme.of(context).colorScheme.error),
+              const SizedBox(height: 12),
+              Text(t.profileDashboardLoadError(_error!), textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              ElevatedButton(onPressed: _loadAll, child: Text(t.retry)),
+            ],
+          ),
         ),
       );
     }
@@ -288,93 +417,124 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     final items = List<DashboardLayoutItem>.from(layout.items)..sort((a, b) => a.order.compareTo(b.order));
     final visible = items.where((e) => !e.hidden).toList();
     final crossAxisCount = layout.columns;
-    final padding = _getPadding(context);
 
-    return Padding(
-      padding: EdgeInsets.all(padding),
-      child: Column(
-        children: [
-          _buildHeaderRow(),
-          SizedBox(height: _isMobile(context) ? 12 : 16),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final totalWidth = constraints.maxWidth;
-                final spacing = _getGridSpacing(context);
-                final minTileUnit = _getMinTileUnit(context);
-                double unit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
-                if (unit <= 0) unit = minTileUnit;
-                if (unit < minTileUnit) unit = minTileUnit;
-                final children = <Widget>[];
-                for (final it in visible) {
-                  final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
-                  final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
-                  children.add(AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeInOut,
-                    key: ValueKey('profile_dash_${it.key}'),
-                    width: cw,
-                    child: _buildGridTile(it, crossAxisCount),
-                  ));
-                }
-                return SingleChildScrollView(
-                  child: Wrap(
+    return Container(
+      color: dashBg,
+      child: Padding(
+        padding: EdgeInsets.all(padding),
+        child: Column(
+          children: [
+            _buildHeaderRow(t),
+            SizedBox(height: _isMobile(context) ? 12 : 16),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final totalWidth = constraints.maxWidth;
+                  final spacing = _getGridSpacing(context);
+                  final unit = _computeColumnUnit(totalWidth, crossAxisCount, context);
+                  final children = _buildGridChildren(
+                    visible: visible,
+                    crossAxisCount: crossAxisCount,
+                    totalWidth: totalWidth,
+                    unit: unit,
                     spacing: spacing,
-                    runSpacing: spacing,
-                    children: children,
-                  ),
-                );
-              },
+                  );
+                  if (!_editMode) {
+                    return SingleChildScrollView(
+                      child: Wrap(
+                        spacing: spacing,
+                        runSpacing: spacing,
+                        children: children,
+                      ),
+                    );
+                  }
+                  return SingleChildScrollView(
+                    child: ReorderableWrap(
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      needsLongPressDraggable: true,
+                      onReorder: (oldIndex, newIndex) {
+                        final list = List<DashboardLayoutItem>.from(visible);
+                        final moved = list.removeAt(oldIndex);
+                        list.insert(newIndex, moved);
+                        final profile = _layout!;
+                        final newItems = <DashboardLayoutItem>[];
+                        final visibleKeys = list.map((e) => e.key).toSet();
+                        newItems.addAll(list);
+                        for (final it in profile.items) {
+                          if (!visibleKeys.contains(it.key) && !it.hidden) continue;
+                          if (it.hidden) newItems.add(it);
+                        }
+                        _reindexAndSave(newItems);
+                      },
+                      children: children,
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        ],
+            if (_editMode) ...[
+              const SizedBox(height: 12),
+              _buildHiddenSection(t),
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildHeaderRow() {
+  Widget _buildHeaderRow(AppLocalizations t) {
     final isMobile = _isMobile(context);
     final headerStyle = _getHeaderTextStyle(context);
-    
+
     final editToggleButton = IconButton(
-      tooltip: _editMode ? 'خروج از ویرایش' : 'ویرایش چیدمان',
+      tooltip: _editMode ? t.profileDashboardExitEdit : t.profileDashboardEditLayout,
       onPressed: () => setState(() => _editMode = !_editMode),
       icon: Icon(_editMode ? Icons.check : Icons.edit),
       iconSize: isMobile ? 20 : 24,
     );
 
-    if (isMobile) {
-      // موبایل: Column layout
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'داشبورد پروفایل',
-                  style: headerStyle,
-                ),
-              ),
-              editToggleButton,
-            ],
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            t.profileDashboardTitle,
+            style: headerStyle,
           ),
-        ],
-      );
-    } else {
-      // دسکتاپ/تبلت: Row layout
-      return Row(
-        children: [
-          Expanded(
-            child: Text(
-              'داشبورد پروفایل',
-              style: headerStyle,
+        ),
+        editToggleButton,
+      ],
+    );
+  }
+
+  Widget _buildHiddenSection(AppLocalizations t) {
+    final profile = _layout;
+    if (profile == null) return const SizedBox.shrink();
+    final hidden = profile.items.where((e) => e.hidden).toList();
+    if (hidden.isEmpty) return const SizedBox.shrink();
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.profileDashboardHiddenWidgets, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: hidden.map((it) {
+                return InputChip(
+                  label: Text(_titleForKey(it.key, t)),
+                  avatar: const Icon(Icons.widgets, size: 18),
+                  onPressed: () => _hideItem(it, hidden: false),
+                );
+              }).toList(),
             ),
-          ),
-          editToggleButton,
-        ],
-      );
-    }
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildGridTile(DashboardLayoutItem item, int totalColumns) {
@@ -389,13 +549,13 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     final builder = _widgetFactory[item.key];
     if (builder == null) {
       return _buildCard(
-        title: 'ویجت ناشناخته: ${item.key}',
-        child: const Center(child: Text('این ویجت ثبت نشده است')),
+        title: l10n.profileDashboardUnknownWidget(item.key),
+        child: Center(child: Text(l10n.profileDashboardWidgetNotRegistered)),
       );
     }
     final trailing = _editMode
         ? PopupMenuButton<String>(
-            tooltip: 'ویرایش',
+            tooltip: l10n.profileDashboardEditLayout,
             onSelected: (v) {
               if (v == 'w+1') _changeItemWidth(item, 1);
               if (v == 'w-1') _changeItemWidth(item, -1);
@@ -403,26 +563,26 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
               if (v == 'down') _moveItemDown(item);
               if (v == 'hide') _hideItem(item, hidden: true);
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(value: 'w+1', child: Row(children: [Icon(Icons.open_in_full, size: 18), SizedBox(width: 8), Text('افزایش عرض')])),
-              PopupMenuItem(value: 'w-1', child: Row(children: [Icon(Icons.close_fullscreen, size: 18), SizedBox(width: 8), Text('کاهش عرض')])),
-              PopupMenuDivider(),
-              PopupMenuItem(value: 'up', child: Row(children: [Icon(Icons.arrow_upward, size: 18), SizedBox(width: 8), Text('بالا')])),
-              PopupMenuItem(value: 'down', child: Row(children: [Icon(Icons.arrow_downward, size: 18), SizedBox(width: 8), Text('پایین')])),
-              PopupMenuDivider(),
-              PopupMenuItem(value: 'hide', child: Row(children: [Icon(Icons.visibility_off, size: 18), SizedBox(width: 8), Text('پنهان کردن')])),
+            itemBuilder: (context) => [
+              PopupMenuItem(value: 'w+1', child: Row(children: [const Icon(Icons.open_in_full, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardIncreaseWidth)])),
+              PopupMenuItem(value: 'w-1', child: Row(children: [const Icon(Icons.close_fullscreen, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardDecreaseWidth)])),
+              const PopupMenuDivider(),
+              PopupMenuItem(value: 'up', child: Row(children: [const Icon(Icons.arrow_upward, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardMoveUp)])),
+              PopupMenuItem(value: 'down', child: Row(children: [const Icon(Icons.arrow_downward, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardMoveDown)])),
+              const PopupMenuDivider(),
+              PopupMenuItem(value: 'hide', child: Row(children: [const Icon(Icons.visibility_off, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardHide)])),
             ],
             icon: const Icon(Icons.tune),
           )
         : IconButton(
-            tooltip: 'بازخوانی',
+            tooltip: l10n.refresh,
             icon: const Icon(Icons.refresh),
-            onPressed: _reloadDataOnly,
+            onPressed: () => _reloadWidget(item.key),
           );
     final card = _buildCard(
       title: _titleForKey(item.key, l10n),
       trailing: trailing,
-      child: builder(context, data, item, onRefresh: _reloadDataOnly),
+      child: builder(context, data, item, onRefresh: () => _reloadWidget(item.key)),
     );
     return card;
   }
@@ -502,15 +662,22 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       setState(() {
         _layout = updated;
       });
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.showError(
+        context,
+        message: t.profileDashboardLayoutSaveFailed(ErrorExtractor.forContext(e, context)),
+      );
+    }
   }
 
   String _titleForKey(String key, AppLocalizations l10n) {
     switch (key) {
       case 'profile_recent_businesses':
-        return 'کسب‌وکارهای شما';
+        return l10n.profileDashboardYourBusinesses;
       case 'profile_announcements':
-        return 'اعلان‌ها';
+        return l10n.profileDashboardAnnouncements;
       case 'profile_support_tickets':
         return l10n.supportTickets;
       default:
@@ -518,7 +685,6 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     }
   }
 
-  // ====== Registry ======
   Map<String, ProfileWidgetBuilder> get _widgetFactory => <String, ProfileWidgetBuilder>{
         'profile_recent_businesses': _recentBusinessesWidget,
         'profile_announcements': _announcementsWidget,
@@ -558,15 +724,27 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     );
   }
 
-  // ====== Widgets ======
   Widget _recentBusinessesWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
     if (items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Center(
-          child: Text('کسب‌وکاری یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        child: Column(
+          children: [
+            Text(
+              t.profileDashboardNoBusinesses,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => context.go('/user/profile/new-business'),
+              icon: const Icon(Icons.add_business),
+              label: Text(t.profileDashboardCreateBusiness),
+            ),
+          ],
         ),
       );
     }
@@ -584,7 +762,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
           dense: true,
           leading: const Icon(Icons.business),
           title: Text(name),
-          subtitle: Text(isOwner ? 'مالک' : (role.isNotEmpty ? role : 'عضو')),
+          subtitle: Text(isOwner ? t.owner : (role.isNotEmpty ? role : t.profileDashboardMemberRole)),
           trailing: TextButton.icon(
             onPressed: () async {
               final id = it['id'];
@@ -598,7 +776,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
               }
             },
             icon: const Icon(Icons.arrow_forward),
-            label: const Text('ورود'),
+            label: Text(t.profileDashboardEnterBusiness),
           ),
         );
       },
@@ -607,12 +785,25 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 
   Widget _announcementsWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
     final theme = Theme.of(context);
+    final t = AppLocalizations.of(context);
     final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
     if (items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Center(
-          child: Text('اعلانی وجود ندارد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        child: Column(
+          children: [
+            Text(
+              t.profileDashboardNoAnnouncements,
+              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.go('/user/profile/announcements'),
+              icon: const Icon(Icons.open_in_new, size: 18),
+              label: Text(t.profileDashboardViewAllAnnouncements),
+            ),
+          ],
         ),
       );
     }
@@ -626,7 +817,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
             runSpacing: 8,
             children: [
               FilterChip(
-                label: const Text('فقط خوانده‌نشده'),
+                label: Text(t.profileDashboardOnlyUnread),
                 selected: _annOnlyUnread,
                 onSelected: (v) async {
                   setState(() => _annOnlyUnread = v);
@@ -637,15 +828,15 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                 onPressed: () async {
                   await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
                   if (!context.mounted) return;
-                  SnackBarHelper.show(context, message: 'اعلان‌ها به‌روز شد');
+                  SnackBarHelper.show(context, message: t.profileDashboardAnnouncementsRefreshed);
                 },
                 icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('بازخوانی'),
+                label: Text(t.refresh),
               ),
               TextButton.icon(
                 onPressed: () => context.go('/user/profile/announcements'),
                 icon: const Icon(Icons.open_in_new, size: 18),
-                label: const Text('مشاهده همه'),
+                label: Text(t.profileDashboardViewAllAnnouncements),
               ),
             ],
           ),
@@ -690,7 +881,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                     ),
                   if (!isRead)
                     IconButton(
-                      tooltip: 'خوانده شد',
+                      tooltip: t.profileDashboardMarkAsRead,
                       icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.done_all, size: 20),
                       onPressed: busy
                           ? null
@@ -699,38 +890,52 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                               if (annId == null) return;
                               setState(() => _annBusyIds.add(annId));
                               await _markAnnouncementRead(annId);
-                              // اگر فیلتر "فقط خوانده‌نشده" فعال است، آیتم را حذف کن
                               if (_annOnlyUnread) {
-                                setState(() {
-                                  items.removeWhere((e) => (e['id'] is int ? e['id'] == annId : int.tryParse('${e['id']}') == annId));
-                                  _data['profile_announcements'] = {'items': items};
-                                });
-                                // اگر لیست خالی شد، دوباره لود کن
-                                if (items.isEmpty) {
-                                  await _reloadAnnouncements(onlyUnread: true);
+                                final current = (_data['profile_announcements'] as Map?)?['items'];
+                                if (current is List) {
+                                  final nextItems = current
+                                      .where((e) {
+                                        if (e is! Map) return true;
+                                        final eid = e['id'];
+                                        final parsed = eid is int ? eid : int.tryParse('$eid');
+                                        return parsed != annId;
+                                      })
+                                      .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+                                      .toList();
+                                  setState(() {
+                                    _data['profile_announcements'] = {'items': nextItems};
+                                  });
+                                  if (nextItems.isEmpty) {
+                                    await _reloadAnnouncements(onlyUnread: true);
+                                  }
                                 }
                               } else {
-                                // در غیر این صورت، فقط is_read را به true تغییر بده
                                 setState(() {
-                                  final item = items.firstWhere(
-                                    (e) => (e['id'] is int ? e['id'] == annId : int.tryParse('${e['id']}') == annId),
-                                    orElse: () => <String, dynamic>{},
-                                  );
-                                  if (item.isNotEmpty) {
-                                    item['is_read'] = true;
+                                  final current = (_data['profile_announcements'] as Map?)?['items'];
+                                  if (current is List) {
+                                    final nextItems = current.map<Map<String, dynamic>>((e) {
+                                      final map = Map<String, dynamic>.from(e as Map);
+                                      final eid = map['id'];
+                                      final parsed = eid is int ? eid : int.tryParse('$eid');
+                                      if (parsed == annId) {
+                                        map['is_read'] = true;
+                                      }
+                                      return map;
+                                    }).toList();
+                                    _data['profile_announcements'] = {'items': nextItems};
                                   }
                                 });
                               }
                               if (!context.mounted) return;
-                              SnackBarHelper.show(context, message: 'به‌عنوان خوانده‌شده علامت خورد');
+                              SnackBarHelper.show(context, message: t.profileDashboardMarkedAsRead);
                             } catch (e) {
                               if (!context.mounted) return;
-                              SnackBarHelper.showError(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}');
+                              SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
                             } finally {
                               if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
                             }
                           },
-                  ),
+                    ),
                 ],
               ),
             );
@@ -763,7 +968,21 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
         if (items.isEmpty)
           Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Center(child: Text('تیکتی یافت نشد', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+            child: Column(
+              children: [
+                Text(
+                  t.profileDashboardNoTickets,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => context.go('/user/profile/support'),
+                  icon: const Icon(Icons.support_agent),
+                  label: Text(t.profileDashboardCreateTicket),
+                ),
+              ],
+            ),
           )
         else
           ListView.separated(
@@ -773,10 +992,12 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final it = items[index];
-              final id = '${it['id'] ?? ''}';
+              final idRaw = it['id'];
+              final id = '${idRaw ?? ''}';
               final subject = '${it['subject'] ?? '-'}';
               final status = '${it['status'] ?? ''}';
               final updatedAt = '${it['updated_at'] ?? ''}';
+              final ticketId = idRaw is int ? idRaw : int.tryParse(id);
               return ListTile(
                 dense: true,
                 leading: const Icon(Icons.support_agent),
@@ -786,36 +1007,29 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                   updatedAt.isNotEmpty ? DateFormatters.formatServerDateTime(updatedAt) : '',
                   style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
-                onTap: () {
-                  // در آینده: ناوبری به جزئیات تیکت
-                },
+                onTap: ticketId != null ? () => _openTicketDetail(ticketId) : null,
               );
             },
           ),
         Align(
-          alignment: Alignment.centerLeft,
+          alignment: AlignmentDirectional.centerStart,
           child: TextButton.icon(
-            onPressed: () {
-              // رفتن به صفحه پشتیبانی
-              context.go('/user/profile/support');
-            },
+            onPressed: () => context.go('/user/profile/support'),
             icon: const Icon(Icons.open_in_new),
-            label: const Text('مشاهده همه'),
+            label: Text(t.profileDashboardViewAllTickets),
           ),
         ),
       ],
     );
   }
 
-  // --- Announcement actions ---
   Future<void> _markAnnouncementRead(int id) async {
     await AnnouncementsService(ApiClient()).markRead(id);
   }
 
   String _formatNotificationTime(dynamic timeData) {
     if (timeData == null) return '-';
-    
-    // اگر object است (Map)، از فیلد formatted استفاده کن
+
     if (timeData is Map) {
       final formatted = timeData['formatted'];
       if (formatted != null) {
@@ -825,24 +1039,20 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       if (dateOnly != null) {
         return dateOnly.toString();
       }
-      // اگر formatted وجود ندارد، سعی کن از raw date استفاده کنی
       final raw = timeData['raw'] ?? timeData['updated_at'] ?? timeData['time'];
       if (raw != null) {
         return _formatNotificationTime(raw);
       }
     }
-    
-    // تبدیل به string
+
     final timeStr = timeData.toString();
     if (timeStr.isEmpty) return '-';
-    
+
     try {
-      // تلاش برای parse کردن تاریخ از سرور (ISO format)
       final dateTime = DateTime.tryParse(timeStr);
       if (dateTime != null) {
         return HesabixDateUtils.formatDateTime(dateTime, widget.calendarController.isJalali);
       }
-      // اگر parse نشد، از formatter قدیمی استفاده کن
       return DateFormatters.formatServerDateTime(timeStr);
     } catch (_) {
       return DateFormatters.formatServerDateTime(timeStr);
@@ -850,4 +1060,72 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
   }
 }
 
+class _ProfileDashboardSkeleton {
+  static Widget header(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return _ShimmerBox(height: 28, width: 180, color: cs.surfaceContainerHighest);
+  }
 
+  static Widget grid(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final count = isMobile ? 2 : 3;
+    return Column(
+      children: List.generate(count, (i) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: i < count - 1 ? 12 : 0),
+          child: _ShimmerBox(height: isMobile ? 140 : 180, color: cs.surfaceContainerHighest),
+        );
+      }),
+    );
+  }
+}
+
+class _ShimmerBox extends StatefulWidget {
+  final double height;
+  final double? width;
+  final Color color;
+
+  const _ShimmerBox({required this.height, required this.color, this.width});
+
+  @override
+  State<_ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: 0.45 + _controller.value * 0.35,
+          child: child,
+        );
+      },
+      child: Container(
+        height: widget.height,
+        width: widget.width ?? double.infinity,
+        decoration: BoxDecoration(
+          color: widget.color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+}

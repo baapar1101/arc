@@ -242,10 +242,13 @@ class AIService {
   }
 
   // ========== Admin: AI Prompts ==========
-  Future<List<AIPrompt>> listDefaultPrompts({String? role}) async {
+  Future<List<AIPrompt>> listDefaultPrompts({String? role, String? category}) async {
     final query = <String, dynamic>{};
     if (role != null) {
       query['role'] = role;
+    }
+    if (category != null) {
+      query['category'] = category;
     }
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/admin/ai/prompts/default',
@@ -258,29 +261,28 @@ class AIService {
         .toList();
   }
 
-  Future<AIPrompt> createDefaultPrompt(Map<String, dynamic> data) async {
-    final res = await _api.post<Map<String, dynamic>>(
-      '/api/v1/admin/ai/prompts/default',
-      data: data,
-    );
-    final body = res.data as Map<String, dynamic>;
-    return AIPrompt.fromJson(body['data'] as Map<String, dynamic>);
-  }
-
-  Future<AIPrompt> updateDefaultPrompt(
-    int promptId,
-    Map<String, dynamic> data,
+  Future<AIPrompt> updateDefaultPromptByKey(
+    String promptKey,
+    String content,
   ) async {
     final res = await _api.put<Map<String, dynamic>>(
-      '/api/v1/admin/ai/prompts/default/$promptId',
-      data: data,
+      '/api/v1/admin/ai/prompts/default/$promptKey',
+      data: {'content': content},
     );
     final body = res.data as Map<String, dynamic>;
     return AIPrompt.fromJson(body['data'] as Map<String, dynamic>);
   }
 
-  Future<void> deleteDefaultPrompt(int promptId) async {
-    await _api.delete('/api/v1/admin/ai/prompts/default/$promptId');
+  Future<AIPrompt> resetDefaultPrompt(String promptKey) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/prompts/default/$promptKey/reset',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIPrompt.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteDefaultPrompt(String promptKey) async {
+    await _api.delete('/api/v1/admin/ai/prompts/default/$promptKey');
   }
 
   // ========== User: Chat ==========

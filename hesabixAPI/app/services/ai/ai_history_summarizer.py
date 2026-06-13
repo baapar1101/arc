@@ -7,6 +7,10 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy.orm import Session
+
+from app.services.ai.prompt_service import get_prompt_by_key
+
 logger = logging.getLogger(__name__)
 
 MAX_SUMMARY_CHARS = 3500
@@ -47,6 +51,7 @@ def summarize_history_with_llm(
     model: str,
     messages: List[Dict[str, Any]],
     *,
+    db: Optional[Session] = None,
     max_output_tokens: int = 500,
 ) -> Optional[str]:
     """خلاصهٔ فشرده با یک فراخوانی LLM."""
@@ -57,11 +62,7 @@ def summarize_history_with_llm(
     prompt_messages = [
         {
             "role": "system",
-            "content": (
-                "توضیحات مکالمهٔ قبلی بین کاربر و دستیار حسابداری را به فارسی خلاصه کن. "
-                "فقط حقایق، اعداد، ترجیحات و تصمیم‌های مهم را نگه دار. "
-                "حداکثر ۱۵ بولت کوتاه. از حدس زدن خودداری کن."
-            ),
+            "content": get_prompt_by_key(db, "aux.history_summary"),
         },
         {
             "role": "user",

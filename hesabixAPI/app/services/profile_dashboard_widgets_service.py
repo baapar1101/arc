@@ -5,6 +5,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+from adapters.db.models.profile_dashboard_layout import ProfileUserDashboardLayout
 from app.services.business_service import get_user_businesses
 from app.services.announcement_service import user_list as list_announcements
 from adapters.db.repositories.support.ticket_repository import TicketRepository
@@ -22,6 +23,15 @@ COLUMNS_BY_BREAKPOINT: Dict[str, int] = {
     "xl": 12,
 }
 
+_VALID_BREAKPOINTS = frozenset(COLUMNS_BY_BREAKPOINT.keys())
+
+
+def _normalize_layout_breakpoint(breakpoint: str) -> str:
+    bp = (breakpoint or "md").lower()
+    if bp not in _VALID_BREAKPOINTS:
+        return "md"
+    return bp
+
 
 # ----------------------------
 # Profile Widget Definitions
@@ -35,8 +45,8 @@ PROFILE_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
         "permissions_required": [],
         "defaults": {
             "xs": {"colSpan": 1, "rowSpan": 2},
-            "sm": {"colSpan": 2, "rowSpan": 2},
-            "md": {"colSpan": 4, "rowSpan": 2},
+            "sm": {"colSpan": 4, "rowSpan": 2},
+            "md": {"colSpan": 8, "rowSpan": 2},
             "lg": {"colSpan": 4, "rowSpan": 2},
             "xl": {"colSpan": 4, "rowSpan": 2},
         },
@@ -50,8 +60,8 @@ PROFILE_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
         "permissions_required": [],
         "defaults": {
             "xs": {"colSpan": 1, "rowSpan": 2},
-            "sm": {"colSpan": 2, "rowSpan": 2},
-            "md": {"colSpan": 4, "rowSpan": 2},
+            "sm": {"colSpan": 4, "rowSpan": 2},
+            "md": {"colSpan": 8, "rowSpan": 2},
             "lg": {"colSpan": 4, "rowSpan": 2},
             "xl": {"colSpan": 4, "rowSpan": 2},
         },
@@ -65,8 +75,8 @@ PROFILE_WIDGET_DEFINITIONS: List[Dict[str, Any]] = [
         "permissions_required": [],
         "defaults": {
             "xs": {"colSpan": 1, "rowSpan": 2},
-            "sm": {"colSpan": 2, "rowSpan": 2},
-            "md": {"colSpan": 4, "rowSpan": 2},
+            "sm": {"colSpan": 4, "rowSpan": 2},
+            "md": {"colSpan": 8, "rowSpan": 2},
             "lg": {"colSpan": 4, "rowSpan": 2},
             "xl": {"colSpan": 4, "rowSpan": 2},
         },
@@ -85,34 +95,7 @@ def get_profile_widget_definitions(db: Session, user_id: int) -> Dict[str, Any]:
     }
 
 
-# ----------------------------
-# Layout Storage (in-memory for now)
-# ----------------------------
-_IN_MEMORY_LAYOUTS: Dict[str, Dict[str, Any]] = {}
-
-
-def _layout_key(user_id: int, breakpoint: str) -> str:
-    return f"profile:{user_id}:{breakpoint}"
-
-
-def get_profile_dashboard_layout_profile(
-    db: Session,
-    user_id: int,
-    breakpoint: str,
-) -> Dict[str, Any]:
-    """
-    Returns a profile for the requested breakpoint:
-    { breakpoint, columns, items: [{ key, order, colSpan, rowSpan, hidden }] }
-    """
-    bp = (breakpoint or "md").lower()
-    if bp not in COLUMNS_BY_BREAKPOINT:
-        bp = "md"
-    key = _layout_key(user_id, bp)
-    found = _IN_MEMORY_LAYOUTS.get(key)
-    if found:
-        return found
-
-    # Build default layout from definitions
+def _default_layout_items(bp: str) -> List[Dict[str, Any]]:
     columns = COLUMNS_BY_BREAKPOINT[bp]
     items: List[Dict[str, Any]] = []
     order = 1
@@ -126,15 +109,52 @@ def get_profile_dashboard_layout_profile(
             "hidden": False,
         })
         order += 1
-    profile = {
+    return items
+
+
+def _layout_profile_dict(
+    bp: str,
+    items: List[Dict[str, Any]],
+    updated_at: datetime,
+) -> Dict[str, Any]:
+    columns = COLUMNS_BY_BREAKPOINT[bp]
+    return {
         "breakpoint": bp,
         "columns": columns,
         "items": items,
-        "version": 1,
-        "updated_at": datetime.utcnow().isoformat() + "Z",
+        "version": 2,
+        "updated_at": updated_at.isoformat() + "Z",
     }
-    _IN_MEMORY_LAYOUTS[key] = profile
-    return profile
+
+
+def get_profile_dashboard_layout_profile(
+    db: Session,
+    user_id: int,
+    breakpoint: str,
+) -> Dict[str, Any]:
+    """
+    Returns a profile for the requested breakpoint:
+    { breakpoint, columns, items: [{ key, order, colSpan, rowSpan, hidden }] }
+    """
+    bp = _normalize_layout_breakpoint(breakpoint)
+    row = (
+        db.query(ProfileUserDashboardLayout)
+        .filter(
+            ProfileUserDashboardLayout.user_id == user_id,
+            ProfileUserDashboardLayout.breakpoint == bp,
+        )
+        .first()
+    )
+    if row is not None and row.items is not None:
+        stored = list(row.items)  # type: ignore[arg-type]
+        return _layout_profile_dict(
+            bp,
+            sorted(stored, key=lambda x: int(x.get("order", 1))),
+            row.updated_at,
+        )
+
+    now = datetime.utcnow()
+    return _layout_profile_dict(bp, _default_layout_items(bp), now)
 
 
 def save_profile_dashboard_layout_profile(
@@ -143,9 +163,7 @@ def save_profile_dashboard_layout_profile(
     breakpoint: str,
     items: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    bp = (breakpoint or "md").lower()
-    if bp not in COLUMNS_BY_BREAKPOINT:
-        bp = "md"
+    bp = _normalize_layout_breakpoint(breakpoint)
     columns = COLUMNS_BY_BREAKPOINT[bp]
     sanitized: List[Dict[str, Any]] = []
     for it in (items or []):
@@ -164,15 +182,28 @@ def save_profile_dashboard_layout_profile(
             })
         except Exception:
             continue
-    profile = {
-        "breakpoint": bp,
-        "columns": columns,
-        "items": sorted(sanitized, key=lambda x: x.get("order", 1)),
-        "version": 1,
-        "updated_at": datetime.utcnow().isoformat() + "Z",
-    }
-    _IN_MEMORY_LAYOUTS[_layout_key(user_id, bp)] = profile
-    return profile
+    sanitized = sorted(sanitized, key=lambda x: x.get("order", 1))
+    now = datetime.utcnow()
+    row = (
+        db.query(ProfileUserDashboardLayout)
+        .filter(
+            ProfileUserDashboardLayout.user_id == user_id,
+            ProfileUserDashboardLayout.breakpoint == bp,
+        )
+        .first()
+    )
+    if row is None:
+        row = ProfileUserDashboardLayout(
+            user_id=user_id,
+            breakpoint=bp,
+            items=sanitized,
+        )
+        db.add(row)
+    else:
+        row.items = sanitized
+        row.updated_at = now
+    db.flush()
+    return _layout_profile_dict(bp, sanitized, row.updated_at)
 
 
 # ----------------------------
@@ -205,24 +236,19 @@ def _resolve_profile_recent_businesses(
     items = result.get("items", [])
     
     # فیلتر کردن کسب و کارهای حذف شده (در حال حذف یا حذف شده)
-    # کسب و کارهایی که deleted_at دارند یا در حال حذف هستند را نشان نمی‌دهیم
     filtered_items = []
     for item in items:
         deleted_at = item.get("deleted_at")
         is_deleted = item.get("is_deleted", False)
         is_deletion_pending = item.get("is_deletion_pending", False)
         
-        # بررسی اینکه آیا کسب و کار حذف شده یا در حال حذف است
-        # deleted_at می‌تواند None، string خالی یا string با تاریخ باشد
         has_deleted_at = deleted_at is not None and deleted_at != ""
         
-        # اگر حذف نشده و در حال حذف نیست، اضافه کن
         if not has_deleted_at and not is_deleted and not is_deletion_pending:
             filtered_items.append(item)
     
     items = filtered_items
     
-    # Format items for widget
     formatted_items = []
     for item in items:
         formatted_items.append({
@@ -249,7 +275,6 @@ def _resolve_profile_announcements(
 
     only_unread = filters.get("only_unread", False)
     
-    # Call the announcements service
     try:
         result = list_announcements(
             db=db,
@@ -281,7 +306,6 @@ def _resolve_profile_support_tickets(
     except Exception:
         limit = 5
 
-    # Call the support tickets repository
     try:
         ticket_repo = TicketRepository(db)
         query_info = QueryInfo(
@@ -294,7 +318,6 @@ def _resolve_profile_support_tickets(
         )
         tickets, total = ticket_repo.get_user_tickets(user_id, query_info)
         
-        # Format items for widget
         formatted_items = []
         for ticket in tickets:
             formatted_items.append({
@@ -334,7 +357,5 @@ def get_profile_widgets_batch_data(
         try:
             result[key] = resolver(db, user_id, filters or {})
         except Exception as ex:
-            # Avoid breaking the whole dashboard; return error per widget
             result[key] = {"error": str(ex)}
     return result
-
