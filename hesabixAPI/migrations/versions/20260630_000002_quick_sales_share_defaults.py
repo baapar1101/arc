@@ -22,7 +22,7 @@ def upgrade() -> None:
             "default_share_online_payment",
             sa.Boolean(),
             nullable=False,
-            server_default=sa.text("1"),
+            server_default=sa.text("true"),
             comment="پرداخت آنلاین در لینک اشتراک فاکتور",
         ),
     )

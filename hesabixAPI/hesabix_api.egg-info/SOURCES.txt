@@ -85,8 +85,10 @@ adapters/api/v1/workflows.py
 adapters/api/v1/zohal.py
 adapters/api/v1/admin/activity_logs_admin.py
 adapters/api/v1/admin/ai_eval.py
+adapters/api/v1/admin/ai_models.py
 adapters/api/v1/admin/ai_plans.py
 adapters/api/v1/admin/ai_prompts.py
+adapters/api/v1/admin/ai_provider_credentials.py
 adapters/api/v1/admin/ai_settings.py
 adapters/api/v1/admin/announcements.py
 adapters/api/v1/admin/businesses_admin.py
@@ -111,6 +113,7 @@ adapters/api/v1/admin/zohal.py
 adapters/api/v1/ai/chat.py
 adapters/api/v1/ai/crm_ai.py
 adapters/api/v1/ai/mcp.py
+adapters/api/v1/ai/models.py
 adapters/api/v1/ai/prompts.py
 adapters/api/v1/ai/subscription.py
 adapters/api/v1/ai/usage.py
@@ -181,8 +184,10 @@ adapters/db/models/ai_knowledge_chunk.py
 adapters/db/models/ai_knowledge_document.py
 adapters/db/models/ai_memory_item.py
 adapters/db/models/ai_message_feedback.py
+adapters/db/models/ai_model.py
 adapters/db/models/ai_plan.py
 adapters/db/models/ai_prompt.py
+adapters/db/models/ai_provider_credential.py
 adapters/db/models/ai_subscription.py
 adapters/db/models/ai_usage_log.py
 adapters/db/models/ai_voice_interaction.py
@@ -286,8 +291,10 @@ adapters/db/repositories/activity_log_repo.py
 adapters/db/repositories/ai_chat_repository.py
 adapters/db/repositories/ai_config_repository.py
 adapters/db/repositories/ai_invoice_repository.py
+adapters/db/repositories/ai_model_repository.py
 adapters/db/repositories/ai_plan_repository.py
 adapters/db/repositories/ai_prompt_repository.py
+adapters/db/repositories/ai_provider_credential_repository.py
 adapters/db/repositories/ai_subscription_repository.py
 adapters/db/repositories/ai_usage_log_repository.py
 adapters/db/repositories/api_key_repo.py
@@ -599,9 +606,12 @@ app/services/ai/ai_memory_proactive_service.py
 app/services/ai/ai_memory_service.py
 app/services/ai/ai_memory_structured.py
 app/services/ai/ai_message_budget.py
+app/services/ai/ai_model_seed_service.py
+app/services/ai/ai_model_service.py
 app/services/ai/ai_ops_metrics.py
 app/services/ai/ai_permission_map.py
 app/services/ai/ai_provider.py
+app/services/ai/ai_provider_service.py
 app/services/ai/ai_query_filter_catalog.py
 app/services/ai/ai_query_filter_prompt.py
 app/services/ai/ai_query_filter_service.py
@@ -838,6 +848,10 @@ migrations/versions/20260625_000001_ai_knowledge_embeddings.py
 migrations/versions/20260626_000001_ai_phase6_eval_connectors_feedback.py
 migrations/versions/20260626_000002_ai_pgvector_optional.py
 migrations/versions/20260627_000001_ai_phase7_schedule.py
+migrations/versions/20260628_000001_ai_models_catalog.py
+migrations/versions/20260629_000001_ai_provider_credentials.py
+migrations/versions/20260630_000001_invoice_share_link_notification_event.py
+migrations/versions/20260630_000002_quick_sales_share_defaults.py
 tests/__init__.py
 tests/test_ai_connector_security.py
 tests/test_ai_context_budget.py
@@ -849,6 +863,8 @@ tests/test_ai_json_safe.py
 tests/test_ai_knowledge_service.py
 tests/test_ai_memory_service.py
 tests/test_ai_memory_structured.py
+tests/test_ai_model_seed_service.py
+tests/test_ai_model_service.py
 tests/test_ai_permission_map.py
 tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
@@ -878,6 +894,7 @@ tests/test_physical_stock.py
 tests/test_product_inventory_tracking_sync.py
 tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
+tests/test_quick_sales_service.py
 tests/test_stock_count.py
 tests/test_tax_key_material_service.py
 tests/test_voice_ws_helpers.py
