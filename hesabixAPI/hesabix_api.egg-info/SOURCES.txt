@@ -100,6 +100,7 @@ adapters/api/v1/admin/firewall.py
 adapters/api/v1/admin/legacy_import.py
 adapters/api/v1/admin/marketplace.py
 adapters/api/v1/admin/monitoring.py
+adapters/api/v1/admin/notification_event_types.py
 adapters/api/v1/admin/notification_moderation.py
 adapters/api/v1/admin/notification_templates.py
 adapters/api/v1/admin/payment_gateways.py
@@ -619,6 +620,7 @@ app/services/ai/ai_query_phase2_service.py
 app/services/ai/ai_query_phase3_service.py
 app/services/ai/ai_query_phase4_service.py
 app/services/ai/ai_query_service.py
+app/services/ai/ai_quota_helpers.py
 app/services/ai/ai_reports_catalog.py
 app/services/ai/ai_reports_service.py
 app/services/ai/ai_retry_policy.py
@@ -696,6 +698,7 @@ app/services/providers/behin_sms_provider.py
 app/services/providers/email_provider.py
 app/services/providers/inapp_provider.py
 app/services/providers/sms_provider.py
+app/services/providers/sunway_sms_provider.py
 app/services/providers/telegram_provider.py
 app/services/voice/__init__.py
 app/services/voice/stt.py
@@ -853,6 +856,7 @@ migrations/versions/20260629_000001_ai_provider_credentials.py
 migrations/versions/20260630_000001_invoice_share_link_notification_event.py
 migrations/versions/20260630_000002_quick_sales_share_defaults.py
 migrations/versions/20260630_000003_merge_heads_ai_memory_items_and_quick_sales_share_defaults.py
+migrations/versions/20260701_000001_backfill_notification_event_type_defaults.py
 tests/__init__.py
 tests/test_ai_connector_security.py
 tests/test_ai_context_budget.py
@@ -864,11 +868,15 @@ tests/test_ai_json_safe.py
 tests/test_ai_knowledge_service.py
 tests/test_ai_memory_service.py
 tests/test_ai_memory_structured.py
+tests/test_ai_model_routing.py
 tests/test_ai_model_seed_service.py
 tests/test_ai_model_service.py
 tests/test_ai_permission_map.py
+tests/test_ai_quota_helpers.py
 tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
+tests/test_ai_subscription_lock.py
+tests/test_ai_subscription_renew.py
 tests/test_ai_tool_intent.py
 tests/test_ai_write_guard.py
 tests/test_basalam_currency.py
@@ -888,6 +896,7 @@ tests/test_legacy_import.py
 tests/test_legacy_sql_account_resolver.py
 tests/test_legacy_sql_dump_reader.py
 tests/test_moadian_plugin_license_gate.py
+tests/test_notification_event_type_defaults.py
 tests/test_permissions.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
@@ -897,6 +906,7 @@ tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
 tests/test_quick_sales_service.py
 tests/test_stock_count.py
+tests/test_sunway_sms_provider.py
 tests/test_tax_key_material_service.py
 tests/test_voice_ws_helpers.py
 tests/test_webm_decode.py

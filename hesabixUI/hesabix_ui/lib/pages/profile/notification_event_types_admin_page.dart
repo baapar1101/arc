@@ -65,7 +65,7 @@ class _NotificationEventTypesAdminPageState
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = extractErrorMessage(e);
+        _error = ErrorExtractor.extractErrorMessage(e);
         _loading = false;
       });
     }
@@ -159,7 +159,7 @@ class _NotificationEventTypesAdminPageState
       emailBodyCtrl.dispose();
       emailSubjectCtrl.dispose();
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: extractErrorMessage(e));
+      SnackBarHelper.showError(context, message: ErrorExtractor.extractErrorMessage(e));
     }
   }
 
