@@ -1029,14 +1029,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       }
       // Build styles and parameters
       final theme = Theme.of(context);
-      final headerTextStyle =
-          theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: theme.colorScheme.onSurface,
-          ) ??
-          const TextStyle(fontSize: 14, fontWeight: FontWeight.w700);
-      final cellTextStyle =
-          theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14);
+      final headerTextStyle = _dtHeaderStyle(theme, fontWeight: FontWeight.w700);
+      final cellTextStyle = _dtCellStyle(theme);
       final minWidth = 96.0;
       // Columns to show (exclude action)
       final columnsToShow =
@@ -1820,6 +1814,26 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       return SizedBox(height: _expandModeBodyHeight(), child: child);
     }
     return Expanded(child: child);
+  }
+
+  bool _preferLatinTabularFigures() {
+    final code = Localizations.localeOf(context).languageCode.toLowerCase();
+    return code != 'fa' && code != 'ar';
+  }
+
+  TextStyle _dtHeaderStyle(ThemeData theme, {FontWeight fontWeight = FontWeight.w600}) {
+    return theme.textTheme.titleSmall!.copyWith(
+      fontWeight: fontWeight,
+      color: theme.colorScheme.onSurface,
+    );
+  }
+
+  TextStyle _dtCellStyle(ThemeData theme, {bool numeric = false}) {
+    final style = theme.textTheme.bodyMedium!;
+    if (numeric && _preferLatinTabularFigures()) {
+      return style.copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
+    }
+    return style;
   }
 
   double _getHeaderAffordancePadding(DataTableColumn column) {
@@ -3060,9 +3074,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                           Text(
                             formattedText,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
                               color: theme.colorScheme.onSurface,
                               fontWeight: FontWeight.w700,
                             ),
@@ -3513,12 +3524,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     columns.addAll(
       dataColumnsToShow.map((column) {
-        final headerTextStyle =
-            theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
-            ) ??
-            const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+        final headerTextStyle = _dtHeaderStyle(theme);
         final double baseWidth = DataTableUtils.getColumnWidth(column.width);
         final double affordancePadding = _getHeaderAffordancePadding(column);
         final double headerTextWidth =
@@ -3584,9 +3590,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 ? () {
                     if (_columnSettings == null) return;
                     final headerStyle = headerTextStyle;
-                    final cellStyle =
-                        theme.textTheme.bodyMedium ??
-                        const TextStyle(fontSize: 14);
+                    final cellStyle = _dtCellStyle(theme);
                     final width = _autoFitColumnWidth(
                       column,
                       headerStyle,
@@ -3972,9 +3976,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         textAlign: align,
         maxLines: _getMaxLines(column),
         overflow: overflow,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          fontFeatures: const [FontFeature.tabularFigures()],
-        ),
+        style: _dtCellStyle(Theme.of(context), numeric: true),
       );
       final wrapped = GestureDetector(
         onLongPress: () {
@@ -4020,10 +4022,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       maxLines: _getMaxLines(column),
       overflow: overflow,
       style: column is NumberColumn
-          ? Theme.of(context).textTheme.bodyMedium?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
-            )
-          : null,
+          ? _dtCellStyle(Theme.of(context), numeric: true)
+          : Theme.of(context).textTheme.bodyMedium,
     );
     final wrapped = GestureDetector(
       onLongPress: () {
@@ -4218,12 +4218,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     ThemeData theme,
     double availableWidth,
   ) {
-    final headerTextStyle =
-        theme.textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: theme.colorScheme.onSurface,
-        ) ??
-        const TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+    final headerTextStyle = _dtHeaderStyle(theme);
 
     // محاسبه عرض کل ستون‌ها
     double totalColumnsWidth = 0.0;

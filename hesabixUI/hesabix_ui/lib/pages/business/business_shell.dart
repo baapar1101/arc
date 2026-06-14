@@ -2130,7 +2130,11 @@ class _BusinessShellState extends State<BusinessShell> {
           const SizedBox(width: 10),
           Text(
             t.appTitle,
-            style: TextStyle(color: appBarFg, fontWeight: FontWeight.w700, fontSize: 15, height: 1.1),
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: appBarFg,
+              fontWeight: FontWeight.w700,
+              height: 1.1,
+            ),
           ),
         ],
       ),

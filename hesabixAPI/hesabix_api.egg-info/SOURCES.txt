@@ -873,6 +873,7 @@ migrations/versions/20260702_000001_ai_skills.py
 migrations/versions/20260702_000002_ai_skill_reviews.py
 migrations/versions/20260702_000003_ai_skills_phase4.py
 migrations/versions/20260702_000004_ai_skill_publisher_revenue.py
+migrations/versions/20260703_000001_merge_heads_seed_ai_prompts_and_ai_skill_publisher_revenue.py
 tests/__init__.py
 tests/test_ai_connector_security.py
 tests/test_ai_context_budget.py

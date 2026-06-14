@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 
 import 'tokens/extensions.dart';
 
-InputDecorationTheme appInputDecorationTheme(ColorScheme scheme, AppRadii radii) {
+InputDecorationTheme appInputDecorationTheme(
+  ColorScheme scheme,
+  AppRadii radii,
+  TextTheme textTheme,
+) {
   final radius = radii.mdBorder;
   OutlineInputBorder outline(BorderSide side) =>
       OutlineInputBorder(borderRadius: radius, borderSide: side);
@@ -26,62 +30,85 @@ InputDecorationTheme appInputDecorationTheme(ColorScheme scheme, AppRadii radii)
     focusedErrorBorder: focusedError,
     filled: true,
     fillColor: scheme.surfaceContainerHighest,
-    hintStyle: TextStyle(color: scheme.onSurfaceVariant.withValues(alpha: 0.75)),
-    labelStyle: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+    hintStyle: textTheme.bodyMedium?.copyWith(
+      color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+    ),
+    labelStyle: textTheme.bodyMedium?.copyWith(
+      color: scheme.onSurfaceVariant,
+    ),
   );
 }
 
-ButtonStyle _baseButtonStyle(ColorScheme scheme, AppRadii radii) => ButtonStyle(
+ButtonStyle _baseButtonStyle(ColorScheme scheme, AppRadii radii, TextTheme textTheme) =>
+    ButtonStyle(
       padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
       minimumSize: const WidgetStatePropertyAll(Size(0, 36)),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: radii.mdBorder)),
-      textStyle: const WidgetStatePropertyAll(TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+      textStyle: WidgetStatePropertyAll(
+        textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+      ),
     );
 
-ElevatedButtonThemeData appElevatedButtonTheme(ColorScheme scheme, AppRadii radii) =>
+ElevatedButtonThemeData appElevatedButtonTheme(
+  ColorScheme scheme,
+  AppRadii radii,
+  TextTheme textTheme,
+) =>
     ElevatedButtonThemeData(
-      style: _baseButtonStyle(scheme, radii).copyWith(
+      style: _baseButtonStyle(scheme, radii, textTheme).copyWith(
         backgroundColor: WidgetStatePropertyAll(scheme.primary),
         foregroundColor: WidgetStatePropertyAll(scheme.onPrimary),
         elevation: const WidgetStatePropertyAll(0),
       ),
     );
 
-FilledButtonThemeData appFilledButtonTheme(ColorScheme scheme, AppRadii radii) =>
+FilledButtonThemeData appFilledButtonTheme(
+  ColorScheme scheme,
+  AppRadii radii,
+  TextTheme textTheme,
+) =>
     FilledButtonThemeData(
-      style: _baseButtonStyle(scheme, radii).copyWith(
+      style: _baseButtonStyle(scheme, radii, textTheme).copyWith(
         backgroundColor: WidgetStatePropertyAll(scheme.primary),
         foregroundColor: WidgetStatePropertyAll(scheme.onPrimary),
       ),
     );
 
-OutlinedButtonThemeData appOutlinedButtonTheme(ColorScheme scheme, AppRadii radii) =>
+OutlinedButtonThemeData appOutlinedButtonTheme(
+  ColorScheme scheme,
+  AppRadii radii,
+  TextTheme textTheme,
+) =>
     OutlinedButtonThemeData(
-      style: _baseButtonStyle(scheme, radii).copyWith(
+      style: _baseButtonStyle(scheme, radii, textTheme).copyWith(
         foregroundColor: WidgetStatePropertyAll(scheme.primary),
         side: WidgetStatePropertyAll(BorderSide(color: scheme.outline)),
       ),
     );
 
-TextButtonThemeData appTextButtonTheme(ColorScheme scheme, AppRadii radii) => TextButtonThemeData(
-      style: _baseButtonStyle(scheme, radii).copyWith(
+TextButtonThemeData appTextButtonTheme(
+  ColorScheme scheme,
+  AppRadii radii,
+  TextTheme textTheme,
+) =>
+    TextButtonThemeData(
+      style: _baseButtonStyle(scheme, radii, textTheme).copyWith(
         foregroundColor: WidgetStatePropertyAll(scheme.primary),
         padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
       ),
     );
 
-AppBarTheme appAppBarTheme(ColorScheme scheme) => AppBarTheme(
+AppBarTheme appAppBarTheme(ColorScheme scheme, TextTheme textTheme) => AppBarTheme(
       backgroundColor: scheme.surface,
       foregroundColor: scheme.onSurface,
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: true,
       toolbarHeight: 44,
-      titleTextStyle: TextStyle(
+      titleTextStyle: textTheme.titleMedium?.copyWith(
         color: scheme.onSurface,
         fontWeight: FontWeight.w600,
-        fontSize: 16,
       ),
     );
 
@@ -96,27 +123,28 @@ CardThemeData appCardTheme(ColorScheme scheme, AppRadii radii) => CardThemeData(
       ),
     );
 
-ListTileThemeData appListTileTheme(ColorScheme scheme) => ListTileThemeData(
+ListTileThemeData appListTileTheme(ColorScheme scheme, TextTheme textTheme) => ListTileThemeData(
       dense: true,
       visualDensity: VisualDensity.compact,
       minVerticalPadding: 2,
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
       iconColor: scheme.onSurfaceVariant,
+      titleTextStyle: textTheme.bodyMedium,
+      subtitleTextStyle: textTheme.bodySmall,
     );
 
-NavigationRailThemeData appNavigationRailTheme(ColorScheme scheme) => NavigationRailThemeData(
+NavigationRailThemeData appNavigationRailTheme(ColorScheme scheme, TextTheme textTheme) =>
+    NavigationRailThemeData(
       backgroundColor: scheme.surface,
       indicatorColor: scheme.primaryContainer,
       selectedIconTheme: IconThemeData(color: scheme.primary, size: 20),
       unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant, size: 20),
-      selectedLabelTextStyle: TextStyle(
+      selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
         color: scheme.primary,
-        fontSize: 12,
         fontWeight: FontWeight.w600,
       ),
-      unselectedLabelTextStyle: TextStyle(
+      unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(
         color: scheme.onSurfaceVariant,
-        fontSize: 12,
       ),
     );
 
@@ -136,51 +164,56 @@ IconButtonThemeData appIconButtonTheme(ColorScheme scheme) => IconButtonThemeDat
       ),
     );
 
-DialogThemeData appDialogTheme(ColorScheme scheme, AppRadii radii) => DialogThemeData(
+DialogThemeData appDialogTheme(ColorScheme scheme, AppRadii radii, TextTheme textTheme) =>
+    DialogThemeData(
       backgroundColor: scheme.surface,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: radii.lgBorder),
-      titleTextStyle: TextStyle(
+      titleTextStyle: textTheme.titleLarge?.copyWith(
         color: scheme.onSurface,
-        fontSize: 17,
         fontWeight: FontWeight.w600,
       ),
-      contentTextStyle: TextStyle(
+      contentTextStyle: textTheme.bodyMedium?.copyWith(
         color: scheme.onSurface,
-        fontSize: 13,
       ),
     );
 
-TabBarThemeData appTabBarTheme(ColorScheme scheme) => TabBarThemeData(
-      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+TabBarThemeData appTabBarTheme(ColorScheme scheme, TextTheme textTheme) => TabBarThemeData(
+      labelStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+      unselectedLabelStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w500),
       indicatorSize: TabBarIndicatorSize.label,
       dividerHeight: 0,
     );
 
-ChipThemeData appChipTheme(ColorScheme scheme, AppRadii radii) => ChipThemeData(
+ChipThemeData appChipTheme(ColorScheme scheme, AppRadii radii, TextTheme textTheme) =>
+    ChipThemeData(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      labelStyle: TextStyle(fontSize: 12, color: scheme.onSurface),
+      labelStyle: textTheme.labelMedium?.copyWith(color: scheme.onSurface),
       side: BorderSide(color: scheme.outlineVariant),
       shape: RoundedRectangleBorder(borderRadius: radii.smBorder),
     );
 
-SnackBarThemeData appSnackBarTheme(ColorScheme scheme, AppRadii radii) => SnackBarThemeData(
+SnackBarThemeData appSnackBarTheme(ColorScheme scheme, AppRadii radii, TextTheme textTheme) =>
+    SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: radii.smBorder),
-      contentTextStyle: TextStyle(color: scheme.onInverseSurface, fontSize: 13),
+      contentTextStyle: textTheme.bodyMedium?.copyWith(
+        color: scheme.onInverseSurface,
+      ),
       backgroundColor: scheme.inverseSurface,
     );
 
-DataTableThemeData appDataTableTheme(ColorScheme scheme) => DataTableThemeData(
+DataTableThemeData appDataTableTheme(ColorScheme scheme, TextTheme textTheme) =>
+    DataTableThemeData(
       headingRowHeight: 36,
       dataRowMinHeight: 36,
       dataRowMaxHeight: 40,
-      headingTextStyle: TextStyle(
-        fontSize: 12,
+      headingTextStyle: textTheme.titleSmall?.copyWith(
         fontWeight: FontWeight.w600,
         color: scheme.onSurfaceVariant,
       ),
-      dataTextStyle: TextStyle(fontSize: 13, color: scheme.onSurface),
+      dataTextStyle: textTheme.bodyMedium?.copyWith(
+        color: scheme.onSurface,
+      ),
     );

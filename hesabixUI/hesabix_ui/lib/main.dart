@@ -3778,9 +3778,13 @@ class _MyAppState extends State<MyApp> {
               GlobalWidgetsLocalizations.delegate,
             ],
             builder: (context, child) {
-              // KeyboardShortcutListener باید داخل MaterialApp باشد تا context معتبر داشته باشد
-              return KeyboardShortcutListener(
-                child: child ?? const SizedBox(),
+              final theme = Theme.of(context);
+              final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle();
+              return DefaultTextStyle(
+                style: baseStyle,
+                child: KeyboardShortcutListener(
+                  child: child ?? const SizedBox(),
+                ),
               );
             },
           ),

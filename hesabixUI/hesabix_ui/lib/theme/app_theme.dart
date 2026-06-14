@@ -15,6 +15,8 @@ class AppTheme {
     final isFa = locale.languageCode.toLowerCase() == 'fa';
 
     final textTheme = isFa ? faTextTheme(isDark: isDark) : enTextTheme(isDark: isDark);
+    final primaryFont = isFa ? AppFonts.faPrimary : AppFonts.enPrimary;
+    final fontFallback = isFa ? AppFonts.faFallback : AppFonts.enFallback;
     const spacing = AppSpacing();
     const radii = AppRadii();
     final shellColors = AppShellColors.fromScheme(scheme, isDark: isDark);
@@ -22,29 +24,28 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      fontFamily: isFa ? 'YekanBakhFaNum' : null,
-      fontFamilyFallback: isFa
-          ? const ['Noto Color Emoji', 'Noto Sans', 'NotoSansArabic', 'Vazirmatn']
-          : const ['Noto Color Emoji', 'Noto Sans', 'Roboto'],
+      fontFamily: primaryFont,
+      fontFamilyFallback: fontFallback,
       textTheme: textTheme,
+      primaryTextTheme: textTheme,
       visualDensity: VisualDensity.compact,
       scaffoldBackgroundColor: isDark ? scheme.surface : scheme.surfaceContainerLowest,
-      inputDecorationTheme: appInputDecorationTheme(scheme, radii),
-      elevatedButtonTheme: appElevatedButtonTheme(scheme, radii),
-      filledButtonTheme: appFilledButtonTheme(scheme, radii),
-      outlinedButtonTheme: appOutlinedButtonTheme(scheme, radii),
-      textButtonTheme: appTextButtonTheme(scheme, radii),
-      appBarTheme: appAppBarTheme(scheme),
+      inputDecorationTheme: appInputDecorationTheme(scheme, radii, textTheme),
+      elevatedButtonTheme: appElevatedButtonTheme(scheme, radii, textTheme),
+      filledButtonTheme: appFilledButtonTheme(scheme, radii, textTheme),
+      outlinedButtonTheme: appOutlinedButtonTheme(scheme, radii, textTheme),
+      textButtonTheme: appTextButtonTheme(scheme, radii, textTheme),
+      appBarTheme: appAppBarTheme(scheme, textTheme),
       cardTheme: appCardTheme(scheme, radii),
-      listTileTheme: appListTileTheme(scheme),
-      navigationRailTheme: appNavigationRailTheme(scheme),
+      listTileTheme: appListTileTheme(scheme, textTheme),
+      navigationRailTheme: appNavigationRailTheme(scheme, textTheme),
       dividerTheme: appDividerTheme(scheme),
       iconButtonTheme: appIconButtonTheme(scheme),
-      dialogTheme: appDialogTheme(scheme, radii),
-      tabBarTheme: appTabBarTheme(scheme),
-      chipTheme: appChipTheme(scheme, radii),
-      snackBarTheme: appSnackBarTheme(scheme, radii),
-      dataTableTheme: appDataTableTheme(scheme),
+      dialogTheme: appDialogTheme(scheme, radii, textTheme),
+      tabBarTheme: appTabBarTheme(scheme, textTheme),
+      chipTheme: appChipTheme(scheme, radii, textTheme),
+      snackBarTheme: appSnackBarTheme(scheme, radii, textTheme),
+      dataTableTheme: appDataTableTheme(scheme, textTheme),
       extensions: <ThemeExtension<dynamic>>[
         spacing,
         radii,
