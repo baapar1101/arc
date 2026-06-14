@@ -90,6 +90,7 @@ adapters/api/v1/admin/ai_plans.py
 adapters/api/v1/admin/ai_prompts.py
 adapters/api/v1/admin/ai_provider_credentials.py
 adapters/api/v1/admin/ai_settings.py
+adapters/api/v1/admin/ai_skills.py
 adapters/api/v1/admin/announcements.py
 adapters/api/v1/admin/businesses_admin.py
 adapters/api/v1/admin/currencies.py
@@ -116,6 +117,7 @@ adapters/api/v1/ai/crm_ai.py
 adapters/api/v1/ai/mcp.py
 adapters/api/v1/ai/models.py
 adapters/api/v1/ai/prompts.py
+adapters/api/v1/ai/skills.py
 adapters/api/v1/ai/subscription.py
 adapters/api/v1/ai/usage.py
 adapters/api/v1/ai/voice_feedback.py
@@ -189,6 +191,7 @@ adapters/db/models/ai_model.py
 adapters/db/models/ai_plan.py
 adapters/db/models/ai_prompt.py
 adapters/db/models/ai_provider_credential.py
+adapters/db/models/ai_skill.py
 adapters/db/models/ai_subscription.py
 adapters/db/models/ai_usage_log.py
 adapters/db/models/ai_voice_interaction.py
@@ -255,6 +258,7 @@ adapters/db/models/product_bom.py
 adapters/db/models/product_general_barcode_alias.py
 adapters/db/models/product_instance.py
 adapters/db/models/product_tax_code.py
+adapters/db/models/profile_dashboard_layout.py
 adapters/db/models/project.py
 adapters/db/models/public_catalog_contact_message.py
 adapters/db/models/quick_sales_settings.py
@@ -335,6 +339,8 @@ adapters/db/repositories/support/priority_repository.py
 adapters/db/repositories/support/status_repository.py
 adapters/db/repositories/support/ticket_repository.py
 adapters/db/seed_data/__init__.py
+adapters/db/seed_data/ai_default_prompts.py
+adapters/db/seed_data/ai_official_skills_seed.py
 adapters/db/seed_data/marketplace_plugins_seed.py
 adapters/db/seed_data/notification_event_types_seed.py
 app/__init__.py
@@ -626,6 +632,10 @@ app/services/ai/ai_reports_service.py
 app/services/ai/ai_retry_policy.py
 app/services/ai/ai_scheduled_task_service.py
 app/services/ai/ai_service.py
+app/services/ai/ai_skill_git_import.py
+app/services/ai/ai_skill_parser.py
+app/services/ai/ai_skill_runtime.py
+app/services/ai/ai_skill_service.py
 app/services/ai/ai_stream_helpers.py
 app/services/ai/ai_summarize_quota.py
 app/services/ai/ai_tool_cache.py
@@ -831,6 +841,8 @@ migrations/versions/20260612_000001_business_print_settings_invoice_pdf_sections
 migrations/versions/20260612_000002_merge_heads_report_template_status_events_and_business_print_settings_invoice_pdf_sections.py
 migrations/versions/20260613_000001_seed_received_loan_facility_chart_accounts.py
 migrations/versions/20260613_000002_received_loan_facility_tables.py
+migrations/versions/20260613_000003_profile_user_dashboard_layouts.py
+migrations/versions/20260613_000004_seed_ai_default_prompts.py
 migrations/versions/20260614_000001_business_invoice_missing_line_warehouse_policy.py
 migrations/versions/20260614_000002_seed_marketplace_plugins.py
 migrations/versions/20260615_000001_seed_woocommerce_hesabix_marketplace.py
@@ -857,6 +869,10 @@ migrations/versions/20260630_000001_invoice_share_link_notification_event.py
 migrations/versions/20260630_000002_quick_sales_share_defaults.py
 migrations/versions/20260630_000003_merge_heads_ai_memory_items_and_quick_sales_share_defaults.py
 migrations/versions/20260701_000001_backfill_notification_event_type_defaults.py
+migrations/versions/20260702_000001_ai_skills.py
+migrations/versions/20260702_000002_ai_skill_reviews.py
+migrations/versions/20260702_000003_ai_skills_phase4.py
+migrations/versions/20260702_000004_ai_skill_publisher_revenue.py
 tests/__init__.py
 tests/test_ai_connector_security.py
 tests/test_ai_context_budget.py
@@ -875,6 +891,7 @@ tests/test_ai_permission_map.py
 tests/test_ai_quota_helpers.py
 tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
+tests/test_ai_skill_parser.py
 tests/test_ai_subscription_lock.py
 tests/test_ai_subscription_renew.py
 tests/test_ai_tool_intent.py
