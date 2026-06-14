@@ -115,6 +115,14 @@ from .ai_connector import AIConnector  # noqa: F401
 from .ai_message_feedback import AIMessageFeedback  # noqa: F401
 from .ai_eval_schedule import AIEvalSchedule  # noqa: F401
 from .ai_prompt import AIPrompt, PromptRole, PromptType  # noqa: F401
+from .ai_skill import (  # noqa: F401
+    AISkillInstall,
+    AISkillPackage,
+    AISkillPurchase,
+    AISkillReview,
+    AISkillSourceType,
+    AISkillVisibility,
+)
 from .ai_voice_interaction import AIVoiceInteraction  # noqa: F401
 # Activity Log models
 from .activity_log import ActivityLog  # noqa: F401

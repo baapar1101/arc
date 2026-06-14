@@ -428,8 +428,15 @@ def _anthropic_blocks_to_openai_result(content_blocks: Any) -> tuple[str, Option
     return content, function_calls or None
 
 
+ANTHROPIC_SKILLS_BETAS = (
+    "code-execution-2025-08-25",
+    "skills-2025-10-02",
+    "files-api-2025-04-14",
+)
+
+
 class AnthropicProvider(AIProviderBase):
-    """Provider برای Anthropic (Claude) با پشتیبانی tool calling."""
+    """Provider برای Anthropic (Claude) با پشتیبانی tool calling و Agent Skills."""
 
     def __init__(self, api_key: str, api_base_url: Optional[str] = None):
         super().__init__(api_key, api_base_url or "https://api.anthropic.com")
@@ -444,6 +451,27 @@ class AnthropicProvider(AIProviderBase):
                 "anthropic package is required. Install it with: pip install anthropic"
             )
 
+    def _apply_skills_extra(
+        self,
+        kwargs: Dict[str, Any],
+        provider_extra: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        if not provider_extra:
+            return kwargs
+        skill_ids = provider_extra.get("anthropic_skills") or []
+        clean = [str(s).strip() for s in skill_ids if s and str(s).strip()]
+        if not clean:
+            return kwargs
+        out = dict(kwargs)
+        out["betas"] = list(ANTHROPIC_SKILLS_BETAS)
+        out["container"] = {
+            "skills": [
+                {"type": "anthropic", "skill_id": sid, "version": "latest"}
+                for sid in clean
+            ]
+        }
+        return out
+
     def _build_request_kwargs(
         self,
         messages: List[Dict[str, Any]],
@@ -451,6 +479,7 @@ class AnthropicProvider(AIProviderBase):
         max_tokens: int,
         temperature: float,
         tools: Optional[List[Dict[str, Any]]],
+        provider_extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
@@ -466,7 +495,7 @@ class AnthropicProvider(AIProviderBase):
             kwargs["system"] = system_message
         if anthropic_tools:
             kwargs["tools"] = anthropic_tools
-        return kwargs
+        return self._apply_skills_extra(kwargs, provider_extra)
 
     def chat_completion(
         self,
@@ -475,10 +504,13 @@ class AnthropicProvider(AIProviderBase):
         max_tokens: int,
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
+        provider_extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         try:
             response = self.client.messages.create(
-                **self._build_request_kwargs(messages, model, max_tokens, temperature, tools)
+                **self._build_request_kwargs(
+                    messages, model, max_tokens, temperature, tools, provider_extra
+                )
             )
             content, function_calls = _anthropic_blocks_to_openai_result(response.content)
             return {
@@ -507,8 +539,11 @@ class AnthropicProvider(AIProviderBase):
         max_tokens: int,
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
+        provider_extra: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        kwargs = self._build_request_kwargs(messages, model, max_tokens, temperature, tools)
+        kwargs = self._build_request_kwargs(
+            messages, model, max_tokens, temperature, tools, provider_extra
+        )
         try:
             accumulated_text = ""
             tool_blocks: Dict[int, Dict[str, Any]] = {}

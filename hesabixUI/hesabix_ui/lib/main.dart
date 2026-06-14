@@ -204,6 +204,8 @@ import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_models_admin_page.dart';
 import 'pages/admin/ai_provider_credentials_admin_page.dart';
 import 'pages/admin/ai_prompts_admin_page.dart';
+import 'pages/admin/ai_skills_admin_page.dart';
+import 'pages/admin/ai_marketplace_settings_page.dart';
 import 'pages/admin/ai_eval_admin_page.dart';
 import 'pages/admin/tax_product_codes_page.dart';
 import 'pages/admin/zohal_settings_page.dart';
@@ -215,6 +217,8 @@ import 'pages/business/ai_usage_page.dart';
 import 'pages/business/zohal_inquiries_page.dart';
 import 'pages/business/workflows_page.dart';
 import 'pages/business/workflow_marketplace_page.dart';
+import 'pages/business/ai_skills_marketplace_page.dart';
+import 'pages/business/ai_skills_publisher_revenue_page.dart';
 import 'pages/business/workflow_visual_editor_page.dart';
 import 'pages/business/crm/crm_dashboard_page.dart';
 import 'pages/business/crm/crm_process_definitions_page.dart';
@@ -421,6 +425,8 @@ class _MyAppState extends State<MyApp> {
       const AIProviderCredentialsAdminPage();
       const AIPlansAdminPage();
       const AIPromptsAdminPage();
+      const AISkillsAdminPage();
+      const AIMarketplaceSettingsPage();
       const AnnouncementsAdminPage();
       const NotificationsSettingsPage();
       const NotificationTemplatesAdminPage();
@@ -1563,6 +1569,34 @@ class _MyAppState extends State<MyApp> {
                   },
                 ),
                 GoRoute(
+                  path: 'ai-skills',
+                  name: 'system_settings_ai_skills',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AISkillsAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'ai-marketplace',
+                  name: 'system_settings_ai_marketplace',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AIMarketplaceSettingsPage();
+                  },
+                ),
+                GoRoute(
                   path: 'ai-eval',
                   name: 'system_settings_ai_eval',
                   builder: (context, state) {
@@ -2287,6 +2321,34 @@ class _MyAppState extends State<MyApp> {
                 return MaterialPage(
                   key: state.pageKey,
                   child: WorkflowMarketplacePage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'ai/skills/marketplace',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: AISkillsMarketplacePage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'ai/skills/publisher',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: AISkillsPublisherRevenuePage(
                     businessId: businessId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,

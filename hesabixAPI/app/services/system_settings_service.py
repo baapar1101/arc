@@ -38,6 +38,8 @@ NOTIFY_INAPP_READ_RETENTION_DAYS = "inapp_read_retention_days"
 DEFAULT_DOCUMENT_POLICIES_KEY = "default_document_monetization_policies"
 SHARE_LINK_PUBLIC_APP_URL_KEY = "share_link_public_app_url"
 SHARE_LINK_INVOICE_GATEWAY_FEE_PERCENT_KEY = "share_link_invoice_gateway_fee_percent"
+MARKETPLACE_PUBLISHER_SHARE_PERCENT_KEY = "marketplace_publisher_share_percent"
+DEFAULT_MARKETPLACE_PUBLISHER_SHARE_PERCENT = 70.0
 
 # SMS destination rate limit (optional DB overrides; base values from Settings / env)
 SMS_DESTINATION_RATE_ENABLED_KEY = "sms_destination_rate_enabled"
@@ -443,6 +445,49 @@ def set_share_link_invoice_gateway_fee_percent(db: Session, percent: float) -> N
 	if p < 0 or p > 100:
 		raise ApiError("INVALID_FEE_PERCENT", "درصد کارمزد باید بین ۰ و ۱۰۰ باشد", http_status=400)
 	_upsert_setting_string(db, SHARE_LINK_INVOICE_GATEWAY_FEE_PERCENT_KEY, str(p))
+
+
+def get_marketplace_publisher_share_percent(db: Session) -> float:
+	"""سهم ناشر از فروش مهارت در مارکت‌پلیس (۰ تا ۱۰۰، پیش‌فرض ۷۰)."""
+	obj = _get_setting(db, MARKETPLACE_PUBLISHER_SHARE_PERCENT_KEY)
+	if not obj or obj.value_string is None or str(obj.value_string).strip() == "":
+		return DEFAULT_MARKETPLACE_PUBLISHER_SHARE_PERCENT
+	try:
+		v = float(str(obj.value_string).strip().replace(",", "."))
+	except Exception:
+		return DEFAULT_MARKETPLACE_PUBLISHER_SHARE_PERCENT
+	if v < 0:
+		return 0.0
+	if v > 100:
+		return 100.0
+	return v
+
+
+def set_marketplace_publisher_share_percent(db: Session, percent: float) -> None:
+	try:
+		p = float(percent)
+	except Exception:
+		raise ApiError("INVALID_SHARE_PERCENT", "درصد سهم ناشر نامعتبر است", http_status=400)
+	if p < 0 or p > 100:
+		raise ApiError("INVALID_SHARE_PERCENT", "درصد سهم ناشر باید بین ۰ و ۱۰۰ باشد", http_status=400)
+	_upsert_setting_string(db, MARKETPLACE_PUBLISHER_SHARE_PERCENT_KEY, str(p))
+
+
+def get_marketplace_settings(db: Session) -> Dict[str, Any]:
+	return {
+		"publisher_share_percent": get_marketplace_publisher_share_percent(db),
+		"default_publisher_share_percent": DEFAULT_MARKETPLACE_PUBLISHER_SHARE_PERCENT,
+	}
+
+
+def set_marketplace_settings(
+	db: Session,
+	*,
+	publisher_share_percent: float | None = None,
+) -> Dict[str, Any]:
+	if publisher_share_percent is not None:
+		set_marketplace_publisher_share_percent(db, float(publisher_share_percent))
+	return get_marketplace_settings(db)
 
 
 def get_share_link_settings(db: Session) -> Dict[str, Any]:

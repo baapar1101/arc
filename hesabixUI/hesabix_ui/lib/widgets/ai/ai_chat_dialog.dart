@@ -25,6 +25,7 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_suggestions.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_memory_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_knowledge_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_connectors_sheet.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_skills_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
 import 'package:hesabix_ui/widgets/ai/ai_error_recovery_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
@@ -1195,6 +1196,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
     );
   }
 
+  void _openSkillsSheet() {
+    showAIChatSkillsSheet(
+      context: context,
+      aiService: _aiService,
+      businessId: widget.businessId,
+    );
+  }
+
   Future<void> _submitFeedback(AIChatMessage msg, int rating) async {
     if (_currentSession?.id == null || msg.id == null) return;
     try {
@@ -2183,6 +2192,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
               onExport: _exportConversation,
               onConnectors: _openConnectorsSheet,
               onKnowledge: _openKnowledgeSheet,
+              onSkills: _openSkillsSheet,
               onVoiceSettings: _openVoiceSettings,
             ),
             if (widget.embeddedInShell)
@@ -2313,6 +2323,7 @@ class _AiMoreMenu extends StatelessWidget {
   final VoidCallback onExport;
   final VoidCallback onConnectors;
   final VoidCallback onKnowledge;
+  final VoidCallback onSkills;
   final VoidCallback onVoiceSettings;
 
   const _AiMoreMenu({
@@ -2324,6 +2335,7 @@ class _AiMoreMenu extends StatelessWidget {
     required this.onExport,
     required this.onConnectors,
     required this.onKnowledge,
+    required this.onSkills,
     required this.onVoiceSettings,
   });
 
@@ -2350,6 +2362,9 @@ class _AiMoreMenu extends StatelessWidget {
             break;
           case _AiMenuAction.knowledge:
             onKnowledge();
+            break;
+          case _AiMenuAction.skills:
+            onSkills();
             break;
           case _AiMenuAction.voice:
             onVoiceSettings();
@@ -2392,6 +2407,13 @@ class _AiMoreMenu extends StatelessWidget {
               label: 'دانشنامه',
             ),
           ),
+          const PopupMenuItem(
+            value: _AiMenuAction.skills,
+            child: _AiMenuItem(
+              icon: Icons.extension_outlined,
+              label: 'مهارت‌های AI',
+            ),
+          ),
         ],
         const PopupMenuItem(
           value: _AiMenuAction.voice,
@@ -2402,7 +2424,7 @@ class _AiMoreMenu extends StatelessWidget {
   }
 }
 
-enum _AiMenuAction { search, memory, export, connectors, knowledge, voice }
+enum _AiMenuAction { search, memory, export, connectors, knowledge, skills, voice }
 
 class _AiMenuItem extends StatelessWidget {
   final IconData icon;

@@ -361,6 +361,36 @@ class AIService:
             api_base_url=api_base_url,
         )
 
+    def _anthropic_skills_extra(
+        self,
+        session_business_id: Optional[int],
+        user_query: Optional[str],
+    ) -> Optional[Dict[str, Any]]:
+        if self.get_effective_provider_type() != "anthropic":
+            return None
+        bid = session_business_id or self.business_id
+        if not bid:
+            return None
+        try:
+            from app.services.ai.ai_skill_runtime import get_runtime_skill_context
+
+            ctx = get_runtime_skill_context(
+                self.db, int(bid), user_query or ""
+            )
+            ids = [s for s in (ctx.get("anthropic_skill_ids") or []) if s]
+            if ids:
+                return {"anthropic_skills": ids}
+        except Exception as exc:
+            logger.warning("Anthropic skills resolve failed: %s", exc)
+        return None
+
+    def _provider_call_extras(self, provider: Any, provider_extra: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        from app.services.ai.ai_provider import AnthropicProvider
+
+        if provider_extra and isinstance(provider, AnthropicProvider):
+            return {"provider_extra": provider_extra}
+        return {}
+
     def _provider_supports_tools(self, provider_type: Optional[str] = None) -> bool:
         from app.services.ai.ai_provider_service import resolve_provider_connection
 
@@ -911,10 +941,26 @@ class AIService:
                     safe_db_rollback(self.db)
                     return ""
 
+            def _load_skills() -> str:
+                try:
+                    from app.services.ai.ai_skill_runtime import get_runtime_skill_context
+
+                    ctx_data = get_runtime_skill_context(
+                        self.db, bid, user_query or ""
+                    )
+                    return str(ctx_data.get("metadata_prompt") or "") + str(
+                        ctx_data.get("activated_prompt") or ""
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to load AI skills for prompt: %s", exc)
+                    safe_db_rollback(self.db)
+                    return ""
+
             loaders: List[tuple[str, Any]] = [
                 ("insights", _load_insights),
                 ("memory", _load_memory),
                 ("connectors", _load_connectors),
+                ("skills", _load_skills),
             ]
             if session_id:
                 loaders.append(("attachments", _load_attachments))
@@ -938,6 +984,7 @@ class AIService:
                 + parts.get("attachments", "")
                 + parts.get("knowledge", "")
                 + parts.get("connectors", "")
+                + parts.get("skills", "")
             )
 
         return trim_system_prompt(base_prompt)
@@ -1063,10 +1110,29 @@ class AIService:
                     safe_db_rollback(loader_db)
                     return ""
 
+        def _load_skills() -> str:
+            from adapters.db.session import get_db_session
+
+            with get_db_session() as loader_db:
+                try:
+                    from app.services.ai.ai_skill_runtime import get_runtime_skill_context
+
+                    ctx_data = get_runtime_skill_context(
+                        loader_db, bid, user_query or ""
+                    )
+                    return str(ctx_data.get("metadata_prompt") or "") + str(
+                        ctx_data.get("activated_prompt") or ""
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to load AI skills for prompt: %s", exc)
+                    safe_db_rollback(loader_db)
+                    return ""
+
         parallel_loaders: List[tuple[str, Any]] = [
             ("loading_insights", _load_insights),
             ("loading_memory", _load_memory),
             ("loading_connectors", _load_connectors),
+            ("loading_skills", _load_skills),
         ]
         if session_id:
             parallel_loaders.append(("loading_attachments", _load_attachments))
@@ -1120,6 +1186,7 @@ class AIService:
             + parts.get("loading_attachments", "")
             + parts.get("loading_knowledge", "")
             + parts.get("loading_connectors", "")
+            + parts.get("loading_skills", "")
         )
         yield {"event": "prompt_ready", "prompt": final_prompt}
     
@@ -1148,6 +1215,21 @@ class AIService:
             }
             allowed = select_tool_names(all_names, user_query)
             definitions = filter_function_definitions(definitions, allowed)
+            try:
+                from app.services.ai.ai_skill_runtime import (
+                    collect_allowed_tool_names,
+                    get_runtime_skill_context,
+                )
+
+                skill_ctx = get_runtime_skill_context(
+                    self.db, int(effective_business_id), user_query
+                )
+                activated = skill_ctx.get("activated") or []
+                skill_tools = collect_allowed_tool_names(activated, all_names)
+                if skill_tools:
+                    definitions = filter_function_definitions(definitions, skill_tools)
+            except Exception as exc:
+                logger.warning("AI skill tool filter failed: %s", exc)
         return definitions
     
     def check_quota_and_charge(
@@ -1540,14 +1622,17 @@ class AIService:
                 )
             elif not eff_tools:
                 tools = None
-            
+
+            skills_extra = self._anthropic_skills_extra(session_business_id, effective_user_query)
+            provider_extras = self._provider_call_extras(provider, skills_extra)
+
             context_retried = False
             loop = asyncio.get_event_loop()
             while True:
                 try:
                     response = await loop.run_in_executor(
                         _executor,
-                        lambda msgs=full_messages: provider.chat_completion(
+                        lambda msgs=full_messages, pe=provider_extras: provider.chat_completion(
                             messages=msgs,
                             model=self.get_effective_model_api_id(),
                             max_tokens=max_tokens_override or self.config.max_tokens,
@@ -1557,6 +1642,7 @@ class AIService:
                                 else self.config.temperature
                             ),
                             tools=tools if tools else None,
+                            **pe,
                         ),
                     )
                     break
@@ -1658,14 +1744,19 @@ class AIService:
                     break
                 try:
                     loop = asyncio.get_event_loop()
+                    pe = self._provider_call_extras(
+                        provider,
+                        self._anthropic_skills_extra(session_business_id, effective_user_query),
+                    )
                     response = await loop.run_in_executor(
                         _executor,
-                        lambda msgs=full_messages, t=tools: provider.chat_completion(
+                        lambda msgs=full_messages, t=tools, extras=pe: provider.chat_completion(
                             messages=msgs,
                             model=self.get_effective_model_api_id(),
                             max_tokens=max_tokens_override or self.config.max_tokens,
                             temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
                             tools=t if eff_tools else None,
+                            **extras,
                         ),
                     )
                 except ApiError:
@@ -1887,6 +1978,9 @@ class AIService:
             elif not eff_tools:
                 tools = None
 
+            skills_extra = self._anthropic_skills_extra(session_business_id, effective_user_query)
+            stream_provider_extras = self._provider_call_extras(provider, skills_extra)
+
             # Planning step برای سوال‌های با کافی طول
             _query_len = len(effective_user_query or "")
             if eff_tools and tools and _query_len >= PLANNING_STEP_MIN_CHARS:
@@ -1962,6 +2056,7 @@ class AIService:
                             max_tokens=max_tokens_override or self.config.max_tokens,
                             temperature=float(self.config.temperature),
                             tools=tools if use_tools else None,
+                            **stream_provider_extras,
                         ):
                             if chunk.get("event") == "tool_planning":
                                 yield status_event("planning_tools")

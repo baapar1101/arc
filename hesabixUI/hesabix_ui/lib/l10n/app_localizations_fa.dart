@@ -10801,6 +10801,20 @@ class AppLocalizationsFa extends AppLocalizations {
       'مدیریت Prompt های پیش‌فرض برای نقش‌های مختلف';
 
   @override
+  String get settingsAISkills => 'مهارت‌های AI';
+
+  @override
+  String get settingsAISkillsDescription =>
+      'بررسی و تأیید مهارت‌های منتشرشده در مارکت‌پلیس';
+
+  @override
+  String get settingsAIMarketplace => 'مارکت‌پلیس AI';
+
+  @override
+  String get settingsAIMarketplaceDescription =>
+      'تنظیم سهم درآمد ناشر از فروش مهارت‌ها';
+
+  @override
   String get settingsZohalServices => 'سرویس‌های زحل';
 
   @override

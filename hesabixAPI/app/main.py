@@ -1126,12 +1126,14 @@ def create_app() -> FastAPI:
     from adapters.api.v1.admin.ai_provider_credentials import (
         router as admin_ai_provider_credentials_router,
     )
+    from adapters.api.v1.admin.ai_skills import router as admin_ai_skills_router
     application.include_router(admin_ai_settings_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_plans_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_prompts_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_eval_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_models_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_provider_credentials_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_ai_skills_router, prefix=settings.api_v1_prefix)
     # User AI endpoints
     from adapters.api.v1.ai.chat import router as ai_chat_router
     from adapters.api.v1.ai.crm_ai import router as ai_crm_router
@@ -1141,9 +1143,11 @@ def create_app() -> FastAPI:
     from adapters.api.v1.ai.voice_feedback import router as ai_voice_feedback_router
     from adapters.api.v1.ai.mcp import router as ai_mcp_router
     from adapters.api.v1.ai.models import router as ai_models_router
+    from adapters.api.v1.ai.skills import router as ai_skills_router
     application.include_router(ai_chat_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_mcp_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_models_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_skills_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_crm_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_subscription_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_prompts_router, prefix=settings.api_v1_prefix)

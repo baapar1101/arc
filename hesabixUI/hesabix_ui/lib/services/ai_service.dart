@@ -1034,6 +1034,219 @@ class AIService {
     return body['data'] as Map<String, dynamic>;
   }
 
+  // ---- AI Skills (Agent Skills / marketplace) ----
+
+  Future<List<Map<String, dynamic>>> listInstalledSkills({
+    required int businessId,
+    bool enabledOnly = false,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills/installed',
+      query: {if (enabledOnly) 'enabled_only': 'true'},
+    );
+    final data = res.data?['data'] as Map<String, dynamic>? ?? {};
+    final items = data['items'] as List? ?? [];
+    return items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> listSkillMarketplace({
+    int skip = 0,
+    int take = 20,
+    String? search,
+    String? sourceType,
+    bool? isOfficial,
+    int? businessId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/skills/marketplace/packages',
+      query: {
+        'skip': skip,
+        'take': take,
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (sourceType != null && sourceType.isNotEmpty) 'source_type': sourceType,
+        if (isOfficial != null) 'is_official': isOfficial.toString(),
+        if (businessId != null) 'business_id': businessId,
+      },
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? {});
+  }
+
+  Future<List<Map<String, dynamic>>> listAnthropicSkillCatalog() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/ai/skills/catalog/anthropic');
+    final data = res.data?['data'] as Map<String, dynamic>? ?? {};
+    final items = data['items'] as List? ?? [];
+    return items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> installSkill({
+    required int businessId,
+    required int packageId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills/install',
+      data: {'package_id': packageId},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? {});
+  }
+
+  Future<Map<String, dynamic>> installAnthropicSkill({
+    required int businessId,
+    required String anthropicSkillId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills/install-anthropic',
+      data: {'anthropic_skill_id': anthropicSkillId},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? {});
+  }
+
+  Future<void> setSkillsEnabled({
+    required int businessId,
+    List<int>? enableIds,
+    List<int>? disableIds,
+  }) async {
+    await _api.put(
+      '/api/v1/businesses/$businessId/ai/skills/enabled',
+      data: {
+        if (enableIds != null) 'enable_ids': enableIds,
+        if (disableIds != null) 'disable_ids': disableIds,
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> importSkillZip({
+    required int businessId,
+    required String filename,
+    required List<int> bytes,
+    String? title,
+  }) async {
+    final formData = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+      if (title != null && title.isNotEmpty) 'title': title,
+    });
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills/import',
+      data: formData,
+      options: Options(
+        sendTimeout: const Duration(seconds: 120),
+        receiveTimeout: const Duration(seconds: 120),
+      ),
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? {});
+  }
+
+  Future<Map<String, dynamic>> createNativeSkill({
+    required int businessId,
+    required String skillSlug,
+    required String title,
+    required String description,
+    required String skillBody,
+    List<String>? allowedToolNames,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills',
+      data: {
+        'skill_slug': skillSlug,
+        'title': title,
+        'description': description,
+        'skill_body': skillBody,
+        if (allowedToolNames != null) 'allowed_tool_names': allowedToolNames,
+      },
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? {});
+  }
+
+  Future<Map<String, dynamic>> importSkillFromGit({
+    required int businessId,
+    required String gitUrl,
+    String? title,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills/import-git',
+      data: {
+        'git_url': gitUrl,
+        if (title != null && title.isNotEmpty) 'title': title,
+      },
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? {});
+  }
+
+  Future<List<Map<String, dynamic>>> listOwnedSkills({
+    required int businessId,
+    int skip = 0,
+    int take = 50,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills/owned',
+      query: {'skip': skip, 'take': take},
+    );
+    final data = res.data?['data'] as Map<String, dynamic>? ?? {};
+    final items = data['items'] as List? ?? [];
+    return items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<Map<String, dynamic>> publishSkill({
+    required int businessId,
+    required int packageId,
+    String? shortDescription,
+    String? longDescription,
+    List<String>? tags,
+    String versionLabel = '1.0.0',
+    String? changelog,
+    double? priceAmount,
+    int? currencyId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills/$packageId/publish',
+      data: {
+        if (shortDescription != null) 'short_description': shortDescription,
+        if (longDescription != null) 'long_description': longDescription,
+        if (tags != null) 'tags': tags,
+        'version_label': versionLabel,
+        if (changelog != null) 'changelog': changelog,
+        if (priceAmount != null) 'price_amount': priceAmount,
+        if (currencyId != null) 'currency_id': currencyId,
+      },
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? {});
+  }
+
+  Future<Map<String, dynamic>> getPublisherRevenue({
+    required int businessId,
+    int skip = 0,
+    int take = 20,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai/skills/publisher/revenue',
+      query: {'skip': skip, 'take': take},
+    );
+    return Map<String, dynamic>.from(res.data?['data'] as Map? ?? {});
+  }
+
+  Future<List<Map<String, dynamic>>> listPendingSkillsAdmin() async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/admin/ai/skills/pending');
+    final data = res.data?['data'] as Map<String, dynamic>? ?? {};
+    final items = data['items'] as List? ?? [];
+    return items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+
+  Future<void> approveSkillAdmin(int packageId) async {
+    await _api.post('/api/v1/admin/ai/skills/packages/$packageId/approve');
+  }
+
+  Future<void> rejectSkillAdmin(int packageId, {String? reason}) async {
+    await _api.post(
+      '/api/v1/admin/ai/skills/packages/$packageId/reject',
+      data: {if (reason != null) 'reason': reason},
+    );
+  }
+
+  Future<int> seedOfficialSkillsAdmin() async {
+    final res = await _api.post<Map<String, dynamic>>('/api/v1/admin/ai/skills/seed-official');
+    final data = res.data?['data'] as Map<String, dynamic>? ?? {};
+    return data['created'] as int? ?? 0;
+  }
+
   Stream<AIStreamChunk> _postSseStream(
     String path, {
     Object? data,

@@ -10861,6 +10861,20 @@ class AppLocalizationsEn extends AppLocalizations {
       'Manage default prompts for different roles';
 
   @override
+  String get settingsAISkills => 'AI Skills';
+
+  @override
+  String get settingsAISkillsDescription =>
+      'Review and approve skills published to the marketplace';
+
+  @override
+  String get settingsAIMarketplace => 'AI Marketplace';
+
+  @override
+  String get settingsAIMarketplaceDescription =>
+      'Configure publisher revenue share for skill sales';
+
+  @override
   String get settingsZohalServices => 'Zohal Services';
 
   @override

@@ -58,6 +58,10 @@ class LocalizationHelper {
         return t.settingsAIPlans;
       case 'settingsAIPrompts':
         return t.settingsAIPrompts;
+      case 'settingsAISkills':
+        return t.settingsAISkills;
+      case 'settingsAIMarketplace':
+        return t.settingsAIMarketplace;
       case 'settingsZohalServices':
         return t.settingsZohalServices;
       case 'settingsZohalSettings':
@@ -130,6 +134,10 @@ class LocalizationHelper {
         return t.settingsAIPlansDescription;
       case 'settingsAIPromptsDescription':
         return t.settingsAIPromptsDescription;
+      case 'settingsAISkillsDescription':
+        return t.settingsAISkillsDescription;
+      case 'settingsAIMarketplaceDescription':
+        return t.settingsAIMarketplaceDescription;
       case 'settingsZohalServicesDescription':
         return t.settingsZohalServicesDescription;
       case 'settingsZohalSettingsDescription':

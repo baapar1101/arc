@@ -20214,6 +20214,30 @@ abstract class AppLocalizations {
   /// **'Manage default prompts for different roles'**
   String get settingsAIPromptsDescription;
 
+  /// No description provided for @settingsAISkills.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Skills'**
+  String get settingsAISkills;
+
+  /// No description provided for @settingsAISkillsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and approve skills published to the marketplace'**
+  String get settingsAISkillsDescription;
+
+  /// No description provided for @settingsAIMarketplace.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Marketplace'**
+  String get settingsAIMarketplace;
+
+  /// No description provided for @settingsAIMarketplaceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure publisher revenue share for skill sales'**
+  String get settingsAIMarketplaceDescription;
+
   /// No description provided for @settingsZohalServices.
   ///
   /// In en, this message translates to:

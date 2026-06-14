@@ -28,6 +28,8 @@ from app.services.system_settings_service import (
 	set_notifications_settings,
 	get_share_link_settings,
 	set_share_link_settings,
+	get_marketplace_settings,
+	set_marketplace_settings,
 	get_effective_notifications_settings,
 	get_system_configuration,
 	set_system_configuration,
@@ -162,6 +164,49 @@ def set_share_link_settings_endpoint(
 		invoice_gateway_fee_percent=payload.invoice_gateway_fee_percent,
 	)
 	return success_response(data, request, message="SHARE_LINK_PUBLIC_APP_URL_UPDATED")
+
+
+class MarketplaceSettingsPayload(BaseModel):
+	publisher_share_percent: float = Field(
+		ge=0,
+		le=100,
+		description="درصد سهم ناشر از فروش مهارت AI (۰ تا ۱۰۰)",
+	)
+
+
+@router.get(
+	"/marketplace",
+	summary="تنظیمات مارکت‌پلیس",
+	description="درصد سهم ناشر از فروش مهارت‌های AI و سایر تنظیمات مارکت‌پلیس",
+)
+def get_marketplace_settings_endpoint(
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = get_marketplace_settings(db)
+	return success_response(data, request)
+
+
+@router.put(
+	"/marketplace",
+	summary="به‌روزرسانی تنظیمات مارکت‌پلیس",
+)
+def set_marketplace_settings_endpoint(
+	payload: MarketplaceSettingsPayload,
+	request: Request,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	if not ctx.has_any_permission("system_settings", "superadmin"):
+		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	data = set_marketplace_settings(
+		db,
+		publisher_share_percent=payload.publisher_share_percent,
+	)
+	return success_response(data, request, message="MARKETPLACE_SETTINGS_UPDATED")
 
 
 @router.put(
