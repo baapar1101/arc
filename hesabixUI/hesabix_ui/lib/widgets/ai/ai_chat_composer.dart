@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../models/ai_models.dart';
 import '../../services/voice/voice_phase.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_model_chip.dart';
 import 'voice_status_label.dart';
 
 enum AIChatComposerPlacement { center, bottom }
@@ -48,7 +50,7 @@ const kSlashCommands = [
     icon: Icons.people_outline_rounded,
   ),
   SlashCommand(
-    command: '/dashboard',
+    command: '/داشبورد',
     description: 'خلاصه داشبورد',
     prompt: 'خلاصه‌ای از وضعیت کلی کسب‌وکار امروز بده.',
     icon: Icons.dashboard_outlined,
@@ -82,6 +84,11 @@ class AIChatComposer extends StatefulWidget {
   final VoidCallback? onStopVoice;
   final VoidCallback? onStopGenerating;
   final VoidCallback? onAttach;
+  final List<AIModelCatalogItem> availableModels;
+  final String? selectedModelCode;
+  final bool modelsLoading;
+  final ValueChanged<String?>? onModelChanged;
+  final String? modelPricingHint;
 
   const AIChatComposer({
     super.key,
@@ -99,6 +106,11 @@ class AIChatComposer extends StatefulWidget {
     this.onStopVoice,
     this.onStopGenerating,
     this.onAttach,
+    this.availableModels = const [],
+    this.selectedModelCode,
+    this.modelsLoading = false,
+    this.onModelChanged,
+    this.modelPricingHint,
   });
 
   @override
@@ -408,6 +420,36 @@ class _AIChatComposerState extends State<AIChatComposer> {
                       hasVoice: widget.onMic != null,
                       voiceActive: widget.voiceActive,
                       l10n: l10n,
+                    ),
+                  )
+                else if (_focused || widget.sending)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+                    child: Text(
+                      '/ دستورات · میکروفون · تأیید قبل از ثبت',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ),
+                if (widget.availableModels.isNotEmpty)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      compact ? 14 : 18,
+                      0,
+                      compact ? 14 : 18,
+                      compact ? 8 : 10,
+                    ),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: AIChatModelChip(
+                        models: widget.availableModels,
+                        selectedCode: widget.selectedModelCode,
+                        loading: widget.modelsLoading,
+                        enabled: !widget.disabled && !widget.sending,
+                        onChanged: widget.onModelChanged,
+                        pricingHint: widget.modelPricingHint,
+                      ),
                     ),
                   ),
                 if (_focused && !compact)

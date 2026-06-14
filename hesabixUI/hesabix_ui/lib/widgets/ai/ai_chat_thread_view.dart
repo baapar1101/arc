@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../models/ai_models.dart';
 import '../../services/voice/voice_phase.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
@@ -57,6 +57,11 @@ class AIChatThreadView extends StatelessWidget {
   final List<GlobalKey>? messageKeys;
   final int? businessId;
   final bool suppressApprovalToolChips;
+  final List<AIModelCatalogItem> availableModels;
+  final String? selectedModelCode;
+  final bool modelsLoading;
+  final ValueChanged<String?>? onModelChanged;
+  final String? modelPricingHint;
 
   const AIChatThreadView({
     super.key,
@@ -101,6 +106,11 @@ class AIChatThreadView extends StatelessWidget {
     this.contextUsagePercent,
     this.contextHistorySummarized = false,
     this.messageKeys,
+    this.availableModels = const [],
+    this.selectedModelCode,
+    this.modelsLoading = false,
+    this.onModelChanged,
+    this.modelPricingHint,
   });
 
   Widget _buildMessageList(BuildContext context) {
@@ -120,41 +130,57 @@ class AIChatThreadView extends StatelessWidget {
               messageKeys != null && index < messageKeys!.length
                   ? messageKeys![index]
                   : null;
-          return KeyedSubtree(
-            key: rowKey,
-            child: _MessageRow(
-              businessId: businessId,
-              suppressApprovalToolChips: suppressApprovalToolChips,
-              message: messages[index],
-              formatTime: formatTime,
-              onLongPress: () => onMessageLongPress(messages[index]),
-              onCopy: () => onCopyMessage(messages[index].content),
-              onFeedback: messages[index].id != null
-                  ? (r) => onFeedback(messages[index], r)
-                  : null,
-              feedbackRating: messages[index].id != null
-                  ? messageFeedbackRatings[messages[index].id!]
-                  : null,
-              onRegenerate: messages[index].id != null &&
-                      messages[index].id == lastAssistantMessageId &&
-                      messages[index].role == MessageRole.assistant
-                  ? onRegenerateLast
-                  : null,
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AIChatDesign.contentMaxWidth,
+              ),
+              child: KeyedSubtree(
+                key: rowKey,
+                child: _MessageRow(
+                  businessId: businessId,
+                  suppressApprovalToolChips: suppressApprovalToolChips,
+                  message: messages[index],
+                  formatTime: formatTime,
+                  onLongPress: () => onMessageLongPress(messages[index]),
+                  onCopy: () => onCopyMessage(messages[index].content),
+                  onFeedback: messages[index].id != null
+                      ? (r) => onFeedback(messages[index], r)
+                      : null,
+                  feedbackRating: messages[index].id != null
+                      ? messageFeedbackRatings[messages[index].id!]
+                      : null,
+                  onRegenerate: messages[index].id != null &&
+                          messages[index].id == lastAssistantMessageId &&
+                          messages[index].role == MessageRole.assistant
+                      ? onRegenerateLast
+                      : null,
+                ),
+              ),
             ),
           );
         }
-        return _StreamingRow(
-          businessId: businessId,
-          suppressApprovalToolChips: suppressApprovalToolChips,
-          content: streamingContent ?? '',
-          toolActivities: streamingToolActivities,
-          traceSteps: streamingTraceSteps,
-          statusPhase: streamingStatusPhase,
-          statusStep: streamingStatusStep,
-          iteration: streamingIteration,
-          maxIterations: streamingMaxIterations,
-          elapsedSeconds: streamingElapsedSeconds,
-          formatTime: formatTime(streamingTimestamp),
+        return Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: AIChatDesign.contentMaxWidth,
+            ),
+            child: _StreamingRow(
+              businessId: businessId,
+              suppressApprovalToolChips: suppressApprovalToolChips,
+              content: streamingContent ?? '',
+              toolActivities: streamingToolActivities,
+              traceSteps: streamingTraceSteps,
+              statusPhase: streamingStatusPhase,
+              statusStep: streamingStatusStep,
+              iteration: streamingIteration,
+              maxIterations: streamingMaxIterations,
+              elapsedSeconds: streamingElapsedSeconds,
+              formatTime: formatTime(streamingTimestamp),
+            ),
+          ),
         );
       },
     );
@@ -247,6 +273,11 @@ class AIChatThreadView extends StatelessWidget {
           onStopVoice: onStopVoice,
           onStopGenerating: isGenerating ? onStopGenerating : null,
           onAttach: onAttach,
+          availableModels: availableModels,
+          selectedModelCode: selectedModelCode,
+          modelsLoading: modelsLoading,
+          onModelChanged: onModelChanged,
+          modelPricingHint: modelPricingHint,
         ),
       ],
     );
@@ -536,32 +567,10 @@ class _StreamingAnswerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (showReasoningAbove) const SizedBox(height: 4),
-        Row(
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: scheme.primary,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 7),
-            Text(
-              l10n.aiAnswerPanelTitle,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.primary,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
           decoration: AIChatDesign.elevatedCard(
@@ -581,7 +590,6 @@ class _StreamingAnswerCard extends StatelessWidget {
             content: content,
             isUser: false,
             businessId: businessId,
-            suppressAnswerLabel: true,
           ),
         ),
       ],

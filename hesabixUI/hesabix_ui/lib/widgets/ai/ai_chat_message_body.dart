@@ -17,7 +17,6 @@ class AIChatMessageBody extends StatelessWidget {
   final int? businessId;
   final Object? functionCalls;
   final Object? functionResults;
-  final bool suppressAnswerLabel;
   final bool suppressApprovalToolChips;
 
   const AIChatMessageBody({
@@ -27,7 +26,6 @@ class AIChatMessageBody extends StatelessWidget {
     this.businessId,
     this.functionCalls,
     this.functionResults,
-    this.suppressAnswerLabel = false,
     this.suppressApprovalToolChips = false,
   });
 
@@ -67,10 +65,6 @@ class AIChatMessageBody extends StatelessWidget {
             ),
         ],
         if (content.trim().isNotEmpty) ...[
-          if (!isUser && !suppressAnswerLabel) ...[
-            const _ResponseLabel(),
-            const SizedBox(height: 10),
-          ],
           isUser
               ? SelectableText(
                   content,
@@ -154,36 +148,6 @@ class AIChatMessageBody extends StatelessWidget {
       if (m['name'] != null) return [m];
     }
     return [];
-  }
-}
-
-class _ResponseLabel extends StatelessWidget {
-  const _ResponseLabel();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Row(
-      children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: scheme.primary,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 7),
-        Text(
-          AppLocalizations.of(context).aiAnswerPanelTitle,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: scheme.primary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
   }
 }
 

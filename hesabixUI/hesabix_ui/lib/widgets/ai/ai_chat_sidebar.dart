@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'ai_chat_design.dart';
+import 'ai_session_pins_store.dart';
 
 /// گروه‌بندی زمانی session‌ها
 enum _SessionGroup {
@@ -52,6 +55,7 @@ class AIChatSidebar extends StatefulWidget {
   final AIChatSession? currentSession;
   final bool loading;
   final bool isJalali;
+  final int? businessId;
   final VoidCallback onNewChat;
   final ValueChanged<AIChatSession> onSelectSession;
   final ValueChanged<AIChatSession> onDeleteSession;
@@ -63,6 +67,7 @@ class AIChatSidebar extends StatefulWidget {
     required this.currentSession,
     required this.loading,
     required this.isJalali,
+    this.businessId,
     required this.onNewChat,
     required this.onSelectSession,
     required this.onDeleteSession,
@@ -75,7 +80,22 @@ class AIChatSidebar extends StatefulWidget {
 
 class _AIChatSidebarState extends State<AIChatSidebar> {
   final TextEditingController _searchCtrl = TextEditingController();
-  final Set<int> _pinnedIds = {};
+  Set<int> _pinnedIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPins();
+  }
+
+  Future<void> _loadPins() async {
+    final pins = await AISessionPinsStore.load(widget.businessId);
+    if (mounted) setState(() => _pinnedIds = pins);
+  }
+
+  Future<void> _persistPins() async {
+    await AISessionPinsStore.save(widget.businessId, _pinnedIds);
+  }
 
   @override
   void dispose() {
@@ -92,6 +112,7 @@ class _AIChatSidebarState extends State<AIChatSidebar> {
         _pinnedIds.add(s.id!);
       }
     });
+    unawaited(_persistPins());
   }
 
   List<Widget> _buildGroupedList(
@@ -369,6 +390,7 @@ class AIChatHistoryDrawer extends StatelessWidget {
   final AIChatSession? currentSession;
   final bool loading;
   final bool isJalali;
+  final int? businessId;
   final VoidCallback onNewChat;
   final ValueChanged<AIChatSession> onSelectSession;
   final ValueChanged<AIChatSession> onDeleteSession;
@@ -380,6 +402,7 @@ class AIChatHistoryDrawer extends StatelessWidget {
     required this.currentSession,
     required this.loading,
     required this.isJalali,
+    this.businessId,
     required this.onNewChat,
     required this.onSelectSession,
     required this.onDeleteSession,
@@ -395,6 +418,7 @@ class AIChatHistoryDrawer extends StatelessWidget {
           currentSession: currentSession,
           loading: loading,
           isJalali: isJalali,
+          businessId: businessId,
           onNewChat: () {
             Navigator.of(context).pop();
             onNewChat();

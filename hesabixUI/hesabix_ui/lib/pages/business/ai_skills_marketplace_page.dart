@@ -6,6 +6,9 @@ import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/wallet_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
+import 'package:hesabix_ui/widgets/ai/ai_empty_state.dart';
+import 'package:hesabix_ui/widgets/ai/ai_skill_marketplace_card.dart';
 import 'package:hesabix_ui/widgets/ai/ai_skill_purchase_confirm_dialog.dart';
 
 /// مارکت‌پلیس مهارت‌های AI
@@ -126,7 +129,7 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
         final ok = await AISkillPurchaseConfirmDialog.show(
           context,
           skillTitle: item['title']?.toString() ?? '',
-          price: (price as num).toDouble(),
+          price: price.toDouble(),
           currencySymbol: symbol,
           walletBalance: balance,
         );
@@ -184,25 +187,93 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
     }
   }
 
-  Widget _packageTile(Map<String, dynamic> item, {required VoidCallback onInstall}) {
-    return ListTile(
-      title: Text(item['title']?.toString() ?? ''),
-      subtitle: Text(
-        '${item['short_description'] ?? item['description'] ?? ''}\n${_priceLabel(item)}',
-        maxLines: 3,
-        overflow: TextOverflow.ellipsis,
-      ),
-      isThreeLine: true,
-      trailing: FilledButton(
-        onPressed: _busy ? null : onInstall,
-        child: const Text('نصب'),
-      ),
+  Widget _packageCard(
+    Map<String, dynamic> item, {
+    required bool isOfficial,
+    required VoidCallback onInstall,
+  }) {
+    final purchased = item['is_purchased'] == true;
+    return AISkillMarketplaceCard(
+      title: item['title']?.toString() ?? '',
+      description: item['short_description']?.toString() ??
+          item['description']?.toString() ??
+          '',
+      priceLabel: _priceLabel(item),
+      isOfficial: isOfficial,
+      isPurchased: purchased,
+      busy: _busy,
+      onInstall: purchased ? null : onInstall,
+      leadingIcon: isOfficial ? Icons.verified_outlined : Icons.extension_outlined,
+    );
+  }
+
+  Widget _buildPackageList(
+    List<Map<String, dynamic>> items, {
+    required bool isOfficial,
+    required String emptyTitle,
+    required String emptySubtitle,
+  }) {
+    if (items.isEmpty) {
+      return AIEmptyState(
+        icon: Icons.extension_off_outlined,
+        title: emptyTitle,
+        subtitle: emptySubtitle,
+        action: OutlinedButton.icon(
+          onPressed: _busy ? null : _load,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('بارگذاری دوباره'),
+        ),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        for (final item in items)
+          _packageCard(
+            item,
+            isOfficial: isOfficial,
+            onInstall: () => _installPackage(item),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAnthropicList() {
+    if (_anthropicItems.isEmpty) {
+      return const AIEmptyState(
+        icon: Icons.auto_awesome_outlined,
+        title: 'مهارتی در کاتالوگ Anthropic نیست',
+        subtitle: 'بعداً دوباره بررسی کنید یا از مارکت‌پلیس جامعه استفاده کنید.',
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        for (final item in _anthropicItems)
+          AISkillMarketplaceCard(
+            title: item['title']?.toString() ??
+                item['anthropic_skill_id']?.toString() ??
+                '',
+            description: item['description']?.toString() ?? '',
+            priceLabel: 'رایگان',
+            busy: _busy,
+            leadingIcon: Icons.auto_awesome_outlined,
+            onInstall: () {
+              final sid = item['anthropic_skill_id']?.toString() ?? '';
+              if (sid.isNotEmpty) _installAnthropic(sid);
+            },
+          ),
+      ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('مارکت‌پلیس مهارت‌های AI'),
@@ -214,90 +285,61 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
             Tab(text: 'Anthropic'),
           ],
         ),
-      ),
-      body: Column(
-        children: [
-          if (_tabController.index == 0)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: 'جستجو…',
-                        prefixIcon: Icon(Icons.search),
-                        isDense: true,
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _load(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(onPressed: _busy ? null : _load, icon: const Icon(Icons.refresh)),
-                ],
-              ),
-            ),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _marketItems.isEmpty
-                          ? const Center(child: Text('مهارتی یافت نشد'))
-                          : ListView.separated(
-                              itemCount: _marketItems.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1),
-                              itemBuilder: (context, i) {
-                                final item = _marketItems[i];
-                                final id = item['id'];
-                                final packageId = id is int ? id : int.tryParse('$id');
-                                if (packageId == null) return const SizedBox.shrink();
-                                return _packageTile(
-                                  item,
-                                  onInstall: () => _installPackage(item),
-                                );
-                              },
-                            ),
-                      _officialItems.isEmpty
-                          ? const Center(child: Text('مهارت رسمی یافت نشد'))
-                          : ListView.separated(
-                              itemCount: _officialItems.length,
-                              separatorBuilder: (_, __) => const Divider(height: 1),
-                              itemBuilder: (context, i) {
-                                final item = _officialItems[i];
-                                final id = item['id'];
-                                final packageId = id is int ? id : int.tryParse('$id');
-                                if (packageId == null) return const SizedBox.shrink();
-                                return _packageTile(
-                                  item,
-                                  onInstall: () => _installPackage(item),
-                                );
-                              },
-                            ),
-                      ListView.separated(
-                        itemCount: _anthropicItems.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, i) {
-                          final item = _anthropicItems[i];
-                          final sid = item['anthropic_skill_id']?.toString() ?? '';
-                          return ListTile(
-                            leading: Icon(Icons.auto_awesome, color: theme.colorScheme.primary),
-                            title: Text(item['title']?.toString() ?? sid),
-                            subtitle: Text(item['description']?.toString() ?? ''),
-                            trailing: FilledButton(
-                              onPressed: _busy || sid.isEmpty ? null : () => _installAnthropic(sid),
-                              child: const Text('نصب'),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+        actions: [
+          IconButton(
+            onPressed: _busy ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
+      ),
+      body: Container(
+        decoration: AIChatDesign.pageBackground(theme, isDark: isDark),
+        child: Column(
+          children: [
+            if (_tabController.index == 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'جستجوی مهارت…',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    isDense: true,
+                    filled: true,
+                    fillColor: theme.colorScheme.surface.withValues(alpha: 0.9),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AIChatDesign.chipRadius),
+                    ),
+                  ),
+                  onSubmitted: (_) => _load(),
+                ),
+              ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildPackageList(
+                          _marketItems,
+                          isOfficial: false,
+                          emptyTitle: 'مهارتی یافت نشد',
+                          emptySubtitle:
+                              'عبارت جستجو را تغییر دهید یا بعداً دوباره امتحان کنید.',
+                        ),
+                        _buildPackageList(
+                          _officialItems,
+                          isOfficial: true,
+                          emptyTitle: 'مهارت رسمی یافت نشد',
+                          emptySubtitle:
+                              'مهارت‌های رسمی حسابیکس به‌زودی اینجا نمایش داده می‌شوند.',
+                        ),
+                        _buildAnthropicList(),
+                      ],
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

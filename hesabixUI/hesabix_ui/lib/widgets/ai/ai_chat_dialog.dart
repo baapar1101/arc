@@ -27,6 +27,8 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_knowledge_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_connectors_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_skills_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_toolbar.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_onboarding_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_error_recovery_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
 import 'package:hesabix_ui/widgets/ai/ai_write_approval_banner.dart';
@@ -123,6 +125,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   String? _selectedModelCode;
   String? _lastResolvedModelLabel;
   bool _modelsLoading = false;
+  bool _focusChatMode = false;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
@@ -252,89 +255,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
     await _checkAvailability(model: code);
   }
 
-  Widget _buildModelSelector(ThemeData theme) {
-    if (_availableModels.isEmpty) return const SizedBox.shrink();
-    AIModelCatalogItem? selected;
-    for (final m in _availableModels) {
-      if (m.code == _selectedModelCode) {
-        selected = m;
-        break;
-      }
-    }
-    final hint = selected?.pricingHint ?? _selectedModelPricingHint();
-    final resolvedHint = _lastResolvedModelLabel;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.hub_outlined, size: 18, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text('مدل', style: theme.textTheme.labelLarge),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    isExpanded: true,
-                    value: _selectedModelCode,
-                    hint: _modelsLoading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('انتخاب مدل'),
-                    items: _availableModels
-                        .map(
-                          (m) => DropdownMenuItem(
-                            value: m.code,
-                            child: Text(_modelDropdownLabel(m)),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: _sending ? null : _onModelChanged,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (hint != null && hint.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, right: 26),
-              child: Text(
-                hint,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          if (resolvedHint != null && resolvedHint.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 2, right: 26),
-              child: Text(
-                'آخرین پاسخ با $resolvedHint',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  String _modelDropdownLabel(AIModelCatalogItem m) {
-    final hint = m.pricingHint;
-    if (hint == null || hint.isEmpty) return m.displayName;
-    return '${m.displayName} · $hint';
-  }
-
   String? _selectedModelPricingHint() {
     final details = _availabilityInfo?['details'] as Map<String, dynamic>?;
     final pricing = details?['model_pricing'] as Map<String, dynamic>?;
     return pricing?['pricing_hint'] as String?;
+  }
+
+  String? _composerModelHint() {
+    final pricing = _selectedModelPricingHint();
+    final resolved = _lastResolvedModelLabel;
+    if (resolved != null && resolved.isNotEmpty) {
+      final tail = 'آخرین پاسخ با $resolved';
+      return pricing != null && pricing.isNotEmpty ? '$pricing · $tail' : tail;
+    }
+    return pricing;
   }
 
   void _onStreamStateChanged() {
@@ -1201,7 +1135,22 @@ class _AIChatDialogState extends State<AIChatDialog> {
       context: context,
       aiService: _aiService,
       businessId: widget.businessId,
+      onOpenPanelPage:
+          widget.embeddedInShell ? null : _navigateToPanelPage,
     );
+  }
+
+  void _navigateToPanelPage(String relativePath) {
+    final bid = widget.businessId;
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    if (bid == null) return;
+    try {
+      final prefix = BusinessRoutePaths.prefixFromRouterState(router.state);
+      router.go('$prefix/$relativePath');
+    } catch (_) {
+      router.go('/business/$bid/tab0/$relativePath');
+    }
   }
 
   Future<void> _submitFeedback(AIChatMessage msg, int rating) async {
@@ -1893,7 +1842,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   void _openHistory() {
-    if (AIChatDesign.showPersistentSidebar(context)) return;
+    if (AIChatDesign.showPersistentSidebar(context) && !_focusChatMode) return;
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
@@ -1901,7 +1850,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final persistentSidebar = AIChatDesign.showPersistentSidebar(context);
+    final persistentSidebar =
+        AIChatDesign.showPersistentSidebar(context) && !_focusChatMode;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -1913,6 +1863,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
               currentSession: _currentSession,
               loading: _sessionsLoading,
               isJalali: _isJalali,
+              businessId: widget.businessId,
               onNewChat: _startNewConversation,
               onSelectSession: _selectSession,
               onDeleteSession: _deleteSession,
@@ -1930,6 +1881,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   currentSession: _currentSession,
                   loading: _sessionsLoading,
                   isJalali: _isJalali,
+                  businessId: widget.businessId,
                   onNewChat: _startNewConversation,
                   onSelectSession: _selectSession,
                   onDeleteSession: _deleteSession,
@@ -1940,7 +1892,24 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildAppBar(theme),
-                    _buildModelSelector(theme),
+                    AIChatToolbar(
+                      isHomeMode: _isHomeMode,
+                      hasSession: _currentSession != null,
+                      hasBusiness: widget.businessId != null,
+                      focusMode: _focusChatMode,
+                      showFocusToggle: AIChatDesign.showPersistentSidebar(context),
+                      onSearch: _openMessageSearch,
+                      onMemory: _openMemorySheet,
+                      onExport: _exportConversation,
+                      onConnectors: _openConnectorsSheet,
+                      onKnowledge: _openKnowledgeSheet,
+                      onSkills: _openSkillsSheet,
+                      onVoiceSettings: _openVoiceSettings,
+                      onToggleFocus: () =>
+                          setState(() => _focusChatMode = !_focusChatMode),
+                    ),
+                    if (_isHomeMode)
+                      AIChatOnboardingBanner(businessId: widget.businessId),
                     if (_showCreditWarning) _buildCreditWarning(theme),
                     if (_showWriteApprovalBanner)
                       AIWriteApprovalBanner(
@@ -1986,6 +1955,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 onUpgradePlan: widget.businessId != null
                                     ? _navigateToSubscription
                                     : null,
+                                availableModels: _availableModels,
+                                selectedModelCode: _selectedModelCode,
+                                modelsLoading: _modelsLoading,
+                                onModelChanged:
+                                    _sending ? null : _onModelChanged,
+                                modelPricingHint: _composerModelHint(),
                               )
                             : Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2072,6 +2047,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                           _scrollToBottom(force: true),
                                       onMessageLongPress: _showMessageActions,
                                       onAttach: _pickAndUploadAttachment,
+                                      availableModels: _availableModels,
+                                      selectedModelCode: _selectedModelCode,
+                                      modelsLoading: _modelsLoading,
+                                      onModelChanged:
+                                          _sending ? null : _onModelChanged,
+                                      modelPricingHint: _composerModelHint(),
                                     ),
                                   ),
                                 ],
@@ -2091,12 +2072,25 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Widget _buildAppBar(ThemeData theme) {
     final scheme = theme.colorScheme;
     final compact = AIChatDesign.isCompactWidth(context);
-    final showHistoryBtn = !AIChatDesign.showPersistentSidebar(context);
+    final embedded = widget.embeddedInShell;
+    final showHistoryBtn =
+        !AIChatDesign.showPersistentSidebar(context) || _focusChatMode;
+    final showSubtitle = _isGenerating || (_isHomeMode && !embedded);
+    final title = _isHomeMode && !embedded
+        ? 'دستیار هوشمند حسابیکس'
+        : (_isHomeMode
+            ? 'دستیار هوشمند'
+            : (_currentSession?.title ?? 'گفت‌وگو'));
 
     return Material(
       color: Colors.transparent,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 10, 12, 6),
+        padding: EdgeInsets.fromLTRB(
+          embedded ? 8 : 10,
+          embedded ? 6 : 10,
+          12,
+          embedded ? 4 : 6,
+        ),
         child: Row(
           children: [
             if (showHistoryBtn)
@@ -2104,72 +2098,87 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 tooltip: 'گفت‌وگوها',
                 onPressed: _openHistory,
                 icon: const Icon(Icons.menu_rounded),
+                visualDensity: VisualDensity.compact,
               ),
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                gradient: LinearGradient(
-                  colors: [
-                    scheme.primary,
-                    scheme.tertiary.withValues(alpha: 0.92),
+            if (!embedded) ...[
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    colors: [
+                      scheme.primary,
+                      scheme.tertiary.withValues(alpha: 0.92),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: scheme.primary.withValues(alpha: 0.18),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
                   ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: scheme.primary.withValues(alpha: 0.18),
-                    blurRadius: 18,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
+                child: Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 18,
+                  color: scheme.onPrimary,
+                ),
               ),
-              child: Icon(
-                Icons.auto_awesome_rounded,
-                size: 18,
-                color: scheme.onPrimary,
-              ),
-            ),
-            const SizedBox(width: 10),
+              const SizedBox(width: 10),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    _isHomeMode
-                        ? 'دستیار هوشمند حسابیکس'
-                        : (_currentSession?.title ?? 'گفت‌وگو'),
+                    title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: (embedded
+                            ? theme.textTheme.titleSmall
+                            : theme.textTheme.titleMedium)
+                        ?.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  Text(
-                    _isGenerating
-                        ? 'در حال تحلیل و آماده‌سازی پاسخ'
-                        : 'تحلیل مالی، گزارش و راهنمایی عملیاتی',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
+                  if (showSubtitle)
+                    Text(
+                      _isGenerating
+                          ? 'در حال تحلیل و آماده‌سازی پاسخ'
+                          : 'تحلیل مالی، گزارش و راهنمایی عملیاتی',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
             if (_isGenerating) ...[
-              const SizedBox(width: 8),
-              FilledButton.tonalIcon(
-                onPressed: _stopGenerating,
-                icon: Icon(Icons.stop_circle_outlined, color: scheme.error),
-                label: const Text('توقف'),
-                style: FilledButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  foregroundColor: scheme.error,
-                ),
-              ),
+              const SizedBox(width: 4),
+              compact
+                  ? IconButton(
+                      tooltip: 'توقف',
+                      onPressed: _stopGenerating,
+                      icon: Icon(
+                        Icons.stop_circle_outlined,
+                        color: scheme.error,
+                      ),
+                    )
+                  : FilledButton.tonalIcon(
+                      onPressed: _stopGenerating,
+                      icon: Icon(
+                        Icons.stop_circle_outlined,
+                        color: scheme.error,
+                      ),
+                      label: const Text('توقف'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: scheme.error,
+                      ),
+                    ),
             ],
             if (!compact)
               TextButton.icon(
@@ -2183,29 +2192,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 onPressed: _startNewConversation,
                 icon: const Icon(Icons.add_comment_outlined),
               ),
-            _AiMoreMenu(
-              isHomeMode: _isHomeMode,
-              hasSession: _currentSession != null,
-              hasBusiness: widget.businessId != null,
-              onSearch: _openMessageSearch,
-              onMemory: _openMemorySheet,
-              onExport: _exportConversation,
-              onConnectors: _openConnectorsSheet,
-              onKnowledge: _openKnowledgeSheet,
-              onSkills: _openSkillsSheet,
-              onVoiceSettings: _openVoiceSettings,
-            ),
-            if (widget.embeddedInShell)
-              IconButton(
-                tooltip: 'بازگشت',
-                onPressed: () {
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.of(context).pop();
-                  }
-                },
-                icon: const Icon(Icons.arrow_back_rounded),
-              )
-            else
+            if (!embedded)
+              _AiMoreMenu(
+                isHomeMode: _isHomeMode,
+                hasSession: _currentSession != null,
+                hasBusiness: widget.businessId != null,
+                onSearch: _openMessageSearch,
+                onMemory: _openMemorySheet,
+                onExport: _exportConversation,
+                onConnectors: _openConnectorsSheet,
+                onKnowledge: _openKnowledgeSheet,
+                onSkills: _openSkillsSheet,
+                onVoiceSettings: _openVoiceSettings,
+              ),
+            if (!embedded)
               IconButton(
                 tooltip: 'بستن',
                 onPressed: () => Navigator.of(context).pop(),
@@ -2277,20 +2277,21 @@ class _AIChatDialogState extends State<AIChatDialog> {
       return const SizedBox.shrink();
     }
     final tokensRemaining = subscription?['tokens_remaining'] as int? ?? 0;
+    final scheme = theme.colorScheme;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.12),
+        color: scheme.tertiaryContainer.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.withValues(alpha: 0.35)),
+        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.35)),
       ),
       child: Row(
         children: [
           Icon(
             Icons.warning_amber_rounded,
-            color: Colors.orange.shade800,
+            color: scheme.onTertiaryContainer,
             size: 20,
           ),
           const SizedBox(width: 10),
@@ -2298,7 +2299,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
             child: Text(
               'اعتبار رو به اتمام — ${tokensRemaining.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} توکن باقی‌مانده',
               style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.orange.shade900,
+                color: scheme.onTertiaryContainer,
               ),
             ),
           ),

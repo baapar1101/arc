@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../models/ai_models.dart';
 import '../../services/voice/voice_phase.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
@@ -24,6 +25,11 @@ class AIChatHomeView extends StatelessWidget {
   final List<Map<String, dynamic>> proactiveAlerts;
   final ValueChanged<String>? onAlertAction;
   final VoidCallback? onUpgradePlan;
+  final List<AIModelCatalogItem> availableModels;
+  final String? selectedModelCode;
+  final bool modelsLoading;
+  final ValueChanged<String?>? onModelChanged;
+  final String? modelPricingHint;
 
   const AIChatHomeView({
     super.key,
@@ -45,6 +51,11 @@ class AIChatHomeView extends StatelessWidget {
     this.proactiveAlerts = const [],
     this.onAlertAction,
     this.onUpgradePlan,
+    this.availableModels = const [],
+    this.selectedModelCode,
+    this.modelsLoading = false,
+    this.onModelChanged,
+    this.modelPricingHint,
   });
 
   @override
@@ -115,6 +126,11 @@ class AIChatHomeView extends StatelessWidget {
                       onSend: onSend,
                       onMic: canUseAi ? onMic : null,
                       onStopVoice: onStopVoice,
+                      availableModels: availableModels,
+                      selectedModelCode: selectedModelCode,
+                      modelsLoading: modelsLoading,
+                      onModelChanged: onModelChanged,
+                      modelPricingHint: modelPricingHint,
                     ),
                     SizedBox(height: compact ? 22 : 28),
                     Align(

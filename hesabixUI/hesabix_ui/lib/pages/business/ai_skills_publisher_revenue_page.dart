@@ -7,6 +7,8 @@ import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/wallet_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
+import 'package:hesabix_ui/widgets/ai/ai_empty_state.dart';
 
 /// داشبورد درآمد ناشر مهارت‌های AI
 class AISkillsPublisherRevenuePage extends StatefulWidget {
@@ -84,94 +86,122 @@ class _AISkillsPublisherRevenuePageState extends State<AISkillsPublisherRevenueP
           IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Text(
-                    'سهم ناشر: ${sharePct.toStringAsFixed(0)}٪',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(child: _statCard('فروش', '${_data['sales_count'] ?? 0}', theme)),
-                      const SizedBox(width: 8),
-                      Expanded(child: _statCard('درآمد شما', _money(_data['publisher_earnings'] as num?), theme)),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: _statCard('فروش کل', _money(_data['gross_sales'] as num?), theme)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _statCard(
-                          'موجودی کیف پول',
-                          _money((_wallet['available_balance'] as num?)?.toDouble()),
-                          theme,
+      body: Container(
+        decoration: AIChatDesign.pageBackground(
+          theme,
+          isDark: theme.brightness == Brightness.dark,
+        ),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _load,
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: AIChatDesign.elevatedCard(theme, alpha: 0.92),
+                      child: Text(
+                        'سهم ناشر: ${sharePct.toStringAsFixed(0)}٪',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: () => context.push('/business/${widget.businessId}/wallet'),
-                    icon: const Icon(Icons.account_balance_wallet_outlined),
-                    label: const Text('مدیریت کیف پول و برداشت'),
-                  ),
-                  const SizedBox(height: 24),
-                  Text('پرفروش‌ترین مهارت‌ها', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  if (top.isEmpty)
-                    const Text('هنوز مهارت منتشرشده‌ای ندارید.')
-                  else
-                    ...top.map((p) {
-                      final m = Map<String, dynamic>.from(p);
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(m['title']?.toString() ?? ''),
-                        subtitle: Text('${m['install_count'] ?? 0} نصب'),
-                        trailing: Text(_money(m['price_amount'] as num?)),
-                      );
-                    }),
-                  const Divider(height: 32),
-                  Text('فروش‌های اخیر', style: theme.textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  if (recent.isEmpty)
-                    const Text('فروشی ثبت نشده است.')
-                  else
-                    ...recent.map((raw) {
-                      final s = Map<String, dynamic>.from(raw);
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(s['skill_title']?.toString() ?? ''),
-                        subtitle: Text(s['created_at']?.toString() ?? ''),
-                        trailing: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(_money(s['publisher_amount'] as num? ?? s['amount'] as num?)),
-                            if (s['publisher_amount'] != null)
-                              Text(
-                                'از ${_money(s['amount'] as num?)}',
-                                style: theme.textTheme.labelSmall,
-                              ),
-                          ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: _statCard('فروش', '${_data['sales_count'] ?? 0}', theme)),
+                        const SizedBox(width: 8),
+                        Expanded(child: _statCard('درآمد شما', _money(_data['publisher_earnings'] as num?), theme)),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(child: _statCard('فروش کل', _money(_data['gross_sales'] as num?), theme)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _statCard(
+                            'موجودی کیف پول',
+                            _money((_wallet['available_balance'] as num?)?.toDouble()),
+                            theme,
+                          ),
                         ),
-                      );
-                    }),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: () => context.push('/business/${widget.businessId}/wallet'),
+                      icon: const Icon(Icons.account_balance_wallet_outlined),
+                      label: const Text('مدیریت کیف پول و برداشت'),
+                    ),
+                    const SizedBox(height: 24),
+                    Text('پرفروش‌ترین مهارت‌ها', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    if (top.isEmpty)
+                      const AIEmptyState(
+                        icon: Icons.extension_off_outlined,
+                        title: 'هنوز مهارت منتشرشده‌ای ندارید',
+                        subtitle: 'مهارت خود را از بخش مهارت‌های AI منتشر کنید.',
+                      )
+                    else
+                      ...top.map((p) {
+                        final m = Map<String, dynamic>.from(p);
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: AIChatDesign.subtlePanel(theme),
+                          child: ListTile(
+                            title: Text(m['title']?.toString() ?? ''),
+                            subtitle: Text('${m['install_count'] ?? 0} نصب'),
+                            trailing: Text(_money(m['price_amount'] as num?)),
+                          ),
+                        );
+                      }),
+                    const Divider(height: 32),
+                    Text('فروش‌های اخیر', style: theme.textTheme.titleMedium),
+                    const SizedBox(height: 8),
+                    if (recent.isEmpty)
+                      const AIEmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        title: 'فروشی ثبت نشده است',
+                        subtitle: 'پس از اولین فروش، جزئیات اینجا نمایش داده می‌شود.',
+                      )
+                    else
+                      ...recent.map((raw) {
+                        final s = Map<String, dynamic>.from(raw);
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: AIChatDesign.subtlePanel(theme),
+                          child: ListTile(
+                            title: Text(s['skill_title']?.toString() ?? ''),
+                            subtitle: Text(s['created_at']?.toString() ?? ''),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(_money(s['publisher_amount'] as num? ?? s['amount'] as num?)),
+                                if (s['publisher_amount'] != null)
+                                  Text(
+                                    'از ${_money(s['amount'] as num?)}',
+                                    style: theme.textTheme.labelSmall,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
   Widget _statCard(String label, String value, ThemeData theme) {
-    return Card(
+    return Container(
+      decoration: AIChatDesign.elevatedCard(theme, alpha: 0.9),
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(

@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/core/business_nav.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -11,6 +12,7 @@ Future<void> showAIChatSkillsSheet({
   required BuildContext context,
   required AIService aiService,
   required int? businessId,
+  void Function(String relativePath)? onOpenPanelPage,
 }) async {
   if (businessId == null) {
     SnackBarHelper.show(context, message: 'ابتدا یک کسب‌وکار انتخاب کنید', isError: true);
@@ -23,6 +25,7 @@ Future<void> showAIChatSkillsSheet({
     builder: (ctx) => _AIChatSkillsSheet(
       aiService: aiService,
       businessId: businessId,
+      onOpenPanelPage: onOpenPanelPage,
     ),
   );
 }
@@ -30,10 +33,12 @@ Future<void> showAIChatSkillsSheet({
 class _AIChatSkillsSheet extends StatefulWidget {
   final AIService aiService;
   final int businessId;
+  final void Function(String relativePath)? onOpenPanelPage;
 
   const _AIChatSkillsSheet({
     required this.aiService,
     required this.businessId,
+    this.onOpenPanelPage,
   });
 
   @override
@@ -122,7 +127,7 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
         bytes: bytes,
       );
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'مهارت import شد');
+      SnackBarHelper.show(context, message: 'مهارت وارد شد');
       await _load();
     } catch (e) {
       if (mounted) {
@@ -142,17 +147,17 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Import از GitHub'),
+        title: const Text('وارد کردن از گیت‌هاب'),
         content: TextField(
           controller: ctrl,
           decoration: const InputDecoration(
-            hintText: 'https://github.com/anthropics/skills/tree/main/...',
+            hintText: 'https://github.com/...',
           ),
           maxLines: 2,
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Import')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('وارد کردن')),
         ],
       ),
     );
@@ -164,7 +169,7 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
         gitUrl: ctrl.text.trim(),
       );
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'مهارت از Git import شد');
+      SnackBarHelper.show(context, message: 'مهارت از گیت‌هاب وارد شد');
       await _load();
     } catch (e) {
       if (mounted) {
@@ -236,6 +241,19 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
     }
   }
 
+  void _openPanelPage(String relativePath) {
+    final onOpenPanelPage = widget.onOpenPanelPage;
+    if (onOpenPanelPage != null) {
+      Navigator.of(context).pop();
+      onOpenPanelPage(relativePath);
+      return;
+    }
+    final path = context.businessPanelUrl(widget.businessId, relativePath);
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    router.push(path);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -252,35 +270,33 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
             children: [
               Text('مهارت‌های AI', style: theme.textTheme.titleLarge),
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   FilledButton.tonalIcon(
                     onPressed: _busy ? null : _importZip,
                     icon: const Icon(Icons.upload_file_outlined, size: 18),
-                    label: const Text('Import ZIP'),
+                    label: const Text('وارد کردن ZIP'),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: _busy ? null : _importGit,
-                    child: const Text('GitHub'),
+                    icon: const Icon(Icons.code_rounded, size: 18),
+                    label: const Text('گیت‌هاب'),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: _busy
                         ? null
-                        : () => context.push(
-                              '/business/${widget.businessId}/ai/skills/marketplace',
-                            ),
-                    child: const Text('مارکت‌پلیس'),
+                        : () => _openPanelPage('ai/skills/marketplace'),
+                    icon: const Icon(Icons.storefront_outlined, size: 18),
+                    label: const Text('مارکت‌پلیس'),
                   ),
-                  const SizedBox(width: 8),
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: _busy
                         ? null
-                        : () => context.push(
-                              '/business/${widget.businessId}/ai/skills/publisher',
-                            ),
-                    child: const Text('درآمد'),
+                        : () => _openPanelPage('ai/skills/publisher'),
+                    icon: const Icon(Icons.payments_outlined, size: 18),
+                    label: const Text('درآمد'),
                   ),
                 ],
               ),
@@ -316,7 +332,7 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
                       if (_owned.isEmpty)
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text('مهارتی import نشده. ZIP یا GitHub را امتحان کنید.'),
+                          child: Text('مهارتی وارد نشده. ZIP یا گیت‌هاب را امتحان کنید.'),
                         )
                       else
                         ..._owned.map((pkg) {
@@ -335,7 +351,7 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
                           );
                         }),
                       const Divider(height: 24),
-                      Text('Anthropic (prebuilt)', style: theme.textTheme.titleSmall),
+                      Text('کتابخانه Anthropic', style: theme.textTheme.titleSmall),
                       ..._anthropicCatalog.map((item) {
                         final sid = item['anthropic_skill_id']?.toString() ?? '';
                         return ListTile(

@@ -20,6 +20,8 @@ abstract final class BusinessNamedRoutes {
     'business_ai_chat': 'ai/chat',
     'business_ai_subscription': 'ai/subscription',
     'business_ai_usage': 'ai/usage',
+    'business_ai_skills_marketplace': 'ai/skills/marketplace',
+    'business_ai_skills_publisher': 'ai/skills/publisher',
     'business_zohal_inquiries': 'zohal/inquiries',
     'business_new_workflow': 'workflows/new',
     'business_edit_workflow': 'workflows/:workflow_id/edit',
