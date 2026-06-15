@@ -3,30 +3,30 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # ============================================================================
-# Hesabix - سیستم حسابداری جامع و متن باز
+# Hesabix - Comprehensive Open Source Accounting System
 # ============================================================================
 #
-# Hesabix یک سیستم حسابداری کامل و مدرن است که شامل یک API قدرتمند 
-# (FastAPI + PostgreSQL) و رابط کاربری زیبا (Flutter Web) می‌باشد.
+# Hesabix is a complete, modern accounting system with a powerful API
+# (FastAPI + PostgreSQL) and a Flutter Web user interface.
 #
-# این نرم‌افزار تحت مجوز GNU General Public License v3.0 منتشر شده است.
-# برای مشاهده کامل متن لایسنس به آدرس زیر مراجعه کنید:
+# This software is distributed under the GNU General Public License v3.0.
+# Full license text:
 # http://www.gnu.org/licenses/gpl-3.0.txt
 #
-# توسعه‌دهندگان: Hesabix Team
-# وب‌سایت: https://hesabix.ir
-# مخزن پروژه: https://source.hesabix.ir/hesabix/arc.git
-# پشتیبانی: https://hesabix.ir/support
+# Developers: Hesabix Team
+# Website: https://hesabix.ir
+# Repository: https://source.hesabix.ir/hesabix/arc.git
+# Support: https://hesabix.ir/support
 #
 # ============================================================================
 # Deployment Script
 # ============================================================================
 #
-# این اسکریپت برای نصب و راه‌اندازی خودکار Hesabix طراحی شده است:
-# - Clone از مخزن: https://source.hesabix.ir/hesabix/arc.git
-# - دریافت دامنه API و UI از کاربر
-# - نصب پیش‌نیازها، دیتابیس (PostgreSQL)، بک‌اند (FastAPI)، 
-#   فرانت‌اند (Flutter Web)، Nginx و SSL
+# This script installs and configures Hesabix automatically:
+# - Clone from: https://source.hesabix.ir/hesabix/arc.git
+# - Prompt for API and UI domains
+# - Install prerequisites, database (PostgreSQL), backend (FastAPI),
+#   frontend (Flutter Web), Nginx, and SSL
 #
 # Usage:
 #   sudo bash deploy.sh
@@ -35,12 +35,12 @@ IFS=$'\n\t'
 #
 # Notes:
 # - Designed for Ubuntu 22.04+/Debian 12+
-# - حداقل RAM نصب: حدود ۵٫۵ گیگابایت (GiB) — تابع check_minimum_ram
-# - Nginx: بعد از SSL، برای عوض کردن فقط دامنه‌ها از scripts/update_nginx_domains.sh استفاده کنید؛
-#   این اسکریپت listen 443 و مسیرهای /p/ و /i/ را با گواهی Let's Encrypt (یا SSL_LETSENCRYPT_LIVE در .deploy_env) می‌سازد.
-# - آدرس API در بیلد وب: به‌صورت خودکار http یا https از روی وجود گواهی در
-#   /etc/letsencrypt/live/<API_DOMAIN>؛ برای TLS بدون این مسیر، API_PUBLIC_SCHEME را در محیط export کنید.
-#   نوشتن دستی hesabix-api فقط با HTTP باعث می‌شود https به سرور پیش‌فرض 443 (مثلاً pgAdmin) بخورد.
+# - Minimum install RAM: ~5.5 GiB — see check_minimum_ram
+# - Nginx: after SSL, use scripts/update_nginx_domains.sh to change domains only;
+#   this script configures listen 443 and /p/ and /i/ paths with Let's Encrypt (or SSL_LETSENCRYPT_LIVE in .deploy_env).
+# - Web build API URL: auto http/https from certificate at
+#   /etc/letsencrypt/live/<API_DOMAIN>; for TLS without that path, export API_PUBLIC_SCHEME.
+#   Manual hesabix-api HTTP-only config can send https traffic to the wrong default 443 vhost (e.g. pgAdmin).
 # - Resume from failure: if a step fails, re-run the script to continue from that step
 #   (completed steps are skipped using .deploy_state)
 # - Saved inputs: last entered domain, branch, pgAdmin4 options, etc. are stored in .deploy_saved_vars
@@ -57,7 +57,7 @@ IFS=$'\n\t'
 #   FLUTTER_SDK_DOWNLOAD_MAX_TIME (default 0 = no overall time limit; was 120s and caused false failures).
 #   Unreliable links: FLUTTER_SDK_TARBALL_ATTEMPTS (default 3), post-download tar test, optional FLUTTER_SDK_TARBALL_SHA256,
 #   FLUTTER_SDK_CURL_HTTP11=1 (default) sends --http1.1 to reduce flaky proxy/CDN issues.
-# - Flutter PATH: /etc/profile.d/hesabix-flutter.sh (+ یک خط در /etc/bash.bashrc برای شِل تعاملی غیر-login).
+# - Flutter PATH: /etc/profile.d/hesabix-flutter.sh (+ one line in /etc/bash.bashrc for non-login interactive shells).
 # - Ubuntu APT mirror (only when ID=ubuntu): UBUNTU_APT_MIRROR=keep|arvan|official (non-interactive);
 #   default keep. arvan uses http://mirror.arvancloud.ir/ubuntu for archive.ubuntu.com and security.ubuntu.com.
 #   official restores those URLs from Arvan (per-stanza: *-security → security.ubuntu.com).
@@ -74,9 +74,9 @@ IFS=$'\n\t'
 
 REPO_URL="https://source.hesabix.ir/hesabix/arc.git"
 APP_ROOT="/opt/hesabix"
-# مخزن داخلی tarball SDK (ایران)؛ کتابخانه‌های pub فقط از f.mirror.hesabix.ir
+# Internal Flutter SDK tarball mirror; pub packages use selected FLUTTER_MIRROR
 FLUTTER_SDK_TARBALL_URL_INTERNAL="https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz"
-# tarball SDK حجیم؛ 0 یعنی بدون سقف زمانی برای کل دانلود (جلوگیری از قطع ناخواسته)
+# Large SDK tarball; 0 = no overall download time limit (avoids premature abort)
 : "${FLUTTER_SDK_CONNECT_TIMEOUT:=120}"
 : "${FLUTTER_SDK_DOWNLOAD_MAX_TIME:=0}"
 : "${FLUTTER_SDK_TARBALL_ATTEMPTS:=3}"
@@ -238,17 +238,17 @@ hesabix_prompt_pip_mirror() {
   PIP_MIRROR="${PIP_MIRROR:-}"; PIP_MIRROR="${PIP_MIRROR,,}"
   [[ -n "${PIP_MIRROR}" ]] && return 0
   echo
-  echo "مخزن پایتون (pip / PyPI) — برای نصب وابستگی‌های بک‌اند:"
-  echo "  [1] Hesabix — p.mirror.hesabix.ir (پیش‌فرض؛ مناسب ایران)"
-  echo "  [2] رسمی — pypi.org"
-  echo "  [3] آینه تسینگ‌هوا (چین) — pypi.tuna.tsinghua.edu.cn"
-  echo "  [4] آینه علی‌بابا (چین) — mirrors.aliyun.com/pypi"
-  echo "  [5] آدرس سفارشی (خودتان وارد کنید)"
-  read -rp "انتخاب [1-5] (پیش‌فرض 1): " _pip_choice
+  echo "Python package index (pip / PyPI) — for backend dependencies:"
+  echo "  [1] Hesabix — p.mirror.hesabix.ir (default; recommended for Iran)"
+  echo "  [2] Official — pypi.org"
+  echo "  [3] Tsinghua mirror (China) — pypi.tuna.tsinghua.edu.cn"
+  echo "  [4] Aliyun mirror (China) — mirrors.aliyun.com/pypi"
+  echo "  [5] Custom URL"
+  read -rp "Choose [1-5] (default 1): " _pip_choice
   _pip_choice=${_pip_choice:-1}
   case "${_pip_choice}" in
     2) PIP_MIRROR=official ;; 3) PIP_MIRROR=tuna ;; 4) PIP_MIRROR=aliyun ;;
-    5) PIP_MIRROR=custom; read -rp "آدرس index (مثال https://my.mirror/simple): " _pip_custom
+    5) PIP_MIRROR=custom; read -rp "Index URL (e.g. https://my.mirror/simple): " _pip_custom
        [[ -n "${_pip_custom}" ]] && { PIP_INDEX_URL="$(hesabix_normalize_pip_index_url "${_pip_custom}")"; export PIP_INDEX_URL; } ;;
     *) PIP_MIRROR=hesabix ;;
   esac
@@ -259,22 +259,22 @@ hesabix_prompt_flutter_mirror() {
   FLUTTER_MIRROR="${FLUTTER_MIRROR:-}"; FLUTTER_MIRROR="${FLUTTER_MIRROR,,}"
   [[ -n "${FLUTTER_MIRROR}" ]] && return 0
   echo
-  echo "مخزن Flutter/Dart (pub get و engine) — برای بیلد رابط کاربری:"
-  echo "  [1] Hesabix — f.mirror.hesabix.ir (پیش‌فرض؛ مناسب ایران)"
-  echo "  [2] pub-azs.ir — مستقیم (ایران)"
-  echo "  [3] چین — pub.flutter-io.cn / storage.flutter-io.cn"
-  echo "  [4] آینه تسینگ‌هوا (چین)"
-  echo "  [5] آینه شانگهای SJTU (چین)"
-  echo "  [6] رسمی — pub.dev / storage.googleapis.com"
-  echo "  [7] آدرس سفارشی"
-  read -rp "انتخاب [1-7] (پیش‌فرض 1): " _flutter_choice
+  echo "Flutter/Dart package mirror (pub get and engine) — for UI build:"
+  echo "  [1] Hesabix — f.mirror.hesabix.ir (default; recommended for Iran)"
+  echo "  [2] pub-azs.ir — direct (Iran)"
+  echo "  [3] China — pub.flutter-io.cn / storage.flutter-io.cn"
+  echo "  [4] Tsinghua mirror (China)"
+  echo "  [5] SJTU mirror (China)"
+  echo "  [6] Official — pub.dev / storage.googleapis.com"
+  echo "  [7] Custom URLs"
+  read -rp "Choose [1-7] (default 1): " _flutter_choice
   _flutter_choice=${_flutter_choice:-1}
   case "${_flutter_choice}" in
     2) FLUTTER_MIRROR=pub_azs ;; 3) FLUTTER_MIRROR=flutter_io_cn ;; 4) FLUTTER_MIRROR=tuna ;;
     5) FLUTTER_MIRROR=sjtu ;; 6) FLUTTER_MIRROR=official ;;
     7) FLUTTER_MIRROR=custom
-       read -rp "PUB_HOSTED_URL (مثال https://pub.example): " _pub_url
-       read -rp "FLUTTER_STORAGE_BASE_URL (مثال https://storage.example): " _storage_url
+       read -rp "PUB_HOSTED_URL (e.g. https://pub.example): " _pub_url
+       read -rp "FLUTTER_STORAGE_BASE_URL (e.g. https://storage.example): " _storage_url
        [[ -n "${_pub_url}" && -n "${_storage_url}" ]] && {
          export PUB_HOSTED_URL="${_pub_url%/}"; export FLUTTER_STORAGE_BASE_URL="${_storage_url%/}"; } ;;
     *) FLUTTER_MIRROR=hesabix ;;
@@ -400,7 +400,7 @@ calculate_db_pool_settings() {
   echo "${pool_size}:${max_overflow}"
 }
 
-# MemTotal از /proc/meminfo (کیلوبایت)
+# MemTotal from /proc/meminfo (kilobytes)
 get_mem_total_kb() {
   if [[ -r /proc/meminfo ]]; then
     awk '/^MemTotal:/ {print int($2); exit}' /proc/meminfo 2>/dev/null || echo "0"
@@ -409,12 +409,12 @@ get_mem_total_kb() {
   fi
 }
 
-# حداقل ۵٫۵ گیگابایت RAM (GiB) برای نصب Hesabix
+# Minimum 5.5 GiB RAM required for Hesabix install
 check_minimum_ram() {
   local mem_kb min_kb mem_mb min_mb
   mem_kb=$(get_mem_total_kb)
   if [[ ! "${mem_kb}" =~ ^[0-9]+$ ]] || [[ "${mem_kb}" -eq 0 ]]; then
-    log_error "خواندن مقدار RAM از /proc/meminfo ممکن نیست. نصب متوقف شد."
+    log_error "Cannot read RAM from /proc/meminfo. Installation aborted."
     exit 1
   fi
   # 5.5 GiB = 5.5 * 1024 * 1024 kB
@@ -422,21 +422,21 @@ check_minimum_ram() {
   mem_mb=$((mem_kb / 1024))
   min_mb=$((min_kb / 1024))
   if [[ "${mem_kb}" -lt "${min_kb}" ]]; then
-    log_error "برای نصب Hesabix حداقل ${min_mb} مگابایت RAM (حدود ۵٫۵ گیگابایت) لازم است. MemTotal فعلی: حدود ${mem_mb} مگابایت."
-    log_error "سرور را ارتقا دهید یا swap/RAM کافی فراهم کنید و دوباره اجرا کنید."
+    log_error "Hesabix requires at least ${min_mb} MB RAM (~5.5 GiB). MemTotal is ~${mem_mb} MB."
+    log_error "Upgrade the server or add sufficient swap/RAM, then run again."
     exit 1
   fi
-  log_success "بررسی RAM: حدود ${mem_mb} مگابایت (حداقل مورد نیاز: ${min_mb} مگابایت)"
+  log_success "RAM check passed: ~${mem_mb} MB (minimum required: ${min_mb} MB)"
 }
 
-# متغیرهای پروفایل PostgreSQL را بر اساس MemTotal (kB) تنظیم می‌کند
+# Set PostgreSQL memory profile variables from MemTotal (kB)
 assign_pg_memory_profile_from_mem_kb() {
   local mem_kb="${1:-0}"
   if [[ ! "${mem_kb}" =~ ^[0-9]+$ ]]; then
     mem_kb=0
   fi
-  # آستانه‌ها بر حسب kB؛ ~۷٫۵GiB برای وی‌پی‌اس «۸ گیگ» تبلیغی (MemTotal ≈ ۷٫۸GiB)
-  # 16GiB=16777216، 32GiB=33554432
+  # Thresholds in kB; ~7.5GiB tier for advertised "8GB" VPS (MemTotal ~7.8GiB)
+  # 16GiB=16777216, 32GiB=33554432
   if [[ "${mem_kb}" -ge 33554432 ]]; then
     PG_SHARED_BUFFERS="8GB"
     PG_EFFECTIVE_CACHE_SIZE="24GB"
@@ -464,12 +464,12 @@ assign_pg_memory_profile_from_mem_kb() {
   fi
 }
 
-# کاهش workers و در صورت نیاز pool تا مجموع اتصال موردنیاز از سقف منطقی RAM عبور نکند
+# Reduce workers and pool so total DB connections stay within a RAM-based cap
 tune_deployment_for_system_ram() {
   local mem_kb need pool_settings cap
   mem_kb=$(get_mem_total_kb)
   if [[ ! "${mem_kb}" =~ ^[0-9]+$ ]] || [[ "${mem_kb}" -eq 0 ]]; then
-    log_warning "RAM خوانده نشد؛ تنظیم خودکار worker/pool رد شد."
+    log_warning "Could not read RAM; skipping automatic worker/pool tuning."
     return 0
   fi
   assign_pg_memory_profile_from_mem_kb "${mem_kb}"
@@ -481,7 +481,7 @@ tune_deployment_for_system_ram() {
     DB_POOL_SIZE=$(echo "${pool_settings}" | cut -d: -f1)
     DB_MAX_OVERFLOW=$(echo "${pool_settings}" | cut -d: -f2)
     need=$(( UVICORN_WORKERS * (DB_POOL_SIZE + DB_MAX_OVERFLOW) + 100 ))
-    log_warning "کاهش UVICORN_WORKERS به ${UVICORN_WORKERS} برای هم‌خوانی با سقف اتصال PostgreSQL (~${cap}) بر اساس RAM."
+    log_warning "Reduced UVICORN_WORKERS to ${UVICORN_WORKERS} to fit PostgreSQL connection cap (~${cap}) for this RAM."
   done
   while [[ "${need}" -gt "${cap}" ]]; do
     if [[ "${DB_POOL_SIZE}" -gt 20 ]]; then
@@ -489,16 +489,16 @@ tune_deployment_for_system_ram() {
     elif [[ "${DB_MAX_OVERFLOW}" -gt 30 ]]; then
       DB_MAX_OVERFLOW=$((DB_MAX_OVERFLOW - 10))
     else
-      log_warning "حداکثر اتصال موردنیاز (${need}) از سقف پیشنهادی (${cap}) بیشتر است؛ max_connections در PostgreSQL بالاتر از cap تنظیم می‌شود."
+      log_warning "Required connections (${need}) exceed suggested cap (${cap}); PostgreSQL max_connections will be set above cap."
       break
     fi
     need=$(( UVICORN_WORKERS * (DB_POOL_SIZE + DB_MAX_OVERFLOW) + 100 ))
-    log_warning "کاهش DB_POOL_SIZE/DB_MAX_OVERFLOW برای جا شدن در محدوده RAM (نیاز اتصال تقریبی: ${need})."
+    log_warning "Reduced DB_POOL_SIZE/DB_MAX_OVERFLOW to fit RAM budget (approx. connections needed: ${need})."
   done
-  log_info "تنظیم نهایی بر اساس RAM: workers=${UVICORN_WORKERS}, pool_size=${DB_POOL_SIZE}, max_overflow=${DB_MAX_OVERFLOW}, سقف اتصال پیشنهادی PG≈${cap}"
+  log_info "Final RAM-based tuning: workers=${UVICORN_WORKERS}, pool_size=${DB_POOL_SIZE}, max_overflow=${DB_MAX_OVERFLOW}, suggested PG connection cap≈${cap}"
 }
 
-# نوشتن conf.d/hesabix-optimization.conf بر اساس RAM و بار محاسبه‌شده
+# Write conf.d/hesabix-optimization.conf from RAM profile and computed load
 write_postgresql_hesabix_optimization_conf() {
   local pg_version="$1"
   local mem_kb max_conn pg_conf_dest tmpf workers pool ov
@@ -533,10 +533,10 @@ write_postgresql_hesabix_optimization_conf() {
   } > "${tmpf}"
   sudo install -o postgres -g postgres -m 0644 "${tmpf}" "${pg_conf_dest}"
   rm -f "${tmpf}"
-  log_success "فایل بهینه‌سازی PostgreSQL نوشته شد: ${pg_conf_dest}"
+  log_success "PostgreSQL optimization config written: ${pg_conf_dest}"
 }
 
-# نسخهٔ major را بدون نیاز به PostgreSQL در حال اجرا تشخیص می‌دهد (برای بازنویسی conf قبل از start)
+# Detect major PostgreSQL version without a running server (rewrite conf before start)
 detect_postgresql_major_version_for_config() {
   local v d
   if command -v pg_lsclusters >/dev/null 2>&1; then
@@ -560,7 +560,7 @@ detect_postgresql_major_version_for_config() {
   return 1
 }
 
-# بارگذاری مجدد سرویس پس از تغییر conf.d (postgresql@VERSION-main یا meta سرویس)
+# Reload PostgreSQL after conf.d change (postgresql@VERSION-main or meta service)
 restart_postgresql_after_config_change() {
   local pgv="${1:-}"
   local meta_svc="${2:-}"
@@ -575,7 +575,7 @@ restart_postgresql_after_config_change() {
     sleep 3
     return 0
   fi
-  log_warning "systemctl restart postgresql@${pgv}-main ناموفق بود؛ تلاش با pg_ctlcluster..."
+  log_warning "systemctl restart postgresql@${pgv}-main failed; trying pg_ctlcluster..."
   if command -v pg_ctlcluster >/dev/null 2>&1; then
     ctl_out=$(pg_ctlcluster "${pgv}" main start 2>&1) || true
     [[ -n "${ctl_out}" ]] && log_info "${ctl_out}"
@@ -622,7 +622,7 @@ wait_for_db() {
     sleep 2
   done
   log_error "Database not ready after $max_attempts attempts"
-  log_error "جزئیات: journalctl -xeu postgresql@*-main.service --no-pager | tail -100"
+  log_error "Details: journalctl -xeu postgresql@*-main.service --no-pager | tail -100"
   return 1
 }
 
@@ -1175,7 +1175,7 @@ prompt_vars() {
   : "${UI_DOMAIN:=}"
   : "${BRANCH:=main}"
   : "${DB_PASSWORD:=}"
-  # نمایش در خلاصه؛ tarball پیش‌فرض داخلی FLUTTER_SDK_TARBALL_URL_INTERNAL ≈ 3.41.x stable
+  # Display in summary; default internal tarball FLUTTER_SDK_TARBALL_URL_INTERNAL ≈ 3.41.x stable
   : "${FLUTTER_VERSION:=3.41.1}"
   : "${UVICORN_WORKERS:=}"
   
@@ -1267,11 +1267,11 @@ prompt_vars() {
     fi
   fi
 
-  # مکالمه صوتی AI — اختیاری (STT/TTS محلی)
+  # AI voice chat — optional (local STT/TTS)
   : "${INSTALL_VOICE:=}"
   if [[ -z "${INSTALL_VOICE}" ]]; then
     echo
-    echo "مکالمه صوتی AI: تشخیص گفتار و TTS روی همین سرور (بدون API ابری؛ نیاز به RAM/CPU بیشتر)."
+    echo "AI voice chat: on-server speech recognition and TTS (no cloud API; needs more RAM/CPU)."
     read -rp "Install AI voice chat dependencies (pip [voice], ~2–4GB disk)? (y/N): " INSTALL_VOICE
     INSTALL_VOICE=${INSTALL_VOICE:-N}
   fi
@@ -1428,7 +1428,7 @@ install_prereqs() {
     fi
   fi
 
-  # pgvector برای جستجوی معنایی RAG (اختیاری؛ در صورت نبود بسته در apt، غیرمرگبار)
+  # pgvector for semantic RAG search (optional; non-fatal if apt package missing)
   if [[ -f "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" ]]; then
     chmod +x "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" 2>/dev/null || true
     log_info "Ensuring PostgreSQL pgvector package (optional)..."
@@ -1514,13 +1514,13 @@ clone_repo() {
 setup_db() {
   log_step "Configuring database (PostgreSQL)..."
   
-  # اگر قبلاً conf.d با shared_buffers غیرواقعی نوشته شده باشد، PostgreSQL اصلاً بالا نمی‌آید و
-  # wait_for_db هرگز موفق نمی‌شود؛ بنابراین ابتدا نسخه را از دیسک تشخیص می‌دهیم، conf را می‌نویسیم و سرویس را ری‌استارت می‌کنیم.
+  # If conf.d was written with unrealistic shared_buffers, PostgreSQL won't start and
+  # wait_for_db never succeeds; detect version from disk first, write conf, then restart.
   local pg_opt_applied_early=false
   local pg_ver_early=""
   pg_ver_early=$(detect_postgresql_major_version_for_config 2>/dev/null || true)
   if [[ -n "${pg_ver_early}" ]] && [[ "${pg_ver_early}" =~ ^[0-9]+$ ]]; then
-    log_info "اعمال پیش‌گیرانهٔ تنظیمات PostgreSQL (نسخه ${pg_ver_early}) تا سرویس با conf معتبر بالا بیاید..."
+    log_info "Applying preventive PostgreSQL settings (version ${pg_ver_early}) so the service starts with valid conf..."
     write_postgresql_hesabix_optimization_conf "${pg_ver_early}"
     restart_postgresql_after_config_change "${pg_ver_early}" ""
     pg_opt_applied_early=true
@@ -1532,7 +1532,7 @@ setup_db() {
   local pg_service=""
   local unit_files=""
   unit_files=$(systemctl list-unit-files --no-pager --no-legend 2>/dev/null || true)
-  # list-units یونیت‌های inactive را نشان نمی‌دهد؛ list-unit-files همیشه واحدهای نصب‌شده را دارد
+  # list-units hides inactive units; list-unit-files lists all installed units
   if echo "${unit_files}" | grep -qE '^postgresql@[0-9]+-main\.service[[:space:]]'; then
     pg_service=$(echo "${unit_files}" | awk '/^postgresql@[0-9]+-main\.service[[:space:]]/ { sub(/\.service$/, "", $1); print $1; exit }')
     pg_service_found=true
@@ -1555,7 +1555,7 @@ setup_db() {
       exit 1
     fi
     
-    log_warning "یونیت systemd برای PostgreSQL در list-unit-files پیدا نشد. تلاش با سرویس meta و pg_ctlcluster..."
+    log_warning "PostgreSQL systemd unit not found in list-unit-files. Trying meta service and pg_ctlcluster..."
     systemctl daemon-reload 2>/dev/null || true
     systemctl enable postgresql 2>/dev/null || true
     systemctl start postgresql 2>/dev/null || true
@@ -1577,7 +1577,7 @@ setup_db() {
     sleep 2
   fi
   
-  # اگر نسخه را داریم ولی هنوز بالا نیست، یک بار دیگر enable/start صریح (کلاستر غیرفعال در list-units دیده نمی‌شد)
+  # If we know the version but the cluster is still down, try explicit enable/start once more
   if [[ -n "${pg_ver_early}" ]] && [[ "${pg_ver_early}" =~ ^[0-9]+$ ]]; then
     systemctl enable "postgresql@${pg_ver_early}-main" 2>/dev/null || true
     systemctl start "postgresql@${pg_ver_early}-main" 2>/dev/null || true
@@ -1648,7 +1648,7 @@ setup_db() {
   fi
 
   if [[ "${pg_opt_applied_early}" != "true" ]]; then
-    log_info "اعمال تنظیمات PostgreSQL پس از بالا آمدن سرویس (نسخه ${pg_version})..."
+    log_info "Applying PostgreSQL settings after service is up (version ${pg_version})..."
     write_postgresql_hesabix_optimization_conf "${pg_version}"
     restart_postgresql_after_config_change "${pg_version}" "${pg_service:-}"
   fi
@@ -1758,7 +1758,7 @@ print('Connection successful')
     fi
   fi
 
-  # pgvector (برای سرورهایی که مرحله prereqs قبلاً skip شده)
+  # pgvector (for servers where prereqs step was skipped earlier)
   if [[ -f "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" ]]; then
     chmod +x "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" 2>/dev/null || true
     log_info "Ensuring PostgreSQL pgvector package before migrations..."
@@ -1800,9 +1800,9 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=/usr/bin:/usr/local/bin:${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
-# ! = اجرا با root: daemon-reload + در صورت نیاز pip از آینه‌های deploy (قبل از alembic)
+# ! = run as root: daemon-reload + pip from deploy mirrors if needed (before alembic)
 ExecStartPre=!${api_dir}/deployment/systemd/hesabix-api-prestart.sh
-# قبل از start/restart: اعمال میگریشن‌ها؛ در صورت شکست، سرویس استارت نمی‌شود
+# Before start/restart: run migrations; service does not start if migrations fail
 ExecStartPre=${api_dir}/.venv/bin/python -m alembic -c ${api_dir}/alembic.ini upgrade head
 ExecStart=${api_dir}/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS}
 Restart=always
@@ -1872,8 +1872,8 @@ UNIT
   
   systemctl enable hesabix-rq-worker
   
-  # همیشه RQ worker را استارت می‌کنیم: اگر Redis در تنظیمات سیستم خاموش باشد، اسکریپت با کد ۰ خارج می‌شود
-  # و با Restart=on-failure دیگر حلقهٔ ری‌استارت بی‌معنی ایجاد نمی‌شود.
+  # Always start RQ worker: if Redis is disabled in system settings, the script exits 0
+  # and Restart=on-failure no longer causes a pointless restart loop.
   systemctl start hesabix-rq-worker
   sleep 2
   if systemctl is-active --quiet hesabix-rq-worker 2>/dev/null; then
@@ -1942,7 +1942,7 @@ UNIT
 
 # pip / Flutter mirrors: scripts/mirror_config.sh or inline fallback (curl installer)
 
-# نصب PATH دائمی برای شِل‌های جدید (ورود به سیستم / bash --login). فایل POSIX-sh برای /etc/profile.d.
+# Persist Flutter PATH for new shells (login / bash --login). POSIX-sh file for /etc/profile.d.
 persist_flutter_path_in_profile_d() {
   local f="/etc/profile.d/hesabix-flutter.sh"
   if [[ ! -x /opt/flutter/bin/flutter && ! -x /snap/bin/flutter ]]; then
@@ -1966,7 +1966,7 @@ PROFILE
   chmod 644 "${f}" 2>/dev/null || true
   log_success "Flutter added to PATH for login shells: ${f}"
 
-  # ترمینال گرافیکی اوبونتو/دبیان معمولاً login نیست؛ یک خط idempotent در bash.bashrc
+  # Graphical Ubuntu/Debian terminals are usually non-login; idempotent line in bash.bashrc
   local marker="# hesabix-flutter-PATH (deploy.sh)"
   if [[ -f /etc/bash.bashrc ]] && ! grep -qF "${marker}" /etc/bash.bashrc 2>/dev/null; then
     printf '\n%s\n[ -r /etc/profile.d/hesabix-flutter.sh ] && . /etc/profile.d/hesabix-flutter.sh\n' "${marker}" >> /etc/bash.bashrc
@@ -1999,7 +1999,7 @@ hesabix_verify_flutter_sdk_tarball() {
 
 # Ensure Flutter SDK is available (install if missing). Exports PATH for current shell.
 # Must be called after set_flutter_mirror_env so first-run Dart SDK download uses mirror.
-# Order: 1) Existing 2) مخزن داخلی (دقیقا FLUTTER_SDK_TARBALL_URL_INTERNAL) 3) Snap 4) Git clone.
+# Order: 1) Existing 2) internal mirror (FLUTTER_SDK_TARBALL_URL_INTERNAL) 3) Snap 4) Git clone.
 ensure_flutter_sdk() {
   local opt_flutter="/opt/flutter/bin"
   local use_mirror=0
@@ -2009,7 +2009,7 @@ ensure_flutter_sdk() {
   fi
 
   # 1) Use existing Flutter if already available
-  # با mirror غیر گوگل فقط /opt/flutter قابل قبول است (snap از storage.googleapis.com دانلود می‌کند و تحریم می‌خورد)
+  # With non-Google mirror, only /opt/flutter is acceptable (snap downloads from storage.googleapis.com)
   if [[ $use_mirror -eq 1 ]]; then
     if [[ -x "${opt_flutter}/flutter" ]]; then
       export PATH="${opt_flutter}:$PATH"
@@ -2043,7 +2043,7 @@ ensure_flutter_sdk() {
     fi
   fi
 
-  # 2) اول: مخزن داخلی (دقیقا همین آدرس) — فقط SDK؛ کتابخانه‌های pub از mirror
+  # 2) First: internal mirror (exact FLUTTER_SDK_TARBALL_URL_INTERNAL) — SDK only; pub packages use mirror
   if [[ ! -d /opt/flutter ]]; then
     log_info "Trying Flutter SDK from internal mirror (first): ${FLUTTER_SDK_TARBALL_URL_INTERNAL}"
     apt-get install -y -qq curl xz-utils >/dev/null 2>&1 || true
@@ -2326,7 +2326,7 @@ configure_nginx_api() {
   if [[ -d /etc/nginx/conf.d ]]; then
     cat > /etc/nginx/conf.d/rate-limit-api.conf <<RATELIMIT
 # Rate limiting zone for API
-# OPTIONS (CORS preflight) را در سهمیه نمی‌گذارد؛ هر XHR معمولاً OPTIONS + METHOD است.
+# OPTIONS (CORS preflight) is not counted in quota; each XHR is usually OPTIONS + METHOD.
 map \$request_method \$api_limit_key {
 	default  \$binary_remote_addr;
 	OPTIONS  "";
@@ -2349,7 +2349,7 @@ server {
   add_header X-XSS-Protection "1; mode=block" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-  # روت ریشه (اطلاعات سرویس و نسخه)
+  # Root route (service info and version)
   location = / {
     proxy_pass http://127.0.0.1:8000;
     proxy_http_version 1.1;
@@ -2361,7 +2361,7 @@ server {
     proxy_set_header X-Forwarded-Port \$server_port;
   }
 
-  # لینک اشتراک عمومی: /p/{code} → بک‌اند (ریدایرکت ۳۰۷)
+  # Public share link: /p/{code} → backend (307 redirect)
   location /p/ {
     proxy_pass http://127.0.0.1:8000/p/;
     proxy_http_version 1.1;
@@ -2376,7 +2376,7 @@ server {
     proxy_send_timeout 30;
   }
 
-  # لینک اشتراک فاکتور/سند: /i/{code} → بک‌اند (ریدایرکت ۳۰۷ به /public/invoice-link/ در Flutter)
+  # Invoice/document share link: /i/{code} → backend (307 redirect to /public/invoice-link/ in Flutter)
   location /i/ {
     proxy_pass http://127.0.0.1:8000/i/;
     proxy_http_version 1.1;
@@ -2391,8 +2391,8 @@ server {
     proxy_send_timeout 30;
   }
 
-  # وقتی API و UI روی یک دامنه هستند: مسیرهای /public/ را از روت UI سرو کن (SPA)
-  # fallback با named location تا /index.html به location / { return 404; } نخورد
+  # When API and UI share one domain: serve /public/ paths from UI root (SPA)
+  # Named location fallback so /index.html does not hit location / { return 404; }
   location /public/ {
     root /var/www/${UI_DOMAIN};
     try_files \$uri \$uri/ @hesabix_public_spa;
@@ -2402,7 +2402,7 @@ server {
     rewrite ^ /index.html break;
   }
 
-  # Swagger / OpenAPI از بک‌اند (^~ برای /docs/* مثل oauth2-redirect؛ /docs-custom زیر همین پیشوند است)
+  # Swagger / OpenAPI from backend (^~ for /docs/* e.g. oauth2-redirect; /docs-custom under same prefix)
   location ^~ /docs {
     proxy_pass http://127.0.0.1:8000;
     proxy_http_version 1.1;
@@ -2445,8 +2445,8 @@ server {
     proxy_send_timeout 300;
   }
 
-  # /assets وب Flutter (فونت MaterialIcons، shaders، …) نباید همیشه به API پروکسی شود؛
-  # وگرنه وقتی API_DOMAIN و UI_DOMAIN یکی‌اند (ادغام server در nginx)، آیکن‌ها و دارایی‌های استاتیک وب خالی/۴۰۴ می‌شوند.
+  # Flutter web /assets (MaterialIcons fonts, shaders, …) must not always proxy to API;
+  # otherwise when API_DOMAIN and UI_DOMAIN match (merged nginx server), web icons/assets return empty/404.
   location ^~ /assets/swagger/ {
     proxy_pass http://127.0.0.1:8000;
     proxy_http_version 1.1;
@@ -2511,7 +2511,7 @@ server {
     return 404;
   }
 
-  # چت وب عمومی: نرخ فقط در اپ (جدول firewall_rate_policies)
+  # Public web chat: rate limits only in app (firewall_rate_policies table)
   location /api/v1/public/crm-chat/ {
     proxy_pass http://127.0.0.1:8000/api/v1/public/crm-chat/;
     proxy_http_version 1.1;
@@ -2630,7 +2630,7 @@ server {
   add_header X-XSS-Protection "1; mode=block" always;
   add_header Referrer-Policy "strict-origin-when-cross-origin" always;
 
-  # لینک اشتراک عمومی: /p/{code} → بک‌اند (ریدایرکت ۳۰۷)
+  # Public share link: /p/{code} → backend (307 redirect)
   location /p/ {
     proxy_pass http://127.0.0.1:8000/p/;
     proxy_http_version 1.1;
@@ -2645,7 +2645,7 @@ server {
     proxy_send_timeout 30;
   }
 
-  # لینک اشتراک فاکتور: /i/{code} → بک‌اند (ریدایرکت ۳۰۷)
+  # Invoice share link: /i/{code} → backend (307 redirect)
   location /i/ {
     proxy_pass http://127.0.0.1:8000/i/;
     proxy_http_version 1.1;
@@ -2706,8 +2706,8 @@ server {
     proxy_send_timeout 86400;
   }
 
-  # همان دامنهٔ UI+API (hsxn): بدون این بلوک، /docs به try_files می‌خورد و index.html Flutter برمی‌گردد.
-  # فقط زیرمسیر /assets/swagger/ و لوگوی مستندات به بک‌اند می‌رود تا با assets وب Flutter تداخل نگیرد.
+  # Same UI+API domain: without this block, /docs hits try_files and returns Flutter index.html.
+  # Only /assets/swagger/ and doc logo proxy to backend to avoid clashing with Flutter web assets.
   location ^~ /docs {
     proxy_pass http://127.0.0.1:8000;
     proxy_http_version 1.1;
@@ -2789,26 +2789,26 @@ server {
     proxy_send_timeout 300;
   }
 
-  # SPA: مسیرهای عمومی (لینک اشتراک و غیره) → index.html
+  # SPA: public paths (share links, etc.) → index.html
   location /public/ {
     try_files \$uri \$uri/ /index.html;
   }
 
-  # نسخهٔ build (همیشه تازه؛ پایهٔ تشخیص به‌روزرسانی در کلاینت)
+  # Build version (always fresh; client uses this to detect updates)
   location = /version.json {
     add_header Cache-Control "no-store" always;
     expires off;
     try_files \$uri =404;
   }
 
-  # Service Worker نباید با immutable یک‌ساله قفل شود
+  # Service Worker must not be locked with one-year immutable cache
   location = /flutter_service_worker.js {
     add_header Cache-Control "no-cache, must-revalidate" always;
     expires off;
     try_files \$uri =404;
   }
 
-  # نام فایل‌های ورودی Flutter معمولاً ثابت است؛ کش یک‌ساله immutable باعث اجرای JS قدیمی پس از دیپلوی می‌شود
+  # Flutter entry JS filenames are usually stable; one-year immutable cache runs old JS after deploy
   location = /flutter_bootstrap.js {
     add_header Cache-Control "no-cache, must-revalidate" always;
     expires off;
@@ -3191,7 +3191,7 @@ main() {
   # Check OS compatibility (must be Debian/Ubuntu)
   check_os_compatibility
   
-  # حداقل RAM برای نصب (قبل از لایسنس تا وقت کاربر هدر نرود)
+  # Minimum RAM check (before license prompt so user time is not wasted)
   check_minimum_ram
   
   # Show license information
