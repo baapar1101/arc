@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Hesabix update script: pull from repo, migrate backend, restart services, rebuild frontend, reload nginx.
-# pip: Hesabix mirror only (https://p.mirror.hesabix.ir/simple) — configure_pip_hesabix_mirror before backend pip install. Nginx install: scripts/install_pip_mirror_nginx.sh
-# Flutter: f.mirror.hesabix.ir only (pub + gcs; upstream pub-azs.ir) — hesabixAPI/f.mirror.hesabix.ir.conf
+# pip / Flutter mirrors: scripts/mirror_config.sh (saved in ${APP_ROOT}/.deploy_env from deploy).
 # Run via: hesabix -update [-source URL] [-branch NAME]
 # PostgreSQL pgvector: scripts/ensure_pgvector.sh (idempotent, non-fatal) before Alembic migrations.
 # AI voice (local STT/TTS): scripts/ensure_voice_chat.sh — prompts if deps missing (INSTALL_VOICE in .deploy_env).
@@ -17,6 +16,13 @@ CROSS_MARK=$'\xE2\x9D\x8C'
 log_info() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"; }
 log_ok()   { echo "${CHECK_MARK} $*" | tee -a "${LOG_FILE}"; }
 log_err()  { echo "${CROSS_MARK} $*" >&2; echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >> "${LOG_FILE}"; }
+
+UPDATE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/mirror_config.sh
+if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/mirror_config.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${UPDATE_SCRIPT_DIR}/scripts/mirror_config.sh"
+fi
 
 # If normal checkout/pull fails (local generated file, merge, diverged branch), realign the clone with remote.
 hesabix_force_sync_origin() {
@@ -70,6 +76,10 @@ PROFILE
 }
 
 configure_pip_hesabix_mirror() {
+  if declare -F hesabix_configure_pip_mirror >/dev/null 2>&1; then
+    hesabix_configure_pip_mirror
+    return 0
+  fi
   if ! command -v python3 >/dev/null 2>&1; then
     return 0
   fi
@@ -103,15 +113,10 @@ fi
 
 # Load saved deploy config (.deploy_env)
 if [[ -f "${APP_ROOT}/.deploy_env" ]]; then
-  if [[ -z "${API_DOMAIN:-}" ]]; then
-    set -a
-    # shellcheck source=/dev/null
-    source "${APP_ROOT}/.deploy_env"
-    set +a
-  elif [[ -z "${INSTALL_VOICE:-}" ]]; then
-    # shellcheck source=/dev/null
-    source "${APP_ROOT}/.deploy_env"
-  fi
+  set -a
+  # shellcheck source=/dev/null
+  source "${APP_ROOT}/.deploy_env"
+  set +a
 fi
 
 for v in API_DOMAIN UI_DOMAIN BRANCH REPO_URL; do
@@ -166,8 +171,13 @@ fi
 cd "${api_dir}"
 # shellcheck disable=SC1091
 source .venv/bin/activate
-export PIP_INDEX_URL="${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}"
-export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}"
+if declare -F hesabix_apply_pip_mirror_env >/dev/null 2>&1; then
+  hesabix_apply_pip_mirror_env
+else
+  export PIP_INDEX_URL="${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}"
+  export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}"
+fi
+log_info "Installing backend deps from PyPI: ${PIP_INDEX_URL}"
 pip install --upgrade pip setuptools wheel -q
 pip install -e . -q
 ensure_voice="${APP_ROOT}/app/scripts/ensure_voice_chat.sh"
@@ -232,8 +242,13 @@ if ! command -v flutter >/dev/null 2>&1; then
   exit 1
 fi
 persist_flutter_path_in_profile_d
-export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
-export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
+if declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
+  hesabix_apply_flutter_mirror_env
+else
+  export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
+  export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://f.mirror.hesabix.ir/gcs}"
+fi
+log_info "Flutter pub/storage: PUB_HOSTED_URL=${PUB_HOSTED_URL}"
 app_dir="${APP_ROOT}/app"
 build_script="${app_dir}/build_web.sh"
 if [[ ! -f "${build_script}" ]]; then

@@ -167,15 +167,15 @@ echo "API URL: $API_BASE_URL"
 
 cd "$APP_DIR"
 
-# آینهٔ pub/storage: فقط Hesabix (مثل deploy.sh / hesabixAPI/f.mirror.hesabix.ir.conf)
-export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
-export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
-# اگر --offline داده نشده و f.mirror در دسترس نبود، مثل حالت آفلاین رفتار کن
+# آینهٔ pub/storage: از محیط یا .deploy_env (deploy.sh / mirror_config.sh)
+export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
+export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://f.mirror.hesabix.ir/gcs}"
+# اگر --offline داده نشده و آینهٔ انتخاب‌شده در دسترس نبود، مثل حالت آفلاین رفتار کن
 if [ "$USE_OFFLINE_CACHE" != true ]; then
-  if ! curl -fsS --connect-timeout 4 --max-time 8 "https://f.mirror.hesabix.ir/pub" >/dev/null 2>&1 && \
-     ! curl -kfsS --connect-timeout 4 --max-time 8 "https://f.mirror.hesabix.ir/pub" >/dev/null 2>&1; then
+  if ! curl -fsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/" >/dev/null 2>&1 && \
+     ! curl -kfsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/" >/dev/null 2>&1; then
     USE_OFFLINE_CACHE=true
-    warn "f.mirror.hesabix.ir در دسترس نیست — اگر cache محلی ندارید، pub get ممکن است شکست بخورد. بررسی DNS/فایروال/Nginx میرور."
+    warn "آینهٔ pub (${PUB_HOSTED_URL}) در دسترس نیست — اگر cache محلی ندارید، pub get ممکن است شکست بخورد."
   fi
 fi
 

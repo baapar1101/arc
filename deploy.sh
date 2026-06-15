@@ -46,9 +46,11 @@ IFS=$'\n\t'
 # - Saved inputs: last entered domain, branch, pgAdmin4 options, etc. are stored in .deploy_saved_vars
 #   and used as defaults on next run (override by env vars or leave blank to be prompted again).
 # - For full re-run/upgrade (e.g. pull latest code and rebuild): use RESET_STATE=y
-# - pip: only Hesabix PyPI mirror — https://p.mirror.hesabix.ir/simple (see configure_pip_hesabix_mirror, set_pip_mirror_env).
-#   If PIP_INDEX_URL is set in the environment before deploy, that value is used instead (advanced override).
-# - Flutter/Dart: آینهٔ داخلی f.mirror.hesabix.ir (pub + gcs؛ upstream: pub-azs.ir). shell.hesabix.ir فقط برای tarball SDK است.
+# - pip / Flutter mirrors: interactive choice in prompt_vars (scripts/mirror_config.sh) — Hesabix, official,
+#   China mirrors, pub-azs.ir, or custom URL. Non-interactive: PIP_MIRROR=hesabix|official|tuna|aliyun|custom
+#   and FLUTTER_MIRROR=hesabix|pub_azs|flutter_io_cn|tuna|sjtu|official|custom. Saved in .deploy_saved_vars and .deploy_env.
+#   Direct URL override: PIP_INDEX_URL, PUB_HOSTED_URL, FLUTTER_STORAGE_BASE_URL.
+# - Flutter SDK tarball: shell.hesabix.ir (internal); pub packages use selected FLUTTER_MIRROR.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
 #   Large tarball (~2GB): download uses --progress-bar, resume (-C -), FLUTTER_SDK_CONNECT_TIMEOUT (default 120s),
@@ -101,6 +103,11 @@ if ! declare -F hesabix_resolve_api_public_scheme >/dev/null 2>&1; then
     case "$s" in http|https) printf '%s' "$s"; return 0 ;; esac
     printf '%s' "http"
   }
+fi
+# shellcheck source=scripts/mirror_config.sh
+if [[ -r "${DEPLOY_SCRIPT_DIR}/scripts/mirror_config.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${DEPLOY_SCRIPT_DIR}/scripts/mirror_config.sh"
 fi
 
 # Initialize log file
@@ -636,6 +643,12 @@ save_deploy_saved_vars() {
     echo "PGADMIN4_PASSWORD=${PGADMIN4_PASSWORD:-}"
     echo "UBUNTU_APT_MIRROR=${UBUNTU_APT_MIRROR:-}"
     echo "INSTALL_VOICE=${INSTALL_VOICE:-N}"
+    echo "PIP_MIRROR=${PIP_MIRROR:-hesabix}"
+    echo "FLUTTER_MIRROR=${FLUTTER_MIRROR:-hesabix}"
+    echo "PIP_INDEX_URL=${PIP_INDEX_URL:-}"
+    echo "PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}"
+    echo "PUB_HOSTED_URL=${PUB_HOSTED_URL:-}"
+    echo "FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}"
   } > "${file}"
   chmod 600 "${file}"
   log_info "Saved inputs for next run (${file})"
@@ -823,12 +836,22 @@ PY
 install_hesabix_command() {
   mkdir -p "${APP_ROOT}"
   local env_file="${APP_ROOT}/.deploy_env"
+  if declare -F hesabix_apply_pip_mirror_env >/dev/null 2>&1; then
+    hesabix_apply_pip_mirror_env
+    hesabix_apply_flutter_mirror_env
+  fi
   cat > "${env_file}" <<ENV
 API_DOMAIN=${API_DOMAIN}
 UI_DOMAIN=${UI_DOMAIN}
 BRANCH=${BRANCH}
 REPO_URL=${REPO_URL}
 INSTALL_VOICE=${INSTALL_VOICE:-N}
+PIP_MIRROR=${PIP_MIRROR:-hesabix}
+FLUTTER_MIRROR=${FLUTTER_MIRROR:-hesabix}
+PIP_INDEX_URL=${PIP_INDEX_URL:-}
+PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}
+PUB_HOSTED_URL=${PUB_HOSTED_URL:-}
+FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}
 ENV
   chmod 600 "${env_file}"
   log_info "Saved deployment config to ${env_file}"
@@ -1058,9 +1081,16 @@ prompt_vars() {
     read -rp "Install AI voice chat dependencies (pip [voice], ~2–4GB disk)? (y/N): " INSTALL_VOICE
     INSTALL_VOICE=${INSTALL_VOICE:-N}
   fi
+
+  if declare -F hesabix_prompt_pip_mirror >/dev/null 2>&1; then
+    hesabix_prompt_pip_mirror
+    hesabix_prompt_flutter_mirror
+    hesabix_apply_pip_mirror_env
+    hesabix_apply_flutter_mirror_env
+  fi
   
   save_deploy_saved_vars
-  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD INSTALL_VOICE DB_POOL_SIZE DB_MAX_OVERFLOW
+  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD INSTALL_VOICE DB_POOL_SIZE DB_MAX_OVERFLOW PIP_MIRROR FLUTTER_MIRROR PIP_INDEX_URL PIP_TRUSTED_HOST PUB_HOSTED_URL FLUTTER_STORAGE_BASE_URL
 }
 
 # Show configuration summary and ask for confirmation
@@ -1110,6 +1140,15 @@ show_config_summary() {
     echo "AI Voice Chat:     Not installed (optional)"
     echo
   fi
+  echo "Package mirrors:"
+  if declare -F hesabix_mirror_summary_pip >/dev/null 2>&1; then
+    hesabix_mirror_summary_pip
+    hesabix_mirror_summary_flutter
+  else
+    echo "  • PyPI (pip):     hesabix (default)"
+    echo "  • Flutter:        hesabix (default)"
+  fi
+  echo
   echo "Installation Paths:"
   echo "  • Application:    ${APP_ROOT}/app"
   echo "  • Frontend:       /var/www/${UI_DOMAIN}"
@@ -1707,58 +1746,7 @@ UNIT
   fi
 }
 
-# میرور داخلی PyPI (pip) — فقط Hesabix
-HESABIX_PIP_INDEX_URL="https://p.mirror.hesabix.ir/simple"
-HESABIX_PIP_TRUSTED_HOST="p.mirror.hesabix.ir"
-
-# pip config سراسری کاربر — همان آدرس برای نصب‌های بعدی
-configure_pip_hesabix_mirror() {
-  if ! command -v python3 >/dev/null 2>&1; then
-    return 0
-  fi
-  python3 -m pip config --user set global.index "${HESABIX_PIP_INDEX_URL}" 2>/dev/null || true
-  python3 -m pip config --user set global.index-url "${HESABIX_PIP_INDEX_URL}" 2>/dev/null || true
-  python3 -m pip config --user set global.trusted-host "${HESABIX_PIP_TRUSTED_HOST}" 2>/dev/null || true
-  log_info "pip user config: Hesabix PyPI (${HESABIX_PIP_INDEX_URL})"
-}
-
-# Set PIP_INDEX_URL and PIP_TRUSTED_HOST for a given mirror URL. Call before pip install.
-set_pip_mirror_for_url() {
-  local index_url="$1"
-  export PIP_INDEX_URL="${index_url}"
-  if [[ "${index_url}" != *"pypi.org"* ]]; then
-    local host
-    host=$(echo "${index_url}" | sed -n 's|https\?://\([^/]*\).*|\1|p')
-    export PIP_TRUSTED_HOST="${host}"
-  else
-    unset PIP_TRUSTED_HOST
-  fi
-}
-
-# میرور پیش‌فرض: Hesabix. اگر PIP_INDEX_URL از قبل در محیط باشد، همان (override) استفاده می‌شود.
-# قبل از هر pip install (بک‌اند و pgAdmin4) صدا بزنید.
-set_pip_mirror_env() {
-  if [[ -n "${PIP_INDEX_URL:-}" ]]; then
-    log_info "Using PyPI index from environment: PIP_INDEX_URL=$PIP_INDEX_URL"
-    export PIP_INDEX_URL
-    if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
-      export PIP_TRUSTED_HOST
-    else
-      set_pip_mirror_for_url "${PIP_INDEX_URL}"
-    fi
-    return 0
-  fi
-  set_pip_mirror_for_url "${HESABIX_PIP_INDEX_URL}"
-  log_info "Using Hesabix PyPI mirror: ${PIP_INDEX_URL}"
-  return 0
-}
-
-# یک آینهٔ ثابت (کش Nginx → Runflare) برای pub و engine artifacts
-set_flutter_mirror_env() {
-  export PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
-  export FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
-  log_info "Flutter pub/storage: PUB_HOSTED_URL=$PUB_HOSTED_URL"
-}
+# pip / Flutter mirrors: scripts/mirror_config.sh (configure_pip_hesabix_mirror, set_pip_mirror_env, set_flutter_mirror_env)
 
 # نصب PATH دائمی برای شِل‌های جدید (ورود به سیستم / bash --login). فایل POSIX-sh برای /etc/profile.d.
 persist_flutter_path_in_profile_d() {
@@ -2072,7 +2060,7 @@ install_flutter_and_build_frontend() {
   echo "  API URL: ${api_url} (scheme from TLS detection or API_PUBLIC_SCHEME)"
   echo "  Output: /var/www/${UI_DOMAIN}"
   echo
-  echo "$CHECK_MARK Flutter build uses Hesabix mirror: f.mirror.hesabix.ir"
+  echo "$CHECK_MARK Flutter build uses mirror: ${PUB_HOSTED_URL:-f.mirror.hesabix.ir}"
 
   cd "${app_dir}"
   log_info "Building Flutter web (pub/storage via ${PUB_HOSTED_URL})"
@@ -2083,7 +2071,7 @@ install_flutter_and_build_frontend() {
     --api-base-url "${api_url}" \
     --clean \
     --install-deps; then
-    log_error "Flutter build failed. Check network, DNS, and f.mirror.hesabix.ir (see hesabixAPI/f.mirror.hesabix.ir.conf)."
+    log_error "Flutter build failed. Check network, DNS, and pub mirror (${PUB_HOSTED_URL:-unknown})."
     exit 1
   fi
   log_success "Flutter web build succeeded"
