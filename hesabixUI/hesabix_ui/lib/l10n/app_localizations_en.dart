@@ -15472,4 +15472,201 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDashboardCreateTicket => 'Create ticket';
+
+  @override
+  String get businessSettingsCategoryBusinessFinance => 'Business & finance';
+
+  @override
+  String get businessSettingsCategoryBusinessFinanceDescription =>
+      'Core info, currencies, fiscal year, and credit';
+
+  @override
+  String get businessSettingsCategorySalesDocuments => 'Sales & documents';
+
+  @override
+  String get businessSettingsCategorySalesDocumentsDescription =>
+      'Quick sales, printing, numbering, and templates';
+
+  @override
+  String get businessSettingsCategoryIntegrations => 'Integrations';
+
+  @override
+  String get businessSettingsCategoryIntegrationsDescription =>
+      'External services and platform connectors';
+
+  @override
+  String get businessSettingsCategoryModules => 'Plugins & modules';
+
+  @override
+  String get businessSettingsCategoryModulesDescription =>
+      'Settings for active business plugins';
+
+  @override
+  String get businessSettingsCategoryAdministration =>
+      'Administration & security';
+
+  @override
+  String get businessSettingsCategoryAdministrationDescription =>
+      'Users, projects, notifications, and activity logs';
+
+  @override
+  String get businessSettingsCategoryPersonalization => 'Personalization';
+
+  @override
+  String get businessSettingsCategoryPersonalizationDescription =>
+      'Your account appearance preferences';
+
+  @override
+  String get businessSettingsCategoryAdvanced => 'Advanced & backup';
+
+  @override
+  String get businessSettingsCategoryAdvancedDescription =>
+      'Backup, restore, and FTP destination';
+
+  @override
+  String get businessSettingsCategoryMembership => 'Membership';
+
+  @override
+  String get businessSettingsCategoryMembershipDescription =>
+      'Your membership in this business';
+
+  @override
+  String get businessSettingsCategoryDangerZone => 'Danger zone';
+
+  @override
+  String get businessSettingsCategoryDangerZoneDescription =>
+      'Irreversible actions — proceed with caution';
+
+  @override
+  String get businessSettingsFiscalYearEdit => 'Edit current fiscal year';
+
+  @override
+  String get businessSettingsFiscalYearEditDescription =>
+      'Edit title and dates of the current fiscal year';
+
+  @override
+  String get businessSettingsQuickSales => 'Quick sales settings';
+
+  @override
+  String get businessSettingsQuickSalesDescription =>
+      'Default settings for quick sales';
+
+  @override
+  String get businessSettingsCrm => 'CRM settings';
+
+  @override
+  String get businessSettingsCrmDescription =>
+      'Web chat and visitor file uploads';
+
+  @override
+  String get businessSettingsProjects => 'Project management';
+
+  @override
+  String get businessSettingsProjectsDescription =>
+      'Define and manage projects for cost and revenue tracking';
+
+  @override
+  String get businessSettingsDocumentNumbering => 'Document numbering';
+
+  @override
+  String get businessSettingsDocumentNumberingDescription =>
+      'Configure numbering for document types';
+
+  @override
+  String get businessSettingsInvoiceSharePayment =>
+      'Invoice link online payment';
+
+  @override
+  String get businessSettingsInvoiceSharePaymentDescription =>
+      'Default gateway and public share link payment';
+
+  @override
+  String get businessSettingsTemplatesDescription =>
+      'Design and manage PDF report and print templates';
+
+  @override
+  String get businessSettingsRepairShop => 'Repair shop settings';
+
+  @override
+  String get businessSettingsRepairShopDescription =>
+      'Numbering, notifications, and repair shop defaults';
+
+  @override
+  String get businessSettingsWarrantyDescription =>
+      'Warranty code format, serial, and security settings';
+
+  @override
+  String get businessSettingsNotificationTemplates => 'Notification templates';
+
+  @override
+  String get businessSettingsNotificationTemplatesDescription =>
+      'Manage SMS and email templates for events';
+
+  @override
+  String get businessSettingsAppearanceProfileDescription =>
+      'Language, theme, and calendar — in user profile settings';
+
+  @override
+  String get businessSettingsLeaveBusiness => 'Leave business';
+
+  @override
+  String get businessSettingsLeaveBusinessDescription =>
+      'Leave this business and remove your access';
+
+  @override
+  String get businessSettingsLeaveBusinessConfirm =>
+      'Are you sure you want to leave this business?\n\nAfter leaving, your access to this business will be removed.';
+
+  @override
+  String get businessSettingsLeaveBusinessAction => 'Leave';
+
+  @override
+  String get businessSettingsLeaveBusinessFailed => 'Failed to leave business';
+
+  @override
+  String get businessSettingsDeleteBusiness => 'Delete business';
+
+  @override
+  String get businessSettingsDeleteBusinessDescription =>
+      'Permanently delete business (recoverable for 30 days)';
+
+  @override
+  String get businessSettingsFiscalYearRollback =>
+      'Rollback current fiscal year';
+
+  @override
+  String get businessSettingsFiscalYearRollbackDescription =>
+      'Delete current year and reactivate the previous one (requires at least two fiscal years)';
+
+  @override
+  String get businessSettingsHubDescriptionOwner =>
+      'You own this business and can manage all settings you have access to.';
+
+  @override
+  String get businessSettingsHubDescriptionMember =>
+      'You are a member of this business; only settings you can access are shown.';
+
+  @override
+  String get businessSettingsHubDescriptionGeneric =>
+      'Manage this business settings from this page.';
+
+  @override
+  String get businessSettingsOwnerRole => 'Business owner';
+
+  @override
+  String get businessSettingsMemberRole => 'Business member';
+
+  @override
+  String get businessSettingsSetupTitle => 'Quick setup';
+
+  @override
+  String get businessSettingsSetupDescription =>
+      'Complete these items to get started:';
+
+  @override
+  String get businessSettingsPluginsLoadingHint => 'Loading plugins…';
+
+  @override
+  String get businessSettingsPluginsLoadFailed =>
+      'Failed to load plugins. Integrations and modules may be incomplete.';
 }

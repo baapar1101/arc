@@ -28515,6 +28515,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create ticket'**
   String get profileDashboardCreateTicket;
+
+  /// No description provided for @businessSettingsCategoryBusinessFinance.
+  ///
+  /// In en, this message translates to:
+  /// **'Business & finance'**
+  String get businessSettingsCategoryBusinessFinance;
+
+  /// No description provided for @businessSettingsCategoryBusinessFinanceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Core info, currencies, fiscal year, and credit'**
+  String get businessSettingsCategoryBusinessFinanceDescription;
+
+  /// No description provided for @businessSettingsCategorySalesDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales & documents'**
+  String get businessSettingsCategorySalesDocuments;
+
+  /// No description provided for @businessSettingsCategorySalesDocumentsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sales, printing, numbering, and templates'**
+  String get businessSettingsCategorySalesDocumentsDescription;
+
+  /// No description provided for @businessSettingsCategoryIntegrations.
+  ///
+  /// In en, this message translates to:
+  /// **'Integrations'**
+  String get businessSettingsCategoryIntegrations;
+
+  /// No description provided for @businessSettingsCategoryIntegrationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'External services and platform connectors'**
+  String get businessSettingsCategoryIntegrationsDescription;
+
+  /// No description provided for @businessSettingsCategoryModules.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugins & modules'**
+  String get businessSettingsCategoryModules;
+
+  /// No description provided for @businessSettingsCategoryModulesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings for active business plugins'**
+  String get businessSettingsCategoryModulesDescription;
+
+  /// No description provided for @businessSettingsCategoryAdministration.
+  ///
+  /// In en, this message translates to:
+  /// **'Administration & security'**
+  String get businessSettingsCategoryAdministration;
+
+  /// No description provided for @businessSettingsCategoryAdministrationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Users, projects, notifications, and activity logs'**
+  String get businessSettingsCategoryAdministrationDescription;
+
+  /// No description provided for @businessSettingsCategoryPersonalization.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalization'**
+  String get businessSettingsCategoryPersonalization;
+
+  /// No description provided for @businessSettingsCategoryPersonalizationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account appearance preferences'**
+  String get businessSettingsCategoryPersonalizationDescription;
+
+  /// No description provided for @businessSettingsCategoryAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced & backup'**
+  String get businessSettingsCategoryAdvanced;
+
+  /// No description provided for @businessSettingsCategoryAdvancedDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup, restore, and FTP destination'**
+  String get businessSettingsCategoryAdvancedDescription;
+
+  /// No description provided for @businessSettingsCategoryMembership.
+  ///
+  /// In en, this message translates to:
+  /// **'Membership'**
+  String get businessSettingsCategoryMembership;
+
+  /// No description provided for @businessSettingsCategoryMembershipDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Your membership in this business'**
+  String get businessSettingsCategoryMembershipDescription;
+
+  /// No description provided for @businessSettingsCategoryDangerZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger zone'**
+  String get businessSettingsCategoryDangerZone;
+
+  /// No description provided for @businessSettingsCategoryDangerZoneDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Irreversible actions — proceed with caution'**
+  String get businessSettingsCategoryDangerZoneDescription;
+
+  /// No description provided for @businessSettingsFiscalYearEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit current fiscal year'**
+  String get businessSettingsFiscalYearEdit;
+
+  /// No description provided for @businessSettingsFiscalYearEditDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit title and dates of the current fiscal year'**
+  String get businessSettingsFiscalYearEditDescription;
+
+  /// No description provided for @businessSettingsQuickSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sales settings'**
+  String get businessSettingsQuickSales;
+
+  /// No description provided for @businessSettingsQuickSalesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Default settings for quick sales'**
+  String get businessSettingsQuickSalesDescription;
+
+  /// No description provided for @businessSettingsCrm.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM settings'**
+  String get businessSettingsCrm;
+
+  /// No description provided for @businessSettingsCrmDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Web chat and visitor file uploads'**
+  String get businessSettingsCrmDescription;
+
+  /// No description provided for @businessSettingsProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Project management'**
+  String get businessSettingsProjects;
+
+  /// No description provided for @businessSettingsProjectsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Define and manage projects for cost and revenue tracking'**
+  String get businessSettingsProjectsDescription;
+
+  /// No description provided for @businessSettingsDocumentNumbering.
+  ///
+  /// In en, this message translates to:
+  /// **'Document numbering'**
+  String get businessSettingsDocumentNumbering;
+
+  /// No description provided for @businessSettingsDocumentNumberingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure numbering for document types'**
+  String get businessSettingsDocumentNumberingDescription;
+
+  /// No description provided for @businessSettingsInvoiceSharePayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice link online payment'**
+  String get businessSettingsInvoiceSharePayment;
+
+  /// No description provided for @businessSettingsInvoiceSharePaymentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Default gateway and public share link payment'**
+  String get businessSettingsInvoiceSharePaymentDescription;
+
+  /// No description provided for @businessSettingsTemplatesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Design and manage PDF report and print templates'**
+  String get businessSettingsTemplatesDescription;
+
+  /// No description provided for @businessSettingsRepairShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair shop settings'**
+  String get businessSettingsRepairShop;
+
+  /// No description provided for @businessSettingsRepairShopDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Numbering, notifications, and repair shop defaults'**
+  String get businessSettingsRepairShopDescription;
+
+  /// No description provided for @businessSettingsWarrantyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty code format, serial, and security settings'**
+  String get businessSettingsWarrantyDescription;
+
+  /// No description provided for @businessSettingsNotificationTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification templates'**
+  String get businessSettingsNotificationTemplates;
+
+  /// No description provided for @businessSettingsNotificationTemplatesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage SMS and email templates for events'**
+  String get businessSettingsNotificationTemplatesDescription;
+
+  /// No description provided for @businessSettingsAppearanceProfileDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Language, theme, and calendar — in user profile settings'**
+  String get businessSettingsAppearanceProfileDescription;
+
+  /// No description provided for @businessSettingsLeaveBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave business'**
+  String get businessSettingsLeaveBusiness;
+
+  /// No description provided for @businessSettingsLeaveBusinessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave this business and remove your access'**
+  String get businessSettingsLeaveBusinessDescription;
+
+  /// No description provided for @businessSettingsLeaveBusinessConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to leave this business?\n\nAfter leaving, your access to this business will be removed.'**
+  String get businessSettingsLeaveBusinessConfirm;
+
+  /// No description provided for @businessSettingsLeaveBusinessAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get businessSettingsLeaveBusinessAction;
+
+  /// No description provided for @businessSettingsLeaveBusinessFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to leave business'**
+  String get businessSettingsLeaveBusinessFailed;
+
+  /// No description provided for @businessSettingsDeleteBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete business'**
+  String get businessSettingsDeleteBusiness;
+
+  /// No description provided for @businessSettingsDeleteBusinessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete business (recoverable for 30 days)'**
+  String get businessSettingsDeleteBusinessDescription;
+
+  /// No description provided for @businessSettingsFiscalYearRollback.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollback current fiscal year'**
+  String get businessSettingsFiscalYearRollback;
+
+  /// No description provided for @businessSettingsFiscalYearRollbackDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete current year and reactivate the previous one (requires at least two fiscal years)'**
+  String get businessSettingsFiscalYearRollbackDescription;
+
+  /// No description provided for @businessSettingsHubDescriptionOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'You own this business and can manage all settings you have access to.'**
+  String get businessSettingsHubDescriptionOwner;
+
+  /// No description provided for @businessSettingsHubDescriptionMember.
+  ///
+  /// In en, this message translates to:
+  /// **'You are a member of this business; only settings you can access are shown.'**
+  String get businessSettingsHubDescriptionMember;
+
+  /// No description provided for @businessSettingsHubDescriptionGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage this business settings from this page.'**
+  String get businessSettingsHubDescriptionGeneric;
+
+  /// No description provided for @businessSettingsOwnerRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Business owner'**
+  String get businessSettingsOwnerRole;
+
+  /// No description provided for @businessSettingsMemberRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Business member'**
+  String get businessSettingsMemberRole;
+
+  /// No description provided for @businessSettingsSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick setup'**
+  String get businessSettingsSetupTitle;
+
+  /// No description provided for @businessSettingsSetupDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete these items to get started:'**
+  String get businessSettingsSetupDescription;
+
+  /// No description provided for @businessSettingsPluginsLoadingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading plugins…'**
+  String get businessSettingsPluginsLoadingHint;
+
+  /// No description provided for @businessSettingsPluginsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load plugins. Integrations and modules may be incomplete.'**
+  String get businessSettingsPluginsLoadFailed;
 }
 
 class _AppLocalizationsDelegate

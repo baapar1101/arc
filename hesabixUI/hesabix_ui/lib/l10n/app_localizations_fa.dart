@@ -15384,4 +15384,198 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get profileDashboardCreateTicket => 'ایجاد تیکت';
+
+  @override
+  String get businessSettingsCategoryBusinessFinance => 'کسب‌وکار و مالی';
+
+  @override
+  String get businessSettingsCategoryBusinessFinanceDescription =>
+      'اطلاعات پایه، ارزها، سال مالی و اعتبار';
+
+  @override
+  String get businessSettingsCategorySalesDocuments => 'فروش و اسناد';
+
+  @override
+  String get businessSettingsCategorySalesDocumentsDescription =>
+      'فروش سریع، چاپ، شماره‌گذاری و قالب‌ها';
+
+  @override
+  String get businessSettingsCategoryIntegrations => 'یکپارچه‌سازی‌ها';
+
+  @override
+  String get businessSettingsCategoryIntegrationsDescription =>
+      'اتصال به سرویس‌ها و پلتفرم‌های خارجی';
+
+  @override
+  String get businessSettingsCategoryModules => 'افزونه‌ها و ماژول‌ها';
+
+  @override
+  String get businessSettingsCategoryModulesDescription =>
+      'تنظیمات افزونه‌های فعال کسب‌وکار';
+
+  @override
+  String get businessSettingsCategoryAdministration => 'مدیریت و امنیت';
+
+  @override
+  String get businessSettingsCategoryAdministrationDescription =>
+      'کاربران، پروژه‌ها، اعلان‌ها و گزارش فعالیت';
+
+  @override
+  String get businessSettingsCategoryPersonalization => 'شخصی‌سازی';
+
+  @override
+  String get businessSettingsCategoryPersonalizationDescription =>
+      'تنظیمات ظاهری حساب کاربری شما';
+
+  @override
+  String get businessSettingsCategoryAdvanced => 'پیشرفته و پشتیبان';
+
+  @override
+  String get businessSettingsCategoryAdvancedDescription =>
+      'پشتیبان‌گیری، بازیابی و مقصد FTP';
+
+  @override
+  String get businessSettingsCategoryMembership => 'عضویت';
+
+  @override
+  String get businessSettingsCategoryMembershipDescription =>
+      'مدیریت عضویت شما در این کسب‌وکار';
+
+  @override
+  String get businessSettingsCategoryDangerZone => 'عملیات خطرناک';
+
+  @override
+  String get businessSettingsCategoryDangerZoneDescription =>
+      'اقدامات غیرقابل بازگشت — با احتیاط ادامه دهید';
+
+  @override
+  String get businessSettingsFiscalYearEdit => 'ویرایش سال مالی جاری';
+
+  @override
+  String get businessSettingsFiscalYearEditDescription =>
+      'ویرایش عنوان و تاریخ‌های سال مالی جاری';
+
+  @override
+  String get businessSettingsQuickSales => 'تنظیمات فروش سریع';
+
+  @override
+  String get businessSettingsQuickSalesDescription =>
+      'تنظیمات پیش‌فرض برای فروش سریع';
+
+  @override
+  String get businessSettingsCrm => 'تنظیمات CRM';
+
+  @override
+  String get businessSettingsCrmDescription =>
+      'چت وب و ارسال فایل توسط بازدیدکننده';
+
+  @override
+  String get businessSettingsProjects => 'مدیریت پروژه‌ها';
+
+  @override
+  String get businessSettingsProjectsDescription =>
+      'تعریف و مدیریت پروژه‌ها برای ردیابی هزینه‌ها و درآمدها';
+
+  @override
+  String get businessSettingsDocumentNumbering => 'شماره‌گذاری اسناد';
+
+  @override
+  String get businessSettingsDocumentNumberingDescription =>
+      'تنظیم نحوه شماره‌گذاری انواع اسناد';
+
+  @override
+  String get businessSettingsInvoiceSharePayment => 'پرداخت آنلاین لینک فاکتور';
+
+  @override
+  String get businessSettingsInvoiceSharePaymentDescription =>
+      'پیش‌فرض درگاه و فعال‌سازی برای لینک اشتراک عمومی';
+
+  @override
+  String get businessSettingsTemplatesDescription =>
+      'طراحی و مدیریت قالب‌های PDF گزارش و چاپ';
+
+  @override
+  String get businessSettingsRepairShop => 'تنظیمات تعمیرگاه';
+
+  @override
+  String get businessSettingsRepairShopDescription =>
+      'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه';
+
+  @override
+  String get businessSettingsWarrantyDescription =>
+      'تنظیمات فرمت کد، سریال و امنیت گارانتی';
+
+  @override
+  String get businessSettingsNotificationTemplates => 'قالب‌های نوتیفیکیشن';
+
+  @override
+  String get businessSettingsNotificationTemplatesDescription =>
+      'مدیریت قالب‌های پیامک و ایمیل برای رویدادهای مختلف';
+
+  @override
+  String get businessSettingsAppearanceProfileDescription =>
+      'زبان، تم و تقویم — در تنظیمات پروفایل کاربری';
+
+  @override
+  String get businessSettingsLeaveBusiness => 'خروج از کسب و کار';
+
+  @override
+  String get businessSettingsLeaveBusinessDescription =>
+      'خروج از این کسب و کار و حذف دسترسی‌های شما';
+
+  @override
+  String get businessSettingsLeaveBusinessConfirm =>
+      'آیا مطمئن هستید که می‌خواهید از این کسب و کار خارج شوید؟\n\nپس از خروج، دسترسی شما به این کسب و کار حذف خواهد شد.';
+
+  @override
+  String get businessSettingsLeaveBusinessAction => 'خروج';
+
+  @override
+  String get businessSettingsLeaveBusinessFailed => 'خطا در خروج از کسب و کار';
+
+  @override
+  String get businessSettingsDeleteBusiness => 'حذف کسب و کار';
+
+  @override
+  String get businessSettingsDeleteBusinessDescription =>
+      'حذف دائمی کسب و کار (۳۰ روز قابل بازیابی)';
+
+  @override
+  String get businessSettingsFiscalYearRollback => 'برگشت از سال مالی جاری';
+
+  @override
+  String get businessSettingsFiscalYearRollbackDescription =>
+      'حذف سال جاری و فعال‌سازی مجدد سال قبل (حداقل دو سال مالی)';
+
+  @override
+  String get businessSettingsHubDescriptionOwner =>
+      'شما مالک این کسب و کار هستید و می‌توانید همه تنظیمات مجاز را مدیریت کنید.';
+
+  @override
+  String get businessSettingsHubDescriptionMember =>
+      'شما عضو این کسب و کار هستید؛ فقط تنظیماتی که به آن‌ها دسترسی دارید نمایش داده می‌شود.';
+
+  @override
+  String get businessSettingsHubDescriptionGeneric =>
+      'تنظیمات این کسب و کار را از این صفحه مدیریت کنید.';
+
+  @override
+  String get businessSettingsOwnerRole => 'مالک کسب و کار';
+
+  @override
+  String get businessSettingsMemberRole => 'عضو کسب و کار';
+
+  @override
+  String get businessSettingsSetupTitle => 'راه‌اندازی سریع';
+
+  @override
+  String get businessSettingsSetupDescription =>
+      'برای شروع کار، این موارد را تکمیل کنید:';
+
+  @override
+  String get businessSettingsPluginsLoadingHint => 'در حال بارگذاری افزونه‌ها…';
+
+  @override
+  String get businessSettingsPluginsLoadFailed =>
+      'بارگذاری افزونه‌ها ناموفق بود. یکپارچه‌سازی‌ها و ماژول‌ها ممکن است کامل نمایش داده نشوند.';
 }

@@ -602,12 +602,7 @@ class _MyAppState extends State<MyApp> {
         businessId: dummyBusinessId,
         calendarController: calendarController,
       );
-      SettingsPage(
-        businessId: dummyBusinessId,
-        localeController: localeController,
-        calendarController: calendarController,
-        themeController: themeController,
-      );
+      SettingsPage(businessId: dummyBusinessId);
       BusinessBackupPage(businessId: dummyBusinessId);
       BusinessRestorePage(businessId: dummyBusinessId);
       BusinessInfoSettingsPage(businessId: dummyBusinessId);
@@ -3086,9 +3081,6 @@ class _MyAppState extends State<MyApp> {
                 }
                 return hesabixNoTransitionPage(state, SettingsPage(
                     businessId: businessId,
-                    localeController: controller,
-                    calendarController: _calendarController!,
-                    themeController: themeController,
                   ),
                 );
               },

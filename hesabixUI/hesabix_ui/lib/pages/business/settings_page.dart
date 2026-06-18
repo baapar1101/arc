@@ -1,34 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import '../../core/business_nav.dart';
-import '../../core/locale_controller.dart';
-import '../../core/calendar_controller.dart';
-import '../../theme/theme_controller.dart';
+
+import '../system_settings/models/settings_category.dart';
+import '../system_settings/models/settings_item.dart';
+import '../system_settings/widgets/settings_search_bar.dart';
+import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../models/business_user_model.dart';
 import '../../services/business_user_service.dart';
 import '../../services/marketplace_service.dart';
-import '../../models/business_user_model.dart';
-import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-import '../../utils/responsive_helper.dart';
-import '../../widgets/calendar_switcher.dart';
-import '../../widgets/language_switcher.dart';
-import '../../widgets/theme_mode_switcher.dart';
+import 'settings/business_settings_categorization_service.dart';
+import 'settings/business_settings_context.dart';
+import 'settings/business_settings_localization_helper.dart';
+import 'settings/widgets/business_settings_card.dart';
+import 'settings/widgets/business_settings_category_section.dart';
+import 'settings/widgets/business_settings_setup_checklist.dart';
 
 class SettingsPage extends StatefulWidget {
   final int businessId;
-  final LocaleController? localeController;
-  final CalendarController? calendarController;
-  final ThemeController? themeController;
 
   const SettingsPage({
     super.key,
     required this.businessId,
-    this.localeController,
-    this.calendarController,
-    this.themeController,
   });
 
   @override
@@ -38,23 +34,29 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   final BusinessUserService _userService = BusinessUserService(ApiClient());
   final MarketplaceService _marketplaceService = MarketplaceService();
+
+  final Map<String, bool> _categoryExpansionStates = {};
+  String _searchQuery = '';
+  bool _isSearching = false;
+  List<SettingsItem> _searchResults = [];
+
   bool _isLeaving = false;
   List<Map<String, dynamic>> _businessPlugins = [];
   bool _pluginsLoaded = false;
-  
+  bool _pluginsLoadFailed = false;
+
   AuthStore? get _authStore => ApiClient.getAuthStore();
-  
+
   @override
   void initState() {
     super.initState();
-    // اضافه کردن listener برای rebuild صفحه وقتی currentBusiness تغییر کرد
     final authStore = _authStore;
     if (authStore != null) {
       authStore.addListener(_onAuthStoreChanged);
     }
     _loadBusinessPlugins();
   }
-  
+
   @override
   void dispose() {
     final authStore = _authStore;
@@ -63,1182 +65,503 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     super.dispose();
   }
-  
+
   void _onAuthStoreChanged() {
-    if (mounted) {
-      setState(() {});
-    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadBusinessPlugins() async {
     if (_pluginsLoaded) return;
-    
     try {
-      final plugins = await _marketplaceService.listBusinessPlugins(businessId: widget.businessId);
-      if (mounted) {
-        setState(() {
-          _businessPlugins = plugins.map((e) => Map<String, dynamic>.from(e as Map)).toList();
-          _pluginsLoaded = true;
-        });
+      final plugins = await _marketplaceService.listBusinessPlugins(
+        businessId: widget.businessId,
+      );
+      if (!mounted) return;
+      setState(() {
+        _businessPlugins =
+            plugins.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        _pluginsLoaded = true;
+        _pluginsLoadFailed = false;
+      });
+      _initializeExpansionStates();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _pluginsLoaded = true;
+        _pluginsLoadFailed = true;
+      });
+      _initializeExpansionStates();
+    }
+  }
+
+  BusinessSettingsContext _buildContext() {
+    return BusinessSettingsContext(
+      businessId: widget.businessId,
+      authStore: _authStore!,
+      plugins: _businessPlugins,
+      pluginsLoaded: _pluginsLoaded,
+      pluginsLoadFailed: _pluginsLoadFailed,
+    );
+  }
+
+  void _initializeExpansionStates() {
+    final categories = BusinessSettingsCategorizationService.buildCategories(
+      _buildContext(),
+    );
+    for (final category in categories) {
+      _categoryExpansionStates.putIfAbsent(
+        category.id,
+        () => category.id != 'danger_zone',
+      );
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    if (!mounted) return;
+    final t = AppLocalizations.of(context);
+    final categories = BusinessSettingsCategorizationService.buildCategories(
+      _buildContext(),
+    );
+    setState(() {
+      _searchQuery = query;
+      _isSearching = query.trim().isNotEmpty;
+      _searchResults = _isSearching
+          ? BusinessSettingsLocalizationHelper.searchItems(
+              query: query,
+              t: t,
+              categories: categories,
+            )
+          : [];
+    });
+  }
+
+  void _onCategoryExpansionChanged(String categoryId, bool isExpanded) {
+    setState(() => _categoryExpansionStates[categoryId] = isExpanded);
+  }
+
+  void _expandAllCategories() {
+    setState(() {
+      for (final id in _categoryExpansionStates.keys) {
+        _categoryExpansionStates[id] = true;
       }
-    } catch (e) {
-      // خطا را نادیده می‌گیریم تا صفحه کار کند
-      if (mounted) {
-        setState(() {
-          _pluginsLoaded = true;
-        });
+    });
+  }
+
+  void _collapseAllCategories() {
+    setState(() {
+      for (final id in _categoryExpansionStates.keys) {
+        _categoryExpansionStates[id] = false;
       }
+    });
+  }
+
+  void _handleItemTap(SettingsItem item) {
+    if (item.id == 'leave_business') {
+      if (!_isLeaving) _handleLeave(context);
+      return;
+    }
+    if (item.route.isNotEmpty) {
+      context.push(item.route);
     }
   }
 
-  bool _isWarrantyPluginActive() {
-    try {
-      final warrantyPlugin = _businessPlugins.firstWhere(
-        (plugin) => plugin['plugin_code'] == 'product_warranty',
-        orElse: () => <String, dynamic>{},
-      );
-      return warrantyPlugin['is_active'] == true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  bool _canAccessWarrantySettings() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    
-    // بررسی فعال بودن پلاگین
-    if (!_isWarrantyPluginActive()) {
-      return false;
-    }
-    
-    // بررسی دسترسی
-    // اگر کاربر مالک است، دسترسی دارد
-    if (authStore.currentBusiness?.isOwner == true) {
-      return true;
-    }
-    
-    // بررسی دسترسی warranty.manage یا warranty.read
-    return authStore.hasBusinessPermission('warranty', 'manage') ||
-           authStore.hasBusinessPermission('warranty', 'read');
-  }
-
-  bool _isRepairShopPluginActive() {
-    try {
-      final repairShopPlugin = _businessPlugins.firstWhere(
-        (plugin) => plugin['plugin_code'] == 'repair_shop_management',
-        orElse: () => <String, dynamic>{},
-      );
-      return repairShopPlugin['is_active'] == true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  bool _canManageFtpBackupSettings() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    if (authStore.currentBusiness?.id != widget.businessId) return false;
-    if (authStore.currentBusiness?.isOwner == true) return true;
-    return authStore.hasBusinessPermission('settings', 'manage_ftp');
-  }
-
-  bool _isCustomerClubPluginActive() {
-    try {
-      final plug = _businessPlugins.firstWhere(
-        (plugin) => plugin['plugin_code'] == 'customer_club',
-        orElse: () => <String, dynamic>{},
-      );
-      return plug['is_active'] == true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  bool _canAccessCustomerClubSettings() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    if (!_isCustomerClubPluginActive()) return false;
-    if (authStore.currentBusiness?.isOwner == true) return true;
-    return authStore.hasBusinessPermission('customer_club', 'view') ||
-        authStore.hasBusinessPermission('customer_club', 'manage');
-  }
-
-  bool _isDistributionPluginActive() {
-    try {
-      final plug = _businessPlugins.firstWhere(
-        (plugin) => plugin['plugin_code'] == 'distribution',
-        orElse: () => <String, dynamic>{},
-      );
-      return plug['is_active'] == true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  bool _canAccessDistributionModule() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    if (!_isDistributionPluginActive()) return false;
-    if (authStore.currentBusiness?.isOwner == true) return true;
-    return authStore.hasBusinessPermission('distribution', 'view');
-  }
-
-  bool _isBasalamPluginActive() {
-    try {
-      final plug = _businessPlugins.firstWhere(
-        (plugin) => plugin['plugin_code'] == 'basalam_connector',
-        orElse: () => <String, dynamic>{},
-      );
-      return plug['is_active'] == true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  bool _canAccessBasalamSettings() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    if (!authStore.hasBusinessPermission('settings', 'join')) return false;
-    if (!_isBasalamPluginActive()) return false;
-    if (authStore.currentBusiness?.isOwner == true) return true;
-    return authStore.hasBusinessPermission('basalam', 'view') ||
-        authStore.hasBusinessPermission('basalam', 'manage');
-  }
-
-  bool _isWooCommerceHesabixPluginActive() {
-    try {
-      final plug = _businessPlugins.firstWhere(
-        (plugin) => plugin['plugin_code'] == 'woocommerce_hesabix',
-        orElse: () => <String, dynamic>{},
-      );
-      return plug['is_active'] == true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  bool _isMoadianPluginActive() {
-    try {
-      final plug = _businessPlugins.firstWhere(
-        (plugin) => plugin['plugin_code'] == 'moadian_tax_integration',
-        orElse: () => <String, dynamic>{},
-      );
-      return plug['is_active'] == true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  bool _canAccessMoadianSettings() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    if (!_isMoadianPluginActive()) return false;
-    if (authStore.currentBusiness?.isOwner == true) return true;
-    return authStore.hasBusinessPermission('moadian', 'manage_settings');
-  }
-
-  bool _canAccessWooCommerceSettings() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    if (!authStore.hasBusinessPermission('settings', 'join')) return false;
-    if (!_isWooCommerceHesabixPluginActive()) return false;
-    if (authStore.currentBusiness?.isOwner == true) return true;
-    return authStore.hasBusinessPermission('woocommerce', 'view') ||
-        authStore.hasBusinessPermission('woocommerce', 'manage');
-  }
-
-  bool _canAccessCrmSettings() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    return authStore.canReadSection('crm');
-  }
-
-  bool _canAccessRepairShopSettings() {
-    final authStore = _authStore;
-    if (authStore == null) return false;
-    
-    // بررسی فعال بودن پلاگین
-    if (!_isRepairShopPluginActive()) {
-      return false;
-    }
-    
-    // بررسی دسترسی
-    // اگر کاربر مالک است، دسترسی دارد
-    if (authStore.currentBusiness?.isOwner == true) {
-      return true;
-    }
-    
-    // بررسی دسترسی repair_shop.manage یا repair_shop.read
-    return authStore.hasBusinessPermission('repair_shop', 'manage') ||
-           authStore.hasBusinessPermission('repair_shop', 'read');
-  }
-  
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final authStore = _authStore;
-    // بررسی دقیق‌تر: آیا کاربر مالک این کسب و کار است؟
-    // باید مطمئن شویم که currentBusiness برای همین businessId است و کاربر مالک است
-    final currentBusiness = authStore?.currentBusiness;
-    final isOwner = currentBusiness != null && 
-                   currentBusiness.id == widget.businessId &&
-                   (currentBusiness.isOwner == true);
-    
-    // اگر currentBusiness null است یا برای کسب و کار دیگری است، 
-    // نمی‌توانیم مطمئن شویم که کاربر مالک است یا نه
-    // در این حالت، دکمه خروج را نمایش نمی‌دهیم (برای امنیت)
-    final canShowLeaveButton = currentBusiness != null && 
-                              currentBusiness.id == widget.businessId &&
-                              !isOwner;
 
-    final canFiscalYearRollback =
-        isOwner || (authStore?.hasBusinessPermission('fiscal_years', 'rollback') ?? false);
+    if (authStore == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    final businessTitle = currentBusiness?.name ?? t.settings;
-    final businessSubtitle = currentBusiness != null
-        ? (isOwner
-            ? 'شما مالک این کسب و کار هستید و می‌توانید همه تنظیمات را مدیریت کنید.'
-            : 'شما عضو این کسب و کار هستید و برخی تنظیمات ممکن است برای شما محدود شده باشند.')
-        : 'تنظیمات این کسب و کار را می‌توانید از این صفحه مدیریت کنید.';
+    final ctx = _buildContext();
+    final categories = BusinessSettingsCategorizationService.buildCategories(ctx);
+    final setupItems = BusinessSettingsCategorizationService.buildSetupChecklist(ctx);
+    final totalItems = categories.fold<int>(0, (sum, c) => sum + c.items.length);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(t.settings),
-        backgroundColor: cs.surface,
-        foregroundColor: cs.onSurface,
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 900;
-          final showSideAppearancePanel = constraints.maxWidth >= ResponsiveHelper.shellNavigationRailExtendedMinWidth;
-          final horizontalPadding = isWide ? 24.0 : 16.0;
+    if (_categoryExpansionStates.isEmpty && categories.isNotEmpty) {
+      _initializeExpansionStates();
+    }
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(
-                  context,
-                  title: businessTitle,
-                  subtitle: businessSubtitle,
-                  isOwner: isOwner,
-                ),
-                const SizedBox(height: 24),
-                if (showSideAppearancePanel)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // بخش تنظیمات عمومی
-                            _buildSection(
-                              context,
-                              title: t.generalSettings,
-                              icon: Icons.settings,
-                              children: [
-                                _buildSettingItem(
-                                  context,
-                                  title: t.businessSettings,
-                                  subtitle: t.businessSettingsDescription,
-                                  icon: Icons.business,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/business'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.settingsSideCurrenciesTitle,
-                                  subtitle: t.settingsSideCurrenciesSubtitle,
-                                  icon: Icons.currency_exchange,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/currencies'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.settingsInvoiceFxPolicyTitle,
-                                  subtitle: t.settingsInvoiceFxPolicySubtitle,
-                                  icon: Icons.tune,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/fx-revaluation'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: 'ویرایش سال مالی جاری',
-                                  subtitle: 'ویرایش عنوان و تاریخ‌های سال مالی جاری',
-                                  icon: Icons.calendar_today,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/fiscal-year'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.creditSettingsTitle,
-                                  subtitle: t.creditSettingsSubtitle,
-                                  icon: Icons.credit_score_outlined,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/credit'),
-                                ),
-                                if (_canAccessCrmSettings())
-                                  _buildSettingItem(
-                                    context,
-                                    title: 'تنظیمات CRM',
-                                    subtitle: 'چت وب و ارسال فایل توسط بازدیدکننده',
-                                    icon: Icons.support_agent,
-                                    onTap: () => context.push('/business/${widget.businessId}/settings/crm'),
-                                  ),
-                                _buildSettingItem(
-                                  context,
-                                  title: 'تنظیمات فروش سریع',
-                                  subtitle: 'تنظیمات پیش‌فرض برای فروش سریع',
-                                  icon: Icons.point_of_sale_outlined,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/quick-sales'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.installmentsTitle,
-                                  subtitle: t.installmentsSettingsSubtitle,
-                                  icon: Icons.dashboard_customize_outlined,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/installments'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.usersAndPermissions,
-                                  subtitle: t.usersAndPermissionsDescription,
-                                  icon: Icons.people_outline,
-                                  onTap: () => context.push('/business/${widget.businessId}/users-permissions'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: 'مدیریت پروژه‌ها',
-                                  subtitle: 'تعریف و مدیریت پروژه‌ها برای ردیابی هزینه‌ها و درآمدها',
-                                  icon: Icons.account_tree,
-                                  onTap: () => context.push('/business/${widget.businessId}/projects'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: 'شماره‌گذاری اسناد',
-                                  subtitle: 'تنظیم نحوه شماره‌گذاری انواع اسناد',
-                                  icon: Icons.numbers,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/document-numbering'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.printDocuments,
-                                  subtitle: t.printDocumentsDescription,
-                                  icon: Icons.print,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/print'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: 'پرداخت آنلاین لینک فاکتور',
-                                  subtitle: 'پیش‌فرض درگاه و فعال‌سازی برای لینک اشتراک عمومی',
-                                  icon: Icons.payment_outlined,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/invoice-share-payment'),
-                                ),
-                                // Report Builder - Templates access
-                                _buildSettingItem(
-                                  context,
-                                  title: t.templates,
-                                  subtitle: t.printDocumentsDescription,
-                                  icon: Icons.picture_as_pdf,
-                                  onTap: () => context.push('/business/${widget.businessId}/report-templates'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.documentMonetizationTitle,
-                                  subtitle: t.documentMonetizationSubtitle,
-                                  icon: Icons.receipt_long_outlined,
-                                  onTap: () => context.push('/business/${widget.businessId}/document-monetization'),
-                                ),
-                                if (_canAccessMoadianSettings())
-                                  _buildSettingItem(
-                                    context,
-                                    title: t.taxIntegrationTitle,
-                                    subtitle: t.taxIntegrationSubtitle,
-                                    icon: Icons.cloud_sync_outlined,
-                                    onTap: () => context.push('/business/${widget.businessId}/settings/tax'),
-                                  ),
-                                if (_canAccessWarrantySettings())
-                                  _buildSettingItem(
-                                    context,
-                                    title: t.warrantySettings,
-                                    subtitle: 'تنظیمات فرمت کد، سریال و امنیت گارانتی',
-                                    icon: Icons.verified_user,
-                                    onTap: () => context.push('/business/${widget.businessId}/warranty/settings'),
-                                  ),
-                                if (_canAccessRepairShopSettings())
-                                  _buildSettingItem(
-                                    context,
-                                    title: 'تنظیمات تعمیرگاه',
-                                    subtitle: 'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه',
-                                    icon: Icons.build_circle,
-                                    onTap: () => context.push('/business/${widget.businessId}/repair-shop-settings'),
-                                  ),
-                                if (_canAccessCustomerClubSettings())
-                                  _buildSettingItem(
-                                    context,
-                                    title: t.customerClubTitle,
-                                    subtitle: t.customerClubSettingsSubtitle,
-                                    icon: Icons.card_giftcard,
-                                    onTap: () => context.push('/business/${widget.businessId}/settings/customer-club'),
-                                  ),
-                                if (_canAccessDistributionModule())
-                                  _buildSettingItem(
-                                    context,
-                                    title: t.distributionMenu,
-                                    subtitle: t.distributionSettingsSubtitle,
-                                    icon: Icons.local_shipping_outlined,
-                                    onTap: () => context.push('/business/${widget.businessId}/distribution'),
-                                  ),
-                                if (_canAccessBasalamSettings())
-                                  _buildSettingItem(
-                                    context,
-                                    title: t.settingsBasalamTitle,
-                                    subtitle: t.settingsBasalamSubtitle,
-                                    icon: Icons.storefront_outlined,
-                                    onTap: () => context.push(
-                                          context.businessPanelUrl(
-                                            widget.businessId,
-                                            'settings/basalam',
-                                          ),
-                                        ),
-                                  ),
-                                if (_canAccessWooCommerceSettings())
-                                  _buildSettingItem(
-                                    context,
-                                    title: t.settingsWooCommerceTitle,
-                                    subtitle: t.settingsWooCommerceSubtitle,
-                                    icon: Icons.shopping_cart_outlined,
-                                    onTap: () => context.push(
-                                          context.businessPanelUrl(
-                                            widget.businessId,
-                                            'settings/woocommerce',
-                                          ),
-                                        ),
-                                  ),
-                                _buildSettingItem(
-                                  context,
-                                  title: 'قالب‌های نوتیفیکیشن',
-                                  subtitle: 'مدیریت قالب‌های پیامک و ایمیل برای رویدادهای مختلف',
-                                  icon: Icons.notifications_active,
-                                  onTap: () => context.push('/business/${widget.businessId}/notification-templates'),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            // بخش تنظیمات پیشرفته
-                            _buildSection(
-                              context,
-                              title: t.advancedSettings,
-                              icon: Icons.engineering,
-                              children: [
-                                _buildSettingItem(
-                                  context,
-                                  title: t.dataBackup,
-                                  subtitle: t.dataBackupDescription,
-                                  icon: Icons.backup,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/backup'),
-                                ),
-                                if (_canManageFtpBackupSettings())
-                                  _buildSettingItem(
-                                    context,
-                                    title: t.ftpBackupSettingsTitle,
-                                    subtitle: t.ftpBackupSettingsDescription,
-                                    icon: Icons.cloud_upload_outlined,
-                                    onTap: () => context.push('/business/${widget.businessId}/settings/ftp-backup'),
-                                  ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.dataRestore,
-                                  subtitle: t.dataRestoreDescription,
-                                  icon: Icons.restore,
-                                  onTap: () => context.push('/business/${widget.businessId}/settings/restore'),
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.systemLogs,
-                                  subtitle: t.systemLogsDescription,
-                                  icon: Icons.assignment,
-                                  onTap: () => context.push('/business/${widget.businessId}/reports/activity-logs'),
-                                ),
-                              ],
-                            ),
-                            // بخش خروج از کسب و کار (فقط برای اعضای غیر از مالک)
-                            if (canShowLeaveButton) ...[
-                              const SizedBox(height: 24),
-                              _buildSection(
-                                context,
-                                title: 'عضویت در کسب و کار',
-                                icon: Icons.business_outlined,
-                                emphasize: true,
-                                children: [
-                                  _buildSettingItem(
-                                    context,
-                                    title: 'خروج از کسب و کار',
-                                    subtitle: 'خروج از این کسب و کار و حذف دسترسی‌های شما',
-                                    icon: Icons.exit_to_app,
-                                    trailing: _isLeaving
-                                        ? SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
-                                            ),
-                                          )
-                                        : Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
-                                    onTap: _isLeaving ? null : () => _handleLeave(context),
-                                  ),
-                                ],
-                              ),
-                            ],
-                            // بخش عملیات خطرناک
-                            if (isOwner || canFiscalYearRollback) ...[
-                              const SizedBox(height: 24),
-                              _buildSection(
-                                context,
-                                title: 'عملیات خطرناک',
-                                icon: Icons.warning_amber_rounded,
-                                isDanger: true,
-                                children: [
-                                  if (isOwner)
-                                    _buildSettingItem(
-                                      context,
-                                      title: 'حذف کسب و کار',
-                                      subtitle: 'حذف دائمی کسب و کار (30 روز قابل بازیابی)',
-                                      icon: Icons.delete_forever,
-                                      isDanger: true,
-                                      trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
-                                      onTap: () => context.push('/business/${widget.businessId}/settings/delete'),
-                                    ),
-                                  if (canFiscalYearRollback)
-                                    _buildSettingItem(
-                                      context,
-                                      title: 'برگشت از سال مالی جاری',
-                                      subtitle: 'حذف سال جاری و فعال‌سازی مجدد سال قبل (حداقل دو سال مالی)',
-                                      icon: Icons.restore_from_trash,
-                                      isDanger: true,
-                                      trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
-                                      onTap: () =>
-                                          context.push('/business/${widget.businessId}/settings/fiscal-year-rollback'),
-                                    ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(
-                        flex: 1,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // بخش تنظیمات ظاهری - در سایدبار
-                            _buildSection(
-                              context,
-                              title: t.appearanceSettings,
-                              icon: Icons.palette,
-                              children: [
-                                _buildSettingItem(
-                                  context,
-                                  title: t.language,
-                                  subtitle: t.languageDescription,
-                                  icon: Icons.language,
-                                  trailing: widget.localeController != null
-                                      ? LanguageSwitcher(controller: widget.localeController!)
-                                      : null,
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.theme,
-                                  subtitle: t.themeDescription,
-                                  icon: Icons.brightness_6,
-                                  trailing: widget.themeController != null
-                                      ? ThemeModeSwitcher(controller: widget.themeController!)
-                                      : null,
-                                ),
-                                _buildSettingItem(
-                                  context,
-                                  title: t.calendar,
-                                  subtitle: t.calendarDescription,
-                                  icon: Icons.calendar_today,
-                                  trailing: widget.calendarController != null
-                                      ? CalendarSwitcher(controller: widget.calendarController!)
-                                      : null,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  )
-                else
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // بخش تنظیمات عمومی
-                      _buildSection(
-                        context,
-                        title: t.generalSettings,
-                        icon: Icons.settings,
-                        children: [
-                          _buildSettingItem(
-                            context,
-                            title: t.businessSettings,
-                            subtitle: t.businessSettingsDescription,
-                            icon: Icons.business,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/business'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.settingsSideCurrenciesTitle,
-                            subtitle: t.settingsSideCurrenciesSubtitle,
-                            icon: Icons.currency_exchange,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/currencies'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.settingsInvoiceFxPolicyTitle,
-                            subtitle: t.settingsInvoiceFxPolicySubtitle,
-                            icon: Icons.tune,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/fx-revaluation'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: 'ویرایش سال مالی جاری',
-                            subtitle: 'ویرایش عنوان و تاریخ‌های سال مالی جاری',
-                            icon: Icons.calendar_today,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/fiscal-year'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.creditSettingsTitle,
-                            subtitle: t.creditSettingsSubtitle,
-                            icon: Icons.credit_score_outlined,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/credit'),
-                          ),
-                          if (_canAccessCrmSettings())
-                            _buildSettingItem(
-                              context,
-                              title: 'تنظیمات CRM',
-                              subtitle: 'چت وب و ارسال فایل توسط بازدیدکننده',
-                              icon: Icons.support_agent,
-                              onTap: () => context.push('/business/${widget.businessId}/settings/crm'),
-                            ),
-                          _buildSettingItem(
-                            context,
-                            title: 'تنظیمات فروش سریع',
-                            subtitle: 'تنظیمات پیش‌فرض برای فروش سریع',
-                            icon: Icons.point_of_sale_outlined,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/quick-sales'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.installmentsTitle,
-                            subtitle: t.installmentsSettingsSubtitle,
-                            icon: Icons.dashboard_customize_outlined,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/installments'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.usersAndPermissions,
-                            subtitle: t.usersAndPermissionsDescription,
-                            icon: Icons.people_outline,
-                            onTap: () => context.push('/business/${widget.businessId}/users-permissions'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: 'مدیریت پروژه‌ها',
-                            subtitle: 'تعریف و مدیریت پروژه‌ها برای ردیابی هزینه‌ها و درآمدها',
-                            icon: Icons.account_tree,
-                            onTap: () => context.push('/business/${widget.businessId}/projects'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: 'شماره‌گذاری اسناد',
-                            subtitle: 'تنظیم نحوه شماره‌گذاری انواع اسناد',
-                            icon: Icons.numbers,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/document-numbering'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.printDocuments,
-                            subtitle: t.printDocumentsDescription,
-                            icon: Icons.print,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/print'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: 'پرداخت آنلاین لینک فاکتور',
-                            subtitle: 'پیش‌فرض درگاه و فعال‌سازی برای لینک اشتراک عمومی',
-                            icon: Icons.payment_outlined,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/invoice-share-payment'),
-                          ),
-                          // Report Builder - Templates access
-                          _buildSettingItem(
-                            context,
-                            title: t.templates,
-                            subtitle: t.printDocumentsDescription,
-                            icon: Icons.picture_as_pdf,
-                            onTap: () => context.push('/business/${widget.businessId}/report-templates'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.documentMonetizationTitle,
-                            subtitle: t.documentMonetizationSubtitle,
-                            icon: Icons.receipt_long_outlined,
-                            onTap: () => context.push('/business/${widget.businessId}/document-monetization'),
-                          ),
-                          if (_canAccessMoadianSettings())
-                            _buildSettingItem(
-                              context,
-                              title: t.taxIntegrationTitle,
-                              subtitle: t.taxIntegrationSubtitle,
-                              icon: Icons.cloud_sync_outlined,
-                              onTap: () => context.push('/business/${widget.businessId}/settings/tax'),
-                            ),
-                          if (_canAccessWarrantySettings())
-                            _buildSettingItem(
-                              context,
-                              title: t.warrantySettings,
-                              subtitle: 'تنظیمات فرمت کد، سریال و امنیت گارانتی',
-                              icon: Icons.verified_user,
-                              onTap: () => context.push('/business/${widget.businessId}/warranty/settings'),
-                            ),
-                          if (_canAccessRepairShopSettings())
-                            _buildSettingItem(
-                              context,
-                              title: 'تنظیمات تعمیرگاه',
-                              subtitle: 'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه',
-                              icon: Icons.build_circle,
-                              onTap: () => context.push('/business/${widget.businessId}/repair-shop-settings'),
-                            ),
-                          if (_canAccessCustomerClubSettings())
-                            _buildSettingItem(
-                              context,
-                              title: t.customerClubTitle,
-                              subtitle: t.customerClubSettingsSubtitle,
-                              icon: Icons.card_giftcard,
-                              onTap: () => context.push('/business/${widget.businessId}/settings/customer-club'),
-                            ),
-                          if (_canAccessDistributionModule())
-                            _buildSettingItem(
-                              context,
-                              title: t.distributionMenu,
-                              subtitle: t.distributionSettingsSubtitle,
-                              icon: Icons.local_shipping_outlined,
-                              onTap: () => context.push('/business/${widget.businessId}/distribution'),
-                            ),
-                          if (_canAccessBasalamSettings())
-                            _buildSettingItem(
-                              context,
-                              title: t.settingsBasalamTitle,
-                              subtitle: t.settingsBasalamSubtitle,
-                              icon: Icons.storefront_outlined,
-                              onTap: () => context.push(
-                                    context.businessPanelUrl(
-                                      widget.businessId,
-                                      'settings/basalam',
-                                    ),
-                                  ),
-                            ),
-                          if (_canAccessWooCommerceSettings())
-                            _buildSettingItem(
-                              context,
-                              title: t.settingsWooCommerceTitle,
-                              subtitle: t.settingsWooCommerceSubtitle,
-                              icon: Icons.shopping_cart_outlined,
-                              onTap: () => context.push(
-                                    context.businessPanelUrl(
-                                      widget.businessId,
-                                      'settings/woocommerce',
-                                    ),
-                                  ),
-                            ),
-                          _buildSettingItem(
-                            context,
-                            title: 'قالب‌های نوتیفیکیشن',
-                            subtitle: 'مدیریت قالب‌های پیامک و ایمیل برای رویدادهای مختلف',
-                            icon: Icons.notifications_active,
-                            onTap: () => context.push('/business/${widget.businessId}/notification-templates'),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // بخش تنظیمات ظاهری
-                      _buildSection(
-                        context,
-                        title: t.appearanceSettings,
-                        icon: Icons.palette,
-                        children: [
-                          _buildSettingItem(
-                            context,
-                            title: t.language,
-                            subtitle: t.languageDescription,
-                            icon: Icons.language,
-                            trailing: widget.localeController != null
-                                ? LanguageSwitcher(controller: widget.localeController!)
-                                : null,
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.theme,
-                            subtitle: t.themeDescription,
-                            icon: Icons.brightness_6,
-                            trailing: widget.themeController != null
-                                ? ThemeModeSwitcher(controller: widget.themeController!)
-                                : null,
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.calendar,
-                            subtitle: t.calendarDescription,
-                            icon: Icons.calendar_today,
-                            trailing: widget.calendarController != null
-                                ? CalendarSwitcher(controller: widget.calendarController!)
-                                : null,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // بخش تنظیمات پیشرفته
-                      _buildSection(
-                        context,
-                        title: t.advancedSettings,
-                        icon: Icons.engineering,
-                        children: [
-                          _buildSettingItem(
-                            context,
-                            title: t.dataBackup,
-                            subtitle: t.dataBackupDescription,
-                            icon: Icons.backup,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/backup'),
-                          ),
-                          if (_canManageFtpBackupSettings())
-                            _buildSettingItem(
-                              context,
-                              title: t.ftpBackupSettingsTitle,
-                              subtitle: t.ftpBackupSettingsDescription,
-                              icon: Icons.cloud_upload_outlined,
-                              onTap: () => context.push('/business/${widget.businessId}/settings/ftp-backup'),
-                            ),
-                          _buildSettingItem(
-                            context,
-                            title: t.dataRestore,
-                            subtitle: t.dataRestoreDescription,
-                            icon: Icons.restore,
-                            onTap: () => context.push('/business/${widget.businessId}/settings/restore'),
-                          ),
-                          _buildSettingItem(
-                            context,
-                            title: t.systemLogs,
-                            subtitle: t.systemLogsDescription,
-                            icon: Icons.assignment,
-                            onTap: () => context.push('/business/${widget.businessId}/reports/activity-logs'),
-                          ),
-                        ],
-                      ),
-                      // بخش خروج از کسب و کار (فقط برای اعضای غیر از مالک)
-                      if (canShowLeaveButton) ...[
-                        const SizedBox(height: 24),
-                        _buildSection(
-                          context,
-                          title: 'عضویت در کسب و کار',
-                          icon: Icons.business_outlined,
-                          emphasize: true,
-                          children: [
-                            _buildSettingItem(
-                              context,
-                              title: 'خروج از کسب و کار',
-                              subtitle: 'خروج از این کسب و کار و حذف دسترسی‌های شما',
-                              icon: Icons.exit_to_app,
-                              trailing: _isLeaving
-                                  ? SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
-                                      ),
-                                    )
-                                  : Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
-                              onTap: _isLeaving ? null : () => _handleLeave(context),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (isOwner || canFiscalYearRollback) ...[
-                        const SizedBox(height: 24),
-                        _buildSection(
-                          context,
-                          title: 'عملیات خطرناک',
-                          icon: Icons.warning_amber_rounded,
-                          isDanger: true,
-                          children: [
-                            if (isOwner)
-                              _buildSettingItem(
-                                context,
-                                title: 'حذف کسب و کار',
-                                subtitle: 'حذف دائمی کسب و کار (30 روز قابل بازیابی)',
-                                icon: Icons.delete_forever,
-                                isDanger: true,
-                                trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
-                                onTap: () => context.push('/business/${widget.businessId}/settings/delete'),
-                              ),
-                            if (canFiscalYearRollback)
-                              _buildSettingItem(
-                                context,
-                                title: 'برگشت از سال مالی جاری',
-                                subtitle: 'حذف سال جاری و فعال‌سازی مجدد سال قبل (حداقل دو سال مالی)',
-                                icon: Icons.restore_from_trash,
-                                isDanger: true,
-                                trailing: Icon(Icons.arrow_forward_ios, size: 16, color: Colors.red),
-                                onTap: () =>
-                                    context.push('/business/${widget.businessId}/settings/fiscal-year-rollback'),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+    final businessTitle = ctx.businessName ?? t.settings;
+    final businessSubtitle = ctx.businessName != null
+        ? (ctx.isOwner
+            ? t.businessSettingsHubDescriptionOwner
+            : t.businessSettingsHubDescriptionMember)
+        : t.businessSettingsHubDescriptionGeneric;
 
-  Widget _buildSection(
-    BuildContext context, {
-    required String title,
-    required IconData icon,
-    required List<Widget> children,
-    bool emphasize = false,
-    bool isDanger = false,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final Color effectiveIconColor = isDanger ? cs.error : cs.primary;
-    final Color cardColor = isDanger
-        ? cs.errorContainer
-        : cs.surface;
-    final BorderSide borderSide = isDanger
-        ? BorderSide(color: cs.error.withOpacity(0.6))
-        : BorderSide.none;
+    final width = MediaQuery.sizeOf(context).width;
+    const kDesktopLoose = 900.0;
+    final isDesktopLoose = width >= kDesktopLoose;
+    final pagePadding = isDesktopLoose
+        ? const EdgeInsets.fromLTRB(16, 8, 16, 12)
+        : const EdgeInsets.all(16);
+    final sectionGap = isDesktopLoose ? 12.0 : 16.0;
+    final innerGap = isDesktopLoose ? 12.0 : 16.0;
 
-    return Card(
-      color: cardColor,
-      elevation: emphasize || isDanger ? 2 : 1,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: borderSide,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    return ColoredBox(
+      color: colorScheme.surface,
+      child: SingleChildScrollView(
+        padding: pagePadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: effectiveIconColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: effectiveIconColor,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: cs.onSurface,
-                  ),
-                ),
-              ],
+            _buildHeader(
+              theme: theme,
+              colorScheme: colorScheme,
+              t: t,
+              title: businessTitle,
+              subtitle: businessSubtitle,
+              isOwner: ctx.isOwner,
+              categoryCount: categories.length,
+              itemCount: totalItems,
+              width: width,
             ),
-            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final bool isSectionWide = constraints.maxWidth >= 720;
-                if (!isSectionWide) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: children,
-                  );
-                }
-
-                final double itemWidth =
-                    (constraints.maxWidth - 16) / 2; // دو ستون در دسکتاپ/عرض زیاد
-
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: children
-                      .map(
-                        (child) => SizedBox(
-                          width: itemWidth,
-                          child: child,
-                        ),
-                      )
-                      .toList(),
-                );
-              },
+            SizedBox(height: sectionGap),
+            if (!_isSearching && setupItems.isNotEmpty)
+              BusinessSettingsSetupChecklist(items: setupItems),
+            if (_pluginsLoadFailed)
+              _buildPluginsErrorBanner(theme, colorScheme, t),
+            SettingsSearchBar(
+              onSearchChanged: _onSearchChanged,
+              initialQuery: _searchQuery,
+              dense: isDesktopLoose,
             ),
+            if (!_isSearching) _buildControlButtons(theme, colorScheme, t),
+            SizedBox(height: innerGap),
+            _isSearching
+                ? _buildSearchResults(theme, colorScheme, t, isDesktopLoose)
+                : _buildCategoriesList(
+                    categories: categories,
+                    ctx: ctx,
+                    theme: theme,
+                    colorScheme: colorScheme,
+                    t: t,
+                    compactSpacing: isDesktopLoose,
+                  ),
+            SizedBox(height: isDesktopLoose ? 12 : 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader(
-    BuildContext context, {
+  Widget _buildHeader({
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required AppLocalizations t,
     required String title,
     required String subtitle,
     required bool isOwner,
+    required int categoryCount,
+    required int itemCount,
+    required double width,
   }) {
-    final cs = Theme.of(context).colorScheme;
+    const kNarrowWelcome = 560.0;
+    final statsText = '$categoryCount ${t.settingsCategoriesCount} • $itemCount ${t.settingsCount}';
+    final statsStyle = theme.textTheme.bodySmall?.copyWith(
+      color: colorScheme.onSurface.withValues(alpha: 0.6),
+    );
 
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+            fontSize: 22,
+          ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurface.withValues(alpha: 0.7),
+            height: 1.4,
+          ),
+        ),
+      ],
+    );
+
+    final roleBadge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: (isOwner ? colorScheme.primary : colorScheme.secondary)
+            .withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isOwner ? Icons.verified_user : Icons.person_outline,
+            size: 16,
+            color: isOwner ? colorScheme.primary : colorScheme.secondary,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isOwner ? t.businessSettingsOwnerRole : t.businessSettingsMemberRole,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: isOwner ? colorScheme.primary : colorScheme.secondary,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (width < kNarrowWelcome) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          titleBlock,
+          const SizedBox(height: 10),
+          roleBadge,
+          const SizedBox(height: 8),
+          Text(statsText, style: statsStyle),
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: titleBlock),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: cs.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.tune,
-                color: cs.onPrimaryContainer,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: (isOwner ? cs.primary : cs.secondary).withOpacity(0.08),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isOwner ? Icons.verified_user : Icons.person_outline,
-                    size: 16,
-                    color: isOwner ? cs.primary : cs.secondary,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    isOwner ? 'مالک کسب و کار' : 'عضو کسب و کار',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: isOwner ? cs.primary : cs.secondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            roleBadge,
+            const SizedBox(height: 8),
+            Text(statsText, style: statsStyle, textAlign: TextAlign.end),
           ],
         ),
+      ],
+    );
+  }
+
+  Widget _buildPluginsErrorBanner(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppLocalizations t,
+  ) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_outlined, size: 18, color: colorScheme.error),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              t.businessSettingsPluginsLoadFailed,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onErrorContainer,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _pluginsLoaded = false;
+                _pluginsLoadFailed = false;
+              });
+              _loadBusinessPlugins();
+            },
+            child: Text(t.retry),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSettingItem(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    Widget? trailing,
-    VoidCallback? onTap,
-    bool isDanger = false,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final Color iconColor = isDanger ? cs.error : cs.primary;
-    final TextStyle titleStyle = TextStyle(
-      fontWeight: FontWeight.w500,
-      color: isDanger ? cs.error : cs.onSurface,
-    );
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      color: isDanger ? cs.error.withOpacity(0.04) : null,
-      child: ListTile(
-        leading: Icon(icon, color: iconColor),
-        title: Text(
-          title,
-          style: titleStyle,
+  Widget _buildControlButtons(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppLocalizations t,
+  ) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        TextButton(
+          onPressed: _expandAllCategories,
+          style: TextButton.styleFrom(
+            foregroundColor: colorScheme.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text(t.expandAllCategories, style: const TextStyle(fontSize: 13)),
         ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(
-            color: cs.onSurfaceVariant,
-            fontSize: 12,
+        const SizedBox(width: 8),
+        TextButton(
+          onPressed: _collapseAllCategories,
+          style: TextButton.styleFrom(
+            foregroundColor: colorScheme.primary,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            minimumSize: Size.zero,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
+          child: Text(t.collapseAllCategories, style: const TextStyle(fontSize: 13)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoriesList({
+    required List<SettingsCategory> categories,
+    required BusinessSettingsContext ctx,
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required AppLocalizations t,
+    required bool compactSpacing,
+  }) {
+    if (categories.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text(
+            t.noSettingsFound,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
           ),
         ),
-        trailing: trailing ?? const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: onTap,
-      ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          t.availableSettings,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
+        ),
+        SizedBox(height: compactSpacing ? 12 : 16),
+        ...categories.map((category) {
+          return BusinessSettingsCategorySection(
+            key: ValueKey(category.id),
+            category: category,
+            isExpanded: _categoryExpansionStates[category.id] ?? true,
+            onExpansionChanged: (isExpanded) =>
+                _onCategoryExpansionChanged(category.id, isExpanded),
+            onItemTap: _handleItemTap,
+            loadingItemId: _isLeaving ? 'leave_business' : null,
+            pluginsLoading: !ctx.pluginsLoaded &&
+                (category.id == 'integrations' || category.id == 'modules'),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildSearchResults(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppLocalizations t,
+    bool compactSpacing,
+  ) {
+    if (_searchResults.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: [
+              Icon(
+                Icons.search_off,
+                size: 64,
+                color: colorScheme.onSurface.withValues(alpha: 0.3),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                t.noSearchResults(_searchQuery),
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.5),
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          t.searchResults,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
+        ),
+        SizedBox(height: compactSpacing ? 12 : 16),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final twoCol = constraints.maxWidth >= 720;
+            const gap = 8.0;
+
+            Widget buildCard(SettingsItem item) {
+              final isDanger = item.tags.contains('danger');
+              return BusinessSettingsCard(
+                item: item,
+                isHighlighted: true,
+                isDanger: isDanger,
+                isLoading: _isLeaving && item.id == 'leave_business',
+                onTap: () => _handleItemTap(item),
+              );
+            }
+
+            if (!twoCol) {
+              return Column(
+                children: [
+                  for (final item in _searchResults)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: buildCard(item),
+                    ),
+                ],
+              );
+            }
+
+            final w = (constraints.maxWidth - gap) / 2;
+            return Wrap(
+              spacing: gap,
+              runSpacing: 6,
+              children: _searchResults
+                  .map((item) => SizedBox(width: w, child: buildCard(item)))
+                  .toList(),
+            );
+          },
+        ),
+      ],
     );
   }
 
   Future<void> _handleLeave(BuildContext context) async {
     final t = AppLocalizations.of(context);
-    
-    // Show confirmation dialog
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('خروج از کسب و کار'),
-        content: const Text(
-          'آیا مطمئن هستید که می‌خواهید از این کسب و کار خارج شوید؟\n\n'
-          'پس از خروج، دسترسی شما به این کسب و کار حذف خواهد شد.',
-        ),
+        title: Text(t.businessSettingsLeaveBusiness),
+        content: Text(t.businessSettingsLeaveBusinessConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1249,7 +572,7 @@ class _SettingsPageState extends State<SettingsPage> {
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            child: const Text('خروج'),
+            child: Text(t.businessSettingsLeaveBusinessAction),
           ),
         ],
       ),
@@ -1257,102 +580,33 @@ class _SettingsPageState extends State<SettingsPage> {
 
     if (confirmed != true) return;
 
-    setState(() {
-      _isLeaving = true;
-    });
+    setState(() => _isLeaving = true);
 
     try {
       final request = LeaveBusinessRequest(businessId: widget.businessId);
       final response = await _userService.leaveBusiness(request);
 
       if (response.success && mounted) {
-        SnackBarHelper.showSuccess(
-          context,
-          message: response.message,
-        );
-        
-        // Clear current business if it's the one we're leaving
+        SnackBarHelper.showSuccess(context, message: response.message);
         final authStore = _authStore;
-        if (authStore != null && authStore.currentBusiness?.id == widget.businessId) {
+        if (authStore != null &&
+            authStore.currentBusiness?.id == widget.businessId) {
           await authStore.clearCurrentBusiness();
         }
-        
-        // Navigate to businesses list
-        if (mounted) {
-          context.go('/user/profile/businesses');
-        }
+        if (mounted) context.go('/user/profile/businesses');
       } else if (mounted) {
-        SnackBarHelper.showError(
-          context,
-          message: response.message,
-        );
+        SnackBarHelper.showError(context, message: response.message);
       }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          message: 'خطا در خروج از کسب و کار: ${ErrorExtractor.forContext(e, context)}',
+          message:
+              '${t.businessSettingsLeaveBusinessFailed}: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLeaving = false;
-        });
-      }
+      if (mounted) setState(() => _isLeaving = false);
     }
   }
-
-  // دیالوگ‌های تنظیمات
-  // ignore: unused_element
-  void _showDataBackupDialog(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.dataBackup),
-        content: Text(t.dataBackupDialogContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(t.close),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to business dashboard for now (until backup functionality is implemented)
-              context.go('/business/${widget.businessId}/dashboard');
-            },
-            child: Text(t.backup),
-          ),
-        ],
-      ),
-    );
-  }
-  // ignore: unused_element
-  void _showDataRestoreDialog(BuildContext context) {
-    final t = AppLocalizations.of(context);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(t.dataRestore),
-        content: Text(t.dataRestoreDialogContent),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(t.close),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to business dashboard for now (until restore functionality is implemented)
-              context.go('/business/${widget.businessId}/dashboard');
-            },
-            child: Text(t.restore),
-          ),
-        ],
-      ),
-    );
-  }
-
 }
