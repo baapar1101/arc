@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../system_settings/models/settings_item.dart';
+import '../business_settings_layout.dart';
 import 'business_settings_card.dart';
 
 /// Quick setup checklist for new business owners.
@@ -54,41 +55,16 @@ class BusinessSettingsSetupChecklist extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final twoCol = constraints.maxWidth >= 640;
-              if (!twoCol) {
-                return Column(
-                  children: [
-                    for (final item in items)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: BusinessSettingsCard(
-                          item: item,
-                          onTap: () => context.push(item.route),
-                        ),
-                      ),
-                  ],
-                );
-              }
-              const gap = 8.0;
-              final w = (constraints.maxWidth - gap) / 2;
-              return Wrap(
-                spacing: gap,
-                runSpacing: 6,
-                children: items
-                    .map(
-                      (item) => SizedBox(
-                        width: w,
-                        child: BusinessSettingsCard(
-                          item: item,
-                          onTap: () => context.push(item.route),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              );
-            },
+          BusinessSettingsLayout.buildTwoColumnGrid(
+            context: context,
+            children: items
+                .map(
+                  (item) => BusinessSettingsCard(
+                    item: item,
+                    onTap: () => context.push(item.route),
+                  ),
+                )
+                .toList(),
           ),
         ],
       ),

@@ -33,6 +33,17 @@ class _SettingsSearchBarState extends State<SettingsSearchBar> {
   }
 
   @override
+  void didUpdateWidget(SettingsSearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Keep local editing state; only sync when parent clears search externally.
+    if (widget.initialQuery != oldWidget.initialQuery &&
+        (widget.initialQuery ?? '').isEmpty &&
+        _controller.text.isNotEmpty) {
+      _controller.clear();
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     _focusNode.dispose();

@@ -17,6 +17,7 @@ import 'settings/business_settings_context.dart';
 import 'settings/business_settings_localization_helper.dart';
 import 'settings/widgets/business_settings_card.dart';
 import 'settings/widgets/business_settings_category_section.dart';
+import 'settings/business_settings_layout.dart';
 import 'settings/widgets/business_settings_setup_checklist.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -44,6 +45,7 @@ class _SettingsPageState extends State<SettingsPage> {
   List<Map<String, dynamic>> _businessPlugins = [];
   bool _pluginsLoaded = false;
   bool _pluginsLoadFailed = false;
+  List<SettingsCategory> _categories = const [];
 
   AuthStore? get _authStore => ApiClient.getAuthStore();
 
@@ -67,7 +69,11 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _onAuthStoreChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final current = _authStore?.currentBusiness;
+    if (current?.id != widget.businessId) return;
+    _refreshCategories();
+    setState(() {});
   }
 
   Future<void> _loadBusinessPlugins() async {
@@ -104,11 +110,13 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _initializeExpansionStates() {
-    final categories = BusinessSettingsCategorizationService.buildCategories(
+  void _refreshCategories() {
+    final authStore = _authStore;
+    if (authStore == null) return;
+    _categories = BusinessSettingsCategorizationService.buildCategories(
       _buildContext(),
     );
-    for (final category in categories) {
+    for (final category in _categories) {
       _categoryExpansionStates.putIfAbsent(
         category.id,
         () => category.id != 'danger_zone',
@@ -116,12 +124,13 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  void _initializeExpansionStates() {
+    _refreshCategories();
+  }
+
   void _onSearchChanged(String query) {
     if (!mounted) return;
     final t = AppLocalizations.of(context);
-    final categories = BusinessSettingsCategorizationService.buildCategories(
-      _buildContext(),
-    );
     setState(() {
       _searchQuery = query;
       _isSearching = query.trim().isNotEmpty;
@@ -129,7 +138,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ? BusinessSettingsLocalizationHelper.searchItems(
               query: query,
               t: t,
-              categories: categories,
+              categories: _categories,
             )
           : [];
     });
@@ -177,7 +186,10 @@ class _SettingsPageState extends State<SettingsPage> {
     }
 
     final ctx = _buildContext();
-    final categories = BusinessSettingsCategorizationService.buildCategories(ctx);
+    if (_categories.isEmpty && _authStore != null) {
+      _refreshCategories();
+    }
+    final categories = _categories;
     final setupItems = BusinessSettingsCategorizationService.buildSetupChecklist(ctx);
     final totalItems = categories.fold<int>(0, (sum, c) => sum + c.items.length);
 
@@ -220,16 +232,20 @@ class _SettingsPageState extends State<SettingsPage> {
               width: width,
             ),
             SizedBox(height: sectionGap),
-            if (!_isSearching && setupItems.isNotEmpty)
-              BusinessSettingsSetupChecklist(items: setupItems),
-            if (_pluginsLoadFailed)
-              _buildPluginsErrorBanner(theme, colorScheme, t),
             SettingsSearchBar(
+              key: const ValueKey('business_settings_search'),
               onSearchChanged: _onSearchChanged,
               initialQuery: _searchQuery,
               dense: isDesktopLoose,
             ),
             if (!_isSearching) _buildControlButtons(theme, colorScheme, t),
+            if (!_isSearching && setupItems.isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(top: isDesktopLoose ? 8 : 12),
+                child: BusinessSettingsSetupChecklist(items: setupItems),
+              ),
+            if (_pluginsLoadFailed)
+              _buildPluginsErrorBanner(theme, colorScheme, t),
             SizedBox(height: innerGap),
             _isSearching
                 ? _buildSearchResults(theme, colorScheme, t, isDesktopLoose)
@@ -512,43 +528,18 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
         SizedBox(height: compactSpacing ? 12 : 16),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final twoCol = constraints.maxWidth >= 720;
-            const gap = 8.0;
-
-            Widget buildCard(SettingsItem item) {
-              final isDanger = item.tags.contains('danger');
-              return BusinessSettingsCard(
-                item: item,
-                isHighlighted: true,
-                isDanger: isDanger,
-                isLoading: _isLeaving && item.id == 'leave_business',
-                onTap: () => _handleItemTap(item),
-              );
-            }
-
-            if (!twoCol) {
-              return Column(
-                children: [
-                  for (final item in _searchResults)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: buildCard(item),
-                    ),
-                ],
-              );
-            }
-
-            final w = (constraints.maxWidth - gap) / 2;
-            return Wrap(
-              spacing: gap,
-              runSpacing: 6,
-              children: _searchResults
-                  .map((item) => SizedBox(width: w, child: buildCard(item)))
-                  .toList(),
+        BusinessSettingsLayout.buildTwoColumnGrid(
+          context: context,
+          children: _searchResults.map((item) {
+            final isDanger = item.tags.contains('danger');
+            return BusinessSettingsCard(
+              item: item,
+              isHighlighted: true,
+              isDanger: isDanger,
+              isLoading: _isLeaving && item.id == 'leave_business',
+              onTap: () => _handleItemTap(item),
             );
-          },
+          }).toList(),
         ),
       ],
     );

@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../system_settings/models/settings_category.dart';
 import '../../../system_settings/models/settings_item.dart';
+import '../business_settings_layout.dart';
 import '../business_settings_localization_helper.dart';
 import 'business_settings_card.dart';
 
@@ -92,18 +93,13 @@ class _BusinessSettingsCategorySectionState
     });
   }
 
-  static const double _kTwoColumnMinWidth = 720;
-
   bool get _isDangerCategory => widget.category.id == 'danger_zone';
 
   Widget _buildItemsGrid(
     BuildContext context,
     List<SettingsItem> items,
-    double maxWidth,
   ) {
-    final bool twoColumns = maxWidth >= _kTwoColumnMinWidth;
-
-    Widget cardWrap(SettingsItem item) {
+    final cards = items.map((item) {
       final isDanger = _isDangerCategory || item.tags.contains('danger');
       return BusinessSettingsCard(
         item: item,
@@ -116,30 +112,11 @@ class _BusinessSettingsCategorySectionState
             ? () => widget.onItemTap!(item)
             : (item.route.isEmpty ? null : () => context.push(item.route)),
       );
-    }
+    }).toList();
 
-    if (!twoColumns) {
-      return Column(
-        children: [
-          for (final item in items)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: cardWrap(item),
-            ),
-        ],
-      );
-    }
-
-    const double gap = 8;
-    final double halfWidth = (maxWidth - gap) / 2;
-    return Wrap(
-      spacing: gap,
-      runSpacing: 6,
-      children: items
-          .map(
-            (item) => SizedBox(width: halfWidth, child: cardWrap(item)),
-          )
-          .toList(),
+    return BusinessSettingsLayout.buildTwoColumnGrid(
+      context: context,
+      children: cards,
     );
   }
 
@@ -289,7 +266,7 @@ class _BusinessSettingsCategorySectionState
                                   ),
                                 ),
                               )
-                            : _buildItemsGrid(context, items, constraints.maxWidth),
+                            : _buildItemsGrid(context, items),
                   );
                 },
               ),
