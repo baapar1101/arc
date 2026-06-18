@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'ai_chat_design.dart';
 import 'ai_session_pins_store.dart';
@@ -81,6 +80,7 @@ class AIChatSidebar extends StatefulWidget {
 class _AIChatSidebarState extends State<AIChatSidebar> {
   final TextEditingController _searchCtrl = TextEditingController();
   Set<int> _pinnedIds = {};
+  bool _searchExpanded = false;
 
   @override
   void initState() {
@@ -120,6 +120,21 @@ class _AIChatSidebarState extends State<AIChatSidebar> {
     ColorScheme scheme,
     List<AIChatSession> sessions,
   ) {
+    if (sessions.length <= 10) {
+      return [
+        for (final session in sessions)
+          _SessionTile(
+            session: session,
+            selected: widget.currentSession?.id == session.id,
+            isPinned: session.id != null && _pinnedIds.contains(session.id),
+            isJalali: widget.isJalali,
+            onTap: () => widget.onSelectSession(session),
+            onDelete: () => widget.onDeleteSession(session),
+            onTogglePin: () => _togglePin(session),
+          ),
+      ];
+    }
+
     final groups = <_SessionGroup, List<AIChatSession>>{};
     for (final s in sessions) {
       final g = _groupForSession(s, _pinnedIds);
@@ -189,44 +204,59 @@ class _AIChatSidebarState extends State<AIChatSidebar> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (v) {
-                widget.onSearch?.call(v);
-                setState(() {});
-              },
-              decoration: InputDecoration(
-                hintText: 'جستجو در گفت‌وگوها…',
-                isDense: true,
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded, size: 18),
-                        onPressed: () {
-                          _searchCtrl.clear();
-                          widget.onSearch?.call('');
-                          setState(() {});
-                        },
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: widget.onNewChat,
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    label: const Text('جدید'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  tooltip: 'جستجو',
+                  onPressed: () => setState(() => _searchExpanded = !_searchExpanded),
+                  icon: Icon(
+                    _searchExpanded ? Icons.close_rounded : Icons.search_rounded,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_searchExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              child: TextField(
+                controller: _searchCtrl,
+                autofocus: true,
+                onChanged: (v) {
+                  widget.onSearch?.call(v);
+                  setState(() {});
+                },
+                decoration: InputDecoration(
+                  hintText: 'جستجو...',
+                  isDense: true,
+                  suffixIcon: _searchCtrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear_rounded, size: 18),
+                          onPressed: () {
+                            _searchCtrl.clear();
+                            widget.onSearch?.call('');
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            child: FilledButton.tonalIcon(
-              onPressed: widget.onNewChat,
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: const Text('گفت‌وگوی جدید'),
-              style: FilledButton.styleFrom(
-                alignment: Alignment.center,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
           Expanded(
             child: widget.loading
                 ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
@@ -284,8 +314,6 @@ class _SessionTileState extends State<_SessionTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final stamp = widget.session.updatedAt ?? widget.session.createdAt ?? DateTime.now();
-    final dateText = HesabixDateUtils.formatForDisplay(stamp, widget.isJalali);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -332,13 +360,6 @@ class _SessionTileState extends State<_SessionTile> {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: widget.selected ? FontWeight.w600 : FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          dateText,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
                           ),
                         ),
                       ],

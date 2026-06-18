@@ -11,6 +11,12 @@ abstract final class AIChatDesign {
   static const Duration layoutTransition = Duration(milliseconds: 380);
   static const Duration fadeTransition = Duration(milliseconds: 280);
 
+  /// حداقل مصرف context برای نمایش نوار ظرفیت.
+  static const double contextBarMinRatio = 0.70;
+
+  /// حداکثر پیشنهادهای شروع در صفحهٔ خانه.
+  static const int homeSuggestionLimit = 4;
+
   /// ارتفاع باکس اسکرول تفکر (desktop / mobile).
   static double reasoningBoxMaxHeight(BuildContext context) {
     final h = MediaQuery.sizeOf(context).height;
@@ -24,31 +30,14 @@ abstract final class AIChatDesign {
   static bool isCompactWidth(BuildContext context) =>
       MediaQuery.sizeOf(context).width < 720;
 
-  /// Rail عمودی دسکتاپ (۶۰۰px+ و نه موبایل فشرده).
-  static bool showConversationRail(BuildContext context) =>
-      MediaQuery.sizeOf(context).width >= 600;
+  /// Rail عمودی — غیرفعال برای رابط مینیمال.
+  static bool showConversationRail(BuildContext context) => false;
 
-  /// FAB + bottom sheet موبایل.
-  static bool showConversationNavFab(BuildContext context) =>
-      MediaQuery.sizeOf(context).width < 600;
+  /// FAB ناوبری پیام — غیرفعال؛ فقط scroll-to-bottom.
+  static bool showConversationNavFab(BuildContext context) => false;
 
   static BoxDecoration pageBackground(ThemeData theme, {required bool isDark}) {
-    final scheme = theme.colorScheme;
-    return BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: isDark
-            ? [
-                scheme.surface,
-                Color.alphaBlend(scheme.primary.withValues(alpha: 0.06), scheme.surface),
-              ]
-            : [
-                scheme.surface,
-                Color.alphaBlend(scheme.primary.withValues(alpha: 0.04), scheme.surfaceContainerLowest),
-              ],
-      ),
-    );
+    return BoxDecoration(color: theme.colorScheme.surface);
   }
 
   static BoxDecoration composerDecoration(ThemeData theme, {required bool focused}) {
@@ -65,9 +54,9 @@ abstract final class AIChatDesign {
       ),
       boxShadow: [
         BoxShadow(
-          color: scheme.shadow.withValues(alpha: isDark ? 0.35 : 0.08),
-          blurRadius: focused ? 28 : 18,
-          offset: const Offset(0, 8),
+          color: scheme.shadow.withValues(alpha: isDark ? 0.22 : 0.06),
+          blurRadius: focused ? 12 : 8,
+          offset: const Offset(0, 2),
         ),
       ],
     );

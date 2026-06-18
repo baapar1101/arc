@@ -31,6 +31,7 @@ from app.services.warehouse_service import (
 	create_from_invoice,
 	create_manual_warehouse_document,
 	create_stock_count_adjustment,
+	compute_invoice_line_quantities,
 	delete_warehouse_document,
 	export_warehouse_documents_excel,
 	post_warehouse_document,
@@ -111,6 +112,7 @@ def _load_invoice_lines(db: Session, invoice_id: int) -> List[Dict[str, Any]]:
 	lines: List[Dict[str, Any]] = []
 	for row in rows:
 		lines.append({
+			"invoice_item_line_id": int(row.id),
 			"product_id": row.product_id,
 			"quantity": float(row.quantity or 0),
 			"extra_info": row.extra_info or {},
@@ -135,58 +137,7 @@ def get_invoice_line_quantities(
 	if not inv or inv.business_id != business_id:
 		raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
 	
-	# بارگذاری خطوط فاکتور
-	invoice_lines = _load_invoice_lines(db, invoice_id)
-	
-	# پیدا کردن حواله‌های مرتبط با فاکتور
-	warehouse_docs = db.query(WarehouseDocument).filter(
-		and_(
-			WarehouseDocument.business_id == business_id,
-			WarehouseDocument.source_type == "invoice",
-			WarehouseDocument.source_document_id == invoice_id,
-		)
-	).all()
-	
-	# محاسبه مقادیر از قبل برای هر محصول
-	from decimal import Decimal
-	processed_quantities: Dict[int, Decimal] = {}  # product_id -> total processed quantity
-	
-	for wh_doc in warehouse_docs:
-		# فقط حواله‌های posted را در نظر بگیریم
-		if wh_doc.status != "posted":
-			continue
-		
-		for wh_line in wh_doc.lines:
-			pid = wh_line.product_id
-			# فقط خطوط با movement مناسب را در نظر بگیریم
-			# برای issue/production_out: movement باید out باشد
-			# برای receipt/production_in: movement باید in باشد
-			if inv.document_type in (INVOICE_SALES, INVOICE_PURCHASE_RETURN, INVOICE_DIRECT_CONSUMPTION, INVOICE_PRODUCTION, INVOICE_WASTE):
-				# خروجی - فقط movement="out" را در نظر بگیریم
-				if wh_line.movement == "out":
-					processed_quantities[pid] = processed_quantities.get(pid, Decimal(0)) + Decimal(str(wh_line.quantity))
-			elif inv.document_type in (INVOICE_PURCHASE, INVOICE_SALES_RETURN):
-				# ورودی - فقط movement="in" را در نظر بگیریم
-				if wh_line.movement == "in":
-					processed_quantities[pid] = processed_quantities.get(pid, Decimal(0)) + Decimal(str(wh_line.quantity))
-	
-	# ساخت پاسخ برای هر خط فاکتور
-	line_quantities = []
-	for inv_line in invoice_lines:
-		pid = inv_line.get("product_id")
-		if not pid:
-			continue
-		
-		required_qty = Decimal(str(inv_line.get("quantity", 0)))
-		processed_qty = processed_quantities.get(pid, Decimal(0))
-		remaining_qty = required_qty - processed_qty
-		
-		line_quantities.append({
-			"product_id": pid,
-			"required_quantity": float(required_qty),
-			"processed_quantity": float(processed_qty),
-			"remaining_quantity": float(remaining_qty) if remaining_qty > 0 else 0.0,
-		})
+	line_quantities = compute_invoice_line_quantities(db, business_id, inv)
 	
 	return success_response(data={"lines": line_quantities}, request=request)
 

@@ -84,7 +84,7 @@ from app.services.ai.ai_tool_cache import (
     invalidate_session,
     set_cached,
 )
-from app.services.ai.ai_message_budget import trim_system_prompt
+from app.services.ai.ai_message_budget import trim_system_prompt, trim_system_prompt_sections
 from app.services.ai.ai_context_budget import (
     is_context_overflow_error,
     prepare_messages_for_context,
@@ -976,15 +976,16 @@ class AIService:
                     logger.warning("Prompt loader %s failed: %s", key, exc)
                     parts[key] = ""
 
-            return trim_system_prompt(
-                base_prompt
-                + business_info
-                + parts.get("insights", "")
-                + parts.get("memory", "")
-                + parts.get("attachments", "")
-                + parts.get("knowledge", "")
-                + parts.get("connectors", "")
-                + parts.get("skills", "")
+            return trim_system_prompt_sections(
+                base_prompt + business_info,
+                [
+                    parts.get("memory", ""),
+                    parts.get("insights", ""),
+                    parts.get("knowledge", ""),
+                    parts.get("skills", ""),
+                    parts.get("connectors", ""),
+                    parts.get("attachments", ""),
+                ],
             )
 
         return trim_system_prompt(base_prompt)
@@ -1178,15 +1179,16 @@ class AIService:
                 yield context_trace(step_key, "done")
                 await asyncio.sleep(0)
 
-        final_prompt = trim_system_prompt(
-            base_prompt
-            + business_info
-            + parts.get("loading_insights", "")
-            + parts.get("loading_memory", "")
-            + parts.get("loading_attachments", "")
-            + parts.get("loading_knowledge", "")
-            + parts.get("loading_connectors", "")
-            + parts.get("loading_skills", "")
+        final_prompt = trim_system_prompt_sections(
+            base_prompt + business_info,
+            [
+                parts.get("loading_memory", ""),
+                parts.get("loading_insights", ""),
+                parts.get("loading_knowledge", ""),
+                parts.get("loading_skills", ""),
+                parts.get("loading_connectors", ""),
+                parts.get("loading_attachments", ""),
+            ],
         )
         yield {"event": "prompt_ready", "prompt": final_prompt}
     

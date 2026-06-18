@@ -68,7 +68,7 @@ class AIChatMessageBody extends StatelessWidget {
           isUser
               ? SelectableText(
                   content,
-                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -177,7 +177,7 @@ class _AssistantRichContent extends StatelessWidget {
             AIChatTableWidget(spec: seg.tableSpec!)
           else if (seg.text.trim().isNotEmpty)
             MarkdownBody(
-              data: seg.text.trim(),
+              data: normalizeAssistantMarkdown(seg.text.trim()),
               selectable: true,
               styleSheet: _markdownStyle(theme, scheme),
               onTapLink: businessId != null
@@ -214,24 +214,73 @@ class _AssistantRichContent extends StatelessWidget {
   );
 
   static MarkdownStyleSheet _markdownStyle(ThemeData theme, ColorScheme scheme) {
+    final body = theme.textTheme.bodyMedium?.copyWith(height: 1.5);
     return MarkdownStyleSheet(
-      p: theme.textTheme.bodyLarge?.copyWith(height: 1.65, letterSpacing: 0.1),
-      h1: theme.textTheme.titleLarge,
-      h2: theme.textTheme.titleMedium,
-      h3: theme.textTheme.titleSmall,
-      code: theme.textTheme.bodyMedium?.copyWith(
+      p: body,
+      pPadding: const EdgeInsets.only(bottom: 2),
+      h1: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+      h2: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+      h3: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+      h1Padding: const EdgeInsets.only(top: 6, bottom: 2),
+      h2Padding: const EdgeInsets.only(top: 6, bottom: 2),
+      h3Padding: const EdgeInsets.only(top: 4, bottom: 2),
+      strong: const TextStyle(fontWeight: FontWeight.w700),
+      em: const TextStyle(fontStyle: FontStyle.italic),
+      code: theme.textTheme.bodySmall?.copyWith(
         fontFamily: 'monospace',
-        backgroundColor: scheme.surfaceContainerHighest,
+        color: scheme.onSurface,
+        backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: 0.7),
       ),
+      codeblockPadding: const EdgeInsets.all(12),
       codeblockDecoration: BoxDecoration(
         color: scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
+      blockquotePadding: const EdgeInsets.symmetric(horizontal: 12),
       blockquoteDecoration: BoxDecoration(
-        border: Border(right: BorderSide(color: scheme.primary, width: 3)),
+        border: BorderDirectional(
+          start: BorderSide(color: scheme.primary, width: 3),
+        ),
       ),
-      listBullet: theme.textTheme.bodyLarge,
+      listBullet: body,
+      listIndent: 20,
     );
+  }
+
+  /// نرمال‌سازی محافظه‌کارانه‌ی markdown دریافتی از هوش مصنوعی.
+  ///
+  /// مدل‌ها اغلب تأکید را با فاصله‌ی اضافه می‌نویسند (`** متن **`) که در
+  /// CommonMark معتبر نیست و bold نمی‌شود. اینجا فقط فاصله‌ی داخل دلیمیترهای
+  /// تأکید حذف می‌شود و محتوای بلوک کد و inline code دست‌نخورده می‌ماند.
+  static String normalizeAssistantMarkdown(String input) {
+    if (input.isEmpty) return input;
+    final codeSpans = RegExp(r'```[\s\S]*?```|`[^`\n]*`');
+    final buffer = StringBuffer();
+    var last = 0;
+    for (final m in codeSpans.allMatches(input)) {
+      if (m.start > last) {
+        buffer.write(_normalizeEmphasis(input.substring(last, m.start)));
+      }
+      buffer.write(m.group(0));
+      last = m.end;
+    }
+    if (last < input.length) {
+      buffer.write(_normalizeEmphasis(input.substring(last)));
+    }
+    return buffer.toString();
+  }
+
+  static final _boldSpaced = RegExp(r'\*\*[ \t]*(\S(?:.*?\S)?)[ \t]*\*\*');
+  static final _boldUnderscoreSpaced =
+      RegExp(r'__[ \t]*(\S(?:.*?\S)?)[ \t]*__');
+
+  static String _normalizeEmphasis(String s) {
+    var out = s.replaceAllMapped(_boldSpaced, (m) => '**${m[1]}**');
+    out = out.replaceAllMapped(_boldUnderscoreSpaced, (m) => '__${m[1]}__');
+    return out;
   }
 
   /// جدا کردن بلوک‌های ```chart / ```table / ```json از متن.

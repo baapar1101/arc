@@ -11,6 +11,7 @@ class AIChatModelChip extends StatelessWidget {
   final bool enabled;
   final ValueChanged<String?>? onChanged;
   final String? pricingHint;
+  final bool compact;
 
   const AIChatModelChip({
     super.key,
@@ -20,6 +21,7 @@ class AIChatModelChip extends StatelessWidget {
     this.enabled = true,
     this.onChanged,
     this.pricingHint,
+    this.compact = false,
   });
 
   String _label(AIModelCatalogItem m) {
@@ -42,8 +44,13 @@ class AIChatModelChip extends StatelessWidget {
       position: PopupMenuPosition.over,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: AIChatDesign.chipDecoration(theme),
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 8 : 10,
+          vertical: compact ? 4 : 6,
+        ),
+        decoration: compact
+            ? null
+            : AIChatDesign.chipDecoration(theme),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -56,19 +63,20 @@ class AIChatModelChip extends StatelessWidget {
                   color: scheme.primary,
                 ),
               )
-            else
+            else if (!compact)
               Icon(Icons.hub_outlined, size: 15, color: scheme.primary),
-            const SizedBox(width: 6),
+            if (!compact || loading) const SizedBox(width: 6),
             Flexible(
               child: Text(
                 _currentLabel(),
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w500,
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ),
-            Icon(Icons.expand_more_rounded, size: 18, color: scheme.onSurfaceVariant),
+            Icon(Icons.expand_more_rounded, size: 16, color: scheme.onSurfaceVariant),
           ],
         ),
       ),

@@ -413,6 +413,169 @@ def _transfer_location_pair_from_payload(ln: Dict[str, Any]) -> tuple[Optional[i
 	return _optional_line_int(o), _optional_line_int(i)
 
 
+def _warehouse_line_matches_invoice_movement(invoice_document_type: str, movement: str) -> bool:
+	from app.services.invoice_service import (
+		INVOICE_SALES,
+		INVOICE_SALES_RETURN,
+		INVOICE_PURCHASE,
+		INVOICE_PURCHASE_RETURN,
+		INVOICE_DIRECT_CONSUMPTION,
+		INVOICE_PRODUCTION,
+		INVOICE_WASTE,
+	)
+
+	if invoice_document_type in (
+		INVOICE_SALES,
+		INVOICE_PURCHASE_RETURN,
+		INVOICE_DIRECT_CONSUMPTION,
+		INVOICE_PRODUCTION,
+		INVOICE_WASTE,
+	):
+		return movement == "out"
+	if invoice_document_type in (INVOICE_PURCHASE, INVOICE_SALES_RETURN):
+		return movement == "in"
+	return False
+
+
+def compute_invoice_line_quantities(
+	db: Session,
+	business_id: int,
+	invoice: Document,
+) -> List[Dict[str, Any]]:
+	"""مقادیر مورد نیاز، پردازش‌شده و باقی‌مانده برای هر ردیف فاکتور (بر اساس invoice_item_line_id)."""
+	from adapters.db.models.invoice_item_line import InvoiceItemLine
+
+	item_rows = (
+		db.query(InvoiceItemLine)
+		.filter(InvoiceItemLine.document_id == invoice.id)
+		.order_by(InvoiceItemLine.id.asc())
+		.all()
+	)
+
+	warehouse_docs = (
+		db.query(WarehouseDocument)
+		.filter(
+			and_(
+				WarehouseDocument.business_id == business_id,
+				WarehouseDocument.source_type == "invoice",
+				WarehouseDocument.source_document_id == invoice.id,
+			)
+		)
+		.all()
+	)
+
+	processed_by_line: Dict[int, Decimal] = {}
+	orphan_by_product: Dict[int, Decimal] = {}
+
+	for wh_doc in warehouse_docs:
+		if wh_doc.status != "posted":
+			continue
+		for wh_line in wh_doc.lines:
+			if not _warehouse_line_matches_invoice_movement(invoice.document_type, str(wh_line.movement or "")):
+				continue
+			qty = Decimal(str(wh_line.quantity or 0))
+			if qty <= 0:
+				continue
+			extra = wh_line.extra_info or {}
+			line_id = extra.get("invoice_item_line_id")
+			if line_id is not None:
+				try:
+					processed_by_line[int(line_id)] = processed_by_line.get(int(line_id), Decimal(0)) + qty
+				except (TypeError, ValueError):
+					orphan_by_product[wh_line.product_id] = orphan_by_product.get(wh_line.product_id, Decimal(0)) + qty
+			else:
+				orphan_by_product[wh_line.product_id] = orphan_by_product.get(wh_line.product_id, Decimal(0)) + qty
+
+	line_quantities: List[Dict[str, Any]] = []
+	for row in item_rows:
+		if not row.product_id:
+			continue
+		required = Decimal(str(row.quantity or 0))
+		processed = processed_by_line.get(int(row.id), Decimal(0))
+		remaining = required - processed
+		line_quantities.append(
+			{
+				"invoice_item_line_id": int(row.id),
+				"product_id": int(row.product_id),
+				"required_quantity": float(required),
+				"processed_quantity": float(processed),
+				"remaining_quantity": float(remaining) if remaining > 0 else 0.0,
+			}
+		)
+
+	for pid, orphan_qty in orphan_by_product.items():
+		left = orphan_qty
+		if left <= 0:
+			continue
+		for entry in line_quantities:
+			if entry["product_id"] != pid or left <= 0:
+				continue
+			req = Decimal(str(entry["required_quantity"]))
+			proc = Decimal(str(entry["processed_quantity"]))
+			space = req - proc
+			if space <= 0:
+				continue
+			take = min(left, space)
+			proc += take
+			left -= take
+			entry["processed_quantity"] = float(proc)
+			rem = req - proc
+			entry["remaining_quantity"] = float(rem) if rem > 0 else 0.0
+
+	return line_quantities
+
+
+def _remaining_quantity_for_invoice_line(
+	line_quantities: List[Dict[str, Any]],
+	invoice_item_line_id: Optional[int],
+	product_id: Optional[int],
+) -> Decimal:
+	if invoice_item_line_id is not None:
+		for entry in line_quantities:
+			if entry.get("invoice_item_line_id") == int(invoice_item_line_id):
+				return Decimal(str(entry.get("remaining_quantity") or 0))
+	if product_id is not None:
+		for entry in line_quantities:
+			if entry.get("product_id") == int(product_id):
+				return Decimal(str(entry.get("remaining_quantity") or 0))
+	return Decimal(0)
+
+
+def validate_invoice_warehouse_lines_quantities(
+	db: Session,
+	business_id: int,
+	invoice: Document,
+	lines: List[Dict[str, Any]],
+) -> None:
+	"""اعتبارسنجی اینکه تعداد هر خط از باقی‌ماندهٔ همان ردیف فاکتور بیشتر نباشد."""
+	line_quantities = compute_invoice_line_quantities(db, business_id, invoice)
+	has_positive = False
+	for i, ln in enumerate(lines, start=1):
+		qty = Decimal(str(ln.get("quantity") or 0))
+		if qty <= 0:
+			continue
+		has_positive = True
+		line_id = ln.get("invoice_item_line_id")
+		try:
+			line_id_int = int(line_id) if line_id is not None else None
+		except (TypeError, ValueError):
+			line_id_int = None
+		pid = ln.get("product_id")
+		try:
+			pid_int = int(pid) if pid is not None else None
+		except (TypeError, ValueError):
+			pid_int = None
+		remaining = _remaining_quantity_for_invoice_line(line_quantities, line_id_int, pid_int)
+		if qty > remaining:
+			raise ApiError(
+				"QUANTITY_EXCEEDS_REMAINING",
+				f"خط {i}: تعداد ({qty}) از باقی‌مانده ({remaining}) بیشتر است",
+				http_status=400,
+			)
+	if not has_positive:
+		raise ApiError("NO_POSITIVE_LINES", "حداقل یک خط با تعداد مثبت لازم است", http_status=400)
+
+
 def invoice_lines_have_trackable_inventory_products(
 	db: Session,
 	business_id: int,
@@ -528,6 +691,10 @@ def create_from_invoice(
 
 	if wh is None:
 		raise ApiError("WAREHOUSE_CODE_CONFLICT", "Failed to generate unique warehouse document code", http_status=500)
+
+	validate_invoice_warehouse_lines_quantities(db, business_id, invoice, lines)
+
+	lines_added = 0
 	for ln in lines:
 		pid = ln.get("product_id")
 		qty = Decimal(str(ln.get("quantity") or 0))
@@ -719,6 +886,13 @@ def create_from_invoice(
 			instance_ids=line_instance_ids,
 		)
 		db.add(wline)
+		lines_added += 1
+
+	if lines_added == 0:
+		db.delete(wh)
+		db.flush()
+		raise ApiError("NO_POSITIVE_LINES", "حداقل یک خط با تعداد مثبت لازم است", http_status=400)
+
 	db.flush()
 	return wh
 
@@ -1539,118 +1713,179 @@ def update_warehouse_document(
 				
 				# ایجاد خطوط جدید
 				all_new_instance_ids = []  # برای نگهداری همه instance_ids جدید
+				lines_added = 0
+
+				invoice_for_validation = None
+				if wh.source_type == "invoice" and wh.source_document_id:
+					invoice_for_validation = (
+						db.query(Document)
+						.filter(
+							and_(
+								Document.id == int(wh.source_document_id),
+								Document.business_id == business_id,
+							)
+						)
+						.first()
+					)
+				if invoice_for_validation is not None:
+					validate_invoice_warehouse_lines_quantities(
+						db, business_id, invoice_for_validation, lines_data
+					)
+
+				for i, ln in enumerate(lines_data, start=1):
+					pid = ln.get("product_id")
+					if not pid:
+						raise ApiError("PRODUCT_REQUIRED", f"خط {i}: شناسه محصول الزامی است", http_status=400)
+
+					qty = Decimal(str(ln.get("quantity") or 0))
+					if qty <= 0:
+						if wh.source_type == "invoice":
+							continue
+						raise ApiError("INVALID_QUANTITY", f"خط {i}: تعداد باید مثبت باشد", http_status=400)
 				
-			for i, ln in enumerate(lines_data, start=1):
-				pid = ln.get("product_id")
-				if not pid:
-					raise ApiError("PRODUCT_REQUIRED", f"خط {i}: شناسه محصول الزامی است", http_status=400)
-				
-				qty = Decimal(str(ln.get("quantity") or 0))
-				if qty <= 0:
-					raise ApiError("INVALID_QUANTITY", f"خط {i}: تعداد باید مثبت باشد", http_status=400)
-				
-				# بررسی محصول
-				product = db.query(Product).filter(and_(Product.id == int(pid), Product.business_id == business_id)).first()
-				if not product:
-					raise ApiError("PRODUCT_NOT_FOUND", f"خط {i}: محصول یافت نشد", http_status=404)
-				
-				movement = ln.get("movement", "in")
-				if movement not in ("in", "out"):
-					raise ApiError("INVALID_MOVEMENT", f"خط {i}: movement باید 'in' یا 'out' باشد", http_status=400)
-				
-				# منطق fallback برای انبار: اگر انبار در سطح ردیف مشخص نشده باشد، از انبار سطح سند استفاده می‌شود
-				# - برای movement="in": line['warehouse_id'] ?? wh.warehouse_id_to (سطح سند)
-				# - برای movement="out": line['warehouse_id'] ?? wh.warehouse_id_from (سطح سند)
-				line_wh = ln.get("warehouse_id")
-				if not line_wh:
-					# اگر انبار در خط مشخص نشده، از حواله استفاده کن (fallback به سطح سند)
-					line_wh = wh.warehouse_id_to if movement == "in" else wh.warehouse_id_from
-				
-				if not line_wh:
-					raise ApiError("WAREHOUSE_REQUIRED", f"خط {i}: انبار الزامی است (در سطح سند یا ردیف)", http_status=400)
-				
-				# بررسی انبار
-				wh_check = db.query(Warehouse).filter(and_(Warehouse.id == int(line_wh), Warehouse.business_id == business_id)).first()
-				if not wh_check:
-					raise ApiError("WAREHOUSE_NOT_FOUND", f"خط {i}: انبار یافت نشد", http_status=404)
-				
-				# پردازش instance_data و instance_ids برای کالاهای یونیک
-				instance_data = ln.get("instance_data")
-				instance_ids = []
-				
-				if instance_data and isinstance(instance_data, list) and len(instance_data) > 0:
-					# بررسی اینکه کالا یونیک است
-					if product.inventory_mode != "unique":
-						raise ApiError("NOT_UNIQUE_PRODUCT", f"خط {i}: این کالا در حالت یونیک نیست", http_status=400)
+					# بررسی محصول
+					product = db.query(Product).filter(and_(Product.id == int(pid), Product.business_id == business_id)).first()
+					if not product:
+						raise ApiError("PRODUCT_NOT_FOUND", f"خط {i}: محصول یافت نشد", http_status=404)
 					
-					# برای حواله ورود، instance ها را ایجاد یا به‌روزرسانی می‌کنیم
-					if wh.doc_type in ("receipt", "production_in") and movement == "in":
-						from adapters.db.models.product_instance import ProductInstance
-						from datetime import date as date_type
+					movement = ln.get("movement", "in")
+					if movement not in ("in", "out"):
+						raise ApiError("INVALID_MOVEMENT", f"خط {i}: movement باید 'in' یا 'out' باشد", http_status=400)
+					
+					# منطق fallback برای انبار: اگر انبار در سطح ردیف مشخص نشده باشد، از انبار سطح سند استفاده می‌شود
+					# - برای movement="in": line['warehouse_id'] ?? wh.warehouse_id_to (سطح سند)
+					# - برای movement="out": line['warehouse_id'] ?? wh.warehouse_id_from (سطح سند)
+					line_wh = ln.get("warehouse_id")
+					if not line_wh:
+						# اگر انبار در خط مشخص نشده، از حواله استفاده کن (fallback به سطح سند)
+						line_wh = wh.warehouse_id_to if movement == "in" else wh.warehouse_id_from
+					
+					if not line_wh:
+						raise ApiError("WAREHOUSE_REQUIRED", f"خط {i}: انبار الزامی است (در سطح سند یا ردیف)", http_status=400)
+					
+					# بررسی انبار
+					wh_check = db.query(Warehouse).filter(and_(Warehouse.id == int(line_wh), Warehouse.business_id == business_id)).first()
+					if not wh_check:
+						raise ApiError("WAREHOUSE_NOT_FOUND", f"خط {i}: انبار یافت نشد", http_status=404)
+					
+					# پردازش instance_data و instance_ids برای کالاهای یونیک
+					instance_data = ln.get("instance_data")
+					instance_ids = []
+					
+					if instance_data and isinstance(instance_data, list) and len(instance_data) > 0:
+						# بررسی اینکه کالا یونیک است
+						if product.inventory_mode != "unique":
+							raise ApiError("NOT_UNIQUE_PRODUCT", f"خط {i}: این کالا در حالت یونیک نیست", http_status=400)
 						
-						document_date = wh.document_date
-						
-						# دریافت instance های قبلی که به این حواله مربوط بودند
-						old_line_instance_ids = []
-						if ln.get("instance_ids") and isinstance(ln.get("instance_ids"), list):
-							old_line_instance_ids = [int(x) for x in ln.get("instance_ids") if x is not None]
-						
-						for inst_idx, inst_data in enumerate(instance_data, start=1):
-							if not isinstance(inst_data, dict):
-								raise ApiError("INVALID_INSTANCE_DATA", f"خط {i}، واحد {inst_idx}: اطلاعات instance معتبر نیست", http_status=400)
+						# برای حواله ورود، instance ها را ایجاد یا به‌روزرسانی می‌کنیم
+						if wh.doc_type in ("receipt", "production_in") and movement == "in":
+							from adapters.db.models.product_instance import ProductInstance
+							from datetime import date as date_type
 							
-							serial_number = inst_data.get("serial_number")
-							barcode = inst_data.get("barcode")
-							custom_attributes = inst_data.get("custom_attributes")
-							instance_id = inst_data.get("id")  # ID instance موجود (اگر وجود داشته باشد)
+							document_date = wh.document_date
 							
-							if not serial_number and product.track_serial:
-								raise ApiError("SERIAL_REQUIRED", f"خط {i}، واحد {inst_idx}: شماره سریال الزامی است", http_status=400)
+							# دریافت instance های قبلی که به این حواله مربوط بودند
+							old_line_instance_ids = []
+							if ln.get("instance_ids") and isinstance(ln.get("instance_ids"), list):
+								old_line_instance_ids = [int(x) for x in ln.get("instance_ids") if x is not None]
 							
-							instance = None
-							
-							# اگر instance قبلاً ایجاد شده (id موجود است)
-							if instance_id:
-								instance = db.query(ProductInstance).filter(
-									and_(
-										ProductInstance.id == int(instance_id),
-										ProductInstance.business_id == business_id,
-										ProductInstance.product_id == int(pid),
-									)
-								).first()
+							for inst_idx, inst_data in enumerate(instance_data, start=1):
+								if not isinstance(inst_data, dict):
+									raise ApiError("INVALID_INSTANCE_DATA", f"خط {i}، واحد {inst_idx}: اطلاعات instance معتبر نیست", http_status=400)
 								
-								if not instance:
-									raise ApiError("INSTANCE_NOT_FOUND", f"خط {i}، واحد {inst_idx}: instance با ID {instance_id} یافت نشد", http_status=404)
+								serial_number = inst_data.get("serial_number")
+								barcode = inst_data.get("barcode")
+								custom_attributes = inst_data.get("custom_attributes")
+								instance_id = inst_data.get("id")  # ID instance موجود (اگر وجود داشته باشد)
 								
-								# به‌روزرسانی instance موجود
-								# بررسی یکتایی سریال نامبر (فقط اگر تغییر کرده باشد)
-								if serial_number and instance.serial_number != serial_number:
-									existing_serial = db.query(ProductInstance).filter(
+								if not serial_number and product.track_serial:
+									raise ApiError("SERIAL_REQUIRED", f"خط {i}، واحد {inst_idx}: شماره سریال الزامی است", http_status=400)
+								
+								instance = None
+								
+								# اگر instance قبلاً ایجاد شده (id موجود است)
+								if instance_id:
+									instance = db.query(ProductInstance).filter(
 										and_(
+											ProductInstance.id == int(instance_id),
 											ProductInstance.business_id == business_id,
-											ProductInstance.serial_number == serial_number,
-											ProductInstance.id != int(instance_id),
+											ProductInstance.product_id == int(pid),
 										)
 									).first()
-									if existing_serial:
-										raise ApiError("DUPLICATE_SERIAL", f"خط {i}، واحد {inst_idx}: شماره سریال {serial_number} تکراری است", http_status=409)
-									instance.serial_number = serial_number
-								
-								# بررسی یکتایی بارکد (فقط اگر تغییر کرده باشد)
-								if barcode and instance.barcode != barcode:
-									existing_barcode = db.query(ProductInstance).filter(
-										and_(
-											ProductInstance.business_id == business_id,
-											ProductInstance.barcode == barcode,
-											ProductInstance.id != int(instance_id),
-										)
-									).first()
-									if existing_barcode:
-										raise ApiError("DUPLICATE_BARCODE", f"خط {i}، واحد {inst_idx}: بارکد {barcode} تکراری است", http_status=409)
-									instance.barcode = barcode
-								
-								# به‌روزرسانی سایر فیلدها
-								if custom_attributes is not None:
+									
+									if not instance:
+										raise ApiError("INSTANCE_NOT_FOUND", f"خط {i}، واحد {inst_idx}: instance با ID {instance_id} یافت نشد", http_status=404)
+									
+									# به‌روزرسانی instance موجود
+									# بررسی یکتایی سریال نامبر (فقط اگر تغییر کرده باشد)
+									if serial_number and instance.serial_number != serial_number:
+										existing_serial = db.query(ProductInstance).filter(
+											and_(
+												ProductInstance.business_id == business_id,
+												ProductInstance.serial_number == serial_number,
+												ProductInstance.id != int(instance_id),
+											)
+										).first()
+										if existing_serial:
+											raise ApiError("DUPLICATE_SERIAL", f"خط {i}، واحد {inst_idx}: شماره سریال {serial_number} تکراری است", http_status=409)
+										instance.serial_number = serial_number
+									
+									# بررسی یکتایی بارکد (فقط اگر تغییر کرده باشد)
+									if barcode and instance.barcode != barcode:
+										existing_barcode = db.query(ProductInstance).filter(
+											and_(
+												ProductInstance.business_id == business_id,
+												ProductInstance.barcode == barcode,
+												ProductInstance.id != int(instance_id),
+											)
+										).first()
+										if existing_barcode:
+											raise ApiError("DUPLICATE_BARCODE", f"خط {i}، واحد {inst_idx}: بارکد {barcode} تکراری است", http_status=409)
+										instance.barcode = barcode
+									
+									# به‌روزرسانی سایر فیلدها
+									if custom_attributes is not None:
+										# اعتبارسنجی custom_attributes
+										if custom_attributes:
+											is_valid, error_message = validate_custom_attributes(
+												db=db,
+												business_id=business_id,
+												product_id=int(pid),
+												custom_attributes=custom_attributes
+											)
+											if not is_valid:
+												raise ApiError("INVALID_CUSTOM_ATTRIBUTES", f"خط {i}، واحد {inst_idx}: {error_message or 'مقادیر ویژگی‌های کالا معتبر نیست'}", http_status=400)
+										instance.custom_attributes = custom_attributes if custom_attributes else None
+									
+									instance_warehouse_id = line_wh if wh.doc_type in ("receipt", "production_in") else instance.warehouse_id
+									if instance_warehouse_id:
+										instance.warehouse_id = int(instance_warehouse_id)
+									
+									instance_ids.append(instance.id)
+								else:
+									# ایجاد instance جدید
+									# بررسی یکتایی سریال نامبر
+									if serial_number:
+										existing_serial = db.query(ProductInstance).filter(
+											and_(
+												ProductInstance.business_id == business_id,
+												ProductInstance.serial_number == serial_number,
+											)
+										).first()
+										if existing_serial:
+											raise ApiError("DUPLICATE_SERIAL", f"خط {i}، واحد {inst_idx}: شماره سریال {serial_number} تکراری است", http_status=409)
+									
+									# بررسی یکتایی بارکد
+									if barcode:
+										existing_barcode = db.query(ProductInstance).filter(
+											and_(
+												ProductInstance.business_id == business_id,
+												ProductInstance.barcode == barcode,
+											)
+										).first()
+										if existing_barcode:
+											raise ApiError("DUPLICATE_BARCODE", f"خط {i}، واحد {inst_idx}: بارکد {barcode} تکراری است", http_status=409)
+									
 									# اعتبارسنجی custom_attributes
 									if custom_attributes:
 										is_valid, error_message = validate_custom_attributes(
@@ -1661,183 +1896,152 @@ def update_warehouse_document(
 										)
 										if not is_valid:
 											raise ApiError("INVALID_CUSTOM_ATTRIBUTES", f"خط {i}، واحد {inst_idx}: {error_message or 'مقادیر ویژگی‌های کالا معتبر نیست'}", http_status=400)
-									instance.custom_attributes = custom_attributes if custom_attributes else None
-								
-								instance_warehouse_id = line_wh if wh.doc_type in ("receipt", "production_in") else instance.warehouse_id
-								if instance_warehouse_id:
-									instance.warehouse_id = int(instance_warehouse_id)
-								
-								instance_ids.append(instance.id)
-							else:
-								# ایجاد instance جدید
-								# بررسی یکتایی سریال نامبر
-								if serial_number:
-									existing_serial = db.query(ProductInstance).filter(
-										and_(
-											ProductInstance.business_id == business_id,
-											ProductInstance.serial_number == serial_number,
-										)
-									).first()
-									if existing_serial:
-										raise ApiError("DUPLICATE_SERIAL", f"خط {i}، واحد {inst_idx}: شماره سریال {serial_number} تکراری است", http_status=409)
-								
-								# بررسی یکتایی بارکد
-								if barcode:
-									existing_barcode = db.query(ProductInstance).filter(
-										and_(
-											ProductInstance.business_id == business_id,
-											ProductInstance.barcode == barcode,
-										)
-									).first()
-									if existing_barcode:
-										raise ApiError("DUPLICATE_BARCODE", f"خط {i}، واحد {inst_idx}: بارکد {barcode} تکراری است", http_status=409)
-								
-								# اعتبارسنجی custom_attributes
-								if custom_attributes:
-									is_valid, error_message = validate_custom_attributes(
-										db=db,
+									
+									# تعیین انبار - برای حواله ورود از line_wh استفاده می‌کنیم
+									instance_warehouse_id = line_wh if wh.doc_type in ("receipt", "production_in") else None
+									
+									# ایجاد instance جدید
+									instance = ProductInstance(
 										business_id=business_id,
 										product_id=int(pid),
-										custom_attributes=custom_attributes
+										serial_number=serial_number or f"SN-{wh.id}-{i}-{inst_idx}",  # اگر track_serial false باشد
+										barcode=barcode,
+										warehouse_id=int(instance_warehouse_id) if instance_warehouse_id else None,
+										status="available",
+										custom_attributes=custom_attributes if custom_attributes else None,
+										entry_date=document_date,
 									)
-									if not is_valid:
-										raise ApiError("INVALID_CUSTOM_ATTRIBUTES", f"خط {i}، واحد {inst_idx}: {error_message or 'مقادیر ویژگی‌های کالا معتبر نیست'}", http_status=400)
+									db.add(instance)
+									db.flush()  # برای دریافت ID
+									instance_ids.append(instance.id)
+							
+							# حذف instance های قدیمی که دیگر استفاده نمی‌شوند
+							if old_line_instance_ids:
+								for old_inst_id in old_line_instance_ids:
+									if old_inst_id not in instance_ids:
+										# این instance دیگر استفاده نمی‌شود - حذف می‌کنیم
+										old_instance = db.query(ProductInstance).filter(
+											and_(
+												ProductInstance.id == old_inst_id,
+												ProductInstance.business_id == business_id,
+											)
+										).first()
+										if old_instance and old_instance.status == "available":
+											# فقط اگر instance در دسترس است، حذف می‌کنیم
+											# (اگر instance به فروش رفته یا استفاده شده، نباید حذف شود)
+											db.delete(old_instance)
+					
+					# پردازش instance_ids برای حواله خروج و انتقال
+					instance_ids_from_line = ln.get("instance_ids")
+					if instance_ids_from_line and isinstance(instance_ids_from_line, list) and len(instance_ids_from_line) > 0:
+						from adapters.db.models.product_instance import ProductInstance
+						
+						# بررسی اینکه کالا یونیک است
+						if product.inventory_mode != "unique":
+							raise ApiError("NOT_UNIQUE_PRODUCT", f"خط {i}: این کالا در حالت یونیک نیست", http_status=400)
+						
+						# برای حواله خروج، instance ها را به‌روزرسانی می‌کنیم (در زمان پست)
+						if wh.doc_type in ("issue", "production_out") and movement == "out":
+							for inst_id in instance_ids_from_line:
+								instance = db.query(ProductInstance).filter(
+									and_(
+										ProductInstance.id == int(inst_id),
+										ProductInstance.business_id == business_id,
+										ProductInstance.product_id == int(pid),
+										ProductInstance.status == "available",
+									)
+								).first()
 								
-								# تعیین انبار - برای حواله ورود از line_wh استفاده می‌کنیم
-								instance_warehouse_id = line_wh if wh.doc_type in ("receipt", "production_in") else None
+								if not instance:
+									raise ApiError("INSTANCE_NOT_FOUND", f"خط {i}: کالای یونیک با ID {inst_id} یافت نشد یا در دسترس نیست", http_status=404)
 								
-								# ایجاد instance جدید
-								instance = ProductInstance(
-									business_id=business_id,
-									product_id=int(pid),
-									serial_number=serial_number or f"SN-{wh.id}-{i}-{inst_idx}",  # اگر track_serial false باشد
-									barcode=barcode,
-									warehouse_id=int(instance_warehouse_id) if instance_warehouse_id else None,
-									status="available",
-									custom_attributes=custom_attributes if custom_attributes else None,
-									entry_date=document_date,
-								)
-								db.add(instance)
-								db.flush()  # برای دریافت ID
 								instance_ids.append(instance.id)
 						
-						# حذف instance های قدیمی که دیگر استفاده نمی‌شوند
-						if old_line_instance_ids:
-							for old_inst_id in old_line_instance_ids:
-								if old_inst_id not in instance_ids:
-									# این instance دیگر استفاده نمی‌شود - حذف می‌کنیم
-									old_instance = db.query(ProductInstance).filter(
-										and_(
-											ProductInstance.id == old_inst_id,
-											ProductInstance.business_id == business_id,
-										)
-									).first()
-									if old_instance and old_instance.status == "available":
-										# فقط اگر instance در دسترس است، حذف می‌کنیم
-										# (اگر instance به فروش رفته یا استفاده شده، نباید حذف شود)
-										db.delete(old_instance)
-				
-				# پردازش instance_ids برای حواله خروج و انتقال
-				instance_ids_from_line = ln.get("instance_ids")
-				if instance_ids_from_line and isinstance(instance_ids_from_line, list) and len(instance_ids_from_line) > 0:
+						# برای حواله انتقال، instance_ids را برای استفاده بعدی ذخیره می‌کنیم
+						elif wh.doc_type == "transfer":
+							# تعیین انبار مبدا (برای بررسی instance ها)
+							line_wh_from_temp = ln.get("warehouse_id_from") or wh.warehouse_id_from
+							
+							# بررسی وجود instance ها در انبار مبدا
+							for inst_id in instance_ids_from_line:
+								instance = db.query(ProductInstance).filter(
+									and_(
+										ProductInstance.id == int(inst_id),
+										ProductInstance.business_id == business_id,
+										ProductInstance.product_id == int(pid),
+										ProductInstance.status == "available",
+									)
+								).first()
+								
+								if not instance:
+									raise ApiError("INSTANCE_NOT_FOUND", f"خط {i}: کالای یونیک با ID {inst_id} یافت نشد یا در دسترس نیست", http_status=404)
+								
+								# بررسی اینکه instance در انبار مبدا است
+								if instance.warehouse_id != int(line_wh_from_temp):
+									raise ApiError("INSTANCE_WRONG_WAREHOUSE", f"خط {i}: کالای یونیک با ID {inst_id} در انبار مبدا نیست", http_status=400)
+								
+								instance_ids.append(instance.id)
+					
+					# اضافه کردن instance_ids به extra_info
+					extra_info = ln.get("extra_info") or {}
+					if ln.get("invoice_item_line_id") is not None:
+						try:
+							extra_info = dict(extra_info)
+							extra_info["invoice_item_line_id"] = int(ln["invoice_item_line_id"])
+						except Exception:
+							pass
+					final_instance_ids = instance_ids if instance_ids else instance_ids_from_line
+					
+					# بررسی تعداد instance ها برای کالاهای یونیک
+					if product.inventory_mode == "unique" and final_instance_ids:
+						instance_count = len(final_instance_ids) if isinstance(final_instance_ids, list) else 0
+						if instance_count > 0:
+							# برای کالاهای یونیک، تعداد instance ها باید با quantity برابر باشد
+							if instance_count > int(qty):
+								raise ApiError("INSTANCE_COUNT_EXCEEDS_QUANTITY", f"خط {i}: تعداد کالاهای یونیک ({instance_count}) نمی‌تواند از تعداد وارد شده ({int(qty)}) بیشتر باشد", http_status=400)
+					
+					if final_instance_ids:
+						extra_info["instance_ids"] = final_instance_ids
+						# اضافه کردن به لیست کلی instance های جدید
+						if isinstance(final_instance_ids, list):
+							all_new_instance_ids.extend([int(x) for x in final_instance_ids if x is not None])
+					
+					line_wh_loc = _warehouse_location_id_from_payload(ln)
+					wline = WarehouseDocumentLine(
+						warehouse_document_id=wh.id,
+						product_id=int(pid),
+						warehouse_id=int(line_wh),
+						warehouse_location_id=line_wh_loc,
+						movement=movement,
+						quantity=qty,
+						extra_info=extra_info,
+						instance_ids=final_instance_ids if final_instance_ids else None,
+					)
+					db.add(wline)
+					lines_added += 1
+
+				if lines_added == 0:
+					raise ApiError("NO_POSITIVE_LINES", "حداقل یک خط با تعداد مثبت لازم است", http_status=400)
+
+				# حذف instance های قدیمی که دیگر استفاده نمی‌شوند (فقط برای حواله ورود)
+				if wh.doc_type in ("receipt", "production_in") and old_instance_ids_to_delete:
 					from adapters.db.models.product_instance import ProductInstance
-					
-					# بررسی اینکه کالا یونیک است
-					if product.inventory_mode != "unique":
-						raise ApiError("NOT_UNIQUE_PRODUCT", f"خط {i}: این کالا در حالت یونیک نیست", http_status=400)
-					
-					# برای حواله خروج، instance ها را به‌روزرسانی می‌کنیم (در زمان پست)
-					if wh.doc_type in ("issue", "production_out") and movement == "out":
-						for inst_id in instance_ids_from_line:
-							instance = db.query(ProductInstance).filter(
+					for old_inst_id in old_instance_ids_to_delete:
+						if old_inst_id not in all_new_instance_ids:
+							# این instance دیگر استفاده نمی‌شود - حذف می‌کنیم
+							old_instance = db.query(ProductInstance).filter(
 								and_(
-									ProductInstance.id == int(inst_id),
+									ProductInstance.id == old_inst_id,
 									ProductInstance.business_id == business_id,
-									ProductInstance.product_id == int(pid),
 									ProductInstance.status == "available",
 								)
 							).first()
-							
-							if not instance:
-								raise ApiError("INSTANCE_NOT_FOUND", f"خط {i}: کالای یونیک با ID {inst_id} یافت نشد یا در دسترس نیست", http_status=404)
-							
-							instance_ids.append(instance.id)
-					
-					# برای حواله انتقال، instance_ids را برای استفاده بعدی ذخیره می‌کنیم
-					elif wh.doc_type == "transfer":
-						# تعیین انبار مبدا (برای بررسی instance ها)
-						line_wh_from_temp = ln.get("warehouse_id_from") or wh.warehouse_id_from
-						
-						# بررسی وجود instance ها در انبار مبدا
-						for inst_id in instance_ids_from_line:
-							instance = db.query(ProductInstance).filter(
-								and_(
-									ProductInstance.id == int(inst_id),
-									ProductInstance.business_id == business_id,
-									ProductInstance.product_id == int(pid),
-									ProductInstance.status == "available",
-								)
-							).first()
-							
-							if not instance:
-								raise ApiError("INSTANCE_NOT_FOUND", f"خط {i}: کالای یونیک با ID {inst_id} یافت نشد یا در دسترس نیست", http_status=404)
-							
-							# بررسی اینکه instance در انبار مبدا است
-							if instance.warehouse_id != int(line_wh_from_temp):
-								raise ApiError("INSTANCE_WRONG_WAREHOUSE", f"خط {i}: کالای یونیک با ID {inst_id} در انبار مبدا نیست", http_status=400)
-							
-							instance_ids.append(instance.id)
-				
-				# اضافه کردن instance_ids به extra_info
-				extra_info = ln.get("extra_info") or {}
-				final_instance_ids = instance_ids if instance_ids else instance_ids_from_line
-				
-				# بررسی تعداد instance ها برای کالاهای یونیک
-				if product.inventory_mode == "unique" and final_instance_ids:
-					instance_count = len(final_instance_ids) if isinstance(final_instance_ids, list) else 0
-					if instance_count > 0:
-						# برای کالاهای یونیک، تعداد instance ها باید با quantity برابر باشد
-						if instance_count > int(qty):
-							raise ApiError("INSTANCE_COUNT_EXCEEDS_QUANTITY", f"خط {i}: تعداد کالاهای یونیک ({instance_count}) نمی‌تواند از تعداد وارد شده ({int(qty)}) بیشتر باشد", http_status=400)
-				
-				if final_instance_ids:
-					extra_info["instance_ids"] = final_instance_ids
-					# اضافه کردن به لیست کلی instance های جدید
-					if isinstance(final_instance_ids, list):
-						all_new_instance_ids.extend([int(x) for x in final_instance_ids if x is not None])
-				
-				line_wh_loc = _warehouse_location_id_from_payload(ln)
-				wline = WarehouseDocumentLine(
-					warehouse_document_id=wh.id,
-					product_id=int(pid),
-					warehouse_id=int(line_wh),
-					warehouse_location_id=line_wh_loc,
-					movement=movement,
-					quantity=qty,
-					extra_info=extra_info,
-					instance_ids=final_instance_ids if final_instance_ids else None,
-				)
-				db.add(wline)
-			
-			# حذف instance های قدیمی که دیگر استفاده نمی‌شوند (فقط برای حواله ورود)
-			if wh.doc_type in ("receipt", "production_in") and old_instance_ids_to_delete:
-				from adapters.db.models.product_instance import ProductInstance
-				for old_inst_id in old_instance_ids_to_delete:
-					if old_inst_id not in all_new_instance_ids:
-						# این instance دیگر استفاده نمی‌شود - حذف می‌کنیم
-						old_instance = db.query(ProductInstance).filter(
-							and_(
-								ProductInstance.id == old_inst_id,
-								ProductInstance.business_id == business_id,
-								ProductInstance.status == "available",
-							)
-						).first()
-						if old_instance:
-							# فقط اگر instance در دسترس است، حذف می‌کنیم
-							# (اگر instance به فروش رفته یا استفاده شده، نباید حذف شود)
-							db.delete(old_instance)
-			
-			db.flush()
+							if old_instance:
+								# فقط اگر instance در دسترس است، حذف می‌کنیم
+								# (اگر instance به فروش رفته یا استفاده شده، نباید حذف شود)
+								db.delete(old_instance)
+
+				db.flush()
 	
 	# دریافت اطلاعات قبل از به‌روزرسانی برای invalidation
 	old_fiscal_year_id = wh.fiscal_year_id

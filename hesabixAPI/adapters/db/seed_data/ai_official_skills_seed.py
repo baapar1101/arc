@@ -20,8 +20,9 @@ OFFICIAL_ERP_SKILLS = [
 ## مراحل
 1. `list_fiscal_years` — سال جاری و وضعیت را ببین.
 2. `get_opening_balance` — مانده افتتاحیه را بررسی کن.
-3. گزارش‌های `get_sales_report` و `get_purchase_report` را برای دوره بگیر.
-4. اختلاف‌ها را به کاربر گزارش بده؛ بدون تأیید صریح سند بستن ایجاد نکن.
+3. `get_sales_report` و `get_purchase_report` — عملکرد دوره.
+4. `get_report(report_type=trial_balance)` — تراز آزمایشی.
+5. اختلاف‌ها را گزارش بده؛ بدون تأیید صریح سند بستن ایجاد نکن.
 
 ## خروجی
 - چک‌لیست موارد انجام‌شده
@@ -34,6 +35,8 @@ OFFICIAL_ERP_SKILLS = [
             "get_sales_report",
             "get_purchase_report",
             "get_financial_summary",
+            "get_report",
+            "list_available_reports",
         ],
         "tags": ["مالی", "سال مالی", "حسابیکس"],
     },
@@ -95,8 +98,9 @@ OFFICIAL_ERP_SKILLS = [
 
 1. `get_debtors_report` — لیست بدهکاران.
 2. `search_persons` / `get_person_balance` — جزئیات اشخاص مهم.
-3. اولویت‌بندی بر اساس مبلغ و مدت بدهی.
-4. پیشنهاد پیگیری برای ۵ بدهکار اول.
+3. aging: ۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ روز بر اساس تاریخ فاکتور/مانده.
+4. اولویت‌بندی بر اساس مبلغ و مدت بدهی.
+5. پیشنهاد پیگیری برای ۵ بدهکار اول.
 """,
         "allowed_tool_names": [
             "get_debtors_report",
@@ -117,9 +121,17 @@ OFFICIAL_ERP_SKILLS = [
         "skill_body": """# مرور مالی ماهانه
 
 1. `get_financial_summary` — تصویر کلی.
-2. `get_sales_report` و `get_purchase_report` — دوره ماه جاری.
-3. `get_cash_flow` — جریان نقد.
-4. ساختار خروجی: خلاصه | فروش | خرید | نقد | هشدارها
+2. `get_sales_report` و `get_purchase_report` — دوره ماه جاری vs ماه قبل.
+3. `get_report(report_type=pnl_period)` — سود و زیان دوره.
+4. `get_cash_flow` — جریان نقد.
+5. `get_debtors_report` — وضعیت مطالبات.
+
+## شاخص‌ها (در صورت داده کافی)
+- حاشیه سود ناخالص/خالص
+- رشد فروش ماه به ماه
+
+## خروجی
+خلاصه اجرایی | فروش | خرید | سود/زیان | نقد | مطالبات | هشدارها
 """,
         "allowed_tool_names": [
             "get_financial_summary",
@@ -127,7 +139,72 @@ OFFICIAL_ERP_SKILLS = [
             "get_purchase_report",
             "get_cash_flow",
             "get_business_dashboard",
+            "get_report",
+            "get_debtors_report",
+            "list_available_reports",
         ],
         "tags": ["گزارش", "مدیریت", "مالی"],
+    },
+    {
+        "skill_slug": "profit-loss-interpretation",
+        "title": "تفسیر سود و زیان",
+        "description": (
+            "خواندن و تفسیر گزارش سود و زیان دوره‌ای یا تجمعی. "
+            "برای سود، زیان، درآمد، هزینه، حاشیه سود استفاده کن."
+        ),
+        "skill_body": """# تفسیر سود و زیان
+
+1. `get_report(report_type=pnl_period)` — سود و زیان دوره جاری.
+2. در صورت نیاز `pnl_cumulative` — تجمعی.
+3. `get_sales_report` — برای تفسیر درآمد عملیاتی.
+4. اعداد را با واحد پول و بازه زمانی بیان کن.
+
+## تفسیر برای مدیر
+- درآمد vs هزینه اصلی
+- حاشیه سود (در صورت داده)
+- مقایسه با دوره قبل
+- ۲–۳ نکته قابل اقدام
+""",
+        "allowed_tool_names": [
+            "get_report",
+            "list_available_reports",
+            "get_financial_summary",
+            "get_sales_report",
+            "get_purchase_report",
+        ],
+        "tags": ["گزارش", "سود و زیان", "مالی"],
+    },
+    {
+        "skill_slug": "accounting-document-guide",
+        "title": "راهنمای سند حسابداری",
+        "description": (
+            "ثبت و تفسیر سند حسابداری، انتخاب حساب، تفاوت با فاکتور. "
+            "برای سند حسابداری، دفتر، بدهکار بستانکار، تراز استفاده کن."
+        ),
+        "skill_body": """# راهنمای سند حسابداری
+
+## تفکیک
+- **فاکتور**: سند تجاری فروش/خرید
+- **سند حسابداری**: ثبت دفتر (بدهکار/بستانکار)
+
+## مراحل راهنمایی
+1. `search_documents` — نمونه اسناد مشابه.
+2. `get_document_details` — ساختار سند.
+3. `get_report(trial_balance)` یا `accounts_review` — مانده حساب‌ها.
+4. قبل از ثبت سند جدید: خلاصه سطرها + تأیید کاربر.
+
+## نکات
+- حساب درآمد/هزینه/دارایی/بدهی را درست انتخاب کن.
+- سند باید متوازن باشد (جمع بدهکار = جمع بستانکار).
+""",
+        "allowed_tool_names": [
+            "search_documents",
+            "get_document_details",
+            "get_report",
+            "list_available_reports",
+            "list_fiscal_years",
+            "get_current_fiscal_year",
+        ],
+        "tags": ["حسابداری", "سند", "دفتر"],
     },
 ]

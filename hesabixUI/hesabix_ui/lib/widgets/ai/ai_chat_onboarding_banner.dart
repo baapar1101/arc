@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'ai_chat_design.dart';
-
-/// بنر راهنمای یک‌بار مصرف برای دستورات سریع و ورودی صوتی.
+/// راهنمای یک‌بار مصرف — یک خط کوچک به‌جای بنر بزرگ.
 class AIChatOnboardingBanner extends StatefulWidget {
   final int? businessId;
 
@@ -52,46 +50,30 @@ class _AIChatOnboardingBannerState extends State<AIChatOnboardingBanner> {
     final scheme = theme.colorScheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Material(
-        color: scheme.primaryContainer.withValues(alpha: 0.28),
-        borderRadius: BorderRadius.circular(AIChatDesign.cardRadius),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.lightbulb_outline_rounded, color: scheme.primary, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'نکته‌های سریع',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'با / دستورات آماده را ببینید، از میکروفون برای گفت‌وگوی صوتی استفاده کنید، و برای ثبت یا ویرایش همیشه تأیید جداگانه می‌گیرید.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ),
+      padding: const EdgeInsets.fromLTRB(16, 0, 12, 6),
+      child: Row(
+        children: [
+          Icon(Icons.lightbulb_outline_rounded, color: scheme.primary, size: 16),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'با / دستورات سریع · میکروفون · تأیید قبل از ثبت',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
               ),
-              IconButton(
-                tooltip: 'بستن',
-                onPressed: _dismiss,
-                icon: const Icon(Icons.close_rounded, size: 20),
-              ),
-            ],
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-        ),
+          IconButton(
+            tooltip: 'بستن',
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            onPressed: _dismiss,
+            icon: Icon(Icons.close_rounded, size: 16, color: scheme.outline),
+          ),
+        ],
       ),
     );
   }
