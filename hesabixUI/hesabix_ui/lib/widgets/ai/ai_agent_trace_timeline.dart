@@ -53,7 +53,7 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
     final activeCount =
         widget.steps.where((s) => s.isActive).length;
 
-    final visibleSteps = _expanded
+    final visibleSteps = (_expanded || widget.compact)
         ? widget.steps
         : widget.steps
             .where((s) => s.isActive || s.isError)

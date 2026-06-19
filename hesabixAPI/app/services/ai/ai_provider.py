@@ -164,6 +164,7 @@ class OpenAIProvider(AIProviderBase):
                 "message": {
                     "role": message.role,
                     "content": message.content or "",
+                    "reasoning_content": getattr(message, "reasoning_content", None) or "",
                     "function_calls": [
                         {
                             "name": fc.function.name,

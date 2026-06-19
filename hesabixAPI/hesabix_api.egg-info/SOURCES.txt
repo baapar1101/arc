@@ -593,6 +593,7 @@ app/services/ai/ai_feedback_service.py
 app/services/ai/ai_function_extensions.py
 app/services/ai/ai_function_extensions_memory.py
 app/services/ai/ai_function_extensions_phase10.py
+app/services/ai/ai_function_extensions_phase11.py
 app/services/ai/ai_function_extensions_phase2.py
 app/services/ai/ai_function_extensions_phase3.py
 app/services/ai/ai_function_extensions_phase4.py

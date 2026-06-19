@@ -2836,6 +2836,21 @@ class AIService:
         """تبدیل datetime, date و سایر objects به JSON-serializable format"""
         return json_safe_value(obj)
     
+    @staticmethod
+    def _extract_chat_title_from_response(response: Dict[str, Any]) -> str:
+        """استخراج عنوان از پاسخ مدل؛ برخی مدل‌های reasoning متن را در reasoning_content می‌گذارند."""
+        message = response.get("message") or {}
+        title = (message.get("content") or "").strip()
+        if title:
+            return title[:80]
+
+        reasoning = (message.get("reasoning_content") or "").strip()
+        if not reasoning:
+            return ""
+
+        first_line = reasoning.split("\n", 1)[0].strip().strip("\"'«»")
+        return first_line[:80] if first_line else ""
+
     async def generate_chat_title(self, user_message: str) -> Optional[str]:
         """
         تولید عنوان کوتاه و هوشمند برای گفت‌وگو بر اساس اولین پیام کاربر (async version)
@@ -2870,14 +2885,21 @@ class AIService:
                         operation=AI_OPERATION_TITLE,
                         user_query=user_message,
                     ),
-                    max_tokens=48,
+                    max_tokens=200,
                     temperature=float(self.config.temperature),
                     tools=None,
                 ),
             )
-            title = response["message"]["content"].strip()
-            if len(title) > 80:
-                title = title[:80]
+            title = self._extract_chat_title_from_response(response)
+            if not title:
+                logger.warning(
+                    "Chat title generation returned empty content (model=%s)",
+                    self.get_effective_model_api_id(
+                        operation=AI_OPERATION_TITLE,
+                        user_query=user_message,
+                    ),
+                )
+                return None
             return title
         except Exception as exc:
             logger.warning(f"Failed to generate chat title: {exc}")
