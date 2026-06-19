@@ -259,6 +259,23 @@ def require_business_access_dep(request: Request, db=Depends(get_db)) -> None:
         raise ApiError("FORBIDDEN", f"No access to business {business_id}", http_status=403)
 
 
+def require_business_backup_restore_dep(request: Request, db=Depends(get_db)) -> None:
+    """دسترسی بازیابی بکاپ: عضویت فعال + مالک کسب‌وکار (یا superadmin)."""
+    ctx = get_current_user(request, db)
+    business_id = request.path_params.get("business_id")
+    if business_id is None:
+        return
+    bid = int(business_id)
+    if not ctx.can_access_business(bid):
+        raise ApiError("FORBIDDEN", f"No access to business {bid}", http_status=403)
+    if not (ctx.is_superadmin() or ctx.is_business_owner(bid)):
+        raise ApiError(
+            "FORBIDDEN",
+            "Only the business owner can restore backups",
+            http_status=403,
+        )
+
+
 def require_business_permission_dep(section: str, action: str = None, business_id_param: str = "business_id"):
     """FastAPI dependency برای بررسی دسترسی کسب و کار با business_id از path parameter.
     

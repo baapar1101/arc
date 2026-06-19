@@ -27,10 +27,13 @@ class EncryptionService:
         """
         if encryption_key is None:
             settings = get_settings()
-            # TODO: باید در settings یک ENCRYPTION_KEY تعریف شود
-            # برای الان از SECRET_KEY استفاده می‌کنیم
-            secret = getattr(settings, 'secret_key', 'default-secret-key-change-me')
-            encryption_key = self._derive_key_from_secret(secret)
+            raw_key = (settings.encryption_key or "").strip()
+            if raw_key:
+                encryption_key = raw_key
+            else:
+                # سازگاری با داده‌های قدیمی — در production ENCRYPTION_KEY اجباری است
+                secret = getattr(settings, 'secret_key', None) or settings.captcha_secret
+                encryption_key = self._derive_key_from_secret(secret)
         
         self.cipher = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
 

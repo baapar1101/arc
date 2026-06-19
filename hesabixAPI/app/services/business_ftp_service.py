@@ -64,7 +64,11 @@ def _with_upload_retries(operation: str, fn: Callable[[], Any]) -> Any:
 	raise last
 
 
+from app.core.egress_policy import assert_public_egress_host
+
+
 def _connect_ftp(params: FtpConnectionParams, timeout: int = 45) -> FTP | FTP_TLS:
+	assert_public_egress_host(params.host, purpose="FTP")
 	if params.use_ftps:
 		ftp: FTP | FTP_TLS = FTP_TLS()
 		ftp.connect(params.host, params.port, timeout=timeout)
@@ -92,6 +96,7 @@ def _connect_ftp(params: FtpConnectionParams, timeout: int = 45) -> FTP | FTP_TL
 
 
 def _sftp_connect(params: FtpConnectionParams, timeout: int = 45) -> tuple[paramiko.SFTPClient, paramiko.Transport]:
+	assert_public_egress_host(params.host, purpose="SFTP")
 	t = paramiko.Transport((params.host, int(params.port)))
 	t.connect(username=params.username, password=params.password)
 	t.set_keepalive(20)

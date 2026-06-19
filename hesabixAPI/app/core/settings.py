@@ -41,6 +41,10 @@ class Settings(BaseSettings):
 	captcha_ttl_seconds: int = 180
 	captcha_secret: str = "change_me_captcha"
 	reset_password_ttl_seconds: int = 3600
+	# کلیدهای امنیتی اختصاصی (در production اجباری؛ در dev به captcha_secret برمی‌گردند)
+	api_key_pepper: str | None = None
+	otp_pepper: str | None = None
+	encryption_key: str | None = None
 
 	# Phone normalization
 	# Used as default region when parsing phone numbers without a country code

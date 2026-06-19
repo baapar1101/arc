@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-import random
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -22,12 +22,13 @@ from app.core.security import hash_password, hash_api_key
 def _hash_otp(otp: str) -> str:
 	"""Hash کردن OTP برای ذخیره امن"""
 	settings = get_settings()
-	return hashlib.sha256(f"{settings.captcha_secret}:{otp}".encode("utf-8")).hexdigest()
+	pepper = (settings.otp_pepper or settings.captcha_secret).strip()
+	return hashlib.sha256(f"{pepper}:{otp}".encode("utf-8")).hexdigest()
 
 
 def generate_otp() -> str:
 	"""تولید کد OTP 6 رقمی"""
-	return str(random.randint(100000, 999999))
+	return str(secrets.randbelow(900000) + 100000)
 
 
 class PasswordResetOtpService:

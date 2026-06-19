@@ -12,9 +12,12 @@ from app.core.settings import get_settings
 def _get_encryption_key() -> bytes:
     """دریافت کلید رمزگذاری از تنظیمات"""
     settings = get_settings()
-    # استفاده از captcha_secret از settings
+    raw_key = (settings.encryption_key or "").strip()
+    if raw_key:
+        return raw_key.encode() if isinstance(raw_key, str) else raw_key
+
     secret = settings.captcha_secret
-    salt = b'hesabix_ai_encryption_salt'  # می‌توان از settings خواند
+    salt = b'hesabix_ai_encryption_salt'
     
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),

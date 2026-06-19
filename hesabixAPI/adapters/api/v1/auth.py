@@ -32,8 +32,10 @@ router = APIRouter(prefix="/auth", tags=["احراز هویت"])
 
 
 def _otp_in_response(otp_code: str | None) -> dict:
-	"""فقط در حالت debug — در production مقدار OTP در پاسخ API برگردانده نمی‌شود."""
-	if get_settings().debug and (otp_code or ""):
+	"""فقط در حالت debug و غیر-production — در production مقدار OTP در پاسخ API برگردانده نمی‌شود."""
+	settings = get_settings()
+	is_production = (settings.environment or "").strip().lower() in {"production", "prod"}
+	if not is_production and settings.debug and (otp_code or ""):
 		return {"otp_code": otp_code}
 	return {}
 
@@ -627,6 +629,12 @@ def send_password_reset_otp(
 			"description": "کد OTP نامعتبر",
 		}
 	}
+)
+@rate_limit(
+	max_requests=10,
+	window_seconds=600,
+	key_func=lambda req: f"verify_pr_otp:{get_client_ip(req)}",
+	error_message="تعداد تلاش‌های تایید کد بازیابی بیش از حد مجاز است. لطفاً بعداً تلاش کنید.",
 )
 def verify_password_reset_otp(
 	request: Request,
