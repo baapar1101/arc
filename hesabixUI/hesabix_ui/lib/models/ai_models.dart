@@ -248,6 +248,7 @@ class AIChatSession {
   final int userId;
   final int? businessId;
   final String title;
+  final String executionMode;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -256,6 +257,7 @@ class AIChatSession {
     required this.userId,
     this.businessId,
     required this.title,
+    this.executionMode = 'analyzer',
     this.createdAt,
     this.updatedAt,
   });
@@ -266,6 +268,7 @@ class AIChatSession {
       userId: json['user_id'] as int,
       businessId: json['business_id'] as int?,
       title: json['title'] as String,
+      executionMode: (json['execution_mode'] as String?) ?? 'analyzer',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -281,7 +284,28 @@ class AIChatSession {
       'user_id': userId,
       if (businessId != null) 'business_id': businessId,
       'title': title,
+      'execution_mode': executionMode,
     };
+  }
+
+  AIChatSession copyWith({
+    int? id,
+    int? userId,
+    int? businessId,
+    String? title,
+    String? executionMode,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return AIChatSession(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      businessId: businessId ?? this.businessId,
+      title: title ?? this.title,
+      executionMode: executionMode ?? this.executionMode,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }
 

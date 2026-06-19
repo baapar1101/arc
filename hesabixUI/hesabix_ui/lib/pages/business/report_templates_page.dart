@@ -17,7 +17,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../widgets/data_table/helpers/file_saver.dart';
 import '../../widgets/report_template/embedded_pdf_iframe.dart';
-import 'report_template_visual_editor_page.dart';
+import 'report_template_studio_page.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 
 class ReportTemplatesPage extends StatefulWidget {
@@ -828,17 +828,27 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
           businessId: widget.businessId,
           templateId: (item['id'] as num).toInt(),
         );
-        if ((full['engine'] ?? '').toString().toLowerCase() == 'builder') {
+        final engine = (full['engine'] ?? '').toString().toLowerCase();
+        if (engine == 'builder' || engine == 'template_v2') {
           final mk = (full['module_key'] ?? '').toString();
           final st = full['subtype']?.toString();
           final assets = (full['assets'] as Map?)?.cast<String, dynamic>() ?? const {};
-          final design = (assets['builder_design'] as Map?)?.cast<String, dynamic>() ?? const {};
-          final validation = await _service.validateBuilderDesign(
-            businessId: widget.businessId,
-            moduleKey: mk,
-            subtype: st,
-            design: design,
-          );
+          final design = engine == 'template_v2'
+              ? (assets['template_design'] as Map?)?.cast<String, dynamic>() ?? const {}
+              : (assets['builder_design'] as Map?)?.cast<String, dynamic>() ?? const {};
+          final validation = engine == 'template_v2'
+              ? await _service.validateV2Design(
+                  businessId: widget.businessId,
+                  moduleKey: mk,
+                  subtype: st,
+                  design: design,
+                )
+              : await _service.validateBuilderDesign(
+                  businessId: widget.businessId,
+                  moduleKey: mk,
+                  subtype: st,
+                  design: design,
+                );
           final errors = ((validation['errors'] as List?) ?? const [])
               .map((e) => e.toString())
               .where((e) => e.trim().isNotEmpty)
@@ -897,7 +907,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     } catch (e) {
       if (!mounted) return;
       final message = ErrorExtractor.forContext(e, context);
-      if (next && message.contains('Cannot publish builder template')) {
+      if (next && (message.contains('Cannot publish builder template') || message.contains('Cannot publish template_v2 template'))) {
         final details = message.split(':').length > 1
             ? message.substring(message.indexOf(':') + 1).trim()
             : message;
@@ -1529,8 +1539,8 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         ),
       ),
     );
-    Map<String, dynamic>? builderDesign;
-    Map<String, dynamic>? builderAssets;
+    Map<String, dynamic>? studioDesign;
+    Map<String, dynamic>? studioAssets;
     try {
       final full = await _service.getTemplate(
         businessId: widget.businessId,
@@ -1551,16 +1561,29 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       final engine = (full['engine'] ?? 'jinja2').toString().toLowerCase();
       final Map<String, dynamic> res;
       if (engine == 'builder') {
-        builderAssets = (full['assets'] as Map?)?.cast<String, dynamic>() ?? {};
-        builderDesign = (builderAssets['builder_design'] as Map?)?.cast<String, dynamic>();
-        if (builderDesign == null) {
+        studioAssets = (full['assets'] as Map?)?.cast<String, dynamic>() ?? {};
+        studioDesign = (studioAssets['builder_design'] as Map?)?.cast<String, dynamic>();
+        if (studioDesign == null) {
           throw StateError(t.reportTemplateBuilderDesignEmpty);
         }
         res = await _service.preview(
           businessId: widget.businessId,
           engine: 'builder',
-          design: builderDesign,
-          assets: builderAssets,
+          design: studioDesign,
+          assets: studioAssets,
+          context: sampleContext,
+        );
+      } else if (engine == 'template_v2') {
+        studioAssets = (full['assets'] as Map?)?.cast<String, dynamic>() ?? {};
+        studioDesign = (studioAssets['template_design'] as Map?)?.cast<String, dynamic>();
+        if (studioDesign == null) {
+          throw StateError('طراحی استودیو خالی است');
+        }
+        res = await _service.preview(
+          businessId: widget.businessId,
+          engine: 'template_v2',
+          design: studioDesign,
+          assets: studioAssets,
           context: sampleContext,
         );
       } else {
@@ -1578,12 +1601,23 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       var pdfFetchFailed = false;
       try {
         final marginsMap = _marginsFromFull(full);
-        if (engine == 'builder' && builderDesign != null) {
+        if (engine == 'builder' && studioDesign != null) {
           pdfBytes = await _service.previewPdf(
             businessId: widget.businessId,
             engine: 'builder',
-            design: builderDesign,
-            assets: builderAssets,
+            design: studioDesign,
+            assets: studioAssets,
+            context: sampleContext,
+            paperSize: full['paper_size']?.toString(),
+            orientation: full['orientation']?.toString(),
+            margins: marginsMap,
+          );
+        } else if (engine == 'template_v2' && studioDesign != null) {
+          pdfBytes = await _service.previewPdf(
+            businessId: widget.businessId,
+            engine: 'template_v2',
+            design: studioDesign,
+            assets: studioAssets,
             context: sampleContext,
             paperSize: full['paper_size']?.toString(),
             orientation: full['orientation']?.toString(),
@@ -1762,13 +1796,14 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
 
   Future<void> _editDialog(Map<String, dynamic> item) async {
     Map<String, dynamic> full = const <String, dynamic>{};
-    bool isBuilder = false;
+    bool isStudio = false;
     try {
       full = await _service.getTemplate(
         businessId: widget.businessId,
         templateId: (item['id'] as num).toInt(),
       );
-      isBuilder = (full['engine'] ?? '').toString() == 'builder';
+      final engine = (full['engine'] ?? '').toString().toLowerCase();
+      isStudio = engine == 'builder' || engine == 'template_v2';
       _nameCtrl.text = (full['name'] ?? '').toString();
       _descCtrl.text = (full['description'] ?? '').toString();
       _htmlCtrl.text = (full['content_html'] ?? '').toString();
@@ -1786,10 +1821,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     } catch (_) {}
 
     if (!mounted) return;
-    if (isBuilder) {
+    if (isStudio) {
       final result = await Navigator.of(context).push<bool>(
         MaterialPageRoute(
-          builder: (context) => ReportTemplateVisualEditorPage(
+          builder: (context) => ReportTemplateStudioPage(
             businessId: widget.businessId,
             authStore: widget.authStore,
             template: item,
@@ -1944,7 +1979,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 onPressed: () async {
                   final result = await Navigator.of(context).push<bool>(
                     MaterialPageRoute(
-                      builder: (context) => ReportTemplateVisualEditorPage(
+                      builder: (context) => ReportTemplateStudioPage(
                         businessId: widget.businessId,
                         authStore: widget.authStore,
                         moduleKey: _moduleCtrl.text.trim().isEmpty ? null : _moduleCtrl.text.trim(),

@@ -4,6 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/ai_models.dart';
 import '../../services/voice/voice_phase.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_execution_mode_chip.dart';
 import 'ai_chat_model_chip.dart';
 import 'voice_status_label.dart';
 
@@ -89,6 +90,8 @@ class AIChatComposer extends StatefulWidget {
   final bool modelsLoading;
   final ValueChanged<String?>? onModelChanged;
   final String? modelPricingHint;
+  final String executionMode;
+  final ValueChanged<String>? onExecutionModeChanged;
 
   const AIChatComposer({
     super.key,
@@ -111,6 +114,8 @@ class AIChatComposer extends StatefulWidget {
     this.modelsLoading = false,
     this.onModelChanged,
     this.modelPricingHint,
+    this.executionMode = 'analyzer',
+    this.onExecutionModeChanged,
   });
 
   @override
@@ -414,6 +419,15 @@ class _AIChatComposerState extends State<AIChatComposer> {
                           icon: Icon(
                             Icons.call_end_rounded,
                             color: scheme.error,
+                          ),
+                        ),
+                      if (widget.onExecutionModeChanged != null)
+                        Flexible(
+                          child: AIChatExecutionModeChip(
+                            selectedMode: widget.executionMode,
+                            enabled: !widget.disabled && !widget.sending,
+                            onChanged: widget.onExecutionModeChanged,
+                            compact: true,
                           ),
                         ),
                       if (widget.availableModels.isNotEmpty)

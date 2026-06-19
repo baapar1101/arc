@@ -17,6 +17,12 @@ class AIChatSession(Base):
     
     # اطلاعات جلسه
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="جلسه چت جدید")
+    execution_mode: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="analyzer",
+        server_default="analyzer",
+    )
     
     # زمان‌بندی
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

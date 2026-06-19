@@ -26,8 +26,18 @@ from app.services.ai.ai_write_guard import (
     build_approval_pause_content,
     build_approval_required_result,
     build_approval_mismatch_result,
+    build_read_only_mode_result,
     write_call_is_approved,
+    is_readonly_function,
     WRITE_FUNCTION_LABELS_FA,
+)
+from app.services.ai.ai_execution_policy import (
+    DEFAULT_EXECUTION_MODE,
+    execution_mode_prompt_block,
+    exposes_write_tools,
+    resolve_execution_mode,
+    should_block_write_in_analyzer,
+    should_require_write_approval,
 )
 from app.services.ai.ai_tool_keys import (
     status_event,
@@ -890,6 +900,7 @@ class AIService:
         session_business_id: Optional[int] = None,
         session_id: Optional[int] = None,
         user_query: Optional[str] = None,
+        execution_mode: Optional[str] = None,
     ) -> str:
         """دریافت system prompt مناسب با business_id، حافظه، پیوست‌ها و دانشنامه"""
         # تشخیص role کاربر
@@ -1016,7 +1027,7 @@ class AIService:
                     parts[key] = ""
 
             return trim_system_prompt_sections(
-                base_prompt + business_info,
+                base_prompt + business_info + execution_mode_prompt_block(execution_mode),
                 [
                     parts.get("memory", ""),
                     parts.get("insights", ""),
@@ -1027,13 +1038,16 @@ class AIService:
                 ],
             )
 
-        return trim_system_prompt(base_prompt)
+        return trim_system_prompt(
+            base_prompt + execution_mode_prompt_block(execution_mode)
+        )
 
     async def build_system_prompt_stream(
         self,
         session_business_id: Optional[int] = None,
         session_id: Optional[int] = None,
         user_query: Optional[str] = None,
+        execution_mode: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ساخت system prompt — هر مرحله ابتدا trace فعال، سپس پس از اتمام trace انجام‌شده."""
         loop = asyncio.get_running_loop()
@@ -1060,7 +1074,10 @@ class AIService:
 
         business_id = session_business_id or self.business_id
         if not business_id:
-            yield {"event": "prompt_ready", "prompt": base_prompt}
+            yield {
+                "event": "prompt_ready",
+                "prompt": base_prompt + execution_mode_prompt_block(execution_mode),
+            }
             return
 
         business_info = (
@@ -1219,7 +1236,7 @@ class AIService:
                 await asyncio.sleep(0)
 
         final_prompt = trim_system_prompt_sections(
-            base_prompt + business_info,
+            base_prompt + business_info + execution_mode_prompt_block(execution_mode),
             [
                 parts.get("loading_memory", ""),
                 parts.get("loading_insights", ""),
@@ -1262,6 +1279,7 @@ class AIService:
         session_business_id: Optional[int] = None,
         user_query: Optional[str] = None,
         force_tool_names: Optional[AbstractSet[str]] = None,
+        execution_mode: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """دریافت function های قابل استفاده بر اساس نقش کاربر و intent سوال.
 
@@ -1306,6 +1324,14 @@ class AIService:
                     )
             except Exception as exc:
                 logger.warning("AI skill tool filter failed: %s", exc)
+        if not exposes_write_tools(resolve_execution_mode(execution_mode)):
+            definitions = [
+                d
+                for d in definitions
+                if is_readonly_function(
+                    (d.get("function") or {}).get("name") or "", registry
+                )
+            ]
         return definitions
     
     def check_quota_and_charge(
@@ -1644,6 +1670,7 @@ class AIService:
         approved_write_calls: Optional[List[Dict[str, Any]]] = None,
         user_query: Optional[str] = None,
         request_model: Optional[str] = None,
+        execution_mode: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         ارسال درخواست به AI (async version برای جلوگیری از blocking)
@@ -1661,6 +1688,8 @@ class AIService:
                 use_function_calling, effective_user_query, messages
             ),
         )
+
+        effective_execution_mode = resolve_execution_mode(execution_mode)
 
         accumulated_function_calls: List[Dict[str, Any]] = []
         accumulated_function_results: Dict[str, Any] = {}
@@ -1703,6 +1732,7 @@ class AIService:
                 session_business_id=session_business_id,
                 session_id=session_id,
                 user_query=effective_user_query,
+                execution_mode=effective_execution_mode,
             )
             provider = self._make_provider()
             full_messages, _context_meta = self._prepare_llm_messages(
@@ -1719,6 +1749,7 @@ class AIService:
                     force_tool_names=self._forced_write_tool_names(
                         approve_writes, approved_write_calls
                     ),
+                    execution_mode=effective_execution_mode,
                 )
             elif not eff_tools:
                 tools = None
@@ -1799,6 +1830,7 @@ class AIService:
                     approve_writes=approve_writes,
                     approved_write_calls=approved_write_calls,
                     iteration=iteration,
+                    execution_mode=effective_execution_mode,
                 )
                 _merge_round_tool_results(accumulated_function_results, function_results)
                 round_productive = assess_tool_round_productivity(
@@ -1960,6 +1992,7 @@ class AIService:
         user_query: Optional[str] = None,
         exploration_mode: Optional[str] = None,
         request_model: Optional[str] = None,
+        execution_mode: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال streaming با چند نوبت tool calling (مثل chat_completion).
 
@@ -1985,6 +2018,7 @@ class AIService:
         exploration_enabled = resolve_exploration_enabled(
             exploration_mode, effective_user_query, messages
         )
+        effective_execution_mode = resolve_execution_mode(execution_mode)
 
         # تنظیم خودکار max_iterations بر اساس پیچیدگی
         complexity = estimate_query_complexity(effective_user_query, messages)
@@ -2099,6 +2133,7 @@ class AIService:
                 session_business_id=session_business_id,
                 session_id=session_id,
                 user_query=effective_user_query,
+                execution_mode=effective_execution_mode,
             ):
                 if build_item.get("event") == "prompt_ready":
                     system_prompt = build_item.get("prompt") or ""
@@ -2140,6 +2175,7 @@ class AIService:
                     force_tool_names=self._forced_write_tool_names(
                         approve_writes, approved_write_calls
                     ),
+                    execution_mode=effective_execution_mode,
                 )
             elif not eff_tools:
                 tools = None
@@ -2453,6 +2489,7 @@ class AIService:
                         approved_write_calls=approved_write_calls,
                         iteration=iteration,
                         session_id=session_id,
+                        execution_mode=effective_execution_mode,
                     )
                     _merge_round_tool_results(
                         accumulated_function_results, function_results
@@ -2916,6 +2953,7 @@ class AIService:
                 "citations_context": citations_context or None,
                 "requested_model": requested_model_code,
                 "resolved_model": resolved_model_code,
+                "execution_mode": effective_execution_mode,
             }
 
         except ApiError:
@@ -2936,10 +2974,12 @@ class AIService:
         session_business_id: Optional[int] = None,
         approve_writes: bool = False,
         approved_write_calls: Optional[List[Dict[str, Any]]] = None,
+        execution_mode: Optional[str] = None,
     ) -> Dict[str, Any]:
         """پردازش function calling (sync — سازگاری با گذشته)"""
         results = {}
         effective_business_id = session_business_id or self.business_id
+        effective_execution_mode = resolve_execution_mode(execution_mode)
         context = {
             "user_context": self.ctx,
             "business_id": effective_business_id,
@@ -2950,13 +2990,27 @@ class AIService:
             function_name = call.get("name")
             arguments = call.get("arguments", {}) or {}
 
-            if is_write_function(function_name):
-                if not approve_writes:
+            if is_write_function(function_name, registry):
+                if should_block_write_in_analyzer(
+                    effective_execution_mode, function_name, registry
+                ):
+                    results[function_name] = build_read_only_mode_result(
+                        function_name, arguments
+                    )
+                    continue
+                if should_require_write_approval(
+                    effective_execution_mode,
+                    function_name,
+                    approve_writes=approve_writes,
+                    registry=registry,
+                ):
                     results[function_name] = build_approval_required_result(
                         function_name, arguments
                     )
                     continue
-                if not write_call_is_approved(function_name, arguments, approved_write_calls):
+                if approve_writes and not write_call_is_approved(
+                    function_name, arguments, approved_write_calls
+                ):
                     results[function_name] = build_approval_mismatch_result(
                         function_name, arguments
                     )
@@ -2979,6 +3033,7 @@ class AIService:
         approved_write_calls: Optional[List[Dict[str, Any]]] = None,
         iteration: int = 0,
         session_id: Optional[int] = None,
+        execution_mode: Optional[str] = None,
     ) -> Dict[str, Any]:
         """پردازش function calling به صورت async — کلید نتیجه tool_call_id.
 
@@ -2989,6 +3044,7 @@ class AIService:
          - invalidation کش بعد از عملیات نوشتنی
         """
         effective_business_id = session_business_id or self.business_id
+        effective_execution_mode = resolve_execution_mode(execution_mode)
         context = {
             "user_context": self.ctx,
             "business_id": effective_business_id,
@@ -3006,17 +3062,29 @@ class AIService:
 
             # بررسی نیاز به تأیید با استفاده از registry
             if is_write_function(function_name, registry):
-                if not approve_writes:
+                if should_block_write_in_analyzer(
+                    effective_execution_mode, function_name, registry
+                ):
+                    return tc_id, function_name, build_read_only_mode_result(
+                        function_name, arguments
+                    )
+                if should_require_write_approval(
+                    effective_execution_mode,
+                    function_name,
+                    approve_writes=approve_writes,
+                    registry=registry,
+                ):
                     return tc_id, function_name, build_approval_required_result(
                         function_name, arguments
                     )
-                if not write_call_is_approved(function_name, arguments, approved_write_calls):
+                if approve_writes and not write_call_is_approved(
+                    function_name, arguments, approved_write_calls
+                ):
                     return tc_id, function_name, build_approval_mismatch_result(
                         function_name, arguments
                     )
 
             # بررسی کش برای توابع read-only
-            from app.services.ai.ai_write_guard import is_readonly_function
             is_readonly = is_readonly_function(function_name, registry)
             if is_readonly and effective_business_id and session_id:
                 hit, cached_result = get_cached(

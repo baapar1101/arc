@@ -30,6 +30,8 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_onboarding_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
 import 'package:hesabix_ui/widgets/ai/ai_write_approval_helpers.dart';
+import 'package:hesabix_ui/widgets/ai/ai_execution_mode.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_execution_mode_store.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_l10n.dart';
 import 'package:share_plus/share_plus.dart';
@@ -123,6 +125,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   String? _lastResolvedModelLabel;
   bool _modelsLoading = false;
   bool _focusChatMode = false;
+  String _executionMode = AIExecutionMode.defaultMode;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
@@ -192,6 +195,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _scrollController.addListener(_onScrollChanged);
     _loadSessions();
     _loadSuggestions();
+    unawaited(_loadExecutionModePreference());
     if (widget.businessId != null) {
       unawaited(_loadProactiveAlerts());
       unawaited(_loadAvailableModels());
@@ -199,6 +203,67 @@ class _AIChatDialogState extends State<AIChatDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _isHomeMode) _focusNode.requestFocus();
     });
+  }
+
+  Future<void> _loadExecutionModePreference() async {
+    final stored = await AIChatExecutionModeStore.load(widget.businessId);
+    if (!mounted) return;
+    setState(() => _executionMode = stored);
+  }
+
+  Future<void> _onExecutionModeChanged(String mode) async {
+    final next = AIExecutionMode.normalize(mode);
+    if (next == _executionMode) return;
+    if (_showWriteApprovalBanner) {
+      _showSnackbar(
+        'ابتدا عملیات در انتظار تأیید را تأیید یا لغو کنید، سپس حالت را تغییر دهید.',
+      );
+      return;
+    }
+    if (AIExecutionMode.requiresAutonomousConfirmation(_executionMode, next)) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('فعال‌سازی حالت خودکار'),
+          content: const Text(
+            'در این حالت دستیار می‌تواند تغییرات معمولی را بدون پرسیدن از شما '
+            'در سیستم اعمال کند. عملیات پرریسک (حذف، workflow و …) همچنان '
+            'نیاز به تأیید دارند.\n\nادامه می‌دهید؟',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('فعال‌سازی'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    setState(() => _executionMode = next);
+    await AIChatExecutionModeStore.save(widget.businessId, next);
+    final sessionId = _currentSession?.id;
+    if (sessionId != null) {
+      try {
+        final updated = await _aiService.updateChatSession(
+          sessionId: sessionId,
+          executionMode: next,
+        );
+        if (!mounted) return;
+        setState(() {
+          _currentSession = updated;
+          _sessions = _sessions
+              .map((s) => s.id == updated.id ? updated : s)
+              .toList();
+        });
+      } catch (e) {
+        debugPrint('[AIChatDialog] update execution mode failed: $e');
+      }
+    }
   }
 
   Future<void> _loadAvailableModels() async {
@@ -625,6 +690,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     try {
       final session = await _aiService.createChatSession(
         businessId: widget.businessId,
+        executionMode: _executionMode,
       );
       if (!mounted) return false;
       setState(() {
@@ -654,6 +720,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _currentSession = session;
       _messages = [];
       _messagesLoading = true;
+      _executionMode = AIExecutionMode.normalize(session.executionMode);
       _clearWriteApprovalState();
     });
     try {
@@ -1442,6 +1509,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sessionId: _currentSession!.id!,
         content: content,
         approveWrites: approveWrites,
+        executionMode: _executionMode,
         model: _selectedModelCode,
         onComplete: (usage, messageId) {
           finalUsage = usage;
@@ -1965,6 +2033,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 onCreditUpgrade: widget.businessId != null
                                     ? _navigateToSubscription
                                     : null,
+                                executionMode: _executionMode,
+                                onExecutionModeChanged:
+                                    _sending ? null : _onExecutionModeChanged,
                               )
                             : AIChatThreadView(
                                 key: ValueKey(
@@ -2067,6 +2138,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 onCreditUpgrade: widget.businessId != null
                                     ? _navigateToSubscription
                                     : null,
+                                executionMode: _executionMode,
+                                onExecutionModeChanged:
+                                    _sending ? null : _onExecutionModeChanged,
                               ),
                       ),
                     ),

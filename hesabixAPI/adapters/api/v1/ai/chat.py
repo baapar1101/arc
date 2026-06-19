@@ -19,6 +19,10 @@ from app.services.ai.chat_message_builder import (
 from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository, AIChatMessageRepository
 from adapters.db.models.ai_chat_session import AIChatSession
 from adapters.db.models.ai_chat_message import AIChatMessage, MessageRole
+from app.services.ai.ai_execution_policy import (
+    exploration_mode_for_execution,
+    resolve_execution_mode,
+)
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -189,11 +193,48 @@ def _extract_pending_write_approvals(messages: List[AIChatMessage]) -> List[Dict
     return []
 
 
+def _session_execution_mode(session: AIChatSession) -> str:
+    return resolve_execution_mode(getattr(session, "execution_mode", None))
+
+
+def _resolve_request_execution_mode(
+    session: AIChatSession,
+    request_mode: Optional[str],
+) -> str:
+    if request_mode and str(request_mode).strip():
+        return resolve_execution_mode(request_mode)
+    return _session_execution_mode(session)
+
+
+def _resolve_exploration_mode(
+    query_mode: Optional[str],
+    body_mode: Optional[str],
+    execution_mode: str,
+) -> str:
+    explicit = (query_mode or body_mode or "").strip().lower()
+    if explicit:
+        return explicit
+    return exploration_mode_for_execution(execution_mode)
+
+
+def _session_response_dict(session: AIChatSession) -> Dict[str, Any]:
+    return {
+        "id": session.id,
+        "user_id": session.user_id,
+        "title": session.title,
+        "business_id": session.business_id,
+        "execution_mode": _session_execution_mode(session),
+        "created_at": session.created_at.isoformat() if session.created_at else None,
+        "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+    }
+
+
 class ChatMessageRequest(BaseModel):
     content: str
     session_id: Optional[int] = None
     approve_writes: bool = False
     mode: Optional[str] = None  # explore | auto | off
+    execution_mode: Optional[str] = None  # analyzer | supervised | autonomous
     model: Optional[str] = None
 
 
@@ -231,7 +272,14 @@ class ChatEditMessageRequest(BaseModel):
     content: str
     approve_writes: bool = False
     regenerate_after: bool = True
+    mode: Optional[str] = None
+    execution_mode: Optional[str] = None
     model: Optional[str] = None
+
+
+class ChatSessionUpdateRequest(BaseModel):
+    execution_mode: Optional[str] = None
+    title: Optional[str] = None
 
 
 class AIConnectorCreateRequest(BaseModel):
@@ -801,14 +849,7 @@ async def get_chat_sessions(
     
     result = []
     for session in sessions:
-        result.append({
-            "id": session.id,
-            "user_id": session.user_id,
-            "title": session.title,
-            "business_id": session.business_id,
-            "created_at": session.created_at.isoformat() if session.created_at else None,
-            "updated_at": session.updated_at.isoformat() if session.updated_at else None
-        })
+        result.append(_session_response_dict(session))
     
     return success_response(result, request)
 
@@ -818,6 +859,7 @@ async def create_chat_session(
     request: Request,
     title: Optional[str] = Body(None, embed=True),
     business_id: Optional[int] = Body(None, embed=True),
+    execution_mode: Optional[str] = Body(None, embed=True),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -830,20 +872,37 @@ async def create_chat_session(
     session = AIChatSession(
         user_id=ctx.get_user_id(),
         business_id=effective_business_id,
-        title=title or DEFAULT_CHAT_TITLE
+        title=title or DEFAULT_CHAT_TITLE,
+        execution_mode=resolve_execution_mode(execution_mode),
     )
     db.add(session)
     db.commit()
     db.refresh(session)
     
-    return success_response({
-        "id": session.id,
-        "user_id": session.user_id,
-        "title": session.title,
-        "business_id": session.business_id,
-        "created_at": session.created_at.isoformat() if session.created_at else None,
-        "updated_at": session.updated_at.isoformat() if session.updated_at else None
-    }, request, "جلسه چت با موفقیت ایجاد شد")
+    return success_response(_session_response_dict(session), request, "جلسه چت با موفقیت ایجاد شد")
+
+
+@router.patch("/sessions/{session_id}", summary="به‌روزرسانی گفت‌وگو")
+async def update_chat_session(
+    session_id: int = Path(...),
+    request: Request = None,
+    params: ChatSessionUpdateRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    session_repo = AIChatSessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session or session.user_id != ctx.get_user_id():
+        raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+    if params.title is not None and params.title.strip():
+        session.title = params.title.strip()[:255]
+    if params.execution_mode is not None:
+        session.execution_mode = resolve_execution_mode(params.execution_mode)
+    from datetime import datetime
+    session.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(session)
+    return success_response(_session_response_dict(session), request, "گفت‌وگو به‌روزرسانی شد")
 
 
 @router.get("/sessions/{session_id}/messages", summary="دریافت پیام‌های جلسه")
@@ -912,13 +971,19 @@ async def send_message(
     ctx: AuthContext = Depends(get_current_user),
 ):
     """ارسال پیام به AI و دریافت پاسخ (با یا بدون streaming)"""
-    exploration_mode = (mode or message_data.mode or "auto").strip().lower()
-    # بررسی دسترسی
     session_repo = AIChatSessionRepository(db)
     session = session_repo.get_by_id(session_id)
     
     if not session or session.user_id != ctx.get_user_id():
         raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+
+    execution_mode = _resolve_request_execution_mode(
+        session, message_data.execution_mode
+    )
+    exploration_mode = _resolve_exploration_mode(
+        mode, message_data.mode, execution_mode
+    )
+    session.execution_mode = execution_mode
     
     # دریافت پیام‌های قبلی
     message_repo = AIChatMessageRepository(db)
@@ -973,6 +1038,7 @@ async def send_message(
                 approve_writes=approve_writes,
                 approved_write_calls=approved_write_calls,
                 exploration_mode=exploration_mode,
+                execution_mode=execution_mode,
                 request_model=message_data.model,
             ),
             media_type="text/event-stream",
@@ -1009,6 +1075,7 @@ async def send_message(
             approved_write_calls=approved_write_calls,
             user_query=message_data.content,
             request_model=message_data.model,
+            execution_mode=execution_mode,
         )
     
     response_content_preview = (response.get("message", {}).get("content") or "")[:500]
@@ -1149,6 +1216,7 @@ async def _stream_message_response(
     approve_writes: bool = False,
     approved_write_calls: Optional[List[Dict[str, Any]]] = None,
     exploration_mode: str = "auto",
+    execution_mode: str = "analyzer",
     request_model: Optional[str] = None,
 ):
     """Generator برای streaming response
@@ -1190,6 +1258,7 @@ async def _stream_message_response(
                     approve_writes=approve_writes,
                     approved_write_calls=approved_write_calls,
                     exploration_mode=exploration_mode,
+                    execution_mode=execution_mode,
                     user_query=message_content,
                     request_model=request_model,
                 ):
@@ -1476,6 +1545,8 @@ async def regenerate_last_response(
 
     business_id = session.business_id
     approved_write_calls = _extract_pending_write_approvals(remaining) if approve_writes else []
+    execution_mode = _session_execution_mode(session)
+    exploration_mode = exploration_mode_for_execution(execution_mode)
 
     if stream:
         db.close()
@@ -1489,6 +1560,8 @@ async def regenerate_last_response(
                 message_content=last_user.content,
                 approve_writes=approve_writes,
                 approved_write_calls=approved_write_calls,
+                exploration_mode=exploration_mode,
+                execution_mode=execution_mode,
                 request_model=model,
             ),
             media_type="text/event-stream",
@@ -1514,6 +1587,7 @@ async def regenerate_last_response(
             approved_write_calls=approved_write_calls,
             user_query=last_user.content,
             request_model=model,
+            execution_mode=execution_mode,
         )
 
     usage = response.get("usage", {})
@@ -1680,6 +1754,10 @@ async def edit_user_message(
         if params.approve_writes
         else []
     )
+    execution_mode = _resolve_request_execution_mode(session, params.execution_mode)
+    exploration_mode = _resolve_exploration_mode(None, params.mode, execution_mode)
+    session.execution_mode = execution_mode
+    db.commit()
 
     if not should_stream:
         return success_response(
@@ -1706,6 +1784,8 @@ async def edit_user_message(
                 message_content=user_text,
                 approve_writes=params.approve_writes,
                 approved_write_calls=approved_write_calls,
+                exploration_mode=exploration_mode,
+                execution_mode=execution_mode,
                 request_model=params.model,
             ),
             media_type="text/event-stream",
@@ -1731,6 +1811,7 @@ async def edit_user_message(
             approved_write_calls=approved_write_calls,
             user_query=user_text,
             request_model=params.model,
+            execution_mode=execution_mode,
         )
 
     usage = response.get("usage", {})
@@ -1829,6 +1910,7 @@ async def fork_chat_session(
         user_id=session.user_id,
         business_id=session.business_id,
         title=fork_title,
+        execution_mode=_session_execution_mode(session),
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -1856,6 +1938,7 @@ async def fork_chat_session(
                 "id": new_session.id,
                 "title": new_session.title,
                 "business_id": new_session.business_id,
+                "execution_mode": _session_execution_mode(new_session),
                 "created_at": new_session.created_at.isoformat() if new_session.created_at else None,
             },
             "message_count": len(to_copy),

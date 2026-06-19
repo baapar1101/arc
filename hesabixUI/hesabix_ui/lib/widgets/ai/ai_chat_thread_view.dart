@@ -14,6 +14,7 @@ import 'ai_chat_context_bar.dart';
 import 'ai_chat_tool_activity_list.dart';
 import 'ai_error_recovery_banner.dart';
 import 'ai_write_approval_banner.dart';
+import 'ai_execution_mode.dart';
 typedef MessageActionCallback = void Function(AIChatMessage message);
 
 class AIChatThreadView extends StatelessWidget {
@@ -77,6 +78,8 @@ class AIChatThreadView extends StatelessWidget {
   final VoidCallback? onDismissWriteApproval;
   final String? creditWarningMessage;
   final VoidCallback? onCreditUpgrade;
+  final String executionMode;
+  final ValueChanged<String>? onExecutionModeChanged;
 
   const AIChatThreadView({
     super.key,
@@ -140,6 +143,8 @@ class AIChatThreadView extends StatelessWidget {
     this.onDismissWriteApproval,
     this.creditWarningMessage,
     this.onCreditUpgrade,
+    this.executionMode = AIExecutionMode.analyzer,
+    this.onExecutionModeChanged,
   });
 
   Widget _buildMessageList(BuildContext context) {
@@ -276,6 +281,8 @@ class AIChatThreadView extends StatelessWidget {
             message: creditWarningMessage!,
             onUpgrade: onCreditUpgrade,
           ),
+        if (AIExecutionMode.normalize(executionMode) == AIExecutionMode.autonomous)
+          _AutonomousModeBanner(mode: executionMode),
         AIChatComposer(
           controller: messageController,
           focusNode: focusNode,
@@ -296,8 +303,51 @@ class AIChatThreadView extends StatelessWidget {
           modelsLoading: modelsLoading,
           onModelChanged: onModelChanged,
           modelPricingHint: modelPricingHint,
+          executionMode: executionMode,
+          onExecutionModeChanged: onExecutionModeChanged,
         ),
       ],
+    );
+  }
+}
+
+class _AutonomousModeBanner extends StatelessWidget {
+  final String mode;
+
+  const _AutonomousModeBanner({required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = AIExecutionMode.accentColor(context, mode);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AIChatDesign.contentMaxWidth),
+          child: Material(
+            color: accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.bolt_outlined, size: 18, color: accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'حالت خودکار فعال است — تغییرات معمولی بدون تأیید اجرا می‌شوند.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

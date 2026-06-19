@@ -17,8 +17,51 @@ from app.services.report_template_scope_registry import (
 	get_scope_meta,
 	is_known_scope,
 )
+from app.services.report_template_gallery import list_gallery_items
+from app.services.report_template_v2_service import migrate_builder_design_to_v2
 
 router = APIRouter(prefix="/report-templates", tags=["قالب‌های گزارش", "گزارش‌ها"])
+
+
+def _preview_assets(body: Dict[str, Any], engine: str) -> Optional[Dict[str, Any]]:
+	assets = (body or {}).get("assets")
+	if assets:
+		return assets
+	design = (body or {}).get("design")
+	if engine == "builder" and design is not None:
+		return {"builder_design": design}
+	if engine == "template_v2" and design is not None:
+		return {"template_design": design}
+	return None
+
+
+def _validate_design_for_publish(entity) -> None:
+	engine = (entity.engine or "").lower()
+	if engine not in ("builder", "template_v2"):
+		return
+	assets = entity.assets or {}
+	if engine == "builder":
+		design = (assets.get("builder_design") or assets.get("design") or {}) if isinstance(assets, dict) else {}
+		validation = ReportTemplateService.validate_builder_design_scope(
+			entity.module_key,
+			entity.subtype,
+			design if isinstance(design, dict) else {},
+		)
+	elif engine == "template_v2":
+		design = (assets.get("template_design") or assets.get("design") or {}) if isinstance(assets, dict) else {}
+		validation = ReportTemplateService.validate_template_v2_design_scope(
+			entity.module_key,
+			entity.subtype,
+			design if isinstance(design, dict) else {},
+		)
+	else:
+		return
+	if validation.get("errors"):
+		raise ApiError(
+			"VALIDATION_ERROR",
+			f"Cannot publish {engine} template: " + "; ".join(validation["errors"]),
+			http_status=400,
+		)
 
 
 def _actor_display(db: Session, user_id: Optional[int]) -> Optional[str]:
@@ -231,20 +274,8 @@ async def publish_report_template(
 		entity_check = ReportTemplateService.get_template(db=db, template_id=template_id, business_id=business_id)
 		if not entity_check:
 			raise ApiError("NOT_FOUND", "Template not found", http_status=404)
-		if (entity_check.engine or "").lower() == "builder":
-			assets = entity_check.assets or {}
-			design = (assets.get("builder_design") or assets.get("design") or {}) if isinstance(assets, dict) else {}
-			validation = ReportTemplateService.validate_builder_design_scope(
-				entity_check.module_key,
-				entity_check.subtype,
-				design if isinstance(design, dict) else {},
-			)
-			if validation.get("errors"):
-				raise ApiError(
-					"VALIDATION_ERROR",
-					"Cannot publish builder template: " + "; ".join(validation["errors"]),
-					http_status=400,
-				)
+		if (entity_check.engine or "").lower() in ("builder", "template_v2"):
+			_validate_design_for_publish(entity_check)
 		if (entity_check.status or "").lower() != "approved":
 			raise ApiError("VALIDATION_ERROR", "Template must be approved before publishing", http_status=400)
 	entity = ReportTemplateService.publish_template(db=db, template_id=template_id, business_id=business_id, is_published=is_published)
@@ -293,20 +324,8 @@ async def transition_report_template_status(
 		# نشر فقط برای قالب approved و بدون خطای validation
 		if (entity.status or "").lower() != "approved":
 			raise ApiError("VALIDATION_ERROR", "Template must be approved before publishing", http_status=400)
-		if (entity.engine or "").lower() == "builder":
-			assets = entity.assets or {}
-			design = (assets.get("builder_design") or assets.get("design") or {}) if isinstance(assets, dict) else {}
-			validation = ReportTemplateService.validate_builder_design_scope(
-				entity.module_key,
-				entity.subtype,
-				design if isinstance(design, dict) else {},
-			)
-			if validation.get("errors"):
-				raise ApiError(
-					"VALIDATION_ERROR",
-					"Cannot publish builder template: " + "; ".join(validation["errors"]),
-					http_status=400,
-				)
+		if (entity.engine or "").lower() in ("builder", "template_v2"):
+			_validate_design_for_publish(entity)
 	entity = ReportTemplateService.transition_status(
 		db=db,
 		template_id=template_id,
@@ -561,7 +580,7 @@ async def preview_report_template(
 		"paper_size": None,
 		"orientation": None,
 		"margins": None,
-		"assets": (body or {}).get("assets") or ({"builder_design": (body or {}).get("design")} if engine == "builder" else None),
+		"assets": _preview_assets(body or {}, engine),
 	})()  # شیء موقت شبیه ReportTemplate
 	try:
 		html = ReportTemplateService.render_with_template(temp, context)
@@ -613,7 +632,7 @@ async def preview_report_template_pdf(
 		"paper_size": (body or {}).get("paper_size") or None,
 		"orientation": (body or {}).get("orientation") or None,
 		"margins": (body or {}).get("margins") or None,
-		"assets": (body or {}).get("assets") or ({"builder_design": (body or {}).get("design")} if engine == "builder" else None),
+		"assets": _preview_assets(body or {}, engine),
 	})()  # شیء موقت شبیه ReportTemplate
 	try:
 		html = ReportTemplateService.render_with_template(temp, context)
@@ -668,11 +687,64 @@ async def report_template_schema(
 			{"name": "table_headers_html", "desc": "HTML آماده هدر جدول"},
 			{"name": "table_rows_html", "desc": "HTML آماده ردیف‌های جدول"},
 		]
+		data["sample_context"].update(
+			{
+				"title_text": "لیست فاکتورها",
+				"business_name": "نمونه کسب‌وکار",
+				"items": [
+					{"code": "INV-1001", "title": "فاکتور فروش ۱", "issue_date": "1403/10/01", "payable_total": 1035500},
+					{"code": "INV-1002", "title": "فاکتور فروش ۲", "issue_date": "1403/10/02", "payable_total": 2500000},
+				],
+				"is_fa": True,
+			}
+		)
 	elif module_key == "invoices" and (subtype or "") == "detail":
 		data["keys"] += [
 			{"name": "invoice", "desc": "شیء فاکتور"},
-			{"name": "items", "desc": "آیتم‌های فاکتور"},
+			{"name": "lines", "desc": "آیتم‌های فاکتور"},
+			{"name": "buyer", "desc": "اطلاعات خریدار"},
+			{"name": "seller", "desc": "اطلاعات فروشنده"},
+			{"name": "business_name", "desc": "نام کسب‌وکار"},
+			{"name": "business_logo_data_uri", "desc": "لوگوی کسب‌وکار"},
+			{"name": "invoice_footer_note", "desc": "یادداشت پاورقی"},
+			{"name": "invoice_verify_qr_data_uri", "desc": "QR تأیید فاکتور"},
 		]
+		data["sample_context"].update(
+			{
+				"title_text": "فاکتور فروش",
+				"business_name": "نمونه کسب‌وکار",
+				"invoice": {
+					"code": "INV-1001",
+					"issue_date": "1403/10/01",
+					"subtotal": 1000000,
+					"discount_total": 50000,
+					"tax_total": 85500,
+					"payable_total": 1035500,
+				},
+				"lines": [
+					{
+						"product_name": "کالای نمونه ۱",
+						"quantity": 2,
+						"unit_price": 250000,
+						"line_total": 500000,
+					},
+					{
+						"product_name": "کالای نمونه ۲",
+						"quantity": 1,
+						"unit_price": 500000,
+						"line_total": 500000,
+					},
+				],
+				"buyer": {"name": "مشتری نمونه"},
+				"seller": {"name": "فروشنده نمونه"},
+				"payments": [{"method_name": "نقد", "amount": 500000}],
+				"invoice_footer_note": "این یک پیش‌نمایش نمونه است.",
+				"show_invoice_verify_qr": False,
+				"generated_at": "1403/10/01 12:00",
+				"issuer_name": "کاربر نمونه",
+				"is_fa": True,
+			}
+		)
 	elif module_key == "transfers" and (subtype or "") == "detail":
 		data["keys"] += [
 			{"name": "document", "desc": "شیء کامل سند انتقال"},
@@ -721,6 +793,102 @@ async def report_template_schema(
 				"amount": 1000000,
 			},
 		]
+		data["sample_context"].update(
+			{
+				"title_text": "سند انتقال",
+				"code": "TR-20240101-0001",
+				"document_date": "1403/10/01",
+				"total_amount": 1000000,
+				"commission": 5000,
+				"description": "انتقال نمونه",
+				"source_type_name": "حساب بانکی",
+				"source_name": "بانک ملی",
+				"destination_type_name": "صندوق",
+				"destination_name": "صندوق اصلی",
+				"generated_at": "1403/10/01 12:00",
+				"is_fa": True,
+			}
+		)
+	elif module_key == "receipts_payments" and (subtype or "") == "detail":
+		data["keys"] += [
+			{"name": "document", "desc": "شیء رسید"},
+			{"name": "person_lines", "desc": "خطوط اشخاص"},
+			{"name": "account_lines", "desc": "خطوط حساب"},
+			{"name": "code", "desc": "کد سند"},
+			{"name": "total_amount", "desc": "جمع کل"},
+		]
+		data["sample_context"].update(
+			{
+				"title_text": "رسید دریافت",
+				"code": "RP-1001",
+				"document_date": "1403/10/01",
+				"description": "دریافت نقدی",
+				"total_amount": 2500000,
+				"person_lines": [{"person_name": "مشتری نمونه", "amount": 2500000}],
+				"account_lines": [
+					{"account_name": "صندوق", "side": "destination", "amount": 2500000},
+				],
+				"generated_at": "1403/10/01 12:00",
+				"is_fa": True,
+			}
+		)
+	elif module_key == "receipts_payments" and (subtype or "") == "list":
+		data["keys"] += [{"name": "items", "desc": "لیست رسیدها"}]
+		data["sample_context"].update(
+			{
+				"title_text": "لیست دریافت/پرداخت",
+				"items": [
+					{"code": "RP-1001", "document_date": "1403/10/01", "total_amount": 2500000, "description": "دریافت نقدی"},
+				],
+				"is_fa": True,
+			}
+		)
+	elif module_key == "documents" and (subtype or "") == "detail":
+		data["keys"] += [
+			{"name": "document", "desc": "شیء سند"},
+			{"name": "lines", "desc": "خطوط سند"},
+			{"name": "total_debit", "desc": "جمع بدهکار"},
+			{"name": "total_credit", "desc": "جمع بستانکار"},
+		]
+		data["sample_context"].update(
+			{
+				"title_text": "سند حسابداری",
+				"code": "DOC-100",
+				"description": "سند نمونه",
+				"document": {"code": "DOC-100", "document_type_name": "سند روزنامه"},
+				"document_date_display": "1403/10/01",
+				"lines": [
+					{"description": "بابت فروش", "debit": 1000000, "credit": 0},
+					{"description": "حساب دریافتنی", "debit": 0, "credit": 1000000},
+				],
+				"total_debit": 1000000,
+				"total_credit": 1000000,
+				"generated_at": "1403/10/01 12:00",
+				"is_fa": True,
+			}
+		)
+	elif module_key == "documents" and (subtype or "") == "list":
+		data["keys"] += [{"name": "items", "desc": "لیست اسناد"}]
+		data["sample_context"].update(
+			{
+				"title_text": "لیست اسناد",
+				"items": [
+					{"code": "DOC-100", "document_date": "1403/10/01", "document_type_name": "روزنامه", "total_debit": 1000000},
+				],
+				"is_fa": True,
+			}
+		)
+	elif module_key == "expense_income" and (subtype or "") == "list":
+		data["keys"] += [{"name": "items", "desc": "لیست هزینه/درآمد"}]
+		data["sample_context"].update(
+			{
+				"title_text": "لیست هزینه و درآمد",
+				"items": [
+					{"code": "EI-01", "document_date": "1403/10/01", "amount": 500000, "description": "هزینه اداری"},
+				],
+				"is_fa": True,
+			}
+		)
 	elif module_key in ("documents", "receipts_payments", "expense_income"):
 		data["keys"] += [
 			{"name": "items", "desc": "لیست رکوردها"},
@@ -728,11 +896,16 @@ async def report_template_schema(
 			{"name": "table_rows_html", "desc": "HTML ردیف‌های جدول"},
 		]
 	elif module_key == "transfers" and (subtype or "") == "list":
-		data["keys"] += [
-			{"name": "items", "desc": "لیست اسناد انتقال"},
-			{"name": "table_headers_html", "desc": "HTML هدر جدول"},
-			{"name": "table_rows_html", "desc": "HTML ردیف‌های جدول"},
-		]
+		data["keys"] += [{"name": "items", "desc": "لیست اسناد انتقال"}]
+		data["sample_context"].update(
+			{
+				"title_text": "لیست انتقالات",
+				"items": [
+					{"code": "TR-001", "document_date": "1403/10/01", "total_amount": 1000000, "description": "انتقال بانک به صندوق"},
+				],
+				"is_fa": True,
+			}
+		)
 	elif module_key == "warehouse_documents" and (subtype or "") == "postal_label":
 		from app.services.warehouse_postal_label_service import sample_postal_label_context
 		sc = sample_postal_label_context()
@@ -796,5 +969,75 @@ async def validate_builder_design(
 		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
 	out = ReportTemplateService.validate_builder_design_scope(module_key, subtype, design)
 	return out
+
+
+@router.get(
+	"/business/{business_id}/template-gallery",
+	summary="گالری قالب‌های آماده (Studio v2)",
+	description="لیست خانواده‌های قالب با طراحی پیش‌فرض برای شروع سریع.",
+)
+@require_business_access("business_id")
+async def report_template_gallery(
+	request: Request,
+	business_id: int,
+	module_key: Optional[str] = None,
+	subtype: Optional[str] = None,
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	return {"items": list_gallery_items(module_key=module_key, subtype=subtype)}
+
+
+@router.post(
+	"/business/{business_id}/validate-v2-design",
+	summary="اعتبارسنجی طراحی Studio v2",
+	description="بررسی سازگاری طراحی v2 با scope و کامپایلر.",
+)
+@require_business_access("business_id")
+async def validate_v2_design_endpoint(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	module_key = str((body or {}).get("module_key") or "")
+	subtype_raw = (body or {}).get("subtype")
+	subtype = str(subtype_raw) if subtype_raw not in (None, "") else None
+	design = (body or {}).get("design") or {}
+	if not isinstance(design, dict):
+		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
+	return ReportTemplateService.validate_template_v2_design_scope(module_key, subtype, design)
+
+
+@router.post(
+	"/business/{business_id}/migrate-builder-to-v2",
+	summary="تبدیل طراحی Builder قدیمی به Studio v2",
+	description="تبدیل best-effort از builder_design به template_design v2.",
+)
+@require_business_access("business_id")
+async def migrate_builder_to_v2(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	module_key = str((body or {}).get("module_key") or "")
+	subtype_raw = (body or {}).get("subtype")
+	subtype = str(subtype_raw) if subtype_raw not in (None, "") else None
+	builder_design = (body or {}).get("builder_design") or (body or {}).get("design") or {}
+	if not isinstance(builder_design, dict):
+		raise ApiError("VALIDATION_ERROR", "builder_design must be an object", http_status=400)
+	try:
+		design = migrate_builder_design_to_v2(module_key, subtype, builder_design)
+	except Exception as ex:
+		raise ApiError("MIGRATION_ERROR", str(ex), http_status=400)
+	validation = ReportTemplateService.validate_template_v2_design_scope(module_key, subtype, design)
+	return {"design": design, **validation}
 
 

@@ -5021,7 +5021,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportTemplatesScopeCustom => 'سفارشی (کلیدهای فنی)';
 
   @override
-  String get reportTemplateNewVisual => 'قالب جدید — سازندهٔ بصری';
+  String get reportTemplateNewVisual => 'قالب جدید — استودیو';
 
   @override
   String get reportTemplateNewHtml => 'قالب جدید — HTML (پیشرفته)';

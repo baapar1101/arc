@@ -6,6 +6,7 @@ import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
 import 'ai_chat_suggestions.dart';
 import 'ai_error_recovery_banner.dart';
+import 'ai_execution_mode.dart';
 
 class AIChatHomeView extends StatelessWidget {
   final TextEditingController messageController;
@@ -33,6 +34,8 @@ class AIChatHomeView extends StatelessWidget {
   final String? modelPricingHint;
   final String? creditWarningMessage;
   final VoidCallback? onCreditUpgrade;
+  final String executionMode;
+  final ValueChanged<String>? onExecutionModeChanged;
 
   const AIChatHomeView({
     super.key,
@@ -61,6 +64,8 @@ class AIChatHomeView extends StatelessWidget {
     this.modelPricingHint,
     this.creditWarningMessage,
     this.onCreditUpgrade,
+    this.executionMode = AIExecutionMode.analyzer,
+    this.onExecutionModeChanged,
   });
 
   @override
@@ -123,6 +128,8 @@ class AIChatHomeView extends StatelessWidget {
                               modelsLoading: modelsLoading,
                               onModelChanged: onModelChanged,
                               modelPricingHint: modelPricingHint,
+                              executionMode: executionMode,
+                              onExecutionModeChanged: onExecutionModeChanged,
                             ),
                             if (creditWarningMessage != null) ...[
                               const SizedBox(height: 8),

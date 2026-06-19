@@ -263,6 +263,27 @@ def build_approval_pause_message(
     return "\n".join(lines)
 
 
+def build_read_only_mode_result(function_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    label = WRITE_FUNCTION_LABELS_FA.get(function_name, function_name)
+    return {
+        "error": "READ_ONLY_MODE",
+        "status": "blocked",
+        "function": function_name,
+        "label": label,
+        "arguments": arguments,
+        "message": (
+            f"عملیات «{label}» در حالت تحلیلگر مجاز نیست. "
+            "فقط خواندن و تحلیل داده‌ها امکان‌پذیر است. "
+            "اگر کاربر می‌خواهد تغییر ثبت شود، از او بخواهید حالت اجرا را به "
+            "«با تأیید من» یا «خودکار» تغییر دهد."
+        ),
+    }
+
+
+def is_read_only_mode_result(result: Any) -> bool:
+    return isinstance(result, dict) and result.get("error") == "READ_ONLY_MODE"
+
+
 def build_approval_mismatch_result(function_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
     label = WRITE_FUNCTION_LABELS_FA.get(function_name, function_name)
     return {

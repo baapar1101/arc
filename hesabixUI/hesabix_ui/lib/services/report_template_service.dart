@@ -251,6 +251,56 @@ class ReportTemplateService {
     return res.data ?? const <String, dynamic>{};
   }
 
+  Future<List<Map<String, dynamic>>> templateGallery({
+    required int businessId,
+    String? moduleKey,
+    String? subtype,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/template-gallery',
+      query: {
+        if (moduleKey != null && moduleKey.isNotEmpty) 'module_key': moduleKey,
+        if (subtype != null && subtype.isNotEmpty) 'subtype': subtype,
+      },
+    );
+    final items = (res.data?['items'] as List?) ?? const [];
+    return items.cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> validateV2Design({
+    required int businessId,
+    required String moduleKey,
+    String? subtype,
+    required Map<String, dynamic> design,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/validate-v2-design',
+      data: {
+        'module_key': moduleKey,
+        if (subtype != null) 'subtype': subtype,
+        'design': design,
+      },
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
+  Future<Map<String, dynamic>> migrateBuilderToV2({
+    required int businessId,
+    required String moduleKey,
+    String? subtype,
+    required Map<String, dynamic> builderDesign,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/migrate-builder-to-v2',
+      data: {
+        'module_key': moduleKey,
+        if (subtype != null) 'subtype': subtype,
+        'builder_design': builderDesign,
+      },
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
   Future<Map<String, dynamic>> statusEventsReport({
     required int businessId,
     String? status,

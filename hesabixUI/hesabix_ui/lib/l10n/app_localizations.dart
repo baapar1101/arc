@@ -9585,7 +9585,7 @@ abstract class AppLocalizations {
   /// No description provided for @reportTemplateNewVisual.
   ///
   /// In en, this message translates to:
-  /// **'New — visual builder'**
+  /// **'قالب جدید — استودیو'**
   String get reportTemplateNewVisual;
 
   /// No description provided for @reportTemplateNewHtml.

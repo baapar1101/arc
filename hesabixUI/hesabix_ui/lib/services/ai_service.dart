@@ -460,10 +460,32 @@ class AIService {
         .toList();
   }
 
-  Future<AIChatSession> createChatSession({int? businessId}) async {
+  Future<AIChatSession> createChatSession({
+    int? businessId,
+    String? executionMode,
+  }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions',
-      data: {if (businessId != null) 'business_id': businessId},
+      data: {
+        if (businessId != null) 'business_id': businessId,
+        if (executionMode != null) 'execution_mode': executionMode,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIChatSession.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<AIChatSession> updateChatSession({
+    required int sessionId,
+    String? executionMode,
+    String? title,
+  }) async {
+    final res = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId',
+      data: {
+        if (executionMode != null) 'execution_mode': executionMode,
+        if (title != null) 'title': title,
+      },
     );
     final body = res.data as Map<String, dynamic>;
     return AIChatSession.fromJson(body['data'] as Map<String, dynamic>);
@@ -511,6 +533,7 @@ class AIService {
     required String content,
     bool approveWrites = false,
     String? explorationMode,
+    String? executionMode,
     String? model,
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
@@ -526,6 +549,8 @@ class AIService {
         'approve_writes': approveWrites,
         if (explorationMode != null && explorationMode.isNotEmpty)
           'mode': explorationMode,
+        if (executionMode != null && executionMode.isNotEmpty)
+          'execution_mode': executionMode,
         if (model != null && model.isNotEmpty) 'model': model,
       };
       final endpoint = '/api/v1/ai/chat/sessions/$sessionId/messages';

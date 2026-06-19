@@ -5053,7 +5053,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportTemplatesScopeCustom => 'Custom (technical keys)';
 
   @override
-  String get reportTemplateNewVisual => 'New — visual builder';
+  String get reportTemplateNewVisual => 'قالب جدید — استودیو';
 
   @override
   String get reportTemplateNewHtml => 'New — HTML (advanced)';
