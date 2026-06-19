@@ -119,6 +119,11 @@ class AIFunctionRegistry:
         )
 
         register_phase10_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase11 import (
+            register_phase11_business_functions,
+        )
+
+        register_phase11_business_functions(self)
         from app.services.ai.ai_function_extensions_memory import register_memory_functions
 
         register_memory_functions(self)
