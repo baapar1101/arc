@@ -322,9 +322,7 @@ class _AIChatComposerState extends State<AIChatComposer> {
                           textInputAction: TextInputAction.newline,
                           style: theme.textTheme.bodyLarge,
                           decoration: InputDecoration(
-                            hintText: isCenter
-                                ? 'پیام خود را بنویسید...'
-                                : 'پیام خود را بنویسید...',
+                            hintText: 'پیام خود را بنویسید...',
                             hintStyle: TextStyle(
                               color: scheme.onSurfaceVariant.withValues(
                                 alpha: 0.65,
@@ -334,8 +332,8 @@ class _AIChatComposerState extends State<AIChatComposer> {
                             contentPadding: EdgeInsets.fromLTRB(
                               compact ? 16 : 20,
                               compact ? 14 : 16,
-                              8,
-                              compact ? 8 : 10,
+                              4,
+                              compact ? 10 : 12,
                             ),
                           ),
                           onSubmitted: (_) {
@@ -344,14 +342,32 @@ class _AIChatComposerState extends State<AIChatComposer> {
                         ),
                       ),
                     ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, right: 6, bottom: 6),
+                      child: widget.onStopGenerating != null
+                          ? IconButton(
+                              tooltip: 'توقف تولید پاسخ',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: widget.onStopGenerating,
+                              icon: Icon(
+                                Icons.stop_circle_outlined,
+                                color: scheme.error,
+                              ),
+                            )
+                          : _SendButton(
+                              sending: widget.sending,
+                              enabled: _canSend,
+                              onPressed: _canSend ? widget.onSend : null,
+                            ),
+                    ),
                   ],
                 ),
                 Padding(
                   padding: EdgeInsets.fromLTRB(
-                    compact ? 6 : 8,
+                    compact ? 2 : 4,
                     0,
                     compact ? 6 : 8,
-                    compact ? 8 : 10,
+                    compact ? 6 : 8,
                   ),
                   child: Row(
                     children: [
@@ -412,22 +428,6 @@ class _AIChatComposerState extends State<AIChatComposer> {
                             compact: true,
                           ),
                         ),
-                      const Spacer(),
-                      if (widget.onStopGenerating != null)
-                        IconButton(
-                          tooltip: 'توقف تولید پاسخ',
-                          visualDensity: VisualDensity.compact,
-                          onPressed: widget.onStopGenerating,
-                          icon: Icon(
-                            Icons.stop_circle_outlined,
-                            color: scheme.error,
-                          ),
-                        ),
-                      _SendButton(
-                        sending: widget.sending,
-                        enabled: _canSend,
-                        onPressed: _canSend ? widget.onSend : null,
-                      ),
                     ],
                   ),
                 ),

@@ -576,6 +576,7 @@ app/services/ws_api_key_handshake.py
 app/services/year_end_closing_service.py
 app/services/zohal_service.py
 app/services/ai/__init__.py
+app/services/ai/ai_accounting_domain_prompt.py
 app/services/ai/ai_attachment_service.py
 app/services/ai/ai_citation_service.py
 app/services/ai/ai_connector_service.py
@@ -630,6 +631,7 @@ app/services/ai/ai_quota_helpers.py
 app/services/ai/ai_reports_catalog.py
 app/services/ai/ai_reports_service.py
 app/services/ai/ai_retry_policy.py
+app/services/ai/ai_role_security_prompt.py
 app/services/ai/ai_scheduled_task_service.py
 app/services/ai/ai_service.py
 app/services/ai/ai_skill_git_import.py
@@ -642,6 +644,7 @@ app/services/ai/ai_tool_cache.py
 app/services/ai/ai_tool_intent.py
 app/services/ai/ai_tool_keys.py
 app/services/ai/ai_tool_query_params.py
+app/services/ai/ai_tool_routing_prompt.py
 app/services/ai/ai_trace.py
 app/services/ai/ai_visualization_prompt.py
 app/services/ai/ai_workflow_agent_policy.py
@@ -852,6 +855,7 @@ migrations/versions/20260616_000002_business_invoice_share_settings.py
 migrations/versions/20260617_000001_business_frequent_descriptions.py
 migrations/versions/20260617_000002_business_frequent_descriptions_scope.py
 migrations/versions/20260617_000003_merge_heads_invoice_share_and_frequent_descriptions_scope.py
+migrations/versions/20260618_000001_upgrade_ai_prompts_accounting_domain.py
 migrations/versions/20260620_000001_product_public_catalog.py
 migrations/versions/20260621_000001_business_backup_import_security.py
 migrations/versions/20260621_000001_public_catalog_price_flag.py

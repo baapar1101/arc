@@ -903,10 +903,31 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   void _scheduleSessionsRefreshForTitle() {
-    unawaited(_loadSessions());
-    Future<void>.delayed(const Duration(seconds: 3), () {
-      if (mounted) unawaited(_loadSessions());
+    unawaited(_syncAfterAssistantResponse());
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (mounted) unawaited(_syncAfterAssistantResponse());
     });
+  }
+
+  Future<void> _syncAfterAssistantResponse() async {
+    final sessionId = _currentSession?.id;
+    if (sessionId == null) return;
+    try {
+      final msgs = await _aiService.getSessionMessages(sessionId: sessionId);
+      if (!mounted) return;
+      setState(() {
+        _messages = msgs;
+        _syncMessageKeys();
+      });
+      await _loadSessions();
+      if (!mounted) return;
+      final updated = _sessions.where((s) => s.id == sessionId).firstOrNull;
+      if (updated != null) {
+        setState(() => _currentSession = updated);
+      }
+    } catch (e) {
+      debugPrint('[AIChatDialog] sync after response failed: $e');
+    }
   }
 
   Future<void> _goToHome() async {

@@ -3,7 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import 'ai_chat_design.dart';
 
-/// اقدامات سریع زیر پیام assistant — دسکتاپ: فقط روی hover.
+/// اقدامات سریع زیر پیام assistant — همیشه کم‌رنگ؛ پررنگ روی hover.
 class AIChatMessageActions extends StatefulWidget {
   final VoidCallback onCopy;
   final VoidCallback? onRegenerate;
@@ -31,15 +31,16 @@ class _AIChatMessageActionsState extends State<AIChatMessageActions> {
     final scheme = Theme.of(context).colorScheme;
     final alwaysVisible = AIChatDesign.isCompactWidth(context);
     final visible = alwaysVisible || _hovered;
+    final baseOpacity = alwaysVisible ? 1.0 : (_hovered ? 1.0 : 0.5);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedOpacity(
-        opacity: visible ? 1 : 0,
+        opacity: visible ? baseOpacity : 0.5,
         duration: const Duration(milliseconds: 150),
         child: IgnorePointer(
-          ignoring: !visible,
+          ignoring: false,
           child: Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Row(

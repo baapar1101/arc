@@ -6,11 +6,12 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
-import 'ai_reasoning_panel.dart';
+import 'ai_agent_trace_timeline.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_message_body.dart';
 import 'ai_chat_message_actions.dart';
 import 'ai_chat_context_bar.dart';
+import 'ai_chat_tool_activity_list.dart';
 import 'ai_error_recovery_banner.dart';
 import 'ai_write_approval_banner.dart';
 typedef MessageActionCallback = void Function(AIChatMessage message);
@@ -599,12 +600,12 @@ class _StreamingActivityLineState extends State<_StreamingActivityLine> {
         ),
         if (_expanded) ...[
           if (widget.traceSteps.isNotEmpty)
-            AIReasoningPanel(
+            AIAgentTraceTimeline(
               steps: widget.traceSteps,
-              initiallyExpanded: true,
               compact: true,
+              initiallyExpanded: false,
             ),
-          if (widget.toolActivities.isNotEmpty && widget.traceSteps.isEmpty)
+          if (widget.toolActivities.isNotEmpty)
             AIChatToolActivityList(
               activities: widget.toolActivities,
               hideApprovalPending: widget.hideApprovalPending,

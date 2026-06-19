@@ -76,6 +76,41 @@ def _usage_log_context(ai_service: AIService) -> Optional[Dict[str, Any]]:
     return None
 
 
+def _session_needs_title(session: AIChatSession) -> bool:
+    title = (session.title or "").strip()
+    return not title or title == DEFAULT_CHAT_TITLE
+
+
+async def _maybe_generate_session_title(
+    db: Session,
+    session: AIChatSession,
+    ctx: AuthContext,
+    business_id: Optional[int],
+    message_content: str,
+) -> None:
+    if not _session_needs_title(session):
+        return
+    content = (message_content or "").strip()
+    if not content:
+        return
+    try:
+        ai_service = AIService(db, ctx, business_id or session.business_id)
+        generated_title = await ai_service.generate_chat_title(content)
+        if not generated_title:
+            logger.warning(
+                "Chat title generation returned empty for session %s",
+                session.id,
+            )
+            return
+        session.title = generated_title.strip()[:80]
+    except Exception as exc:
+        logger.warning(
+            "Chat title generation failed for session %s: %s",
+            session.id,
+            exc,
+        )
+
+
 def _schedule_session_title_generation(
     session_id: int,
     message_content: str,
@@ -1042,16 +1077,22 @@ async def send_message(
         from datetime import datetime
         commit_session.updated_at = datetime.utcnow()
 
-        needs_title = (
-            (not commit_session.title or commit_session.title == DEFAULT_CHAT_TITLE)
-            and is_first_message
-        )
+        needs_title = _session_needs_title(commit_session) and is_first_message
+
+        if needs_title:
+            await _maybe_generate_session_title(
+                commit_db,
+                commit_session,
+                ctx,
+                business_id,
+                message_data.content,
+            )
 
         commit_db.commit()
         commit_db.refresh(assistant_message)
         message_id = assistant_message.id
 
-        if needs_title:
+        if needs_title and _session_needs_title(commit_session):
             _schedule_session_title_generation(
                 session_id,
                 message_data.content,
@@ -1304,16 +1345,24 @@ async def _stream_message_response(
                 from datetime import datetime
                 updated_session.updated_at = datetime.utcnow()
 
-                needs_title = (
-                    (not updated_session.title or updated_session.title == DEFAULT_CHAT_TITLE)
-                    and len(previous_messages) == 0
-                )
+                needs_title = _session_needs_title(updated_session) and len(
+                    previous_messages
+                ) == 0
+
+                if needs_title:
+                    await _maybe_generate_session_title(
+                        new_db,
+                        updated_session,
+                        ctx,
+                        updated_session.business_id or business_id,
+                        message_content,
+                    )
 
                 new_db.commit()
                 new_db.refresh(assistant_message)
                 message_id = assistant_message.id
 
-                if needs_title:
+                if needs_title and _session_needs_title(updated_session):
                     _schedule_session_title_generation(
                         session_id,
                         message_content,
