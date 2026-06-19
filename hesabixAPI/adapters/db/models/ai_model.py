@@ -30,6 +30,13 @@ class AIModel(Base):
     supports_tools: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     max_tokens_default: Mapped[int] = mapped_column(Integer, nullable=False, default=4000)
 
+    # مدل از استدلال درون‌مدلی (reasoning/thinking) پشتیبانی می‌کند؟
+    supports_reasoning: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False
+    )
+    # سطح پیش‌فرض تلاش استدلال: minimal | low | medium | high (یا None = خودکار)
+    reasoning_effort: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     reference_input_cost_per_1k: Mapped[float | None] = mapped_column(Numeric(18, 4), nullable=True)
     reference_output_cost_per_1k: Mapped[float | None] = mapped_column(Numeric(18, 4), nullable=True)
 

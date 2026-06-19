@@ -1,6 +1,7 @@
 """تست intent filter ابزارهای AI."""
 from app.services.ai.ai_tool_intent import (
     detect_categories,
+    estimate_query_complexity,
     query_needs_knowledge,
     select_tool_names,
 )
@@ -51,3 +52,17 @@ def test_select_tools_includes_write_on_add_keyword():
 def test_detect_people_category():
     cats = detect_categories("لیست مشتریان و گروه اشخاص")
     assert "people" in cats
+
+
+def test_estimate_query_complexity_multi_domain():
+    assert estimate_query_complexity(
+        "گزارش فروش، موجودی انبار و وضعیت مشتریان VIP"
+    ) == "complex"
+
+
+def test_estimate_query_complexity_write_operation():
+    assert estimate_query_complexity("یک مشتری جدید به نام علی اضافه کن") == "medium"
+
+
+def test_estimate_query_complexity_greeting():
+    assert estimate_query_complexity("سلام") == "simple"

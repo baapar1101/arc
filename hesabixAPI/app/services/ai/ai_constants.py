@@ -81,5 +81,49 @@ EXPLORATION_COMPLEXITY_ITERATIONS: dict[str, int] = {
 }
 EXPLORATION_LLM_THOUGHT_MIN_TOOLS = 2
 
+# ---- بودجهٔ یکپارچهٔ مراحل استدلال (Agent Budget) ----
+# سقف چندبعدی برای کنترل «سقف مراحل استدلال»: علاوه بر تعداد نوبت‌ها،
+# بودجهٔ توکن کل و سقف زمان دیوار (wall-clock) نیز اعمال می‌شود.
+
+# سقف توکن مصرفی کل (ورودی+خروجی) در یک پاسخ، بر اساس پیچیدگی سوال.
+QUERY_COMPLEXITY_TOKEN_BUDGET: dict[str, int] = {
+    "simple": 24_000,
+    "medium": 80_000,
+    "complex": 220_000,
+}
+
+# سقف زمان دیوار (ثانیه) برای کل حلقهٔ agent، بر اساس پیچیدگی سوال.
+QUERY_COMPLEXITY_WALL_CLOCK_SEC: dict[str, float] = {
+    "simple": 45.0,
+    "medium": 120.0,
+    "complex": 300.0,
+}
+
+# توقف زودهنگام: اگر این تعداد نوبت متوالی «بی‌حاصل» (خطا یا بدون دادهٔ جدید)
+# رخ دهد، حلقه پیش از رسیدن به سقف متوقف می‌شود.
+MAX_UNPRODUCTIVE_ROUNDS = 2
+
+# ---- کنترل استدلال درون‌مدلی (reasoning effort) ----
+# سطوح مجاز تلاش استدلال برای مدل‌های reasoning (OpenAI o-series/gpt-5 و Anthropic).
+REASONING_EFFORT_LEVELS: frozenset[str] = frozenset(
+    {"minimal", "low", "medium", "high"}
+)
+
+# نگاشت سطح تلاش به بودجهٔ توکن تفکر (thinking) برای Anthropic extended thinking.
+ANTHROPIC_THINKING_BUDGET_TOKENS: dict[str, int] = {
+    "minimal": 1_024,
+    "low": 4_000,
+    "medium": 10_000,
+    "high": 24_000,
+}
+
+# انتخاب خودکار سطح تلاش استدلال بر اساس پیچیدگی سوال (وقتی مدل reasoning است
+# ولی سطح صریحی تنظیم نشده باشد).
+REASONING_EFFORT_BY_COMPLEXITY: dict[str, str] = {
+    "simple": "low",
+    "medium": "medium",
+    "complex": "high",
+}
+
 # حداکثر انتظار برای هر loader زمینهٔ prompt (ثانیه)
 PROMPT_LOADER_TIMEOUT_SEC = 4.0

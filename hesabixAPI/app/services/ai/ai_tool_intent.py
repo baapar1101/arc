@@ -327,7 +327,7 @@ def estimate_query_complexity(
 ) -> str:
     """
     تخمین پیچیدگی سوال: simple / medium / complex.
-    از تاریخچه مکالمه برای بافت چندوجهی استفاده می‌کند.
+    از تاریخچه مکالمه، دسته‌بندی ابزار و الگوهای متنی استفاده می‌کند.
     """
     q = (user_query or "").strip()
     if not q:
@@ -336,6 +336,20 @@ def estimate_query_complexity(
     # سوال بسیار کوتاه یا خوش‌و‌بش
     if len(q) < 15 or _SIMPLE_PATTERNS.match(q):
         return "simple"
+
+    categories = detect_categories(q)
+    if len(categories) >= 3:
+        return "complex"
+    if len(categories) >= 2 and (
+        _MEDIUM_PATTERNS.search(q) or _COMPLEX_PATTERNS.search(q)
+    ):
+        return "complex"
+
+    # عملیات نوشتنی معمولاً چندمرحله‌ای است
+    if _WRITE_KEYWORDS.search(q):
+        if len(q) > 80 or len(categories) >= 2:
+            return "complex"
+        return "medium"
 
     # الگوهای صریحاً پیچیده
     if _COMPLEX_PATTERNS.search(q) or len(q) > 200:
@@ -349,10 +363,10 @@ def estimate_query_complexity(
 
     # بررسی تاریخچه: اگر مکالمه طولانی است سوال احتمالاً عمیق‌تر است
     if history_messages and len(history_messages) >= 6:
-        if _MEDIUM_PATTERNS.search(q):
+        if _MEDIUM_PATTERNS.search(q) or len(categories) >= 2:
             return "complex"
 
-    if _MEDIUM_PATTERNS.search(q) or len(q) > 60:
+    if _MEDIUM_PATTERNS.search(q) or len(q) > 60 or len(categories) >= 2:
         return "medium"
 
     return "simple"

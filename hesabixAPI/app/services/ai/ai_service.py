@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional, AsyncGenerator
+from typing import Dict, Any, List, Optional, AsyncGenerator, AbstractSet, Set
 from decimal import Decimal
 from datetime import datetime, date
 from sqlalchemy.orm import Session
@@ -74,11 +74,17 @@ from app.services.ai.ai_exploration_service import (
     extract_entity_refs_from_calls,
     new_bundle_id,
     resolve_exploration_enabled,
-    should_continue_exploring,
+    should_agent_continue_after_text,
+    assess_tool_round_productivity,
     synthesize_thought_with_llm,
 )
 from app.services.ai.ai_retry_policy import is_retryable_error
 from app.services.ai.ai_constants import MAX_LLM_RETRIES
+from app.services.ai.ai_budget import (
+    AgentBudget,
+    STOP_REASON_ITERATIONS,
+    build_agent_budget,
+)
 from app.services.ai.ai_tool_cache import (
     get_cached,
     invalidate_session,
@@ -341,6 +347,33 @@ class AIService:
             ),
             self.config,
         )
+
+    def _effective_reasoning_effort(
+        self,
+        *,
+        complexity: Optional[str] = None,
+        operation: str = AI_OPERATION_CHAT,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
+        needs_tools: bool = False,
+    ) -> Optional[str]:
+        """سطح تلاش استدلال مؤثر برای مدل جاری (None اگر مدل reasoning نباشد)."""
+        from app.services.ai.ai_model_service import get_reasoning_effort_for_model
+
+        try:
+            return get_reasoning_effort_for_model(
+                self.db,
+                self.get_effective_model_code(
+                    operation=operation,
+                    user_query=user_query,
+                    history_messages=history_messages,
+                    needs_tools=needs_tools,
+                ),
+                complexity=complexity,
+            )
+        except Exception as exc:
+            logger.warning("reasoning effort resolve failed: %s", exc)
+            return None
 
     def _make_provider(self, provider_type: Optional[str] = None):
         """ساخت provider فعال برای تخمین توکن و فراخوانی مدل."""
@@ -1192,13 +1225,45 @@ class AIService:
         )
         yield {"event": "prompt_ready", "prompt": final_prompt}
     
+    @staticmethod
+    def _forced_write_tool_names(
+        approve_writes: bool,
+        approved_write_calls: Optional[List[Dict[str, Any]]],
+    ) -> Set[str]:
+        """نام ابزارهای نوشتنیِ تأییدشده که باید در لیست ابزارها بمانند.
+
+        هنگام تأیید عملیات، متن پیام کاربر فاقد کلیدواژهٔ نوشتنی است و
+        intent-router ابزار نوشتنی را حذف می‌کند؛ این مجموعه تضمین می‌کند
+        همان ابزار تأییدشده در دسترس مدل باقی بماند.
+        """
+        if not approve_writes:
+            return set()
+        forced = {
+            str(call.get("function"))
+            for call in (approved_write_calls or [])
+            if call.get("function")
+        }
+        if forced:
+            return forced
+        # fallback: اگر به هر دلیل لیست تأییدشده خالی بود، همهٔ ابزارهای نوشتنی
+        from app.services.ai.ai_tool_intent import _WRITE_TOOLS
+
+        return set(_WRITE_TOOLS)
+
     def get_available_functions(
         self,
         category: Optional[str] = None,
         session_business_id: Optional[int] = None,
         user_query: Optional[str] = None,
+        force_tool_names: Optional[AbstractSet[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """دریافت function های قابل استفاده بر اساس نقش کاربر و intent سوال."""
+        """دریافت function های قابل استفاده بر اساس نقش کاربر و intent سوال.
+
+        force_tool_names: نام ابزارهایی که باید حتماً در لیست بمانند حتی اگر
+        intent متن کاربر آن‌ها را انتخاب نکند (مثلاً ابزار نوشتنیِ تأییدشده
+        هنگام اجرای مرحلهٔ approve). بدون این، پیام تأیید کاربر (که فاقد
+        کلیدواژهٔ نوشتنی است) باعث حذف ابزار از لیست و عدم اجرای عملیات می‌شود.
+        """
         effective_business_id = session_business_id or self.business_id
         context = {
             "db": self.db,
@@ -1215,7 +1280,8 @@ class AIService:
                 for d in definitions
                 if (d.get("function") or {}).get("name")
             }
-            allowed = select_tool_names(all_names, user_query)
+            forced = set(force_tool_names or ()) & all_names
+            allowed = select_tool_names(all_names, user_query) | forced
             definitions = filter_function_definitions(definitions, allowed)
             try:
                 from app.services.ai.ai_skill_runtime import (
@@ -1229,7 +1295,9 @@ class AIService:
                 activated = skill_ctx.get("activated") or []
                 skill_tools = collect_allowed_tool_names(activated, all_names)
                 if skill_tools:
-                    definitions = filter_function_definitions(definitions, skill_tools)
+                    definitions = filter_function_definitions(
+                        definitions, set(skill_tools) | forced
+                    )
             except Exception as exc:
                 logger.warning("AI skill tool filter failed: %s", exc)
         return definitions
@@ -1590,6 +1658,27 @@ class AIService:
 
         accumulated_function_calls: List[Dict[str, Any]] = []
         accumulated_function_results: Dict[str, Any] = {}
+
+        complexity = estimate_query_complexity(effective_user_query, messages)
+        adaptive_max_iterations = iterations_for_query(
+            effective_user_query, messages
+        )
+        if max_iterations != MAX_AGENT_ITERATIONS:
+            adaptive_max_iterations = max(adaptive_max_iterations, max_iterations)
+        max_iterations = adaptive_max_iterations
+        budget: AgentBudget = build_agent_budget(
+            complexity, max_iterations=max_iterations
+        )
+        reasoning_effort = self._effective_reasoning_effort(
+            complexity=complexity,
+            operation=AI_OPERATION_CHAT,
+            user_query=effective_user_query,
+            history_messages=messages,
+            needs_tools=self._routing_needs_tools(
+                use_function_calling, effective_user_query, messages
+            ),
+        )
+        budget.reset_clock()
         
         if not self.config or not self.config.is_active:
             self.clear_routing_context()
@@ -1621,6 +1710,9 @@ class AIService:
                 tools = self.get_available_functions(
                     session_business_id=session_business_id,
                     user_query=effective_user_query,
+                    force_tool_names=self._forced_write_tool_names(
+                        approve_writes, approved_write_calls
+                    ),
                 )
             elif not eff_tools:
                 tools = None
@@ -1644,9 +1736,12 @@ class AIService:
                                 else self.config.temperature
                             ),
                             tools=tools if tools else None,
+                            reasoning_effort=reasoning_effort,
                             **pe,
                         ),
                     )
+                    if response.get("usage"):
+                        budget.add_tokens(response["usage"].get("total_tokens"))
                     break
                 except ApiError as api_exc:
                     if not context_retried and is_context_overflow_error(api_exc):
@@ -1680,7 +1775,10 @@ class AIService:
             
             # پردازش function calls در یک حلقه (multi-round agent)
             iteration = 0
-            while eff_tools and response["message"].get("function_calls") and iteration < max_iterations:
+            while eff_tools and response["message"].get("function_calls"):
+                budget_status = budget.check(iteration)
+                if budget_status.stop:
+                    break
                 iteration += 1
                 current_calls = response["message"]["function_calls"]
                 accumulated_function_calls.extend(current_calls)
@@ -1693,6 +1791,13 @@ class AIService:
                     iteration=iteration,
                 )
                 _merge_round_tool_results(accumulated_function_results, function_results)
+                round_productive = assess_tool_round_productivity(
+                    current_calls, function_results, _lookup_tool_result
+                )
+                budget.note_round(productive=round_productive)
+                budget_status = budget.check(iteration)
+                if budget_status.stop:
+                    break
                 
                 # ایجاد assistant message با tool_calls برای OpenAI API
                 assistant_msg = {
@@ -1758,9 +1863,12 @@ class AIService:
                             max_tokens=max_tokens_override or self.config.max_tokens,
                             temperature=float(temperature_override if temperature_override is not None else self.config.temperature),
                             tools=t if eff_tools else None,
+                            reasoning_effort=reasoning_effort,
                             **extras,
                         ),
                     )
+                    if response.get("usage"):
+                        budget.add_tokens(response["usage"].get("total_tokens"))
                 except ApiError:
                     raise
                 except Exception as e:
@@ -1856,8 +1964,8 @@ class AIService:
         )
 
         # تنظیم خودکار max_iterations بر اساس پیچیدگی
+        complexity = estimate_query_complexity(effective_user_query, messages)
         if exploration_enabled:
-            complexity = estimate_query_complexity(effective_user_query, messages)
             adaptive_max_iterations = EXPLORATION_COMPLEXITY_ITERATIONS.get(
                 complexity, MAX_AGENT_ITERATIONS
             )
@@ -1869,6 +1977,22 @@ class AIService:
         if max_iterations != MAX_AGENT_ITERATIONS:
             adaptive_max_iterations = max(adaptive_max_iterations, max_iterations)
         max_iterations = adaptive_max_iterations
+
+        # بودجهٔ یکپارچهٔ مراحل استدلال (نوبت + توکن + زمان + بازده نزولی)
+        budget: AgentBudget = build_agent_budget(
+            complexity, max_iterations=max_iterations
+        )
+
+        # سطح تلاش استدلال درون‌مدلی (در صورت پشتیبانی مدل)
+        reasoning_effort = self._effective_reasoning_effort(
+            complexity=complexity,
+            operation=AI_OPERATION_CHAT,
+            user_query=effective_user_query,
+            history_messages=messages,
+            needs_tools=self._routing_needs_tools(
+                use_function_calling, effective_user_query, messages
+            ),
+        )
 
         observation_store: Optional[ObservationStore] = (
             ObservationStore() if exploration_enabled else None
@@ -1976,6 +2100,9 @@ class AIService:
                 tools = self.get_available_functions(
                     session_business_id=session_business_id,
                     user_query=effective_user_query,
+                    force_tool_names=self._forced_write_tool_names(
+                        approve_writes, approved_write_calls
+                    ),
                 )
             elif not eff_tools:
                 tools = None
@@ -2011,7 +2138,15 @@ class AIService:
                     "done": False,
                 }
 
-            while iteration < max_iterations:
+            budget.reset_clock()
+            budget_stop_reason: Optional[str] = None
+            budget_stop_message: Optional[str] = None
+            while True:
+                budget_status = budget.check(iteration)
+                if budget_status.stop:
+                    budget_stop_reason = budget_status.reason
+                    budget_stop_message = budget_status.message_fa
+                    break
                 iteration += 1
                 function_calls = None
                 tool_call_id_map: Dict[str, str] = {}
@@ -2058,6 +2193,7 @@ class AIService:
                             max_tokens=max_tokens_override or self.config.max_tokens,
                             temperature=float(self.config.temperature),
                             tools=tools if use_tools else None,
+                            reasoning_effort=reasoning_effort,
                             **stream_provider_extras,
                         ):
                             if chunk.get("event") == "tool_planning":
@@ -2186,6 +2322,10 @@ class AIService:
                         iteration=iteration,
                     )
 
+                # ثبت توکن مصرف‌شدهٔ این نوبت در بودجهٔ یکپارچه
+                if final_usage:
+                    budget.add_tokens(final_usage.get("total_tokens"))
+
                 if function_calls and use_tools:
                     accumulated_function_calls.extend(function_calls)
                     yield status_event("planning_tools")
@@ -2272,6 +2412,10 @@ class AIService:
                     )
                     _merge_round_tool_results(
                         accumulated_function_results, function_results
+                    )
+
+                    round_productive = assess_tool_round_productivity(
+                        function_calls, function_results, _lookup_tool_result
                     )
 
                     for idx, call in enumerate(function_calls):
@@ -2565,16 +2709,16 @@ class AIService:
                                     "content": thought_ctx,
                                 }
                             )
+                    budget.note_round(productive=round_productive)
                     continue
 
                 if round_text.strip():
-                    if (
-                        exploration_enabled
-                        and observation_store is not None
-                        and iteration < max_iterations
-                        and should_continue_exploring(
-                            observation_store, iteration, max_iterations
-                        )
+                    if should_agent_continue_after_text(
+                        exploration_enabled=exploration_enabled,
+                        observation_store=observation_store,
+                        iteration=iteration,
+                        max_iterations=max_iterations,
+                        budget=budget,
                     ):
                         yield _emit_trace(
                             step_id=f"continue_explore_{iteration}",
@@ -2621,12 +2765,18 @@ class AIService:
                 accumulated_content = round_text
                 break
 
-            if not accumulated_content.strip() and iteration >= max_iterations:
-                accumulated_content = (
-                    f"به حداکثر تعداد مراحل تحلیل ({max_iterations}) رسیدم. "
-                    "با داده‌های جمع‌آوری‌شده می‌توانید سوال را دقیق‌تر تکرار کنید "
-                    "یا موضوع را در چند پیام جدا بپرسید."
-                )
+            if not accumulated_content.strip() and budget_stop_reason:
+                if budget_stop_reason == STOP_REASON_ITERATIONS:
+                    accumulated_content = (
+                        f"به حداکثر تعداد مراحل تحلیل ({max_iterations}) رسیدم. "
+                        "با داده‌های جمع‌آوری‌شده می‌توانید سوال را دقیق‌تر تکرار کنید "
+                        "یا موضوع را در چند پیام جدا بپرسید."
+                    )
+                else:
+                    accumulated_content = (
+                        budget_stop_message
+                        or "تحلیل این پاسخ به سقف تعیین‌شده رسید."
+                    )
                 yield {
                     "delta": {"content": accumulated_content},
                     "usage": None,

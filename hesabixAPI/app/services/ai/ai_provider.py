@@ -38,7 +38,8 @@ class AIProviderBase(ABC):
         model: str,
         max_tokens: int,
         temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> Dict[str, Any]:
         """ارسال درخواست chat completion"""
         pass
@@ -55,7 +56,8 @@ class AIProviderBase(ABC):
         model: str,
         max_tokens: int,
         temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         ارسال درخواست chat completion به صورت streaming
@@ -131,29 +133,61 @@ class OpenAIProvider(AIProviderBase):
             http_status=500,
         ) from e
     
+    def _build_request_kwargs(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        tools: Optional[List[Dict[str, Any]]],
+        reasoning_effort: Optional[str],
+        *,
+        stream: bool = False,
+    ) -> Dict[str, Any]:
+        """ساخت پارامترهای درخواست با پشتیبانی از مدل‌های reasoning.
+
+        مدل‌های reasoning (o-series/gpt-5) به‌جای `max_tokens` از
+        `max_completion_tokens` استفاده می‌کنند، `temperature` را نمی‌پذیرند و
+        پارامتر `reasoning_effort` را قبول دارند.
+        """
+        if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
+            max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
+
+        kwargs: Dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "tools": tools if tools else None,
+        }
+        if stream:
+            kwargs["stream"] = True
+
+        if reasoning_effort:
+            kwargs["reasoning_effort"] = reasoning_effort
+            kwargs["max_completion_tokens"] = max_tokens
+        else:
+            kwargs["max_tokens"] = max_tokens
+            kwargs["temperature"] = temperature
+        return kwargs
+
     def chat_completion(
         self,
         messages: List[Dict[str, Any]],
         model: str,
         max_tokens: int,
         temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> Dict[str, Any]:
         """ارسال درخواست به OpenAI"""
         try:
             from app.services.ai.ai_retry_policy import sync_retry_llm
 
-            if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
-                max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
+            request_kwargs = self._build_request_kwargs(
+                messages, model, max_tokens, temperature, tools, reasoning_effort
+            )
 
             def _call():
-                return self.client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    tools=tools if tools else None,
-                )
+                return self.client.chat.completions.create(**request_kwargs)
 
             response = sync_retry_llm(_call)
             
@@ -195,23 +229,26 @@ class OpenAIProvider(AIProviderBase):
         model: str,
         max_tokens: int,
         temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به OpenAI به صورت streaming با async client"""
         try:
             from app.services.ai.ai_retry_policy import async_retry_llm
 
-            if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
-                max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
+            request_kwargs = self._build_request_kwargs(
+                messages,
+                model,
+                max_tokens,
+                temperature,
+                tools,
+                reasoning_effort,
+                stream=True,
+            )
 
             async def _open_stream():
                 return await self.async_client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    tools=tools if tools else None,
-                    stream=True,
+                    **request_kwargs
                 )
 
             stream = await async_retry_llm(_open_stream)
@@ -481,6 +518,7 @@ class AnthropicProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]],
         provider_extra: Optional[Dict[str, Any]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> Dict[str, Any]:
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
@@ -492,6 +530,23 @@ class AnthropicProvider(AIProviderBase):
             "temperature": temperature,
             "messages": anthropic_messages,
         }
+        if reasoning_effort:
+            from app.services.ai.ai_constants import (
+                ANTHROPIC_THINKING_BUDGET_TOKENS,
+            )
+
+            budget = ANTHROPIC_THINKING_BUDGET_TOKENS.get(reasoning_effort)
+            if budget:
+                # extended thinking: max_tokens باید بزرگ‌تر از budget باشد و
+                # temperature سفارشی پشتیبانی نمی‌شود (باید 1 باشد).
+                kwargs["max_tokens"] = min(
+                    _MAX_SAFE_CHAT_OUTPUT_TOKENS, max(max_tokens, budget + 1024)
+                )
+                kwargs["temperature"] = 1.0
+                kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": budget,
+                }
         if system_message:
             kwargs["system"] = system_message
         if anthropic_tools:
@@ -506,11 +561,18 @@ class AnthropicProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         provider_extra: Optional[Dict[str, Any]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> Dict[str, Any]:
         try:
             response = self.client.messages.create(
                 **self._build_request_kwargs(
-                    messages, model, max_tokens, temperature, tools, provider_extra
+                    messages,
+                    model,
+                    max_tokens,
+                    temperature,
+                    tools,
+                    provider_extra,
+                    reasoning_effort,
                 )
             )
             content, function_calls = _anthropic_blocks_to_openai_result(response.content)
@@ -541,9 +603,16 @@ class AnthropicProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         provider_extra: Optional[Dict[str, Any]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         kwargs = self._build_request_kwargs(
-            messages, model, max_tokens, temperature, tools, provider_extra
+            messages,
+            model,
+            max_tokens,
+            temperature,
+            tools,
+            provider_extra,
+            reasoning_effort,
         )
         try:
             accumulated_text = ""
@@ -654,7 +723,8 @@ class LocalProvider(AIProviderBase):
         model: str,
         max_tokens: int,
         temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> Dict[str, Any]:
         """ارسال درخواست به مدل محلی"""
         try:
@@ -698,7 +768,8 @@ class LocalProvider(AIProviderBase):
         model: str,
         max_tokens: int,
         temperature: float,
-        tools: Optional[List[Dict[str, Any]]] = None
+        tools: Optional[List[Dict[str, Any]]] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به مدل محلی به صورت streaming"""
         import httpx

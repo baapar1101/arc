@@ -1,6 +1,7 @@
 """تست سرویس Exploration (Exploring / Explored / Thought)."""
 from __future__ import annotations
 
+from app.services.ai.ai_budget import build_agent_budget
 from app.services.ai.ai_exploration_service import (
     EXPLORATION_MODE_AUTO,
     EXPLORATION_MODE_EXPLORE,
@@ -14,6 +15,8 @@ from app.services.ai.ai_exploration_service import (
     mask_sensitive_text,
     resolve_exploration_enabled,
     should_continue_exploring,
+    assess_tool_round_productivity,
+    should_agent_continue_after_text,
 )
 from app.services.ai.ai_trace import trace_step
 
@@ -130,3 +133,32 @@ def test_should_continue_exploring():
         )
     )
     assert should_continue_exploring(store, 2, 8) is False
+
+
+def test_assess_tool_round_productivity():
+    calls = [{"name": "search_invoices", "arguments": {}}]
+    results = {
+        "call_1": {"items": [{"id": 1}], "pagination": {"total": 1}},
+    }
+
+    def lookup(results_map, call):
+        return results_map.get("call_1")
+
+    assert assess_tool_round_productivity(calls, results, lookup) is True
+    assert assess_tool_round_productivity(
+        calls,
+        {"call_1": {"error": "NOT_FOUND"}},
+        lookup,
+    ) is False
+
+
+def test_should_agent_continue_after_text_respects_budget():
+    budget = build_agent_budget("medium", max_iterations=2)
+    store = ObservationStore()
+    assert should_agent_continue_after_text(
+        exploration_enabled=True,
+        observation_store=store,
+        iteration=2,
+        max_iterations=8,
+        budget=budget,
+    ) is False

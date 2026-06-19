@@ -25,6 +25,24 @@ def _serialize(model: AIModel) -> Dict[str, Any]:
     return serialize_model(model)
 
 
+def _normalize_reasoning_effort(value: Any) -> Optional[str]:
+    """اعتبارسنجی سطح تلاش استدلال؛ مقدار نامعتبر → None (خودکار)."""
+    from app.services.ai.ai_constants import REASONING_EFFORT_LEVELS
+
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if not normalized:
+        return None
+    if normalized not in REASONING_EFFORT_LEVELS:
+        raise ApiError(
+            "INVALID_REASONING_EFFORT",
+            "سطح تلاش استدلال نامعتبر است (minimal/low/medium/high)",
+            http_status=400,
+        )
+    return normalized
+
+
 @router.get("", summary="لیست مدل‌های AI")
 async def list_ai_models(
     request: Request,
@@ -80,6 +98,8 @@ async def create_ai_model(
         tier=payload.get("tier"),
         supports_tools=bool(payload.get("supports_tools", True)),
         max_tokens_default=int(payload.get("max_tokens_default") or 4000),
+        supports_reasoning=bool(payload.get("supports_reasoning", False)),
+        reasoning_effort=_normalize_reasoning_effort(payload.get("reasoning_effort")),
         reference_input_cost_per_1k=payload.get("reference_input_cost_per_1k"),
         reference_output_cost_per_1k=payload.get("reference_output_cost_per_1k"),
         is_active=bool(payload.get("is_active", True)),
@@ -113,6 +133,8 @@ async def update_ai_model(
         "tier",
         "supports_tools",
         "max_tokens_default",
+        "supports_reasoning",
+        "reasoning_effort",
         "reference_input_cost_per_1k",
         "reference_output_cost_per_1k",
         "is_active",
@@ -120,7 +142,10 @@ async def update_ai_model(
     )
     for key in allowed:
         if key in payload:
-            setattr(model, key, payload[key])
+            value = payload[key]
+            if key == "reasoning_effort":
+                value = _normalize_reasoning_effort(value)
+            setattr(model, key, value)
 
     db.commit()
     db.refresh(model)

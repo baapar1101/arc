@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.services.ai.ai_tool_intent import estimate_query_complexity
 from app.services.ai.ai_tool_keys import tool_label_fa
-from app.services.ai.ai_trace import summarize_tool_result
+from app.services.ai.ai_trace import summarize_tool_result, extract_result_count
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +306,49 @@ def should_continue_exploring(
     if last.confidence == "low" and iteration < max_iterations - 1:
         return True
     return bool(last.open_questions) and iteration < max_iterations
+
+
+def is_tool_result_productive(result: Any) -> bool:
+    """آیا خروجی یک ابزار برای ادامهٔ تحلیل مفید است؟"""
+    if isinstance(result, dict) and result.get("error"):
+        return False
+    count = extract_result_count(result) if isinstance(result, dict) else None
+    return count is None or count > 0
+
+
+def assess_tool_round_productivity(
+    function_calls: List[Dict[str, Any]],
+    function_results: Dict[str, Any],
+    lookup_result: Any,
+) -> bool:
+    """آیا حداقل یک ابزار در این نوبت دادهٔ معنادار برگرداند؟"""
+    for call in function_calls:
+        result = lookup_result(function_results, call)
+        if is_tool_result_productive(result):
+            return True
+    return False
+
+
+def should_agent_continue_after_text(
+    *,
+    exploration_enabled: bool,
+    observation_store: Optional[ObservationStore],
+    iteration: int,
+    max_iterations: int,
+    budget: Any = None,
+) -> bool:
+    """
+    توقف/ادامهٔ سراسری پس از پاسخ متنی مدل (بدون tool call).
+
+    در حالت exploration از Thought استفاده می‌کند؛ در هر حالت سقف budget را رعایت می‌کند.
+    """
+    if budget is not None and budget.remaining_iterations(iteration) <= 0:
+        return False
+    if iteration >= max_iterations:
+        return False
+    if not exploration_enabled or observation_store is None:
+        return False
+    return should_continue_exploring(observation_store, iteration, max_iterations)
 
 
 async def synthesize_thought_with_llm(
