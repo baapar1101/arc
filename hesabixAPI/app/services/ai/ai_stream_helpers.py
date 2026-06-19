@@ -209,3 +209,9 @@ async def iter_with_heartbeat(
                 await task
             except asyncio.CancelledError:
                 pass
+        else:
+            # اگر producer با خطا تمام شده، آن را به مصرف‌کننده propagate کن
+            # (در غیر این صورت chat.py پیام خالی ذخیره می‌کند و کلاینت بدون خطا تمام می‌شود).
+            exc = task.exception()
+            if exc is not None:
+                raise exc

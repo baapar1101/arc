@@ -578,6 +578,7 @@ app/services/zohal_service.py
 app/services/ai/__init__.py
 app/services/ai/ai_accounting_domain_prompt.py
 app/services/ai/ai_attachment_service.py
+app/services/ai/ai_budget.py
 app/services/ai/ai_citation_service.py
 app/services/ai/ai_connector_service.py
 app/services/ai/ai_constants.py
@@ -602,6 +603,7 @@ app/services/ai/ai_function_extensions_phase6.py
 app/services/ai/ai_function_extensions_phase7.py
 app/services/ai/ai_function_extensions_phase8.py
 app/services/ai/ai_function_extensions_workflow.py
+app/services/ai/ai_goal_assessment.py
 app/services/ai/ai_helpers.py
 app/services/ai/ai_history_summarizer.py
 app/services/ai/ai_insight_service.py
@@ -857,6 +859,7 @@ migrations/versions/20260617_000001_business_frequent_descriptions.py
 migrations/versions/20260617_000002_business_frequent_descriptions_scope.py
 migrations/versions/20260617_000003_merge_heads_invoice_share_and_frequent_descriptions_scope.py
 migrations/versions/20260618_000001_upgrade_ai_prompts_accounting_domain.py
+migrations/versions/20260619_000001_merge_heads_ai_prompts_accounting_domain_and_ai_model_reasoning_effort.py
 migrations/versions/20260620_000001_product_public_catalog.py
 migrations/versions/20260621_000001_business_backup_import_security.py
 migrations/versions/20260621_000001_public_catalog_price_flag.py
@@ -879,13 +882,16 @@ migrations/versions/20260702_000002_ai_skill_reviews.py
 migrations/versions/20260702_000003_ai_skills_phase4.py
 migrations/versions/20260702_000004_ai_skill_publisher_revenue.py
 migrations/versions/20260703_000001_merge_heads_seed_ai_prompts_and_ai_skill_publisher_revenue.py
+migrations/versions/20260704_000001_ai_model_reasoning_effort.py
 tests/__init__.py
+tests/test_ai_budget.py
 tests/test_ai_connector_security.py
 tests/test_ai_context_budget.py
 tests/test_ai_embedding_service.py
 tests/test_ai_eval_service.py
 tests/test_ai_exploration_service.py
 tests/test_ai_feedback_analytics.py
+tests/test_ai_goal_assessment.py
 tests/test_ai_json_safe.py
 tests/test_ai_knowledge_service.py
 tests/test_ai_memory_service.py

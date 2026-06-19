@@ -127,6 +127,13 @@ class OpenAIProvider(AIProviderBase):
                 "محدودیت استفاده از API رسیده است. لطفاً بعداً تلاش کنید.",
                 http_status=429,
             ) from e
+        if "debtor" in el or "insufficient" in el and "balance" in el:
+            raise ApiError(
+                "AI_PROVIDER_BILLING",
+                "اعتبار حساب AI Provider (آروان کلاد) تمام شده است. "
+                "لطفاً حساب را شارژ کنید یا مدل/ارائه‌دهنده دیگری تنظیم کنید.",
+                http_status=402,
+            ) from e
         raise ApiError(
             "AI_PROVIDER_ERROR",
             f"خطا در ارتباط با AI Provider: {error_message}",

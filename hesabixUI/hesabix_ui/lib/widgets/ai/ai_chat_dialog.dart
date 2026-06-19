@@ -1264,6 +1264,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 createdAt: _stream.timestamp,
               ),
             );
+        } else {
+          _streamErrorMessage =
+              'پاسخی از دستیار دریافت نشد. احتمالاً مشکل از سرویس AI یا اعتبار حساب است.';
+          _streamErrorRecoverable = true;
         }
         _syncPendingWriteApprovalFromMessages();
         if (!_pendingWriteApproval &&
