@@ -538,3 +538,27 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       return l10n.aiStatusThinking;
   }
 }
+
+bool _isFaLocale(AppLocalizations l10n) =>
+    l10n.localeName.toLowerCase().startsWith('fa');
+
+String aiSessionPlanDefaultTitle(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'برنامهٔ کاری' : 'Work plan';
+
+String aiSessionPlanReasoningTitle(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'تحلیل و برنامهٔ کاری' : 'Analysis & work plan';
+
+String aiSessionPlanProgressLabel(
+  AppLocalizations l10n, {
+  required int completed,
+  required int total,
+}) =>
+    _isFaLocale(l10n)
+        ? '$completed از $total مرحله انجام شد'
+        : '$completed of $total steps done';
+
+String aiSessionPlanLinkedToolLabel(AppLocalizations l10n, String tool) =>
+    _isFaLocale(l10n) ? 'ابزار: $tool' : 'Tool: $tool';
+
+String aiStatusLoadingSessionPlan(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'بارگذاری برنامهٔ کاری…' : 'Loading work plan…';

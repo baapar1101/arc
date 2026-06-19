@@ -261,6 +261,9 @@ TOOL_LABELS_FA: Dict[str, str] = {
     "adjust_customer_club_points": "تنظیم امتیاز باشگاه",
     "recalculate_customer_club_rfm": "محاسبه مجدد RFM",
     "update_customer_club_settings": "تنظیمات باشگاه مشتری",
+    "create_session_plan": "ساخت برنامهٔ کاری",
+    "list_session_todos": "فهرست برنامهٔ کاری",
+    "update_session_todo": "به‌روزرسانی مرحله",
 }
 
 

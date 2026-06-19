@@ -31,6 +31,7 @@ class AIFunction:
     requires_approval: bool = False   # نیاز به تأیید صریح کاربر قبل از اجرا
     risk_level: str = "safe"          # safe / medium / high
     is_readonly: bool = True          # قابل کش شدن — عملیات read-only
+    is_agent_internal: bool = False   # state داخلی agent — در حالت تحلیلگر هم مجاز
 
 
 def _has_filter_property(query: Dict[str, Any], prop: str) -> bool:
@@ -127,6 +128,11 @@ class AIFunctionRegistry:
         from app.services.ai.ai_function_extensions_memory import register_memory_functions
 
         register_memory_functions(self)
+        from app.services.ai.ai_function_extensions_session_todos import (
+            register_session_todo_functions,
+        )
+
+        register_session_todo_functions(self)
         from app.services.ai.ai_function_extensions_workflow import (
             register_workflow_ai_functions,
         )

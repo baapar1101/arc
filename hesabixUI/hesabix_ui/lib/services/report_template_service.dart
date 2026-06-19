@@ -284,6 +284,17 @@ class ReportTemplateService {
     return res.data ?? const <String, dynamic>{};
   }
 
+  Future<Map<String, dynamic>> compileV2Design({
+    required int businessId,
+    required Map<String, dynamic> design,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/report-templates/business/$businessId/compile-v2-design',
+      data: {'design': design},
+    );
+    return res.data ?? const <String, dynamic>{};
+  }
+
   Future<Map<String, dynamic>> migrateBuilderToV2({
     required int businessId,
     required String moduleKey,

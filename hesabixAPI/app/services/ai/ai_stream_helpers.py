@@ -67,6 +67,17 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             }
         ]
 
+    if event_type == "session_todo_snapshot":
+        data = {
+            "type": "session_todo_snapshot",
+            "items": chunk.get("items") or [],
+            "summary": chunk.get("summary") or {},
+            "done": False,
+        }
+        if chunk.get("plan_title"):
+            data["plan_title"] = chunk.get("plan_title")
+        return [data]
+
     if event_type == "trace_step":
         data = {
             "type": "trace_step",

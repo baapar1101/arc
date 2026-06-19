@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from app.services.ai.ai_constants import AGENT_MAX_IDENTICAL_TOOL_REPEATS
 from app.services.ai.ai_budget import AgentBudget, BudgetStatus, STOP_REASON_ITERATIONS
@@ -22,6 +22,9 @@ from app.services.ai.ai_exploration_service import (
     build_thought_markdown_rule_based,
     should_continue_exploring,
 )
+
+if TYPE_CHECKING:
+    from app.services.ai.ai_session_todo_service import SessionTodoGoalState
 
 
 @dataclass
@@ -77,6 +80,7 @@ class AgentGoalTracker:
     def __init__(self) -> None:
         self.tool_tracker = ToolCallTracker()
         self.last_assessment: Optional[RoundAssessment] = None
+        self.last_session_todo_state: Optional["SessionTodoGoalState"] = None
 
     def assess_after_tool_round(
         self,
@@ -85,7 +89,9 @@ class AgentGoalTracker:
         lookup_result: Callable[[Dict[str, Any], Dict[str, Any]], Any],
         *,
         user_query: Optional[str] = None,
+        session_todo_state: Optional["SessionTodoGoalState"] = None,
     ) -> RoundAssessment:
+        self.last_session_todo_state = session_todo_state
         self.tool_tracker.record(function_calls)
         loop_detected = self.tool_tracker.has_loop()
         productive = assess_tool_round_productivity(
@@ -124,6 +130,14 @@ class AgentGoalTracker:
                 reason_fa="همان ابزار با همان پارامترها تکرار شد.",
                 loop_detected=True,
             )
+        elif session_todo_state and session_todo_state.has_plan:
+            assessment = self._assess_with_session_plan(
+                session_todo_state=session_todo_state,
+                productive=productive,
+                confidence=confidence,
+                open_questions=open_questions,
+                hypothesis=hypothesis,
+            )
         elif not productive:
             assessment = RoundAssessment(
                 goal_reached=False,
@@ -160,6 +174,60 @@ class AgentGoalTracker:
         self.last_assessment = assessment
         return assessment
 
+    @staticmethod
+    def _assess_with_session_plan(
+        *,
+        session_todo_state: "SessionTodoGoalState",
+        productive: bool,
+        confidence: str,
+        open_questions: List[str],
+        hypothesis: Optional[str],
+    ) -> RoundAssessment:
+        if session_todo_state.all_complete:
+            return RoundAssessment(
+                goal_reached=True,
+                should_continue=False,
+                confidence="high",
+                reason_fa=(
+                    f"همهٔ مراحل برنامه انجام شد ({session_todo_state.progress_label_fa})."
+                ),
+            )
+
+        reason_parts = [
+            f"برنامهٔ کاری: {session_todo_state.progress_label_fa} تکمیل شده",
+        ]
+        if session_todo_state.in_progress:
+            reason_parts.append(
+                f"{session_todo_state.in_progress} مرحله در حال اجرا"
+            )
+        if session_todo_state.pending:
+            reason_parts.append(f"{session_todo_state.pending} مرحله باقی‌مانده")
+        if session_todo_state.error_count:
+            reason_parts.append(f"{session_todo_state.error_count} مرحله با خطا")
+
+        plan_open_questions = list(open_questions)
+        for title in session_todo_state.open_titles[:4]:
+            marker = f"انجام: {title}"
+            if marker not in plan_open_questions:
+                plan_open_questions.append(marker)
+
+        if not productive:
+            return RoundAssessment(
+                goal_reached=False,
+                should_continue=True,
+                confidence="low",
+                open_questions=plan_open_questions[:6],
+                reason_fa="خروجی ابزارها بی‌حاصل بود؛ مراحل باز برنامه هنوز مانده.",
+            )
+
+        return RoundAssessment(
+            goal_reached=False,
+            should_continue=True,
+            confidence=confidence,
+            open_questions=plan_open_questions[:6],
+            reason_fa="؛ ".join(reason_parts),
+        )
+
     def continue_context_for_llm(self) -> Optional[str]:
         if not self.last_assessment or not self.last_assessment.should_continue:
             return None
@@ -169,6 +237,16 @@ class AgentGoalTracker:
         ]
         if self.last_assessment.reason_fa:
             parts.append(f"**وضعیت:** {self.last_assessment.reason_fa}")
+        if self.last_session_todo_state and self.last_session_todo_state.has_open:
+            from app.services.ai.ai_session_todo_service import (
+                format_open_todos_for_agent_context,
+            )
+
+            plan_ctx = format_open_todos_for_agent_context(
+                self.last_session_todo_state
+            )
+            if plan_ctx:
+                parts.append(plan_ctx)
         if self.last_assessment.open_questions:
             parts.append("**سوالات باز:**")
             parts.extend(f"- {q}" for q in self.last_assessment.open_questions[:5])
@@ -232,6 +310,12 @@ def should_agent_continue_after_text_round(
 
     if goal_tracker and goal_tracker.last_assessment:
         last = goal_tracker.last_assessment
-        return last.should_continue and not last.loop_detected
+        if last.should_continue and not last.loop_detected:
+            return True
+
+    if goal_tracker and goal_tracker.last_session_todo_state:
+        state = goal_tracker.last_session_todo_state
+        if state.has_open:
+            return budget.try_extend() if budget.remaining_iterations(iteration) <= 0 else True
 
     return False

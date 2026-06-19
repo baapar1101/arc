@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_agent_trace_timeline.dart';
+import 'ai_agent_todo_list.dart';
 import 'ai_chat_design.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_tool_activity_list.dart';
@@ -11,6 +12,7 @@ class AIReasoningPanel extends StatefulWidget {
   final List<AIAgentTraceStep> steps;
   final List<AIToolActivity> toolActivities;
   final AIStreamAgentBudget? agentBudget;
+  final AISessionTodoSnapshot? todoSnapshot;
   final bool compact;
   final bool initiallyExpanded;
 
@@ -19,6 +21,7 @@ class AIReasoningPanel extends StatefulWidget {
     required this.steps,
     this.toolActivities = const [],
     this.agentBudget,
+    this.todoSnapshot,
     this.compact = false,
     this.initiallyExpanded = false,
   });
@@ -82,25 +85,38 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   }
 
   bool get _hasActiveStep =>
-      widget.steps.any((s) => s.isActive && s.layer != 'answer');
+      widget.steps.any((s) => s.isActive && s.layer != 'answer') ||
+      (widget.todoSnapshot?.hasActiveItem ?? false);
+
+  bool get _hasTodoPlan =>
+      widget.todoSnapshot != null && !widget.todoSnapshot!.isEmpty;
 
   @override
   Widget build(BuildContext context) {
     final reasoning = AIReasoningPanel.reasoningOnly(widget.steps);
     final toolCount = widget.toolActivities.length;
-    if (reasoning.isEmpty && toolCount == 0 && widget.agentBudget == null) {
+    final todoCount = widget.todoSnapshot?.items.length ?? 0;
+    if (reasoning.isEmpty &&
+        toolCount == 0 &&
+        widget.agentBudget == null &&
+        !_hasTodoPlan) {
       return const SizedBox.shrink();
     }
 
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final detailCount = reasoning.length + toolCount + (widget.agentBudget != null ? 1 : 0);
-    final title = reasoning.isNotEmpty
-        ? l10n.aiReasoningPanelTitle
-        : widget.agentBudget != null
-            ? 'بودجه تحلیل'
-            : 'ابزارهای استفاده‌شده';
+    final detailCount = reasoning.length +
+        toolCount +
+        todoCount +
+        (widget.agentBudget != null ? 1 : 0);
+    final title = _hasTodoPlan
+        ? aiSessionPlanReasoningTitle(l10n)
+        : reasoning.isNotEmpty
+            ? l10n.aiReasoningPanelTitle
+            : widget.agentBudget != null
+                ? 'بودجه تحلیل'
+                : 'ابزارهای استفاده‌شده';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -202,6 +218,16 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (_hasTodoPlan)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: AIAgentTodoList(
+                            snapshot: widget.todoSnapshot!,
+                            compact: widget.compact,
+                            initiallyExpanded:
+                                widget.todoSnapshot!.hasActiveItem,
+                          ),
+                        ),
                       if (widget.agentBudget != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),

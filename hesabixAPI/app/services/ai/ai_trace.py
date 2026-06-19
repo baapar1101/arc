@@ -28,6 +28,7 @@ CONTEXT_STEP_TITLE_KEYS: Dict[str, str] = {
     "loading_attachments": "aiStatusLoadingAttachments",
     "loading_knowledge": "aiStatusLoadingKnowledge",
     "loading_connectors": "aiStatusLoadingConnectors",
+    "loading_session_todos": "aiStatusLoadingSessionPlan",
 }
 
 TraceKind = str  # context | explore | explored | thought | plan | narrative | tool | observation | plan_next | answer | system

@@ -36,6 +36,7 @@ class AIChatMessageBody extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     var agentTrace = extractAgentTraceFromResults(functionResults);
     final agentBudget = extractAgentBudgetFromResults(functionResults);
+    final agentTodos = extractAgentTodosFromResults(functionResults);
     if (suppressApprovalToolChips) {
       agentTrace =
           agentTrace.where((s) => s.kind != 'approval').toList();
@@ -50,13 +51,18 @@ class AIChatMessageBody extends StatelessWidget {
       crossAxisAlignment:
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        if (!isUser && (agentTrace.isNotEmpty || toolActivities.isNotEmpty || agentBudget != null)) ...[
+        if (!isUser &&
+            (agentTrace.isNotEmpty ||
+                toolActivities.isNotEmpty ||
+                agentBudget != null ||
+                (agentTodos != null && !agentTodos.isEmpty))) ...[
           AIReasoningPanel(
             steps: agentTrace,
             toolActivities: toolActivities,
             agentBudget: agentBudget,
+            todoSnapshot: agentTodos,
             compact: true,
-            initiallyExpanded: false,
+            initiallyExpanded: agentTodos?.hasActiveItem ?? false,
           ),
           const SizedBox(height: 8),
         ],

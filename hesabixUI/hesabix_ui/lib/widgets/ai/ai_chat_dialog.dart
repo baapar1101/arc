@@ -2050,6 +2050,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 streamingToolActivities:
                                     _stream.toolActivities,
                                 streamingTraceSteps: _stream.traceSteps,
+                                streamingTodoSnapshot: _stream.todoSnapshot,
                                 streamingStatusPhase: _stream.statusPhase,
                                 streamingStatusStep: _stream.statusStep,
                                 streamingIteration: _stream.iteration,

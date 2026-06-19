@@ -38,4 +38,10 @@ class AIChatSession(Base):
         cascade="all, delete-orphan",
         order_by="AIChatAttachment.created_at",
     )
+    session_todos = relationship(
+        "AISessionTodo",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="AISessionTodo.sort_order",
+    )
 

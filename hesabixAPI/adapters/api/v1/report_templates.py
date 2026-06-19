@@ -1013,6 +1013,38 @@ async def validate_v2_design_endpoint(
 
 
 @router.post(
+	"/business/{business_id}/compile-v2-design",
+	summary="کامپایل طراحی Studio v2 به HTML/CSS",
+	description="تبدیل template_design به fragmentهای Jinja2 برای حالت پیشرفته.",
+)
+@require_business_access("business_id")
+async def compile_v2_design_endpoint(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	ctx: AuthContext = Depends(get_current_user),
+	db: Session = Depends(get_db),
+):
+	if not ctx.can_write_section("report_templates"):
+		raise ApiError("FORBIDDEN", "Missing permission: report_templates.write", http_status=403)
+	design = (body or {}).get("design") or {}
+	if not isinstance(design, dict):
+		raise ApiError("VALIDATION_ERROR", "design must be an object", http_status=400)
+	from app.services.template_design_v2_compiler import compile_v2_design_to_jinja_html
+
+	try:
+		html, css, header, footer = compile_v2_design_to_jinja_html(design)
+	except Exception as ex:
+		raise ApiError("COMPILE_ERROR", str(ex), http_status=400)
+	return {
+		"content_html": html,
+		"content_css": css,
+		"header_html": header,
+		"footer_html": footer,
+	}
+
+
+@router.post(
 	"/business/{business_id}/migrate-builder-to-v2",
 	summary="تبدیل طراحی Builder قدیمی به Studio v2",
 	description="تبدیل best-effort از builder_design به template_design v2.",

@@ -29,6 +29,7 @@ from app.services.ai.ai_write_guard import (
     build_read_only_mode_result,
     write_call_is_approved,
     is_readonly_function,
+    is_agent_internal_function,
     WRITE_FUNCTION_LABELS_FA,
 )
 from app.services.ai.ai_execution_policy import (
@@ -1017,6 +1018,8 @@ class AIService:
             if user_query and query_needs_knowledge(user_query):
                 loaders.append(("knowledge", _load_knowledge))
 
+            todos_text, plan_block = self._session_todo_prompt_extras(session_id, user_query)
+
             parts: Dict[str, str] = {}
             futures = [_executor.submit(fn) for _, fn in loaders]
             for (key, _), fut in zip(loaders, futures):
@@ -1027,7 +1030,10 @@ class AIService:
                     parts[key] = ""
 
             return trim_system_prompt_sections(
-                base_prompt + business_info + execution_mode_prompt_block(execution_mode),
+                base_prompt
+                + business_info
+                + execution_mode_prompt_block(execution_mode)
+                + plan_block,
                 [
                     parts.get("memory", ""),
                     parts.get("insights", ""),
@@ -1035,6 +1041,7 @@ class AIService:
                     parts.get("skills", ""),
                     parts.get("connectors", ""),
                     parts.get("attachments", ""),
+                    todos_text,
                 ],
             )
 
@@ -1185,6 +1192,23 @@ class AIService:
                     safe_db_rollback(loader_db)
                     return ""
 
+        def _load_session_todos() -> str:
+            if not session_id:
+                return ""
+            from adapters.db.session import get_db_session
+
+            with get_db_session() as loader_db:
+                try:
+                    from app.services.ai.ai_session_todo_service import (
+                        format_session_todos_for_prompt,
+                    )
+
+                    return format_session_todos_for_prompt(loader_db, int(session_id))
+                except Exception as exc:
+                    logger.warning("Failed to load session todos for prompt: %s", exc)
+                    safe_db_rollback(loader_db)
+                    return ""
+
         parallel_loaders: List[tuple[str, Any]] = [
             ("loading_insights", _load_insights),
             ("loading_memory", _load_memory),
@@ -1193,6 +1217,7 @@ class AIService:
         ]
         if session_id:
             parallel_loaders.append(("loading_attachments", _load_attachments))
+            parallel_loaders.append(("loading_session_todos", _load_session_todos))
         if user_query and query_needs_knowledge(user_query):
             parallel_loaders.append(("loading_knowledge", _load_knowledge))
 
@@ -1235,8 +1260,13 @@ class AIService:
                 yield context_trace(step_key, "done")
                 await asyncio.sleep(0)
 
+        todos_text, plan_block = self._session_todo_prompt_extras(session_id, user_query)
+
         final_prompt = trim_system_prompt_sections(
-            base_prompt + business_info + execution_mode_prompt_block(execution_mode),
+            base_prompt
+            + business_info
+            + execution_mode_prompt_block(execution_mode)
+            + plan_block,
             [
                 parts.get("loading_memory", ""),
                 parts.get("loading_insights", ""),
@@ -1244,6 +1274,7 @@ class AIService:
                 parts.get("loading_skills", ""),
                 parts.get("loading_connectors", ""),
                 parts.get("loading_attachments", ""),
+                parts.get("loading_session_todos", "") or todos_text,
             ],
         )
         yield {"event": "prompt_ready", "prompt": final_prompt}
@@ -1273,6 +1304,46 @@ class AIService:
 
         return set(_WRITE_TOOLS)
 
+    def _session_todo_prompt_extras(
+        self,
+        session_id: Optional[int],
+        user_query: Optional[str],
+    ) -> tuple[str, str]:
+        """(متن todoهای باز، راهنمای ابزار برنامه)"""
+        from app.services.ai.ai_session_todo_service import (
+            format_session_todos_for_prompt,
+            session_plan_tools_prompt_block,
+            should_expose_session_plan_tools,
+        )
+
+        todos_text = ""
+        plan_block = ""
+        if session_id:
+            try:
+                todos_text = format_session_todos_for_prompt(self.db, int(session_id))
+            except Exception as exc:
+                logger.warning("Failed to load session todos for prompt: %s", exc)
+                safe_db_rollback(self.db)
+        if should_expose_session_plan_tools(
+            user_query,
+            session_id=session_id,
+            db=self.db,
+        ):
+            plan_block = session_plan_tools_prompt_block()
+        return todos_text, plan_block
+
+    def _session_todo_goal_state(self, session_id: Optional[int]):
+        if not session_id:
+            return None
+        try:
+            from app.services.ai.ai_session_todo_service import get_session_todo_goal_state
+
+            return get_session_todo_goal_state(self.db, int(session_id))
+        except Exception as exc:
+            logger.warning("Failed to load session todo goal state: %s", exc)
+            safe_db_rollback(self.db)
+            return None
+
     def get_available_functions(
         self,
         category: Optional[str] = None,
@@ -1280,6 +1351,7 @@ class AIService:
         user_query: Optional[str] = None,
         force_tool_names: Optional[AbstractSet[str]] = None,
         execution_mode: Optional[str] = None,
+        session_id: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """دریافت function های قابل استفاده بر اساس نقش کاربر و intent سوال.
 
@@ -1324,11 +1396,31 @@ class AIService:
                     )
             except Exception as exc:
                 logger.warning("AI skill tool filter failed: %s", exc)
+        from app.services.ai.ai_session_todo_service import (
+            SESSION_TODO_TOOL_NAMES,
+            should_expose_session_plan_tools,
+        )
+
+        expose_plan_tools = should_expose_session_plan_tools(
+            user_query,
+            session_id=session_id,
+            db=self.db,
+        )
+        forced_names = set(force_tool_names or ())
+        if not expose_plan_tools and not (forced_names & SESSION_TODO_TOOL_NAMES):
+            definitions = [
+                d
+                for d in definitions
+                if (d.get("function") or {}).get("name") not in SESSION_TODO_TOOL_NAMES
+            ]
         if not exposes_write_tools(resolve_execution_mode(execution_mode)):
             definitions = [
                 d
                 for d in definitions
                 if is_readonly_function(
+                    (d.get("function") or {}).get("name") or "", registry
+                )
+                or is_agent_internal_function(
                     (d.get("function") or {}).get("name") or "", registry
                 )
             ]
@@ -1750,6 +1842,7 @@ class AIService:
                         approve_writes, approved_write_calls
                     ),
                     execution_mode=effective_execution_mode,
+                    session_id=session_id,
                 )
             elif not eff_tools:
                 tools = None
@@ -1830,6 +1923,7 @@ class AIService:
                     approve_writes=approve_writes,
                     approved_write_calls=approved_write_calls,
                     iteration=iteration,
+                    session_id=session_id,
                     execution_mode=effective_execution_mode,
                 )
                 _merge_round_tool_results(accumulated_function_results, function_results)
@@ -1842,6 +1936,7 @@ class AIService:
                         function_results,
                         _lookup_tool_result,
                         user_query=effective_user_query,
+                        session_todo_state=self._session_todo_goal_state(session_id),
                     )
                     try_extend_budget_for_goal(budget, assessment)
                     goal_ctx = goal_tracker.continue_context_for_llm()
@@ -1937,6 +2032,27 @@ class AIService:
             if accumulated_function_calls:
                 response["_function_calls"] = accumulated_function_calls
                 response["_function_results"] = accumulated_function_results
+            if session_id and accumulated_function_results is not None:
+                try:
+                    from app.services.ai.ai_session_todo_service import (
+                        list_session_todos,
+                        merge_todos_into_function_results,
+                        todos_dicts_from_rows,
+                        todos_summary,
+                    )
+
+                    todo_rows = list_session_todos(self.db, int(session_id))
+                    if todo_rows:
+                        response["_function_results"] = merge_todos_into_function_results(
+                            accumulated_function_results,
+                            todos_dicts_from_rows(todo_rows),
+                            summary=todos_summary(todo_rows),
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to merge session todos into sync results: %s", exc
+                    )
+                    safe_db_rollback(self.db)
             
             return response
         finally:
@@ -2176,6 +2292,7 @@ class AIService:
                         approve_writes, approved_write_calls
                     ),
                     execution_mode=effective_execution_mode,
+                    session_id=session_id,
                 )
             elif not eff_tools:
                 tools = None
@@ -2482,6 +2599,12 @@ class AIService:
                             "label": label,
                         }
 
+                    from app.services.ai.ai_session_todo_events import (
+                        drain_session_todo_sse,
+                        reset_session_todo_sse_buffer,
+                    )
+
+                    reset_session_todo_sse_buffer()
                     function_results = await self.handle_function_calls_async(
                         function_calls,
                         session_business_id=session_business_id,
@@ -2491,6 +2614,9 @@ class AIService:
                         session_id=session_id,
                         execution_mode=effective_execution_mode,
                     )
+                    for todo_event in drain_session_todo_sse():
+                        yield todo_event
+                        await asyncio.sleep(0)
                     _merge_round_tool_results(
                         accumulated_function_results, function_results
                     )
@@ -2788,6 +2914,7 @@ class AIService:
                             function_results,
                             _lookup_tool_result,
                             user_query=effective_user_query,
+                            session_todo_state=self._session_todo_goal_state(session_id),
                         )
                         if try_extend_budget_for_goal(budget, round_assessment):
                             max_iterations = budget.max_iterations
@@ -2937,6 +3064,25 @@ class AIService:
                 is_write_guard_stop_result(_approval_result_value(v))
                 for v in (accumulated_function_results or {}).values()
             )
+            if session_id:
+                try:
+                    from app.services.ai.ai_session_todo_service import (
+                        list_session_todos,
+                        merge_todos_into_function_results,
+                        todos_dicts_from_rows,
+                        todos_summary,
+                    )
+
+                    todo_rows = list_session_todos(self.db, int(session_id))
+                    if todo_rows:
+                        accumulated_function_results = merge_todos_into_function_results(
+                            accumulated_function_results,
+                            todos_dicts_from_rows(todo_rows),
+                            summary=todos_summary(todo_rows),
+                        )
+                except Exception as exc:
+                    logger.warning("Failed to merge session todos into results: %s", exc)
+                    safe_db_rollback(self.db)
             yield {
                 "delta": {"content": ""},
                 "usage": final_usage,
@@ -3049,6 +3195,7 @@ class AIService:
             "user_context": self.ctx,
             "business_id": effective_business_id,
             "session_business_id": session_business_id,
+            "session_id": session_id,
         }
 
         async def call_single_function(
@@ -3112,7 +3259,8 @@ class AIService:
                     set_cached(effective_business_id, session_id, function_name, arguments, result)
                 # بعد از عملیات نوشتنی کش session را پاک کن
                 elif not is_readonly and effective_business_id and session_id:
-                    invalidate_session(effective_business_id, session_id)
+                    if not is_agent_internal_function(function_name, registry):
+                        invalidate_session(effective_business_id, session_id)
 
                 if isinstance(result, dict):
                     result["_elapsed_ms"] = elapsed_ms

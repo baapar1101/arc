@@ -10,6 +10,7 @@ class AIChatStreamController extends ChangeNotifier {
   String? content;
   List<AIToolActivity> toolActivities = [];
   List<AIAgentTraceStep> traceSteps = [];
+  AISessionTodoSnapshot? todoSnapshot;
   String? statusPhase;
   String? statusStep;
   int? iteration;
@@ -28,7 +29,10 @@ class AIChatStreamController extends ChangeNotifier {
   static const _contentThrottleMs = 16;
 
   bool get isActive =>
-      content != null || traceSteps.isNotEmpty || toolActivities.isNotEmpty;
+      content != null ||
+      traceSteps.isNotEmpty ||
+      toolActivities.isNotEmpty ||
+      (todoSnapshot != null && !todoSnapshot!.isEmpty);
 
   void begin({String phase = 'connecting'}) {
     startedAt = DateTime.now();
@@ -40,6 +44,7 @@ class AIChatStreamController extends ChangeNotifier {
     content = '';
     toolActivities = [];
     traceSteps = [];
+    todoSnapshot = null;
     timestamp = DateTime.now();
     pendingWriteApproval = false;
     pendingApprovalOps = [];
@@ -52,6 +57,7 @@ class AIChatStreamController extends ChangeNotifier {
     content = null;
     toolActivities = [];
     traceSteps = [];
+    todoSnapshot = null;
     statusPhase = null;
     statusStep = null;
     iteration = null;
@@ -72,30 +78,40 @@ class AIChatStreamController extends ChangeNotifier {
     String partialContent,
     List<AIToolActivity> tools,
     List<AIAgentTraceStep> trace,
+    AISessionTodoSnapshot? todos,
     DateTime? createdAt,
   })?
   snapshotForCancel() {
     final partial = content?.trim() ?? '';
-    if (partial.isEmpty && toolActivities.isEmpty && traceSteps.isEmpty) {
+    if (partial.isEmpty &&
+        toolActivities.isEmpty &&
+        traceSteps.isEmpty &&
+        (todoSnapshot == null || todoSnapshot!.isEmpty)) {
       return null;
     }
     return (
       partialContent: partial.isEmpty ? '…' : partial,
       tools: List<AIToolActivity>.from(toolActivities),
       trace: List<AIAgentTraceStep>.from(traceSteps),
+      todos: todoSnapshot,
       createdAt: timestamp,
     );
   }
 
   Object? functionResultsWithTrace(Object? functionResults) {
-    if (traceSteps.isEmpty) return functionResults;
     final map = functionResults is Map
-        ? Map<String, dynamic>.from(functionResults as Map)
+        ? Map<String, dynamic>.from(functionResults)
         : <String, dynamic>{};
-    map[kAgentTraceStorageKey] = traceSteps.map((e) => e.toJson()).toList();
+    if (traceSteps.isNotEmpty) {
+      map[kAgentTraceStorageKey] = traceSteps.map((e) => e.toJson()).toList();
+    }
     if (agentBudget != null) {
       map[kAgentBudgetStorageKey] = agentBudget!.toJson();
     }
+    if (todoSnapshot != null && !todoSnapshot!.isEmpty) {
+      map[kAgentTodosStorageKey] = todoSnapshot!.toJson();
+    }
+    if (map.isEmpty) return functionResults;
     return map;
   }
 
@@ -126,6 +142,11 @@ class AIChatStreamController extends ChangeNotifier {
     }
     if (chunk.traceStep != null) {
       _applyTraceStep(chunk.traceStep!);
+      notifyListeners();
+      return;
+    }
+    if (chunk.todoSnapshot != null) {
+      todoSnapshot = chunk.todoSnapshot;
       notifyListeners();
       return;
     }
@@ -175,6 +196,7 @@ class AIChatStreamController extends ChangeNotifier {
   bool updateAccumulatedContent(String accumulated, AIStreamChunk chunk) {
     final immediate =
         chunk.traceStep != null ||
+        chunk.todoSnapshot != null ||
         chunk.statusEvent != null ||
         chunk.toolEvent != null ||
         chunk.heartbeatElapsedMs != null ||

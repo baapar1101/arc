@@ -6,12 +6,11 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
-import 'ai_agent_trace_timeline.dart';
+import 'ai_reasoning_panel.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_message_body.dart';
 import 'ai_chat_message_actions.dart';
 import 'ai_chat_context_bar.dart';
-import 'ai_chat_tool_activity_list.dart';
 import 'ai_error_recovery_banner.dart';
 import 'ai_write_approval_banner.dart';
 import 'ai_execution_mode.dart';
@@ -22,6 +21,7 @@ class AIChatThreadView extends StatelessWidget {
   final String? streamingContent;
   final List<AIToolActivity> streamingToolActivities;
   final List<AIAgentTraceStep> streamingTraceSteps;
+  final AISessionTodoSnapshot? streamingTodoSnapshot;
   final String? streamingStatusPhase;
   final String? streamingStatusStep;
   final int? streamingIteration;
@@ -89,6 +89,7 @@ class AIChatThreadView extends StatelessWidget {
     required this.streamingContent,
     this.streamingToolActivities = const [],
     this.streamingTraceSteps = const [],
+    this.streamingTodoSnapshot,
     this.streamingStatusPhase,
     this.streamingStatusStep,
     this.streamingIteration,
@@ -152,7 +153,12 @@ class AIChatThreadView extends StatelessWidget {
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       itemCount: messages.length +
-          ((streamingContent != null || streamingTraceSteps.isNotEmpty) ? 1 : 0),
+          ((streamingContent != null ||
+                  streamingTraceSteps.isNotEmpty ||
+                  (streamingTodoSnapshot != null &&
+                      !streamingTodoSnapshot!.isEmpty))
+              ? 1
+              : 0),
       itemBuilder: (context, index) {
         if (index < messages.length) {
           final rowKey =
@@ -210,6 +216,7 @@ class AIChatThreadView extends StatelessWidget {
               content: streamingContent ?? '',
               toolActivities: streamingToolActivities,
               traceSteps: streamingTraceSteps,
+              todoSnapshot: streamingTodoSnapshot,
               statusPhase: streamingStatusPhase,
               statusStep: streamingStatusStep,
               iteration: streamingIteration,
@@ -487,6 +494,7 @@ class _StreamingRow extends StatelessWidget {
   final String content;
   final List<AIToolActivity> toolActivities;
   final List<AIAgentTraceStep> traceSteps;
+  final AISessionTodoSnapshot? todoSnapshot;
   final String? statusPhase;
   final String? statusStep;
   final int? iteration;
@@ -502,6 +510,7 @@ class _StreamingRow extends StatelessWidget {
     required this.content,
     this.toolActivities = const [],
     this.traceSteps = const [],
+    this.todoSnapshot,
     this.statusPhase,
     this.statusStep,
     this.iteration,
@@ -525,8 +534,12 @@ class _StreamingRow extends StatelessWidget {
             maxIterations: maxIterations,
           )
         : l10n.aiStatusThinking;
+    final hasReasoningPanel = (todoSnapshot != null && !todoSnapshot!.isEmpty) ||
+        traceSteps.isNotEmpty ||
+        toolActivities.isNotEmpty ||
+        agentBudget != null;
     final showStatusLine =
-        content.isEmpty && toolActivities.isEmpty && traceSteps.isEmpty;
+        content.isEmpty && !hasReasoningPanel;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -542,15 +555,19 @@ class _StreamingRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (traceSteps.isNotEmpty || toolActivities.isNotEmpty)
-                  _StreamingActivityLine(
-                    traceSteps: traceSteps,
-                    toolActivities: toolActivities,
-                    statusLabel: statusLabel,
-                    budgetSummary: agentBudget != null
-                        ? aiAgentBudgetSummary(l10n, budget: agentBudget!)
-                        : null,
-                    hideApprovalPending: suppressApprovalToolChips,
+                if (hasReasoningPanel)
+                  AIReasoningPanel(
+                    steps: traceSteps,
+                    toolActivities: suppressApprovalToolChips
+                        ? toolActivities
+                            .where((a) => !a.approvalRequired)
+                            .toList()
+                        : toolActivities,
+                    agentBudget: agentBudget,
+                    todoSnapshot: todoSnapshot,
+                    compact: true,
+                    initiallyExpanded: todoSnapshot?.hasActiveItem == true ||
+                        traceSteps.any((s) => s.isActive),
                   ),
                 if (content.isNotEmpty)
                   AIChatMessageBody(
@@ -591,101 +608,6 @@ class _StreamingRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// خط وضعیت/ابزار در حالت استریم — پیش‌فرض جمع‌شده.
-class _StreamingActivityLine extends StatefulWidget {
-  final List<AIAgentTraceStep> traceSteps;
-  final List<AIToolActivity> toolActivities;
-  final String statusLabel;
-  final String? budgetSummary;
-  final bool hideApprovalPending;
-
-  const _StreamingActivityLine({
-    required this.traceSteps,
-    required this.toolActivities,
-    required this.statusLabel,
-    this.budgetSummary,
-    this.hideApprovalPending = false,
-  });
-
-  @override
-  State<_StreamingActivityLine> createState() => _StreamingActivityLineState();
-}
-
-class _StreamingActivityLineState extends State<_StreamingActivityLine> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final toolCount = widget.toolActivities.length;
-    final stepCount = widget.traceSteps.length;
-    final summary = stepCount > 0
-        ? '${widget.statusLabel} · $stepCount مرحله'
-        : toolCount > 0
-            ? '${widget.statusLabel} · $toolCount ابزار'
-            : widget.statusLabel;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                Icon(
-                  _expanded ? Icons.expand_less : Icons.expand_more,
-                  size: 18,
-                  color: scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        summary,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                      if (widget.budgetSummary != null &&
-                          widget.budgetSummary!.isNotEmpty)
-                        Text(
-                          widget.budgetSummary!,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: scheme.outline,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_expanded) ...[
-          if (widget.traceSteps.isNotEmpty)
-            AIAgentTraceTimeline(
-              steps: widget.traceSteps,
-              compact: true,
-              initiallyExpanded: false,
-            ),
-          if (widget.toolActivities.isNotEmpty)
-            AIChatToolActivityList(
-              activities: widget.toolActivities,
-              hideApprovalPending: widget.hideApprovalPending,
-            ),
-          const SizedBox(height: 6),
-        ],
-      ],
     );
   }
 }

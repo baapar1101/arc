@@ -134,6 +134,11 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "list_petty_cash",
         "get_person_transactions",
     }),
+    "agent": frozenset({
+        "create_session_plan",
+        "list_session_todos",
+        "update_session_todo",
+    }),
     "people": frozenset({
         "search_persons",
         "get_customer_info",
@@ -199,6 +204,7 @@ _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"مالیات|مودیان|tax|کارپوشه", "tax"),
     (r"پروژه|project", "projects"),
     (r"ووکامرس|woocommerce|باسلام|basalam|کانکتور|connector|یکپارچه", "integration"),
+    (r"مرحله|گام|قدم|سناریو|چند\s*مرحله|گام\s*به\s*گام|برنامه\s*کار|checklist|todo", "agent"),
     (r"فروش\s*سریع|quick\s*sales|لیست\s*قیمت|price\s*list|لاگ|فعالیت\s*سیستم|workflow|تعمیر|گارانتی|توزیع|صندوق\s*خرد", "misc"),
     (r"شخص|مشتری|تامین|تأمین|supplier|customer|people|گروه\s*اشخاص", "people"),
     (r"دسته\s*بندی|category|ویژگی\s*کالا|attribute", "products_write"),

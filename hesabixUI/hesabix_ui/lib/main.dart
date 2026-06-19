@@ -185,6 +185,8 @@ import 'pages/business/opening_balance_page.dart';
 import 'pages/business/year_end_closing_page.dart';
 import 'pages/business/currency_revaluation_page.dart';
 import 'pages/business/report_templates_page.dart';
+import 'pages/business/report_template_studio_page.dart';
+import 'pages/business/report_template_html_editor_page.dart';
 import 'pages/business/storage_files_page.dart';
 import 'pages/business/storage_file_manager_page.dart';
 import 'pages/business/document_monetization_page.dart';
@@ -3632,6 +3634,68 @@ class _MyAppState extends State<MyApp> {
                 return hesabixNoTransitionPage(state, ReportTemplatesPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'report-templates/studio/new',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final q = state.uri.queryParameters;
+                return hesabixNoTransitionPage(state, ReportTemplateStudioPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    moduleKey: q['module_key'],
+                    subtype: q['subtype'],
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'report-templates/studio/:template_id',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final templateId = int.parse(state.pathParameters['template_id']!);
+                return hesabixNoTransitionPage(state, ReportTemplateStudioPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    templateId: templateId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'report-templates/html/new',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final q = state.uri.queryParameters;
+                final seed = state.extra is ReportTemplateHtmlEditorSeed
+                    ? state.extra as ReportTemplateHtmlEditorSeed
+                    : null;
+                return hesabixNoTransitionPage(state, ReportTemplateHtmlEditorPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    moduleKey: q['module_key'] ?? seed?.moduleKey,
+                    subtype: q['subtype'] ?? seed?.subtype,
+                    seed: seed,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'report-templates/html/:template_id/edit',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final templateId = int.parse(state.pathParameters['template_id']!);
+                final seed = state.extra is ReportTemplateHtmlEditorSeed
+                    ? state.extra as ReportTemplateHtmlEditorSeed
+                    : null;
+                return hesabixNoTransitionPage(state, ReportTemplateHtmlEditorPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    templateId: templateId,
+                    seed: seed,
                   ),
                 );
               },

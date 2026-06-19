@@ -685,6 +685,27 @@ class AIService {
         ),
       );
     }
+    if (eventType == 'session_todo_snapshot') {
+      final rawItems = data['items'];
+      final items = rawItems is List
+          ? rawItems
+              .whereType<Map>()
+              .map((e) => AISessionTodoItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : <AISessionTodoItem>[];
+      final rawSummary = data['summary'];
+      return AIStreamChunk(
+        todoSnapshot: AISessionTodoSnapshot(
+          items: items,
+          summary: rawSummary is Map
+              ? AISessionTodoSummary.fromJson(
+                  Map<String, dynamic>.from(rawSummary),
+                )
+              : AISessionTodoSummary.fromItems(items),
+          planTitle: data['plan_title'] as String?,
+        ),
+      );
+    }
     if (eventType == 'trace_step' || eventType == 'trace_step_update') {
       final step = AIAgentTraceStep.fromJson(data);
       return AIStreamChunk(traceStep: step);

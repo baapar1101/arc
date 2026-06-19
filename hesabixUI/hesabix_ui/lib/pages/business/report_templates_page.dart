@@ -6,19 +6,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
-import '../../constants/report_template_constants.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/report_template_service.dart';
-import '../../utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../widgets/data_table/helpers/file_saver.dart';
 import '../../widgets/report_template/embedded_pdf_iframe.dart';
-import 'report_template_studio_page.dart';
+
+import '../../core/business_named_route_locations.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import 'report_template_html_editor_page.dart';
 
 class ReportTemplatesPage extends StatefulWidget {
   final int businessId;
@@ -38,23 +38,6 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
 
   bool _loading = false;
   List<Map<String, dynamic>> _items = const [];
-
-  // Create/Edit form
-  final _nameCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  final _htmlCtrl = TextEditingController(text: "<html><head></head><body><h3>{{ title_text }}</h3></body></html>");
-  final _cssCtrl = TextEditingController(text: "body { font-family: Tahoma, Arial; }");
-  final _headerCtrl = TextEditingController();
-  final _footerCtrl = TextEditingController();
-  // Page settings
-  String? _paperSize = 'A4'; // A4, Letter, ...
-  String? _orientation = 'portrait'; // portrait, landscape
-  final _marginTopCtrl = TextEditingController(text: '10');
-  final _marginRightCtrl = TextEditingController(text: '10');
-  final _marginBottomCtrl = TextEditingController(text: '10');
-  final _marginLeftCtrl = TextEditingController(text: '10');
-  /// اگر پر باشد، به‌جای مقدار کشوی «سایز صفحه» برای API استفاده می‌شود.
-  final _paperCustomCtrl = TextEditingController();
 
   bool get _canWrite => widget.authStore.hasBusinessPermission('report_templates', 'write');
   bool get _canApprove => widget.authStore.hasBusinessPermission('report_templates', 'approve');
@@ -188,24 +171,20 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     return map.isEmpty ? null : map;
   }
 
-  List<DropdownMenuItem<String>> _paperSizeDropdownItems(String? current) {
-    return [
-      ...kReportTemplatePaperSizeOptions.map(
-        (e) => DropdownMenuItem<String>(value: e, child: Text(e)),
-      ),
-      if (current != null &&
-          current.isNotEmpty &&
-          !kReportTemplatePaperSizeOptions.contains(current))
-        DropdownMenuItem<String>(value: current, child: Text(current)),
-    ];
-  }
-
-  String _effectivePaperSize() {
-    final c = _paperCustomCtrl.text.trim();
-    if (c.isEmpty) return _paperSize ?? 'A4';
-    return c.length > kReportTemplatePaperSizeMaxLength
-        ? c.substring(0, kReportTemplatePaperSizeMaxLength)
-        : c;
+  ReportTemplateHtmlEditorSeed _seedFromImportJson(Map<String, dynamic> data) {
+    return ReportTemplateHtmlEditorSeed(
+      name: data['name']?.toString(),
+      description: data['description']?.toString(),
+      moduleKey: data['module_key']?.toString(),
+      subtype: data['subtype']?.toString(),
+      contentHtml: data['content_html']?.toString(),
+      contentCss: data['content_css']?.toString(),
+      headerHtml: data['header_html']?.toString(),
+      footerHtml: data['footer_html']?.toString(),
+      paperSize: data['paper_size']?.toString(),
+      orientation: data['orientation']?.toString(),
+      margins: (data['margins'] as Map?)?.cast<String, dynamic>(),
+    );
   }
 
   Future<void> _showExportPicker(AppLocalizations t) async {
@@ -330,28 +309,20 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     if (ok != true || !mounted) return;
     try {
       final data = jsonDecode(ctrl.text) as Map<String, dynamic>;
+      final moduleKey = (data['module_key'] ?? _moduleCtrl.text).toString();
+      final subtype = (data['subtype'] ?? _subtypeCtrl.text).toString();
       setState(() {
         _filterPresetId = 'custom';
-        _moduleCtrl.text = (data['module_key'] ?? _moduleCtrl.text).toString();
-        _subtypeCtrl.text = (data['subtype'] ?? _subtypeCtrl.text).toString();
-        _nameCtrl.text = (data['name'] ?? _nameCtrl.text).toString();
-        _descCtrl.text = (data['description'] ?? _descCtrl.text).toString();
-        _htmlCtrl.text = (data['content_html'] ?? _htmlCtrl.text).toString();
-        _cssCtrl.text = (data['content_css'] ?? _cssCtrl.text).toString();
-        _headerCtrl.text = (data['header_html'] ?? _headerCtrl.text).toString();
-        _footerCtrl.text = (data['footer_html'] ?? _footerCtrl.text).toString();
-        _paperSize = (data['paper_size'] ?? _paperSize)?.toString();
-        _paperCustomCtrl.clear();
-        _orientation = (data['orientation'] ?? _orientation)?.toString();
-        final margins = (data['margins'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-        _marginTopCtrl.text = (margins['top']?.toString() ?? _marginTopCtrl.text);
-        _marginRightCtrl.text = (margins['right']?.toString() ?? _marginRightCtrl.text);
-        _marginBottomCtrl.text = (margins['bottom']?.toString() ?? _marginBottomCtrl.text);
-        _marginLeftCtrl.text = (margins['left']?.toString() ?? _marginLeftCtrl.text);
+        _moduleCtrl.text = moduleKey;
+        _subtypeCtrl.text = subtype;
       });
       if (!mounted) return;
       SnackBarHelper.show(context, message: t.reportTemplateImportDoneOpenHtml);
-      await _createDialog();
+      await _openHtmlEditorNew(
+        moduleKey: moduleKey,
+        subtype: subtype,
+        seed: _seedFromImportJson(data),
+      );
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -374,17 +345,6 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     _moduleCtrl.dispose();
     _subtypeCtrl.dispose();
     _searchCtrl.dispose();
-    _nameCtrl.dispose();
-    _descCtrl.dispose();
-    _htmlCtrl.dispose();
-    _cssCtrl.dispose();
-    _headerCtrl.dispose();
-    _footerCtrl.dispose();
-    _marginTopCtrl.dispose();
-    _marginRightCtrl.dispose();
-    _marginBottomCtrl.dispose();
-    _marginLeftCtrl.dispose();
-    _paperCustomCtrl.dispose();
     super.dispose();
   }
 
@@ -423,394 +383,37 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     }
   }
 
-  /// موبایل: کوچک‌ترین ضلع کمتر از ۶۰۰ → ادیتور تمام‌صفحه.
-  bool _reportHtmlEditorUseFullscreenLayout(BuildContext context) {
-    return MediaQuery.sizeOf(context).shortestSide < 600;
-  }
-
-  TextStyle? _reportHtmlCodeStyle(BuildContext context) {
-    final base = Theme.of(context).textTheme.bodyMedium;
-    return base?.copyWith(fontFamily: 'monospace', fontSize: 13, height: 1.4);
-  }
-
-  List<TextInputFormatter> get _reportHtmlMarginInputFormatters => [
-        EnglishDigitsFormatter(),
-        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-      ];
-
-  Widget _reportHtmlCodeEditorField({
-    required BuildContext context,
-    required TextEditingController controller,
-    required String hintText,
-  }) {
-    return TextField(
-      controller: controller,
-      style: _reportHtmlCodeStyle(context),
-      decoration: InputDecoration(
-        border: const OutlineInputBorder(),
-        hintText: hintText,
-        filled: true,
-        fillColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-        alignLabelWithHint: true,
-        isDense: true,
-        contentPadding: const EdgeInsets.all(12),
-      ),
-      maxLines: null,
-      minLines: null,
-      expands: true,
-      textAlignVertical: TextAlignVertical.top,
-      keyboardType: TextInputType.multiline,
+  Future<void> _openStudioNew() async {
+    final result = await BusinessNamedRoutes.pushNamed<bool>(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_report_template_studio_new',
+      queryParameters: {
+        if (_moduleCtrl.text.trim().isNotEmpty) 'module_key': _moduleCtrl.text.trim(),
+        if (_subtypeCtrl.text.trim().isNotEmpty) 'subtype': _subtypeCtrl.text.trim(),
+      },
     );
+    if (result == true && mounted) await _fetch();
   }
 
-  Widget _reportHtmlEditorPageSettingsForm(BuildContext context, AppLocalizations t) {
-    const marginDec = InputDecoration(
-      isDense: true,
-      border: OutlineInputBorder(),
-    );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _paperSize,
-                decoration: InputDecoration(
-                  labelText: t.pageSize,
-                  isDense: true,
-                  border: const OutlineInputBorder(),
-                ),
-                items: _paperSizeDropdownItems(_paperSize),
-                onChanged: (v) => setState(() => _paperSize = v),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: DropdownButtonFormField<String>(
-                value: _orientation,
-                decoration: InputDecoration(
-                  labelText: t.orientation,
-                  isDense: true,
-                  border: const OutlineInputBorder(),
-                ),
-                items: [
-                  DropdownMenuItem(value: 'portrait', child: Text(t.portrait)),
-                  DropdownMenuItem(value: 'landscape', child: Text(t.landscape)),
-                ],
-                onChanged: (v) => setState(() => _orientation = v),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _marginTopCtrl,
-                decoration: marginDec.copyWith(labelText: t.marginTop),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: _reportHtmlMarginInputFormatters,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _marginRightCtrl,
-                decoration: marginDec.copyWith(labelText: t.marginRight),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: _reportHtmlMarginInputFormatters,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _marginBottomCtrl,
-                decoration: marginDec.copyWith(labelText: t.marginBottom),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: _reportHtmlMarginInputFormatters,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: TextField(
-                controller: _marginLeftCtrl,
-                decoration: marginDec.copyWith(labelText: t.marginLeft),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: _reportHtmlMarginInputFormatters,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _paperCustomCtrl,
-          maxLength: kReportTemplatePaperSizeMaxLength,
-          decoration: InputDecoration(
-            labelText: t.reportTemplatePaperCustomLabel,
-            helperText: t.reportTemplatePaperCustomHelper,
-            border: const OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _reportHtmlEditorCodeTabs(BuildContext context, AppLocalizations t) {
-    final cs = Theme.of(context).colorScheme;
-    return DefaultTabController(
-      length: 4,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TabBar(
-            isScrollable: true,
-            labelColor: cs.primary,
-            tabs: [
-              Tab(text: t.reportTemplatePreviewHtmlTab),
-              Tab(text: t.reportTemplateEditorTabCss),
-              Tab(text: t.reportTemplateEditorTabHeader),
-              Tab(text: t.reportTemplateEditorTabFooter),
-            ],
-          ),
-          Expanded(
-            child: TabBarView(
-              children: [
-                _reportHtmlCodeEditorField(
-                  context: context,
-                  controller: _htmlCtrl,
-                  hintText: t.reportTemplateHintHtmlBody,
-                ),
-                _reportHtmlCodeEditorField(
-                  context: context,
-                  controller: _cssCtrl,
-                  hintText: t.reportTemplateHintCss,
-                ),
-                _reportHtmlCodeEditorField(
-                  context: context,
-                  controller: _headerCtrl,
-                  hintText: t.reportTemplateHintHeaderHtml,
-                ),
-                _reportHtmlCodeEditorField(
-                  context: context,
-                  controller: _footerCtrl,
-                  hintText: t.reportTemplateHintFooterHtml,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _reportHtmlEditorFormHeader(BuildContext context, AppLocalizations t) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _nameCtrl,
-          decoration: InputDecoration(
-            labelText: t.reportTemplateFieldName,
-            border: const OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _descCtrl,
-          decoration: InputDecoration(
-            labelText: t.reportTemplateFieldDescription,
-            border: const OutlineInputBorder(),
-            isDense: true,
-          ),
-        ),
-        const SizedBox(height: 4),
-        ExpansionTile(
-          initiallyExpanded: false,
-          tilePadding: EdgeInsets.zero,
-          title: Text(
-            t.reportTemplatePageSettingsSection,
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          childrenPadding: const EdgeInsets.only(bottom: 4),
-          children: [
-            _reportHtmlEditorPageSettingsForm(context, t),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Future<void> _openReportHtmlEditorAdaptive({
-    required String title,
-    required Widget Function(BuildContext dialogContext) buildBody,
-    required List<Widget> Function(BuildContext dialogContext) buildActions,
+  Future<void> _openHtmlEditorNew({
+    String? moduleKey,
+    String? subtype,
+    ReportTemplateHtmlEditorSeed? seed,
   }) async {
-    await showDialog<void>(
-      context: context,
-      useSafeArea: true,
-      builder: (dialogContext) {
-        final actions = buildActions(dialogContext);
-        final body = buildBody(dialogContext);
-        final fullscreen = _reportHtmlEditorUseFullscreenLayout(dialogContext);
-        if (fullscreen) {
-          return Dialog.fullscreen(
-            child: Scaffold(
-              appBar: AppBar(
-                title: Text(title),
-                leading: IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: MaterialLocalizations.of(dialogContext).closeButtonLabel,
-                  onPressed: () => Navigator.pop(dialogContext),
-                ),
-              ),
-              body: body,
-              bottomNavigationBar: Material(
-                elevation: 6,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-                    child: OverflowBar(
-                      alignment: MainAxisAlignment.end,
-                      spacing: 8,
-                      overflowSpacing: 8,
-                      overflowAlignment: OverflowBarAlignment.end,
-                      children: actions,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
-          clipBehavior: Clip.antiAlias,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 960,
-              maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.92,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 4, 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(title, style: Theme.of(dialogContext).textTheme.titleLarge),
-                      ),
-                      IconButton(
-                        tooltip: MaterialLocalizations.of(dialogContext).closeButtonLabel,
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.pop(dialogContext),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(child: body),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                  child: Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: OverflowBar(
-                      spacing: 8,
-                      overflowSpacing: 8,
-                      overflowAlignment: OverflowBarAlignment.end,
-                      children: actions,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
+    final mk = moduleKey ?? (_moduleCtrl.text.trim().isEmpty ? null : _moduleCtrl.text.trim());
+    final st = subtype ?? (_subtypeCtrl.text.trim().isEmpty ? null : _subtypeCtrl.text.trim());
+    final result = await BusinessNamedRoutes.pushNamed<bool>(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_report_template_html_new',
+      queryParameters: {
+        if (mk != null && mk.isNotEmpty) 'module_key': mk,
+        if (st != null && st.isNotEmpty) 'subtype': st,
       },
+      extra: seed,
     );
-  }
-
-  Future<void> _createDialog() async {
-    final t = AppLocalizations.of(context);
-    await _openReportHtmlEditorAdaptive(
-      title: t.reportTemplateNewHtml,
-      buildBody: (dctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _reportHtmlEditorFormHeader(dctx, t),
-              const SizedBox(height: 8),
-              Expanded(child: _reportHtmlEditorCodeTabs(dctx, t)),
-            ],
-          ),
-        );
-      },
-      buildActions: (dctx) => [
-        TextButton(onPressed: () => Navigator.pop(dctx), child: Text(t.cancel)),
-        FilledButton(
-          onPressed: () async {
-            try {
-              Map<String, dynamic>? margins;
-              double? parseMargin(String s) {
-                try {
-                  if (s.trim().isEmpty) return null;
-                  return double.parse(s.trim());
-                } catch (_) {
-                  return null;
-                }
-              }
-              final mt = parseMargin(_marginTopCtrl.text);
-              final mr = parseMargin(_marginRightCtrl.text);
-              final mb = parseMargin(_marginBottomCtrl.text);
-              final ml = parseMargin(_marginLeftCtrl.text);
-              margins = {
-                if (mt != null) 'top': mt,
-                if (mr != null) 'right': mr,
-                if (mb != null) 'bottom': mb,
-                if (ml != null) 'left': ml,
-              };
-              if (margins.isEmpty) margins = null;
-              final id = await _service.createTemplate(
-                businessId: widget.businessId,
-                moduleKey: _moduleCtrl.text.trim().isEmpty ? 'invoices' : _moduleCtrl.text.trim(),
-                subtype: _subtypeCtrl.text.trim().isEmpty ? 'list' : _subtypeCtrl.text.trim(),
-                name: _nameCtrl.text.trim().isEmpty ? 'Template' : _nameCtrl.text.trim(),
-                description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-                contentHtml: _htmlCtrl.text,
-                contentCss: _cssCtrl.text.trim().isEmpty ? null : _cssCtrl.text,
-                headerHtml: _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text,
-                footerHtml: _footerCtrl.text.trim().isEmpty ? null : _footerCtrl.text,
-                paperSize: _effectivePaperSize(),
-                orientation: _orientation,
-                margins: margins,
-              );
-              if (!dctx.mounted) return;
-              Navigator.pop(dctx);
-              SnackBarHelper.showSuccess(dctx, message: t.templateCreatedWithId(id));
-              await _fetch();
-            } catch (e) {
-              if (!dctx.mounted) return;
-              SnackBarHelper.showError(
-              dctx,
-              message: t.createError(ErrorExtractor.forContext(e, dctx)),
-            );
-            }
-          },
-          child: Text(t.create),
-        ),
-      ],
-    );
+    if (result == true && mounted) await _fetch();
   }
 
   Future<void> _togglePublish(Map<String, dynamic> item) async {
@@ -1795,126 +1398,27 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   }
 
   Future<void> _editDialog(Map<String, dynamic> item) async {
-    Map<String, dynamic> full = const <String, dynamic>{};
-    bool isStudio = false;
-    try {
-      full = await _service.getTemplate(
-        businessId: widget.businessId,
-        templateId: (item['id'] as num).toInt(),
-      );
-      final engine = (full['engine'] ?? '').toString().toLowerCase();
-      isStudio = engine == 'builder' || engine == 'template_v2';
-      _nameCtrl.text = (full['name'] ?? '').toString();
-      _descCtrl.text = (full['description'] ?? '').toString();
-      _htmlCtrl.text = (full['content_html'] ?? '').toString();
-      _cssCtrl.text = (full['content_css'] ?? '').toString();
-      _headerCtrl.text = (full['header_html'] ?? '').toString();
-      _footerCtrl.text = (full['footer_html'] ?? '').toString();
-      _paperSize = (full['paper_size'] ?? _paperSize)?.toString();
-      _orientation = (full['orientation'] ?? _orientation)?.toString();
-      _paperCustomCtrl.clear();
-      final margins = (full['margins'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{};
-      _marginTopCtrl.text = (margins['top']?.toString() ?? _marginTopCtrl.text);
-      _marginRightCtrl.text = (margins['right']?.toString() ?? _marginRightCtrl.text);
-      _marginBottomCtrl.text = (margins['bottom']?.toString() ?? _marginBottomCtrl.text);
-      _marginLeftCtrl.text = (margins['left']?.toString() ?? _marginLeftCtrl.text);
-    } catch (_) {}
+    final templateId = (item['id'] as num).toInt();
+    final engine = (item['engine'] ?? 'jinja2').toString().toLowerCase();
+    final isStudio = engine == 'builder' || engine == 'template_v2';
 
-    if (!mounted) return;
+    final bool? result;
     if (isStudio) {
-      final result = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (context) => ReportTemplateStudioPage(
-            businessId: widget.businessId,
-            authStore: widget.authStore,
-            template: item,
-            moduleKey: full['module_key']?.toString(),
-            subtype: full['subtype']?.toString(),
-          ),
-        ),
+      result = await BusinessNamedRoutes.pushNamed<bool>(
+        context,
+        businessId: widget.businessId,
+        routeName: 'business_report_template_studio_edit',
+        pathParameters: {'template_id': templateId.toString()},
       );
-      if (result == true && mounted) await _fetch();
-      return;
+    } else {
+      result = await BusinessNamedRoutes.pushNamed<bool>(
+        context,
+        businessId: widget.businessId,
+        routeName: 'business_report_template_html_edit',
+        pathParameters: {'template_id': templateId.toString()},
+      );
     }
-
-    final tEdit = AppLocalizations.of(context);
-    await _openReportHtmlEditorAdaptive(
-      title: tEdit.reportTemplateEdit,
-      buildBody: (dctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _reportHtmlEditorFormHeader(dctx, tEdit),
-              const SizedBox(height: 8),
-              Expanded(child: _reportHtmlEditorCodeTabs(dctx, tEdit)),
-            ],
-          ),
-        );
-      },
-      buildActions: (dctx) => [
-        TextButton(onPressed: () => Navigator.pop(dctx), child: Text(tEdit.cancel)),
-        TextButton(
-          onPressed: () async {
-            await _previewTemplate(item);
-          },
-          child: Text(tEdit.reportTemplatePreview),
-        ),
-        FilledButton(
-          onPressed: () async {
-            try {
-              Map<String, dynamic>? margins;
-              double? parseMargin(String s) {
-                try {
-                  if (s.trim().isEmpty) return null;
-                  return double.parse(s.trim());
-                } catch (_) {
-                  return null;
-                }
-              }
-              final mt = parseMargin(_marginTopCtrl.text);
-              final mr = parseMargin(_marginRightCtrl.text);
-              final mb = parseMargin(_marginBottomCtrl.text);
-              final ml = parseMargin(_marginLeftCtrl.text);
-              margins = {
-                if (mt != null) 'top': mt,
-                if (mr != null) 'right': mr,
-                if (mb != null) 'bottom': mb,
-                if (ml != null) 'left': ml,
-              };
-              if (margins.isEmpty) margins = null;
-              final changes = <String, dynamic>{
-                'name': _nameCtrl.text.trim(),
-                'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-                'content_html': _htmlCtrl.text,
-                'content_css': _cssCtrl.text.trim().isEmpty ? null : _cssCtrl.text,
-                'header_html': _headerCtrl.text.trim().isEmpty ? null : _headerCtrl.text,
-                'footer_html': _footerCtrl.text.trim().isEmpty ? null : _footerCtrl.text,
-                'paper_size': _effectivePaperSize(),
-                'orientation': _orientation,
-                if (margins != null) 'margins': margins,
-              };
-              await _service.updateTemplate(
-                businessId: widget.businessId,
-                templateId: (item['id'] as num).toInt(),
-                changes: changes,
-              );
-              if (!dctx.mounted) return;
-              Navigator.pop(dctx);
-              await _fetch();
-            } catch (e) {
-              if (!dctx.mounted) return;
-              SnackBarHelper.showError(
-              dctx,
-              message: tEdit.reportTemplateEditSaveError(ErrorExtractor.forContext(e, dctx)),
-            );
-            }
-          },
-          child: Text(tEdit.save),
-        ),
-      ],
-    );
+    if (result == true && mounted) await _fetch();
   }
 
   Future<void> _setDefault(Map<String, dynamic> item) async {
@@ -1976,19 +1480,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: FilledButton.icon(
-                onPressed: () async {
-                  final result = await Navigator.of(context).push<bool>(
-                    MaterialPageRoute(
-                      builder: (context) => ReportTemplateStudioPage(
-                        businessId: widget.businessId,
-                        authStore: widget.authStore,
-                        moduleKey: _moduleCtrl.text.trim().isEmpty ? null : _moduleCtrl.text.trim(),
-                        subtype: _subtypeCtrl.text.trim().isEmpty ? null : _subtypeCtrl.text.trim(),
-                      ),
-                    ),
-                  );
-                  if (result == true && mounted) await _fetch();
-                },
+                onPressed: _openStudioNew,
                 icon: const Icon(Icons.view_quilt),
                 label: Text(t.reportTemplateNewVisual),
               ),
@@ -1996,7 +1488,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
               child: OutlinedButton.icon(
-                onPressed: _createDialog,
+                onPressed: _openHtmlEditorNew,
                 icon: const Icon(Icons.code),
                 label: Text(t.reportTemplateNewHtml),
               ),

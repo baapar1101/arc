@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../constants/report_template_constants.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../core/business_named_route_locations.dart';
 import '../../services/report_template_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/number_normalizer.dart';
@@ -15,6 +17,7 @@ import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/report_template/studio/report_template_studio_customize_panel.dart';
 import '../../widgets/report_template/studio/report_template_studio_gallery.dart';
 import '../../widgets/report_template/studio/report_template_studio_preview_panel.dart';
+import 'report_template_html_editor_page.dart';
 
 enum _StudioStep { gallery, customize }
 
@@ -22,6 +25,7 @@ class ReportTemplateStudioPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
   final Map<String, dynamic>? template;
+  final int? templateId;
   final String? moduleKey;
   final String? subtype;
 
@@ -30,9 +34,12 @@ class ReportTemplateStudioPage extends StatefulWidget {
     required this.businessId,
     required this.authStore,
     this.template,
+    this.templateId,
     this.moduleKey,
     this.subtype,
   });
+
+  bool get isNew => template == null && templateId == null;
 
   @override
   State<ReportTemplateStudioPage> createState() => _ReportTemplateStudioPageState();
@@ -120,10 +127,12 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       await Future.wait([_loadScopeCatalog(), _loadGallery(), _loadSampleContext()]);
       if (widget.template != null) {
         await _loadExistingTemplate();
-        if (_design != null) {
-          _step = _StudioStep.customize;
-          _schedulePreview();
-        }
+      } else if (widget.templateId != null) {
+        await _loadExistingTemplateById(widget.templateId!);
+      }
+      if (_design != null) {
+        _step = _StudioStep.customize;
+        _schedulePreview();
       }
     } catch (e) {
       if (mounted) {
@@ -158,11 +167,21 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     if (mounted) setState(() => _sampleContext = sample ?? const {});
   }
 
+  Future<void> _loadExistingTemplateById(int templateId) async {
+    final full = await _service.getTemplate(businessId: widget.businessId, templateId: templateId);
+    _templateId = templateId;
+    await _applyLoadedTemplate(full);
+  }
+
   Future<void> _loadExistingTemplate() async {
     final tid = (widget.template!['id'] as num?)?.toInt();
     if (tid == null) return;
     final full = await _service.getTemplate(businessId: widget.businessId, templateId: tid);
     _templateId = tid;
+    await _applyLoadedTemplate(full);
+  }
+
+  Future<void> _applyLoadedTemplate(Map<String, dynamic> full) async {
     _moduleKey = full['module_key']?.toString() ?? _moduleKey;
     _subtype = full['subtype']?.toString();
     _nameCtrl.text = (full['name'] ?? '').toString();
@@ -199,7 +218,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
           ),
         );
         if (migrate != true) {
-          if (mounted) Navigator.of(context).pop();
+          if (mounted) context.pop();
           return;
         }
         final out = await _service.migrateBuilderToV2(
@@ -399,7 +418,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       _lastSavedFingerprint = _fingerprint();
       if (mounted) {
         SnackBarHelper.show(context, message: 'قالب ذخیره شد');
-        Navigator.of(context).pop(true);
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -424,6 +443,74 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       ),
     );
     return ok == true;
+  }
+
+  Future<void> _openAdvancedHtml() async {
+    if (_design == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حالت پیشرفته — HTML'),
+        content: const Text(
+          'طراحی استودیو به HTML/CSS تبدیل می‌شود و دیگر از ویزارد استودیو قابل ویرایش نیست. '
+          'می‌توانید کد را در ادیتور پیشرفته ویرایش کنید.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ادامه')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    try {
+      final fragments = await _service.compileV2Design(
+        businessId: widget.businessId,
+        design: _design!,
+      );
+      if (!mounted) return;
+
+      final seed = ReportTemplateHtmlEditorSeed(
+        name: _nameCtrl.text.trim(),
+        description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+        moduleKey: _moduleKey,
+        subtype: _subtype,
+        contentHtml: fragments['content_html']?.toString(),
+        contentCss: fragments['content_css']?.toString(),
+        headerHtml: fragments['header_html']?.toString(),
+        footerHtml: fragments['footer_html']?.toString(),
+        paperSize: _effectivePaperSize(),
+        orientation: _orientation,
+        margins: _parseMargins(),
+        convertFromStudio: true,
+      );
+
+      if (_templateId != null) {
+        await BusinessNamedRoutes.pushNamed<bool>(
+          context,
+          businessId: widget.businessId,
+          routeName: 'business_report_template_html_edit',
+          pathParameters: {'template_id': _templateId.toString()},
+          extra: seed,
+        );
+      } else {
+        await BusinessNamedRoutes.pushNamed<bool>(
+          context,
+          businessId: widget.businessId,
+          routeName: 'business_report_template_html_new',
+          queryParameters: {
+            if (_moduleKey != null) 'module_key': _moduleKey!,
+            if (_subtype != null) 'subtype': _subtype!,
+          },
+          extra: seed,
+        );
+      }
+      if (mounted) context.pop(true);
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      }
+    }
   }
 
   String _currentScopeId() => '${_moduleKey ?? ''}:${_subtype ?? ''}';
@@ -512,14 +599,14 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       return const AccessDeniedPage(message: 'شما دسترسی لازم برای ویرایش قالب‌ها را ندارید');
     }
 
-    final isNew = widget.template == null;
+    final isNew = widget.isNew;
     final title = isNew ? 'استودیو قالب — جدید' : 'استودیو قالب — ویرایش';
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (await _confirmDiscard() && context.mounted) Navigator.of(context).pop();
+        if (await _confirmDiscard() && context.mounted) context.pop();
       },
       child: Scaffold(
         appBar: AppBar(
@@ -527,15 +614,21 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios_new),
             onPressed: () async {
-              if (await _confirmDiscard() && mounted) Navigator.of(context).pop();
+              if (await _confirmDiscard() && mounted) context.pop();
             },
           ),
           actions: [
-            if (_step == _StudioStep.customize && widget.template == null)
+            if (_step == _StudioStep.customize && isNew)
               TextButton.icon(
                 onPressed: () => setState(() => _step = _StudioStep.gallery),
                 icon: const Icon(Icons.grid_view),
                 label: const Text('تغییر قالب'),
+              ),
+            if (_step == _StudioStep.customize && _design != null)
+              TextButton.icon(
+                onPressed: _openAdvancedHtml,
+                icon: const Icon(Icons.code),
+                label: const Text('حالت پیشرفته'),
               ),
             IconButton(icon: const Icon(Icons.settings), tooltip: 'تنظیمات صفحه', onPressed: _showPageSettings),
             if (_hasUnsavedChanges)
