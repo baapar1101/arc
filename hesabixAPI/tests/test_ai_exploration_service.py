@@ -16,7 +16,10 @@ from app.services.ai.ai_exploration_service import (
     resolve_exploration_enabled,
     should_continue_exploring,
     assess_tool_round_productivity,
-    should_agent_continue_after_text,
+from app.services.ai.ai_goal_assessment import (
+    AgentGoalTracker,
+    should_agent_continue_after_text_round,
+)
 )
 from app.services.ai.ai_trace import trace_step
 
@@ -155,10 +158,10 @@ def test_assess_tool_round_productivity():
 def test_should_agent_continue_after_text_respects_budget():
     budget = build_agent_budget("medium", max_iterations=2)
     store = ObservationStore()
-    assert should_agent_continue_after_text(
-        exploration_enabled=True,
+    assert should_agent_continue_after_text_round(
+        goal_tracker=AgentGoalTracker(),
         observation_store=store,
+        exploration_enabled=True,
         iteration=2,
-        max_iterations=8,
         budget=budget,
     ) is False

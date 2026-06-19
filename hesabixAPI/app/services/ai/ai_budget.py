@@ -17,6 +17,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from app.services.ai.ai_constants import (
+    AGENT_BUDGET_ABSOLUTE_MAX_ITERATIONS,
+    AGENT_BUDGET_EXTENSION_ITERATIONS,
+    AGENT_BUDGET_EXTENSIONS_MAX,
     MAX_AGENT_ITERATIONS,
     MAX_UNPRODUCTIVE_ROUNDS,
     QUERY_COMPLEXITY_TOKEN_BUDGET,
@@ -46,14 +49,23 @@ class AgentBudget:
     """سقف چندبعدی برای یک پاسخ assistant."""
 
     max_iterations: int = MAX_AGENT_ITERATIONS
+    base_max_iterations: int = 0
     max_total_tokens: Optional[int] = None
     wall_clock_sec: Optional[float] = None
     max_unproductive_rounds: int = MAX_UNPRODUCTIVE_ROUNDS
+    max_extensions: int = AGENT_BUDGET_EXTENSIONS_MAX
+    extension_iterations: int = AGENT_BUDGET_EXTENSION_ITERATIONS
+    absolute_max_iterations: int = AGENT_BUDGET_ABSOLUTE_MAX_ITERATIONS
 
     # وضعیت runtime
     tokens_used: int = 0
     unproductive_rounds: int = 0
+    extensions_granted: int = 0
     started_at: float = field(default_factory=time.monotonic)
+
+    def __post_init__(self) -> None:
+        if self.base_max_iterations <= 0:
+            self.base_max_iterations = self.max_iterations
 
     def reset_clock(self) -> None:
         self.started_at = time.monotonic()
@@ -75,6 +87,19 @@ class AgentBudget:
 
     def remaining_iterations(self, current_iteration: int) -> int:
         return max(0, self.max_iterations - current_iteration)
+
+    def try_extend(self) -> bool:
+        """تمدید سقف نوبت در صورت نیاز به تحلیل بیشتر (با سقف مطلق)."""
+        if self.extensions_granted >= self.max_extensions:
+            return False
+        new_max = self.max_iterations + self.extension_iterations
+        if new_max > self.absolute_max_iterations:
+            new_max = self.absolute_max_iterations
+        if new_max <= self.max_iterations:
+            return False
+        self.max_iterations = new_max
+        self.extensions_granted += 1
+        return True
 
     def check(self, current_iteration: int) -> BudgetStatus:
         """آیا حلقه باید پیش از نوبت بعدی متوقف شود؟"""
@@ -162,12 +187,15 @@ def budget_snapshot(
     snap: dict[str, object] = {
         "iteration": iteration,
         "max_iterations": budget.max_iterations,
+        "base_max_iterations": budget.base_max_iterations,
         "tokens_used": budget.tokens_used,
         "max_total_tokens": budget.max_total_tokens,
         "elapsed_sec": round(budget.elapsed_sec, 1),
         "wall_clock_sec": budget.wall_clock_sec,
         "unproductive_rounds": budget.unproductive_rounds,
         "max_unproductive_rounds": budget.max_unproductive_rounds,
+        "extensions_granted": budget.extensions_granted,
+        "max_extensions": budget.max_extensions,
     }
     if reasoning_effort:
         snap["reasoning_effort"] = reasoning_effort

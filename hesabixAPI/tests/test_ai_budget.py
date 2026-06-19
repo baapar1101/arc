@@ -32,6 +32,17 @@ def test_budget_stops_at_max_iterations():
     assert status.reason == STOP_REASON_ITERATIONS
 
 
+def test_budget_try_extend():
+    budget = AgentBudget(max_iterations=3, extension_iterations=2, max_extensions=2)
+    assert budget.base_max_iterations == 3
+    assert budget.try_extend() is True
+    assert budget.max_iterations == 5
+    assert budget.extensions_granted == 1
+    assert budget.try_extend() is True
+    assert budget.max_iterations == 7
+    assert budget.try_extend() is False
+
+
 def test_budget_stops_on_token_limit():
     budget = AgentBudget(max_iterations=10, max_total_tokens=1000)
     budget.add_tokens(999)

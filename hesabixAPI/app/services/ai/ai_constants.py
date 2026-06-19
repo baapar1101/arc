@@ -103,6 +103,14 @@ QUERY_COMPLEXITY_WALL_CLOCK_SEC: dict[str, float] = {
 # رخ دهد، حلقه پیش از رسیدن به سقف متوقف می‌شود.
 MAX_UNPRODUCTIVE_ROUNDS = 2
 
+# ---- تمدید پویا بودجه agent (ارزیابی هدف + ضد loop) ----
+# وقتی ارزیابی میانی نشان دهد هدف محقق نشده، بودجه تا این حد تمدید می‌شود.
+AGENT_BUDGET_EXTENSIONS_MAX = 2
+AGENT_BUDGET_EXTENSION_ITERATIONS = 2
+AGENT_BUDGET_ABSOLUTE_MAX_ITERATIONS = 15
+# بیش از این تکرار همان tool+args → تشخیص loop و توقف تمدید
+AGENT_MAX_IDENTICAL_TOOL_REPEATS = 1
+
 # ---- کنترل استدلال درون‌مدلی (reasoning effort) ----
 # سطوح مجاز تلاش استدلال برای مدل‌های reasoning (OpenAI o-series/gpt-5 و Anthropic).
 REASONING_EFFORT_LEVELS: frozenset[str] = frozenset(

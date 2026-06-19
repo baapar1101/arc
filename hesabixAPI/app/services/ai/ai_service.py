@@ -74,9 +74,14 @@ from app.services.ai.ai_exploration_service import (
     extract_entity_refs_from_calls,
     new_bundle_id,
     resolve_exploration_enabled,
-    should_agent_continue_after_text,
     assess_tool_round_productivity,
     synthesize_thought_with_llm,
+)
+from app.services.ai.ai_goal_assessment import (
+    AgentGoalTracker,
+    resolve_budget_gate,
+    should_agent_continue_after_text_round,
+    try_extend_budget_for_goal,
 )
 from app.services.ai.ai_retry_policy import is_retryable_error
 from app.services.ai.ai_constants import MAX_LLM_RETRIES
@@ -1718,6 +1723,10 @@ class AIService:
             elif not eff_tools:
                 tools = None
 
+            goal_tracker: Optional[AgentGoalTracker] = (
+                AgentGoalTracker() if eff_tools and tools else None
+            )
+
             skills_extra = self._anthropic_skills_extra(session_business_id, effective_user_query)
             provider_extras = self._provider_call_extras(provider, skills_extra)
 
@@ -1777,7 +1786,7 @@ class AIService:
             # پردازش function calls در یک حلقه (multi-round agent)
             iteration = 0
             while eff_tools and response["message"].get("function_calls"):
-                budget_status = budget.check(iteration)
+                budget_status = resolve_budget_gate(budget, iteration, goal_tracker)
                 if budget_status.stop:
                     break
                 iteration += 1
@@ -1795,8 +1804,19 @@ class AIService:
                 round_productive = assess_tool_round_productivity(
                     current_calls, function_results, _lookup_tool_result
                 )
+                if goal_tracker is not None:
+                    assessment = goal_tracker.assess_after_tool_round(
+                        current_calls,
+                        function_results,
+                        _lookup_tool_result,
+                        user_query=effective_user_query,
+                    )
+                    try_extend_budget_for_goal(budget, assessment)
+                    goal_ctx = goal_tracker.continue_context_for_llm()
+                else:
+                    goal_ctx = None
                 budget.note_round(productive=round_productive)
-                budget_status = budget.check(iteration)
+                budget_status = resolve_budget_gate(budget, iteration, goal_tracker)
                 if budget_status.stop:
                     break
                 
@@ -1842,6 +1862,8 @@ class AIService:
                     })
                 
                 full_messages.extend(function_messages)
+                if goal_ctx:
+                    full_messages.append({"role": "user", "content": goal_ctx})
                 round_needs_write_approval = any(
                     is_write_guard_stop_result(
                         _lookup_tool_result(function_results, call)
@@ -2122,6 +2144,10 @@ class AIService:
             elif not eff_tools:
                 tools = None
 
+            goal_tracker: Optional[AgentGoalTracker] = (
+                AgentGoalTracker() if eff_tools and tools else None
+            )
+
             skills_extra = self._anthropic_skills_extra(session_business_id, effective_user_query)
             stream_provider_extras = self._provider_call_extras(provider, skills_extra)
 
@@ -2157,12 +2183,13 @@ class AIService:
             budget_stop_reason: Optional[str] = None
             budget_stop_message: Optional[str] = None
             while True:
-                budget_status = budget.check(iteration)
+                budget_status = resolve_budget_gate(budget, iteration, goal_tracker)
                 if budget_status.stop:
                     budget_stop_reason = budget_status.reason
                     budget_stop_message = budget_status.message_fa
                     break
                 iteration += 1
+                max_iterations = budget.max_iterations
                 function_calls = None
                 tool_call_id_map: Dict[str, str] = {}
                 round_text = ""
@@ -2717,6 +2744,28 @@ class AIService:
                             iteration=iteration,
                         )
 
+                    round_assessment = None
+                    if goal_tracker is not None:
+                        round_assessment = goal_tracker.assess_after_tool_round(
+                            function_calls,
+                            function_results,
+                            _lookup_tool_result,
+                            user_query=effective_user_query,
+                        )
+                        if try_extend_budget_for_goal(budget, round_assessment):
+                            max_iterations = budget.max_iterations
+                            yield _emit_trace(
+                                step_id=f"budget_extend_{budget.extensions_granted}",
+                                kind="system",
+                                state="done",
+                                body_markdown=(
+                                    f"هدف هنوز محقق نشده — بودجه تحلیل به "
+                                    f"{budget.max_iterations} مرحله تمدید شد."
+                                ),
+                                iteration=iteration,
+                            )
+                            yield _emit_agent_budget()
+
                     if observation_store is not None:
                         thought_ctx = observation_store.context_for_llm()
                         if thought_ctx:
@@ -2726,17 +2775,25 @@ class AIService:
                                     "content": thought_ctx,
                                 }
                             )
+                    elif goal_tracker is not None:
+                        goal_ctx = goal_tracker.continue_context_for_llm()
+                        if goal_ctx:
+                            full_messages.append(
+                                {"role": "user", "content": goal_ctx}
+                            )
+
                     budget.note_round(productive=round_productive)
                     continue
 
                 if round_text.strip():
-                    if should_agent_continue_after_text(
+                    if should_agent_continue_after_text_round(
+                        goal_tracker=goal_tracker,
                         exploration_enabled=exploration_enabled,
                         observation_store=observation_store,
                         iteration=iteration,
-                        max_iterations=max_iterations,
                         budget=budget,
                     ):
+                        max_iterations = budget.max_iterations
                         yield _emit_trace(
                             step_id=f"continue_explore_{iteration}",
                             kind="plan_next",
@@ -2747,16 +2804,18 @@ class AIService:
                         full_messages.append(
                             {"role": "assistant", "content": round_text.strip()}
                         )
+                        continue_msg = (
+                            goal_tracker.continue_context_for_llm()
+                            if goal_tracker
+                            else None
+                        ) or (
+                            "[agent_continue]\n"
+                            "بر اساس یافته‌های تا اینجا، هنوز نیاز به بررسی "
+                            "یا ابزار بیشتر است. قبل از پاسخ نهایی، "
+                            "دادهٔ لازم را جمع‌آوری کن."
+                        )
                         full_messages.append(
-                            {
-                                "role": "user",
-                                "content": (
-                                    "[agent_continue]\n"
-                                    "بر اساس یافته‌های تا اینجا، هنوز نیاز به بررسی "
-                                    "یا ابزار بیشتر است. قبل از پاسخ نهایی، "
-                                    "دادهٔ لازم را جمع‌آوری کن."
-                                ),
-                            }
+                            {"role": "user", "content": continue_msg}
                         )
                         continue
 
