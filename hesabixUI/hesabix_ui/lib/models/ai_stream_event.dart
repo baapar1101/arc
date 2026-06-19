@@ -1,5 +1,6 @@
 /// کلید ذخیره trace در function_results (بک‌اند).
 const kAgentTraceStorageKey = '_agent_trace';
+const kAgentBudgetStorageKey = '_agent_budget';
 
 /// استخراج trace از function_results پیام ذخیره‌شده.
 List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
@@ -12,6 +13,13 @@ List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
       .toList();
 }
 
+AIStreamAgentBudget? extractAgentBudgetFromResults(Object? functionResults) {
+  if (functionResults is! Map) return null;
+  final raw = functionResults[kAgentBudgetStorageKey];
+  if (raw is! Map) return null;
+  return AIStreamAgentBudget.fromJson(Map<String, dynamic>.from(raw));
+}
+
 /// رویدادهای استریم SSE چت AI
 class AIStreamChunk {
   final String? contentDelta;
@@ -20,6 +28,7 @@ class AIStreamChunk {
   final AIAgentTraceStep? traceStep;
   final AIAgentTraceStep? traceStepUpdate;
   final AIStreamContextUsage? contextUsage;
+  final AIStreamAgentBudget? agentBudget;
   final int? heartbeatElapsedMs;
   final bool done;
   final Map<String, dynamic>? usage;
@@ -40,6 +49,7 @@ class AIStreamChunk {
     this.traceStep,
     this.traceStepUpdate,
     this.contextUsage,
+    this.agentBudget,
     this.heartbeatElapsedMs,
     this.done = false,
     this.usage,
@@ -237,6 +247,67 @@ class AIStreamContextUsage {
       contextRetried: json['context_retried'] as bool? ?? false,
     );
   }
+}
+
+/// بودجهٔ یکپارچهٔ agent (توکن، زمان، استدلال).
+class AIStreamAgentBudget {
+  final int? iteration;
+  final int? maxIterations;
+  final int? tokensUsed;
+  final int? maxTotalTokens;
+  final double? elapsedSec;
+  final double? wallClockSec;
+  final int? unproductiveRounds;
+  final int? maxUnproductiveRounds;
+  final String? reasoningEffort;
+  final String? stopReason;
+  final String? stopMessageFa;
+
+  const AIStreamAgentBudget({
+    this.iteration,
+    this.maxIterations,
+    this.tokensUsed,
+    this.maxTotalTokens,
+    this.elapsedSec,
+    this.wallClockSec,
+    this.unproductiveRounds,
+    this.maxUnproductiveRounds,
+    this.reasoningEffort,
+    this.stopReason,
+    this.stopMessageFa,
+  });
+
+  factory AIStreamAgentBudget.fromJson(Map<String, dynamic> json) {
+    return AIStreamAgentBudget(
+      iteration: json['iteration'] as int?,
+      maxIterations: json['max_iterations'] as int?,
+      tokensUsed: json['tokens_used'] as int?,
+      maxTotalTokens: json['max_total_tokens'] as int?,
+      elapsedSec: (json['elapsed_sec'] as num?)?.toDouble(),
+      wallClockSec: (json['wall_clock_sec'] as num?)?.toDouble(),
+      unproductiveRounds: json['unproductive_rounds'] as int?,
+      maxUnproductiveRounds: json['max_unproductive_rounds'] as int?,
+      reasoningEffort: json['reasoning_effort'] as String?,
+      stopReason: json['stop_reason'] as String?,
+      stopMessageFa: json['stop_message_fa'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        if (iteration != null) 'iteration': iteration,
+        if (maxIterations != null) 'max_iterations': maxIterations,
+        if (tokensUsed != null) 'tokens_used': tokensUsed,
+        if (maxTotalTokens != null) 'max_total_tokens': maxTotalTokens,
+        if (elapsedSec != null) 'elapsed_sec': elapsedSec,
+        if (wallClockSec != null) 'wall_clock_sec': wallClockSec,
+        if (unproductiveRounds != null)
+          'unproductive_rounds': unproductiveRounds,
+        if (maxUnproductiveRounds != null)
+          'max_unproductive_rounds': maxUnproductiveRounds,
+        if (reasoningEffort != null) 'reasoning_effort': reasoningEffort,
+        if (stopReason != null) 'stop_reason': stopReason,
+        if (stopMessageFa != null) 'stop_message_fa': stopMessageFa,
+      };
 }
 
 class AIStreamStatusEvent {

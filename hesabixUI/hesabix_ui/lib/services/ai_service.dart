@@ -667,6 +667,11 @@ class AIService {
     if (eventType == 'context_usage') {
       return AIStreamChunk(contextUsage: AIStreamContextUsage.fromJson(data));
     }
+    if (eventType == 'agent_budget') {
+      return AIStreamChunk(
+        agentBudget: AIStreamAgentBudget.fromJson(data),
+      );
+    }
 
     final done = data['done'] as bool? ?? false;
     final content = data['content'] as String? ?? '';
@@ -684,12 +689,19 @@ class AIService {
             .map((e) => AIAgentTraceStep.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       }
+      AIStreamAgentBudget? agentBudget;
+      if (data['agent_budget'] is Map) {
+        agentBudget = AIStreamAgentBudget.fromJson(
+          Map<String, dynamic>.from(data['agent_budget'] as Map),
+        );
+      }
       return AIStreamChunk(
         done: true,
         messageId: data['message_id'] as int?,
         functionCalls: data['function_calls'],
         functionResults: data['function_results'],
         agentTrace: agentTrace,
+        agentBudget: agentBudget,
         requestedModel: data['requested_model'] as String?,
         resolvedModel: data['resolved_model'] as String?,
       );

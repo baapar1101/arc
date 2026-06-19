@@ -8,6 +8,7 @@ from app.services.ai.ai_budget import (
     STOP_REASON_WALL_CLOCK,
     AgentBudget,
     build_agent_budget,
+    budget_snapshot,
 )
 
 
@@ -57,6 +58,22 @@ def test_productive_round_resets_unproductive_counter():
     budget.note_round(productive=True)
     budget.note_round(productive=False)
     assert budget.check(3).stop is False
+
+
+def test_budget_snapshot():
+    budget = build_agent_budget("medium", max_iterations=6)
+    budget.add_tokens(1200)
+    snap = budget_snapshot(
+        budget,
+        iteration=2,
+        reasoning_effort="medium",
+        stop_reason=STOP_REASON_TOKENS,
+        stop_message_fa="test",
+    )
+    assert snap["iteration"] == 2
+    assert snap["tokens_used"] == 1200
+    assert snap["reasoning_effort"] == "medium"
+    assert snap["stop_reason"] == STOP_REASON_TOKENS
 
 
 def test_budget_stops_on_wall_clock(monkeypatch):

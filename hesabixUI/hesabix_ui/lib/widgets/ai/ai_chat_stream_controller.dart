@@ -18,6 +18,7 @@ class AIChatStreamController extends ChangeNotifier {
   double? contextUsageRatio;
   double? contextUsagePercent;
   bool contextHistorySummarized = false;
+  AIStreamAgentBudget? agentBudget;
   DateTime? startedAt;
   DateTime? timestamp;
   bool pendingWriteApproval = false;
@@ -42,6 +43,7 @@ class AIChatStreamController extends ChangeNotifier {
     timestamp = DateTime.now();
     pendingWriteApproval = false;
     pendingApprovalOps = [];
+    agentBudget = null;
     _lastUiUpdate = null;
     notifyListeners();
   }
@@ -60,6 +62,7 @@ class AIChatStreamController extends ChangeNotifier {
     timestamp = null;
     pendingWriteApproval = false;
     pendingApprovalOps = [];
+    agentBudget = null;
     _lastUiUpdate = null;
     notifyListeners();
   }
@@ -90,6 +93,9 @@ class AIChatStreamController extends ChangeNotifier {
         ? Map<String, dynamic>.from(functionResults as Map)
         : <String, dynamic>{};
     map[kAgentTraceStorageKey] = traceSteps.map((e) => e.toJson()).toList();
+    if (agentBudget != null) {
+      map[kAgentBudgetStorageKey] = agentBudget!.toJson();
+    }
     return map;
   }
 
@@ -101,6 +107,20 @@ class AIChatStreamController extends ChangeNotifier {
       contextUsageRatio = chunk.contextUsage!.usageRatio;
       contextUsagePercent = chunk.contextUsage!.usagePercent;
       contextHistorySummarized = chunk.contextUsage!.historySummarized;
+      notifyListeners();
+      return;
+    }
+    if (chunk.agentBudget != null) {
+      agentBudget = chunk.agentBudget;
+      if (chunk.agentBudget!.iteration != null) {
+        iteration = chunk.agentBudget!.iteration;
+      }
+      if (chunk.agentBudget!.maxIterations != null) {
+        maxIterations = chunk.agentBudget!.maxIterations;
+      }
+      if (iteration != null && maxIterations != null) {
+        statusStep = '$iteration/$maxIterations';
+      }
       notifyListeners();
       return;
     }
@@ -157,7 +177,8 @@ class AIChatStreamController extends ChangeNotifier {
         chunk.traceStep != null ||
         chunk.statusEvent != null ||
         chunk.toolEvent != null ||
-        chunk.heartbeatElapsedMs != null;
+        chunk.heartbeatElapsedMs != null ||
+        chunk.agentBudget != null;
 
     if (immediate) {
       content = accumulated;

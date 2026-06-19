@@ -95,6 +95,8 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
 
     String provider = model?.provider ?? 'openai';
     bool supportsTools = model?.supportsTools ?? true;
+    bool supportsReasoning = model?.supportsReasoning ?? false;
+    String? reasoningEffort = model?.reasoningEffort;
     bool isActive = model?.isActive ?? true;
     int sortOrder = 0;
 
@@ -191,6 +193,37 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                         onChanged: (v) => setDialogState(() => supportsTools = v),
                       ),
                       SwitchListTile(
+                        title: const Text('مدل استدلالی (reasoning)'),
+                        subtitle: const Text(
+                          'برای o-series، gpt-5 و Claude extended thinking',
+                        ),
+                        value: supportsReasoning,
+                        onChanged: (v) => setDialogState(() {
+                          supportsReasoning = v;
+                          if (!v) reasoningEffort = null;
+                        }),
+                      ),
+                      if (supportsReasoning)
+                        DropdownButtonFormField<String?>(
+                          value: reasoningEffort,
+                          decoration: const InputDecoration(
+                            labelText: 'سطح تلاش استدلال',
+                            helperText: 'خالی = خودکار بر اساس پیچیدگی سوال',
+                          ),
+                          items: const [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text('خودکار'),
+                            ),
+                            DropdownMenuItem(value: 'minimal', child: Text('minimal')),
+                            DropdownMenuItem(value: 'low', child: Text('low')),
+                            DropdownMenuItem(value: 'medium', child: Text('medium')),
+                            DropdownMenuItem(value: 'high', child: Text('high')),
+                          ],
+                          onChanged: (v) =>
+                              setDialogState(() => reasoningEffort = v),
+                        ),
+                      SwitchListTile(
                         title: const Text('فعال'),
                         value: isActive,
                         onChanged: (v) => setDialogState(() => isActive = v),
@@ -218,6 +251,8 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                         : descCtrl.text.trim(),
                     'tier': tierCtrl.text.trim().isEmpty ? null : tierCtrl.text.trim(),
                     'supports_tools': supportsTools,
+                    'supports_reasoning': supportsReasoning,
+                    'reasoning_effort': supportsReasoning ? reasoningEffort : null,
                     'max_tokens_default': int.tryParse(maxTokensCtrl.text) ?? 4000,
                     'is_active': isActive,
                     'sort_order': sortOrder,
@@ -308,7 +343,9 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                             title: Text(m.displayName),
                             subtitle: Text(
                               '${m.code} · ${m.provider} · ${m.modelId}'
-                              '${m.tier != null ? ' · ${m.tier}' : ''}',
+                              '${m.tier != null ? ' · ${m.tier}' : ''}'
+                              '${m.supportsReasoning ? ' · reasoning' : ''}'
+                              '${m.reasoningEffort != null ? ' (${m.reasoningEffort})' : ''}',
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,

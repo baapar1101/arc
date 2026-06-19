@@ -26,6 +26,7 @@ class AIChatThreadView extends StatelessWidget {
   final int? streamingIteration;
   final int? streamingMaxIterations;
   final int? streamingElapsedSeconds;
+  final AIStreamAgentBudget? streamingAgentBudget;
   final DateTime? streamingTimestamp;
   final bool messagesLoading;
   final bool sending;
@@ -90,6 +91,7 @@ class AIChatThreadView extends StatelessWidget {
     this.streamingIteration,
     this.streamingMaxIterations,
     this.streamingElapsedSeconds,
+    this.streamingAgentBudget,
     required this.streamingTimestamp,
     required this.messagesLoading,
     required this.sending,
@@ -208,6 +210,7 @@ class AIChatThreadView extends StatelessWidget {
               iteration: streamingIteration,
               maxIterations: streamingMaxIterations,
               elapsedSeconds: streamingElapsedSeconds,
+              agentBudget: streamingAgentBudget,
               formatTime: formatTime(streamingTimestamp),
             ),
           ),
@@ -439,6 +442,7 @@ class _StreamingRow extends StatelessWidget {
   final int? iteration;
   final int? maxIterations;
   final int? elapsedSeconds;
+  final AIStreamAgentBudget? agentBudget;
   final String formatTime;
 
   const _StreamingRow({
@@ -453,6 +457,7 @@ class _StreamingRow extends StatelessWidget {
     this.iteration,
     this.maxIterations,
     this.elapsedSeconds,
+    this.agentBudget,
     required this.formatTime,
   });
 
@@ -492,6 +497,9 @@ class _StreamingRow extends StatelessWidget {
                     traceSteps: traceSteps,
                     toolActivities: toolActivities,
                     statusLabel: statusLabel,
+                    budgetSummary: agentBudget != null
+                        ? aiAgentBudgetSummary(l10n, budget: agentBudget!)
+                        : null,
                     hideApprovalPending: suppressApprovalToolChips,
                   ),
                 if (content.isNotEmpty)
@@ -542,12 +550,14 @@ class _StreamingActivityLine extends StatefulWidget {
   final List<AIAgentTraceStep> traceSteps;
   final List<AIToolActivity> toolActivities;
   final String statusLabel;
+  final String? budgetSummary;
   final bool hideApprovalPending;
 
   const _StreamingActivityLine({
     required this.traceSteps,
     required this.toolActivities,
     required this.statusLabel,
+    this.budgetSummary,
     this.hideApprovalPending = false,
   });
 
@@ -587,11 +597,24 @@ class _StreamingActivityLineState extends State<_StreamingActivityLine> {
                 ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(
-                    summary,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        summary,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      if (widget.budgetSummary != null &&
+                          widget.budgetSummary!.isNotEmpty)
+                        Text(
+                          widget.budgetSummary!,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.outline,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],

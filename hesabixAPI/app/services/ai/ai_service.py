@@ -84,6 +84,7 @@ from app.services.ai.ai_budget import (
     AgentBudget,
     STOP_REASON_ITERATIONS,
     build_agent_budget,
+    budget_snapshot,
 )
 from app.services.ai.ai_tool_cache import (
     get_cached,
@@ -2049,6 +2050,20 @@ class AIService:
                 state = kwargs.pop("state", "done")
                 return _ingest_trace_event(trace_step(sid, kind, state, **kwargs))
 
+            def _emit_agent_budget(
+                *,
+                stop_reason: Optional[str] = None,
+                stop_message_fa: Optional[str] = None,
+            ) -> Dict[str, Any]:
+                snap = budget_snapshot(
+                    budget,
+                    iteration=iteration,
+                    reasoning_effort=reasoning_effort,
+                    stop_reason=stop_reason,
+                    stop_message_fa=stop_message_fa,
+                )
+                return {"event": "agent_budget", **snap}
+
             yield status_event("thinking")
             yield _emit_trace(
                 step_id="ctx_thinking",
@@ -2161,6 +2176,7 @@ class AIService:
                     "max_iterations": max_iterations,
                     "done": False,
                 }
+                yield _emit_agent_budget()
 
                 if iteration > 1:
                     yield _emit_trace(
@@ -2325,6 +2341,7 @@ class AIService:
                 # ثبت توکن مصرف‌شدهٔ این نوبت در بودجهٔ یکپارچه
                 if final_usage:
                     budget.add_tokens(final_usage.get("total_tokens"))
+                    yield _emit_agent_budget()
 
                 if function_calls and use_tools:
                     accumulated_function_calls.extend(function_calls)
@@ -2782,6 +2799,18 @@ class AIService:
                     "usage": None,
                     "done": False,
                 }
+                yield _emit_agent_budget(
+                    stop_reason=budget_stop_reason,
+                    stop_message_fa=budget_stop_message,
+                )
+
+            final_agent_budget = budget_snapshot(
+                budget,
+                iteration=iteration,
+                reasoning_effort=reasoning_effort,
+                stop_reason=budget_stop_reason,
+                stop_message_fa=budget_stop_message,
+            )
 
             if exploration_enabled:
                 yield _emit_trace(
@@ -2824,6 +2853,7 @@ class AIService:
                     else None
                 ),
                 "agent_trace": trace_steps or None,
+                "agent_budget": final_agent_budget,
                 "citations_context": citations_context or None,
                 "requested_model": requested_model_code,
                 "resolved_model": resolved_model_code,

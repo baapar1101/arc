@@ -1984,6 +1984,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                     _stream.elapsedSeconds > 0
                                     ? _stream.elapsedSeconds
                                     : null,
+                                streamingAgentBudget: _stream.agentBudget,
                                 streamingTimestamp: _stream.timestamp,
                                 messageFeedbackRatings:
                                     _messageFeedbackRatings,

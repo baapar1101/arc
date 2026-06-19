@@ -29,6 +29,8 @@ STOP_REASON_TOKENS = "token_budget"
 STOP_REASON_WALL_CLOCK = "wall_clock"
 STOP_REASON_UNPRODUCTIVE = "diminishing_returns"
 
+AGENT_BUDGET_STORAGE_KEY = "_agent_budget"
+
 
 @dataclass
 class BudgetStatus:
@@ -146,3 +148,31 @@ def build_agent_budget(
         max_total_tokens=token_budget,
         wall_clock_sec=wall_clock,
     )
+
+
+def budget_snapshot(
+    budget: AgentBudget,
+    *,
+    iteration: int = 0,
+    reasoning_effort: Optional[str] = None,
+    stop_reason: Optional[str] = None,
+    stop_message_fa: Optional[str] = None,
+) -> dict[str, object]:
+    """نمای لحظه‌ای بودجه برای SSE و ذخیره در function_results."""
+    snap: dict[str, object] = {
+        "iteration": iteration,
+        "max_iterations": budget.max_iterations,
+        "tokens_used": budget.tokens_used,
+        "max_total_tokens": budget.max_total_tokens,
+        "elapsed_sec": round(budget.elapsed_sec, 1),
+        "wall_clock_sec": budget.wall_clock_sec,
+        "unproductive_rounds": budget.unproductive_rounds,
+        "max_unproductive_rounds": budget.max_unproductive_rounds,
+    }
+    if reasoning_effort:
+        snap["reasoning_effort"] = reasoning_effort
+    if stop_reason:
+        snap["stop_reason"] = stop_reason
+    if stop_message_fa:
+        snap["stop_message_fa"] = stop_message_fa
+    return snap

@@ -35,6 +35,7 @@ class AIChatMessageBody extends StatelessWidget {
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     var agentTrace = extractAgentTraceFromResults(functionResults);
+    final agentBudget = extractAgentBudgetFromResults(functionResults);
     if (suppressApprovalToolChips) {
       agentTrace =
           agentTrace.where((s) => s.kind != 'approval').toList();
@@ -49,10 +50,11 @@ class AIChatMessageBody extends StatelessWidget {
       crossAxisAlignment:
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        if (!isUser && (agentTrace.isNotEmpty || toolActivities.isNotEmpty)) ...[
+        if (!isUser && (agentTrace.isNotEmpty || toolActivities.isNotEmpty || agentBudget != null)) ...[
           AIReasoningPanel(
             steps: agentTrace,
             toolActivities: toolActivities,
+            agentBudget: agentBudget,
             compact: true,
             initiallyExpanded: false,
           ),
@@ -92,7 +94,8 @@ class AIChatMessageBody extends StatelessWidget {
 
     final results = functionResults is Map
         ? (Map<String, dynamic>.from(functionResults as Map)
-          ..remove(kAgentTraceStorageKey))
+          ..remove(kAgentTraceStorageKey)
+          ..remove(kAgentBudgetStorageKey))
         : <String, dynamic>{};
 
     return calls.map((call) {

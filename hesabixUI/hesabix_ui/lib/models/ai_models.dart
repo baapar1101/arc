@@ -519,6 +519,8 @@ class AIModelCatalogItem {
   final String? tier;
   final bool supportsTools;
   final int maxTokensDefault;
+  final bool supportsReasoning;
+  final String? reasoningEffort;
   final bool isActive;
   final bool isDefault;
   final Map<String, dynamic>? pricing;
@@ -536,6 +538,8 @@ class AIModelCatalogItem {
     this.tier,
     this.supportsTools = true,
     this.maxTokensDefault = 4000,
+    this.supportsReasoning = false,
+    this.reasoningEffort,
     this.isActive = true,
     this.isDefault = false,
     this.pricing,
@@ -555,6 +559,8 @@ class AIModelCatalogItem {
       tier: json['tier'] as String?,
       supportsTools: json['supports_tools'] as bool? ?? true,
       maxTokensDefault: json['max_tokens_default'] as int? ?? 4000,
+      supportsReasoning: json['supports_reasoning'] as bool? ?? false,
+      reasoningEffort: json['reasoning_effort'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       isDefault: json['is_default'] as bool? ?? false,
       pricing: json['pricing'] is Map
@@ -578,6 +584,8 @@ class AIModelCatalogItem {
       if (tier != null) 'tier': tier,
       'supports_tools': supportsTools,
       'max_tokens_default': maxTokensDefault,
+      'supports_reasoning': supportsReasoning,
+      if (reasoningEffort != null) 'reasoning_effort': reasoningEffort,
       'is_active': isActive,
       'sort_order': 0,
     };

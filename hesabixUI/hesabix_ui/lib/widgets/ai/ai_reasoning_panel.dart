@@ -3,12 +3,14 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_agent_trace_timeline.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_l10n.dart';
 import 'ai_chat_tool_activity_list.dart';
 
 /// پنل استدلال — traceهای لایه reasoning جدا از پاسخ نهایی.
 class AIReasoningPanel extends StatefulWidget {
   final List<AIAgentTraceStep> steps;
   final List<AIToolActivity> toolActivities;
+  final AIStreamAgentBudget? agentBudget;
   final bool compact;
   final bool initiallyExpanded;
 
@@ -16,6 +18,7 @@ class AIReasoningPanel extends StatefulWidget {
     super.key,
     required this.steps,
     this.toolActivities = const [],
+    this.agentBudget,
     this.compact = false,
     this.initiallyExpanded = false,
   });
@@ -85,15 +88,19 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   Widget build(BuildContext context) {
     final reasoning = AIReasoningPanel.reasoningOnly(widget.steps);
     final toolCount = widget.toolActivities.length;
-    if (reasoning.isEmpty && toolCount == 0) return const SizedBox.shrink();
+    if (reasoning.isEmpty && toolCount == 0 && widget.agentBudget == null) {
+      return const SizedBox.shrink();
+    }
 
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final detailCount = reasoning.length + toolCount;
+    final detailCount = reasoning.length + toolCount + (widget.agentBudget != null ? 1 : 0);
     final title = reasoning.isNotEmpty
         ? l10n.aiReasoningPanelTitle
-        : 'ابزارهای استفاده‌شده';
+        : widget.agentBudget != null
+            ? 'بودجه تحلیل'
+            : 'ابزارهای استفاده‌شده';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -195,6 +202,16 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (widget.agentBudget != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            aiAgentBudgetSummary(l10n, budget: widget.agentBudget!),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
                       if (reasoning.isNotEmpty)
                         AIAgentTraceTimeline(
                           steps: reasoning,

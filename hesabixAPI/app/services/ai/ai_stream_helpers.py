@@ -31,6 +31,28 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             data["exploration"] = chunk.get("exploration")
         return [data]
 
+    if event_type == "agent_budget":
+        data = {
+            "type": "agent_budget",
+            "done": False,
+        }
+        for key in (
+            "iteration",
+            "max_iterations",
+            "tokens_used",
+            "max_total_tokens",
+            "elapsed_sec",
+            "wall_clock_sec",
+            "unproductive_rounds",
+            "max_unproductive_rounds",
+            "reasoning_effort",
+            "stop_reason",
+            "stop_message_fa",
+        ):
+            if chunk.get(key) is not None:
+                data[key] = chunk.get(key)
+        return [data]
+
     if event_type == "context_usage":
         return [
             {
@@ -121,6 +143,8 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
         }
         if chunk.get("agent_trace"):
             done_payload["agent_trace"] = chunk.get("agent_trace")
+        if chunk.get("agent_budget"):
+            done_payload["agent_budget"] = chunk.get("agent_budget")
         if chunk.get("requested_model"):
             done_payload["requested_model"] = chunk.get("requested_model")
         if chunk.get("resolved_model"):

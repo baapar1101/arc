@@ -349,6 +349,37 @@ const _toolLabelFallbackFa = <String, String>{
   'update_user_memory': 'به‌روزرسانی حافظه دستیار',
 };
 
+/// خلاصهٔ بودجه agent برای نمایش در استریم.
+String aiAgentBudgetSummary(
+  AppLocalizations l10n, {
+  required AIStreamAgentBudget budget,
+}) {
+  final parts = <String>[];
+  final used = budget.tokensUsed;
+  final maxTok = budget.maxTotalTokens;
+  if (used != null && maxTok != null && maxTok > 0) {
+    parts.add('${formatCompactInt(used)}/${formatCompactInt(maxTok)} tok');
+  }
+  final elapsed = budget.elapsedSec;
+  if (elapsed != null) {
+    parts.add('${elapsed.toStringAsFixed(0)}s');
+  }
+  final effort = budget.reasoningEffort;
+  if (effort != null && effort.isNotEmpty) {
+    parts.add('reasoning: $effort');
+  }
+  if (budget.stopReason != null && budget.stopReason!.isNotEmpty) {
+    parts.add(budget.stopMessageFa ?? budget.stopReason!);
+  }
+  return parts.join(' · ');
+}
+
+String formatCompactInt(int value) {
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+  return value.toString();
+}
+
 /// متن وضعیت استریم AI از phase/step.
 String aiStreamStatusLabel(
   AppLocalizations l10n, {
