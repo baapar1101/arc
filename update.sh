@@ -269,13 +269,15 @@ if ! command -v flutter >/dev/null 2>&1; then
   exit 1
 fi
 persist_flutter_path_in_profile_d
-if declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
+if declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
+  hesabix_resolve_flutter_storage_base_url || true
+elif declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
   hesabix_apply_flutter_mirror_env
 else
   export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
   export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://f.mirror.hesabix.ir/gcs}"
 fi
-log_info "Flutter pub/storage: PUB_HOSTED_URL=${PUB_HOSTED_URL}"
+log_info "Flutter pub/storage: PUB_HOSTED_URL=${PUB_HOSTED_URL} FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL}"
 app_dir="${APP_ROOT}/app"
 build_script="${app_dir}/build_web.sh"
 if [[ ! -f "${build_script}" ]]; then

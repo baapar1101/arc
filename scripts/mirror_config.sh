@@ -166,6 +166,75 @@ hesabix_apply_flutter_mirror_env() {
   hesabix_mirror_log_info "Flutter pub/storage (${FLUTTER_MIRROR}): PUB_HOSTED_URL=${PUB_HOSTED_URL}"
 }
 
+# Ordered Flutter engine/storage bases (preferred env URL first).
+hesabix_flutter_storage_fallback_bases() {
+  local -a bases=()
+  local b
+  if [[ -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
+    bases+=("${FLUTTER_STORAGE_BASE_URL%/}")
+  fi
+  bases+=(
+    "${HESABIX_FLUTTER_STORAGE_BASE_URL}"
+    "https://storage.flutter-io.cn"
+    "https://mirrors.tuna.tsinghua.edu.cn/flutter"
+    "https://storage.googleapis.com"
+  )
+  local -A seen=()
+  for b in "${bases[@]}"; do
+    [[ -n "$b" && -z "${seen[$b]:-}" ]] || continue
+    seen[$b]=1
+    printf '%s\n' "$b"
+  done
+}
+
+# Probe sky_engine.zip for the installed Flutter engine; print first working storage base.
+hesabix_probe_flutter_storage_base() {
+  local flutter_root="${FLUTTER_STORAGE_PROBE_FLUTTER_ROOT:-/opt/flutter}"
+  local engine realm rel_path base url code
+  [[ -f "${flutter_root}/bin/internal/engine.version" ]] || return 1
+  engine="$(tr -d '\n\r' < "${flutter_root}/bin/internal/engine.version")"
+  [[ -n "$engine" ]] || return 1
+  realm=""
+  if [[ -f "${flutter_root}/bin/cache/engine.realm" ]]; then
+    realm="$(tr -d '\n\r' < "${flutter_root}/bin/cache/engine.realm")"
+  fi
+  rel_path="flutter_infra_release/flutter/${engine}/sky_engine.zip"
+  while IFS= read -r base; do
+    [[ -n "$base" ]] || continue
+    base="${base%/}"
+    if [[ -n "$realm" ]]; then
+      url="${base}/${realm}/${rel_path}"
+    else
+      url="${base}/${rel_path}"
+    fi
+    code="$(curl -fsSI -o /dev/null -w '%{http_code}' --connect-timeout 8 --max-time 25 "$url" 2>/dev/null || echo 000)"
+    if [[ "$code" == "200" ]]; then
+      printf '%s' "$base"
+      return 0
+    fi
+  done < <(hesabix_flutter_storage_fallback_bases)
+  return 1
+}
+
+# If the preferred storage mirror lacks engine artifacts, switch to a working fallback.
+hesabix_resolve_flutter_storage_base_url() {
+  local preferred resolved
+  preferred="${FLUTTER_STORAGE_BASE_URL:-}"
+  hesabix_apply_flutter_mirror_env >/dev/null 2>&1 || true
+  preferred="${FLUTTER_STORAGE_BASE_URL:-${preferred}}"
+  resolved="$(hesabix_probe_flutter_storage_base)" || {
+    hesabix_mirror_log_warning "No Flutter storage mirror has sky_engine for the installed engine."
+    return 1
+  }
+  export FLUTTER_STORAGE_BASE_URL="${resolved}"
+  if [[ -n "${preferred}" && "${resolved}" != "${preferred%/}" ]]; then
+    hesabix_mirror_log_warning "Flutter storage fallback: ${preferred} → ${resolved} (engine artifacts missing on preferred mirror)"
+  else
+    hesabix_mirror_log_info "Flutter storage: ${resolved}"
+  fi
+  return 0
+}
+
 hesabix_configure_pip_mirror() {
   if ! command -v python3 >/dev/null 2>&1; then
     return 0

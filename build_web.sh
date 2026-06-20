@@ -170,6 +170,12 @@ cd "$APP_DIR"
 # آینهٔ pub/storage: از محیط یا .deploy_env (deploy.sh / mirror_config.sh)
 export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
 export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://f.mirror.hesabix.ir/gcs}"
+# shellcheck source=scripts/mirror_config.sh
+if [[ -r "${REPO_ROOT}/scripts/mirror_config.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${REPO_ROOT}/scripts/mirror_config.sh"
+  hesabix_resolve_flutter_storage_base_url || true
+fi
 # اگر --offline داده نشده و آینهٔ انتخاب‌شده در دسترس نبود، مثل حالت آفلاین رفتار کن
 if [ "$USE_OFFLINE_CACHE" != true ]; then
   if ! curl -fsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/" >/dev/null 2>&1 && \

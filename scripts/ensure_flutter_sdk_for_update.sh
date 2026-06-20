@@ -1,33 +1,21 @@
 #!/usr/bin/env bash
-# Ensure Flutter Dart SDK is usable before web build (update.sh / deploy).
+# Ensure Flutter Dart SDK + web engine artifacts before web build (update.sh / deploy).
 # - Optional git update to origin/stable only when HESABIX_UPDATE_FLUTTER_SDK=1
-# - Download Dart SDK with storage mirror fallbacks when primary mirror lacks artifacts
-# - Roll back Flutter git + restore dart-sdk.old if update breaks the toolchain
+# - Resolve FLUTTER_STORAGE_BASE_URL to a mirror that has engine artifacts (sky_engine.zip)
+# - Download Dart SDK / precache web with storage mirror fallbacks
 set -euo pipefail
 
+APP_ROOT="${APP_ROOT:-/opt/hesabix}"
 FLUTTER_ROOT="${FLUTTER_ROOT:-/opt/flutter}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=scripts/mirror_config.sh
+if [[ -r "${SCRIPT_DIR}/mirror_config.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${SCRIPT_DIR}/mirror_config.sh"
+fi
 
 log() { echo "ensure_flutter_sdk: $*" >&2; }
-
-_flutter_storage_fallback_bases() {
-  local -a bases=()
-  local b
-  if [[ -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
-    bases+=("${FLUTTER_STORAGE_BASE_URL%/}")
-  fi
-  bases+=(
-    "https://f.mirror.hesabix.ir/gcs"
-    "https://storage.flutter-io.cn"
-    "https://mirrors.tuna.tsinghua.edu.cn/flutter"
-    "https://storage.googleapis.com"
-  )
-  local -A seen=()
-  for b in "${bases[@]}"; do
-    [[ -n "$b" && -z "${seen[$b]:-}" ]] || continue
-    seen[$b]=1
-    printf '%s\n' "$b"
-  done
-}
 
 _dart_sdk_ready() {
   local dart_bin="${FLUTTER_ROOT}/bin/cache/dart-sdk/bin/dart"
@@ -37,7 +25,7 @@ _dart_sdk_ready() {
 _ensure_dart_sdk_with_mirror() {
   local base update_script
   update_script="${FLUTTER_ROOT}/bin/internal/update_dart_sdk.sh"
-  [[ -x "$update_script" || -f "$update_script" ]] || {
+  [[ -f "$update_script" ]] || {
     log "missing ${update_script}"
     return 1
   }
@@ -52,7 +40,7 @@ _ensure_dart_sdk_with_mirror() {
     fi
     rm -f "${FLUTTER_ROOT}/bin/cache/dart-sdk-linux-x64.zip" 2>/dev/null || true
     rm -f "${FLUTTER_ROOT}/bin/cache/dart-sdk-linux-arm64.zip" 2>/dev/null || true
-  done < <(_flutter_storage_fallback_bases)
+  done < <(hesabix_flutter_storage_fallback_bases)
   return 1
 }
 
@@ -129,9 +117,43 @@ ensure_flutter_dart_sdk() {
   return 1
 }
 
+ensure_flutter_web_artifacts() {
+  local flutter_bin="${FLUTTER_ROOT}/bin/flutter"
+  [[ -x "$flutter_bin" ]] || flutter_bin="$(command -v flutter 2>/dev/null || true)"
+  [[ -n "$flutter_bin" ]] || {
+    log "flutter binary not found"
+    return 1
+  }
+
+  if ! declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
+    export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.flutter-io.cn}"
+  elif ! hesabix_resolve_flutter_storage_base_url; then
+    return 1
+  fi
+
+  export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
+  export PATH="${FLUTTER_ROOT}/bin:/snap/bin:${PATH:-}"
+  log "Precaching Flutter web artifacts (FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL})"
+  if env PUB_HOSTED_URL="${PUB_HOSTED_URL}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL}" \
+    "$flutter_bin" precache --web --no-android --no-ios --no-linux --no-macos --no-windows --no-fuchsia; then
+    log "Flutter web artifacts precached"
+    return 0
+  fi
+  log "flutter precache --web failed"
+  return 1
+}
+
 main() {
+  if declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
+    hesabix_apply_flutter_mirror_env
+  else
+    export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
+    export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://f.mirror.hesabix.ir/gcs}"
+  fi
+
   maybe_update_flutter_git || true
   ensure_flutter_dart_sdk
+  ensure_flutter_web_artifacts
 }
 
 main "$@"
