@@ -240,19 +240,21 @@ LOW_RAM=0
 
 # For release mode, use PWA strategy and full optimizations
 if [ "$MODE" = "release" ]; then
-  BUILD_FLAGS+=(--pwa-strategy offline-first)
+  # Flutter 3.42+ deprecated PWA; offline-first now emits a SW that unregisters and reloads
+  # the page on activate, which breaks CanvasKit startup. Use no service worker.
+  BUILD_FLAGS+=(--pwa-strategy none)
   BUILD_FLAGS+=(--base-href /)
   # On low-RAM use -O1 to avoid dart2js OOM (exit code -9). Otherwise -O2.
   if [ "$LOW_RAM" -eq 1 ]; then
     BUILD_FLAGS+=(--optimization-level 1)
     echo "Building Flutter for Web (Production) with low-memory settings..."
-    echo "  - PWA Strategy: offline-first (Service Worker enabled)"
+    echo "  - PWA Strategy: none (no Flutter service worker)"
     echo "  - Base Href: /"
     echo "  - Optimization Level: 1 (reduces memory use on <2.5GB RAM)"
   else
     BUILD_FLAGS+=(--optimization-level 2)
     echo "Building Flutter for Web (Production) with full optimizations..."
-    echo "  - PWA Strategy: offline-first (Service Worker enabled)"
+    echo "  - PWA Strategy: none (no Flutter service worker)"
     echo "  - Base Href: /"
     echo "  - Optimization Level: 2 (balanced optimization)"
   fi
@@ -455,15 +457,14 @@ echo ""
 if [ "$MODE" = "release" ]; then
   echo "✓ Applied optimizations:"
   echo "  - Mode: Production (Release)"
-  echo "  - Service Worker: Enabled (offline-first strategy)"
+  echo "  - Service Worker: disabled (pwa-strategy none)"
   echo "  - Optimization Level: 2 (balanced optimization)"
   echo "  - Parallel Workers: $BUILD_WORKERS (80% of $AVAILABLE_CORES cores)"
   echo "  - Heap Size: ${HEAP_SIZE_MB}MB (80% of ${TOTAL_RAM_MB}MB RAM)"
   echo "  - Base Href: /"
   echo "  - API Base URL: $API_BASE_URL"
   echo ""
-  echo "Note: Service Worker automatically caches static files"
-  echo "      and improves performance and enables offline usage."
+  echo "Note: Flutter service worker is disabled to avoid CanvasKit startup races."
 else
   echo "✓ Applied optimizations:"
   echo "  - Mode: $MODE"

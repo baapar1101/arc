@@ -17,6 +17,36 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <!-- Purge legacy Flutter service workers once per deploy (old SW + cache can mismatch CanvasKit). -->
+  <script>
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      var purgeKey = 'hesabix_sw_purged_for';
+      fetch('version.json?t=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          var build = j && typeof j.build === 'string' ? j.build : '';
+          if (build && localStorage.getItem(purgeKey) === build) return;
+          return navigator.serviceWorker.getRegistrations().then(function (regs) {
+            var hadSw = regs.length > 0;
+            var tasks = regs.map(function (reg) { return reg.unregister(); });
+            return Promise.all(tasks).then(function () {
+              if ('caches' in window) {
+                return caches.keys().then(function (keys) {
+                  return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                });
+              }
+            }).then(function () {
+              if (build) {
+                try { localStorage.setItem(purgeKey, build); } catch (e) {}
+              }
+              if (hadSw) window.location.reload();
+            });
+          });
+        })
+        .catch(function () {});
+    })();
+  </script>
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Hesabix - سیستم مدیریت مالی">
   <!-- viewport-fit=cover برای مدیریت بهتر فضای پایین صفحه روی موبایل (خصوصاً iOS) -->
