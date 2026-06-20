@@ -2181,7 +2181,16 @@ ensure_flutter_sdk() {
       exit 1
     fi
   else
-    (cd /opt/flutter && git fetch --depth 1 origin stable && git reset --hard origin/stable) 2>/dev/null || true
+    local ensure_flutter_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_flutter_sdk_for_update.sh"
+    export HESABIX_UPDATE_FLUTTER_SDK="${HESABIX_UPDATE_FLUTTER_SDK:-1}"
+    if [[ -f "${ensure_flutter_script}" ]]; then
+      chmod +x "${ensure_flutter_script}" 2>/dev/null || true
+      if ! bash "${ensure_flutter_script}"; then
+        log_warning "Flutter SDK ensure failed after git update; trying flutter doctor..."
+      fi
+    else
+      (cd /opt/flutter && git fetch --depth 1 origin stable && git reset --hard origin/stable) 2>/dev/null || true
+    fi
   fi
   export PATH="/opt/flutter/bin:$PATH"
   git config --global --add safe.directory /opt/flutter 2>/dev/null || true
