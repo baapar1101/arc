@@ -29,8 +29,7 @@ def validate_production_security(settings: Settings) -> None:
 	if settings.debug:
 		errors.append("DEBUG must be false in production")
 
-	if settings.cors_allowed_origins == ["*"]:
-		errors.append("CORS_ALLOWED_ORIGINS must list explicit frontend domains in production")
+	# API عمومی: CORS_ALLOWED_ORIGINS=["*"] در production مجاز است (allow_credentials=False در main.py).
 
 	for name, value in (
 		("CAPTCHA_SECRET", settings.captcha_secret),
@@ -43,9 +42,7 @@ def validate_production_security(settings: Settings) -> None:
 	if not (settings.encryption_key or "").strip():
 		errors.append("ENCRYPTION_KEY must be set in production")
 
-	import os
-
-	if not os.getenv("WALLET_WEBHOOK_SECRET", "").strip():
+	if not (settings.wallet_webhook_secret or "").strip():
 		errors.append("WALLET_WEBHOOK_SECRET must be set in production")
 
 	if errors:

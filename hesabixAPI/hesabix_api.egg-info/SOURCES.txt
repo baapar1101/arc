@@ -191,6 +191,7 @@ adapters/db/models/ai_model.py
 adapters/db/models/ai_plan.py
 adapters/db/models/ai_prompt.py
 adapters/db/models/ai_provider_credential.py
+adapters/db/models/ai_session_todo.py
 adapters/db/models/ai_skill.py
 adapters/db/models/ai_subscription.py
 adapters/db/models/ai_usage_log.py
@@ -361,6 +362,7 @@ app/core/crm_web_chat_permissions.py
 app/core/customer_club_plugin_dependency.py
 app/core/db_pool_monitor.py
 app/core/distribution_plugin_dependency.py
+app/core/egress_policy.py
 app/core/error_handlers.py
 app/core/firewall_middleware.py
 app/core/i18n.py
@@ -372,6 +374,7 @@ app/core/monitoring.py
 app/core/pagination.py
 app/core/payment_response.py
 app/core/permissions.py
+app/core/production_security.py
 app/core/query_timeout.py
 app/core/queue.py
 app/core/rate_limiter.py
@@ -417,6 +420,7 @@ app/services/bom_service.py
 app/services/bulk_price_update_service.py
 app/services/bulk_product_prices_sheet_service.py
 app/services/business_background_jobs.py
+app/services/business_backup_access.py
 app/services/business_backup_financial_policy.py
 app/services/business_backup_orphan_cleanup_service.py
 app/services/business_backup_schema_compat.py
@@ -527,8 +531,10 @@ app/services/repair_shop_accounting.py
 app/services/repair_shop_notification.py
 app/services/repair_shop_operations.py
 app/services/repair_shop_service.py
+app/services/report_template_gallery.py
 app/services/report_template_scope_registry.py
 app/services/report_template_service.py
+app/services/report_template_v2_service.py
 app/services/session_service.py
 app/services/share_link_logo_service.py
 app/services/sms_destination_rate_limit.py
@@ -561,6 +567,7 @@ app/services/tax_validation_service.py
 app/services/telegram_ai_chat_handler.py
 app/services/telegram_ai_chat_service.py
 app/services/template_builder_compiler.py
+app/services/template_design_v2_compiler.py
 app/services/transfer_service.py
 app/services/trial_balance_service.py
 app/services/user_ui_preferences_service.py
@@ -587,6 +594,7 @@ app/services/ai/ai_db_helpers.py
 app/services/ai/ai_embedding_service.py
 app/services/ai/ai_eval_schedule_service.py
 app/services/ai/ai_eval_service.py
+app/services/ai/ai_execution_policy.py
 app/services/ai/ai_exploration_service.py
 app/services/ai/ai_export_service.py
 app/services/ai/ai_feedback_analytics_service.py
@@ -602,6 +610,7 @@ app/services/ai/ai_function_extensions_phase5.py
 app/services/ai/ai_function_extensions_phase6.py
 app/services/ai/ai_function_extensions_phase7.py
 app/services/ai/ai_function_extensions_phase8.py
+app/services/ai/ai_function_extensions_session_todos.py
 app/services/ai/ai_function_extensions_workflow.py
 app/services/ai/ai_goal_assessment.py
 app/services/ai/ai_helpers.py
@@ -637,6 +646,8 @@ app/services/ai/ai_retry_policy.py
 app/services/ai/ai_role_security_prompt.py
 app/services/ai/ai_scheduled_task_service.py
 app/services/ai/ai_service.py
+app/services/ai/ai_session_todo_events.py
+app/services/ai/ai_session_todo_service.py
 app/services/ai/ai_skill_git_import.py
 app/services/ai/ai_skill_parser.py
 app/services/ai/ai_skill_runtime.py
@@ -860,6 +871,8 @@ migrations/versions/20260617_000002_business_frequent_descriptions_scope.py
 migrations/versions/20260617_000003_merge_heads_invoice_share_and_frequent_descriptions_scope.py
 migrations/versions/20260618_000001_upgrade_ai_prompts_accounting_domain.py
 migrations/versions/20260619_000001_merge_heads_ai_prompts_accounting_domain_and_ai_model_reasoning_effort.py
+migrations/versions/20260619_000002_ai_chat_session_execution_mode.py
+migrations/versions/20260619_000003_ai_session_todos.py
 migrations/versions/20260620_000001_product_public_catalog.py
 migrations/versions/20260621_000001_business_backup_import_security.py
 migrations/versions/20260621_000001_public_catalog_price_flag.py
@@ -892,6 +905,7 @@ tests/test_ai_eval_service.py
 tests/test_ai_exploration_service.py
 tests/test_ai_feedback_analytics.py
 tests/test_ai_goal_assessment.py
+tests/test_ai_goal_assessment_session_todos.py
 tests/test_ai_json_safe.py
 tests/test_ai_knowledge_service.py
 tests/test_ai_memory_service.py
@@ -903,6 +917,7 @@ tests/test_ai_permission_map.py
 tests/test_ai_quota_helpers.py
 tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
+tests/test_ai_session_todo_service.py
 tests/test_ai_skill_parser.py
 tests/test_ai_subscription_lock.py
 tests/test_ai_subscription_renew.py
@@ -934,8 +949,10 @@ tests/test_product_inventory_tracking_sync.py
 tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
 tests/test_quick_sales_service.py
+tests/test_security_hardening.py
 tests/test_stock_count.py
 tests/test_sunway_sms_provider.py
 tests/test_tax_key_material_service.py
+tests/test_template_design_v2_compiler.py
 tests/test_voice_ws_helpers.py
 tests/test_webm_decode.py

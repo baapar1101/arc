@@ -1689,6 +1689,17 @@ deploy_backend() {
     : > "${env_file}"
   fi
   merge_hesabix_api_env_file "${env_file}"
+  local ensure_secrets="${DEPLOY_SCRIPT_DIR}/scripts/ensure_api_production_secrets.sh"
+  if [[ -f "${ensure_secrets}" ]]; then
+    chmod +x "${ensure_secrets}" 2>/dev/null || true
+    log_info "Ensuring API production secrets in .env..."
+    if APP_ROOT="${APP_ROOT}" bash "${ensure_secrets}"; then
+      log_success "API production secrets verified."
+    else
+      log_error "Failed to ensure API production secrets."
+      exit 1
+    fi
+  fi
 
   if [[ "${INSTALL_VOICE:-N}" =~ ^[Yy]$ ]]; then
     local voice_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_voice_chat.sh"

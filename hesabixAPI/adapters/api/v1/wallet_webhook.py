@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Dict, Any
-import os
 import hmac
 import hashlib
 import json
@@ -30,7 +29,7 @@ def wallet_webhook_endpoint(
 	db: Session = Depends(get_db),
 ) -> dict:
 	settings = get_settings()
-	secret = os.getenv("WALLET_WEBHOOK_SECRET", "").strip()
+	secret = (settings.wallet_webhook_secret or "").strip()
 	is_production = (settings.environment or "").strip().lower() in {"production", "prod"}
 	if is_production and not secret:
 		raise ApiError(

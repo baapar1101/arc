@@ -219,6 +219,17 @@ if ! alembic upgrade head; then
   exit 1
 fi
 log_ok "Migrations done."
+ensure_secrets="${APP_ROOT}/app/scripts/ensure_api_production_secrets.sh"
+if [[ -f "${ensure_secrets}" ]]; then
+  chmod +x "${ensure_secrets}" 2>/dev/null || true
+  log_info "Ensuring API production secrets in .env..."
+  if bash "${ensure_secrets}"; then
+    log_ok "API production secrets verified."
+  else
+    log_err "Failed to ensure API production secrets."
+    exit 1
+  fi
+fi
 chown -R www-data:www-data "${api_dir}"
 systemctl daemon-reload
 systemctl restart hesabix-api hesabix-rq-worker hesabix-notification-moderation

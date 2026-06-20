@@ -88,6 +88,7 @@ class Settings(BaseSettings):
 	share_link_public_base_url: str = "https://app.hesabix.com/p"
 	share_link_secret: str = "change_me_share_link"
 	share_link_public_app_url: str = "https://app.hesabix.com/public"
+	wallet_webhook_secret: str | None = None
 
 	# Tax system (Moadian) integration
 	# پیش‌فرض روی حالت واقعی است؛ برای محیط‌های توسعه در env روی true ست شود
