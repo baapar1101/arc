@@ -9979,6 +9979,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiToolQueryBusinessData => 'پرس‌وجوی داده';
 
   @override
+  String get aiToolListQueryableFields => 'فیلدهای قابل جستجو';
+
+  @override
+  String get aiToolResolveDateRange => 'تبدیل بازهٔ تاریخ';
+
+  @override
   String get aiToolSearchWarehouseDocuments => 'جستجوی حواله انبار';
 
   @override

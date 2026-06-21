@@ -13,6 +13,7 @@ from app.services.ai.ai_constants import MAX_TOOLS_PER_REQUEST, QUERY_COMPLEXITY
 _CORE_TOOL_NAMES: frozenset[str] = frozenset({
     "query_business_data",
     "list_queryable_fields",
+    "resolve_date_range",
     "get_business_info",
     "get_business_dashboard",
     "search_persons",
@@ -159,6 +160,7 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
     "query": frozenset({
         "query_business_data",
         "list_queryable_fields",
+        "resolve_date_range",
         "batch_query_business_data",
         "search_invoices",
         "search_persons",
@@ -209,6 +211,7 @@ _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"شخص|مشتری|تامین|تأمین|supplier|customer|people|گروه\s*اشخاص", "people"),
     (r"دسته\s*بندی|category|ویژگی\s*کالا|attribute", "products_write"),
     (r"فیلتر\s*پیشرفته|عملگر|بزرگتر\s*از|کمتر\s*از|شامل|list_queryable|query_business", "query"),
+    (r"ماه\s*گذشته|هفته\s*اخیر|امروز|دیروز|فروردین|اردیبهشت|خرداد|مرداد|شهریور|آبان|اسفند|بازه\s*تاریخ|resolve_date|از\s*تاریخ|تا\s*تاریخ", "query"),
     (r"گزارش\s*یکپارچه|get_report|batch_query|list_available_reports", "reports_meta"),
     (r"خروجی|export|اکسل|excel|دانلود\s*لیست", "reports_meta"),
     (r"تراز\s*آزمایشی|دفتر\s*کل|دفتر\s*روزنامه|سود\s*و\s*زیان|مرور\s*حساب|trial\s*balance|ledger", "reports_meta"),

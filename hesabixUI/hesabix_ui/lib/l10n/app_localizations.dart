@@ -18726,6 +18726,12 @@ abstract class AppLocalizations {
   /// **'Query business data'**
   String get aiToolQueryBusinessData;
 
+  /// No description provided for @aiToolListQueryableFields.
+  String get aiToolListQueryableFields;
+
+  /// No description provided for @aiToolResolveDateRange.
+  String get aiToolResolveDateRange;
+
   /// No description provided for @aiToolSearchWarehouseDocuments.
   ///
   /// In en, this message translates to:

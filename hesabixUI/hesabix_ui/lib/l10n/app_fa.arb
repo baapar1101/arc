@@ -3904,6 +3904,8 @@
   "aiToolGetLeadFunnelReport": "گزارش قیف سرنخ",
   "aiToolInvokeConnector": "فراخوانی کانکتور",
   "aiToolQueryBusinessData": "پرس‌وجوی داده",
+  "aiToolListQueryableFields": "فیلدهای قابل جستجو",
+  "aiToolResolveDateRange": "تبدیل بازهٔ تاریخ",
   "aiToolSearchWarehouseDocuments": "جستجوی حواله انبار",
   "aiToolGetWarehouseDocumentDetails": "جزئیات حواله انبار",
   "aiToolListWarehouses": "لیست انبارها",

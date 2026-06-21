@@ -10035,6 +10035,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiToolQueryBusinessData => 'Query business data';
 
   @override
+  String get aiToolListQueryableFields => 'Queryable fields';
+
+  @override
+  String get aiToolResolveDateRange => 'Resolve date range';
+
+  @override
   String get aiToolSearchWarehouseDocuments => 'Search warehouse documents';
 
   @override

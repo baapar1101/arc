@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from app.core.calendar import CalendarType
+
 # یک FilterItem برای JSON Schema ابزارها
 _FILTER_ITEM_SCHEMA = {
     "type": "object",
@@ -35,8 +37,16 @@ ADVANCED_LIST_QUERY_PROPERTIES: Dict[str, Any] = {
         "items": _FILTER_ITEM_SCHEMA,
         "description": "فیلترهای ستونی؛ همه با AND. از list_queryable_fields(entity) راهنما بگیر.",
     },
-    "from_date": {"type": "string", "format": "date", "description": "از تاریخ (اختیاری)"},
-    "to_date": {"type": "string", "format": "date", "description": "تا تاریخ (اختیاری)"},
+    "from_date": {
+        "type": "string",
+        "format": "date",
+        "description": "از تاریخ — ISO میلادی YYYY-MM-DD یا شمسی YYYY/MM/DD؛ برای عبارات نسبی از resolve_date_range استفاده کن",
+    },
+    "to_date": {
+        "type": "string",
+        "format": "date",
+        "description": "تا تاریخ — ISO میلادی YYYY-MM-DD یا شمسی YYYY/MM/DD",
+    },
     "fiscal_year_id": {"type": "integer", "description": "شناسه سال مالی (اختیاری)"},
     "sort_by": {"type": "string", "description": "ستون مرتب‌سازی"},
     "sort_desc": {"type": "boolean", "description": "مرتب‌سازی نزولی"},
@@ -52,6 +62,7 @@ def build_ai_list_query(
     *,
     entity: Optional[str] = None,
     extra_keys: Optional[List[str]] = None,
+    calendar_type: CalendarType = "jalali",
 ) -> Dict[str, Any]:
     """ساخت query dict برای سرویس list از kwargs ابزار AI."""
     from app.services.ai.ai_query_filter_service import merge_into_query_dict
@@ -61,7 +72,7 @@ def build_ai_list_query(
     for k in extra_keys or []:
         if k in kwargs and kwargs[k] is not None:
             raw[k] = kwargs[k]
-    merged = merge_into_query_dict(raw, entity=entity)
+    merged = merge_into_query_dict(raw, entity=entity, calendar_type=calendar_type)
     return _build_list_query(merged, entity=entity)
 
 

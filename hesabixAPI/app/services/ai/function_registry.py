@@ -1687,6 +1687,26 @@ class AIFunctionRegistry:
         def handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
             db: Session = context["db"]
             user_context: AuthContext = context["user_context"]
+
+            from app.services.ai.ai_date_resolver import (
+                calendar_type_from_context,
+                enrich_tool_result_dates,
+                normalize_query_dates,
+            )
+
+            calendar_type = calendar_type_from_context(context)
+            context["calendar_type"] = calendar_type
+
+            _date_keys = frozenset({
+                "from_date", "to_date", "date_from", "date_to",
+                "as_of_date", "document_date", "filters",
+            })
+            if any(k in args for k in _date_keys):
+                try:
+                    normalized = normalize_query_dates(dict(args), calendar_type=calendar_type)
+                    args.update(normalized)
+                except ValueError as exc:
+                    raise ValueError(str(exc)) from exc
             
             # دریافت business_id از session (اولویت) یا context
             session_business_id = context.get("session_business_id")
@@ -1721,7 +1741,8 @@ class AIFunctionRegistry:
                 args["user_id"] = user_context.get_user_id()
             
             try:
-                return service_func(db=db, **args)
+                result = service_func(db=db, **args)
+                return enrich_tool_result_dates(result, calendar_type=calendar_type)
             except Exception:
                 try:
                     db.rollback()

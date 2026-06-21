@@ -67,7 +67,7 @@ def _build_list_query(filters: Dict[str, Any], *, entity: Optional[str] = None) 
     """نگاشت filters عمومی به query dict سرویس‌ها (شامل filters[] پیشرفته)."""
     from app.services.ai.ai_query_filter_service import merge_into_query_dict
 
-    merged = merge_into_query_dict(filters or {}, entity=entity)
+    merged = merge_into_query_dict(filters or {}, entity=entity, calendar_type="jalali")
     q = _clamp_pagination(merged)
     for key in (
         "search",
@@ -136,7 +136,10 @@ def query_business_data(
     try:
         from app.services.ai.ai_query_filter_service import merge_into_query_dict
 
-        flt = merge_into_query_dict(flt, entity=entity_key)
+        cal: str = "jalali"
+        if user_context is not None and hasattr(user_context, "get_calendar_type"):
+            cal = user_context.get_calendar_type()
+        flt = merge_into_query_dict(flt, entity=entity_key, calendar_type=cal)  # type: ignore[arg-type]
     except ValueError as exc:
         raise ValueError(str(exc)) from exc
 
