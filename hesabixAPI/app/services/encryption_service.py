@@ -29,13 +29,25 @@ class EncryptionService:
             settings = get_settings()
             raw_key = (settings.encryption_key or "").strip()
             if raw_key:
-                encryption_key = raw_key
+                if self._is_valid_fernet_key(raw_key):
+                    encryption_key = raw_key
+                else:
+                    encryption_key = self._derive_key_from_secret(raw_key)
             else:
                 # سازگاری با داده‌های قدیمی — در production ENCRYPTION_KEY اجباری است
                 secret = getattr(settings, 'secret_key', None) or settings.captcha_secret
                 encryption_key = self._derive_key_from_secret(secret)
-        
+
         self.cipher = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+
+    @staticmethod
+    def _is_valid_fernet_key(key: str | bytes) -> bool:
+        try:
+            raw = key.encode() if isinstance(key, str) else key
+            Fernet(raw)
+            return True
+        except (ValueError, TypeError):
+            return False
 
     @staticmethod
     def _derive_key_from_secret(secret: str, salt: Optional[bytes] = None) -> str:

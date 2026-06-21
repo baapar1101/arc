@@ -1315,37 +1315,41 @@ async def _stream_message_response(
             yield payload
 
         # اگر usage موجود نبود، از provider تخمین بزن
-        if not final_usage:
-            # تخمین tokens از accumulated_content
+        if not final_usage and stream_ai_config:
             from app.services.ai.ai_provider import create_provider
-            from app.services.ai.encryption import decrypt_api_key
-            
-            if stream_ai_config:
-                api_key = (
-                    decrypt_api_key(stream_ai_config.api_key)
-                    if stream_ai_config.api_key
-                    else None
-                )
-                if api_key:
-                    provider = create_provider(
-                        provider_type=stream_ai_config.provider,
-                        api_key=api_key,
-                        api_base_url=stream_ai_config.api_base_url,
+            from app.services.ai.ai_provider_service import resolve_provider_connection
+
+            api_key = None
+            api_base_url = stream_ai_config.api_base_url
+            provider_type = (stream_ai_config.provider or "openai").strip().lower()
+            try:
+                with get_db_session() as est_db:
+                    _, api_key, api_base_url, _ = resolve_provider_connection(
+                        est_db, provider_type, legacy_config=stream_ai_config
                     )
-                    
-                    # تخمین input tokens از messages
-                    input_tokens_estimate = 0
-                    for msg in messages:
-                        input_tokens_estimate += provider.estimate_tokens(msg.get("content", ""))
-                    
-                    # تخمین output tokens از accumulated_content
-                    output_tokens_estimate = provider.estimate_tokens(accumulated_content)
-                    
-                    final_usage = {
-                        "input_tokens": input_tokens_estimate,
-                        "output_tokens": output_tokens_estimate,
-                        "total_tokens": input_tokens_estimate + output_tokens_estimate
-                    }
+            except Exception:
+                api_key = None
+
+            if api_key:
+                provider = create_provider(
+                    provider_type=provider_type,
+                    api_key=api_key,
+                    api_base_url=api_base_url,
+                )
+
+                # تخمین input tokens از messages
+                input_tokens_estimate = 0
+                for msg in messages:
+                    input_tokens_estimate += provider.estimate_tokens(msg.get("content", ""))
+
+                # تخمین output tokens از accumulated_content
+                output_tokens_estimate = provider.estimate_tokens(accumulated_content)
+
+                final_usage = {
+                    "input_tokens": input_tokens_estimate,
+                    "output_tokens": output_tokens_estimate,
+                    "total_tokens": input_tokens_estimate + output_tokens_estimate,
+                }
         
         if final_usage:
             input_tokens = final_usage.get("input_tokens", 0)

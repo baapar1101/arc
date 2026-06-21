@@ -404,7 +404,7 @@ class AIService:
             legacy_config=self.config,
         )
         if not api_key:
-            raise ApiError("INVALID_API_KEY", "API Key تنظیم نشده است", http_status=400)
+            raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
         return create_provider(
             provider_type=ptype,
             api_key=api_key,
@@ -1812,13 +1812,6 @@ class AIService:
             raise ApiError("AI_NOT_CONFIGURED", "تنظیمات AI فعال نیست", http_status=400)
         
         try:
-            # رمزگشایی API Key
-            from app.services.ai.encryption import decrypt_api_key
-            api_key = decrypt_api_key(self.config.api_key) if self.config.api_key else None
-            
-            if not api_key:
-                raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
-        
             # اضافه کردن system prompt با business_id از session
             system_prompt = self.get_system_prompt(
                 session_business_id=session_business_id,
@@ -2180,12 +2173,6 @@ class AIService:
 
         if not self.config or not self.config.is_active:
             raise ApiError("AI_NOT_CONFIGURED", "تنظیمات AI فعال نیست", http_status=400)
-
-        from app.services.ai.encryption import decrypt_api_key
-
-        api_key = decrypt_api_key(self.config.api_key) if self.config.api_key else None
-        if not api_key:
-            raise ApiError("API_KEY_NOT_SET", "API Key تنظیم نشده است", http_status=400)
 
         provider = self._make_provider()
         context_compress_retried = False
