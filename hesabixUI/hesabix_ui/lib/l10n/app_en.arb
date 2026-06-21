@@ -3862,6 +3862,8 @@
   "aiToolGetLeadFunnelReport": "Lead funnel report",
   "aiToolInvokeConnector": "Invoke connector",
   "aiToolQueryBusinessData": "Query business data",
+  "aiToolListQueryableFields": "Queryable fields",
+  "aiToolResolveDateRange": "Resolve date range",
   "aiToolSearchWarehouseDocuments": "Search warehouse documents",
   "aiToolGetWarehouseDocumentDetails": "Warehouse document details",
   "aiToolListWarehouses": "List warehouses",

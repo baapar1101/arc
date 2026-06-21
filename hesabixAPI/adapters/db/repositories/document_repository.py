@@ -123,18 +123,12 @@ class DocumentRepository:
             query = query.filter(Document.fiscal_year_id == filters["fiscal_year_id"])
 
         if filters.get("from_date"):
-            try:
-                from_date = self._parse_date(filters["from_date"])
-                query = query.filter(Document.document_date >= from_date)
-            except Exception:
-                pass
+            from_date = self._parse_date(filters["from_date"])
+            query = query.filter(Document.document_date >= from_date)
 
         if filters.get("to_date"):
-            try:
-                to_date = self._parse_date(filters["to_date"])
-                query = query.filter(Document.document_date <= to_date)
-            except Exception:
-                pass
+            to_date = self._parse_date(filters["to_date"])
+            query = query.filter(Document.document_date <= to_date)
 
         if filters.get("currency_id"):
             query = query.filter(Document.currency_id == filters["currency_id"])
@@ -178,11 +172,28 @@ class DocumentRepository:
                         continue
                 if ids:
                     query = query.filter(Document.project_id.in_(ids))
+            elif prop == "document_date" and val not in (None, ""):
+                dt = self._parse_date(val)
+                col = Document.document_date
+                if operator == ">=":
+                    query = query.filter(col >= dt)
+                elif operator == ">":
+                    query = query.filter(col > dt)
+                elif operator == "<=":
+                    query = query.filter(col <= dt)
+                elif operator == "<":
+                    query = query.filter(col < dt)
+                elif operator == "=":
+                    query = query.filter(col == dt)
+                elif operator == "!=":
+                    query = query.filter(col != dt)
             elif prop == "project_name" and operator == "=" and val not in (None, ""):
                 try:
                     query = query.filter(Document.project_id == int(val))
                 except (TypeError, ValueError):
                     pass
+            elif prop == "document_type" and operator == "=" and val:
+                query = query.filter(Document.document_type == str(val))
 
         # جستجو
         if filters.get("search"):
@@ -477,13 +488,10 @@ class DocumentRepository:
         return line_dict
 
     def _parse_date(self, date_value: Any) -> date:
-        """تبدیل مقدار به date"""
-        if isinstance(date_value, date):
-            return date_value
-        if isinstance(date_value, str):
-            from datetime import datetime
-            return datetime.fromisoformat(date_value.split("T")[0]).date()
-        raise ValueError(f"Invalid date format: {date_value}")
+        """تبدیل مقدار به date میلادی (ISO یا شمسی)."""
+        from app.core.date_input import parse_user_date
+
+        return parse_user_date(date_value, calendar_type="jalali")
 
     def create_document(self, document_data: Dict[str, Any]) -> Document:
         """

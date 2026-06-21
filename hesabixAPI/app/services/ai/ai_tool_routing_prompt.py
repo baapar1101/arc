@@ -17,12 +17,14 @@ TOOL_ROUTING_PROMPT_BLOCK = """
 - گزارش‌های دیگر → `list_available_reports` سپس `get_report`
 
 **جست‌وجو و جزئیات**
+- بازهٔ تاریخ مبهم → `resolve_date_range` سپس فیلتر در search/query
 - فاکتور → `search_invoices` / `get_invoice_details`
 - شخص/مشتری → `search_persons` / `get_person_balance`
 - کالا → `search_products` / `get_product_info` / `get_inventory_status`
 - سند حسابداری → `search_documents` / `get_document_details`
 - حواله انبار → `search_warehouse_documents`
 - لیست پیشرفته با فیلتر → `list_queryable_fields` سپس `query_business_data`
+- «ماه گذشته»، «فروردین ۱۴۰۴»، «هفته اخیر» → ابتدا `resolve_date_range`
 
 **عملیات (نیاز به تأیید)**
 - ثبت فاکتور → `create_invoice` | شخص → ابزارهای person

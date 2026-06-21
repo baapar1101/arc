@@ -1020,6 +1020,13 @@ class AIService:
 
             todos_text, plan_block = self._session_todo_prompt_extras(session_id, user_query)
 
+            from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+
+            calendar_block = build_calendar_context_prompt_block(
+                self.ctx.get_calendar_type(),
+                business_id=int(bid),
+            )
+
             parts: Dict[str, str] = {}
             futures = [_executor.submit(fn) for _, fn in loaders]
             for (key, _), fut in zip(loaders, futures):
@@ -1032,6 +1039,7 @@ class AIService:
             return trim_system_prompt_sections(
                 base_prompt
                 + business_info
+                + calendar_block
                 + execution_mode_prompt_block(execution_mode)
                 + plan_block,
                 [
@@ -1045,8 +1053,12 @@ class AIService:
                 ],
             )
 
+        from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+
         return trim_system_prompt(
-            base_prompt + execution_mode_prompt_block(execution_mode)
+            base_prompt
+            + build_calendar_context_prompt_block(self.ctx.get_calendar_type())
+            + execution_mode_prompt_block(execution_mode)
         )
 
     async def build_system_prompt_stream(
@@ -1081,9 +1093,13 @@ class AIService:
 
         business_id = session_business_id or self.business_id
         if not business_id:
+            from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+
             yield {
                 "event": "prompt_ready",
-                "prompt": base_prompt + execution_mode_prompt_block(execution_mode),
+                "prompt": base_prompt
+                + build_calendar_context_prompt_block(self.ctx.get_calendar_type())
+                + execution_mode_prompt_block(execution_mode),
             }
             return
 
@@ -1262,9 +1278,17 @@ class AIService:
 
         todos_text, plan_block = self._session_todo_prompt_extras(session_id, user_query)
 
+        from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+
+        calendar_block = build_calendar_context_prompt_block(
+            self.ctx.get_calendar_type(),
+            business_id=int(bid),
+        )
+
         final_prompt = trim_system_prompt_sections(
             base_prompt
             + business_info
+            + calendar_block
             + execution_mode_prompt_block(execution_mode)
             + plan_block,
             [
@@ -3117,6 +3141,7 @@ class AIService:
             "user_context": self.ctx,
             "business_id": effective_business_id,
             "session_business_id": session_business_id,
+            "calendar_type": self.ctx.get_calendar_type(),
         }
 
         for call in function_calls:
@@ -3183,6 +3208,7 @@ class AIService:
             "business_id": effective_business_id,
             "session_business_id": session_business_id,
             "session_id": session_id,
+            "calendar_type": self.ctx.get_calendar_type(),
         }
 
         async def call_single_function(
