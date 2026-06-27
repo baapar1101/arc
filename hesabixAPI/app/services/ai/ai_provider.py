@@ -76,15 +76,23 @@ class OpenAIProvider(AIProviderBase):
         super().__init__(api_key, api_base_url or "https://api.openai.com/v1")
         try:
             import openai
+
+            from app.services.ai.ai_constants import (
+                AI_PROVIDER_STREAM_TIMEOUT_SEC,
+                AI_PROVIDER_TIMEOUT_SEC,
+            )
+
             # استفاده از sync client برای non-streaming
             self.client = openai.OpenAI(
                 api_key=api_key,
-                base_url=api_base_url or None
+                base_url=api_base_url or None,
+                timeout=AI_PROVIDER_TIMEOUT_SEC,
             )
             # استفاده از async client برای streaming
             self.async_client = openai.AsyncOpenAI(
                 api_key=api_key,
-                base_url=api_base_url or None
+                base_url=api_base_url or None,
+                timeout=AI_PROVIDER_STREAM_TIMEOUT_SEC,
             )
         except ImportError:
             raise ImportError("openai package is required. Install it with: pip install openai")

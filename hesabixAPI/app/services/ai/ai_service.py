@@ -1850,7 +1850,12 @@ class AIService:
                 provider,
             )
             
-            eff_tools = self._use_tools_for_request(use_function_calling)
+            eff_tools = (
+                self._use_tools_for_request(use_function_calling)
+                and self._routing_needs_tools(
+                    use_function_calling, effective_user_query, messages
+                )
+            )
             if eff_tools and tools is None:
                 tools = self.get_available_functions(
                     session_business_id=session_business_id,
@@ -2126,6 +2131,7 @@ class AIService:
         exploration_mode: Optional[str] = None,
         request_model: Optional[str] = None,
         execution_mode: Optional[str] = None,
+        prebuilt_system_prompt: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال streaming با چند نوبت tool calling (مثل chat_completion).
 
@@ -2255,28 +2261,31 @@ class AIService:
                 title_key="aiStatusThinking",
             )
 
-            system_prompt = ""
-            async for build_item in self.build_system_prompt_stream(
-                session_business_id=session_business_id,
-                session_id=session_id,
-                user_query=effective_user_query,
-                execution_mode=effective_execution_mode,
-            ):
-                if build_item.get("event") == "prompt_ready":
-                    system_prompt = build_item.get("prompt") or ""
-                    continue
-                if build_item.get("event") == "trace_step":
-                    yield _ingest_trace_event(build_item)
-                    await asyncio.sleep(0)
-                    continue
-                yield build_item
+            if prebuilt_system_prompt is not None:
+                system_prompt = prebuilt_system_prompt
+            else:
+                system_prompt = ""
+                async for build_item in self.build_system_prompt_stream(
+                    session_business_id=session_business_id,
+                    session_id=session_id,
+                    user_query=effective_user_query,
+                    execution_mode=effective_execution_mode,
+                ):
+                    if build_item.get("event") == "prompt_ready":
+                        system_prompt = build_item.get("prompt") or ""
+                        continue
+                    if build_item.get("event") == "trace_step":
+                        yield _ingest_trace_event(build_item)
+                        await asyncio.sleep(0)
+                        continue
+                    yield build_item
 
-            yield _emit_trace(
-                step_id="ctx_thinking",
-                kind="context",
-                state="done",
-                title_key="aiStatusThinking",
-            )
+                yield _emit_trace(
+                    step_id="ctx_thinking",
+                    kind="context",
+                    state="done",
+                    title_key="aiStatusThinking",
+                )
 
             full_messages, context_meta = self._prepare_llm_messages(
                 system_prompt,
@@ -2294,7 +2303,12 @@ class AIService:
             }
             await asyncio.sleep(0)
 
-            eff_tools = self._use_tools_for_request(use_function_calling)
+            eff_tools = (
+                self._use_tools_for_request(use_function_calling)
+                and self._routing_needs_tools(
+                    use_function_calling, effective_user_query, messages
+                )
+            )
             if eff_tools and tools is None:
                 tools = self.get_available_functions(
                     session_business_id=session_business_id,

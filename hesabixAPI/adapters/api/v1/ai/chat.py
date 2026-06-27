@@ -1206,6 +1206,270 @@ def _emit_chunk_as_sse(chunk: Dict[str, Any]):
         yield _sse_payload(data)
 
 
+def _extract_content_from_agent_trace(
+    accumulated_content: str,
+    agent_trace: Optional[List[Dict[str, Any]]],
+) -> str:
+    """اگر متن delta خالی بود، از narrative/answer در trace استفاده کن."""
+    text = (accumulated_content or "").strip()
+    if text:
+        return accumulated_content
+    if not agent_trace:
+        return accumulated_content or ""
+    for kind in ("answer", "narrative"):
+        for step in reversed(agent_trace):
+            if step.get("kind") != kind:
+                continue
+            body = (step.get("body_markdown") or "").strip()
+            if body:
+                return body
+    return accumulated_content or ""
+
+
+def _estimate_stream_usage_if_missing(
+    final_usage: Optional[Dict[str, Any]],
+    stream_ai_config: Any,
+    messages: List[Dict[str, Any]],
+    accumulated_content: str,
+) -> Optional[Dict[str, Any]]:
+    if final_usage:
+        return final_usage
+    if not stream_ai_config:
+        return None
+
+    from adapters.db.session import get_db_session
+    from app.services.ai.ai_provider import create_provider
+    from app.services.ai.ai_provider_service import resolve_provider_connection
+
+    api_key = None
+    api_base_url = stream_ai_config.api_base_url
+    provider_type = (stream_ai_config.provider or "openai").strip().lower()
+    try:
+        with get_db_session() as est_db:
+            _, api_key, api_base_url, _ = resolve_provider_connection(
+                est_db, provider_type, legacy_config=stream_ai_config
+            )
+    except Exception:
+        api_key = None
+
+    if not api_key:
+        return None
+
+    provider = create_provider(
+        provider_type=provider_type,
+        api_key=api_key,
+        api_base_url=api_base_url,
+    )
+    input_tokens_estimate = sum(
+        provider.estimate_tokens(msg.get("content", "")) for msg in messages
+    )
+    output_tokens_estimate = provider.estimate_tokens(accumulated_content)
+    return {
+        "input_tokens": input_tokens_estimate,
+        "output_tokens": output_tokens_estimate,
+        "total_tokens": input_tokens_estimate + output_tokens_estimate,
+    }
+
+
+async def _persist_stream_assistant_message(
+    *,
+    session_id: int,
+    ctx: AuthContext,
+    business_id: int,
+    messages: List[Dict[str, Any]],
+    message_content: str,
+    previous_messages: List[AIChatMessage],
+    request_model: Optional[str],
+    accumulated_content: str,
+    final_usage: Optional[Dict[str, Any]],
+    final_function_calls: Optional[List[Dict[str, Any]]],
+    final_function_results: Optional[Dict[str, Any]],
+    final_agent_trace: Optional[List[Dict[str, Any]]],
+    stream_ai_config: Any = None,
+) -> tuple[Optional[int], Optional[Dict[str, Any]]]:
+    """ذخیره پاسخ assistant و ثبت usage. برمی‌گرداند (message_id, usage)."""
+    from adapters.db.session import get_db_session
+    from app.services.ai.ai_trace import merge_trace_into_function_results
+
+    content = _extract_content_from_agent_trace(
+        accumulated_content, final_agent_trace
+    )
+    usage = _estimate_stream_usage_if_missing(
+        final_usage, stream_ai_config, messages, content
+    )
+
+    if usage:
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+
+        with get_db_session() as new_db:
+            session_repo = AIChatSessionRepository(new_db)
+            updated_session = session_repo.get_by_id(session_id)
+            if not updated_session:
+                logger.error("Session %s not found for commit", session_id)
+                return None, usage
+
+            new_ai_service = AIService(new_db, ctx, updated_session.business_id)
+            _prepare_ai_service_model(new_ai_service, request_model)
+            _apply_chat_routing_context(
+                new_ai_service,
+                user_query=message_content,
+                messages=messages,
+            )
+
+            charge_result = new_ai_service.check_quota_and_charge(
+                input_tokens,
+                output_tokens,
+                model_code=new_ai_service.get_effective_model_code(),
+            )
+
+            merged_results = merge_trace_into_function_results(
+                final_function_results, final_agent_trace or []
+            )
+            fc_json, fr_json = serialize_function_metadata(
+                final_function_calls, merged_results
+            )
+            assistant_message = AIChatMessage(
+                session_id=session_id,
+                role=MessageRole.ASSISTANT.value,
+                content=content,
+                function_calls=fc_json,
+                function_results=fr_json,
+                tokens_used=input_tokens + output_tokens,
+            )
+            new_db.add(assistant_message)
+
+            provider_name, model_code = _usage_provider_and_model(new_ai_service)
+            new_ai_service.log_usage(
+                provider=provider_name,
+                model=model_code,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cost=charge_result.get("cost", 0),
+                payment_method=charge_result.get("payment_method", "free"),
+                wallet_transaction_id=charge_result.get("wallet_transaction_id"),
+                document_id=charge_result.get("document_id"),
+                context=_usage_log_context(new_ai_service),
+            )
+            new_ai_service.clear_routing_context()
+
+            from datetime import datetime
+
+            updated_session.updated_at = datetime.utcnow()
+
+            needs_title = _session_needs_title(updated_session) and len(
+                previous_messages
+            ) == 0
+
+            if needs_title:
+                await _maybe_generate_session_title(
+                    new_db,
+                    updated_session,
+                    ctx,
+                    updated_session.business_id or business_id,
+                    message_content,
+                )
+
+            new_db.commit()
+            new_db.refresh(assistant_message)
+            message_id = assistant_message.id
+
+            if needs_title and _session_needs_title(updated_session):
+                _schedule_session_title_generation(
+                    session_id,
+                    message_content,
+                    ctx,
+                    updated_session.business_id or business_id,
+                )
+
+            from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+            schedule_memory_update_after_chat(
+                session_id,
+                updated_session.business_id or business_id,
+                ctx,
+            )
+
+        return message_id, usage
+
+    with get_db_session() as new_db:
+        session_repo = AIChatSessionRepository(new_db)
+        updated_session = session_repo.get_by_id(session_id)
+        if not updated_session:
+            return None, None
+
+        assistant_message = AIChatMessage(
+            session_id=session_id,
+            role=MessageRole.ASSISTANT.value,
+            content=content or "خطا در دریافت پاسخ",
+            tokens_used=0,
+        )
+        new_db.add(assistant_message)
+        from datetime import datetime
+
+        updated_session.updated_at = datetime.utcnow()
+        new_db.commit()
+        new_db.refresh(assistant_message)
+        return assistant_message.id, None
+
+
+def _schedule_stream_persist_after_disconnect(
+    *,
+    session_id: int,
+    ctx: AuthContext,
+    business_id: int,
+    messages: List[Dict[str, Any]],
+    message_content: str,
+    previous_messages: List[AIChatMessage],
+    request_model: Optional[str],
+    accumulated_content: str,
+    final_usage: Optional[Dict[str, Any]],
+    final_function_calls: Optional[List[Dict[str, Any]]],
+    final_function_results: Optional[Dict[str, Any]],
+    final_agent_trace: Optional[List[Dict[str, Any]]],
+    stream_ai_config: Any = None,
+) -> None:
+    """ذخیره پاسخ در پس‌زمینه وقتی کلاینت قبل از done قطع می‌کند."""
+    import asyncio
+
+    has_payload = bool(
+        (accumulated_content or "").strip()
+        or final_agent_trace
+        or final_function_results
+    )
+    if not has_payload:
+        return
+
+    async def _task() -> None:
+        try:
+            await _persist_stream_assistant_message(
+                session_id=session_id,
+                ctx=ctx,
+                business_id=business_id,
+                messages=messages,
+                message_content=message_content,
+                previous_messages=previous_messages,
+                request_model=request_model,
+                accumulated_content=accumulated_content,
+                final_usage=final_usage,
+                final_function_calls=final_function_calls,
+                final_function_results=final_function_results,
+                final_agent_trace=final_agent_trace,
+                stream_ai_config=stream_ai_config,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Background persist after stream disconnect failed (session=%s): %s",
+                session_id,
+                exc,
+            )
+
+    try:
+        asyncio.get_running_loop().create_task(_task())
+    except RuntimeError:
+        pass
+
+
 async def _stream_message_response(
     session_id: int,
     messages: List[Dict[str, Any]],
@@ -1219,10 +1483,11 @@ async def _stream_message_response(
     execution_mode: str = "analyzer",
     request_model: Optional[str] = None,
 ):
-    """Generator برای streaming response
-    
-    ⚠️ مهم: از session جدید برای هر عملیات استفاده می‌کنیم تا از connection leak جلوگیری کنیم.
-    Session فقط برای commit نهایی استفاده می‌شود و بلافاصله بسته می‌شود.
+    """Generator برای streaming response.
+
+    فاز ۱: ساخت system prompt در session کوتاه‌عمر.
+    فاز ۲: استریم LLM در session جدا (بدون نگه‌داشتن اتصال در فاز ۱).
+    فاز ۳: ذخیره پاسخ در session تازه؛ در صورت قطع کلاینت، ذخیره پس‌زمینه.
     """
     import asyncio
 
@@ -1230,27 +1495,85 @@ async def _stream_message_response(
     from app.services.ai.ai_stream_helpers import iter_with_heartbeat
     from app.services.ai.ai_tool_keys import status_event
 
+    accumulated_content = ""
+    final_usage = None
+    final_function_calls: Optional[List[Dict[str, Any]]] = None
+    final_function_results: Optional[Dict[str, Any]] = None
+    final_agent_trace: Optional[List[Dict[str, Any]]] = None
+    stream_ai_config = None
+    prebuilt_prompt: Optional[str] = None
+    message_id: Optional[int] = None
+
+    def _capture_chunk(chunk: Dict[str, Any]) -> None:
+        nonlocal accumulated_content, final_usage, final_function_calls
+        nonlocal final_function_results, final_agent_trace
+        delta = chunk.get("delta", {})
+        content_chunk = delta.get("content", "")
+        if content_chunk:
+            accumulated_content += content_chunk
+        if chunk.get("usage"):
+            final_usage = chunk["usage"]
+        if chunk.get("function_calls"):
+            final_function_calls = chunk["function_calls"]
+        if chunk.get("function_results"):
+            final_function_results = chunk["function_results"]
+        if chunk.get("agent_trace"):
+            final_agent_trace = chunk["agent_trace"]
+
+    def _schedule_persist_on_disconnect() -> None:
+        _schedule_stream_persist_after_disconnect(
+            session_id=session_id,
+            ctx=ctx,
+            business_id=business_id,
+            messages=messages,
+            message_content=message_content,
+            previous_messages=previous_messages,
+            request_model=request_model,
+            accumulated_content=accumulated_content,
+            final_usage=final_usage,
+            final_function_calls=final_function_calls,
+            final_function_results=final_function_results,
+            final_agent_trace=final_agent_trace,
+            stream_ai_config=stream_ai_config,
+        )
+
     try:
-        # بلافاصله به کلاینت سیگنال بده (قبل از کارهای سنگین)
         yield _sse_payload({"type": "status", "phase": "connecting", "done": False})
         await asyncio.sleep(0)
         yield _sse_payload({"type": "status", "phase": "thinking", "done": False})
         await asyncio.sleep(0)
 
-        accumulated_content = ""
-        final_usage = None
-        final_function_calls: Optional[List[Dict[str, Any]]] = None
-        final_function_results: Optional[Dict[str, Any]] = None
-        final_agent_trace: Optional[List[Dict[str, Any]]] = None
-        stream_ai_config = None
+        # فاز ۱: آماده‌سازی prompt (session کوتاه)
+        with get_db_session() as prep_db:
+            prep_service = AIService(prep_db, ctx, business_id)
+            _prepare_ai_service_model(prep_service, request_model)
+            stream_ai_config = prep_service.config
+            prebuilt_prompt = ""
+            async for build_item in prep_service.build_system_prompt_stream(
+                session_business_id=business_id,
+                session_id=session_id,
+                user_query=message_content,
+                execution_mode=execution_mode,
+            ):
+                if build_item.get("event") == "prompt_ready":
+                    prebuilt_prompt = build_item.get("prompt") or ""
+                    continue
+                if build_item.get("event") == "trace_step":
+                    for payload in _emit_chunk_as_sse(build_item):
+                        yield payload
+                    await asyncio.sleep(0)
+                    continue
+                for payload in _emit_chunk_as_sse(build_item):
+                    yield payload
+                    await asyncio.sleep(0)
 
-        with get_db_session() as temp_db:
-            temp_ai_service = AIService(temp_db, ctx, business_id)
-            _prepare_ai_service_model(temp_ai_service, request_model)
-            stream_ai_config = temp_ai_service.config
+        # فاز ۲: استریم LLM (session جدا — فقط برای tool calls در صورت نیاز)
+        with get_db_session() as stream_db:
+            stream_ai_service = AIService(stream_db, ctx, business_id)
+            _prepare_ai_service_model(stream_ai_service, request_model)
 
             async def _stream_factory():
-                async for chunk in temp_ai_service.chat_completion_stream(
+                async for chunk in stream_ai_service.chat_completion_stream(
                     messages,
                     use_function_calling=True,
                     session_business_id=business_id,
@@ -1261,6 +1584,7 @@ async def _stream_message_response(
                     execution_mode=execution_mode,
                     user_query=message_content,
                     request_model=request_model,
+                    prebuilt_system_prompt=prebuilt_prompt,
                 ):
                     yield chunk
 
@@ -1280,18 +1604,7 @@ async def _stream_message_response(
                 if event_type == "prompt_ready":
                     continue
 
-                delta = chunk.get("delta", {})
-                content_chunk = delta.get("content", "")
-                if content_chunk:
-                    accumulated_content += content_chunk
-                if chunk.get("usage"):
-                    final_usage = chunk["usage"]
-                if chunk.get("function_calls"):
-                    final_function_calls = chunk["function_calls"]
-                if chunk.get("function_results"):
-                    final_function_results = chunk["function_results"]
-                if chunk.get("agent_trace"):
-                    final_agent_trace = chunk["agent_trace"]
+                _capture_chunk(chunk)
 
                 for payload in _emit_chunk_as_sse(chunk):
                     yield payload
@@ -1304,198 +1617,45 @@ async def _stream_message_response(
             "[AI Stream][session=%s] final_response_length=%s preview=%s",
             session_id,
             len(accumulated_content),
-            (accumulated_content or "")[:500]
+            (accumulated_content or "")[:500],
         )
-        
-        # بعد از تمام شدن streaming:
-        # 1. ذخیره پیام در دیتابیس
-        # 2. بررسی سهمیه و شارژ
-        # 3. ارسال chunk نهایی با usage stats
+
         for payload in _emit_chunk_as_sse(status_event("saving")):
             yield payload
 
-        # اگر usage موجود نبود، از provider تخمین بزن
-        if not final_usage and stream_ai_config:
-            from app.services.ai.ai_provider import create_provider
-            from app.services.ai.ai_provider_service import resolve_provider_connection
+        message_id, final_usage = await _persist_stream_assistant_message(
+            session_id=session_id,
+            ctx=ctx,
+            business_id=business_id,
+            messages=messages,
+            message_content=message_content,
+            previous_messages=previous_messages,
+            request_model=request_model,
+            accumulated_content=accumulated_content,
+            final_usage=final_usage,
+            final_function_calls=final_function_calls,
+            final_function_results=final_function_results,
+            final_agent_trace=final_agent_trace,
+            stream_ai_config=stream_ai_config,
+        )
 
-            api_key = None
-            api_base_url = stream_ai_config.api_base_url
-            provider_type = (stream_ai_config.provider or "openai").strip().lower()
-            try:
-                with get_db_session() as est_db:
-                    _, api_key, api_base_url, _ = resolve_provider_connection(
-                        est_db, provider_type, legacy_config=stream_ai_config
-                    )
-            except Exception:
-                api_key = None
+        yield _sse_payload({
+            "content": "",
+            "done": True,
+            "usage": final_usage,
+            "message_id": message_id,
+            "function_calls": final_function_calls,
+            "function_results": final_function_results,
+            "agent_trace": final_agent_trace,
+            **({"warning": "Usage information not available"} if not final_usage else {}),
+        })
 
-            if api_key:
-                provider = create_provider(
-                    provider_type=provider_type,
-                    api_key=api_key,
-                    api_base_url=api_base_url,
-                )
-
-                # تخمین input tokens از messages
-                input_tokens_estimate = 0
-                for msg in messages:
-                    input_tokens_estimate += provider.estimate_tokens(msg.get("content", ""))
-
-                # تخمین output tokens از accumulated_content
-                output_tokens_estimate = provider.estimate_tokens(accumulated_content)
-
-                final_usage = {
-                    "input_tokens": input_tokens_estimate,
-                    "output_tokens": output_tokens_estimate,
-                    "total_tokens": input_tokens_estimate + output_tokens_estimate,
-                }
-        
-        if final_usage:
-            input_tokens = final_usage.get("input_tokens", 0)
-            output_tokens = final_usage.get("output_tokens", 0)
-            
-            # استفاده از session جدید برای commit (جلوگیری از connection leak)
-            with get_db_session() as new_db:
-                # خواندن session و message از دیتابیس
-                from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository
-                session_repo = AIChatSessionRepository(new_db)
-                updated_session = session_repo.get_by_id(session_id)
-                
-                if not updated_session:
-                    logger.error(f"Session {session_id} not found for commit")
-                    yield _sse_payload({"error": "Session not found", "done": True})
-                    return
-                
-                new_ai_service = AIService(new_db, ctx, updated_session.business_id)
-                _prepare_ai_service_model(new_ai_service, request_model)
-                _apply_chat_routing_context(
-                    new_ai_service,
-                    user_query=message_content,
-                    messages=messages,
-                )
-
-                charge_result = new_ai_service.check_quota_and_charge(
-                    input_tokens,
-                    output_tokens,
-                    model_code=new_ai_service.get_effective_model_code(),
-                )
-                
-                from app.services.ai.ai_trace import merge_trace_into_function_results
-
-                merged_results = merge_trace_into_function_results(
-                    final_function_results, final_agent_trace or []
-                )
-                fc_json, fr_json = serialize_function_metadata(
-                    final_function_calls, merged_results
-                )
-                assistant_message = AIChatMessage(
-                    session_id=session_id,
-                    role=MessageRole.ASSISTANT.value,
-                    content=accumulated_content,
-                    function_calls=fc_json,
-                    function_results=fr_json,
-                    tokens_used=input_tokens + output_tokens
-                )
-                new_db.add(assistant_message)
-                
-                # ثبت لاگ استفاده
-                provider_name, model_code = _usage_provider_and_model(new_ai_service)
-                new_ai_service.log_usage(
-                    provider=provider_name,
-                    model=model_code,
-                    input_tokens=input_tokens,
-                    output_tokens=output_tokens,
-                    cost=charge_result.get("cost", 0),
-                    payment_method=charge_result.get("payment_method", "free"),
-                    wallet_transaction_id=charge_result.get("wallet_transaction_id"),
-                    document_id=charge_result.get("document_id"),
-                    context=_usage_log_context(new_ai_service),
-                )
-                new_ai_service.clear_routing_context()
-                
-                # به‌روزرسانی زمان جلسه
-                from datetime import datetime
-                updated_session.updated_at = datetime.utcnow()
-
-                needs_title = _session_needs_title(updated_session) and len(
-                    previous_messages
-                ) == 0
-
-                if needs_title:
-                    await _maybe_generate_session_title(
-                        new_db,
-                        updated_session,
-                        ctx,
-                        updated_session.business_id or business_id,
-                        message_content,
-                    )
-
-                new_db.commit()
-                new_db.refresh(assistant_message)
-                message_id = assistant_message.id
-
-                if needs_title and _session_needs_title(updated_session):
-                    _schedule_session_title_generation(
-                        session_id,
-                        message_content,
-                        ctx,
-                        updated_session.business_id or business_id,
-                    )
-
-                from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
-
-                schedule_memory_update_after_chat(
-                    session_id,
-                    updated_session.business_id or business_id,
-                    ctx,
-                )
-            
-            yield _sse_payload({
-                "content": "",
-                "done": True,
-                "usage": final_usage,
-                "message_id": message_id,
-                "function_calls": final_function_calls,
-                "function_results": final_function_results,
-                "agent_trace": final_agent_trace,
-            })
-        else:
-            # در صورت خطا - حداقل پیام را ذخیره کن (با session جدید)
-            with get_db_session() as new_db:
-                from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository
-                session_repo = AIChatSessionRepository(new_db)
-                updated_session = session_repo.get_by_id(session_id)
-                
-                if updated_session:
-                    assistant_message = AIChatMessage(
-                        session_id=session_id,
-                        role=MessageRole.ASSISTANT.value,
-                        content=accumulated_content or "خطا در دریافت پاسخ",
-                        tokens_used=0
-                    )
-                    new_db.add(assistant_message)
-                    from datetime import datetime
-                    updated_session.updated_at = datetime.utcnow()
-                    new_db.commit()
-                    new_db.refresh(assistant_message)
-                    message_id = assistant_message.id
-                else:
-                    message_id = None
-            
-            # ارسال chunk نهایی بدون usage (اما با message_id)
-            yield _sse_payload({
-                "content": "",
-                "done": True,
-                "usage": None,
-                "message_id": message_id,
-                "warning": "Usage information not available",
-            })
-            
+    except asyncio.CancelledError:
+        _schedule_persist_on_disconnect()
+        raise
     except Exception as e:
-        # ارسال خطا به صورت SSE
-        import traceback
-        logger.error(f"Error in streaming response: {e}", exc_info=True)
+        _schedule_persist_on_disconnect()
+        logger.error("Error in streaming response: %s", e, exc_info=True)
         from app.services.ai.ai_retry_policy import is_retryable_error
 
         recoverable = is_retryable_error(e)

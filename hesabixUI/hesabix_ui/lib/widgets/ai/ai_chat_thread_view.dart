@@ -578,6 +578,7 @@ class _StreamingRow extends StatelessWidget {
                 else if (showStatusLine)
                   _StreamingStatusPulse(
                     label: statusLabel,
+                    elapsedSeconds: elapsedSeconds,
                     theme: theme,
                     scheme: scheme,
                   ),
@@ -614,11 +615,13 @@ class _StreamingRow extends StatelessWidget {
 
 class _StreamingStatusPulse extends StatefulWidget {
   final String label;
+  final int? elapsedSeconds;
   final ThemeData theme;
   final ColorScheme scheme;
 
   const _StreamingStatusPulse({
     required this.label,
+    this.elapsedSeconds,
     required this.theme,
     required this.scheme,
   });
@@ -648,12 +651,18 @@ class _StreamingStatusPulseState extends State<_StreamingStatusPulse>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final elapsed = widget.elapsedSeconds;
+    final displayLabel = elapsed != null && elapsed > 0
+        ? '${widget.label} · ${l10n.aiStatusElapsed(elapsed)}'
+        : widget.label;
+
     return FadeTransition(
       opacity: Tween<double>(begin: 0.45, end: 1).animate(
         CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
       ),
       child: Text(
-        widget.label,
+        displayLabel,
         style: widget.theme.textTheme.bodyMedium?.copyWith(
           height: 1.5,
           color: widget.scheme.onSurfaceVariant,

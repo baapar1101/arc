@@ -18,6 +18,10 @@ LIGHT_AI_OPERATIONS: frozenset[str] = frozenset({
     AI_OPERATION_THOUGHT,
 })
 
+# timeout ارتباط با AI Provider (ثانیه)
+AI_PROVIDER_TIMEOUT_SEC = 120.0
+AI_PROVIDER_STREAM_TIMEOUT_SEC = 180.0
+
 # حداکثر نوبت LLM ↔ tool در یک پاسخ (پیش‌فرض)
 MAX_AGENT_ITERATIONS = 8
 
