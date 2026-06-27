@@ -7,6 +7,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/file_saver.dart';
+import 'package:hesabix_ui/widgets/support/support_semantic_colors.dart';
 
 class MessageBubble extends StatelessWidget {
   final SupportMessage message;
@@ -22,60 +23,73 @@ class MessageBubble extends StatelessWidget {
     this.isOperator = false,
   });
 
+  bool get _alignEnd {
+    if (message.isInternal) return true;
+    final fromUser = message.isFromUser;
+    return isOperator ? !fromUser : fromUser;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
-    final isUser = message.isFromUser;
-    final isOperator = message.isFromOperator;
+    final colors = SupportSemanticColors.of(context);
+    final alignEnd = _alignEnd;
+    final isInternal = message.isInternal;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
       child: Row(
-        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: alignEnd ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isUser) ...[
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: _getSenderColor(theme),
-              child: Icon(
-                isOperator ? Icons.support_agent : Icons.settings,
-                size: 16,
-                color: Colors.white,
-              ),
-            ),
+          if (!alignEnd) ...[
+            _Avatar(message: message, theme: theme),
             const SizedBox(width: 8),
           ],
           Flexible(
             child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.7,
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: _getBubbleColor(theme, isUser),
+                color: _bubbleColor(theme, colors, alignEnd, isInternal),
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(16),
-                  topRight: const Radius.circular(16),
-                  bottomLeft: Radius.circular(isUser ? 16 : 4),
-                  bottomRight: Radius.circular(isUser ? 4 : 16),
+                  topLeft: const Radius.circular(14),
+                  topRight: const Radius.circular(14),
+                  bottomLeft: Radius.circular(alignEnd ? 14 : 4),
+                  bottomRight: Radius.circular(alignEnd ? 4 : 14),
                 ),
-                border: Border.all(
-                  color: _getBorderColor(theme, isUser),
-                  width: 1,
-                ),
+                border: Border.all(color: _borderColor(theme, colors, alignEnd, isInternal)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (!isUser && message.sender != null) ...[
+                  if (isInternal)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock, size: 12, color: colors.internalNoteFg),
+                          const SizedBox(width: 4),
+                          Text(
+                            'یادداشت داخلی',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: colors.internalNoteFg,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  if (message.sender != null && !message.isFromUser) ...[
                     Text(
                       message.sender!.displayName,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: _getSenderTextColor(theme, isUser),
+                        color: theme.colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -85,7 +99,8 @@ class MessageBubble extends StatelessWidget {
                       message.content,
                       style: TextStyle(
                         fontSize: 14,
-                        color: _getTextColor(theme, isUser),
+                        height: 1.4,
+                        color: _textColor(theme, colors, alignEnd, isInternal),
                       ),
                     ),
                   if (message.attachments != null && message.attachments!.isNotEmpty) ...[
@@ -95,18 +110,11 @@ class MessageBubble extends StatelessWidget {
                       runSpacing: 4,
                       children: message.attachments!.map((a) {
                         return ActionChip(
-                          avatar: Icon(
-                            Icons.attach_file,
-                            size: 16,
-                            color: _getTextColor(theme, isUser),
-                          ),
+                          avatar: Icon(Icons.attach_file, size: 16, color: _textColor(theme, colors, alignEnd, isInternal)),
                           label: Text(
                             a.originalName,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _getTextColor(theme, isUser),
-                            ),
+                            style: TextStyle(fontSize: 12, color: _textColor(theme, colors, alignEnd, isInternal)),
                           ),
                           onPressed: () => _downloadAttachment(context, a),
                         );
@@ -114,45 +122,43 @@ class MessageBubble extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _formatTime(message.createdAt, l10n),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _getTimeColor(theme, isUser),
-                        ),
-                      ),
-                      if (message.isInternal) ...[
-                        const SizedBox(width: 4),
-                        Icon(
-                          Icons.lock,
-                          size: 12,
-                          color: _getTimeColor(theme, isUser),
-                        ),
-                      ],
-                    ],
+                  Text(
+                    _formatTime(message.createdAt, l10n),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _textColor(theme, colors, alignEnd, isInternal).withValues(alpha: 0.65),
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-          if (isUser) ...[
+          if (alignEnd) ...[
             const SizedBox(width: 8),
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: theme.colorScheme.primary,
-              child: const Icon(
-                Icons.person,
-                size: 16,
-                color: Colors.white,
-              ),
-            ),
+            _Avatar(message: message, theme: theme),
           ],
         ],
       ),
     );
+  }
+
+  Color _bubbleColor(ThemeData theme, SupportSemanticColors colors, bool alignEnd, bool isInternal) {
+    if (isInternal) return colors.internalNoteBg;
+    if (alignEnd && !isOperator) return theme.colorScheme.primary;
+    if (alignEnd && isOperator) return colors.agentBubbleBg;
+    return colors.customerBubbleBg;
+  }
+
+  Color _borderColor(ThemeData theme, SupportSemanticColors colors, bool alignEnd, bool isInternal) {
+    if (isInternal) return colors.internalNoteBorder;
+    if (alignEnd && !isOperator) return theme.colorScheme.primary.withValues(alpha: 0.25);
+    return theme.colorScheme.outlineVariant;
+  }
+
+  Color _textColor(ThemeData theme, SupportSemanticColors colors, bool alignEnd, bool isInternal) {
+    if (isInternal) return colors.internalNoteFg;
+    if (alignEnd && !isOperator) return theme.colorScheme.onPrimary;
+    return theme.colorScheme.onSurface;
   }
 
   Future<void> _downloadAttachment(BuildContext context, SupportAttachment attachment) async {
@@ -172,92 +178,49 @@ class MessageBubble extends StatelessWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(ErrorExtractor.forContext(e, context)),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
     }
   }
 
-  Color _getSenderColor(ThemeData theme) {
-    if (message.isFromOperator) {
-      return Colors.blue;
-    } else if (message.isFromSystem) {
-      return Colors.grey;
-    }
-    return theme.colorScheme.primary;
-  }
-
-  Color _getBubbleColor(ThemeData theme, bool isUser) {
-    if (isUser) {
-      return theme.colorScheme.primary;
-    } else {
-      return theme.colorScheme.surface;
-    }
-  }
-
-  Color _getBorderColor(ThemeData theme, bool isUser) {
-    if (isUser) {
-      return theme.colorScheme.primary.withValues(alpha: 0.3);
-    } else {
-      return theme.colorScheme.outline.withValues(alpha: 0.3);
-    }
-  }
-
-  Color _getTextColor(ThemeData theme, bool isUser) {
-    if (isUser) {
-      return Colors.white;
-    } else {
-      return theme.colorScheme.onSurface;
-    }
-  }
-
-  Color _getSenderTextColor(ThemeData theme, bool isUser) {
-    if (isUser) {
-      return Colors.white.withValues(alpha: 0.8);
-    } else {
-      return theme.colorScheme.primary;
-    }
-  }
-
-  Color _getTimeColor(ThemeData theme, bool isUser) {
-    if (isUser) {
-      return Colors.white.withValues(alpha: 0.7);
-    } else {
-      return theme.colorScheme.onSurface.withValues(alpha: 0.6);
-    }
-  }
-
   String _formatTime(DateTime dateTime, AppLocalizations l10n) {
-    // Ensure dateTime is in local timezone
     final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
-    final now = DateTime.now();
-    final difference = now.difference(localDateTime);
-
-    // If the difference is negative (future time), show just now
-    if (difference.isNegative) {
-      return l10n.justNow;
-    }
-
-    // Calculate total hours (more accurate than inDays for edge cases)
-    final totalHours = difference.inHours;
-    final totalDays = difference.inDays;
-
-    // For messages older than 24 hours, always show full date and time
-    if (totalDays > 0 || totalHours >= 24) {
+    final difference = DateTime.now().difference(localDateTime);
+    if (difference.isNegative) return l10n.justNow;
+    if (difference.inDays > 0 || difference.inHours >= 24) {
       final isJalali = calendarController?.isJalali ?? true;
       return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
     }
+    if (difference.inHours > 0) return l10n.hoursAgo(difference.inHours.toString());
+    if (difference.inMinutes > 0) return l10n.minutesAgo(difference.inMinutes.toString());
+    return l10n.justNow;
+  }
+}
 
-    // For recent messages (less than 24 hours), show relative time
-    if (difference.inHours > 0) {
-      return l10n.hoursAgo(difference.inHours.toString());
-    } else if (difference.inMinutes > 0) {
-      return l10n.minutesAgo(difference.inMinutes.toString());
-    } else if (difference.inSeconds > 10) {
-      return l10n.justNow;
-    } else {
-      return l10n.justNow;
-    }
+class _Avatar extends StatelessWidget {
+  final SupportMessage message;
+  final ThemeData theme;
+
+  const _Avatar({required this.message, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = message.isFromOperator
+        ? theme.colorScheme.secondary
+        : message.isFromSystem
+            ? theme.colorScheme.outline
+            : theme.colorScheme.primary;
+    final icon = message.isFromOperator
+        ? Icons.support_agent
+        : message.isFromSystem
+            ? Icons.settings
+            : Icons.person;
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: bg,
+      child: Icon(icon, size: 16, color: theme.colorScheme.onPrimary),
+    );
   }
 }

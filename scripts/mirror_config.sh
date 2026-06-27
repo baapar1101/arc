@@ -196,7 +196,7 @@ hesabix_probe_flutter_storage_base() {
   [[ -n "$engine" ]] || return 1
   realm=""
   if [[ -f "${flutter_root}/bin/cache/engine.realm" ]]; then
-    realm="$(tr -d '\n\r' < "${flutter_root}/bin/cache/engine.realm")"
+    realm="$(tr -d '[:space:]' < "${flutter_root}/bin/cache/engine.realm")"
   fi
   rel_path="flutter_infra_release/flutter/${engine}/sky_engine.zip"
   while IFS= read -r base; do
@@ -207,7 +207,8 @@ hesabix_probe_flutter_storage_base() {
     else
       url="${base}/${rel_path}"
     fi
-    code="$(curl -fsSI -o /dev/null -w '%{http_code}' --connect-timeout 8 --max-time 25 "$url" 2>/dev/null || echo 000)"
+    code="$(curl -fsSI -o /dev/null -w '%{http_code}' --connect-timeout 8 --max-time 25 "$url" 2>/dev/null || true)"
+    code="${code:-000}"
     if [[ "$code" == "200" ]]; then
       printf '%s' "$base"
       return 0

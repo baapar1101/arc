@@ -1,31 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/widgets/support/support_semantic_colors.dart';
 
 /// Visual SLA indicator for support tickets.
 class SlaIndicator extends StatelessWidget {
   final String slaStatus;
+  final bool compact;
 
-  const SlaIndicator({super.key, required this.slaStatus});
+  const SlaIndicator({super.key, required this.slaStatus, this.compact = false});
 
   @override
   Widget build(BuildContext context) {
+    final colors = SupportSemanticColors.of(context);
     final (color, label, icon) = switch (slaStatus) {
-      'breached' => (Colors.red, 'SLA نقض', Icons.error_outline),
-      'warning' => (Colors.orange, 'نزدیک SLA', Icons.schedule),
-      _ => (Colors.green, 'SLA OK', Icons.check_circle_outline),
+      'breached' => (colors.slaBreached, 'نقض SLA', Icons.error_outline),
+      'warning' => (colors.slaWarning, 'نزدیک SLA', Icons.schedule),
+      _ => (colors.slaOk, 'در SLA', Icons.check_circle_outline),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 8, vertical: compact ? 2 : 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(compact ? 6 : 8),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+          Icon(icon, size: compact ? 12 : 14, color: color),
+          SizedBox(width: compact ? 3 : 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: compact ? 10 : 11,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
@@ -90,6 +100,6 @@ String slaStatusLabel(String status) {
   return switch (status) {
     'breached' => 'نقض SLA',
     'warning' => 'نزدیک SLA',
-    _ => 'SLA OK',
+    _ => 'در SLA',
   };
 }

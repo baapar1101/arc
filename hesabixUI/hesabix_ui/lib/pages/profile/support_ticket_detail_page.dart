@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/support/ticket_csat_dialog.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 
 /// صفحه جزئیات تیکت (deep link و navigation مستقیم)
@@ -94,6 +95,12 @@ class _SupportTicketDetailPageState extends State<SupportTicketDetailPage> {
       calendarController: widget.calendarController,
       displayMode: TicketDetailDisplayMode.page,
       onTicketUpdated: _loadTicket,
+      onRequestCsat: widget.isOperator ? null : () => _maybeShowCsat(),
     );
+  }
+
+  Future<void> _maybeShowCsat() async {
+    final ok = await TicketCsatDialog.show(context, widget.ticketId);
+    if (ok == true && mounted) _loadTicket();
   }
 }

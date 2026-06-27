@@ -26,6 +26,8 @@ from app.services.support.ticket_lifecycle_service import TicketLifecycleService
 from app.services.support.ticket_event_service import TicketEventService
 from app.services.support.support_attachment_service import SupportAttachmentService
 from adapters.api.v1.support.message_helpers import serialize_message, serialize_messages
+from adapters.api.v1.support.ticket_serialize import ticket_to_dict, ticket_response_dict
+from app.services.support.ticket_engagement_service import mark_operator_read
 from adapters.db.repositories.support.attachment_repository import AttachmentRepository
 from app.services.support.notification_helpers import support_notification_context
 import logging
@@ -50,62 +52,7 @@ async def search_operator_tickets(
     
     tickets, total = ticket_repo.get_operator_tickets(query_info)
     
-    # تبدیل به dict
-    ticket_dicts = []
-    for ticket in tickets:
-        ticket_dict = {
-            "id": ticket.id,
-            "title": ticket.title,
-            "description": ticket.description,
-            "user_id": ticket.user_id,
-            "category_id": ticket.category_id,
-            "priority_id": ticket.priority_id,
-            "status_id": ticket.status_id,
-            "assigned_operator_id": ticket.assigned_operator_id,
-            "is_internal": ticket.is_internal,
-            "closed_at": ticket.closed_at,
-            "created_at": ticket.created_at,
-            "updated_at": ticket.updated_at,
-            "user": {
-                "id": ticket.user.id,
-                "first_name": ticket.user.first_name,
-                "last_name": ticket.user.last_name,
-                "email": ticket.user.email
-            } if ticket.user else None,
-            "assigned_operator": {
-                "id": ticket.assigned_operator.id,
-                "first_name": ticket.assigned_operator.first_name,
-                "last_name": ticket.assigned_operator.last_name,
-                "email": ticket.assigned_operator.email
-            } if ticket.assigned_operator else None,
-            "category": {
-                "id": ticket.category.id,
-                "name": ticket.category.name,
-                "description": ticket.category.description,
-                "is_active": ticket.category.is_active,
-                "created_at": ticket.category.created_at,
-                "updated_at": ticket.category.updated_at
-            } if ticket.category else None,
-            "priority": {
-                "id": ticket.priority.id,
-                "name": ticket.priority.name,
-                "description": ticket.priority.description,
-                "color": ticket.priority.color,
-                "order": ticket.priority.order,
-                "created_at": ticket.priority.created_at,
-                "updated_at": ticket.priority.updated_at
-            } if ticket.priority else None,
-            "status": {
-                "id": ticket.status.id,
-                "name": ticket.status.name,
-                "description": ticket.status.description,
-                "color": ticket.status.color,
-                "is_final": ticket.status.is_final,
-                "created_at": ticket.status.created_at,
-                "updated_at": ticket.status.updated_at
-            } if ticket.status else None
-        }
-        ticket_dicts.append(ticket_dict)
+    ticket_dicts = [ticket_to_dict(ticket, db) for ticket in tickets]
     
     paginated_data = PaginatedResponse.create(
         items=ticket_dicts,
@@ -191,10 +138,26 @@ async def get_operator_ticket(
         )
     
     # Format datetime fields based on calendar type
-    ticket_data = TicketResponse.from_orm(ticket).dict()
+    ticket_data = ticket_response_dict(ticket, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     
     return success_response(formatted_data, request)
+
+
+@router.post("/tickets/{ticket_id}/read", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def mark_ticket_read_operator(
+    request: Request,
+    ticket_id: int,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """علامت‌گذاری تیکت به‌عنوان خوانده‌شده توسط اپراتور"""
+    access = TicketAccessService(db)
+    ticket = access.get_operator_ticket(ticket_id)
+    mark_operator_read(db, ticket)
+    data = ticket_to_dict(ticket, db)
+    return success_response(format_datetime_fields(data, request), request)
 
 
 @router.put("/tickets/{ticket_id}/status", response_model=SuccessResponse)
@@ -256,7 +219,7 @@ async def update_ticket_status(
             logger.error(f"خطا در ارسال ناتیفیکیشن برای تغییر وضعیت تیکت {ticket_id}: {e}")
     
     # Format datetime fields based on calendar type
-    ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
+    ticket_data = ticket_response_dict(ticket_with_details, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     
     return success_response(formatted_data, request)
@@ -276,7 +239,7 @@ async def update_ticket_priority(
     ticket_with_details = lifecycle.update_priority(
         ticket_id, priority_request.priority_id, current_user.get_user_id()
     )
-    ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
+    ticket_data = ticket_response_dict(ticket_with_details, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     return success_response(formatted_data, request)
 
@@ -357,7 +320,7 @@ async def assign_ticket(
             logger.error(f"خطا در ارسال ناتیفیکیشن برای تخصیص تیکت {ticket_id}: {e}")
     
     # Format datetime fields based on calendar type
-    ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
+    ticket_data = ticket_response_dict(ticket_with_details, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     
     return success_response(formatted_data, request)

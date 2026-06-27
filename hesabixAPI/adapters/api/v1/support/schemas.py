@@ -199,4 +199,9 @@ class BulkUpdateStatusRequest(BaseModel):
     assigned_operator_id: Optional[int] = Field(None, description="شناسه اپراتور (اختیاری)")
 
 
+class SubmitCsatRequest(BaseModel):
+    rating: int = Field(..., ge=1, le=5, description="امتیاز ۱ تا ۵")
+    comment: Optional[str] = Field(None, max_length=2000)
+
+
 # PaginatedResponse is now imported from adapters.api.v1.schemas

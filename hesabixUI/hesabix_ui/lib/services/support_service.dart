@@ -439,6 +439,22 @@ class SupportService {
         .toList();
   }
 
+  Future<void> markUserTicketRead(int ticketId) async {
+    await _apiClient.post<Map<String, dynamic>>('/api/v1/support/$ticketId/read');
+  }
+
+  Future<void> markOperatorTicketRead(int ticketId) async {
+    await _apiClient.post<Map<String, dynamic>>('/api/v1/support/operator/tickets/$ticketId/read');
+  }
+
+  Future<SupportTicket> submitTicketCsat(int ticketId, {required int rating, String? comment}) async {
+    final response = await _apiClient.post<Map<String, dynamic>>(
+      '/api/v1/support/$ticketId/csat',
+      data: {'rating': rating, if (comment != null && comment.isNotEmpty) 'comment': comment},
+    );
+    return SupportTicket.fromJson(response.data!['data'] as Map<String, dynamic>);
+  }
+
   // Error handling
   Exception _handleError(DioException e) {
     if (e.response != null) {

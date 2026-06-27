@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, or_
 from sqlalchemy.orm import Session, joinedload
 
+from adapters.db.models.support.message import Message
 from adapters.db.models.support.status import Status
 from adapters.db.models.support.ticket import Ticket
 from adapters.db.repositories.support.ticket_repository import TicketRepository
@@ -20,6 +21,51 @@ class SupportDashboardService:
 
     def _open_filter(self):
         return Ticket.status.has(Status.is_final.is_(False))
+
+    def _last_public_message_subquery(self):
+        return (
+            self.db.query(
+                Message.ticket_id,
+                func.max(Message.created_at).label("max_created_at"),
+            )
+            .filter(Message.is_internal.is_(False))
+            .group_by(Message.ticket_id)
+            .subquery()
+        )
+
+    def _unread_operator_count(self, operator_id: Optional[int] = None) -> int:
+        last_sub = self._last_public_message_subquery()
+        last_msg = (
+            self.db.query(
+                Message.ticket_id,
+                Message.sender_type,
+                Message.created_at,
+            )
+            .join(
+                last_sub,
+                and_(
+                    Message.ticket_id == last_sub.c.ticket_id,
+                    Message.created_at == last_sub.c.max_created_at,
+                    Message.is_internal.is_(False),
+                ),
+            )
+            .subquery()
+        )
+        q = (
+            self.db.query(func.count(Ticket.id))
+            .join(last_msg, Ticket.id == last_msg.c.ticket_id)
+            .filter(
+                self._open_filter(),
+                last_msg.c.sender_type == "user",
+                or_(
+                    Ticket.operator_last_read_at.is_(None),
+                    last_msg.c.created_at > Ticket.operator_last_read_at,
+                ),
+            )
+        )
+        if operator_id is not None:
+            q = q.filter(Ticket.assigned_operator_id == operator_id)
+        return q.scalar() or 0
 
     def get_stats(self, operator_id: int) -> Dict[str, Any]:
         open_q = self.db.query(func.count(Ticket.id)).filter(self._open_filter())
@@ -55,6 +101,8 @@ class SupportDashboardService:
         return {
             "open_count": open_count,
             "my_open_count": mine_count,
+            "unread_count": self._unread_operator_count(),
+            "my_unread_count": self._unread_operator_count(operator_id),
             "overdue_count": overdue_count,
             "resolved_today_count": resolved_today,
         }

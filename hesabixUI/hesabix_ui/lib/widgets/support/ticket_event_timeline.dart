@@ -6,11 +6,13 @@ import 'package:hesabix_ui/models/support_models.dart';
 class TicketEventTimeline extends StatelessWidget {
   final List<SupportTicketEvent> events;
   final CalendarController? calendarController;
+  final bool initiallyExpanded;
 
   const TicketEventTimeline({
     super.key,
     required this.events,
     this.calendarController,
+    this.initiallyExpanded = false,
   });
 
   String _labelFor(SupportTicketEvent event) {
@@ -55,7 +57,7 @@ class TicketEventTimeline extends StatelessWidget {
     final isJalali = calendarController?.isJalali ?? true;
 
     return ExpansionTile(
-      initiallyExpanded: false,
+      initiallyExpanded: initiallyExpanded,
       leading: Icon(Icons.timeline, color: theme.colorScheme.primary),
       title: Text('تاریخچه رویدادها (${events.length})'),
       children: events

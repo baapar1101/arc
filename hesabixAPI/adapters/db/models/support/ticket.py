@@ -31,6 +31,12 @@ class Ticket(Base):
     resolution_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     first_responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     sla_breached: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    user_last_read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    operator_last_read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    csat_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    csat_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    csat_submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

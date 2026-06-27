@@ -103,7 +103,8 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
 
     // اضافه کردن منوی اپراتور پشتیبانی
     final operatorDestinations = <_Dest>[
-      _Dest(t.operatorPanel, Icons.support_agent, Icons.support_agent, '/user/profile/operator'),
+      _Dest('صندوق ورودی', Icons.inbox_outlined, Icons.inbox, '/user/profile/operator'),
+      _Dest('داشبورد پشتیبانی', Icons.dashboard_outlined, Icons.dashboard, '/user/profile/operator/dashboard'),
     ];
 
     // اضافه کردن منوی تنظیمات سیستم برای ادمین‌ها

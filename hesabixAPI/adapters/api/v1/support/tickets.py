@@ -10,14 +10,16 @@ from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.db.repositories.support.message_repository import MessageRepository
 from adapters.api.v1.schemas import QueryInfo, PaginatedResponse, SuccessResponse
 from adapters.api.v1.support.schemas import (
-    CreateTicketRequest, 
+    CreateTicketRequest,
     CreateMessageRequest,
     TicketResponse,
-    MessageResponse
+    MessageResponse,
+    SubmitCsatRequest,
 )
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.services.support.support_attachment_service import SupportAttachmentService
 from adapters.api.v1.support.message_helpers import serialize_message, serialize_messages
+from adapters.api.v1.support.ticket_serialize import ticket_to_dict, ticket_response_dict
 from adapters.db.repositories.support.attachment_repository import AttachmentRepository
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.services.notification_service import NotificationService
@@ -28,7 +30,7 @@ from app.services.support.notification_helpers import (
     support_notification_context,
     support_operator_notification_context,
 )
-from app.core.cache import get_cache
+from app.services.support.ticket_engagement_service import mark_user_read, submit_csat
 import logging
 
 router = APIRouter()
@@ -74,50 +76,7 @@ async def search_user_tickets(
     
     tickets, total = ticket_repo.get_user_tickets(current_user.get_user_id(), query_info)
     
-    # تبدیل به dict
-    ticket_dicts = []
-    for ticket in tickets:
-        ticket_dict = {
-            "id": ticket.id,
-            "title": ticket.title,
-            "description": ticket.description,
-            "user_id": ticket.user_id,
-            "category_id": ticket.category_id,
-            "priority_id": ticket.priority_id,
-            "status_id": ticket.status_id,
-            "assigned_operator_id": ticket.assigned_operator_id,
-            "is_internal": ticket.is_internal,
-            "closed_at": ticket.closed_at,
-            "created_at": ticket.created_at,
-            "updated_at": ticket.updated_at,
-            "category": {
-                "id": ticket.category.id,
-                "name": ticket.category.name,
-                "description": ticket.category.description,
-                "is_active": ticket.category.is_active,
-                "created_at": ticket.category.created_at,
-                "updated_at": ticket.category.updated_at
-            } if ticket.category else None,
-            "priority": {
-                "id": ticket.priority.id,
-                "name": ticket.priority.name,
-                "description": ticket.priority.description,
-                "color": ticket.priority.color,
-                "order": ticket.priority.order,
-                "created_at": ticket.priority.created_at,
-                "updated_at": ticket.priority.updated_at
-            } if ticket.priority else None,
-            "status": {
-                "id": ticket.status.id,
-                "name": ticket.status.name,
-                "description": ticket.status.description,
-                "color": ticket.status.color,
-                "is_final": ticket.status.is_final,
-                "created_at": ticket.status.created_at,
-                "updated_at": ticket.status.updated_at
-            } if ticket.status else None
-        }
-        ticket_dicts.append(ticket_dict)
+    ticket_dicts = [ticket_to_dict(ticket, db) for ticket in tickets]
     
     paginated_data = PaginatedResponse.create(
         items=ticket_dicts,
@@ -216,7 +175,7 @@ async def create_ticket(
         pass
     
     # Format datetime fields based on calendar type
-    ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
+    ticket_data = ticket_response_dict(ticket_with_details, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     
     return success_response(formatted_data, request)
@@ -241,7 +200,7 @@ async def get_ticket(
         )
     
     # Format datetime fields based on calendar type
-    ticket_data = TicketResponse.from_orm(ticket).dict()
+    ticket_data = ticket_response_dict(ticket, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     
     return success_response(formatted_data, request)
@@ -258,7 +217,7 @@ async def close_ticket(
     """بستن تیکت توسط کاربر"""
     lifecycle = TicketLifecycleService(db)
     ticket = lifecycle.close_by_user(ticket_id, current_user.get_user_id())
-    ticket_data = TicketResponse.from_orm(ticket).dict()
+    ticket_data = ticket_response_dict(ticket, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     return success_response(formatted_data, request)
 
@@ -274,7 +233,7 @@ async def reopen_ticket(
     """بازگشایی تیکت توسط کاربر"""
     lifecycle = TicketLifecycleService(db)
     ticket = lifecycle.reopen_by_user(ticket_id, current_user.get_user_id())
-    ticket_data = TicketResponse.from_orm(ticket).dict()
+    ticket_data = ticket_response_dict(ticket, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     return success_response(formatted_data, request)
 
@@ -431,3 +390,41 @@ async def search_ticket_messages(
     formatted_data = format_datetime_fields(paginated_data.dict(), request)
     
     return success_response(formatted_data, request)
+
+
+@router.post("/{ticket_id}/read", response_model=SuccessResponse)
+async def mark_ticket_read_user(
+    request: Request,
+    ticket_id: int,
+    _require_support: None = Depends(require_end_user_support_open),
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """علامت‌گذاری تیکت به‌عنوان خوانده‌شده توسط کاربر"""
+    access = TicketAccessService(db)
+    ticket = access.get_user_ticket(ticket_id, current_user.get_user_id())
+    mark_user_read(db, ticket)
+    data = ticket_to_dict(ticket, db)
+    return success_response(format_datetime_fields(data, request), request)
+
+
+@router.post("/{ticket_id}/csat", response_model=SuccessResponse)
+async def submit_ticket_csat(
+    request: Request,
+    ticket_id: int,
+    body: SubmitCsatRequest,
+    _require_support: None = Depends(require_end_user_support_open),
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """ثبت رضایت‌سنجی پس از بستن تیکت"""
+    access = TicketAccessService(db)
+    ticket = access.get_user_ticket(ticket_id, current_user.get_user_id())
+    if not ticket.status or not ticket.status.is_final:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSAT فقط برای تیکت‌های بسته مجاز است")
+    try:
+        ticket = submit_csat(db, ticket, body.rating, body.comment)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    data = ticket_to_dict(ticket, db)
+    return success_response(format_datetime_fields(data, request), request)

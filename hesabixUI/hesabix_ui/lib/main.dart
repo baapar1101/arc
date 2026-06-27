@@ -29,6 +29,7 @@ import 'pages/profile/account_settings_page.dart';
 import 'pages/profile/appearance_settings_page.dart';
 import 'pages/profile/verification_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
+import 'widgets/support/operator_inbox_list.dart';
 import 'pages/profile/operator/operator_dashboard_page.dart';
 import 'pages/profile/announcements_page.dart';
 import 'pages/system_settings_page.dart';
@@ -1277,10 +1278,21 @@ class _MyAppState extends State<MyApp> {
                   return PermissionGuard.buildAccessDeniedPage();
                 }
                 final initialTicketId = int.tryParse(state.uri.queryParameters['ticket'] ?? '');
+                OperatorInboxView? initialView;
+                final viewParam = state.uri.queryParameters['view'];
+                if (viewParam != null) {
+                  for (final v in OperatorInboxView.values) {
+                    if (v.name == viewParam) {
+                      initialView = v;
+                      break;
+                    }
+                  }
+                }
                 return OperatorTicketsPage(
                   calendarController: _calendarController,
                   initialTicketId: initialTicketId,
                   authStore: _authStore,
+                  initialInboxView: initialView,
                 );
               },
             ),

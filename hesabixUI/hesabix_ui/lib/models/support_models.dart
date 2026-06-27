@@ -343,6 +343,11 @@ class SupportTicket {
   final DateTime? resolutionDueAt;
   final DateTime? firstRespondedAt;
   final bool slaBreached;
+  final bool isUnreadForUser;
+  final bool isUnreadForOperator;
+  final int? csatRating;
+  final String? csatComment;
+  final DateTime? csatSubmittedAt;
   
   // Related objects
   final SupportUser? user;
@@ -369,6 +374,11 @@ class SupportTicket {
     this.resolutionDueAt,
     this.firstRespondedAt,
     this.slaBreached = false,
+    this.isUnreadForUser = false,
+    this.isUnreadForOperator = false,
+    this.csatRating,
+    this.csatComment,
+    this.csatSubmittedAt,
     this.user,
     this.assignedOperator,
     this.category,
@@ -411,6 +421,11 @@ class SupportTicket {
       resolutionDueAt: parseOpt(json['resolution_due_at_raw'] ?? json['resolution_due_at']),
       firstRespondedAt: parseOpt(json['first_responded_at_raw'] ?? json['first_responded_at']),
       slaBreached: json['sla_breached'] == true,
+      isUnreadForUser: json['is_unread_for_user'] == true,
+      isUnreadForOperator: json['is_unread_for_operator'] == true,
+      csatRating: json['csat_rating'] is int ? json['csat_rating'] as int : int.tryParse('${json['csat_rating']}'),
+      csatComment: json['csat_comment'] as String?,
+      csatSubmittedAt: parseOpt(json['csat_submitted_at_raw'] ?? json['csat_submitted_at']),
       user: json['user'] != null ? SupportUser.fromJson(json['user']) : null,
       assignedOperator: json['assigned_operator'] != null ? SupportUser.fromJson(json['assigned_operator']) : null,
       category: json['category'] != null ? SupportCategory.fromJson(json['category']) : null,
@@ -442,14 +457,21 @@ class SupportTicket {
       'priority': priority?.toJson(),
       'status': status?.toJson(),
       'messages': messages?.map((m) => m.toJson()).toList(),
+      'is_unread_for_user': isUnreadForUser,
+      'is_unread_for_operator': isUnreadForOperator,
+      'csat_rating': csatRating,
+      'csat_comment': csatComment,
+      'csat_submitted_at': csatSubmittedAt?.toIso8601String(),
     };
   }
 
-  bool get isOpen => statusId == 1; // وضعیت "باز"
-  bool get isInProgress => statusId == 2; // وضعیت "در حال پیگیری"
-  bool get isWaitingForUser => statusId == 3; // وضعیت "در انتظار کاربر"
-  bool get isClosed => statusId == 4; // وضعیت "بسته"
-  bool get isResolved => statusId == 5; // وضعیت "حل شده"
+  bool get needsCsat => isClosedFinal && csatSubmittedAt == null;
+
+  bool get isOpen => statusId == 1;
+  bool get isInProgress => statusId == 2;
+  bool get isWaitingForUser => statusId == 3;
+  bool get isClosed => statusId == 4;
+  bool get isResolved => statusId == 5;
   bool get isClosedFinal => status?.isFinal ?? false;
 
   String get slaStatus {

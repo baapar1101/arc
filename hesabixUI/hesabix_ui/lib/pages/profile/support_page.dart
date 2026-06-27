@@ -10,30 +10,18 @@ import 'package:hesabix_ui/services/support_tickets_public_config.dart';
 import 'package:hesabix_ui/services/saved_filters_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/models/saved_filter.dart';
-import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
-import '../../core/date_utils.dart';
-import '../../widgets/jalali_date_picker.dart';
-import '../../utils/date_formatters.dart';
 import '../../utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
+import 'package:hesabix_ui/widgets/support/ticket_detail_view.dart';
+import 'package:hesabix_ui/widgets/support/ticket_csat_dialog.dart';
 import 'package:hesabix_ui/widgets/support/ticket_card.dart';
+import 'package:hesabix_ui/widgets/support/user_ticket_list_item.dart';
 import 'create_ticket_page.dart';
 
-// View modes enum
-enum ViewMode { list, card, table }
+enum UserSupportTab { all, open, unread, waiting, resolved }
 
-// Quick filter types
-enum QuickFilterType {
-  all,
-  open,
-  waitingForResponse,
-  resolved,
-  today,
-  thisWeek,
-  thisMonth,
-  highPriority,
-}
+enum ViewMode { compact, card }
 
 class SupportPage extends StatefulWidget {
   final CalendarController? calendarController;
@@ -44,9 +32,6 @@ class SupportPage extends StatefulWidget {
 }
 
 class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
-  Set<int> _selectedRows = <int>{};
-  
-  // Support data for filters
   final SupportService _supportService = SupportService(ApiClient());
   bool _supportGateResolved = false;
   SupportTicketsPublicConfig _supportPublic = const SupportTicketsPublicConfig();
@@ -56,13 +41,12 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   bool _metadataLoading = false;
   String? _metadataError;
   
-  // Refresh counter to force data table refresh
+  // Refresh counter to force list refresh after actions
   int _refreshCounter = 0;
 
-  // Mobile state
+  // Ticket list state
   bool _ticketsLoading = false;
   String? _ticketsError;
-  bool _ticketsEverLoaded = false;
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
   List<SupportTicket> _tickets = <SupportTicket>[];
@@ -75,14 +59,10 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   int? _selectedStatusId;
   int? _selectedPriorityId;
   int? _selectedCategoryId;
-  QuickFilterType? _activeQuickFilter;
-  DateTime? _dateFrom;
-  DateTime? _dateTo;
-  bool? _lastMessageFromUser; // null = همه, true = از کاربر, false = از اپراتور
-  bool? _isOpen; // null = همه, true = باز, false = بسته
+  UserSupportTab _activeTab = UserSupportTab.all;
   
   // View mode
-  ViewMode _viewMode = ViewMode.list;
+  ViewMode _viewMode = ViewMode.compact;
   
   // Saved filters
   List<SavedFilter> _savedFilters = [];
@@ -91,6 +71,10 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   // Grouping
   bool _groupByStatus = false;
   Map<String, List<SupportTicket>>? _groupedTickets;
+
+  SupportTicket? _selectedTicket;
+  bool _selectedTicketLoading = false;
+  int? _selectedTicketId;
 
   @override
   void initState() {
@@ -125,6 +109,12 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     if (cfg.enabledForUsers) {
       _loadMetadata();
       _loadSavedFilters();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _ticketPage = 1;
+        _hasMoreTickets = true;
+        _loadTickets();
+      });
     } else if (mounted) {
       setState(() {
         _metadataLoading = false;
@@ -178,11 +168,9 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       if (result == true && mounted) {
         setState(() {
           _refreshCounter++;
-          if (_ticketsEverLoaded) {
-            _ticketPage = 1;
-            _hasMoreTickets = true;
-            _loadTickets(showSpinner: false);
-          }
+          _ticketPage = 1;
+          _hasMoreTickets = true;
+          _loadTickets(showSpinner: false);
         });
       }
       return;
@@ -196,11 +184,9 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     if (result == true) {
       setState(() {
         _refreshCounter++;
-        if (_ticketsEverLoaded) {
-          _ticketPage = 1;
-          _hasMoreTickets = true;
-          _loadTickets(showSpinner: false);
-        }
+        _ticketPage = 1;
+        _hasMoreTickets = true;
+        _loadTickets(showSpinner: false);
       });
     }
   }
@@ -208,6 +194,11 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
     final ticketId = ticketData['id'];
     if (ticketId is! int) return;
+
+    if (MediaQuery.of(context).size.width >= 960) {
+      _openTicketInSplitView(ticketId, ticketData);
+      return;
+    }
 
     if (MediaQuery.of(context).size.width >= 768) {
       context.push('/user/profile/support/tickets/$ticketId');
@@ -221,18 +212,46 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
         ticket: ticket,
         isOperator: false,
         calendarController: widget.calendarController,
-        onTicketUpdated: () {
-          setState(() {
-            _refreshCounter++;
-            if (_ticketsEverLoaded) {
-              _ticketPage = 1;
-              _hasMoreTickets = true;
-              _loadTickets(showSpinner: false);
-            }
-          });
-        },
+        onTicketUpdated: _refreshTicketList,
+        onRequestCsat: () => _maybeShowCsat(ticketId),
       ),
     );
+  }
+
+  void _refreshTicketList() {
+    setState(() {
+      _refreshCounter++;
+      _ticketPage = 1;
+      _hasMoreTickets = true;
+    });
+    _loadTickets(showSpinner: false);
+  }
+
+  Future<void> _openTicketInSplitView(int ticketId, [Map<String, dynamic>? row]) async {
+    setState(() {
+      _selectedTicketId = ticketId;
+      _selectedTicket = row != null ? SupportTicket.fromJson(row) : null;
+      _selectedTicketLoading = true;
+    });
+    try {
+      final ticket = await _supportService.getTicket(ticketId);
+      if (!mounted) return;
+      setState(() {
+        _selectedTicket = ticket;
+        _selectedTicketLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _selectedTicketLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+      );
+    }
+  }
+
+  Future<void> _maybeShowCsat(int ticketId) async {
+    final ok = await TicketCsatDialog.show(context, ticketId);
+    if (ok == true) _refreshTicketList();
   }
 
   List<FilterItem> _buildFilters() {
@@ -249,107 +268,40 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     if (_selectedCategoryId != null) {
       filters.add(FilterItem(property: 'category_id', operator: '==', value: _selectedCategoryId));
     }
-    
-    if (_dateFrom != null && _dateTo != null) {
-      final start = DateTime(_dateFrom!.year, _dateFrom!.month, _dateFrom!.day);
-      final endExclusive = DateTime(_dateTo!.year, _dateTo!.month, _dateTo!.day)
-          .add(const Duration(days: 1));
-      filters.add(FilterItem(property: 'created_at', operator: '>=', value: start.toIso8601String()));
-      filters.add(FilterItem(property: 'created_at', operator: '<', value: endExclusive.toIso8601String()));
-    }
-    
-    if (_lastMessageFromUser != null) {
-      filters.add(FilterItem(
-        property: 'last_message_from_user',
-        operator: '==',
-        value: _lastMessageFromUser == true ? 'true' : 'false',
-      ));
-    }
-    
-    if (_isOpen != null) {
-      final openStatusIds = _statuses.where((s) => !s.isFinal).map((s) => s.id).toList();
-      if (_isOpen == true) {
-        filters.add(FilterItem(property: 'status_id', operator: 'in', value: openStatusIds));
-      } else {
-        final closedStatusIds = _statuses.where((s) => s.isFinal).map((s) => s.id).toList();
-        filters.add(FilterItem(property: 'status_id', operator: 'in', value: closedStatusIds));
-      }
+
+    switch (_activeTab) {
+      case UserSupportTab.open:
+        final openIds = _statuses.where((s) => !s.isFinal).map((s) => s.id).toList();
+        if (openIds.isNotEmpty) {
+          filters.add(FilterItem(property: 'status_id', operator: 'in', value: openIds));
+        }
+        break;
+      case UserSupportTab.unread:
+        filters.add(const FilterItem(property: 'is_unread_for_user', operator: '==', value: 'true'));
+        break;
+      case UserSupportTab.waiting:
+        filters.add(const FilterItem(property: 'last_message_from_user', operator: '==', value: 'true'));
+        break;
+      case UserSupportTab.resolved:
+        final closedIds = _statuses.where((s) => s.isFinal).map((s) => s.id).toList();
+        if (closedIds.isNotEmpty) {
+          filters.add(FilterItem(property: 'status_id', operator: 'in', value: closedIds));
+        }
+        break;
+      case UserSupportTab.all:
+        break;
     }
     
     return filters;
   }
 
-  void _applyQuickFilter(QuickFilterType filterType) {
+  void _onTabChanged(UserSupportTab tab) {
     setState(() {
-      _activeQuickFilter = _activeQuickFilter == filterType ? null : filterType;
-      
-      // Reset other filters when applying quick filter
-      if (_activeQuickFilter != null) {
-        _selectedStatusId = null;
-        _selectedPriorityId = null;
-        _selectedCategoryId = null;
-        _dateFrom = null;
-        _dateTo = null;
-        _lastMessageFromUser = null;
-        _isOpen = null;
-        _selectedSavedFilter = null;
-      }
-      
-      // Apply quick filter logic
-      switch (_activeQuickFilter) {
-        case QuickFilterType.all:
-          // No filters
-          break;
-        case QuickFilterType.open:
-          final openStatus = _statuses.firstWhere(
-            (s) => s.name.toLowerCase().contains('باز') || s.name.toLowerCase().contains('open'),
-            orElse: () => _statuses.firstWhere(
-              (s) => !s.isFinal,
-              orElse: () => _statuses.first,
-            ),
-          );
-          _selectedStatusId = openStatus.id;
-          break;
-        case QuickFilterType.waitingForResponse:
-          _lastMessageFromUser = true;
-          break;
-        case QuickFilterType.resolved:
-          final resolvedStatus = _statuses.firstWhere(
-            (s) => s.name.toLowerCase().contains('حل') || s.name.toLowerCase().contains('resolved'),
-            orElse: () => _statuses.firstWhere(
-              (s) => s.isFinal,
-              orElse: () => _statuses.last,
-            ),
-          );
-          _selectedStatusId = resolvedStatus.id;
-          break;
-        case QuickFilterType.today:
-          final now = DateTime.now();
-          _dateFrom = DateTime(now.year, now.month, now.day);
-          _dateTo = DateTime(now.year, now.month, now.day);
-          break;
-        case QuickFilterType.thisWeek:
-          final now = DateTime.now();
-          final weekStart = now.subtract(Duration(days: now.weekday - 1));
-          _dateFrom = DateTime(weekStart.year, weekStart.month, weekStart.day);
-          _dateTo = DateTime(now.year, now.month, now.day);
-          break;
-        case QuickFilterType.thisMonth:
-          final now = DateTime.now();
-          _dateFrom = DateTime(now.year, now.month, 1);
-          _dateTo = DateTime(now.year, now.month, now.day);
-          break;
-        case QuickFilterType.highPriority:
-          final highPriority = _priorities.firstWhere(
-            (p) => p.name.toLowerCase().contains('بالا') || p.name.toLowerCase().contains('high'),
-            orElse: () => _priorities.first,
-          );
-          _selectedPriorityId = highPriority.id;
-          break;
-        case null:
-          break;
-      }
-      
+      _activeTab = tab;
+      _selectedStatusId = null;
+      _selectedPriorityId = null;
+      _selectedCategoryId = null;
+      _selectedSavedFilter = null;
       _ticketPage = 1;
       _hasMoreTickets = true;
     });
@@ -425,11 +377,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       _selectedStatusId = null;
       _selectedPriorityId = null;
       _selectedCategoryId = null;
-      _activeQuickFilter = null;
-      _dateFrom = null;
-      _dateTo = null;
-      _lastMessageFromUser = null;
-      _isOpen = null;
+      _activeTab = UserSupportTab.all;
       _selectedSavedFilter = null;
       _ticketPage = 1;
       _hasMoreTickets = true;
@@ -488,17 +436,6 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       return Color(int.parse(hex.replaceFirst('#', '0xFF')));
     } catch (_) {
       return null;
-    }
-  }
-
-  String _formatTicketDate(DateTime dateTime) {
-    try {
-      final isJalali = widget.calendarController?.isJalali ??
-          ApiClient.getCalendarController()?.isJalali ??
-          true;
-      return HesabixDateUtils.formatDateTime(dateTime, isJalali);
-    } catch (_) {
-      return DateFormatters.formatServerDateTime(dateTime.toIso8601String());
     }
   }
 
@@ -584,39 +521,34 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildQuickFilters(AppLocalizations t, ThemeData theme) {
+  Widget _buildSupportTabs(ThemeData theme) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          _buildQuickFilterChip(t, theme, QuickFilterType.all, 'همه', Icons.list),
+          _tabChip('همه', UserSupportTab.all, Icons.inbox_outlined),
           const SizedBox(width: 8),
-          _buildQuickFilterChip(t, theme, QuickFilterType.open, 'تیکت‌های باز', Icons.lock_open),
+          _tabChip('باز', UserSupportTab.open, Icons.lock_open_outlined),
           const SizedBox(width: 8),
-          _buildQuickFilterChip(t, theme, QuickFilterType.waitingForResponse, 'در انتظار پاسخ', Icons.schedule),
+          _tabChip('جدید', UserSupportTab.unread, Icons.mark_email_unread_outlined),
           const SizedBox(width: 8),
-          _buildQuickFilterChip(t, theme, QuickFilterType.resolved, 'حل شده', Icons.check_circle),
+          _tabChip('منتظر پاسخ', UserSupportTab.waiting, Icons.schedule),
           const SizedBox(width: 8),
-          _buildQuickFilterChip(t, theme, QuickFilterType.today, 'امروز', Icons.today),
-          const SizedBox(width: 8),
-          _buildQuickFilterChip(t, theme, QuickFilterType.thisWeek, 'این هفته', Icons.calendar_view_week),
-          const SizedBox(width: 8),
-          _buildQuickFilterChip(t, theme, QuickFilterType.thisMonth, 'این ماه', Icons.calendar_month),
-          const SizedBox(width: 8),
-          _buildQuickFilterChip(t, theme, QuickFilterType.highPriority, 'اولویت بالا', Icons.flag),
+          _tabChip('بسته / حل‌شده', UserSupportTab.resolved, Icons.check_circle_outline),
         ],
       ),
     );
   }
 
-  Widget _buildQuickFilterChip(AppLocalizations t, ThemeData theme, QuickFilterType type, String label, IconData icon) {
-    final isSelected = _activeQuickFilter == type;
+  Widget _tabChip(String label, UserSupportTab tab, IconData icon) {
+    final theme = Theme.of(context);
+    final selected = _activeTab == tab;
     return FilterChip(
       avatar: Icon(icon, size: 18),
       label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => _applyQuickFilter(type),
+      selected: selected,
+      onSelected: (_) => _onTabChanged(tab),
       selectedColor: theme.colorScheme.primaryContainer,
       checkmarkColor: theme.colorScheme.onPrimaryContainer,
     );
@@ -698,13 +630,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     if (result != null && result.isNotEmpty) {
       try {
         final filters = <String, dynamic>{};
-        if (_selectedStatusId != null) filters['status_id'] = _selectedStatusId;
-        if (_selectedPriorityId != null) filters['priority_id'] = _selectedPriorityId;
         if (_selectedCategoryId != null) filters['category_id'] = _selectedCategoryId;
-        if (_dateFrom != null && _dateTo != null) {
-          filters['date_from'] = _dateFrom!.toIso8601String();
-          filters['date_to'] = _dateTo!.toIso8601String();
-        }
         
         final filter = SavedFilter(
           name: result,
@@ -992,133 +918,6 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
                 ),
                 const SizedBox(height: 16),
               ],
-              // Date range filter
-              Text(
-                'بازه زمانی',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final date = await showAdaptiveDatePicker(
-                          context: context,
-                          calendarController: widget.calendarController,
-                          initialDate: _dateFrom ?? DateTime.now(),
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
-                        );
-                        if (date != null) {
-                          setState(() {
-                            _dateFrom = date;
-                            _ticketPage = 1;
-                            _hasMoreTickets = true;
-                          });
-                          _loadTickets(showSpinner: true);
-                        }
-                      },
-                      icon: const Icon(Icons.calendar_today, size: 16),
-                      label: Text(_dateFrom != null ? _formatTicketDate(_dateFrom!) : 'از تاریخ'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final date = await showAdaptiveDatePicker(
-                          context: context,
-                          calendarController: widget.calendarController,
-                          initialDate: _dateTo ?? DateTime.now(),
-                          firstDate: _dateFrom ?? DateTime(2020),
-                          lastDate: DateTime.now(),
-                        );
-                        if (date != null) {
-                          setState(() {
-                            _dateTo = date;
-                            _ticketPage = 1;
-                            _hasMoreTickets = true;
-                          });
-                          _loadTickets(showSpinner: true);
-                        }
-                      },
-                      icon: const Icon(Icons.calendar_today, size: 16),
-                      label: Text(_dateTo != null ? _formatTicketDate(_dateTo!) : 'تا تاریخ'),
-                    ),
-                  ),
-                ],
-              ),
-              if (_dateFrom != null || _dateTo != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _dateFrom = null;
-                        _dateTo = null;
-                        _ticketPage = 1;
-                        _hasMoreTickets = true;
-                      });
-                      _loadTickets(showSpinner: true);
-                    },
-                    icon: const Icon(Icons.clear, size: 16),
-                    label: const Text('پاک کردن تاریخ'),
-                  ),
-                ),
-              const SizedBox(height: 16),
-              // Advanced filters
-              Text(
-                'فیلترهای پیشرفته',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilterChip(
-                    label: const Text('آخرین پیام از کاربر'),
-                    selected: _lastMessageFromUser == true,
-                    onSelected: (selected) {
-                      setState(() {
-                        _lastMessageFromUser = selected ? true : null;
-                        _ticketPage = 1;
-                        _hasMoreTickets = true;
-                      });
-                      _loadTickets(showSpinner: true);
-                    },
-                  ),
-                  FilterChip(
-                    label: const Text('تیکت‌های باز'),
-                    selected: _isOpen == true,
-                    onSelected: (selected) {
-                      setState(() {
-                        _isOpen = selected ? true : null;
-                        _ticketPage = 1;
-                        _hasMoreTickets = true;
-                      });
-                      _loadTickets(showSpinner: true);
-                    },
-                  ),
-                  FilterChip(
-                    label: const Text('تیکت‌های بسته'),
-                    selected: _isOpen == false,
-                    onSelected: (selected) {
-                      setState(() {
-                        _isOpen = selected ? false : null;
-                        _ticketPage = 1;
-                        _hasMoreTickets = true;
-                      });
-                      _loadTickets(showSpinner: true);
-                    },
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -1179,9 +978,6 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       _selectedStatusId != null,
       _selectedPriorityId != null,
       _selectedCategoryId != null,
-      _dateFrom != null || _dateTo != null,
-      _lastMessageFromUser != null,
-      _isOpen != null,
     ].where((x) => x).length;
     
     return Wrap(
@@ -1260,14 +1056,12 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   Widget _buildViewModeSelector(AppLocalizations t, ThemeData theme) {
     return SegmentedButton<ViewMode>(
       segments: const [
-        ButtonSegment(value: ViewMode.list, icon: Icon(Icons.list), label: Text('لیست')),
+        ButtonSegment(value: ViewMode.compact, icon: Icon(Icons.view_list), label: Text('فشرده')),
         ButtonSegment(value: ViewMode.card, icon: Icon(Icons.view_module), label: Text('کارت')),
       ],
       selected: {_viewMode},
       onSelectionChanged: (Set<ViewMode> newSelection) {
-        setState(() {
-          _viewMode = newSelection.first;
-        });
+        setState(() => _viewMode = newSelection.first);
       },
     );
   }
@@ -1277,6 +1071,37 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       ticket: ticket,
       calendarController: widget.calendarController,
       onTap: () => _navigateToTicketDetail(ticket.toJson()),
+    );
+  }
+
+  Widget _buildUserSplitDetail() {
+    final theme = Theme.of(context);
+    if (_selectedTicketId == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.forum_outlined, size: 56, color: theme.colorScheme.outline),
+            const SizedBox(height: 12),
+            Text('تیکتی انتخاب نشده', style: theme.textTheme.titleMedium),
+          ],
+        ),
+      );
+    }
+    if (_selectedTicketLoading || _selectedTicket == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return TicketDetailView(
+      key: ValueKey(_selectedTicket!.id),
+      ticket: _selectedTicket!,
+      isOperator: false,
+      calendarController: widget.calendarController,
+      displayMode: TicketDetailDisplayMode.embedded,
+      onTicketUpdated: () {
+        _refreshTicketList();
+        _openTicketInSplitView(_selectedTicket!.id);
+      },
+      onRequestCsat: () => _maybeShowCsat(_selectedTicket!.id),
     );
   }
 
@@ -1355,7 +1180,12 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
           final ticket = tickets[index];
           return _viewMode == ViewMode.card
               ? _buildTicketCard(ticket, t, theme)
-              : _buildTicketCard(ticket, t, theme); // For now, both use card style
+              : UserTicketListItem(
+                  ticket: ticket,
+                  isSelected: ticket.id == _selectedTicketId,
+                  calendarController: widget.calendarController,
+                  onTap: () => _navigateToTicketDetail(ticket.toJson()),
+                );
         },
       );
     }
@@ -1369,6 +1199,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
         await _loadTickets(showSpinner: false);
       },
       child: NotificationListener<ScrollNotification>(
+        key: ValueKey('tickets_$_refreshCounter'),
         onNotification: (notification) {
           if (notification.metrics.extentAfter < 200 &&
               !_ticketsLoading &&
@@ -1428,16 +1259,6 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       );
     }
 
-    if (isMobile && !_ticketsEverLoaded && !_ticketsLoading) {
-      _ticketsEverLoaded = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _ticketPage = 1;
-        _hasMoreTickets = true;
-        _loadTickets();
-      });
-    }
-
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: isMobile
@@ -1453,44 +1274,50 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildMobileHeader(t, theme, isMobile),
-            const SizedBox(height: 16),
-            // Quick Filters
-            _buildQuickFilters(t, theme),
-            const SizedBox(height: 8),
-            // Saved Filters
-            _buildSavedFilters(t, theme),
-            if (isMobile) ...[
+            if (!isMobile) ...[
               const SizedBox(height: 12),
-              _buildMobileSearch(t),
-              const SizedBox(height: 12),
-              _buildMobileFilters(t, theme),
-              const SizedBox(height: 8),
-              // View mode selector
               Row(
                 children: [
-                  Expanded(child: _buildViewModeSelector(t, theme)),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: Icon(_groupByStatus ? Icons.view_list : Icons.view_module),
-                    tooltip: _groupByStatus ? 'نمایش عادی' : 'گروه\u200cبندی بر اساس وضعیت',
-                    onPressed: () {
-                      setState(() {
-                        _groupByStatus = !_groupByStatus;
-                        if (_groupByStatus) {
-                          _groupedTickets = _groupTicketsByStatus(_tickets);
-                        } else {
-                          _groupedTickets = null;
-                        }
-                      });
-                    },
+                  Expanded(child: _buildMobileSearch(t)),
+                  const SizedBox(width: 12),
+                  FilledButton.icon(
+                    onPressed: _navigateToCreateTicket,
+                    icon: const Icon(Icons.add),
+                    label: Text(t.newTicket),
                   ),
                 ],
               ),
             ],
-            if (!isMobile) const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            _buildSupportTabs(theme),
+            const SizedBox(height: 8),
+            _buildSavedFilters(t, theme),
+            if (isMobile) ...[
+              const SizedBox(height: 8),
+              _buildMobileSearch(t),
+              const SizedBox(height: 8),
+              _buildMobileFilters(t, theme),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: _buildViewModeSelector(t, theme)),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: Icon(_groupByStatus ? Icons.view_list : Icons.view_module),
+                  tooltip: _groupByStatus ? 'نمایش عادی' : 'گروه\u200cبندی بر اساس وضعیت',
+                  onPressed: () {
+                    setState(() {
+                      _groupByStatus = !_groupByStatus;
+                      _groupedTickets = _groupByStatus ? _groupTicketsByStatus(_tickets) : null;
+                    });
+                  },
+                ),
+              ],
+            ),
             if (_metadataError != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
+                padding: const EdgeInsets.only(top: 8.0),
                 child: Card(
                   color: theme.colorScheme.errorContainer,
                   child: Padding(
@@ -1502,9 +1329,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
                         Expanded(
                           child: Text(
                             'امکان بارگذاری لیست فیلترها وجود ندارد. لطفاً صفحه را رفرش کنید.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onErrorContainer,
-                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
                           ),
                         ),
                       ],
@@ -1513,143 +1338,21 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
                 ),
               ),
             Expanded(
-              child: !isMobile
-                  ? SingleChildScrollView(
-                      child: DataTableWidget<Map<String, dynamic>>(
-                        key: ValueKey('data_table_$_refreshCounter'),
-                        config: DataTableConfig<Map<String, dynamic>>(
-                        title: null,
-                        subtitle: null,
-                        endpoint: '/api/v1/support/search',
-                        columns: [
-                          TextColumn(
-                            'title',
-                            t.ticketTitle,
-                            sortable: true,
-                            searchable: true,
-                            width: ColumnWidth.large,
-                          ),
-                          TextColumn(
-                            'category.name',
-                            t.category,
-                            sortable: true,
-                            searchable: true,
-                            width: ColumnWidth.medium,
-                            filterType: ColumnFilterType.multiSelect,
-                            filterOptions: _categories
-                                .map(
-                                  (category) => FilterOption(
-                                    value: category.name,
-                                    label: category.name,
-                                    description: category.description,
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                          TextColumn(
-                            'priority.name',
-                            t.priority,
-                            sortable: true,
-                            searchable: true,
-                            width: ColumnWidth.small,
-                            filterType: ColumnFilterType.multiSelect,
-                            filterOptions: _priorities
-                                .map(
-                                  (priority) => FilterOption(
-                                    value: priority.name,
-                                    label: priority.name,
-                                    description: priority.description,
-                                    color: priority.color != null ? _parseHexColor(priority.color!) : null,
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                          TextColumn(
-                            'status.name',
-                            t.status,
-                            sortable: true,
-                            searchable: true,
-                            width: ColumnWidth.small,
-                            filterType: ColumnFilterType.multiSelect,
-                            filterOptions: _statuses
-                                .map(
-                                  (status) => FilterOption(
-                                    value: status.name,
-                                    label: status.name,
-                                    description: status.description,
-                                    color: status.color != null ? _parseHexColor(status.color!) : null,
-                                  ),
-                                )
-                                .toList(),
-                          ),
-                          DateColumn(
-                            'created_at',
-                            t.ticketCreatedAt,
-                            sortable: true,
-                            searchable: true,
-                            width: ColumnWidth.medium,
-                            showTime: false,
-                          ),
-                          DateColumn(
-                            'updated_at',
-                            t.ticketUpdatedAt,
-                            sortable: true,
-                            searchable: true,
-                            width: ColumnWidth.medium,
-                            showTime: false,
-                          ),
-                        ],
-                        searchFields: const ['title', 'description'],
-                        filterFields: const ['title', 'category.name', 'priority.name', 'status.name', 'created_at'],
-                        dateRangeField: 'created_at',
-                        showSearch: true,
-                        showFilters: true,
-                        showColumnSearch: true,
-                        showPagination: true,
-                        showActiveFilters: true,
-                        enableSorting: true,
-                        enableGlobalSearch: true,
-                        enableDateRangeFilter: true,
-                        showRowNumbers: true,
-                        enableRowSelection: true,
-                        enableMultiRowSelection: true,
-                        selectedRows: _selectedRows,
-                        onRowSelectionChanged: (selectedRows) {
-                          setState(() {
-                            _selectedRows = selectedRows;
-                          });
-                        },
-                        defaultPageSize: 20,
-                        pageSizeOptions: const [10, 20, 50, 100],
-                        showFiltersButton: false,
-                        showClearFiltersButton: true,
-                        emptyStateMessage: t.noTickets,
-                        emptyStateWidget: _buildTicketsEmptyState(t, theme),
-                        loadingMessage: t.loadingTickets,
-                        errorMessage: t.ticketLoadingError,
-                        enableHorizontalScroll: true,
-                        minTableWidth: 720,
-                        showBorder: true,
-                        borderRadius: BorderRadius.circular(8),
-                        padding: const EdgeInsets.all(8),
-                        onRowTap: (ticketData) => _navigateToTicketDetail(ticketData),
-                        customHeaderActions: [
-                          Tooltip(
-                            message: t.newTicket,
-                            child: FilledButton.icon(
-                              onPressed: _navigateToCreateTicket,
-                              icon: const Icon(Icons.add),
-                              label: Text(t.newTicket),
-                            ),
-                          ),
-                        ],
-                        expandBodyHeightToFitRows: true,
-                        ),
-                        fromJson: (json) => json,
-                        calendarController: widget.calendarController,
-                      ),
-                    )
-                  : _buildMobileTicketsList(t, theme),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final useSplit = constraints.maxWidth >= 960;
+                  final list = _buildMobileTicketsList(t, theme);
+                  if (!useSplit) return list;
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(flex: 4, child: list),
+                      VerticalDivider(width: 1, color: theme.dividerColor),
+                      Expanded(flex: 6, child: _buildUserSplitDetail()),
+                    ],
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -1657,3 +1360,4 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     );
   }
 }
+
