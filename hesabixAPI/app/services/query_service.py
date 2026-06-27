@@ -7,6 +7,7 @@ from sqlalchemy.sql import Select
 
 from adapters.api.v1.schemas import QueryInfo, FilterItem
 from app.services.sort_resolution import effective_sort_specs
+from app.core.settings import get_settings
 
 T = TypeVar('T')
 
@@ -131,8 +132,11 @@ class QueryBuilder:
 			raise ValueError(f"عملگر پشتیبانی نشده: {operator}")
 	
 	def get_count_query(self) -> Select:
-		"""دریافت کوئری شمارش (بدون pagination)"""
-		return select(func.count()).select_from(self.stmt.subquery())
+		"""دریافت کوئری شمارش (بدون pagination و بدون subquery غیرضروری)"""
+		count_stmt = select(func.count()).select_from(self.model_class)
+		if self.stmt.whereclause is not None:
+			count_stmt = count_stmt.where(self.stmt.whereclause)
+		return count_stmt
 	
 	def execute(self) -> list[T]:
 		"""اجرای کوئری و بازگرداندن نتایج"""
@@ -164,6 +168,9 @@ class QueryService:
 		Returns:
 			tuple: (لیست نتایج, تعداد کل رکوردها)
 		"""
+		settings = get_settings()
+		if query_info.take > settings.max_page_size:
+			query_info = query_info.model_copy(update={"take": settings.max_page_size})
 		# کوئری شمارش (بدون pagination)
 		count_builder = QueryBuilder(model_class, db)
 		count_builder.apply_filters(query_info.filters)

@@ -7,7 +7,7 @@ import logging
 import re
 from collections import defaultdict, deque
 
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import and_, or_, func, cast
 from sqlalchemy.dialects.postgresql import JSONB
@@ -8989,6 +8989,307 @@ def get_production_report(
 
 
 
+
+def _is_account_payment_line(line: DocumentLine) -> bool:
+    line_extra = line.extra_info or {}
+    tt = str(line_extra.get("transaction_type") or "").strip().lower()
+    is_wallet_line = line.person_id is None and tt == "wallet"
+    if line.person_id is None and (
+        line.bank_account_id is not None
+        or line.cash_register_id is not None
+        or line.petty_cash_id is not None
+        or line.check_id is not None
+        or is_wallet_line
+    ):
+        if not line_extra.get("is_commission_line"):
+            return True
+    return False
+
+
+def _sum_receipt_doc_account_payments(doc: Document) -> Decimal:
+    total = Decimal(0)
+    for line in doc.lines:
+        if _is_account_payment_line(line):
+            total += Decimal(str(line.debit)) + Decimal(str(line.credit))
+    return total
+
+
+def _invoice_total_amount_for_document(
+    document: Document,
+    item_lines: Optional[List[InvoiceItemLine]] = None,
+) -> Decimal:
+    total_amount = Decimal(0)
+    extra_info = document.extra_info or {}
+    totals = extra_info.get("totals", {})
+    if isinstance(totals, dict) and "net" in totals:
+        try:
+            total_amount = Decimal(str(totals["net"]))
+        except (ValueError, TypeError):
+            pass
+    if total_amount != 0:
+        return total_amount
+    if item_lines is None:
+        return total_amount
+    for item_line in item_lines:
+        item_extra = item_line.extra_info or {}
+        line_total = item_extra.get("line_total")
+        if line_total is not None:
+            total_amount += Decimal(str(line_total))
+        else:
+            qty = Decimal(str(item_line.quantity or 0))
+            unit_price = Decimal(str(item_extra.get("unit_price", 0)))
+            line_discount = Decimal(str(item_extra.get("line_discount", 0)))
+            tax_amount = Decimal(str(item_extra.get("tax_amount", 0)))
+            total_amount += (qty * unit_price) - line_discount + tax_amount
+    return total_amount
+
+
+def invoice_documents_to_list_dicts(
+    db: Session,
+    documents: List[Document],
+) -> List[Dict[str, Any]]:
+    """سریال‌سازی سبک فاکتورها برای لیست (بدون بارگذاری خطوط و محاسبه سود)."""
+    if not documents:
+        return []
+
+    user_ids = {int(d.created_by_user_id) for d in documents if d.created_by_user_id}
+    currency_ids = {int(d.currency_id) for d in documents if d.currency_id}
+    project_ids = {int(d.project_id) for d in documents if d.project_id}
+
+    users_by_id: Dict[int, User] = {}
+    if user_ids:
+        for u in db.query(User).filter(User.id.in_(list(user_ids))).all():
+            users_by_id[int(u.id)] = u
+
+    currencies_by_id: Dict[int, Currency] = {}
+    if currency_ids:
+        for c in db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all():
+            currencies_by_id[int(c.id)] = c
+
+    projects_by_id: Dict[int, Any] = {}
+    if project_ids:
+        from adapters.db.models.project import Project
+
+        for p in db.query(Project).filter(Project.id.in_(list(project_ids))).all():
+            projects_by_id[int(p.id)] = p
+
+    results: List[Dict[str, Any]] = []
+    for doc in documents:
+        created_by = users_by_id.get(int(doc.created_by_user_id)) if doc.created_by_user_id else None
+        created_by_name = (
+            f"{getattr(created_by, 'first_name', '')} {getattr(created_by, 'last_name', '')}".strip()
+            if created_by
+            else None
+        )
+        currency = currencies_by_id.get(int(doc.currency_id)) if doc.currency_id else None
+        project_name = None
+        if doc.project_id and int(doc.project_id) in projects_by_id:
+            project_name = projects_by_id[int(doc.project_id)].name
+
+        results.append(
+            {
+                "id": doc.id,
+                "code": doc.code,
+                "business_id": doc.business_id,
+                "document_type": doc.document_type,
+                "document_date": doc.document_date.isoformat(),
+                "registered_at": doc.registered_at.isoformat(),
+                "currency_id": doc.currency_id,
+                "currency_code": getattr(currency, "code", None),
+                "created_by_user_id": doc.created_by_user_id,
+                "created_by_name": created_by_name,
+                "is_proforma": doc.is_proforma,
+                "description": doc.description,
+                "project_id": doc.project_id,
+                "project_name": project_name,
+                "extra_info": _normalize_document_extra_info_for_storage(doc.extra_info),
+                "product_lines": [],
+                "account_lines": [],
+                "tags": [],
+                "tags_display": "",
+                "created_at": doc.created_at.isoformat(),
+                "updated_at": doc.updated_at.isoformat(),
+            }
+        )
+    return results
+
+
+def batch_add_counterparty_to_invoice_items(
+    db: Session,
+    items: List[Dict[str, Any]],
+) -> None:
+    """افزودن counterparty به چند آیتم فاکتور با یک query."""
+    person_ids: set[int] = set()
+    for item in items:
+        extra = item.get("extra_info") or {}
+        pid = extra.get("person_id")
+        if pid is not None:
+            try:
+                person_ids.add(int(pid))
+            except (ValueError, TypeError):
+                pass
+
+    if not person_ids:
+        for item in items:
+            item["counterparty"] = ""
+        return
+
+    persons_by_id: Dict[int, Person] = {}
+    for p in db.query(Person).filter(Person.id.in_(list(person_ids))).all():
+        persons_by_id[int(p.id)] = p
+
+    for item in items:
+        try:
+            extra = item.get("extra_info") or {}
+            person_id = extra.get("person_id")
+            person_name = None
+            if person_id is not None:
+                p = persons_by_id.get(int(person_id))
+                if p is not None:
+                    person_name = getattr(p, "display_name", None) or getattr(p, "name", None)
+                    if not person_name:
+                        person_name = getattr(p, "alias_name", None)
+                    if not person_name and (
+                        getattr(p, "first_name", None) or getattr(p, "last_name", None)
+                    ):
+                        name_parts = []
+                        if getattr(p, "first_name", None):
+                            name_parts.append(p.first_name)
+                        if getattr(p, "last_name", None):
+                            name_parts.append(p.last_name)
+                        person_name = " ".join(name_parts) if name_parts else None
+                    if not person_name and getattr(p, "company_name", None):
+                        person_name = p.company_name
+            item["counterparty"] = person_name or ""
+        except Exception:
+            item["counterparty"] = ""
+
+
+def batch_calculate_invoices_remaining(
+    db: Session,
+    business_id: int,
+    documents: List[Document],
+) -> Dict[int, Dict[str, Any]]:
+    """محاسبه batch مانده فاکتورها برای لیست."""
+    if not documents:
+        return {}
+
+    invoice_ids = [int(d.id) for d in documents]
+    need_item_lines: List[int] = []
+    link_doc_ids: set[int] = set()
+
+    for doc in documents:
+        extra = doc.extra_info or {}
+        totals = extra.get("totals", {})
+        has_net = isinstance(totals, dict) and "net" in totals
+        if not has_net:
+            need_item_lines.append(int(doc.id))
+        links = extra.get("links", {}) or {}
+        for doc_id in links.get("receipt_payment_document_ids", []) or []:
+            try:
+                link_doc_ids.add(int(doc_id))
+            except (ValueError, TypeError):
+                pass
+
+    item_lines_by_doc: Dict[int, List[InvoiceItemLine]] = defaultdict(list)
+    if need_item_lines:
+        rows = db.query(InvoiceItemLine).filter(
+            InvoiceItemLine.document_id.in_(need_item_lines)
+        ).all()
+        for row in rows:
+            item_lines_by_doc[int(row.document_id)].append(row)
+
+    totals_by_id = {
+        int(doc.id): _invoice_total_amount_for_document(
+            doc, item_lines_by_doc.get(int(doc.id))
+        )
+        for doc in documents
+    }
+
+    invoice_id_set = set(invoice_ids)
+    line_invoice_id_expr = cast(
+        cast(DocumentLine.extra_info, JSONB)["invoice_id"].astext,
+        Integer,
+    )
+
+    person_linked_doc_ids: set[int] = set()
+    invoice_to_person_rp: Dict[int, set[int]] = defaultdict(set)
+    if invoice_id_set:
+        plines = (
+            db.query(DocumentLine.document_id, line_invoice_id_expr)
+            .join(Document, DocumentLine.document_id == Document.id)
+            .filter(
+                Document.business_id == business_id,
+                Document.document_type.in_(["receipt", "payment"]),
+                DocumentLine.person_id.isnot(None),
+                line_invoice_id_expr.in_(list(invoice_id_set)),
+            )
+            .all()
+        )
+        for doc_id, inv_id in plines:
+            if inv_id is None:
+                continue
+            doc_id_int = int(doc_id)
+            inv_id_int = int(inv_id)
+            person_linked_doc_ids.add(doc_id_int)
+            invoice_to_person_rp[inv_id_int].add(doc_id_int)
+
+    all_rp_doc_ids = link_doc_ids | person_linked_doc_ids
+    rp_docs_by_id: Dict[int, Document] = {}
+    if all_rp_doc_ids:
+        rp_docs = (
+            db.query(Document)
+            .options(selectinload(Document.lines))
+            .filter(
+                Document.id.in_(list(all_rp_doc_ids)),
+                Document.business_id == business_id,
+                Document.document_type.in_(["receipt", "payment"]),
+            )
+            .all()
+        )
+        rp_docs_by_id = {int(d.id): d for d in rp_docs}
+
+    results: Dict[int, Dict[str, Any]] = {}
+    for doc in documents:
+        inv_id = int(doc.id)
+        total_amount = totals_by_id.get(inv_id, Decimal(0))
+        total_paid = Decimal(0)
+        processed_doc_ids: set[int] = set()
+
+        extra = doc.extra_info or {}
+        links = extra.get("links", {}) or {}
+        for doc_id in links.get("receipt_payment_document_ids", []) or []:
+            try:
+                doc_id_int = int(doc_id)
+            except (ValueError, TypeError):
+                continue
+            rp_doc = rp_docs_by_id.get(doc_id_int)
+            if not rp_doc:
+                continue
+            processed_doc_ids.add(doc_id_int)
+            total_paid += _sum_receipt_doc_account_payments(rp_doc)
+
+        for doc_id_int in invoice_to_person_rp.get(inv_id, set()):
+            if doc_id_int in processed_doc_ids:
+                continue
+            rp_doc = rp_docs_by_id.get(doc_id_int)
+            if not rp_doc:
+                continue
+            processed_doc_ids.add(doc_id_int)
+            total_paid += _sum_receipt_doc_account_payments(rp_doc)
+
+        remaining = total_amount - total_paid
+        results[inv_id] = {
+            "invoice_id": inv_id,
+            "total_amount": float(total_amount),
+            "paid_amount": float(total_paid),
+            "remaining": float(remaining),
+            "is_settled": float(remaining) <= 0.01,
+        }
+
+    return results
+
+
 def calculate_invoice_remaining(
     db: Session,
     business_id: int,
@@ -9012,7 +9313,7 @@ def calculate_invoice_remaining(
         }
     """
     try:
-        logger.info(f"شروع محاسبه مانده فاکتور - invoice_id: {invoice_id}, business_id: {business_id}")
+        logger.debug("calculate_invoice_remaining invoice_id=%s business_id=%s", invoice_id, business_id)
         
         # دریافت فاکتور
         invoice = db.query(Document).filter(
@@ -9021,10 +9322,8 @@ def calculate_invoice_remaining(
         ).first()
         
         if not invoice:
-            logger.warning(f"فاکتور یافت نشد - invoice_id: {invoice_id}, business_id: {business_id}")
+            logger.warning("Invoice not found invoice_id=%s business_id=%s", invoice_id, business_id)
             raise ApiError("INVOICE_NOT_FOUND", "فاکتور یافت نشد", http_status=404)
-        
-        logger.info(f"فاکتور یافت شد - code: {invoice.code}, document_type: {invoice.document_type}")
         
         # پاک‌سازی لینک‌های مرده قبل از محاسبه مانده
         try:
@@ -9037,43 +9336,14 @@ def calculate_invoice_remaining(
             db.rollback()
         
         # محاسبه مبلغ کل فاکتور
-        total_amount = Decimal(0)
         extra_info = invoice.extra_info or {}
-        
-        # اول از extra_info.totals.net
+        item_lines = None
         totals = extra_info.get('totals', {})
-        if isinstance(totals, dict) and 'net' in totals:
-            try:
-                total_amount = Decimal(str(totals['net']))
-                logger.info(f"total_amount از extra_info.totals.net: {total_amount}")
-            except (ValueError, TypeError) as e:
-                logger.warning(f"خطا در خواندن totals.net: {e}")
-                pass
-        
-        # اگر total_amount هنوز 0 است، از InvoiceItemLine محاسبه کن
-        if total_amount == 0:
-            try:
-                logger.info("محاسبه total_amount از InvoiceItemLine")
-                item_lines = db.query(InvoiceItemLine).filter(
-                    InvoiceItemLine.document_id == invoice_id
-                ).all()
-                
-                for item_line in item_lines:
-                    item_extra = item_line.extra_info or {}
-                    line_total = item_extra.get('line_total')
-                    if line_total is not None:
-                        total_amount += Decimal(str(line_total))
-                    else:
-                        # محاسبه از quantity و unit_price
-                        qty = Decimal(str(item_line.quantity or 0))
-                        unit_price = Decimal(str(item_extra.get('unit_price', 0)))
-                        line_discount = Decimal(str(item_extra.get('line_discount', 0)))
-                        tax_amount = Decimal(str(item_extra.get('tax_amount', 0)))
-                        line_total = (qty * unit_price) - line_discount + tax_amount
-                        total_amount += line_total
-                logger.info(f"total_amount از InvoiceItemLine: {total_amount}")
-            except Exception as e:
-                logger.exception(f"خطا در محاسبه total_amount از InvoiceItemLine: {e}")
+        if not (isinstance(totals, dict) and 'net' in totals):
+            item_lines = db.query(InvoiceItemLine).filter(
+                InvoiceItemLine.document_id == invoice_id
+            ).all()
+        total_amount = _invoice_total_amount_for_document(invoice, item_lines)
     
         # محاسبه مبلغ پرداخت شده
         total_paid = Decimal(0)
@@ -9086,7 +9356,9 @@ def calculate_invoice_remaining(
         for doc_id in receipt_payment_ids:
             try:
                 doc_id_int = int(doc_id)
-                doc = db.query(Document).filter(
+                doc = db.query(Document).options(
+                    selectinload(Document.lines)
+                ).filter(
                     Document.id == doc_id_int,
                     Document.business_id == business_id,
                     Document.document_type.in_(['receipt', 'payment']),
@@ -9096,110 +9368,51 @@ def calculate_invoice_remaining(
                     continue
                 
                 processed_doc_ids.add(doc_id_int)
-                
-                # مجموع account_lines (بدون کارمزد)
-                # account_lines خطوطی هستند که bank_account_id, cash_register_id, petty_cash_id یا check_id دارند
-                for line in doc.lines:
-                    # بررسی اینکه آیا این خط مربوط به حساب است (نه person)
-                    line_extra = line.extra_info or {}
-                    tt = str(line_extra.get("transaction_type") or "").strip().lower()
-                    is_wallet_line = line.person_id is None and tt == "wallet"
-                    if line.person_id is None and (
-                        line.bank_account_id is not None
-                        or line.cash_register_id is not None
-                        or line.petty_cash_id is not None
-                        or line.check_id is not None
-                        or is_wallet_line
-                    ):
-                        if not line_extra.get('is_commission_line'):
-                            # amount = debit + credit (همیشه یکی از آنها 0 است)
-                            line_amount = Decimal(str(line.debit)) + Decimal(str(line.credit))
-                            total_paid += line_amount
+                total_paid += _sum_receipt_doc_account_payments(doc)
             except (ValueError, TypeError) as e:
-                logger.warning(f"خطا در پردازش receipt_payment_id {doc_id}: {e}")
+                logger.warning("receipt_payment_id parse error %s: %s", doc_id, e)
                 continue
         
-        # 2. بررسی از طریق person_lines که invoice_id دارند
-        # جستجوی receipts-payments که در person_lines به این فاکتور لینک شده‌اند
-        # بهینه‌سازی: فقط خطوطی که invoice_id در extra_info دارند را بررسی کن
-        receipt_payment_lines = db.query(DocumentLine).join(
-            Document, DocumentLine.document_id == Document.id
-        ).filter(
-            Document.business_id == business_id,
-            Document.document_type.in_(['receipt', 'payment']),
-            DocumentLine.person_id.isnot(None),
-        ).all()
-        
-        # استخراج document_ids منحصر به فرد
-        receipt_payment_doc_ids = set()
-        for line in receipt_payment_lines:
-            line_extra = line.extra_info or {}
-            line_invoice_id = line_extra.get('invoice_id')
-            if line_invoice_id is not None:
-                try:
-                    if isinstance(line_invoice_id, (int, float)):
-                        line_invoice_id_int = int(line_invoice_id)
-                    else:
-                        line_invoice_id_int = int(str(line_invoice_id))
-                    
-                    if line_invoice_id_int == invoice_id:
-                        receipt_payment_doc_ids.add(line.document_id)
-                except (ValueError, TypeError):
-                    continue
-        
-        # دریافت documents
-        receipt_payment_docs = []
-        if receipt_payment_doc_ids:
-            receipt_payment_docs = db.query(Document).filter(
-                Document.id.in_(list(receipt_payment_doc_ids)),
+        # 2. receipts/payments لینک‌شده از person_lines
+        line_invoice_id_expr = cast(
+            cast(DocumentLine.extra_info, JSONB)['invoice_id'].astext,
+            Integer,
+        )
+        person_linked_rows = (
+            db.query(DocumentLine.document_id)
+            .join(Document, DocumentLine.document_id == Document.id)
+            .filter(
                 Document.business_id == business_id,
-            ).all()
-        
-        for doc in receipt_payment_docs:
-            if doc.id in processed_doc_ids:
-                continue
-            
-            # بررسی person_lines (خطوطی که person_id دارند)
-            for line in doc.lines:
-                if line.person_id is not None:
-                    line_extra = line.extra_info or {}
-                    line_invoice_id = line_extra.get('invoice_id')
-                    
-                    # تبدیل به int برای مقایسه
-                    if line_invoice_id is not None:
-                        try:
-                            if isinstance(line_invoice_id, (int, float)):
-                                line_invoice_id_int = int(line_invoice_id)
-                            else:
-                                line_invoice_id_int = int(str(line_invoice_id))
-                            
-                            if line_invoice_id_int == invoice_id:
-                                processed_doc_ids.add(doc.id)
-                                
-                                # مجموع account_lines (بدون کارمزد)
-                                # account_lines خطوطی هستند که bank_account_id, cash_register_id, petty_cash_id یا check_id دارند
-                                for acc_line in doc.lines:
-                                    acc_extra = acc_line.extra_info or {}
-                                    tt = str(acc_extra.get("transaction_type") or "").strip().lower()
-                                    is_wallet_line = acc_line.person_id is None and tt == "wallet"
-                                    if acc_line.person_id is None and (
-                                        acc_line.bank_account_id is not None
-                                        or acc_line.cash_register_id is not None
-                                        or acc_line.petty_cash_id is not None
-                                        or acc_line.check_id is not None
-                                        or is_wallet_line
-                                    ):
-                                        if not acc_extra.get('is_commission_line'):
-                                            # amount = debit + credit (همیشه یکی از آنها 0 است)
-                                            acc_line_amount = Decimal(str(acc_line.debit)) + Decimal(str(acc_line.credit))
-                                            total_paid += acc_line_amount
-                                break
-                        except (ValueError, TypeError):
-                            continue
+                Document.document_type.in_(['receipt', 'payment']),
+                DocumentLine.person_id.isnot(None),
+                line_invoice_id_expr == int(invoice_id),
+            )
+            .distinct()
+            .all()
+        )
+        person_doc_ids = [int(r[0]) for r in person_linked_rows]
+        if person_doc_ids:
+            receipt_payment_docs = (
+                db.query(Document)
+                .options(selectinload(Document.lines))
+                .filter(
+                    Document.id.in_(person_doc_ids),
+                    Document.business_id == business_id,
+                )
+                .all()
+            )
+            for doc in receipt_payment_docs:
+                if doc.id in processed_doc_ids:
+                    continue
+                processed_doc_ids.add(doc.id)
+                total_paid += _sum_receipt_doc_account_payments(doc)
         
         remaining = total_amount - total_paid
         
-        logger.info(f"محاسبه مانده تمام شد - invoice_id: {invoice_id}, total_amount: {total_amount}, paid_amount: {total_paid}, remaining: {remaining}")
+        logger.debug(
+            "calculate_invoice_remaining done invoice_id=%s total=%s paid=%s remaining=%s",
+            invoice_id, total_amount, total_paid, remaining,
+        )
         
         return {
             'invoice_id': invoice_id,

@@ -20,13 +20,13 @@ class Settings(BaseSettings):
 	db_port: int = 5432
 	db_name: str = "hesabix"
 	sqlalchemy_echo: bool = False
-	# DB Pooling - بهینه‌سازی برای مقیاس‌پذیری بالا
-	# بهینه‌سازی برای 24 worker و PostgreSQL با max_connections=300
-	# محاسبه: (تعداد Worker ها * اتصالات مورد نیاز per Worker)
-	# 24 workers * 12 connections = 288 + buffer = 300 (مطابق با max_connections PostgreSQL)
-	# برای استفاده حداکثری از منابع و کمترین زمان پاسخگویی
-	db_pool_size: int = 150  # اتصالات پایه در Pool (50% از max_connections)
-	db_max_overflow: int = 150  # اتصالات اضافی در صورت نیاز (50% از max_connections)
+	# DB Pooling — هر worker Uvicorn pool مستقل دارد.
+	# فرمول: (postgres_max_connections - overhead) / uvicorn_workers ≈ اتصال per worker
+	# با max_connections=300 و 24 worker → ~12 اتصال per worker (8+4)
+	# برای بار بالاتر از PgBouncer (transaction pooling) استفاده شود.
+	uvicorn_workers: int = 24
+	db_pool_size: int = 8
+	db_max_overflow: int = 4
 	db_pool_timeout: int = 30  # Timeout برای Pool (30 ثانیه)
 	db_pool_recycle: int = 1800  # Recycle اتصالات هر 30 دقیقه - بهینه برای جلوگیری از connection leak و بهبود performance
 

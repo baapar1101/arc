@@ -191,8 +191,8 @@ class QueryInfo(BaseModel):
 	take: int = Field(
 		default=10, 
 		ge=1, 
-		le=1000, 
-		description="تعداد رکورد در هر صفحه (حداقل 1، حداکثر 1000)",
+		le=100, 
+		description="تعداد رکورد در هر صفحه (حداقل 1، حداکثر 100)",
 		example=20
 	)
 	skip: int = Field(
@@ -241,8 +241,8 @@ class QueryInfo(BaseModel):
 	def validate_take(cls, v):
 		if v < 1:
 			raise ValueError('take باید حداقل 1 باشد')
-		if v > 1000:
-			raise ValueError('take نمی‌تواند بیشتر از 1000 باشد')
+		if v > 100:
+			raise ValueError('take نمی‌تواند بیشتر از 100 باشد')
 		return v
 
 

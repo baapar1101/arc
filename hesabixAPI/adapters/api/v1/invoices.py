@@ -49,6 +49,9 @@ from app.services.invoice_service import (
     delete_invoice,
     bulk_delete_invoices,
     invoice_document_to_dict,
+    invoice_documents_to_list_dicts,
+    batch_calculate_invoices_remaining,
+    batch_add_counterparty_to_invoice_items,
     calculate_invoice_remaining,
     SUPPORTED_INVOICE_TYPES,
     get_invoice_installment_plan,
@@ -2782,17 +2785,10 @@ async def search_invoices_endpoint(
 
 	data_items: List[Dict[str, Any]] = []
 	_log = logging.getLogger(__name__)
-	for d in items:
-		try:
-			item = invoice_document_to_dict(db, d, include_tags=False)
-		except Exception as e:
-			_log.exception("invoice_document_to_dict failed for document_id=%s business_id=%s", d.id, business_id)
-			raise ApiError(
-				"INVOICE_DATA_ERROR",
-				f"خطا در بارگذاری فاکتور با شناسه {d.id}. داده‌های سند را بررسی کنید.",
-				http_status=500,
-			)
-
+	list_dicts = invoice_documents_to_list_dicts(db, items)
+	remaining_by_id = batch_calculate_invoices_remaining(db, business_id, items)
+	for item in list_dicts:
+		d_id = int(item.get("id") or 0)
 		# Tax workspace fields from extra_info
 		try:
 			extra = item.get("extra_info") or {}
@@ -2820,23 +2816,9 @@ async def search_invoices_endpoint(
 				total_amount = totals.get('net')
 		except Exception:
 			total_amount = None
-		# Fallback compute from product lines
 		if total_amount is None:
-			try:
-				net_sum = 0.0
-				for pl in item.get('product_lines', []) or []:
-					info = pl.get('extra_info') or {}
-					qty = float(pl.get('quantity') or 0)
-					unit_price = float(info.get('unit_price') or 0)
-					line_discount = float(info.get('line_discount') or 0)
-					tax_amount = float(info.get('tax_amount') or 0)
-					line_total = info.get('line_total')
-					if line_total is None:
-						line_total = (qty * unit_price) - line_discount + tax_amount
-					net_sum += float(line_total)
-				total_amount = float(net_sum)
-			except Exception:
-				total_amount = None
+			remaining_result = remaining_by_id.get(d_id) or {}
+			total_amount = remaining_result.get("total_amount")
 
 		item['document_type_name'] = _type_name(item.get('document_type'))
 		if total_amount is not None:
@@ -2844,7 +2826,7 @@ async def search_invoices_endpoint(
 
 		# مبلغ پرداخت‌شده و مبلغ باقی‌مانده فاکتور
 		try:
-			remaining_result = calculate_invoice_remaining(db, business_id, d.id)
+			remaining_result = remaining_by_id.get(d_id) or {}
 			item["paid_amount"] = remaining_result.get("paid_amount")
 			item["remaining_amount"] = remaining_result.get("remaining")
 		except Exception:
@@ -2868,10 +2850,10 @@ async def search_invoices_endpoint(
 			item["installment_status"] = None
 			item["remaining_total"] = None
 
-		# افزودن counterparty
-		_add_counterparty_to_invoice_item(db, item)
+		data_items.append(item)
 
-		data_items.append(format_datetime_fields(item, request))
+	batch_add_counterparty_to_invoice_items(db, data_items)
+	data_items = [format_datetime_fields(item, request) for item in data_items]
 
 	attach_tags_to_invoice_items(db, business_id, data_items)
 
@@ -3111,8 +3093,8 @@ async def search_tax_workspace_endpoint(
         return mapping.get(str(tp), str(tp))
 
     data_items: List[Dict[str, Any]] = []
-    for d in page_docs:
-        item = invoice_document_to_dict(db, d, include_tags=False)
+    list_dicts = invoice_documents_to_list_dicts(db, page_docs)
+    for item in list_dicts:
         extra = item.get("extra_info") or {}
         tax_status = extra.get("tax_status")
         if isinstance(tax_status, str):
@@ -3124,7 +3106,7 @@ async def search_tax_workspace_endpoint(
         item["tax_last_send_at"] = extra.get("tax_last_send_at")
         item.update(build_tax_status_fields_for_api(extra))
 
-        # total_amount from totals.net or recomputed
+        # total_amount from totals.net
         total_amount = None
         try:
             totals = (item.get("extra_info") or {}).get("totals") or {}
@@ -3132,31 +3114,15 @@ async def search_tax_workspace_endpoint(
                 total_amount = totals.get("net")
         except Exception:
             total_amount = None
-        if total_amount is None:
-            try:
-                net_sum = 0.0
-                for pl in item.get("product_lines", []) or []:
-                    info = pl.get("extra_info") or {}
-                    qty = float(pl.get("quantity") or 0)
-                    unit_price = float(info.get("unit_price") or 0)
-                    line_discount = float(info.get("line_discount") or 0)
-                    tax_amount = float(info.get("tax_amount") or 0)
-                    line_total = info.get("line_total")
-                    if line_total is None:
-                        line_total = (qty * unit_price) - line_discount + tax_amount
-                    net_sum += float(line_total)
-                total_amount = float(net_sum)
-            except Exception:
-                total_amount = None
 
         item["document_type_name"] = _type_name(item.get("document_type"))
         if total_amount is not None:
             item["total_amount"] = total_amount
-        
-        # افزودن counterparty
-        _add_counterparty_to_invoice_item(db, item)
-        
-        data_items.append(format_datetime_fields(item, request))
+
+        data_items.append(item)
+
+    batch_add_counterparty_to_invoice_items(db, data_items)
+    data_items = [format_datetime_fields(item, request) for item in data_items]
 
     attach_tags_to_invoice_items(db, business_id, data_items)
 
@@ -4279,8 +4245,8 @@ async def export_invoices_excel(
         return mapping.get(str(tp), str(tp))
 
     items: List[Dict[str, Any]] = []
-    for d in docs:
-        item = invoice_document_to_dict(db, d, include_tags=False)
+    list_dicts = invoice_documents_to_list_dicts(db, docs)
+    for item in list_dicts:
         # total_amount
         total_amount = None
         try:
@@ -4289,31 +4255,15 @@ async def export_invoices_excel(
                 total_amount = totals.get('net')
         except Exception:
             total_amount = None
-        if total_amount is None:
-            try:
-                net_sum = 0.0
-                for pl in item.get('product_lines', []) or []:
-                    info = pl.get('extra_info') or {}
-                    qty = float(pl.get('quantity') or 0)
-                    unit_price = float(info.get('unit_price') or 0)
-                    line_discount = float(info.get('line_discount') or 0)
-                    tax_amount = float(info.get('tax_amount') or 0)
-                    line_total = info.get('line_total')
-                    if line_total is None:
-                        line_total = (qty * unit_price) - line_discount + tax_amount
-                    net_sum += float(line_total)
-                total_amount = float(net_sum)
-            except Exception:
-                total_amount = None
 
         item['document_type_name'] = _type_name(item.get('document_type'))
         if total_amount is not None:
             item['total_amount'] = total_amount
-        
-        # افزودن counterparty
-        _add_counterparty_to_invoice_item(db, item)
-        
-        items.append(format_datetime_fields(item, request))
+
+        items.append(item)
+
+    batch_add_counterparty_to_invoice_items(db, items)
+    items = [format_datetime_fields(item, request) for item in items]
 
     attach_tags_to_invoice_items(db, business_id, items)
 
