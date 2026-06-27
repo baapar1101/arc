@@ -959,6 +959,7 @@ def delete_business_info(
     request: Request,
     business_id: int,
     deletion_reason: str | None = Body(None, embed=True),
+    skip_restore_period: bool = Body(False, embed=True),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("settings", "business")),
@@ -968,7 +969,8 @@ def delete_business_info(
     - فقط مالک می‌تواند حذف کند
     - قبل از حذف، بکاپ خودکار ایجاد می‌شود
     - اطلاع‌رسانی به مالک ارسال می‌شود
-    - کسب و کار 30 روز قابل بازیابی است
+    - به‌طور پیش‌فرض کسب و کار 30 روز قابل بازیابی است
+    - با skip_restore_period=true مهلت بازیابی اعمال نمی‌شود (حذف سریع)
     """
     from app.services.notification_service import NotificationService
     
@@ -978,8 +980,15 @@ def delete_business_info(
         business_id=business_id,
         owner_id=owner_id,
         deletion_reason=deletion_reason,
-        requested_by=owner_id
+        requested_by=owner_id,
+        skip_restore_period=skip_restore_period,
     )
+    
+    restore_days = int(result.get("restore_deadline_days") or 0)
+    if skip_restore_period:
+        success_message = "کسب و کار با موفقیت حذف شد. مهلت بازیابی فعال نیست."
+    else:
+        success_message = "کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید."
     
     # ارسال اطلاع‌رسانی
     try:
@@ -994,7 +1003,8 @@ def delete_business_info(
                     "business_id": business_id,
                     "deletion_date": result["deleted_at"],
                     "restore_deadline": result["auto_delete_at"],
-                    "restore_days": 30,
+                    "restore_days": restore_days,
+                    "skip_restore_period": skip_restore_period,
                 },
                 preferred_channels=["email", "telegram", "inapp"]
             )
@@ -1006,7 +1016,7 @@ def delete_business_info(
     return success_response(
         result, 
         request, 
-        "کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید."
+        success_message,
     )
 
 

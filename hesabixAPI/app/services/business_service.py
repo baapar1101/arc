@@ -875,10 +875,14 @@ def delete_business_soft(
     business_id: int,
     owner_id: int,
     deletion_reason: str | None = None,
-    requested_by: int | None = None
+    requested_by: int | None = None,
+    skip_restore_period: bool = False,
 ) -> Dict[str, Any] | None:
     """
-    حذف نرم کسب و کار با بررسی‌های امنیتی و ایجاد بکاپ خودکار
+    حذف نرم کسب و کار با بررسی‌های امنیتی و ایجاد بکاپ خودکار.
+
+    اگر skip_restore_period=True باشد، auto_delete_at بلافاصله تنظیم می‌شود
+    و مهلت ۳۰ روزه بازیابی اعمال نمی‌شود (حذف سریع soft delete).
     """
     business_repo = BusinessRepository(db)
     business = business_repo.get_by_id(business_id)
@@ -946,11 +950,12 @@ def delete_business_soft(
     
     # انجام Soft Delete
     now = datetime.utcnow()
+    restore_deadline_days = 0 if skip_restore_period else 30
     business.deleted_at = now
     business.deletion_requested_at = now
     business.deletion_requested_by = requested_by or owner_id
     business.deletion_reason = deletion_reason
-    business.auto_delete_at = now + timedelta(days=30)  # 30 روز بعد
+    business.auto_delete_at = now if skip_restore_period else now + timedelta(days=30)
     
     db.commit()
     db.refresh(business)
@@ -964,6 +969,7 @@ def delete_business_soft(
             "deleted_at": now.isoformat(),
             "auto_delete_at": business.auto_delete_at.isoformat(),
             "backup_created": backup_result is not None,
+            "skip_restore_period": skip_restore_period,
         }
     )
     
@@ -971,7 +977,8 @@ def delete_business_soft(
         "business_id": business_id,
         "deleted_at": business.deleted_at.isoformat(),
         "auto_delete_at": business.auto_delete_at.isoformat(),
-        "restore_deadline_days": 30,
+        "restore_deadline_days": restore_deadline_days,
+        "skip_restore_period": skip_restore_period,
         "backup_created": backup_result is not None,
         "backup_id": backup_result.get("id") if backup_result else None,
     }

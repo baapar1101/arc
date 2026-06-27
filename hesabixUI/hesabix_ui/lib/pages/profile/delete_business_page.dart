@@ -21,6 +21,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
   Map<String, dynamic>? _deleteInfo;
   bool _loading = true;
   bool _confirming = false;
+  bool _skipRestorePeriod = false;
   final TextEditingController _deleteConfirmController = TextEditingController();
 
   /// Accepts English `delete` (case-insensitive) or Persian `حذف`.
@@ -145,13 +146,19 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        _buildWarningItem(Icons.delete_forever, 'غیرقابل بازگشت است (بعد از 30 روز)'),
-                        const SizedBox(height: 8),
-                        _buildWarningItem(Icons.data_object, 'تمام داده‌های کسب و کار را حذف می‌کند'),
-                        const SizedBox(height: 8),
                         _buildWarningItem(Icons.backup, 'یک بکاپ خودکار قبل از حذف ایجاد می‌شود'),
-                        const SizedBox(height: 8),
-                        _buildWarningItem(Icons.restore, 'شما 30 روز فرصت دارید آن را بازیابی کنید'),
+                        if (_skipRestorePeriod) ...[
+                          const SizedBox(height: 8),
+                          _buildWarningItem(
+                            Icons.timer_off,
+                            'بدون مهلت بازیابی — امکان بازگردانی وجود ندارد',
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 8),
+                          _buildWarningItem(Icons.delete_forever, 'غیرقابل بازگشت است (بعد از 30 روز)'),
+                          const SizedBox(height: 8),
+                          _buildWarningItem(Icons.restore, 'شما 30 روز فرصت دارید آن را بازیابی کنید'),
+                        ],
                       ],
                     ),
                   ),
@@ -296,11 +303,16 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
     // انجام حذف
     setState(() => _confirming = true);
     try {
-      await BusinessApiService.deleteBusiness(businessId: widget.businessId);
+      await BusinessApiService.deleteBusiness(
+        businessId: widget.businessId,
+        skipRestorePeriod: _skipRestorePeriod,
+      );
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message: 'کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید.',
+          message: _skipRestorePeriod
+              ? 'کسب و کار با موفقیت حذف شد. مهلت بازیابی فعال نیست.'
+              : 'کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید.',
         );
         // هدایت به صفحه لیست کسب و کارها
         context.go('/user/profile/businesses');
@@ -705,10 +717,41 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                   const SizedBox(height: 12),
                   _buildInfoItem(Icons.backup, 'بکاپ خودکار قبل از حذف ایجاد می‌شود'),
                   const SizedBox(height: 8),
-                  _buildInfoItem(Icons.restore, '30 روز فرصت برای بازیابی دارید'),
-                  const SizedBox(height: 8),
-                  _buildInfoItem(Icons.delete_forever, 'بعد از 30 روز حذف دائمی خواهد بود'),
+                  if (_skipRestorePeriod)
+                    _buildInfoItem(
+                      Icons.timer_off,
+                      'حذف سریع: بدون مهلت ۳۰ روزه بازیابی',
+                    )
+                  else ...[
+                    _buildInfoItem(Icons.restore, '30 روز فرصت برای بازیابی دارید'),
+                    const SizedBox(height: 8),
+                    _buildInfoItem(Icons.delete_forever, 'بعد از 30 روز حذف دائمی خواهد بود'),
+                  ],
                 ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: cs.outlineVariant),
+              ),
+              child: CheckboxListTile(
+                value: _skipRestorePeriod,
+                onChanged: canDelete && !_confirming
+                    ? (value) => setState(() => _skipRestorePeriod = value ?? false)
+                    : null,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: const Text(
+                  'حذف سریع (بدون مهلت بازیابی)',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'کسب و کار بلافاصله حذف می‌شود و امکان بازیابی از داخل برنامه وجود ندارد.',
+                  style: TextStyle(fontSize: 13),
+                ),
+                secondary: Icon(Icons.flash_on, color: _skipRestorePeriod ? Colors.orange.shade700 : cs.onSurfaceVariant),
               ),
             ),
             const SizedBox(height: 24),
