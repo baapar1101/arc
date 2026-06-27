@@ -17,11 +17,10 @@ import 'package:hesabix_ui/widgets/support/ticket_detail_view.dart';
 import 'package:hesabix_ui/widgets/support/ticket_csat_dialog.dart';
 import 'package:hesabix_ui/widgets/support/ticket_card.dart';
 import 'package:hesabix_ui/widgets/support/user_ticket_list_item.dart';
+import 'package:hesabix_ui/widgets/support/user_support_page_header.dart';
+import 'package:hesabix_ui/widgets/support/user_support_tab_bar.dart';
+import 'package:hesabix_ui/widgets/support/user_support_types.dart';
 import 'create_ticket_page.dart';
-
-enum UserSupportTab { all, open, unread, waiting, resolved }
-
-enum ViewMode { compact, card }
 
 class SupportPage extends StatefulWidget {
   final CalendarController? calendarController;
@@ -62,7 +61,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   UserSupportTab _activeTab = UserSupportTab.all;
   
   // View mode
-  ViewMode _viewMode = ViewMode.compact;
+  UserSupportViewMode _viewMode = UserSupportViewMode.compact;
   
   // Saved filters
   List<SavedFilter> _savedFilters = [];
@@ -444,155 +443,225 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     return _tickets.where((t) => openStatusIds.contains(t.statusId)).length;
   }
 
-  Widget _buildMobileHeader(AppLocalizations t, ThemeData theme, bool isMobile) {
-    final openCount = _getOpenTicketsCount();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                t.supportTickets,
-                style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ),
-            if (openCount > 0)
-              Badge(
-                label: Text('$openCount'),
-                backgroundColor: theme.colorScheme.error,
-                child: Icon(
-                  Icons.support_agent,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          isMobile
-              ? 'مدیریت و پیگیری درخواست‌های پشتیبانی خود'
-              : 'در این بخش می‌توانید همه تیکت‌های پشتیبانی خود را مشاهده کنید، جست‌وجو و بر اساس وضعیت و اولویت فیلتر کنید.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
+  Widget _buildPageHeader(AppLocalizations t, ThemeData theme, bool isMobile) {
+    return UserSupportPageHeader(
+      t: t,
+      openCount: _getOpenTicketsCount(),
+      totalCount: _ticketsTotal,
+      showCreateButton: !isMobile,
+      onCreateTicket: _navigateToCreateTicket,
     );
   }
 
   Widget _buildTicketsEmptyState(AppLocalizations t, ThemeData theme) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.support_agent_outlined,
-            size: 72,
-            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            t.noTickets,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.support_agent_outlined,
+                size: 48,
+                color: theme.colorScheme.primary,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text(
-              'هنوز هیچ تیکتی ثبت نکرده‌اید. برای دریافت کمک از تیم پشتیبانی، اولین تیکت خود را ایجاد کنید.',
+            const SizedBox(height: 20),
+            Text(
+              t.noTickets,
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'هنوز تیکتی ثبت نکرده‌اید. برای دریافت کمک از تیم پشتیبانی، اولین تیکت خود را ایجاد کنید.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
+                height: 1.4,
               ),
               textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _navigateToCreateTicket,
-            icon: const Icon(Icons.add),
-            label: Text(t.newTicket),
-          ),
-        ],
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: _navigateToCreateTicket,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(t.newTicket),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSupportTabs(ThemeData theme) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          _tabChip('همه', UserSupportTab.all, Icons.inbox_outlined),
-          const SizedBox(width: 8),
-          _tabChip('باز', UserSupportTab.open, Icons.lock_open_outlined),
-          const SizedBox(width: 8),
-          _tabChip('جدید', UserSupportTab.unread, Icons.mark_email_unread_outlined),
-          const SizedBox(width: 8),
-          _tabChip('منتظر پاسخ', UserSupportTab.waiting, Icons.schedule),
-          const SizedBox(width: 8),
-          _tabChip('بسته / حل‌شده', UserSupportTab.resolved, Icons.check_circle_outline),
-        ],
-      ),
+  int _activeFilterCount() {
+    return [
+      _selectedStatusId != null,
+      _selectedPriorityId != null,
+      _selectedCategoryId != null,
+    ].where((x) => x).length;
+  }
+
+  Widget _buildInboxToolbar(AppLocalizations t, ThemeData theme) {
+    final filterCount = _activeFilterCount();
+
+    return Row(
+      children: [
+        Expanded(
+          child: SearchBar(
+            controller: _searchController,
+            hintText: 'جست‌وجو در عنوان و توضیحات…',
+            leading: const Icon(Icons.search_rounded, size: 20),
+            trailing: [
+              ListenableBuilder(
+                listenable: _searchController,
+                builder: (context, _) {
+                  if (_searchController.text.isEmpty) return const SizedBox.shrink();
+                  return IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    onPressed: () {
+                      setState(() {
+                        _searchController.clear();
+                        _searchDebounce?.cancel();
+                        _ticketPage = 1;
+                        _hasMoreTickets = true;
+                      });
+                      _loadTickets(showSpinner: false);
+                    },
+                  );
+                },
+              ),
+            ],
+            onChanged: _onSearchChanged,
+            onSubmitted: (_) {
+              _searchDebounce?.cancel();
+              setState(() {
+                _ticketPage = 1;
+                _hasMoreTickets = true;
+              });
+              _loadTickets();
+            },
+            elevation: WidgetStateProperty.all(0),
+            backgroundColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest),
+            padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Badge(
+          isLabelVisible: filterCount > 0,
+          label: Text('$filterCount'),
+          child: IconButton.filledTonal(
+            onPressed: () => _showMobileFiltersBottomSheet(t, theme),
+            icon: const Icon(Icons.tune_rounded),
+            tooltip: 'فیلترها',
+          ),
+        ),
+        const SizedBox(width: 4),
+        IconButton(
+          onPressed: () {
+            setState(() {
+              _viewMode = _viewMode == UserSupportViewMode.compact
+                  ? UserSupportViewMode.card
+                  : UserSupportViewMode.compact;
+            });
+          },
+          icon: Icon(
+            _viewMode == UserSupportViewMode.compact
+                ? Icons.grid_view_rounded
+                : Icons.view_list_rounded,
+          ),
+          tooltip: _viewMode == UserSupportViewMode.compact ? 'نمای کارت' : 'نمای فشرده',
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert_rounded),
+          tooltip: 'گزینه‌های بیشتر',
+          onSelected: (value) {
+            switch (value) {
+              case 'group':
+                setState(() {
+                  _groupByStatus = !_groupByStatus;
+                  _groupedTickets = _groupByStatus ? _groupTicketsByStatus(_tickets) : null;
+                });
+              case 'clear_filters':
+                _clearAllFilters();
+              case 'save_filter':
+                _saveCurrentFilter();
+            }
+          },
+          itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'group',
+              child: Row(
+                children: [
+                  Icon(
+                    _groupByStatus ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('گروه‌بندی بر اساس وضعیت'),
+                ],
+              ),
+            ),
+            if (_activeFilterCount() > 0)
+              const PopupMenuItem(
+                value: 'clear_filters',
+                child: Row(
+                  children: [
+                    Icon(Icons.filter_alt_off_rounded, size: 20),
+                    SizedBox(width: 10),
+                    Text('پاک کردن فیلترها'),
+                  ],
+                ),
+              ),
+            const PopupMenuItem(
+              value: 'save_filter',
+              child: Row(
+                children: [
+                  Icon(Icons.bookmark_add_outlined, size: 20),
+                  SizedBox(width: 10),
+                  Text('ذخیره فیلتر فعلی'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _tabChip(String label, UserSupportTab tab, IconData icon) {
-    final theme = Theme.of(context);
-    final selected = _activeTab == tab;
-    return FilterChip(
-      avatar: Icon(icon, size: 18),
-      label: Text(label),
-      selected: selected,
-      onSelected: (_) => _onTabChanged(tab),
-      selectedColor: theme.colorScheme.primaryContainer,
-      checkmarkColor: theme.colorScheme.onPrimaryContainer,
-    );
-  }
-
-  Widget _buildSavedFilters(AppLocalizations t, ThemeData theme) {
+  Widget _buildSavedFiltersRow(AppLocalizations t, ThemeData theme) {
     if (_savedFilters.isEmpty) return const SizedBox.shrink();
-    
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
+          Icon(Icons.bookmark_outline_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(width: 6),
           ..._savedFilters.map((filter) {
             final isSelected = _selectedSavedFilter?.name == filter.name;
             return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(filter.name),
+              padding: const EdgeInsetsDirectional.only(end: 6),
+              child: InputChip(
+                label: Text(filter.name, style: const TextStyle(fontSize: 12)),
                 selected: isSelected,
+                visualDensity: VisualDensity.compact,
                 onSelected: (selected) {
                   setState(() {
-                    if (selected) {
-                      _selectedSavedFilter = filter;
-                      // Apply saved filter
-                      // TODO: Apply filter logic
-                    } else {
-                      _selectedSavedFilter = null;
-                    }
+                    _selectedSavedFilter = selected ? filter : null;
                     _ticketPage = 1;
                     _hasMoreTickets = true;
                   });
                   _loadTickets(showSpinner: true);
                 },
-                deleteIcon: Icon(Icons.close, size: 18),
                 onDeleted: () => _deleteSavedFilter(filter.name),
               ),
             );
           }),
-          IconButton(
-            icon: const Icon(Icons.add),
-            tooltip: 'ذخیره فیلتر فعلی',
-            onPressed: _saveCurrentFilter,
-          ),
         ],
       ),
     );
@@ -973,99 +1042,6 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     });
   }
 
-  Widget _buildMobileFilters(AppLocalizations t, ThemeData theme) {
-    final activeFiltersCount = [
-      _selectedStatusId != null,
-      _selectedPriorityId != null,
-      _selectedCategoryId != null,
-    ].where((x) => x).length;
-    
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        if (activeFiltersCount > 0)
-          ActionChip(
-            avatar: const Icon(Icons.filter_alt, size: 18),
-            label: Text('$activeFiltersCount فیلتر فعال'),
-            onPressed: _clearAllFilters,
-          ),
-        ActionChip(
-          avatar: const Icon(Icons.tune, size: 18),
-          label: const Text('فیلترهای بیشتر'),
-          onPressed: () => _showMobileFiltersBottomSheet(t, theme),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMobileSearch(AppLocalizations t) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                labelText: t.search,
-                hintText: 'جست‌وجو در عنوان و توضیحات تیکت‌ها...',
-                prefixIcon: const Icon(Icons.search),
-              ),
-              textInputAction: TextInputAction.search,
-              onChanged: _onSearchChanged,
-              onSubmitted: (_) {
-                _searchDebounce?.cancel();
-                setState(() {
-                  _ticketPage = 1;
-                  _hasMoreTickets = true;
-                });
-                _loadTickets();
-              },
-            ),
-          ),
-          SizedBox(
-            width: 48,
-            child: ListenableBuilder(
-              listenable: _searchController,
-              builder: (context, _) {
-                if (_searchController.text.isEmpty) {
-                  return const SizedBox.shrink();
-                }
-                return IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () {
-                    setState(() {
-                      _searchController.clear();
-                      _searchDebounce?.cancel();
-                      _ticketPage = 1;
-                      _hasMoreTickets = true;
-                    });
-                    _loadTickets(showSpinner: false);
-                  },
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildViewModeSelector(AppLocalizations t, ThemeData theme) {
-    return SegmentedButton<ViewMode>(
-      segments: const [
-        ButtonSegment(value: ViewMode.compact, icon: Icon(Icons.view_list), label: Text('فشرده')),
-        ButtonSegment(value: ViewMode.card, icon: Icon(Icons.view_module), label: Text('کارت')),
-      ],
-      selected: {_viewMode},
-      onSelectionChanged: (Set<ViewMode> newSelection) {
-        setState(() => _viewMode = newSelection.first);
-      },
-    );
-  }
-
   Widget _buildTicketCard(SupportTicket ticket, AppLocalizations t, ThemeData theme) {
     return TicketCard(
       ticket: ticket,
@@ -1074,17 +1050,41 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     );
   }
 
+  Widget _buildTicketsPanel(AppLocalizations t, ThemeData theme, Widget list) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: list,
+    );
+  }
+
   Widget _buildUserSplitDetail() {
     final theme = Theme.of(context);
     if (_selectedTicketId == null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.forum_outlined, size: 56, color: theme.colorScheme.outline),
-            const SizedBox(height: 12),
-            Text('تیکتی انتخاب نشده', style: theme.textTheme.titleMedium),
-          ],
+      return Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.5)),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.forum_outlined, size: 48, color: theme.colorScheme.outline),
+              const SizedBox(height: 12),
+              Text('تیکتی انتخاب نشده', style: theme.textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(
+                'از لیست سمت راست یک تیکت را انتخاب کنید',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -1149,9 +1149,19 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
           final statusName = entry.key;
           final statusTickets = entry.value;
           
-          return ExpansionTile(
-            title: Text('$statusName (${statusTickets.length})'),
-            children: statusTickets.map((ticket) => _buildTicketCard(ticket, t, theme)).toList(),
+          return Theme(
+            data: theme.copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 16),
+              childrenPadding: EdgeInsets.zero,
+              shape: const Border(),
+              collapsedShape: const Border(),
+              title: Text(
+                '$statusName (${statusTickets.length})',
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+              children: statusTickets.map((ticket) => _buildTicketCard(ticket, t, theme)).toList(),
+            ),
           );
         },
       );
@@ -1178,7 +1188,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
           }
 
           final ticket = tickets[index];
-          return _viewMode == ViewMode.card
+          return _viewMode == UserSupportViewMode.card
               ? _buildTicketCard(ticket, t, theme)
               : UserTicketListItem(
                   ticket: ticket,
@@ -1264,91 +1274,69 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       floatingActionButton: isMobile
           ? FloatingActionButton.extended(
               onPressed: _navigateToCreateTicket,
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add_rounded),
               label: Text(t.newTicket),
+              elevation: 2,
             )
           : null,
       body: Padding(
-        padding: EdgeInsets.all(isMobile ? 8.0 : 16.0),
+        padding: EdgeInsets.all(isMobile ? 12.0 : 20.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildMobileHeader(t, theme, isMobile),
-            if (!isMobile) ...[
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _buildMobileSearch(t)),
-                  const SizedBox(width: 12),
-                  FilledButton.icon(
-                    onPressed: _navigateToCreateTicket,
-                    icon: const Icon(Icons.add),
-                    label: Text(t.newTicket),
+            _buildPageHeader(t, theme, isMobile),
+            const SizedBox(height: 16),
+            UserSupportTabBar(
+              activeTab: _activeTab,
+              onChanged: _onTabChanged,
+            ),
+            if (_savedFilters.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _buildSavedFiltersRow(t, theme),
+            ],
+            const SizedBox(height: 12),
+            _buildInboxToolbar(t, theme),
+            if (_metadataError != null) ...[
+              const SizedBox(height: 10),
+              Material(
+                color: theme.colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 18, color: theme.colorScheme.onErrorContainer),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'امکان بارگذاری لیست فیلترها وجود ندارد. لطفاً صفحه را رفرش کنید.',
+                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ],
             const SizedBox(height: 12),
-            _buildSupportTabs(theme),
-            const SizedBox(height: 8),
-            _buildSavedFilters(t, theme),
-            if (isMobile) ...[
-              const SizedBox(height: 8),
-              _buildMobileSearch(t),
-              const SizedBox(height: 8),
-              _buildMobileFilters(t, theme),
-            ],
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(child: _buildViewModeSelector(t, theme)),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: Icon(_groupByStatus ? Icons.view_list : Icons.view_module),
-                  tooltip: _groupByStatus ? 'نمایش عادی' : 'گروه\u200cبندی بر اساس وضعیت',
-                  onPressed: () {
-                    setState(() {
-                      _groupByStatus = !_groupByStatus;
-                      _groupedTickets = _groupByStatus ? _groupTicketsByStatus(_tickets) : null;
-                    });
-                  },
-                ),
-              ],
-            ),
-            if (_metadataError != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Card(
-                  color: theme.colorScheme.errorContainer,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, size: 20, color: theme.colorScheme.onErrorContainer),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'امکان بارگذاری لیست فیلترها وجود ندارد. لطفاً صفحه را رفرش کنید.',
-                            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final useSplit = constraints.maxWidth >= 960;
-                  final list = _buildMobileTicketsList(t, theme);
+                  final list = _buildTicketsPanel(t, theme, _buildMobileTicketsList(t, theme));
                   if (!useSplit) return list;
                   return Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Expanded(flex: 4, child: list),
-                      VerticalDivider(width: 1, color: theme.dividerColor),
-                      Expanded(flex: 6, child: _buildUserSplitDetail()),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 6,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: _buildUserSplitDetail(),
+                        ),
+                      ),
                     ],
                   );
                 },
