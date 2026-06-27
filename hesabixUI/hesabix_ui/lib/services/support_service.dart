@@ -6,6 +6,9 @@ import 'package:dio/dio.dart';
 class SupportService {
   final ApiClient _apiClient;
 
+  /// حداکثر take مجاز در QueryInfo سمت API
+  static const int maxQueryPageSize = 100;
+
   SupportService(this._apiClient);
 
   // Categories
@@ -182,6 +185,38 @@ class SupportService {
     } on DioException catch (e) {
       throw _handleError(e);
     }
+  }
+
+  Future<List<SupportMessage>> getAllTicketMessages(
+    int ticketId, {
+    required bool isOperator,
+  }) async {
+    final all = <SupportMessage>[];
+    var skip = 0;
+
+    while (true) {
+      final response = isOperator
+          ? await searchOperatorTicketMessages(ticketId, {
+              'take': maxQueryPageSize,
+              'skip': skip,
+              'sort_by': 'created_at',
+              'sort_desc': false,
+            })
+          : await searchTicketMessages(ticketId, {
+              'take': maxQueryPageSize,
+              'skip': skip,
+              'sort_by': 'created_at',
+              'sort_desc': false,
+            });
+
+      all.addAll(response.items);
+      if (all.length >= response.total || response.items.length < maxQueryPageSize) {
+        break;
+      }
+      skip += response.items.length;
+    }
+
+    return all;
   }
 
   // حذف تیکت (فقط برای مدیر سیستم)

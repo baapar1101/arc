@@ -158,18 +158,10 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
 
     try {
       final supportService = SupportService(ApiClient());
-      final queryInfo = {
-        'take': 1000, // Get all messages
-        'skip': 0,
-        'sort_by': 'created_at',
-        'sort_desc': false,
-      };
-      
-      // Use appropriate endpoint based on whether user is operator or not
-      final response = widget.isOperator
-          ? await supportService.searchOperatorTicketMessages(_ticket.id, queryInfo)
-          : await supportService.searchTicketMessages(_ticket.id, queryInfo);
-      final messages = response.items;
+      final messages = await supportService.getAllTicketMessages(
+        _ticket.id,
+        isOperator: widget.isOperator,
+      );
       
       setState(() {
         _messages = messages;
