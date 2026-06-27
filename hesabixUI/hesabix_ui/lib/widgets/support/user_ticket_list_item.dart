@@ -14,6 +14,7 @@ class UserTicketListItem extends StatelessWidget {
   final VoidCallback? onTap;
   final CalendarController? calendarController;
   final bool isSelected;
+  final bool compact;
 
   const UserTicketListItem({
     super.key,
@@ -21,6 +22,7 @@ class UserTicketListItem extends StatelessWidget {
     this.onTap,
     this.calendarController,
     this.isSelected = false,
+    this.compact = false,
   });
 
   String _relativeTime(DateTime dt, AppLocalizations l10n) {
@@ -58,7 +60,10 @@ class UserTicketListItem extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 16,
+            vertical: compact ? 9 : 12,
+          ),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.45)),
@@ -67,7 +72,69 @@ class UserTicketListItem extends StatelessWidget {
                   : BorderSide.none,
             ),
           ),
-          child: Row(
+          child: compact ? _buildCompactRow(theme, l10n, colors, priorityColor, isUnread) : _buildFullRow(theme, l10n, colors, priorityColor, isUnread),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactRow(
+    ThemeData theme,
+    AppLocalizations l10n,
+    SupportSemanticColors colors,
+    Color? priorityColor,
+    bool isUnread,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      ticket.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: isUnread || isSelected ? FontWeight.w700 : FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  SupportUnreadBadge(show: isUnread),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  if (ticket.status != null)
+                    TicketStatusChip(status: ticket.status!, isSmall: true),
+                  const Spacer(),
+                  Text(
+                    _relativeTime(ticket.updatedAt, l10n),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFullRow(
+    ThemeData theme,
+    AppLocalizations l10n,
+    SupportSemanticColors colors,
+    Color? priorityColor,
+    bool isUnread,
+  ) {
+    return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _TicketAvatar(
@@ -160,9 +227,6 @@ class UserTicketListItem extends StatelessWidget {
                 ],
               ),
             ],
-          ),
-        ),
-      ),
     );
   }
 }

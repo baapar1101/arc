@@ -12,12 +12,11 @@ import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/models/saved_filter.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import '../../utils/error_extractor.dart';
-import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 import 'package:hesabix_ui/widgets/support/ticket_detail_view.dart';
 import 'package:hesabix_ui/widgets/support/ticket_csat_dialog.dart';
 import 'package:hesabix_ui/widgets/support/ticket_card.dart';
 import 'package:hesabix_ui/widgets/support/user_ticket_list_item.dart';
-import 'package:hesabix_ui/widgets/support/user_support_page_header.dart';
+import 'package:hesabix_ui/widgets/support/user_support_inbox_sidebar.dart';
 import 'package:hesabix_ui/widgets/support/user_support_tab_bar.dart';
 import 'package:hesabix_ui/widgets/support/user_support_types.dart';
 import 'create_ticket_page.dart';
@@ -31,6 +30,9 @@ class SupportPage extends StatefulWidget {
 }
 
 class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
+  static const double _sidebarWidth = 320;
+  static const double _masterDetailBreakpoint = 768;
+
   final SupportService _supportService = SupportService(ApiClient());
   bool _supportGateResolved = false;
   SupportTicketsPublicConfig _supportPublic = const SupportTicketsPublicConfig();
@@ -194,28 +196,16 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     final ticketId = ticketData['id'];
     if (ticketId is! int) return;
 
-    if (MediaQuery.of(context).size.width >= 960) {
+    if (_useMasterDetail) {
       _openTicketInSplitView(ticketId, ticketData);
       return;
     }
 
-    if (MediaQuery.of(context).size.width >= 768) {
-      context.push('/user/profile/support/tickets/$ticketId');
-      return;
-    }
-
-    final ticket = SupportTicket.fromJson(ticketData);
-    showDialog(
-      context: context,
-      builder: (context) => TicketDetailsDialog(
-        ticket: ticket,
-        isOperator: false,
-        calendarController: widget.calendarController,
-        onTicketUpdated: _refreshTicketList,
-        onRequestCsat: () => _maybeShowCsat(ticketId),
-      ),
-    );
+    context.push('/user/profile/support/tickets/$ticketId');
   }
+
+  bool get _useMasterDetail =>
+      MediaQuery.sizeOf(context).width >= _masterDetailBreakpoint;
 
   void _refreshTicketList() {
     setState(() {
@@ -346,6 +336,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
         _ticketsError = null;
         _groupedTickets = _groupByStatus ? _groupTicketsByStatus(_tickets) : null;
       });
+      _maybeAutoSelectFirstTicket();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -369,6 +360,31 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       grouped[statusName]!.add(ticket);
     }
     return grouped;
+  }
+
+  void _maybeAutoSelectFirstTicket() {
+    if (!_useMasterDetail || _selectedTicketId != null || _tickets.isEmpty) return;
+    final first = _tickets.first;
+    _openTicketInSplitView(first.id, first.toJson());
+  }
+
+  void _clearSearch() {
+    setState(() {
+      _searchController.clear();
+      _searchDebounce?.cancel();
+      _ticketPage = 1;
+      _hasMoreTickets = true;
+    });
+    _loadTickets(showSpinner: false);
+  }
+
+  void _submitSearch() {
+    _searchDebounce?.cancel();
+    setState(() {
+      _ticketPage = 1;
+      _hasMoreTickets = true;
+    });
+    _loadTickets();
   }
 
   void _clearAllFilters() {
@@ -443,16 +459,6 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     return _tickets.where((t) => openStatusIds.contains(t.statusId)).length;
   }
 
-  Widget _buildPageHeader(AppLocalizations t, ThemeData theme, bool isMobile) {
-    return UserSupportPageHeader(
-      t: t,
-      openCount: _getOpenTicketsCount(),
-      totalCount: _ticketsTotal,
-      showCreateButton: !isMobile,
-      onCreateTicket: _navigateToCreateTicket,
-    );
-  }
-
   Widget _buildTicketsEmptyState(AppLocalizations t, ThemeData theme) {
     return Center(
       child: Padding(
@@ -504,167 +510,6 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       _selectedPriorityId != null,
       _selectedCategoryId != null,
     ].where((x) => x).length;
-  }
-
-  Widget _buildInboxToolbar(AppLocalizations t, ThemeData theme) {
-    final filterCount = _activeFilterCount();
-
-    return Row(
-      children: [
-        Expanded(
-          child: SearchBar(
-            controller: _searchController,
-            hintText: 'جست‌وجو در عنوان و توضیحات…',
-            leading: const Icon(Icons.search_rounded, size: 20),
-            trailing: [
-              ListenableBuilder(
-                listenable: _searchController,
-                builder: (context, _) {
-                  if (_searchController.text.isEmpty) return const SizedBox.shrink();
-                  return IconButton(
-                    icon: const Icon(Icons.clear_rounded, size: 18),
-                    onPressed: () {
-                      setState(() {
-                        _searchController.clear();
-                        _searchDebounce?.cancel();
-                        _ticketPage = 1;
-                        _hasMoreTickets = true;
-                      });
-                      _loadTickets(showSpinner: false);
-                    },
-                  );
-                },
-              ),
-            ],
-            onChanged: _onSearchChanged,
-            onSubmitted: (_) {
-              _searchDebounce?.cancel();
-              setState(() {
-                _ticketPage = 1;
-                _hasMoreTickets = true;
-              });
-              _loadTickets();
-            },
-            elevation: WidgetStateProperty.all(0),
-            backgroundColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest),
-            padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 8)),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Badge(
-          isLabelVisible: filterCount > 0,
-          label: Text('$filterCount'),
-          child: IconButton.filledTonal(
-            onPressed: () => _showMobileFiltersBottomSheet(t, theme),
-            icon: const Icon(Icons.tune_rounded),
-            tooltip: 'فیلترها',
-          ),
-        ),
-        const SizedBox(width: 4),
-        IconButton(
-          onPressed: () {
-            setState(() {
-              _viewMode = _viewMode == UserSupportViewMode.compact
-                  ? UserSupportViewMode.card
-                  : UserSupportViewMode.compact;
-            });
-          },
-          icon: Icon(
-            _viewMode == UserSupportViewMode.compact
-                ? Icons.grid_view_rounded
-                : Icons.view_list_rounded,
-          ),
-          tooltip: _viewMode == UserSupportViewMode.compact ? 'نمای کارت' : 'نمای فشرده',
-        ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert_rounded),
-          tooltip: 'گزینه‌های بیشتر',
-          onSelected: (value) {
-            switch (value) {
-              case 'group':
-                setState(() {
-                  _groupByStatus = !_groupByStatus;
-                  _groupedTickets = _groupByStatus ? _groupTicketsByStatus(_tickets) : null;
-                });
-              case 'clear_filters':
-                _clearAllFilters();
-              case 'save_filter':
-                _saveCurrentFilter();
-            }
-          },
-          itemBuilder: (context) => [
-            PopupMenuItem(
-              value: 'group',
-              child: Row(
-                children: [
-                  Icon(
-                    _groupByStatus ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  const Text('گروه‌بندی بر اساس وضعیت'),
-                ],
-              ),
-            ),
-            if (_activeFilterCount() > 0)
-              const PopupMenuItem(
-                value: 'clear_filters',
-                child: Row(
-                  children: [
-                    Icon(Icons.filter_alt_off_rounded, size: 20),
-                    SizedBox(width: 10),
-                    Text('پاک کردن فیلترها'),
-                  ],
-                ),
-              ),
-            const PopupMenuItem(
-              value: 'save_filter',
-              child: Row(
-                children: [
-                  Icon(Icons.bookmark_add_outlined, size: 20),
-                  SizedBox(width: 10),
-                  Text('ذخیره فیلتر فعلی'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSavedFiltersRow(AppLocalizations t, ThemeData theme) {
-    if (_savedFilters.isEmpty) return const SizedBox.shrink();
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          Icon(Icons.bookmark_outline_rounded, size: 16, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(width: 6),
-          ..._savedFilters.map((filter) {
-            final isSelected = _selectedSavedFilter?.name == filter.name;
-            return Padding(
-              padding: const EdgeInsetsDirectional.only(end: 6),
-              child: InputChip(
-                label: Text(filter.name, style: const TextStyle(fontSize: 12)),
-                selected: isSelected,
-                visualDensity: VisualDensity.compact,
-                onSelected: (selected) {
-                  setState(() {
-                    _selectedSavedFilter = selected ? filter : null;
-                    _ticketPage = 1;
-                    _hasMoreTickets = true;
-                  });
-                  _loadTickets(showSpinner: true);
-                },
-                onDeleted: () => _deleteSavedFilter(filter.name),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
   }
 
   Future<void> _saveCurrentFilter() async {
@@ -1050,37 +895,20 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildTicketsPanel(AppLocalizations t, ThemeData theme, Widget list) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: list,
-    );
-  }
-
-  Widget _buildUserSplitDetail() {
-    final theme = Theme.of(context);
+  Widget _buildChatPane(ThemeData theme) {
     if (_selectedTicketId == null) {
-      return Container(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.5)),
-        ),
+      return ColoredBox(
+        color: theme.colorScheme.surface,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.forum_outlined, size: 48, color: theme.colorScheme.outline),
-              const SizedBox(height: 12),
-              Text('تیکتی انتخاب نشده', style: theme.textTheme.titleMedium),
+              Icon(Icons.forum_outlined, size: 52, color: theme.colorScheme.outline),
+              const SizedBox(height: 14),
+              Text('گفتگو را شروع کنید', style: theme.textTheme.titleMedium),
               const SizedBox(height: 6),
               Text(
-                'از لیست سمت راست یک تیکت را انتخاب کنید',
+                'یک تیکت از لیست انتخاب کنید',
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ],
@@ -1089,7 +917,10 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       );
     }
     if (_selectedTicketLoading || _selectedTicket == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const ColoredBox(
+        color: Colors.transparent,
+        child: Center(child: CircularProgressIndicator()),
+      );
     }
     return TicketDetailView(
       key: ValueKey(_selectedTicket!.id),
@@ -1105,7 +936,100 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildMobileTicketsList(AppLocalizations t, ThemeData theme) {
+  Widget _buildMasterDetailLayout(AppLocalizations t, ThemeData theme) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          width: _sidebarWidth,
+          child: UserSupportInboxSidebar(
+            t: t,
+            searchController: _searchController,
+            activeTab: _activeTab,
+            activeFilterCount: _activeFilterCount(),
+            onTabChanged: _onTabChanged,
+            onSearchChanged: _onSearchChanged,
+            onSearchClear: _clearSearch,
+            onSearchSubmitted: _submitSearch,
+            onOpenFilters: () => _showMobileFiltersBottomSheet(t, theme),
+            onCreateTicket: _navigateToCreateTicket,
+            ticketList: _buildTicketsList(t, theme, forSidebar: true),
+          ),
+        ),
+        VerticalDivider(width: 1, color: theme.dividerColor.withValues(alpha: 0.6)),
+        Expanded(child: _buildChatPane(theme)),
+      ],
+    );
+  }
+
+  Widget _buildMobileLayout(AppLocalizations t, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  t.supportTickets,
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ),
+              IconButton(
+                onPressed: () => _showMobileFiltersBottomSheet(t, theme),
+                icon: Badge(
+                  isLabelVisible: _activeFilterCount() > 0,
+                  label: Text('${_activeFilterCount()}'),
+                  child: const Icon(Icons.tune_rounded),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: SearchBar(
+            controller: _searchController,
+            hintText: 'جست‌وجو در تیکت‌ها…',
+            leading: const Icon(Icons.search_rounded, size: 20),
+            trailing: [
+              ListenableBuilder(
+                listenable: _searchController,
+                builder: (context, _) {
+                  if (_searchController.text.isEmpty) return const SizedBox.shrink();
+                  return IconButton(
+                    icon: const Icon(Icons.clear_rounded, size: 18),
+                    onPressed: _clearSearch,
+                  );
+                },
+              ),
+            ],
+            onChanged: _onSearchChanged,
+            onSubmitted: (_) => _submitSearch(),
+            elevation: WidgetStateProperty.all(0),
+            backgroundColor: WidgetStateProperty.all(theme.colorScheme.surfaceContainerHighest),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+          child: UserSupportTabBar(activeTab: _activeTab, onChanged: _onTabChanged),
+        ),
+        if (_metadataError != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+            child: Text(
+              'امکان بارگذاری فیلترها وجود ندارد.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+            ),
+          ),
+        const SizedBox(height: 8),
+        Expanded(child: _buildTicketsList(t, theme)),
+      ],
+    );
+  }
+
+  Widget _buildTicketsList(AppLocalizations t, ThemeData theme, {bool forSidebar = false}) {
     if (_ticketsLoading && _tickets.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -1137,18 +1061,19 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       return _buildTicketsEmptyState(t, theme);
     }
 
+    final useCardView = !forSidebar && _viewMode == UserSupportViewMode.card;
+    final bottomPad = forSidebar ? 8.0 : 80.0;
     Widget listContent;
-    
-    if (_groupByStatus && _groupedTickets != null) {
-      // Grouped view
+
+    if (_groupByStatus && _groupedTickets != null && !forSidebar) {
       listContent = ListView.builder(
-        padding: const EdgeInsets.only(top: 12, bottom: 80),
+        padding: EdgeInsets.only(top: 8, bottom: bottomPad),
         itemCount: _groupedTickets!.length,
         itemBuilder: (context, index) {
           final entry = _groupedTickets!.entries.elementAt(index);
           final statusName = entry.key;
           final statusTickets = entry.value;
-          
+
           return Theme(
             data: theme.copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
@@ -1166,36 +1091,34 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
         },
       );
     } else {
-      // Normal list view
       listContent = ListView.builder(
-        padding: const EdgeInsets.only(top: 12, bottom: 80),
+        padding: EdgeInsets.only(top: forSidebar ? 0 : 8, bottom: bottomPad),
         itemCount: tickets.length + (_hasMoreTickets ? 1 : 0),
         itemBuilder: (context, index) {
           if (index >= tickets.length) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
               child: Center(
                 child: SizedBox(
                   width: 24,
                   height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: theme.colorScheme.primary,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ),
             );
           }
 
           final ticket = tickets[index];
-          return _viewMode == UserSupportViewMode.card
-              ? _buildTicketCard(ticket, t, theme)
-              : UserTicketListItem(
-                  ticket: ticket,
-                  isSelected: ticket.id == _selectedTicketId,
-                  calendarController: widget.calendarController,
-                  onTap: () => _navigateToTicketDetail(ticket.toJson()),
-                );
+          if (useCardView) {
+            return _buildTicketCard(ticket, t, theme);
+          }
+          return UserTicketListItem(
+            ticket: ticket,
+            isSelected: ticket.id == _selectedTicketId,
+            calendarController: widget.calendarController,
+            compact: forSidebar,
+            onTap: () => _navigateToTicketDetail(ticket.toJson()),
+          );
         },
       );
     }
@@ -1227,8 +1150,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final width = MediaQuery.of(context).size.width;
-    final bool isMobile = width < 768;
+    final isMobile = MediaQuery.sizeOf(context).width < _masterDetailBreakpoint;
 
     if (!_supportGateResolved) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -1259,7 +1181,10 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
                   SelectableText(
                     bodyText,
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.35),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
                   ),
                 ],
               ),
@@ -1276,75 +1201,9 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
               onPressed: _navigateToCreateTicket,
               icon: const Icon(Icons.add_rounded),
               label: Text(t.newTicket),
-              elevation: 2,
             )
           : null,
-      body: Padding(
-        padding: EdgeInsets.all(isMobile ? 12.0 : 20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildPageHeader(t, theme, isMobile),
-            const SizedBox(height: 16),
-            UserSupportTabBar(
-              activeTab: _activeTab,
-              onChanged: _onTabChanged,
-            ),
-            if (_savedFilters.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              _buildSavedFiltersRow(t, theme),
-            ],
-            const SizedBox(height: 12),
-            _buildInboxToolbar(t, theme),
-            if (_metadataError != null) ...[
-              const SizedBox(height: 10),
-              Material(
-                color: theme.colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(12),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, size: 18, color: theme.colorScheme.onErrorContainer),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'امکان بارگذاری لیست فیلترها وجود ندارد. لطفاً صفحه را رفرش کنید.',
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onErrorContainer),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 12),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final useSplit = constraints.maxWidth >= 960;
-                  final list = _buildTicketsPanel(t, theme, _buildMobileTicketsList(t, theme));
-                  if (!useSplit) return list;
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(flex: 4, child: list),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        flex: 6,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: _buildUserSplitDetail(),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
+      body: isMobile ? _buildMobileLayout(t, theme) : _buildMasterDetailLayout(t, theme),
     );
   }
 }

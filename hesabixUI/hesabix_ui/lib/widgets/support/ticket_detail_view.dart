@@ -20,6 +20,7 @@ import 'package:hesabix_ui/widgets/support/sla_indicator.dart';
 import 'package:hesabix_ui/widgets/support/ticket_composer.dart';
 import 'package:hesabix_ui/widgets/support/ticket_pinned_request.dart';
 import 'package:hesabix_ui/widgets/support/ticket_meta_sidebar.dart';
+import 'package:hesabix_ui/widgets/support/ticket_status_chip.dart';
 
 enum TicketDetailDisplayMode { dialog, page, embedded }
 
@@ -511,18 +512,19 @@ class _TicketDetailViewState extends State<TicketDetailView> {
   }
 
 
-  int _listItemCount(bool showSidePanel) {
+  int _listItemCount(bool showSidePanel, {bool compactUser = false}) {
     var count = 1 + _messages.length; // pinned request + messages
-    if (!showSidePanel) count += 1; // conversation info
+    if (!showSidePanel && !compactUser) count += 1; // conversation info
     if (_messages.isEmpty) count += 1; // empty state
     return count;
   }
 
-  int _pinnedRequestIndex(bool showSidePanel) => showSidePanel ? 0 : 1;
+  int _pinnedRequestIndex(bool showSidePanel, {bool compactUser = false}) =>
+      (!showSidePanel && !compactUser) ? 1 : 0;
 
-  int? _emptyStateIndex(bool showSidePanel) {
+  int? _emptyStateIndex(bool showSidePanel, {bool compactUser = false}) {
     if (_messages.isNotEmpty) return null;
-    return showSidePanel ? 1 : 2;
+    return (!showSidePanel && !compactUser) ? 2 : 1;
   }
 
   Widget _buildListItem(
@@ -530,18 +532,19 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     int index,
     bool showSidePanel,
     AppLocalizations l10n,
-    ThemeData theme,
-  ) {
-    if (!showSidePanel && index == 0) {
+    ThemeData theme, {
+    bool compactUser = false,
+  }) {
+    if (!showSidePanel && !compactUser && index == 0) {
       return _buildConversationInfo(l10n, theme);
     }
 
-    final pinnedIndex = _pinnedRequestIndex(showSidePanel);
+    final pinnedIndex = _pinnedRequestIndex(showSidePanel, compactUser: compactUser);
     if (index == pinnedIndex) {
       return TicketPinnedRequest(ticket: _ticket);
     }
 
-    final emptyIndex = _emptyStateIndex(showSidePanel);
+    final emptyIndex = _emptyStateIndex(showSidePanel, compactUser: compactUser);
     if (emptyIndex != null && index == emptyIndex) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 24),
@@ -599,6 +602,62 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
     final isJalali = widget.calendarController?.isJalali ?? true;
     return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
+  }
+
+  Widget _buildCompactUserHeader(ThemeData theme, AppLocalizations l10n, bool showBack) {
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.6))),
+        ),
+        child: Row(
+          children: [
+            if (showBack)
+              IconButton(
+                onPressed: () => context.pop(),
+                icon: const Icon(Icons.arrow_back_rounded),
+                tooltip: 'بازگشت',
+              ),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _ticket.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  Text(
+                    l10n.ticketNumber(_ticket.id.toString()),
+                    style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            if (_ticket.status != null) TicketStatusChip(status: _ticket.status!, isSmall: true),
+            const SizedBox(width: 4),
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (value) {
+                if (value == 'close') _closeTicket();
+                if (value == 'reopen') _reopenTicket();
+              },
+              itemBuilder: (context) => [
+                if (!_ticket.isClosedFinal)
+                  const PopupMenuItem(value: 'close', child: Text('بستن تیکت')),
+                if (_ticket.isClosedFinal)
+                  const PopupMenuItem(value: 'reopen', child: Text('بازگشایی تیکت')),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildConversationInfo(AppLocalizations l10n, ThemeData theme) {
@@ -687,6 +746,8 @@ class _TicketDetailViewState extends State<TicketDetailView> {
 
     final isEmbedded = widget.displayMode == TicketDetailDisplayMode.embedded;
     final isDialog = widget.displayMode == TicketDetailDisplayMode.dialog;
+    final isPage = widget.displayMode == TicketDetailDisplayMode.page;
+    final compactUser = !widget.isOperator && (isEmbedded || isPage);
 
     final body = Container(
         width: isDialog ? MediaQuery.of(context).size.width * 0.9 : null,
@@ -697,7 +758,10 @@ class _TicketDetailViewState extends State<TicketDetailView> {
         ),
         child: Column(
           children: [
-            Container(
+            if (compactUser)
+              _buildCompactUserHeader(theme, l10n, isPage)
+            else
+              Container(
               padding: EdgeInsets.all(isEmbedded ? 14 : 20),
               decoration: BoxDecoration(
                 color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
@@ -826,7 +890,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                 onAssignChanged: _handleAssignChange,
               ),
 
-            if (_events.isNotEmpty && !widget.isOperator)
+            if (_events.isNotEmpty && !widget.isOperator && !compactUser)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: TicketEventTimeline(
@@ -859,7 +923,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
             // Messages Section (Main Focus) + AI Panel
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: EdgeInsets.symmetric(horizontal: compactUser ? 8 : 16),
                 child: LayoutBuilder(
                 builder: (context, constraints) {
                   final showSidePanel = widget.isOperator && constraints.maxWidth > 900;
@@ -879,9 +943,15 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                                   primary: false,
                                   physics: const AlwaysScrollableScrollPhysics(),
                                   padding: const EdgeInsets.all(12),
-                                  itemCount: _listItemCount(showSidePanel),
-                                  itemBuilder: (context, index) =>
-                                      _buildListItem(context, index, showSidePanel, l10n, theme),
+                                  itemCount: _listItemCount(showSidePanel, compactUser: compactUser),
+                                  itemBuilder: (context, index) => _buildListItem(
+                                        context,
+                                        index,
+                                        showSidePanel,
+                                        l10n,
+                                        theme,
+                                        compactUser: compactUser,
+                                      ),
                                 ),
                               ),
                       ),

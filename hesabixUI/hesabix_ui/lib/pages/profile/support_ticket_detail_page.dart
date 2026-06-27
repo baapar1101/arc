@@ -88,14 +88,16 @@ class _SupportTicketDetailPageState extends State<SupportTicketDetailPage> {
       );
     }
 
-    return TicketDetailsDialog(
-      key: ValueKey(_ticket!.id),
-      ticket: _ticket!,
-      isOperator: widget.isOperator,
-      calendarController: widget.calendarController,
-      displayMode: TicketDetailDisplayMode.page,
-      onTicketUpdated: _loadTicket,
-      onRequestCsat: widget.isOperator ? null : () => _maybeShowCsat(),
+    return Scaffold(
+      body: TicketDetailsDialog(
+        key: ValueKey(_ticket!.id),
+        ticket: _ticket!,
+        isOperator: widget.isOperator,
+        calendarController: widget.calendarController,
+        displayMode: TicketDetailDisplayMode.page,
+        onTicketUpdated: _loadTicket,
+        onRequestCsat: widget.isOperator ? null : () => _maybeShowCsat(),
+      ),
     );
   }
 
