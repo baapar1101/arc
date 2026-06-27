@@ -221,6 +221,10 @@ class DataTableConfig<T> {
   final bool defaultSortDesc;
   final void Function(dynamic item)? onRowTap;
   final void Function(dynamic item)? onRowDoubleTap;
+  /// Shortcut `r` — reply / open active row (when search field is not focused).
+  final void Function(dynamic item)? onRowShortcutReply;
+  /// Shortcut `a` — assign active row (when search field is not focused).
+  final void Function(dynamic item)? onRowShortcutAssign;
   final Widget? Function(dynamic item)? customRowBuilder;
   final Map<String, dynamic>? additionalParams;
   final Duration? searchDebounce;
@@ -360,6 +364,8 @@ class DataTableConfig<T> {
     this.defaultSortDesc = false,
     this.onRowTap,
     this.onRowDoubleTap,
+    this.onRowShortcutReply,
+    this.onRowShortcutAssign,
     this.customRowBuilder,
     this.additionalParams,
     this.searchDebounce = const Duration(milliseconds: 500),

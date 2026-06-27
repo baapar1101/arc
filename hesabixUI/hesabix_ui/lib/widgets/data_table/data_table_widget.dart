@@ -1952,6 +1952,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 const ClearSelectionIntent(),
             LogicalKeySet(LogicalKeyboardKey.keyA, LogicalKeyboardKey.control):
                 const SelectAllIntent(),
+            if (widget.config.onRowShortcutReply != null)
+              LogicalKeySet(LogicalKeyboardKey.keyR): const ReplyRowIntent(),
+            if (widget.config.onRowShortcutAssign != null)
+              LogicalKeySet(LogicalKeyboardKey.keyA): const AssignRowIntent(),
           },
           child: Actions(
             actions: <Type, Action<Intent>>{
@@ -1977,6 +1981,28 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       _activeRowIndex < _items.length &&
                       widget.config.onRowTap != null) {
                     widget.config.onRowTap!(_items[_activeRowIndex]);
+                  }
+                  return null;
+                },
+              ),
+              ReplyRowIntent: CallbackAction<ReplyRowIntent>(
+                onInvoke: (intent) {
+                  if (_searchFocusNode.hasFocus) return null;
+                  if (_activeRowIndex >= 0 &&
+                      _activeRowIndex < _items.length &&
+                      widget.config.onRowShortcutReply != null) {
+                    widget.config.onRowShortcutReply!(_items[_activeRowIndex]);
+                  }
+                  return null;
+                },
+              ),
+              AssignRowIntent: CallbackAction<AssignRowIntent>(
+                onInvoke: (intent) {
+                  if (_searchFocusNode.hasFocus) return null;
+                  if (_activeRowIndex >= 0 &&
+                      _activeRowIndex < _items.length &&
+                      widget.config.onRowShortcutAssign != null) {
+                    widget.config.onRowShortcutAssign!(_items[_activeRowIndex]);
                   }
                   return null;
                 },
@@ -4655,6 +4681,14 @@ class ClearSelectionIntent extends Intent {
 
 class SelectAllIntent extends Intent {
   const SelectAllIntent();
+}
+
+class ReplyRowIntent extends Intent {
+  const ReplyRowIntent();
+}
+
+class AssignRowIntent extends Intent {
+  const AssignRowIntent();
 }
 
 class _SortSpec {

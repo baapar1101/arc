@@ -13,11 +13,20 @@ class MessageRepository(BaseRepository[Message]):
     def __init__(self, db: Session):
         super().__init__(db, Message)
     
-    def get_ticket_messages(self, ticket_id: int, query_info: QueryInfo) -> tuple[List[Message], int]:
+    def get_ticket_messages(
+        self,
+        ticket_id: int,
+        query_info: QueryInfo,
+        *,
+        exclude_internal: bool = False,
+    ) -> tuple[List[Message], int]:
         """دریافت پیام‌های تیکت با فیلتر و صفحه‌بندی"""
         query = self.db.query(Message)\
             .options(joinedload(Message.sender))\
             .filter(Message.ticket_id == ticket_id)
+
+        if exclude_internal:
+            query = query.filter(Message.is_internal.is_(False))
         
         # اعمال جستجو
         if query_info.search and query_info.search_fields:

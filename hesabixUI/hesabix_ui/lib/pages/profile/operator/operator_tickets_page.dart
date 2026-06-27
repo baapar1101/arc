@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/services/saved_filters_service.dart';
@@ -9,11 +13,22 @@ import 'package:hesabix_ui/models/saved_filter.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/support_filter_utils.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
+import 'package:hesabix_ui/services/support_realtime_service.dart';
+import 'package:hesabix_ui/widgets/support/sla_indicator.dart';
 
 class OperatorTicketsPage extends StatefulWidget {
   final CalendarController? calendarController;
-  const OperatorTicketsPage({super.key, this.calendarController});
+  final int? initialTicketId;
+  final AuthStore? authStore;
+
+  const OperatorTicketsPage({
+    super.key,
+    this.calendarController,
+    this.initialTicketId,
+    this.authStore,
+  });
 
   @override
   State<OperatorTicketsPage> createState() => _OperatorTicketsPageState();
@@ -43,9 +58,17 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   // Saved filters
   List<SavedFilter> _savedFilters = [];
   SavedFilter? _selectedFilter;
+
+  // Split view (desktop)
+  SupportTicket? _selectedTicket;
+  bool _selectedTicketLoading = false;
+  int? _selectedTicketId;
   
   // Additional filters
   bool? _lastMessageFromUser; // null = همه, true = از کاربر, false = از اپراتور
+
+  SupportRealtimeService? _realtime;
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -54,6 +77,46 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     _checkUserPermissions();
     _loadCurrentUserId();
     _loadSavedFilters();
+    _startPolling();
+    _connectRealtime();
+    final ticketId = widget.initialTicketId;
+    if (ticketId != null && ticketId > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openTicketInSplitView(ticketId);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _realtime?.disconnect();
+    super.dispose();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) _safeSetState(() => _refreshCounter++);
+    });
+  }
+
+  void _connectRealtime() {
+    final apiKey = widget.authStore?.apiKey;
+    if (apiKey == null || apiKey.isEmpty) return;
+    _realtime = createSupportRealtimeService();
+    _realtime!.connect(
+      apiKey: apiKey,
+      onEvent: (event) {
+        if ('${event['type']}' != 'support') return;
+        if (!mounted) return;
+        _safeSetState(() => _refreshCounter++);
+        final ticketId = event['ticket_id'];
+        if (ticketId is int && ticketId == _selectedTicketId) {
+          _reloadSelectedTicket();
+        }
+      },
+    );
   }
 
   // Helper برای setState ایمن
@@ -272,6 +335,29 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     }
   }
 
+  Future<void> _assignActiveRowToMe(Map<String, dynamic> row) async {
+    final ticketId = row['id'];
+    if (ticketId is! int || _currentUserId == null) return;
+    try {
+      await _supportService.assignTicket(
+        ticketId,
+        AssignTicketRequest(operatorId: _currentUserId!),
+      );
+      _safeSetState(() => _refreshCounter++);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تیکت #$ticketId به شما تخصیص داده شد'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ErrorExtractor.forContext(e, context)), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   Future<void> _markResolved() async {
     if (_selectedRows.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -325,6 +411,14 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
 
 
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
+    final ticketId = ticketData['id'];
+    if (ticketId is! int) return;
+
+    if (MediaQuery.of(context).size.width >= 1024) {
+      _openTicketInSplitView(ticketId);
+      return;
+    }
+
     final ticket = SupportTicket.fromJson(ticketData);
     showDialog(
       context: context,
@@ -333,13 +427,49 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         isOperator: true,
         calendarController: widget.calendarController,
         onTicketUpdated: () {
-          // Refresh the data table after ticket update
           _safeSetState(() {
             _refreshCounter++;
           });
         },
       ),
     );
+  }
+
+  Future<void> _openTicketInSplitView(int ticketId) async {
+    _safeSetState(() {
+      _selectedTicketId = ticketId;
+      _selectedTicket = null;
+      _selectedTicketLoading = true;
+    });
+    _realtime?.subscribeTicket(ticketId);
+    try {
+      final ticket = await _supportService.getOperatorTicket(ticketId);
+      _safeSetState(() {
+        _selectedTicket = ticket;
+        _selectedTicketLoading = false;
+      });
+    } catch (e) {
+      _safeSetState(() {
+        _selectedTicketLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorExtractor.forContext(e, context)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _reloadSelectedTicket() async {
+    final id = _selectedTicketId;
+    if (id == null) return;
+    try {
+      final ticket = await _supportService.getOperatorTicket(id);
+      _safeSetState(() => _selectedTicket = ticket);
+    } catch (_) {}
   }
 
   Future<void> _deleteTicket(int ticketId) async {
@@ -548,6 +678,17 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+                    const SizedBox(width: 12),
+                    TextButton.icon(
+                      onPressed: () => context.push('/user/profile/operator/dashboard'),
+                      icon: const Icon(Icons.dashboard_outlined, size: 18),
+                      label: const Text('داشبورد'),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'میانبر: j/k حرکت • Enter باز • r پاسخ • a تخصیص',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+                    ),
                     const Spacer(),
                 // Quick Actions
                 if (_selectedRows.isNotEmpty) ...[
@@ -697,7 +838,59 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: DataTableWidget<Map<String, dynamic>>(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final useSplitView = constraints.maxWidth >= 900;
+                  if (!useSplitView) {
+                    return _buildTicketsTable();
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: _buildTicketsTable(),
+                      ),
+                      const VerticalDivider(width: 1),
+                      Expanded(
+                        flex: 4,
+                        child: _buildSplitDetailPanel(),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSplitDetailPanel() {
+    if (_selectedTicketId == null) {
+      return const Center(
+        child: Text('یک تیکت از لیست انتخاب کنید'),
+      );
+    }
+    if (_selectedTicketLoading || _selectedTicket == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return TicketDetailsDialog(
+      key: ValueKey(_selectedTicket!.id),
+      ticket: _selectedTicket!,
+      isOperator: true,
+      calendarController: widget.calendarController,
+      displayMode: TicketDetailDisplayMode.embedded,
+      onTicketUpdated: () {
+        _safeSetState(() => _refreshCounter++);
+        _reloadSelectedTicket();
+      },
+    );
+  }
+
+  Widget _buildTicketsTable() {
+    return DataTableWidget<Map<String, dynamic>>(
                 key: ValueKey('data_table_$_refreshCounter'),
                 config: DataTableConfig<Map<String, dynamic>>(
                   title: 'لیست تیکت‌های پشتیبانی - پنل اپراتور',
@@ -788,6 +981,17 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                       width: ColumnWidth.medium,
                       showTime: false,
                     ),
+                    TextColumn(
+                      'sla',
+                      'SLA',
+                      sortable: false,
+                      searchable: false,
+                      width: ColumnWidth.small,
+                      formatter: (item) {
+                        if (item is! Map<String, dynamic>) return '';
+                        return slaStatusLabel(slaStatusFromRow(item));
+                      },
+                    ),
                     // ستون عملیات (فقط برای superadmin)
                     if (_isSuperAdmin)
                       ActionColumn('actions', 'عملیات', actions: [
@@ -835,6 +1039,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                   },
                   getCustomFilters: () {
                     final filters = <FilterItem>[];
+                    if (_selectedFilter != null) {
+                      filters.addAll(savedFilterToFilterItems(_selectedFilter!.filters));
+                    }
                     if (_lastMessageFromUser != null) {
                       filters.add(FilterItem(
                         property: 'last_message_from_user',
@@ -857,16 +1064,21 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                   borderRadius: BorderRadius.circular(8),
                   padding: const EdgeInsets.all(16),
                   onRowTap: (ticketData) => _navigateToTicketDetail(ticketData),
+                  onRowShortcutReply: (row) => _navigateToTicketDetail(row),
+                  onRowShortcutAssign: (row) {
+                    if (row is Map<String, dynamic>) _assignActiveRowToMe(row);
+                  },
+                  rowColorBuilder: (item, index) {
+                    if (item is Map<String, dynamic>) {
+                      return slaRowBackgroundColor(item);
+                    }
+                    return null;
+                  },
                   expandBodyHeightToFitRows: true,
                 ),
                 fromJson: (json) => json,
                 calendarController: widget.calendarController,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+              );
   }
 
 }

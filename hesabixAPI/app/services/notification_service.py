@@ -435,12 +435,14 @@ class NotificationService:
 						self.db.commit()
 					except Exception:
 						pass
+				deep_link = context.get("deep_link") or context.get("action_url")
 				ok = self.inapp.push_realtime(
 					user_id=user_id,
 					title=title_inapp,
 					body=ws_body,
 					level="info",
 					announcement_id=announcement_id,
+					deep_link=str(deep_link) if deep_link else None,
 				)
 				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "inapp_failed")
 				outbox.status = "sent" if ok else "failed"

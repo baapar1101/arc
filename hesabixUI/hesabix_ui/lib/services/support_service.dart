@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -78,6 +80,24 @@ class SupportService {
     }
   }
 
+  Future<SupportTicket> closeTicket(int ticketId) async {
+    try {
+      final response = await _apiClient.put<Map<String, dynamic>>('/api/v1/support/$ticketId/close');
+      return SupportTicket.fromJson(response.data!['data']);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<SupportTicket> reopenTicket(int ticketId) async {
+    try {
+      final response = await _apiClient.put<Map<String, dynamic>>('/api/v1/support/$ticketId/reopen');
+      return SupportTicket.fromJson(response.data!['data']);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
   Future<SupportMessage> sendMessage(int ticketId, CreateMessageRequest request) async {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
@@ -152,6 +172,29 @@ class SupportService {
         data: request.toJson(),
       );
       return SupportTicket.fromJson(response.data!['data']);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<SupportTicket> updateTicketPriority(int ticketId, UpdatePriorityRequest request) async {
+    try {
+      final response = await _apiClient.put<Map<String, dynamic>>(
+        '/api/v1/support/operator/tickets/$ticketId/priority',
+        data: request.toJson(),
+      );
+      return SupportTicket.fromJson(response.data!['data']);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<SupportOperatorInfo>> getSupportOperators() async {
+    try {
+      final response = await _apiClient.get<Map<String, dynamic>>('/api/v1/support/operator/operators');
+      return (response.data!['data'] as List)
+          .map((json) => SupportOperatorInfo.fromJson(json as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw _handleError(e);
     }
@@ -295,6 +338,105 @@ class SupportService {
     } on DioException catch (e) {
       throw _handleError(e);
     }
+  }
+
+  Future<List<SupportTicketEvent>> getTicketEvents(int ticketId, {required bool isOperator}) async {
+    try {
+      final path = isOperator
+          ? '/api/v1/support/operator/tickets/$ticketId/events'
+          : '/api/v1/support/$ticketId/events';
+      final response = await _apiClient.get<Map<String, dynamic>>(path);
+      return (response.data!['data'] as List)
+          .map((json) => SupportTicketEvent.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<SupportAttachment> uploadAttachment(
+    int ticketId,
+    Uint8List bytes,
+    String filename, {
+    required bool isOperator,
+  }) async {
+    try {
+      final path = isOperator
+          ? '/api/v1/support/operator/tickets/$ticketId/attachments'
+          : '/api/v1/support/$ticketId/attachments';
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(bytes, filename: filename),
+      });
+      final response = await _apiClient.post<Map<String, dynamic>>(path, data: formData);
+      return SupportAttachment.fromJson(response.data!['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<List<int>> downloadAttachment(int attachmentId, {required bool isOperator}) async {
+    try {
+      final path = attachmentDownloadPath(attachmentId, isOperator: isOperator);
+      final response = await _apiClient.get<List<int>>(
+        path,
+        responseType: ResponseType.bytes,
+      );
+      return response.data ?? [];
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  String attachmentDownloadPath(int attachmentId, {required bool isOperator}) {
+    return isOperator
+        ? '/api/v1/support/operator/attachments/$attachmentId/download'
+        : '/api/v1/support/attachments/$attachmentId/download';
+  }
+
+  Future<List<ServerResponseTemplate>> getResponseTemplates() async {
+    try {
+      final response = await _apiClient.get<Map<String, dynamic>>('/api/v1/support/operator/templates');
+      return (response.data!['data'] as List)
+          .map((json) => ServerResponseTemplate.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> getOperatorDashboardStats() async {
+    final response = await _apiClient.get<Map<String, dynamic>>('/api/v1/support/operator/dashboard/stats');
+    return Map<String, dynamic>.from(response.data!['data'] as Map);
+  }
+
+  Future<List<Map<String, dynamic>>> getOperatorDashboardOverdue({int limit = 20}) async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/support/operator/dashboard/overdue',
+      query: {'limit': limit},
+    );
+    return (response.data!['data'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getOperatorDashboardActivity({int days = 7}) async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/support/operator/dashboard/activity',
+      query: {'days': days},
+    );
+    return (response.data!['data'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getOperatorUserTicketHistory(int userId, {int take = 5}) async {
+    final response = await _apiClient.get<Map<String, dynamic>>(
+      '/api/v1/support/operator/users/$userId/tickets',
+      query: {'take': take},
+    );
+    return (response.data!['data'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
   }
 
   // Error handling

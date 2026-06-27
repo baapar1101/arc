@@ -130,6 +130,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
               final level = '${msg['level'] ?? 'info'}';
               final dynamic aid = msg['announcement_id'];
               final int? annId = aid is int ? aid : int.tryParse('$aid');
+              final deepLink = msg['deep_link']?.toString();
               if (!mounted) return;
               setState(() {
                 _notifications.insert(0, <String, dynamic>{
@@ -137,6 +138,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
                   'body': body,
                   'level': level,
                   if (annId != null) 'id': annId,
+                  if (deepLink != null && deepLink.isNotEmpty) 'deep_link': deepLink,
                 });
                 _unreadCount = (_unreadCount + 1).clamp(0, 99);
               });
@@ -144,9 +146,20 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
                 unawaited(NotificationAlertSoundPlayer.playForSoundAssetId(prefs.soundAssetId));
               }
               if (mounted) {
-                ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(content: Text('$title: $body'), duration: const Duration(seconds: 4)));
+                final messenger = ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context);
+                messenger.hideCurrentSnackBar();
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('$title: $body'),
+                    duration: const Duration(seconds: 4),
+                    action: deepLink != null && deepLink.isNotEmpty
+                        ? SnackBarAction(
+                            label: 'مشاهده',
+                            onPressed: () => context.go(deepLink),
+                          )
+                        : null,
+                  ),
+                );
               }
               _scheduleAnnouncementsResync();
             }
@@ -268,8 +281,17 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
                               levelColor = cs.primary;
                           }
                           final int? annId = it['id'] is int ? it['id'] as int : int.tryParse('${it['id']}');
+                          final deepLink = it['deep_link']?.toString();
                           final bool busy = annId != null && _busyAnnIds.contains(annId);
-                          return Container(
+                          return InkWell(
+                            onTap: deepLink != null && deepLink.isNotEmpty
+                                ? () {
+                                    Navigator.of(context).pop();
+                                    context.go(deepLink);
+                                  }
+                                : null,
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
                             decoration: BoxDecoration(
                               color: cs.surface,
                               borderRadius: BorderRadius.circular(12),
@@ -332,6 +354,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
                                   ),
                               ],
                             ),
+                          ),
                           );
                         },
                         separatorBuilder: (_, _) => const SizedBox(height: 8),

@@ -26,6 +26,11 @@ class Ticket(Base):
     # Additional fields
     is_internal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # آیا تیکت داخلی است؟
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    first_response_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolution_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    first_responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sla_breached: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -38,3 +43,5 @@ class Ticket(Base):
     priority = relationship("Priority", back_populates="tickets")
     status = relationship("Status", back_populates="tickets")
     messages = relationship("Message", back_populates="ticket", cascade="all, delete-orphan", order_by="Message.created_at")
+    events = relationship("TicketEvent", back_populates="ticket", cascade="all, delete-orphan", order_by="TicketEvent.created_at")
+    attachments = relationship("SupportAttachment", back_populates="ticket", cascade="all, delete-orphan")

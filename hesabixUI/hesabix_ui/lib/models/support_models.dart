@@ -272,6 +272,7 @@ class SupportMessage {
   final bool isInternal;
   final DateTime createdAt;
   final SupportUser? sender;
+  final List<SupportAttachment>? attachments;
 
   SupportMessage({
     required this.id,
@@ -282,6 +283,7 @@ class SupportMessage {
     required this.isInternal,
     required this.createdAt,
     this.sender,
+    this.attachments,
   });
 
   factory SupportMessage.fromJson(Map<String, dynamic> json) {
@@ -300,6 +302,9 @@ class SupportMessage {
       isInternal: json['is_internal'],
       createdAt: SupportCategory._parseDateTime(createdAtData),
       sender: json['sender'] != null ? SupportUser.fromJson(json['sender']) : null,
+      attachments: json['attachments'] != null
+          ? (json['attachments'] as List).map((a) => SupportAttachment.fromJson(a as Map<String, dynamic>)).toList()
+          : null,
     );
   }
 
@@ -334,6 +339,10 @@ class SupportTicket {
   final DateTime? closedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? firstResponseDueAt;
+  final DateTime? resolutionDueAt;
+  final DateTime? firstRespondedAt;
+  final bool slaBreached;
   
   // Related objects
   final SupportUser? user;
@@ -356,6 +365,10 @@ class SupportTicket {
     this.closedAt,
     required this.createdAt,
     required this.updatedAt,
+    this.firstResponseDueAt,
+    this.resolutionDueAt,
+    this.firstRespondedAt,
+    this.slaBreached = false,
     this.user,
     this.assignedOperator,
     this.category,
@@ -379,6 +392,7 @@ class SupportTicket {
     if (closedAtData == null) {
       closedAtData = json['closed_at_raw'] ?? json['closed_at'];
     }
+    DateTime? parseOpt(dynamic v) => v != null ? SupportCategory._parseDateTime(v) : null;
     
     return SupportTicket(
       id: json['id'],
@@ -393,6 +407,10 @@ class SupportTicket {
       closedAt: closedAtData != null ? SupportCategory._parseDateTime(closedAtData) : null,
       createdAt: SupportCategory._parseDateTime(createdAtData),
       updatedAt: SupportCategory._parseDateTime(updatedAtData),
+      firstResponseDueAt: parseOpt(json['first_response_due_at_raw'] ?? json['first_response_due_at']),
+      resolutionDueAt: parseOpt(json['resolution_due_at_raw'] ?? json['resolution_due_at']),
+      firstRespondedAt: parseOpt(json['first_responded_at_raw'] ?? json['first_responded_at']),
+      slaBreached: json['sla_breached'] == true,
       user: json['user'] != null ? SupportUser.fromJson(json['user']) : null,
       assignedOperator: json['assigned_operator'] != null ? SupportUser.fromJson(json['assigned_operator']) : null,
       category: json['category'] != null ? SupportCategory.fromJson(json['category']) : null,
@@ -432,6 +450,139 @@ class SupportTicket {
   bool get isWaitingForUser => statusId == 3; // وضعیت "در انتظار کاربر"
   bool get isClosed => statusId == 4; // وضعیت "بسته"
   bool get isResolved => statusId == 5; // وضعیت "حل شده"
+  bool get isClosedFinal => status?.isFinal ?? false;
+
+  String get slaStatus {
+    if (slaBreached) return 'breached';
+    if (closedAt != null) return 'ok';
+    final due = resolutionDueAt ?? (firstRespondedAt == null ? firstResponseDueAt : null);
+    if (due != null && DateTime.now().isAfter(due.subtract(const Duration(minutes: 30)))) {
+      if (DateTime.now().isAfter(due)) return 'breached';
+      return 'warning';
+    }
+    return 'ok';
+  }
+}
+
+class SupportAttachment {
+  final int id;
+  final int ticketId;
+  final int? messageId;
+  final String fileStorageId;
+  final String originalName;
+  final String? mimeType;
+  final int sizeBytes;
+  final int uploadedBy;
+  final DateTime createdAt;
+
+  SupportAttachment({
+    required this.id,
+    required this.ticketId,
+    this.messageId,
+    required this.fileStorageId,
+    required this.originalName,
+    this.mimeType,
+    required this.sizeBytes,
+    required this.uploadedBy,
+    required this.createdAt,
+  });
+
+  factory SupportAttachment.fromJson(Map<String, dynamic> json) {
+    return SupportAttachment(
+      id: json['id'],
+      ticketId: json['ticket_id'],
+      messageId: json['message_id'],
+      fileStorageId: json['file_storage_id'],
+      originalName: json['original_name'],
+      mimeType: json['mime_type'],
+      sizeBytes: json['size_bytes'] ?? 0,
+      uploadedBy: json['uploaded_by'],
+      createdAt: SupportCategory._parseDateTime(json['created_at']),
+    );
+  }
+
+  bool get isImage => (mimeType ?? '').startsWith('image/');
+}
+
+class SupportTicketEvent {
+  final int id;
+  final int ticketId;
+  final int? actorId;
+  final String eventType;
+  final Map<String, dynamic>? oldValue;
+  final Map<String, dynamic>? newValue;
+  final DateTime createdAt;
+
+  SupportTicketEvent({
+    required this.id,
+    required this.ticketId,
+    this.actorId,
+    required this.eventType,
+    this.oldValue,
+    this.newValue,
+    required this.createdAt,
+  });
+
+  factory SupportTicketEvent.fromJson(Map<String, dynamic> json) {
+    return SupportTicketEvent(
+      id: json['id'],
+      ticketId: json['ticket_id'],
+      actorId: json['actor_id'],
+      eventType: json['event_type'],
+      oldValue: json['old_value'] as Map<String, dynamic>?,
+      newValue: json['new_value'] as Map<String, dynamic>?,
+      createdAt: SupportCategory._parseDateTime(json['created_at']),
+    );
+  }
+}
+
+class ServerResponseTemplate {
+  final int id;
+  final String name;
+  final String content;
+
+  ServerResponseTemplate({required this.id, required this.name, required this.content});
+
+  factory ServerResponseTemplate.fromJson(Map<String, dynamic> json) {
+    return ServerResponseTemplate(
+      id: json['id'],
+      name: json['name'],
+      content: json['content'],
+    );
+  }
+}
+
+class SupportOperatorInfo {
+  final int id;
+  final String? firstName;
+  final String? lastName;
+  final String? email;
+
+  SupportOperatorInfo({
+    required this.id,
+    this.firstName,
+    this.lastName,
+    this.email,
+  });
+
+  factory SupportOperatorInfo.fromJson(Map<String, dynamic> json) {
+    return SupportOperatorInfo(
+      id: json['id'],
+      firstName: json['first_name'],
+      lastName: json['last_name'],
+      email: json['email'],
+    );
+  }
+
+  String get displayName {
+    if (firstName != null && lastName != null) {
+      return '$firstName $lastName';
+    }
+    if (firstName != null) return firstName!;
+    if (lastName != null) return lastName!;
+    if (email != null) return email!;
+    return 'اپراتور $id';
+  }
 }
 
 // Request models
@@ -461,16 +612,19 @@ class CreateTicketRequest {
 class CreateMessageRequest {
   final String content;
   final bool isInternal;
+  final List<int> attachmentIds;
 
   CreateMessageRequest({
     required this.content,
     this.isInternal = false,
+    this.attachmentIds = const [],
   });
 
   Map<String, dynamic> toJson() {
     return {
       'content': content,
       'is_internal': isInternal,
+      'attachment_ids': attachmentIds,
     };
   }
 }
@@ -490,6 +644,14 @@ class UpdateStatusRequest {
       'assigned_operator_id': assignedOperatorId,
     };
   }
+}
+
+class UpdatePriorityRequest {
+  final int priorityId;
+
+  UpdatePriorityRequest({required this.priorityId});
+
+  Map<String, dynamic> toJson() => {'priority_id': priorityId};
 }
 
 class AssignTicketRequest {

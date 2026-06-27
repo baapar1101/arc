@@ -86,9 +86,56 @@ class MessageResponse(MessageBase):
     sender_type: SenderType
     sender: Optional[UserInfo] = None
     created_at: datetime
+    attachments: Optional[List["AttachmentResponse"]] = None
 
     class Config:
         from_attributes = True
+
+
+class AttachmentResponse(BaseModel):
+    id: int
+    ticket_id: int
+    message_id: Optional[int] = None
+    file_storage_id: str
+    original_name: str
+    mime_type: Optional[str] = None
+    size_bytes: int
+    uploaded_by: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ResponseTemplateResponse(BaseModel):
+    id: int
+    name: str
+    content: str
+    category_id: Optional[int] = None
+    is_global: bool = True
+    created_by: int
+    is_active: bool = True
+    usage_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ResponseTemplateCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    content: str = Field(..., min_length=1)
+    category_id: Optional[int] = None
+    is_global: bool = True
+
+
+class ResponseTemplateUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    content: Optional[str] = Field(None, min_length=1)
+    category_id: Optional[int] = None
+    is_global: Optional[bool] = None
+    is_active: Optional[bool] = None
 
 
 class TicketResponse(TicketBase):
@@ -100,6 +147,10 @@ class TicketResponse(TicketBase):
     closed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    first_response_due_at: Optional[datetime] = None
+    resolution_due_at: Optional[datetime] = None
+    first_responded_at: Optional[datetime] = None
+    sla_breached: bool = False
     
     # Related objects
     user: Optional[UserInfo] = None
@@ -118,8 +169,10 @@ class CreateTicketRequest(TicketBase):
     pass
 
 
-class CreateMessageRequest(MessageBase):
-    pass
+class CreateMessageRequest(BaseModel):
+    content: str = ""
+    is_internal: bool = False
+    attachment_ids: List[int] = Field(default_factory=list)
 
 
 class UpdateStatusRequest(BaseModel):
@@ -129,6 +182,10 @@ class UpdateStatusRequest(BaseModel):
 
 class AssignTicketRequest(BaseModel):
     operator_id: int
+
+
+class UpdatePriorityRequest(BaseModel):
+    priority_id: int
 
 
 class BulkAssignRequest(BaseModel):

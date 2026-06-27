@@ -12,12 +12,20 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/widgets/support/message_bubble.dart';
 import 'package:hesabix_ui/widgets/support/ai_ticket_assistant.dart';
+import 'package:hesabix_ui/widgets/support/ticket_action_bar.dart';
+import 'package:hesabix_ui/widgets/support/ticket_attachment_picker.dart';
+import 'package:hesabix_ui/widgets/support/ticket_event_timeline.dart';
+import 'package:hesabix_ui/services/support_realtime_service.dart';
+import 'package:hesabix_ui/widgets/support/sla_indicator.dart';
+
+enum TicketDetailDisplayMode { dialog, page, embedded }
 
 class TicketDetailsDialog extends StatefulWidget {
   final SupportTicket ticket;
   final bool isOperator;
   final VoidCallback? onTicketUpdated;
   final CalendarController? calendarController;
+  final TicketDetailDisplayMode displayMode;
 
   const TicketDetailsDialog({
     super.key,
@@ -25,6 +33,7 @@ class TicketDetailsDialog extends StatefulWidget {
     this.isOperator = false,
     this.onTicketUpdated,
     this.calendarController,
+    this.displayMode = TicketDetailDisplayMode.dialog,
   });
 
   @override
@@ -39,6 +48,19 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   List<ResponseTemplate> _templates = [];
+  bool _isInternalNote = false;
+  bool _isActionBusy = false;
+  List<SupportStatus> _statuses = [];
+  List<SupportPriority> _priorities = [];
+  List<SupportOperatorInfo> _operators = [];
+  List<SupportAttachment> _pendingAttachments = [];
+  bool _isUploadingAttachment = false;
+  List<SupportTicketEvent> _events = [];
+  SupportRealtimeService? _realtime;
+  List<Map<String, dynamic>> _userTicketHistory = [];
+
+  bool get _canUserReply => !widget.isOperator && !_ticket.isClosedFinal;
+  bool get _canComposeMessage => widget.isOperator || _canUserReply;
 
   @override
   void initState() {
@@ -46,8 +68,198 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
     _ticket = widget.ticket;
     _messages = _ticket.messages ?? [];
     _loadMessages();
+    _loadEvents();
     if (widget.isOperator) {
       _loadTemplates();
+      _loadOperatorMetadata();
+      _loadUserTicketHistory();
+    }
+    _connectRealtime();
+  }
+
+  Future<void> _loadUserTicketHistory() async {
+    try {
+      final items = await SupportService(ApiClient()).getOperatorUserTicketHistory(
+        _ticket.userId,
+        take: 5,
+      );
+      if (mounted) setState(() => _userTicketHistory = items);
+    } catch (_) {}
+  }
+
+  void _connectRealtime() {
+    final apiKey = ApiClient.getAuthStore()?.apiKey;
+    if (apiKey == null || apiKey.isEmpty) return;
+    _realtime = createSupportRealtimeService();
+    _realtime!.connect(
+      apiKey: apiKey,
+      onEvent: (event) {
+        if ('${event['type']}' != 'support') return;
+        if (event['ticket_id'] != _ticket.id) return;
+        if (!mounted) return;
+        if (event['event'] == 'message.created') {
+          _loadMessages();
+        } else {
+          _reloadTicket();
+        }
+      },
+    );
+    _realtime!.subscribeTicket(_ticket.id);
+  }
+
+  Future<void> _reloadTicket() async {
+    try {
+      final supportService = SupportService(ApiClient());
+      final ticket = widget.isOperator
+          ? await supportService.getOperatorTicket(_ticket.id)
+          : await supportService.getTicket(_ticket.id);
+      if (!mounted) return;
+      setState(() => _ticket = ticket);
+      widget.onTicketUpdated?.call();
+    } catch (_) {}
+  }
+
+  Future<void> _loadOperatorMetadata() async {
+    try {
+      final supportService = SupportService(ApiClient());
+      final results = await Future.wait([
+        supportService.getStatuses(),
+        supportService.getPriorities(),
+        supportService.getSupportOperators(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _statuses = results[0] as List<SupportStatus>;
+        _priorities = results[1] as List<SupportPriority>;
+        _operators = results[2] as List<SupportOperatorInfo>;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadEvents() async {
+    try {
+      final events = await SupportService(ApiClient()).getTicketEvents(
+        _ticket.id,
+        isOperator: widget.isOperator,
+      );
+      if (mounted) setState(() => _events = events);
+    } catch (_) {}
+  }
+
+  Future<void> _pickAttachment() async {
+    final file = await TicketAttachmentPicker.pickFile();
+    if (file == null || file.bytes == null) return;
+    setState(() => _isUploadingAttachment = true);
+    try {
+      final attachment = await SupportService(ApiClient()).uploadAttachment(
+        _ticket.id,
+        file.bytes!,
+        file.name,
+        isOperator: widget.isOperator,
+      );
+      if (mounted) {
+        setState(() => _pendingAttachments = [..._pendingAttachments, attachment]);
+      }
+    } catch (e) {
+      if (mounted) {
+        _showOverlayMessage('خطا در آپلود فایل', Colors.red, const Duration(seconds: 3));
+      }
+    } finally {
+      if (mounted) setState(() => _isUploadingAttachment = false);
+    }
+  }
+
+  Future<void> _closeTicket() async {
+    setState(() => _isActionBusy = true);
+    try {
+      final updated = await SupportService(ApiClient()).closeTicket(_ticket.id);
+      if (!mounted) return;
+      setState(() => _ticket = updated);
+      _showOverlayMessage('تیکت بسته شد', Colors.green, const Duration(seconds: 2));
+      widget.onTicketUpdated?.call();
+    } catch (e) {
+      if (mounted) {
+        _showOverlayMessage('خطا در بستن تیکت', Colors.red, const Duration(seconds: 3));
+      }
+    } finally {
+      if (mounted) setState(() => _isActionBusy = false);
+    }
+  }
+
+  Future<void> _reopenTicket() async {
+    setState(() => _isActionBusy = true);
+    try {
+      final updated = await SupportService(ApiClient()).reopenTicket(_ticket.id);
+      if (!mounted) return;
+      setState(() => _ticket = updated);
+      _showOverlayMessage('تیکت بازگشایی شد', Colors.green, const Duration(seconds: 2));
+      widget.onTicketUpdated?.call();
+    } catch (e) {
+      if (mounted) {
+        _showOverlayMessage('خطا در بازگشایی تیکت', Colors.red, const Duration(seconds: 3));
+      }
+    } finally {
+      if (mounted) setState(() => _isActionBusy = false);
+    }
+  }
+
+  Future<void> _handleStatusChange(int statusId) async {
+    if (statusId == _ticket.statusId) return;
+    setState(() => _isActionBusy = true);
+    try {
+      final updated = await SupportService(ApiClient()).updateTicketStatus(
+        _ticket.id,
+        UpdateStatusRequest(statusId: statusId),
+      );
+      if (!mounted) return;
+      setState(() => _ticket = updated);
+      widget.onTicketUpdated?.call();
+    } catch (e) {
+      if (mounted) {
+        _showOverlayMessage('خطا در تغییر وضعیت', Colors.red, const Duration(seconds: 3));
+      }
+    } finally {
+      if (mounted) setState(() => _isActionBusy = false);
+    }
+  }
+
+  Future<void> _handlePriorityChange(int priorityId) async {
+    if (priorityId == _ticket.priorityId) return;
+    setState(() => _isActionBusy = true);
+    try {
+      final updated = await SupportService(ApiClient()).updateTicketPriority(
+        _ticket.id,
+        UpdatePriorityRequest(priorityId: priorityId),
+      );
+      if (!mounted) return;
+      setState(() => _ticket = updated);
+      widget.onTicketUpdated?.call();
+    } catch (e) {
+      if (mounted) {
+        _showOverlayMessage('خطا در تغییر اولویت', Colors.red, const Duration(seconds: 3));
+      }
+    } finally {
+      if (mounted) setState(() => _isActionBusy = false);
+    }
+  }
+
+  Future<void> _handleAssignChange(int? operatorId) async {
+    if (operatorId == null || operatorId == _ticket.assignedOperatorId) return;
+    setState(() => _isActionBusy = true);
+    try {
+      final updated = await SupportService(ApiClient()).assignTicket(
+        _ticket.id,
+        AssignTicketRequest(operatorId: operatorId),
+      );
+      if (!mounted) return;
+      setState(() => _ticket = updated);
+      widget.onTicketUpdated?.call();
+    } catch (e) {
+      if (mounted) {
+        _showOverlayMessage('خطا در تخصیص تیکت', Colors.red, const Duration(seconds: 3));
+      }
+    } finally {
+      if (mounted) setState(() => _isActionBusy = false);
     }
   }
 
@@ -87,6 +299,8 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
 
   @override
   void dispose() {
+    _realtime?.unsubscribeTicket(_ticket.id);
+    _realtime?.disconnect();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -197,7 +411,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
 
   Future<void> _sendMessage() async {
     final content = _messageController.text.trim();
-    if (content.isEmpty) return;
+    if (content.isEmpty && _pendingAttachments.isEmpty) return;
 
     setState(() {
       _isSending = true;
@@ -205,7 +419,11 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
 
     try {
       final supportService = SupportService(ApiClient());
-      final request = CreateMessageRequest(content: content);
+      final request = CreateMessageRequest(
+        content: content,
+        isInternal: widget.isOperator && _isInternalNote,
+        attachmentIds: _pendingAttachments.map((a) => a.id).toList(),
+      );
       
       SupportMessage message;
       if (widget.isOperator) {
@@ -227,6 +445,8 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
       setState(() {
         _messages.add(message);
         _messageController.clear();
+        _isInternalNote = false;
+        _pendingAttachments = [];
         _isSending = false;
       });
 
@@ -359,6 +579,23 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                   ),
               ],
             ),
+            if (_userTicketHistory.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text('تیکت‌های قبلی کاربر', style: theme.textTheme.labelLarge),
+              const SizedBox(height: 6),
+              ..._userTicketHistory.where((t) => t['id'] != _ticket.id).map(
+                (t) => ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text('#${t['id']} — ${t['title'] ?? ''}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text('${t['status'] ?? ''}'),
+                  onTap: () {
+                    final id = t['id'];
+                    if (id is int) context.push('/user/profile/operator?ticket=$id');
+                  },
+                ),
+              ),
+            ],
           ],
         ],
       ),
@@ -370,16 +607,18 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.9,
+    final body = Container(
+        width: widget.displayMode == TicketDetailDisplayMode.dialog
+            ? MediaQuery.of(context).size.width * 0.9
+            : null,
+        height: widget.displayMode == TicketDetailDisplayMode.dialog
+            ? MediaQuery.of(context).size.height * 0.9
+            : null,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
+          borderRadius: widget.displayMode == TicketDetailDisplayMode.dialog
+              ? BorderRadius.circular(20)
+              : null,
+          color: theme.colorScheme.surface,
         ),
         child: Column(
           children: [
@@ -421,6 +660,8 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 4),
+                        SlaIndicator(slaStatus: _ticket.slaStatus),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
                             Icon(
@@ -440,17 +681,86 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                       ],
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(Icons.close),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey[200],
-                      foregroundColor: Colors.grey[600],
+                  if (!widget.isOperator && !_ticket.isClosedFinal)
+                    TextButton.icon(
+                      onPressed: _isActionBusy ? null : _closeTicket,
+                      icon: const Icon(Icons.check_circle_outline, size: 18),
+                      label: const Text('بستن تیکت'),
                     ),
-                  ),
+                  if (!widget.isOperator && _ticket.isClosedFinal)
+                    TextButton.icon(
+                      onPressed: _isActionBusy ? null : _reopenTicket,
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('بازگشایی'),
+                    ),
+                  if (widget.displayMode != TicketDetailDisplayMode.embedded)
+                    IconButton(
+                      onPressed: () {
+                        if (widget.displayMode == TicketDetailDisplayMode.page) {
+                          context.pop();
+                        } else {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                      icon: Icon(
+                        widget.displayMode == TicketDetailDisplayMode.page
+                            ? Icons.arrow_back
+                            : Icons.close,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.grey[200],
+                        foregroundColor: Colors.grey[600],
+                      ),
+                    ),
                 ],
               ),
             ),
+
+            if (widget.isOperator && _statuses.isNotEmpty)
+              TicketActionBar(
+                ticket: _ticket,
+                statuses: _statuses,
+                priorities: _priorities,
+                operators: _operators,
+                isBusy: _isActionBusy,
+                onStatusChanged: (v) {
+                  if (v != null) _handleStatusChange(v);
+                },
+                onPriorityChanged: (v) {
+                  if (v != null) _handlePriorityChange(v);
+                },
+                onAssignChanged: _handleAssignChange,
+              ),
+
+            if (_events.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: TicketEventTimeline(
+                  events: _events,
+                  calendarController: widget.calendarController,
+                ),
+              ),
+
+            if (!_canComposeMessage)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: Colors.orange.shade50,
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange.shade800, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'این تیکت بسته شده است. برای ادامه گفتگو آن را بازگشایی کنید.',
+                        style: TextStyle(color: Colors.orange.shade900, fontSize: 13),
+                      ),
+                    ),
+                    if (!widget.isOperator)
+                      TextButton(onPressed: _reopenTicket, child: const Text('بازگشایی')),
+                  ],
+                ),
+              ),
 
             // Messages Section (Main Focus) + AI Panel
             Expanded(
@@ -503,6 +813,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                                           child: MessageBubble(
                                             message: message,
                                             calendarController: widget.calendarController,
+                                            isOperator: widget.isOperator,
                                           ),
                                         );
                                       },
@@ -527,6 +838,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                         ),
 
                       // Message Input
+                      if (_canComposeMessage)
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -537,6 +849,28 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
                         ),
                         child: Column(
                           children: [
+                            if (widget.isOperator) ...[
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                dense: true,
+                                title: const Text('یادداشت داخلی'),
+                                subtitle: const Text('فقط برای اپراتورها — کاربر نمی‌بیند'),
+                                secondary: Icon(
+                                  _isInternalNote ? Icons.lock : Icons.lock_open,
+                                  color: _isInternalNote ? Colors.amber.shade800 : null,
+                                ),
+                                value: _isInternalNote,
+                                onChanged: (v) => setState(() => _isInternalNote = v),
+                              ),
+                            ],
+                            TicketAttachmentPicker(
+                              pendingAttachments: _pendingAttachments,
+                              isUploading: _isUploadingAttachment,
+                              onPick: _pickAttachment,
+                              onRemove: (id) => setState(
+                                () => _pendingAttachments = _pendingAttachments.where((a) => a.id != id).toList(),
+                              ),
+                            ),
                             // Quick Reply Buttons (only for operators)
                             if (widget.isOperator && _templates.isNotEmpty) ...[
                               Container(
@@ -705,8 +1039,18 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
             ),
           ],
         ),
-      ),
-    );
+      );
+
+    switch (widget.displayMode) {
+      case TicketDetailDisplayMode.page:
+      case TicketDetailDisplayMode.embedded:
+        return SizedBox.expand(child: body);
+      case TicketDetailDisplayMode.dialog:
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: body,
+        );
+    }
   }
 }
 

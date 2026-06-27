@@ -16,8 +16,18 @@ from adapters.api.v1.support.schemas import (
     MessageResponse
 )
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.responses import success_response, format_datetime_fields
+from app.services.support.support_attachment_service import SupportAttachmentService
+from adapters.api.v1.support.message_helpers import serialize_message, serialize_messages
+from adapters.db.repositories.support.attachment_repository import AttachmentRepository
+from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.services.notification_service import NotificationService
+from app.services.support.ticket_access_service import TicketAccessService
+from app.services.support.ticket_lifecycle_service import TicketLifecycleService
+from app.services.support.ticket_event_service import TicketEventService
+from app.services.support.notification_helpers import (
+    support_notification_context,
+    support_operator_notification_context,
+)
 from app.core.cache import get_cache
 import logging
 
@@ -148,6 +158,11 @@ async def create_ticket(
     }
     
     ticket = ticket_repo.create(ticket_data)
+
+    from app.services.support.support_sla_service import SupportSlaService
+    from app.services.support.support_broadcast import broadcast_ticket_created
+
+    SupportSlaService(db).apply_on_create(ticket)
     
     # ایجاد پیام اولیه
     message_repo = MessageRepository(db)
@@ -172,7 +187,7 @@ async def create_ticket(
         user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر"
         message_preview = ticket_request.description[:200] + ("..." if len(ticket_request.description) > 200 else "")
         
-        context = {
+        context = support_operator_notification_context({
             "subject": f"تیکت جدید #{ticket.id}: {ticket.title}",
             "message": f"کاربر {user_name} تیکت جدیدی ایجاد کرده است:\n\n{message_preview}",
             "ticket_id": ticket.id,
@@ -180,7 +195,7 @@ async def create_ticket(
             "user_name": user_name,
             "category": ticket_with_details.category.name if ticket_with_details.category else "نامشخص",
             "priority": ticket_with_details.priority.name if ticket_with_details.priority else "نامشخص"
-        }
+        }, ticket.id)
         
         logger.info(f"فراخوانی notify_support_operators برای تیکت {ticket.id} با context: {list(context.keys())}")
         
@@ -194,6 +209,11 @@ async def create_ticket(
         # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
         logger = logging.getLogger(__name__)
         logger.error(f"خطا در ارسال ناتیفیکیشن برای تیکت جدید {ticket.id}: {e}", exc_info=True)
+
+    try:
+        broadcast_ticket_created(db, ticket)
+    except Exception:
+        pass
     
     # Format datetime fields based on calendar type
     ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
@@ -227,6 +247,66 @@ async def get_ticket(
     return success_response(formatted_data, request)
 
 
+@router.put("/{ticket_id}/close", response_model=SuccessResponse)
+async def close_ticket(
+    request: Request,
+    ticket_id: int,
+    _require_support: None = Depends(require_end_user_support_open),
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """بستن تیکت توسط کاربر"""
+    lifecycle = TicketLifecycleService(db)
+    ticket = lifecycle.close_by_user(ticket_id, current_user.get_user_id())
+    ticket_data = TicketResponse.from_orm(ticket).dict()
+    formatted_data = format_datetime_fields(ticket_data, request)
+    return success_response(formatted_data, request)
+
+
+@router.put("/{ticket_id}/reopen", response_model=SuccessResponse)
+async def reopen_ticket(
+    request: Request,
+    ticket_id: int,
+    _require_support: None = Depends(require_end_user_support_open),
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """بازگشایی تیکت توسط کاربر"""
+    lifecycle = TicketLifecycleService(db)
+    ticket = lifecycle.reopen_by_user(ticket_id, current_user.get_user_id())
+    ticket_data = TicketResponse.from_orm(ticket).dict()
+    formatted_data = format_datetime_fields(ticket_data, request)
+    return success_response(formatted_data, request)
+
+
+@router.get("/{ticket_id}/events", response_model=SuccessResponse)
+async def get_ticket_events(
+    request: Request,
+    ticket_id: int,
+    _require_support: None = Depends(require_end_user_support_open),
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """دریافت تاریخچه رویدادهای تیکت"""
+    access = TicketAccessService(db)
+    access.get_user_ticket(ticket_id, current_user.get_user_id())
+    events = TicketEventService(db).list_for_ticket(ticket_id)
+    items = [
+        {
+            "id": e.id,
+            "ticket_id": e.ticket_id,
+            "actor_id": e.actor_id,
+            "event_type": e.event_type,
+            "old_value": e.old_value,
+            "new_value": e.new_value,
+            "created_at": e.created_at,
+        }
+        for e in events
+    ]
+    formatted_data = format_datetime_fields(items, request)
+    return success_response(formatted_data, request)
+
+
 @router.post("/{ticket_id}/messages", response_model=SuccessResponse)
 async def send_message(
     request: Request,
@@ -237,68 +317,79 @@ async def send_message(
     db: Session = Depends(get_db)
 ):
     """ارسال پیام به تیکت"""
-    ticket_repo = TicketRepository(db)
+    access = TicketAccessService(db)
     message_repo = MessageRepository(db)
     
-    # بررسی وجود تیکت
-    ticket = ticket_repo.get_ticket_with_details(ticket_id, current_user.get_user_id())
-    if not ticket:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="تیکت یافت نشد"
-        )
-    
-    # ایجاد پیام
+    ticket = access.get_user_ticket(ticket_id, current_user.get_user_id())
+    access.assert_ticket_open(ticket)
+
+    content = (message_request.content or "").strip()
+    if not content and not message_request.attachment_ids:
+        raise ApiError("EMPTY_MESSAGE", "متن پیام یا پیوست الزامی است", http_status=400)
+    if not content:
+        content = "📎 پیوست فایل"
+
     message = message_repo.create_message(
         ticket_id=ticket_id,
         sender_id=current_user.get_user_id(),
         sender_type="user",
-        content=message_request.content,
-        is_internal=message_request.is_internal
+        content=content,
+        is_internal=False,
     )
-    
-    # ارسال ناتیفیکیشن به اپراتورها (فقط برای پیام‌های غیرداخلی)
-    if not message_request.is_internal:
-        try:
-            from adapters.db.repositories.user_repo import UserRepository
-            
-            notification_service = NotificationService(db)
-            user_repo = UserRepository(db)
-            user = current_user.user
-            user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر"
-            message_preview = message_request.content[:200] + ("..." if len(message_request.content) > 200 else "")
-            
-            context = {
-                "subject": f"پاسخ جدید به تیکت #{ticket.id}",
-                "message": f"کاربر {user_name} به تیکت شما پاسخ داد:\n\n{message_preview}",
-                "ticket_id": ticket.id,
-                "ticket_title": ticket.title,
-                "user_name": user_name,
-                "message_preview": message_preview
-            }
-            
-            # اگر تیکت به اپراتور خاصی تخصیص شده، فقط به او ارسال می‌کنیم
-            assigned_operator_id = getattr(ticket, 'assigned_operator_id', None)
-            
-            # اعتبارسنجی: اگر assigned_operator_id وجود دارد، باید واقعاً یک اپراتور باشد
-            if assigned_operator_id and not user_repo.is_support_operator(assigned_operator_id):
-                # اگر assigned_operator_id نامعتبر است، به همه اپراتورها ارسال می‌کنیم
-                logger = logging.getLogger(__name__)
-                logger.warning(f"assigned_operator_id {assigned_operator_id} برای تیکت {ticket.id} یک اپراتور معتبر نیست. ارسال به همه اپراتورها")
-                assigned_operator_id = None
-            
-            notification_service.notify_support_operators(
-                event_key="support.user_reply",
-                context=context,
-                assigned_operator_id=assigned_operator_id
-            )
-        except Exception as e:
-            # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
+
+    attachment_service = SupportAttachmentService(db)
+    if message_request.attachment_ids:
+        attachment_service.attach_to_message(ticket_id, message.id, message_request.attachment_ids)
+
+    try:
+        from adapters.db.repositories.user_repo import UserRepository
+
+        notification_service = NotificationService(db)
+        user_repo = UserRepository(db)
+        user = current_user.user
+        user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or user.email or "کاربر"
+        message_preview = content[:200] + ("..." if len(content) > 200 else "")
+
+        context = support_operator_notification_context({
+            "subject": f"پاسخ جدید به تیکت #{ticket.id}",
+            "message": f"کاربر {user_name} به تیکت شما پاسخ داد:\n\n{message_preview}",
+            "ticket_id": ticket.id,
+            "ticket_title": ticket.title,
+            "user_name": user_name,
+            "message_preview": message_preview
+        }, ticket.id)
+
+        assigned_operator_id = getattr(ticket, 'assigned_operator_id', None)
+
+        if assigned_operator_id and not user_repo.is_support_operator(assigned_operator_id):
             logger = logging.getLogger(__name__)
-            logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ کاربر به تیکت {ticket_id}: {e}")
+            logger.warning(
+                f"assigned_operator_id {assigned_operator_id} برای تیکت {ticket.id} "
+                "یک اپراتور معتبر نیست. ارسال به همه اپراتورها"
+            )
+            assigned_operator_id = None
+
+        notification_service.notify_support_operators(
+            event_key="support.user_reply",
+            context=context,
+            assigned_operator_id=assigned_operator_id
+        )
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ کاربر به تیکت {ticket_id}: {e}")
+
+    try:
+        from app.services.support.support_broadcast import broadcast_message_created
+
+        broadcast_message_created(
+            db, ticket, sender_type="user", message_id=message.id, preview=content
+        )
+    except Exception:
+        pass
     
     # Format datetime fields based on calendar type
-    message_data = MessageResponse.from_orm(message).dict()
+    attachment_repo = AttachmentRepository(db)
+    message_data = serialize_message(message, attachment_repo)
     formatted_data = format_datetime_fields(message_data, request)
     
     return success_response(formatted_data, request)
@@ -314,42 +405,20 @@ async def search_ticket_messages(
     db: Session = Depends(get_db)
 ):
     """جستجو در پیام‌های تیکت"""
-    ticket_repo = TicketRepository(db)
+    access = TicketAccessService(db)
     message_repo = MessageRepository(db)
     
-    # بررسی وجود تیکت
-    ticket = ticket_repo.get_ticket_with_details(ticket_id, current_user.get_user_id())
-    if not ticket:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="تیکت یافت نشد"
-        )
+    access.get_user_ticket(ticket_id, current_user.get_user_id())
     
-    # تنظیم فیلدهای قابل جستجو
     if not query_info.search_fields:
         query_info.search_fields = ["content"]
     
-    messages, total = message_repo.get_ticket_messages(ticket_id, query_info)
+    messages, total = message_repo.get_ticket_messages(
+        ticket_id, query_info, exclude_internal=True
+    )
     
-    # تبدیل به dict
-    message_dicts = []
-    for message in messages:
-        message_dict = {
-            "id": message.id,
-            "ticket_id": message.ticket_id,
-            "sender_id": message.sender_id,
-            "sender_type": message.sender_type,
-            "content": message.content,
-            "is_internal": message.is_internal,
-            "created_at": message.created_at,
-            "sender": {
-                "id": message.sender.id,
-                "first_name": message.sender.first_name,
-                "last_name": message.sender.last_name,
-                "email": message.sender.email
-            } if message.sender else None
-        }
-        message_dicts.append(message_dict)
+    attachment_repo = AttachmentRepository(db)
+    message_dicts = serialize_messages(messages, attachment_repo)
     
     paginated_data = PaginatedResponse.create(
         items=message_dicts,

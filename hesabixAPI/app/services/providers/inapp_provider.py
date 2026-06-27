@@ -20,10 +20,13 @@ class InAppProvider:
 		body: str,
 		level: str = "info",
 		announcement_id: Optional[int] = None,
+		deep_link: Optional[str] = None,
 	) -> bool:
 		payload: Dict[str, Any] = {"type": "notification", "title": title, "body": body, "level": level}
 		if announcement_id is not None:
 			payload["announcement_id"] = announcement_id
+		if deep_link:
+			payload["deep_link"] = deep_link
 		try:
 			import anyio
 

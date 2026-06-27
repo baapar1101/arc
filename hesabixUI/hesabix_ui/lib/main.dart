@@ -19,6 +19,8 @@ import 'pages/profile/new_business_page.dart';
 import 'pages/profile/businesses_page.dart';
 import 'pages/profile/user_signature_page.dart';
 import 'pages/profile/support_page.dart';
+import 'pages/profile/support_ticket_detail_page.dart';
+import 'pages/profile/create_ticket_page.dart';
 import 'pages/profile/change_password_page.dart';
 import 'pages/profile/api_keys_page.dart';
 import 'pages/profile/sessions_page.dart';
@@ -27,6 +29,7 @@ import 'pages/profile/account_settings_page.dart';
 import 'pages/profile/appearance_settings_page.dart';
 import 'pages/profile/verification_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
+import 'pages/profile/operator/operator_dashboard_page.dart';
 import 'pages/profile/announcements_page.dart';
 import 'pages/system_settings_page.dart';
 import 'pages/admin/storage_management_page.dart';
@@ -1193,6 +1196,22 @@ class _MyAppState extends State<MyApp> {
               builder: (context, state) => SupportPage(calendarController: _calendarController),
             ),
             GoRoute(
+              path: '/user/profile/support/new',
+              name: 'profile_support_new',
+              builder: (context, state) => const CreateTicketPage(fullPage: true),
+            ),
+            GoRoute(
+              path: '/user/profile/support/tickets/:ticketId',
+              name: 'profile_support_ticket_detail',
+              builder: (context, state) {
+                final ticketId = int.parse(state.pathParameters['ticketId']!);
+                return SupportTicketDetailPage(
+                  ticketId: ticketId,
+                  calendarController: _calendarController,
+                );
+              },
+            ),
+            GoRoute(
               path: '/user/profile/account-settings',
               name: 'profile_account_settings',
               builder: (context, state) => AccountSettingsPage(
@@ -1257,7 +1276,22 @@ class _MyAppState extends State<MyApp> {
                 if (!_authStore!.canAccessSupportOperator) {
                   return PermissionGuard.buildAccessDeniedPage();
                 }
-                return OperatorTicketsPage(calendarController: _calendarController);
+                final initialTicketId = int.tryParse(state.uri.queryParameters['ticket'] ?? '');
+                return OperatorTicketsPage(
+                  calendarController: _calendarController,
+                  initialTicketId: initialTicketId,
+                  authStore: _authStore,
+                );
+              },
+            ),
+            GoRoute(
+              path: '/user/profile/operator/dashboard',
+              name: 'profile_operator_dashboard',
+              builder: (context, state) {
+                if (_authStore == null || !_authStore!.canAccessSupportOperator) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                return OperatorDashboardPage(calendarController: _calendarController);
               },
             ),
             GoRoute(

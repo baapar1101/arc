@@ -234,9 +234,12 @@ class TicketRepository(BaseRepository[Ticket]):
                         query = query.filter(Ticket.category_id.in_(filter_item.value))
                     else:
                         query = query.filter(Ticket.category_id == filter_item.value)
+                elif filter_item.property == "assigned_operator_id":
+                    if filter_item.operator in ("is_null", "==") and filter_item.value is None:
+                        query = query.filter(Ticket.assigned_operator_id.is_(None))
+                    elif filter_item.operator == "==":
+                        query = query.filter(Ticket.assigned_operator_id == filter_item.value)
                 elif filter_item.property == "last_message_from_user":
-                    # فیلتر تیکت‌هایی که آخرین پیام از کاربر است
-                    # تبدیل value به boolean
                     filter_value = str(filter_item.value).lower() if filter_item.value else None
                     
                     if filter_value in ("true", "1"):
@@ -334,11 +337,12 @@ class TicketRepository(BaseRepository[Ticket]):
         if operator_id:
             ticket.assigned_operator_id = operator_id
         
-        # اگر وضعیت نهایی است، تاریخ بسته شدن را تنظیم کن
         status = self.db.query(Status).filter(Status.id == status_id).first()
+        from datetime import datetime
         if status and status.is_final:
-            from datetime import datetime
             ticket.closed_at = datetime.utcnow()
+        else:
+            ticket.closed_at = None
         
         self.db.commit()
         self.db.refresh(ticket)
@@ -369,11 +373,12 @@ class TicketRepository(BaseRepository[Ticket]):
         if operator_id:
             update_dict[Ticket.assigned_operator_id] = operator_id
         
-        # بررسی وضعیت نهایی برای تنظیم closed_at
         status = self.db.query(Status).filter(Status.id == status_id).first()
+        from datetime import datetime
         if status and status.is_final:
-            from datetime import datetime
             update_dict[Ticket.closed_at] = datetime.utcnow()
+        else:
+            update_dict[Ticket.closed_at] = None
         
         updated = self.db.query(Ticket)\
             .filter(Ticket.id.in_(ticket_ids))\

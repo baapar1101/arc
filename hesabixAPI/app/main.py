@@ -45,6 +45,8 @@ from adapters.api.v1.tax_settings import router as tax_settings_router
 from adapters.api.v1.tax_reports import router as tax_reports_router
 from adapters.api.v1.support.tickets import router as support_tickets_router
 from adapters.api.v1.support.operator import router as support_operator_router
+from adapters.api.v1.support.attachments_user import router as support_attachments_user_router
+from adapters.api.v1.support.attachments_operator import router as support_attachments_operator_router
 from adapters.api.v1.support.categories import router as support_categories_router
 from adapters.api.v1.support.priorities import router as support_priorities_router
 from adapters.api.v1.support.statuses import router as support_statuses_router
@@ -1095,7 +1097,9 @@ def create_app() -> FastAPI:
     
     # Support endpoints
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
+    application.include_router(support_attachments_user_router, prefix=f"{settings.api_v1_prefix}/support")
     application.include_router(support_operator_router, prefix=f"{settings.api_v1_prefix}/support/operator")
+    application.include_router(support_attachments_operator_router, prefix=f"{settings.api_v1_prefix}/support/operator")
     from adapters.api.v1.support.ai_tickets import router as support_ai_router
     application.include_router(support_ai_router, prefix=settings.api_v1_prefix)
     application.include_router(support_categories_router, prefix=f"{settings.api_v1_prefix}/metadata/categories")
@@ -1178,6 +1182,10 @@ def create_app() -> FastAPI:
         loop = asyncio.get_running_loop()
         start_crm_chat_fanout_subscriber(loop)
 
+        from app.services.support.support_realtime_fanout import start_support_fanout_subscriber
+
+        start_support_fanout_subscriber(loop)
+
         # سایر background jobs باید فقط در یک process اجرا شوند (leader-only)
         if not _try_acquire_background_jobs_lock():
             logger = logging.getLogger(__name__)
@@ -1240,6 +1248,10 @@ def create_app() -> FastAPI:
         # ورک‌فلو: cron زمان‌بندی‌شده + یادآوری سررسید چک
         from app.services.workflow.workflow_background_jobs import workflow_automation_background_loop
         asyncio.create_task(workflow_automation_background_loop(60))
+
+        from app.services.support.support_background_jobs import support_sla_breach_check_loop
+
+        asyncio.create_task(support_sla_breach_check_loop(300))
 
     @application.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):

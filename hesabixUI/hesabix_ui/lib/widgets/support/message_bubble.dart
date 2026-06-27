@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/services/support_service.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/data_table/helpers/file_saver.dart';
 
 class MessageBubble extends StatelessWidget {
   final SupportMessage message;
   final CalendarController? calendarController;
   final bool isCurrentUser;
+  final bool isOperator;
 
   const MessageBubble({
     super.key,
     required this.message,
     this.calendarController,
     this.isCurrentUser = false,
+    this.isOperator = false,
   });
 
   @override
@@ -74,13 +80,39 @@ class MessageBubble extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                   ],
-                  Text(
-                    message.content,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: _getTextColor(theme, isUser),
+                  if (message.content.isNotEmpty)
+                    Text(
+                      message.content,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _getTextColor(theme, isUser),
+                      ),
                     ),
-                  ),
+                  if (message.attachments != null && message.attachments!.isNotEmpty) ...[
+                    if (message.content.isNotEmpty) const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: message.attachments!.map((a) {
+                        return ActionChip(
+                          avatar: Icon(
+                            Icons.attach_file,
+                            size: 16,
+                            color: _getTextColor(theme, isUser),
+                          ),
+                          label: Text(
+                            a.originalName,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: _getTextColor(theme, isUser),
+                            ),
+                          ),
+                          onPressed: () => _downloadAttachment(context, a),
+                        );
+                      }).toList(),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -121,6 +153,30 @@ class MessageBubble extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _downloadAttachment(BuildContext context, SupportAttachment attachment) async {
+    try {
+      final bytes = await SupportService(ApiClient()).downloadAttachment(
+        attachment.id,
+        isOperator: isOperator,
+      );
+      await FileSaver.saveBytes(bytes, attachment.originalName);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${attachment.originalName} دانلود شد')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorExtractor.forContext(e, context)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Color _getSenderColor(ThemeData theme) {

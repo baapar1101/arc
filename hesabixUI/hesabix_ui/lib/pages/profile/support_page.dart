@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -16,6 +17,7 @@ import '../../widgets/jalali_date_picker.dart';
 import '../../utils/date_formatters.dart';
 import '../../utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
+import 'package:hesabix_ui/widgets/support/ticket_card.dart';
 import 'create_ticket_page.dart';
 
 // View modes enum
@@ -170,6 +172,22 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   }
 
   void _navigateToCreateTicket() async {
+    final width = MediaQuery.of(context).size.width;
+    if (width >= 768) {
+      final result = await context.push<bool>('/user/profile/support/new');
+      if (result == true && mounted) {
+        setState(() {
+          _refreshCounter++;
+          if (_ticketsEverLoaded) {
+            _ticketPage = 1;
+            _hasMoreTickets = true;
+            _loadTickets(showSpinner: false);
+          }
+        });
+      }
+      return;
+    }
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => const CreateTicketPage(),
@@ -188,6 +206,14 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   }
 
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
+    final ticketId = ticketData['id'];
+    if (ticketId is! int) return;
+
+    if (MediaQuery.of(context).size.width >= 768) {
+      context.push('/user/profile/support/tickets/$ticketId');
+      return;
+    }
+
     final ticket = SupportTicket.fromJson(ticketData);
     showDialog(
       context: context,
@@ -1247,134 +1273,10 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   }
 
   Widget _buildTicketCard(SupportTicket ticket, AppLocalizations t, ThemeData theme) {
-    final statusLabel = _statusLabelFor(ticket);
-    final statusColor = _statusColorFor(ticket) ?? theme.colorScheme.primary;
-    final priorityLabel = _priorityLabelFor(ticket);
-    final priorityColor = _priorityColorFor(ticket) ?? theme.colorScheme.secondary;
-    final categoryLabel = _categoryLabelFor(ticket);
-    final updatedLabel = _formatTicketDate(ticket.updatedAt);
-    final createdLabel = _formatTicketDate(ticket.createdAt);
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.colorScheme.outlineVariant.withOpacity(0.4),
-          width: 1,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => _navigateToTicketDetail(ticket.toJson()),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ticket.title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        if (categoryLabel.isNotEmpty && categoryLabel != 'نامشخص')
-                          Chip(
-                            label: Text(
-                              categoryLabel,
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            padding: EdgeInsets.zero,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Chip(
-                    label: Text(
-                      statusLabel,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 12,
-                      ),
-                    ),
-                    backgroundColor: _chipBackground(statusColor),
-                    side: BorderSide(color: statusColor.withOpacity(0.5)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              if (ticket.description.isNotEmpty) ...[
-                Text(
-                  ticket.description,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-              ],
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.flag, size: 16, color: priorityColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        priorityLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(color: priorityColor),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.schedule, size: 14, color: theme.colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text(
-                        'بروزرسانی: $updatedLabel',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.calendar_today, size: 14, color: theme.colorScheme.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text(
-                        'ایجاد: $createdLabel',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
+    return TicketCard(
+      ticket: ticket,
+      calendarController: widget.calendarController,
+      onTap: () => _navigateToTicketDetail(ticket.toJson()),
     );
   }
 

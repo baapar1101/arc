@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'ticket_status_chip.dart';
 import 'priority_indicator.dart';
+import 'sla_indicator.dart';
 
 class TicketCard extends StatelessWidget {
   final SupportTicket ticket;
@@ -104,6 +105,10 @@ class TicketCard extends StatelessWidget {
                         priority: ticket.priority!,
                         isSmall: true,
                       ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (!ticket.isClosedFinal) ...[
+                      SlaIndicator(slaStatus: ticket.slaStatus),
                       const SizedBox(width: 8),
                     ],
                     const Spacer(),
