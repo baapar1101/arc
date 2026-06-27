@@ -360,6 +360,7 @@ app/core/calendar.py
 app/core/calendar_middleware.py
 app/core/crm_web_chat_permissions.py
 app/core/customer_club_plugin_dependency.py
+app/core/date_input.py
 app/core/db_pool_monitor.py
 app/core/distribution_plugin_dependency.py
 app/core/egress_policy.py
@@ -586,10 +587,12 @@ app/services/ai/__init__.py
 app/services/ai/ai_accounting_domain_prompt.py
 app/services/ai/ai_attachment_service.py
 app/services/ai/ai_budget.py
+app/services/ai/ai_calendar_prompt.py
 app/services/ai/ai_citation_service.py
 app/services/ai/ai_connector_service.py
 app/services/ai/ai_constants.py
 app/services/ai/ai_context_budget.py
+app/services/ai/ai_date_resolver.py
 app/services/ai/ai_db_helpers.py
 app/services/ai/ai_embedding_service.py
 app/services/ai/ai_eval_schedule_service.py
@@ -878,6 +881,7 @@ migrations/versions/20260621_000001_business_backup_import_security.py
 migrations/versions/20260621_000001_public_catalog_price_flag.py
 migrations/versions/20260621_000002_merge_heads_backup_import_security_and_public_catalog_price_flag.py
 migrations/versions/20260622_000001_invoice_purchase_accounting_mode.py
+migrations/versions/20260622_000002_documents_performance_indexes.py
 migrations/versions/20260623_000001_ai_memory_and_attachments.py
 migrations/versions/20260624_000001_ai_knowledge_documents.py
 migrations/versions/20260625_000001_ai_knowledge_embeddings.py
@@ -900,6 +904,7 @@ tests/__init__.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
 tests/test_ai_context_budget.py
+tests/test_ai_date_resolver.py
 tests/test_ai_embedding_service.py
 tests/test_ai_eval_service.py
 tests/test_ai_exploration_service.py

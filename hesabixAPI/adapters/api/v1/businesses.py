@@ -1042,7 +1042,6 @@ def delete_business_info(
         }
     }
 )
-@require_business_access("business_id")
 def restore_business_endpoint(
     request: Request,
     business_id: int,

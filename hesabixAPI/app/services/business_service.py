@@ -26,6 +26,30 @@ from app.services.system_settings_service import get_wallet_settings
 logger = logging.getLogger(__name__)
 
 
+def invalidate_user_businesses_list_cache() -> None:
+    """پاک‌سازی کش لیست کسب‌وکارهای کاربر پس از حذف/بازیابی."""
+    from app.core.cache import get_cache
+
+    cache = get_cache()
+    if not cache.enabled:
+        return
+    try:
+        cache.delete_pattern("user_businesses:*")
+    except Exception as e:
+        logger.warning("Failed to invalidate user_businesses cache: %s", e)
+
+
+def _business_is_restorable(business: Business, *, now: datetime | None = None) -> bool:
+    """کسب‌وکار soft-delete شده هنوز در مهلت بازیابی است."""
+    if getattr(business, "deleted_at", None) is None:
+        return False
+    auto_delete_at = getattr(business, "auto_delete_at", None)
+    if auto_delete_at is None:
+        return True
+    ref = now or datetime.utcnow()
+    return ref < auto_delete_at
+
+
 def _normalize_invoice_warehouse_release_mode(value) -> str:
     if value is None:
         return "draft"
@@ -959,6 +983,8 @@ def delete_business_soft(
     
     db.commit()
     db.refresh(business)
+
+    invalidate_user_businesses_list_cache()
     
     # لاگ عملیات
     logger.info(
@@ -1016,6 +1042,8 @@ def restore_business(db: Session, business_id: int, owner_id: int) -> Dict[str, 
     
     db.commit()
     db.refresh(business)
+
+    invalidate_user_businesses_list_cache()
     
     logger.info(f"Business {business_id} restored by user {owner_id}")
     
@@ -1452,11 +1480,7 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "deletion_requested_at": business.deletion_requested_at.isoformat() if getattr(business, "deletion_requested_at", None) else None,
         "auto_delete_at": business.auto_delete_at.isoformat() if getattr(business, "auto_delete_at", None) else None,
         "is_deleted": getattr(business, "deleted_at", None) is not None,
-        "is_deletion_pending": (
-            getattr(business, "deleted_at", None) is not None and
-            getattr(business, "auto_delete_at", None) is not None and
-            datetime.utcnow() < business.auto_delete_at
-        ),
+        "is_deletion_pending": _business_is_restorable(business),
     }
 
     # ارز پیشفرض

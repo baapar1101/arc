@@ -13,6 +13,10 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 
+bool _businessBlocksAccess(BusinessWithPermission business) {
+  return business.isDeleted || business.isDeletionPending;
+}
+
 class BusinessesPage extends StatefulWidget {
   const BusinessesPage({super.key});
 
@@ -93,7 +97,9 @@ class _BusinessesPageState extends State<BusinessesPage> {
       );
 
       if (mounted) {
-        final newBusinesses = result['items'] as List<BusinessWithPermission>;
+        final newBusinesses = (result['items'] as List<BusinessWithPermission>)
+            .where((b) => !b.isDeleted || b.isDeletionPending)
+            .toList();
         final pagination = result['pagination'] as Map<String, dynamic>?;
         
         setState(() {
@@ -148,7 +154,9 @@ class _BusinessesPageState extends State<BusinessesPage> {
       );
 
       if (mounted) {
-        final newBusinesses = result['items'] as List<BusinessWithPermission>;
+        final newBusinesses = (result['items'] as List<BusinessWithPermission>)
+            .where((b) => !b.isDeleted || b.isDeletionPending)
+            .toList();
         final pagination = result['pagination'] as Map<String, dynamic>?;
         
         setState(() {
@@ -186,11 +194,12 @@ class _BusinessesPageState extends State<BusinessesPage> {
       orElse: () => throw Exception('کسب و کار یافت نشد'),
     );
 
-    if (business.isDeletionPending) {
+    if (_businessBlocksAccess(business)) {
       SnackBarHelper.showError(
         context,
-        message:
-            'این کسب و کار در حال حذف است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.',
+        message: business.isDeletionPending
+            ? 'این کسب و کار در حال حذف است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.'
+            : 'این کسب و کار حذف شده است و قابل دسترسی نیست.',
       );
       return;
     }
@@ -553,7 +562,7 @@ class _BusinessCardState extends State<_BusinessCard> {
       elevation: 1,
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: widget.onTap,
+        onTap: _businessBlocksAccess(widget.business) ? null : widget.onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: EdgeInsets.all(cardPadding),
@@ -734,7 +743,7 @@ class _BusinessCardState extends State<_BusinessCard> {
       elevation: 1,
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: widget.business.isDeletionPending ? null : widget.onTap,
+        onTap: _businessBlocksAccess(widget.business) ? null : widget.onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
           padding: EdgeInsets.all(cardPadding),
@@ -880,7 +889,7 @@ class _BusinessCardState extends State<_BusinessCard> {
               SizedBox(width: isMobile ? 8 : 12),
               
               // Arrow (only if not deleted)
-              if (!widget.business.isDeletionPending)
+              if (!_businessBlocksAccess(widget.business))
                 Icon(
                   Icons.arrow_forward_ios,
                   size: isMobile ? 16 : 20,
