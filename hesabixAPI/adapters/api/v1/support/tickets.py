@@ -30,6 +30,7 @@ from app.services.support.notification_helpers import (
     support_notification_context,
     support_operator_notification_context,
 )
+from app.core.cache import get_cache
 from app.services.support.ticket_engagement_service import mark_user_read, submit_csat
 import logging
 

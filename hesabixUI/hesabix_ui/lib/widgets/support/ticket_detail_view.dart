@@ -511,6 +511,67 @@ class _TicketDetailViewState extends State<TicketDetailView> {
   }
 
 
+  int _listItemCount(bool showSidePanel) {
+    var count = 1 + _messages.length; // pinned request + messages
+    if (!showSidePanel) count += 1; // conversation info
+    if (_messages.isEmpty) count += 1; // empty state
+    return count;
+  }
+
+  int _pinnedRequestIndex(bool showSidePanel) => showSidePanel ? 0 : 1;
+
+  int? _emptyStateIndex(bool showSidePanel) {
+    if (_messages.isNotEmpty) return null;
+    return showSidePanel ? 1 : 2;
+  }
+
+  Widget _buildListItem(
+    BuildContext context,
+    int index,
+    bool showSidePanel,
+    AppLocalizations l10n,
+    ThemeData theme,
+  ) {
+    if (!showSidePanel && index == 0) {
+      return _buildConversationInfo(l10n, theme);
+    }
+
+    final pinnedIndex = _pinnedRequestIndex(showSidePanel);
+    if (index == pinnedIndex) {
+      return TicketPinnedRequest(ticket: _ticket);
+    }
+
+    final emptyIndex = _emptyStateIndex(showSidePanel);
+    if (emptyIndex != null && index == emptyIndex) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[400]),
+              const SizedBox(height: 16),
+              Text(
+                l10n.noMessagesFound,
+                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final messageOffset = pinnedIndex + 1 + (_messages.isEmpty ? 1 : 0);
+    final message = _messages[index - messageOffset];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: MessageBubble(
+        message: message,
+        calendarController: widget.calendarController,
+        isOperator: widget.isOperator,
+      ),
+    );
+  }
+
   Widget _buildInfoChip(String label, String value, IconData icon) {
     final theme = Theme.of(context);
     return Container(
@@ -804,57 +865,25 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                   final showSidePanel = widget.isOperator && constraints.maxWidth > 900;
                   final conversationColumn = Column(
                     children: [
-                      if (!showSidePanel) _buildConversationInfo(l10n, theme),
-
                       // Messages List
                       Expanded(
                         child: _isLoading
                             ? const Center(
                                 child: CircularProgressIndicator(),
                               )
-                            : _messages.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.chat_bubble_outline,
-                                          size: 48,
-                                          color: Colors.grey[400],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          l10n.noMessagesFound,
-                                          style: theme.textTheme.bodyLarge?.copyWith(
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : Scrollbar(
-                                    controller: _scrollController,
-                                    thumbVisibility: true,
-                                    child: ListView.builder(
-                                      controller: _scrollController,
-                                      padding: const EdgeInsets.all(12),
-                                      itemCount: _messages.length + 1,
-                                      itemBuilder: (context, index) {
-                                        if (index == 0) {
-                                          return TicketPinnedRequest(ticket: _ticket);
-                                        }
-                                        final message = _messages[index - 1];
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 8),
-                                          child: MessageBubble(
-                                            message: message,
-                                            calendarController: widget.calendarController,
-                                            isOperator: widget.isOperator,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
+                            : Scrollbar(
+                                controller: _scrollController,
+                                thumbVisibility: true,
+                                child: ListView.builder(
+                                  controller: _scrollController,
+                                  primary: false,
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.all(12),
+                                  itemCount: _listItemCount(showSidePanel),
+                                  itemBuilder: (context, index) =>
+                                      _buildListItem(context, index, showSidePanel, l10n, theme),
+                                ),
+                              ),
                       ),
 
                       if (!showSidePanel && widget.isOperator)
@@ -902,8 +931,14 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                     ],
                   );
 
+                  final sizedConversation = SizedBox(
+                    height: constraints.maxHeight,
+                    width: constraints.maxWidth,
+                    child: conversationColumn,
+                  );
+
                   if (!showSidePanel) {
-                    return conversationColumn;
+                    return sizedConversation;
                   }
 
                   final sidePanelWidth = math.min(
@@ -918,17 +953,20 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                         width: sidePanelWidth,
                         child: Scrollbar(
                           thumbVisibility: true,
-                          child: TicketMetaSidebar(
-                            ticket: _ticket,
-                            events: _events,
-                            userTicketHistory: _userTicketHistory,
-                            calendarController: widget.calendarController,
-                            isOperator: widget.isOperator,
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(12),
+                            child: TicketMetaSidebar(
+                              ticket: _ticket,
+                              events: _events,
+                              userTicketHistory: _userTicketHistory,
+                              calendarController: widget.calendarController,
+                              isOperator: widget.isOperator,
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 16),
-                      Expanded(child: conversationColumn),
+                      Expanded(child: sizedConversation),
                     ],
                   );
                 },

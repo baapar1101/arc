@@ -37,10 +37,12 @@ class TicketMetaSidebar extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
 
-    return ListView(
-      padding: const EdgeInsets.all(12),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: [
         if (isOperator && ticket.user != null) ...[
+          const SizedBox(height: 4),
           _SectionTitle(icon: Icons.person_outline, title: 'مشتری'),
           ListTile(
             contentPadding: EdgeInsets.zero,
