@@ -30,6 +30,7 @@ from app.services.payroll_service import (
 	_get_run_row,
 	_persist_run_lines,
 	_get_or_create_settings,
+	_person_display_name,
 	create_employee,
 	update_employee,
 )
@@ -309,7 +310,7 @@ def build_run_lines_import_template(db: Session, business_id: int, run_id: int) 
 	headers = ["employee_code", "person_name"] + [f"item:{it.code}" for it in items]
 	_write_header_row(ws, headers)
 	for emp, person in employees:
-		ws.append([emp.employee_code, person.name] + [None] * len(items))
+		ws.append([emp.employee_code, _person_display_name(person)] + [None] * len(items))
 	buf = io.BytesIO()
 	wb.save(buf)
 	filename = f"payroll_run_{run.code or run_id}_template.xlsx"

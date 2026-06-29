@@ -727,6 +727,18 @@ def create_department(
 # ─── پرسنل ──────────────────────────────────────────────────────────────────
 
 
+def _person_display_name(person: Person) -> str:
+	"""نام نمایشی شخص (مدل Person فیلد name ندارد)."""
+	parts = [person.first_name, person.last_name]
+	full = " ".join(p for p in parts if p)
+	return (
+		person.alias_name
+		or full.strip()
+		or person.company_name
+		or ""
+	)
+
+
 def _employee_to_dict(row: PayrollEmployee, person: Optional[Person] = None) -> Dict[str, Any]:
 	data: Dict[str, Any] = {
 		"id": row.id,
@@ -746,7 +758,7 @@ def _employee_to_dict(row: PayrollEmployee, person: Optional[Person] = None) -> 
 		"extra_info": row.extra_info,
 	}
 	if person:
-		data["person_name"] = person.name
+		data["person_name"] = _person_display_name(person)
 		data["person_code"] = person.code
 	return data
 
@@ -1170,7 +1182,7 @@ def _line_to_dict(
 		data["employee_code"] = employee.employee_code
 		data["job_title"] = employee.job_title
 	if person:
-		data["person_name"] = person.name
+		data["person_name"] = _person_display_name(person)
 	if items is not None:
 		data["items"] = items
 	return data
