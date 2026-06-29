@@ -11456,6 +11456,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get payrollTaxId => 'Tax ID';
 
   @override
+  String get payrollHireDate => 'Hire date';
+
+  @override
+  String get payrollTerminationDate => 'Termination date';
+
+  @override
+  String get payrollPeriodStartDate => 'Period start date';
+
+  @override
+  String get payrollPeriodEndDate => 'Period end date';
+
+  @override
+  String get payrollEmployeePersonHint =>
+      'Only persons marked as employee are listed.';
+
+  @override
+  String get payrollEmployeeDepartment => 'Department';
+
+  @override
   String get payrollNewRun => 'New payroll document';
 
   @override

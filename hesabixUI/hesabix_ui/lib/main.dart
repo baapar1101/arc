@@ -2270,6 +2270,7 @@ class _MyAppState extends State<MyApp> {
                     child: PayrollMainPage(
                       businessId: businessId,
                       authStore: _authStore!,
+                      calendarController: _calendarController!,
                     ),
                   ),
                 );
@@ -2286,6 +2287,7 @@ class _MyAppState extends State<MyApp> {
                     child: PayrollReportsPage(
                       businessId: businessId,
                       authStore: _authStore!,
+                      calendarController: _calendarController!,
                     ),
                   ),
                 );
@@ -2302,6 +2304,7 @@ class _MyAppState extends State<MyApp> {
                     child: PayrollRunEditPage(
                       businessId: businessId,
                       authStore: _authStore!,
+                      calendarController: _calendarController!,
                     ),
                   ),
                 );
@@ -2319,6 +2322,7 @@ class _MyAppState extends State<MyApp> {
                     child: PayrollRunEditPage(
                       businessId: businessId,
                       authStore: _authStore!,
+                      calendarController: _calendarController!,
                       runId: runId,
                     ),
                   ),

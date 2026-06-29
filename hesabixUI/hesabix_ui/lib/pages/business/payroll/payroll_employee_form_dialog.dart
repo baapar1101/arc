@@ -2,29 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../../../core/calendar_controller.dart';
+import '../../../core/date_utils.dart';
 import '../../../models/person_model.dart';
+import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/date_input_field.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
 
 /// دیالوگ ثبت/ویرایش پرسنل حقوق.
 class PayrollEmployeeFormDialog extends StatefulWidget {
   final int businessId;
+  final CalendarController calendarController;
+  final List<Map<String, dynamic>> departments;
   final Map<String, dynamic>? existing;
 
   const PayrollEmployeeFormDialog({
     super.key,
     required this.businessId,
+    required this.calendarController,
+    this.departments = const [],
     this.existing,
   });
 
   static Future<Map<String, dynamic>?> show(
     BuildContext context, {
     required int businessId,
+    required CalendarController calendarController,
+    List<Map<String, dynamic>> departments = const [],
     Map<String, dynamic>? existing,
   }) {
     return showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (_) => PayrollEmployeeFormDialog(
         businessId: businessId,
+        calendarController: calendarController,
+        departments: departments,
         existing: existing,
       ),
     );
@@ -43,10 +55,16 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
   late final TextEditingController _taxCtrl;
 
   Person? _person;
+  int? _departmentId;
   String _employmentType = 'full_time';
   bool _isActive = true;
+  DateTime? _hireDate;
+  DateTime? _terminationDate;
 
   bool get _isEdit => widget.existing != null;
+
+  List<Map<String, dynamic>> get _activeDepartments =>
+      widget.departments.where((d) => d['is_active'] != false).toList();
 
   @override
   void initState() {
@@ -61,6 +79,9 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
     _taxCtrl = TextEditingController(text: '${e?['tax_id'] ?? ''}');
     _employmentType = '${e?['employment_type'] ?? 'full_time'}';
     _isActive = e?['is_active'] != false;
+    _departmentId = (e?['department_id'] as num?)?.toInt();
+    _hireDate = HesabixDateUtils.parseApiDate(e?['hire_date']);
+    _terminationDate = HesabixDateUtils.parseApiDate(e?['termination_date']);
   }
 
   @override
@@ -75,12 +96,19 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    if (!_isEdit && _person == null) return;
+    if (!_isEdit) {
+      if (_person == null) return;
+      if (!_person!.personTypes.contains(PersonType.employee)) {
+        SnackBarHelper.showError(context, message: AppLocalizations.of(context).payrollEmployeePersonHint);
+        return;
+      }
+    }
     final payload = <String, dynamic>{
       if (!_isEdit) 'person_id': _person!.id,
       'employee_code': _codeCtrl.text.trim(),
       'job_title': _jobCtrl.text.trim().isEmpty ? null : _jobCtrl.text.trim(),
       'employment_type': _employmentType,
+      'department_id': _departmentId,
       'base_salary': _salaryCtrl.text.trim().isEmpty
           ? null
           : double.tryParse(_salaryCtrl.text.replaceAll(',', '')),
@@ -88,6 +116,18 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
       'tax_id': _taxCtrl.text.trim().isEmpty ? null : _taxCtrl.text.trim(),
       'is_active': _isActive,
     };
+    if (_isEdit) {
+      payload['hire_date'] =
+          _hireDate != null ? HesabixDateUtils.formatForApiDate(_hireDate!) : null;
+      payload['termination_date'] = _terminationDate != null
+          ? HesabixDateUtils.formatForApiDate(_terminationDate!)
+          : null;
+    } else {
+      if (_hireDate != null) payload['hire_date'] = HesabixDateUtils.formatForApiDate(_hireDate!);
+      if (_terminationDate != null) {
+        payload['termination_date'] = HesabixDateUtils.formatForApiDate(_terminationDate!);
+      }
+    }
     Navigator.pop(context, payload);
   }
 
@@ -104,21 +144,52 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (!_isEdit)
+                if (!_isEdit) ...[
                   PersonComboboxWidget(
                     businessId: widget.businessId,
                     selectedPerson: _person,
                     onChanged: (p) => setState(() => _person = p),
                     label: t.customerClubPerson,
                     isRequired: true,
+                    personTypes: [PersonType.employee.persianName],
                   ),
-                if (!_isEdit) const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        t.payrollEmployeePersonHint,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.outline,
+                            ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 TextFormField(
                   controller: _codeCtrl,
                   decoration: InputDecoration(labelText: t.payrollEmployeeCode),
                   validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
                 ),
                 const SizedBox(height: 12),
+                if (_activeDepartments.isNotEmpty) ...[
+                  DropdownButtonFormField<int?>(
+                    initialValue: _departmentId,
+                    decoration: InputDecoration(labelText: t.payrollEmployeeDepartment),
+                    items: [
+                      DropdownMenuItem<int?>(value: null, child: Text('—')),
+                      ..._activeDepartments.map(
+                        (d) => DropdownMenuItem<int?>(
+                          value: (d['id'] as num).toInt(),
+                          child: Text('${d['name'] ?? d['code']}'),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setState(() => _departmentId = v),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 TextFormField(
                   controller: _jobCtrl,
                   decoration: InputDecoration(labelText: t.payrollJobTitle),
@@ -132,7 +203,7 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: _employmentType,
+                  initialValue: _employmentType,
                   decoration: InputDecoration(labelText: t.payrollEmploymentType),
                   items: [
                     DropdownMenuItem(value: 'full_time', child: Text(t.payrollEmploymentFullTime)),
@@ -140,6 +211,20 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
                     DropdownMenuItem(value: 'contract', child: Text(t.payrollEmploymentContract)),
                   ],
                   onChanged: (v) => setState(() => _employmentType = v ?? 'full_time'),
+                ),
+                const SizedBox(height: 12),
+                DateInputField(
+                  value: _hireDate,
+                  calendarController: widget.calendarController,
+                  labelText: t.payrollHireDate,
+                  onChanged: (d) => setState(() => _hireDate = d),
+                ),
+                const SizedBox(height: 12),
+                DateInputField(
+                  value: _terminationDate,
+                  calendarController: widget.calendarController,
+                  labelText: t.payrollTerminationDate,
+                  onChanged: (d) => setState(() => _terminationDate = d),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(

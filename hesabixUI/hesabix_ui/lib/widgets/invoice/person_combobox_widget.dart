@@ -538,6 +538,22 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     _selectPerson(result);
   }
 
+  /// انواع شخص برای پیش‌انتخاب در دیالوگ افزودن، بر اساس فیلتر combobox.
+  List<PersonType>? _initialPersonTypesForNewDialog() {
+    final raw = widget.personTypes;
+    if (raw == null || raw.isEmpty) return null;
+    final types = <PersonType>[];
+    for (final name in raw) {
+      for (final pt in PersonType.values) {
+        if (pt.persianName == name) {
+          types.add(pt);
+          break;
+        }
+      }
+    }
+    return types.isEmpty ? null : types;
+  }
+
   Future<void> _addNewPerson(BuildContext bottomSheetContext) async {
     final searchQuery = _searchController.text.trim();
     Navigator.pop(bottomSheetContext);
@@ -548,6 +564,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         businessId: widget.businessId,
         onSuccess: () {},
         initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
+        initialPersonTypes: _initialPersonTypesForNewDialog(),
       ),
     );
 
@@ -566,6 +583,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         businessId: widget.businessId,
         onSuccess: () {},
         initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
+        initialPersonTypes: _initialPersonTypesForNewDialog(),
       ),
     );
 

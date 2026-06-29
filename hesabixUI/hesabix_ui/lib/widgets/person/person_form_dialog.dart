@@ -22,6 +22,8 @@ class PersonFormDialog extends StatefulWidget {
   final Person? person; // null برای افزودن، مقدار برای ویرایش
   final VoidCallback? onSuccess;
   final String? initialAliasName; // مقدار اولیه برای نام مستعار
+  /// انواع پیش‌فرض شخص هنگام افزودن (مثلاً کارمند از combobox حقوق).
+  final List<PersonType>? initialPersonTypes;
 
   const PersonFormDialog({
     super.key,
@@ -29,6 +31,7 @@ class PersonFormDialog extends StatefulWidget {
     this.person,
     this.onSuccess,
     this.initialAliasName,
+    this.initialPersonTypes,
   });
 
   @override
@@ -194,9 +197,16 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _commissionPostInInvoiceDocument = person.commissionPostInInvoiceDocument;
       _selectedPersonGroupId = person.personGroupId;
     } else {
-      // برای افزودن شخص جدید، نوع شخص به صورت پیش‌فرض "مشتری" انتخاب می‌شود
-      _selectedPersonTypes.add(PersonType.customer);
-      _selectedPersonType = PersonType.customer;
+      final initial = widget.initialPersonTypes;
+      if (initial != null && initial.isNotEmpty) {
+        _selectedPersonTypes
+          ..clear()
+          ..addAll(initial);
+        _selectedPersonType = initial.first;
+      } else {
+        _selectedPersonTypes.add(PersonType.customer);
+        _selectedPersonType = PersonType.customer;
+      }
       
       if (widget.initialAliasName != null && widget.initialAliasName!.isNotEmpty) {
         // اگر مقدار اولیه برای نام مستعار داریم

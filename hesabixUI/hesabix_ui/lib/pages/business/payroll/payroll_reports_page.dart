@@ -5,19 +5,23 @@ import 'package:intl/intl.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
+import '../../../core/calendar_controller.dart';
 import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import 'payroll_calendar_utils.dart';
 
 /// گزارش‌های پیشرفته حقوق و دستمزد (فاز ۴).
 class PayrollReportsPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
+  final CalendarController calendarController;
 
   const PayrollReportsPage({
     super.key,
     required this.businessId,
     required this.authStore,
+    required this.calendarController,
   });
 
   @override
@@ -38,10 +42,23 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
   Map<String, dynamic>? _statutorySummary;
   Map<String, dynamic>? _periodOverview;
 
+  bool get _isJalali => widget.calendarController.isJalali;
+
   @override
   void initState() {
     super.initState();
+    widget.calendarController.addListener(_onCalendarChanged);
     _loadPeriods();
+  }
+
+  void _onCalendarChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.calendarController.removeListener(_onCalendarChanged);
+    super.dispose();
   }
 
   Future<void> _loadPeriods() async {
@@ -54,12 +71,13 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
       int? periodId;
       if (list.isNotEmpty) {
         final first = list.first;
-        year = (first['year'] as num?)?.toInt();
         periodId = (first['id'] as num?)?.toInt();
+        year = PayrollCalendarUtils.displayYearFromPeriod(first, _isJalali);
       }
+      final defaults = PayrollCalendarUtils.defaultDisplayYearMonth(_isJalali);
       setState(() {
         _periods = list;
-        _selectedYear = year ?? DateTime.now().year;
+        _selectedYear = year ?? defaults.year;
         _selectedPeriodId = periodId;
         _loading = false;
       });
@@ -99,15 +117,17 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
           Future.value(const <String, dynamic>{}),
         _svc.getPeriodOverviewReport(
           businessId: widget.businessId,
-          year: _selectedYear,
+          year: _apiYearForOverview(),
         ),
       ]);
       if (!mounted) return;
+      var overview = Map<String, dynamic>.from(results[3] as Map);
+      overview = _filterPeriodOverview(overview);
       setState(() {
         _itemSummary = Map<String, dynamic>.from(results[0] as Map);
         _employeeSummary = Map<String, dynamic>.from(results[1] as Map);
         _statutorySummary = Map<String, dynamic>.from(results[2] as Map);
-        _periodOverview = Map<String, dynamic>.from(results[3] as Map);
+        _periodOverview = overview;
         _loadingReports = false;
       });
     } catch (e) {
@@ -117,11 +137,30 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
     }
   }
 
-  String _periodLabel(Map<String, dynamic> p) {
-    final title = '${p['title'] ?? ''}'.trim();
-    if (title.isNotEmpty) return title;
-    return '${p['year']}/${p['month']}';
+  /// سال شمسی برای فیلتر API؛ در تقویم میلادی null تا همه دوره‌ها بیاید و سمت کلاینت فیلتر شود.
+  int? _apiYearForOverview() {
+    if (_selectedYear == null) return null;
+    if (_isJalali) return _selectedYear;
+    return null;
   }
+
+  Map<String, dynamic> _filterPeriodOverview(Map<String, dynamic> overview) {
+    if (_isJalali || _selectedYear == null) return overview;
+    final raw = overview['periods'];
+    if (raw is! List) return overview;
+    final filtered = raw
+        .where(
+          (p) => PayrollCalendarUtils.periodMatchesDisplayYear(
+            Map<String, dynamic>.from(p as Map),
+            _selectedYear!,
+            false,
+          ),
+        )
+        .toList();
+    return {...overview, 'periods': filtered};
+  }
+
+  String _periodLabel(Map<String, dynamic> p) => PayrollCalendarUtils.periodTitle(p, _isJalali);
 
   String _fmt(dynamic v) => _money.format((v as num?)?.toDouble() ?? 0);
 
@@ -221,6 +260,7 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
                     periods: List<Map<String, dynamic>>.from(_periodOverview!['periods'] as List),
                     fmt: _fmt,
                     t: t,
+                    isJalali: _isJalali,
                   ),
                 ],
               ],
@@ -228,15 +268,8 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
     );
   }
 
-  List<int> _availableYears() {
-    final years = _periods.map((p) => (p['year'] as num?)?.toInt()).whereType<int>().toSet().toList()
-      ..sort();
-    if (years.isEmpty) {
-      final y = DateTime.now().year;
-      return [y - 1, y, y + 1];
-    }
-    return years;
-  }
+  List<int> _availableYears() =>
+      PayrollCalendarUtils.displayYearsFromPeriods(_periods, _isJalali);
 }
 
 class _StatutoryCard extends StatelessWidget {
@@ -354,8 +387,14 @@ class _PeriodOverviewTable extends StatelessWidget {
   final List<Map<String, dynamic>> periods;
   final String Function(dynamic) fmt;
   final AppLocalizations t;
+  final bool isJalali;
 
-  const _PeriodOverviewTable({required this.periods, required this.fmt, required this.t});
+  const _PeriodOverviewTable({
+    required this.periods,
+    required this.fmt,
+    required this.t,
+    required this.isJalali,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -373,7 +412,7 @@ class _PeriodOverviewTable extends StatelessWidget {
               .map(
                 (row) => DataRow(
                   cells: [
-                    DataCell(Text('${row['title'] ?? '${row['year']}/${row['month']}'}')),
+                    DataCell(Text(PayrollCalendarUtils.periodTitle(row, isJalali))),
                     DataCell(Text('${row['run_count'] ?? 0}')),
                     DataCell(Text(fmt(row['gross_total']))),
                     DataCell(Text(fmt(row['net_total']))),

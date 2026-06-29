@@ -4,11 +4,15 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
+import '../../../core/calendar_controller.dart';
+import '../../../core/date_utils.dart';
 import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/number_formatters.dart' show formatWithThousands;
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/date_input_field.dart';
 import '../../../widgets/invoice/invoice_pdf_print_flow.dart';
+import 'payroll_calendar_utils.dart';
 import 'payroll_post_payment_dialog.dart';
 import 'payroll_run_import_dialog.dart';
 
@@ -16,12 +20,14 @@ import 'payroll_run_import_dialog.dart';
 class PayrollRunEditPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
+  final CalendarController calendarController;
   final int? runId;
 
   const PayrollRunEditPage({
     super.key,
     required this.businessId,
     required this.authStore,
+    required this.calendarController,
     this.runId,
   });
 
@@ -47,7 +53,8 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
 
   late final TextEditingController _titleCtrl;
   late final TextEditingController _descCtrl;
-  late final TextEditingController _dateCtrl;
+
+  DateTime? _runDate;
 
   int? _periodId;
   final Set<int> _selectedEmployeeIds = {};
@@ -77,20 +84,27 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
 
   bool get _hasPaymentLink => _documentLinks.any((l) => l['link_type'] == 'payment');
 
+  bool get _isJalali => widget.calendarController.isJalali;
+
   @override
   void initState() {
     super.initState();
     _titleCtrl = TextEditingController();
     _descCtrl = TextEditingController();
-    _dateCtrl = TextEditingController(text: DateTime.now().toIso8601String().substring(0, 10));
+    _runDate = DateTime.now();
+    widget.calendarController.addListener(_onCalendarChanged);
     _load();
+  }
+
+  void _onCalendarChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    widget.calendarController.removeListener(_onCalendarChanged);
     _titleCtrl.dispose();
     _descCtrl.dispose();
-    _dateCtrl.dispose();
     for (final c in _amountControllers.values) {
       c.dispose();
     }
@@ -121,7 +135,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
         _run = Map<String, dynamic>.from(results[3] as Map);
         _titleCtrl.text = '${_run!['title'] ?? ''}';
         _descCtrl.text = '${_run!['description'] ?? ''}';
-        _dateCtrl.text = '${_run!['run_date'] ?? ''}';
+        _runDate = HesabixDateUtils.parseApiDate(_run!['run_date']) ?? DateTime.now();
         _periodId = (_run!['period_id'] as num?)?.toInt();
         _bindLineControllers(_run!);
         if (_run!['status'] != 'draft' && _run!['status'] != 'cancelled') {
@@ -207,13 +221,20 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
       );
       return;
     }
+    if (_runDate == null) {
+      SnackBarHelper.showError(
+        context,
+        message: AppLocalizations.of(context).required,
+      );
+      return;
+    }
 
     setState(() => _saving = true);
     try {
       final base = <String, dynamic>{
         'title': _titleCtrl.text.trim(),
         'description': _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-        'run_date': _dateCtrl.text.trim(),
+        'run_date': HesabixDateUtils.formatForApiDate(_runDate!),
         'period_id': _periodId,
       };
 
@@ -422,7 +443,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
             ...openPeriods.map(
               (p) => SimpleDialogOption(
                 onPressed: () => Navigator.pop(ctx, (p['id'] as num).toInt()),
-                child: Text('${p['title']}'),
+                child: Text(PayrollCalendarUtils.periodTitle(p, _isJalali)),
               ),
             ),
           ],
@@ -561,10 +582,13 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
                     validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _dateCtrl,
+                  DateInputField(
+                    value: _runDate,
                     enabled: _isDraft,
-                    decoration: InputDecoration(labelText: t.payrollRunDate),
+                    calendarController: widget.calendarController,
+                    labelText: t.payrollRunDate,
+                    validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
+                    onChanged: _isDraft ? (d) => setState(() => _runDate = d) : null,
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<int?>(
@@ -575,7 +599,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
                       ..._periods.map(
                         (p) => DropdownMenuItem<int?>(
                           value: (p['id'] as num).toInt(),
-                          child: Text('${p['title']}'),
+                          child: Text(PayrollCalendarUtils.periodTitle(p, _isJalali)),
                         ),
                       ),
                     ],
@@ -593,7 +617,11 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
                     _TotalsBar(run: _run!),
                     const SizedBox(height: 16),
                     if (_documentLinks.isNotEmpty)
-                      _AccountingLinksCard(links: _documentLinks, t: t),
+                      _AccountingLinksCard(
+                        links: _documentLinks,
+                        t: t,
+                        isJalali: _isJalali,
+                      ),
                     if (_documentLinks.isNotEmpty) const SizedBox(height: 16),
                     if (_deptSummary != null) _DepartmentSummaryCard(summary: _deptSummary!, t: t),
                     if (_deptSummary != null) const SizedBox(height: 16),
@@ -767,8 +795,13 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
 class _AccountingLinksCard extends StatelessWidget {
   final List<Map<String, dynamic>> links;
   final AppLocalizations t;
+  final bool isJalali;
 
-  const _AccountingLinksCard({required this.links, required this.t});
+  const _AccountingLinksCard({
+    required this.links,
+    required this.t,
+    required this.isJalali,
+  });
 
   String _linkLabel(String? type) {
     switch (type) {
@@ -799,7 +832,13 @@ class _AccountingLinksCard extends StatelessWidget {
                   link['link_type'] == 'payment' ? Icons.payments_outlined : Icons.account_balance_outlined,
                 ),
                 title: Text(_linkLabel(link['link_type'] as String?)),
-                subtitle: Text('${link['document_code'] ?? link['document_id']}'),
+                subtitle: Text(
+                  [
+                    '${link['document_code'] ?? link['document_id']}',
+                    if (link['document_date'] != null)
+                      PayrollCalendarUtils.formatRunDate(link['document_date'], isJalali),
+                  ].join(' · '),
+                ),
               );
             }),
           ],

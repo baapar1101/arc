@@ -21330,6 +21330,42 @@ abstract class AppLocalizations {
   /// **'Tax ID'**
   String get payrollTaxId;
 
+  /// No description provided for @payrollHireDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire date'**
+  String get payrollHireDate;
+
+  /// No description provided for @payrollTerminationDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Termination date'**
+  String get payrollTerminationDate;
+
+  /// No description provided for @payrollPeriodStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Period start date'**
+  String get payrollPeriodStartDate;
+
+  /// No description provided for @payrollPeriodEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Period end date'**
+  String get payrollPeriodEndDate;
+
+  /// No description provided for @payrollEmployeePersonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only persons marked as employee are listed.'**
+  String get payrollEmployeePersonHint;
+
+  /// No description provided for @payrollEmployeeDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Department'**
+  String get payrollEmployeeDepartment;
+
   /// No description provided for @payrollNewRun.
   ///
   /// In en, this message translates to:

@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import json
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -29,7 +30,7 @@ from adapters.db.models.payroll import (
 	PayrollRunLineItem,
 	PayrollSettings,
 )
-from adapters.db.models.person import Person
+from adapters.db.models.person import Person, PersonType
 from adapters.db.models.document import Document
 from app.core.payroll_plugin_dependency import check_payroll_plugin_active
 from app.core.responses import ApiError
@@ -63,6 +64,19 @@ def _decimal(value: Any, default: Decimal = Decimal("0")) -> Decimal:
 		return Decimal(str(value))
 	except (InvalidOperation, ValueError, TypeError):
 		raise ApiError("INVALID_AMOUNT", f"مقدار عددی نامعتبر: {value}", http_status=400)
+
+
+def _person_has_type(person: Person, type_value: str) -> bool:
+	raw = person.person_types
+	if not raw:
+		return False
+	try:
+		types = json.loads(raw)
+		if isinstance(types, list):
+			return type_value in types
+	except (json.JSONDecodeError, TypeError):
+		pass
+	return f'"{type_value}"' in raw or type_value in raw
 
 
 def _validate_code(code: str) -> str:
@@ -778,6 +792,12 @@ def create_employee(
 	)
 	if not person:
 		raise ApiError("PERSON_NOT_FOUND", "شخص یافت نشد.", http_status=404)
+	if not _person_has_type(person, PersonType.EMPLOYEE.value):
+		raise ApiError(
+			"PERSON_NOT_EMPLOYEE",
+			"شخص انتخاب‌شده باید از نوع کارمند باشد.",
+			http_status=400,
+		)
 	emp_code = str(payload.get("employee_code") or "").strip()
 	if not emp_code:
 		emp_code = person.code or f"EMP{person.id}"

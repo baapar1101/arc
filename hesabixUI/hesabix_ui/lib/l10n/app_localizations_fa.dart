@@ -11393,6 +11393,25 @@ class AppLocalizationsFa extends AppLocalizations {
   String get payrollTaxId => 'شناسه مالیاتی';
 
   @override
+  String get payrollHireDate => 'تاریخ استخدام';
+
+  @override
+  String get payrollTerminationDate => 'تاریخ پایان همکاری';
+
+  @override
+  String get payrollPeriodStartDate => 'تاریخ شروع دوره';
+
+  @override
+  String get payrollPeriodEndDate => 'تاریخ پایان دوره';
+
+  @override
+  String get payrollEmployeePersonHint =>
+      'فقط اشخاص با نوع «کارمند» نمایش داده می‌شوند.';
+
+  @override
+  String get payrollEmployeeDepartment => 'بخش سازمانی';
+
+  @override
   String get payrollNewRun => 'سند حقوق جدید';
 
   @override
