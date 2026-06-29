@@ -219,16 +219,24 @@ def _theme_css(design: Dict[str, Any], family_id: str) -> str:
 """.strip()
 
 
-def _logo_src(design: Dict[str, Any]) -> str:
+def _logo_html(design: Dict[str, Any], *, style: str = "") -> str:
 	branding = design.get("branding") or {}
 	if not branding.get("show_logo", True):
 		return ""
 	source = str(branding.get("logo_source") or "business").lower()
 	if source == "none":
 		return ""
+	style_attr = f" style='{_esc(style)}'" if style else ""
 	if source == "custom":
-		return str(branding.get("custom_logo_data_uri") or "")
-	return "{{ business_logo_data_uri }}"
+		uri = str(branding.get("custom_logo_data_uri") or "").strip()
+		if not uri:
+			return ""
+		return f"<img class='rt-logo' src='{_esc(uri)}' alt=''{style_attr} />"
+	return (
+		"{% if business_logo_data_uri is defined and business_logo_data_uri %}"
+		f"<img class='rt-logo' src='{{{{ business_logo_data_uri }}}}' alt=''{style_attr} />"
+		"{% endif %}"
+	)
 
 
 def _business_name_expr(design: Dict[str, Any]) -> str:
@@ -250,7 +258,7 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
 	columns = _visible_columns(list(table_cfg.get("columns") or []))
 	striped = "striped" if table_cfg.get("striped", True) else ""
 	css = _theme_css(design, family_id)
-	logo_src = _logo_src(design)
+	logo_html = _logo_html(design)
 	business_name = _business_name_expr(design)
 
 	header_parts: List[str] = []
@@ -263,13 +271,12 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
       <h1 class="rt-title">{{{{ title_text | default('فاکتور') }}}}</h1>
       <div class="rt-subtitle">{{{{ invoice.code | default('-') }}}} — {{{{ invoice.issue_date | default('-') }}}}</div>
     </div>
-    {"<img class='rt-logo' src='" + logo_src + "' alt='' />" if logo_src else ""}
+    {logo_html}
   </div>
 </div>
 """.strip()
 		)
 	else:
-		logo_html = f"<img class='rt-logo' src='{logo_src}' alt='' />" if logo_src else ""
 		name_html = f"<div style='font-weight:700;font-size:14px;'>{business_name}</div>" if business_name else ""
 		header_parts.append(
 			f"""
@@ -429,7 +436,7 @@ def _is_modern_header(design: Dict[str, Any]) -> bool:
 
 def _compile_list_header(design: Dict[str, Any], *, default_title: str = "گزارش") -> str:
 	sections = design.get("sections") or {}
-	logo_src = _logo_src(design)
+	logo_html = _logo_html(design)
 	business_name = _business_name_expr(design)
 	if _is_modern_header(design):
 		return f"""
@@ -438,7 +445,7 @@ def _compile_list_header(design: Dict[str, Any], *, default_title: str = "گزا
   {"<div class='rt-subtitle'>" + business_name + "</div>" if business_name else ""}
 </div>
 """.strip()
-	logo_html = f"<img class='rt-logo' src='{logo_src}' alt='' />" if logo_src else ""
+	logo_html = _logo_html(design)
 	name_html = f"<div>{business_name}</div>" if business_name else ""
 	return f"""
 <div class="rt-classic-header">
@@ -529,9 +536,8 @@ def _compile_document_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str
 	table_cfg = design.get("table") or {}
 	totals_cfg = design.get("totals") or {}
 	css = _theme_css(design, family_id)
-	logo_src = _logo_src(design)
+	logo_html = _logo_html(design)
 	business_name = _business_name_expr(design)
-	logo_html = f"<img class='rt-logo' src='{logo_src}' alt='' />" if logo_src else ""
 	name_html = f"<div style='font-weight:700;'>{business_name}</div>" if business_name else ""
 	header_html = f"""
 <div class="rt-classic-header">
@@ -653,8 +659,7 @@ def _compile_postal_label(design: Dict[str, Any]) -> Tuple[str, str, str, str]:
 	css = _theme_css(design, family_id)
 	if compact:
 		css += "\n.rt-layout { font-size: 9px; }\n.rt-card { padding: 6px 8px; margin-bottom: 6px; }"
-	logo_src = _logo_src(design)
-	logo_html = f"<img class='rt-logo' src='{logo_src}' alt='' style='max-height:40px;' />" if logo_src else ""
+	logo_html = _logo_html(design, style="max-height:40px;")
 	header_html = f"""
 <div class="rt-classic-header">
   <div style="display:flex;justify-content:space-between;align-items:center;">

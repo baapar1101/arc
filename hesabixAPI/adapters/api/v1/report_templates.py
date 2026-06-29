@@ -686,11 +686,14 @@ async def report_template_schema(
 			{"name": "items", "desc": "لیست فاکتورها"},
 			{"name": "table_headers_html", "desc": "HTML آماده هدر جدول"},
 			{"name": "table_rows_html", "desc": "HTML آماده ردیف‌های جدول"},
+			{"name": "business_name", "desc": "نام کسب‌وکار"},
+			{"name": "business_logo_data_uri", "desc": "لوگوی کسب‌وکار (data URI)"},
 		]
 		data["sample_context"].update(
 			{
 				"title_text": "لیست فاکتورها",
 				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"items": [
 					{"code": "INV-1001", "title": "فاکتور فروش ۱", "issue_date": "1403/10/01", "payable_total": 1035500},
 					{"code": "INV-1002", "title": "فاکتور فروش ۲", "issue_date": "1403/10/02", "payable_total": 2500000},

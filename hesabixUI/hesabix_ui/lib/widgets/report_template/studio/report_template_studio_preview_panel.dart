@@ -85,7 +85,10 @@ class ReportTemplateStudioPreviewPanel extends StatelessWidget {
                               ],
                             ),
                             clipBehavior: Clip.hardEdge,
-                            child: ReportTemplateEmbeddedPdf(bytes: pdfBytes!),
+                            child: ReportTemplateEmbeddedPdf(
+                              key: ValueKey(pdfBytes!.length),
+                              bytes: pdfBytes!,
+                            ),
                           ),
                         ),
                       ),

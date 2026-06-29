@@ -653,25 +653,69 @@ class ReportTemplateService:
 
 		# تزریق assets به context برای دسترسی در قالب‌ها (مثلاً assets.images['logo'])
 		try:
+			ctx = dict(context or {})
 			if hasattr(template, "assets") and getattr(template, "assets"):
-				ctx = dict(context or {})
 				ctx.setdefault("assets", getattr(template, "assets"))
-			else:
-				ctx = context
 		except Exception:
-			ctx = context
+			ctx = dict(context or {})
+		for _key in (
+			"business_logo_data_uri",
+			"business_name",
+			"invoice_footer_note",
+			"invoice_verify_qr_data_uri",
+			"title_text",
+			"date_now",
+		):
+			ctx.setdefault(_key, "")
+		def _render_jinja_fragment(source: str, *, fragment: str) -> str:
+			src = (source or "").strip()
+			if not src:
+				return ""
+			try:
+				return env.from_string(src).render(**ctx)
+			except TemplateSyntaxError as e:
+				logger.error(
+					"Template syntax error in %s for template %s: %s",
+					fragment,
+					getattr(template, "id", "unknown"),
+					e,
+					exc_info=True,
+				)
+				raise ApiError(
+					"TEMPLATE_SYNTAX_ERROR",
+					f"خطای دستور در {fragment}: {e.message} (خط {e.lineno})",
+					http_status=400,
+				) from e
+			except UndefinedError as e:
+				logger.warning(
+					"Undefined variable in %s for template %s: %s",
+					fragment,
+					getattr(template, "id", "unknown"),
+					e,
+					exc_info=True,
+				)
+				raise ApiError(
+					"TEMPLATE_VARIABLE_ERROR",
+					f"متغیر تعریف نشده در {fragment}: {e.message}",
+					http_status=400,
+				) from e
+			except Exception as e:
+				logger.exception(
+					"Template rendering error in %s for template %s: %s",
+					fragment,
+					getattr(template, "id", "unknown"),
+					e,
+				)
+				raise ApiError(
+					"TEMPLATE_RENDER_ERROR",
+					f"خطا در رندر {fragment}: {str(e)}",
+					http_status=500,
+				) from e
+
 		try:
-			template_obj = env.from_string(template.content_html)
-			html = template_obj.render(**ctx)
-		except TemplateSyntaxError as e:
-			logger.error(f"Template syntax error in template {getattr(template, 'id', 'unknown')}: {e}", exc_info=True)
-			raise ApiError("TEMPLATE_SYNTAX_ERROR", f"خطای دستور در قالب: {e.message} (خط {e.lineno})", http_status=400)
-		except UndefinedError as e:
-			logger.warning(f"Undefined variable in template {getattr(template, 'id', 'unknown')}: {e}", exc_info=True)
-			raise ApiError("TEMPLATE_VARIABLE_ERROR", f"متغیر تعریف نشده در قالب: {e.message}", http_status=400)
-		except Exception as e:
-			logger.exception(f"Template rendering error for template {getattr(template, 'id', 'unknown')}: {e}")
-			raise ApiError("TEMPLATE_RENDER_ERROR", f"خطا در رندر قالب: {str(e)}", http_status=500)
+			html = _render_jinja_fragment(template.content_html, fragment="بدنه قالب")
+		except ApiError:
+			raise
 
 		# تنظیمات صفحه (@page) از روی ویژگی‌های قالب (با امکان override از چاپ/PDF)
 		try:
@@ -733,8 +777,14 @@ class ReportTemplateService:
 				html = f"<head><style>{css}</style></head>{html}"
 		# درج Header/Footer ساده در بدنه (در صورت وجود). طراح می‌تواند با CSS آن‌ها را به fixed تبدیل کند.
 		try:
-			header_html = (template.header_html or "").strip()
-			footer_html = (template.footer_html or "").strip()
+			header_html = _render_jinja_fragment(
+				getattr(template, "header_html", None) or "",
+				fragment="سربرگ قالب",
+			)
+			footer_html = _render_jinja_fragment(
+				getattr(template, "footer_html", None) or "",
+				fragment="پاورقی قالب",
+			)
 			if header_html:
 				insertion = f'<div class="__tpl-header">{header_html}</div>'
 				if "<body" in html and "</body>" in html:
@@ -750,8 +800,8 @@ class ReportTemplateService:
 					html = html.replace("</body>", f"{insertion}</body>", 1)
 				else:
 					html = f"{html}{insertion}"
-		except Exception:
-			pass
+		except ApiError:
+			raise
 		return html
 
 	@staticmethod

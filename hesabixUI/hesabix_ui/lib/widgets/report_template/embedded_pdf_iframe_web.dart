@@ -1,15 +1,12 @@
+import 'dart:js_interop';
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:web/web.dart' as web;
 
-import '../../utils/web/web_utils.dart' as web_utils;
-
 /// نمایش PDF داخل صفحه (وب) با iframe و blob URL.
-///
-/// ریشهٔ DOM باید ظرفی با ابعاد قطعی باشد؛ فقط iframe با height:100% کافی نیست
-/// چون در platform view والد اغلب ارتفاع محاسبه‌شده ندارد.
 class ReportTemplateEmbeddedPdf extends StatefulWidget {
   final Uint8List bytes;
 
@@ -20,55 +17,99 @@ class ReportTemplateEmbeddedPdf extends StatefulWidget {
 }
 
 class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
-  late final String _viewType;
-  late final String _blobUrl;
+  String? _viewType;
+  String? _objectUrl;
+  int _seq = 0;
 
   @override
   void initState() {
     super.initState();
-    _viewType = 'report-pdf-${identityHashCode(this)}-${DateTime.now().microsecondsSinceEpoch}';
-    _blobUrl = web_utils.createObjectUrlFromBytes(
-      widget.bytes,
-      mimeType: 'application/pdf',
+    _mountView();
+  }
+
+  @override
+  void didUpdateWidget(covariant ReportTemplateEmbeddedPdf oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!listEquals(oldWidget.bytes, widget.bytes)) {
+      _mountView();
+    }
+  }
+
+  void _mountView() {
+    _revokeBlob();
+    _viewType = null;
+
+    if (widget.bytes.isEmpty) {
+      if (mounted) setState(() {});
+      return;
+    }
+
+    final seq = ++_seq;
+    final bytes = widget.bytes;
+    final blob = web.Blob(
+      [bytes.toJS].toJS,
+      web.BlobPropertyBag(type: 'application/pdf'),
     );
-    ui_web.platformViewRegistry.registerViewFactory(_viewType, (int viewId) {
-      final root = web.document.createElement('div') as web.HTMLDivElement
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.position = 'relative'
-        ..style.overflow = 'hidden'
-        ..style.display = 'block';
+    final url = web.URL.createObjectURL(blob);
+    final vt = 'report-pdf-$seq-${DateTime.now().microsecondsSinceEpoch}';
 
-      final iframe = web.HTMLIFrameElement()
-        ..src = _blobUrl
-        ..title = 'PDF preview'
-        ..style.border = 'none'
-        ..style.position = 'absolute'
-        ..style.left = '0'
-        ..style.top = '0'
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.display = 'block';
-
-      root.append(iframe);
-      return root;
+    ui_web.platformViewRegistry.registerViewFactory(vt, (int viewId) {
+      final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement;
+      iframe.src = url;
+      iframe.title = 'PDF preview';
+      iframe.style.border = 'none';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.display = 'block';
+      return iframe;
     });
+
+    if (mounted) {
+      setState(() {
+        _objectUrl = url;
+        _viewType = vt;
+      });
+    }
+  }
+
+  void _revokeBlob() {
+    final url = _objectUrl;
+    if (url == null || url.isEmpty) return;
+    try {
+      web.URL.revokeObjectURL(url);
+    } catch (_) {}
+    _objectUrl = null;
   }
 
   @override
   void dispose() {
-    final url = _blobUrl;
+    _revokeBlob();
     super.dispose();
-    // تأخیر تا iframe فرصت بارگذاری blob را داشته باشد؛ revoke زودهنگام صفحهٔ سفید می‌دهد.
-    Future<void>.delayed(const Duration(seconds: 3), () {
-      web_utils.revokeBlobUrl(url);
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (widget.bytes.isEmpty) {
+      return Center(
+        child: Text(
+          'فایل PDF خالی است',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+      );
+    }
+
+    final vt = _viewType;
+    if (vt == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return SizedBox.expand(
-      child: HtmlElementView(viewType: _viewType),
+      child: HtmlElementView(
+        key: ValueKey(vt),
+        viewType: vt,
+      ),
     );
   }
 }
