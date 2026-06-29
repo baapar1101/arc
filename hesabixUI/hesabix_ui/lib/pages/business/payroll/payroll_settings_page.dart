@@ -9,7 +9,7 @@ import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/account_tree_combobox_widget.dart';
-import '../../../widgets/permission_guard.dart';
+import '../../../core/permission_guard.dart';
 import 'payroll_item_edit_dialog.dart';
 
 /// تنظیمات افزونه حقوق و دستمزد: آیتم‌ها، حساب‌های پیش‌فرض و قوانین.

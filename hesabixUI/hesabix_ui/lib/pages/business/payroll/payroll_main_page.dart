@@ -238,7 +238,7 @@ class _SummaryCards extends StatelessWidget {
               ),
             ],
           ),
-          if (((dashboard['pending_approvals'] as num?)?.toInt()) ?? 0) > 0) ...[
+          if (((dashboard['pending_approvals'] as num?)?.toInt() ?? 0) > 0) ...[
             const SizedBox(height: 12),
             Card(
               color: theme.colorScheme.errorContainer,

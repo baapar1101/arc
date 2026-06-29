@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
-import '../../models/account_model.dart';
-import '../../widgets/invoice/account_tree_combobox_widget.dart';
+import '../../../models/account_model.dart';
+import '../../../widgets/invoice/account_tree_combobox_widget.dart';
 
 /// دیالوگ ویرایش/ایجاد آیتم حقوق.
 class PayrollItemEditDialog extends StatefulWidget {

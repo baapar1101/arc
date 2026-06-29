@@ -45,6 +45,7 @@ adapters/api/v1/notifications_ws.py
 adapters/api/v1/opening_balance.py
 adapters/api/v1/payment_callbacks.py
 adapters/api/v1/payment_gateways.py
+adapters/api/v1/payroll.py
 adapters/api/v1/person_group_routes.py
 adapters/api/v1/persons.py
 adapters/api/v1/petty_cash.py
@@ -251,6 +252,7 @@ adapters/db/models/notification_config.py
 adapters/db/models/otp_login_session.py
 adapters/db/models/password_reset.py
 adapters/db/models/payment_gateway.py
+adapters/db/models/payroll.py
 adapters/db/models/person.py
 adapters/db/models/person_group.py
 adapters/db/models/person_share_link.py
@@ -385,6 +387,7 @@ app/core/moadian_plugin_dependency.py
 app/core/monitoring.py
 app/core/pagination.py
 app/core/payment_response.py
+app/core/payroll_plugin_dependency.py
 app/core/permissions.py
 app/core/production_security.py
 app/core/query_timeout.py
@@ -512,6 +515,11 @@ app/services/opening_balance_service.py
 app/services/otp_login_service.py
 app/services/password_reset_otp_service.py
 app/services/payment_service.py
+app/services/payroll_accounting.py
+app/services/payroll_excel.py
+app/services/payroll_reports.py
+app/services/payroll_service.py
+app/services/payroll_statutory.py
 app/services/person_bulk_upsert_service.py
 app/services/person_excel_import.py
 app/services/person_group_service.py
@@ -929,6 +937,7 @@ migrations/versions/20260704_000001_ai_model_reasoning_effort.py
 migrations/versions/20260705_000001_merge_support_and_documents_heads.py
 migrations/versions/20260705_000002_support_phase3_sla_realtime.py
 migrations/versions/20260706_000001_support_read_csat.py
+migrations/versions/20260707_000001_payroll_plugin_tables.py
 tests/__init__.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
@@ -975,6 +984,10 @@ tests/test_legacy_sql_account_resolver.py
 tests/test_legacy_sql_dump_reader.py
 tests/test_moadian_plugin_license_gate.py
 tests/test_notification_event_type_defaults.py
+tests/test_payroll_accounting_lines.py
+tests/test_payroll_plugin_license_gate.py
+tests/test_payroll_run_calculations.py
+tests/test_payroll_statutory.py
 tests/test_permissions.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
