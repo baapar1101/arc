@@ -75,6 +75,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   String? _paperSize = 'A4';
   String? _orientation = 'portrait';
   Uint8List? _previewPdfBytes;
+  int _previewRevision = 0;
   List<String> _validationErrors = const [];
   List<String> _validationWarnings = const [];
 
@@ -309,6 +310,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       if (mounted) {
         setState(() {
           _previewPdfBytes = Uint8List.fromList(pdfBytes);
+          _previewRevision++;
           _validationWarnings = warnings;
           _previewLoading = false;
         });
@@ -772,6 +774,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
           child: ReportTemplateStudioPreviewPanel(
             loading: _previewLoading,
             pdfBytes: _previewPdfBytes,
+            previewRevision: _previewRevision,
             errors: _validationErrors,
             warnings: _validationWarnings,
             onRefresh: _refreshPreview,

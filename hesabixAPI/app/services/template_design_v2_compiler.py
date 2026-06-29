@@ -11,6 +11,19 @@ def _esc(s: Any) -> str:
 	return html.escape("" if s is None else str(s))
 
 
+def _jinja_first_of(*exprs: str, default: str = "'-'") -> str:
+	"""اولین مقدار تعریف‌شده و غیرخالی؛ سازگار با StrictUndefined."""
+	guards: List[str] = []
+	for expr in exprs:
+		expr = expr.strip()
+		if "." in expr:
+			root = expr.split(".", 1)[0]
+			guards.append(f"({expr} if {root} is defined and {expr} is defined and {expr} else none)")
+		else:
+			guards.append(f"({expr} if {expr} is defined and {expr} else none)")
+	return "{{ " + " or ".join(guards) + f" or {default}" + " }}"
+
+
 def _color(value: Any, fallback: str) -> str:
 	s = str(value or "").strip()
 	if re.fullmatch(r"#[0-9a-fA-F]{3,8}", s):
@@ -32,11 +45,12 @@ def _visible_columns(columns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def _cell_expr(col: Dict[str, Any]) -> str:
 	key = _esc(col.get("key") or "")
 	fmt = str(col.get("format") or "").lower()
+	val = f"row.{key}|default('', true)"
 	if fmt == "money":
-		return f"{{{{ row.{key}|money }}}}"
+		return f"{{{{ {val}|money }}}}"
 	if fmt == "date":
-		return f"{{{{ row.{key}|date }}}}"
-	return f"{{{{ row.{key} }}}}"
+		return f"{{{{ {val}|date }}}}"
+	return f"{{{{ {val} }}}}"
 
 
 def _total_expr(row: Dict[str, Any]) -> str:
@@ -44,11 +58,12 @@ def _total_expr(row: Dict[str, Any]) -> str:
 	fmt = str(row.get("format") or "").lower()
 	if not expr:
 		return '""'
+	safe = f"{expr}|default('', true)"
 	if fmt == "money":
-		return f"{{{{ {expr}|money }}}}"
+		return f"{{{{ {safe}|money }}}}"
 	if fmt == "date":
-		return f"{{{{ {expr}|date }}}}"
-	return f"{{{{ {expr} }}}}"
+		return f"{{{{ {safe}|date }}}}"
+	return f"{{{{ {safe} }}}}"
 
 
 def _theme_css(design: Dict[str, Any], family_id: str) -> str:
@@ -290,7 +305,7 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
   </div>
   <div class="rt-meta-row">
     <div class="rt-meta-item"><strong>کد:</strong> {{{{ invoice.code | default('-') }}}}</div>
-    <div class="rt-meta-item"><strong>تاریخ:</strong> {{{{ invoice.issue_date | default(invoice_date_jalali | default('-')) }}}}</div>
+    <div class="rt-meta-item"><strong>تاریخ:</strong> {_jinja_first_of("invoice.issue_date", "invoice_date_jalali")}</div>
   </div>
 </div>
 """.strip()
@@ -304,7 +319,7 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
 				"""
 <div class="rt-party">
   <h4>فروشنده</h4>
-  <div>{{ seller.name | default(business_name | default('-')) }}</div>
+  <div>{_jinja_first_of("seller.name", "business_name")}</div>
 </div>
 """.strip()
 			)
@@ -363,7 +378,7 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
 	if sections.get("show_payments", True):
 		body_parts.append(
 			"""
-{% if payments %}
+{% if payments is defined and payments %}
 <div class="rt-card">
   <h4 style="margin:0 0 6px 0;color:var(--rt-primary);">پرداخت‌ها</h4>
   <ul style="margin:0;padding-inline-start:18px;">
@@ -379,7 +394,7 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
 	if sections.get("show_footer_note", True):
 		body_parts.append(
 			"""
-{% if invoice_footer_note %}
+{% if invoice_footer_note is defined and invoice_footer_note %}
 <div class="rt-footer-note">{{ invoice_footer_note }}</div>
 {% endif %}
 """.strip()
@@ -397,7 +412,7 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
 	if sections.get("show_qr", False):
 		body_parts.append(
 			"""
-{% if show_invoice_verify_qr and invoice_verify_qr_data_uri %}
+{% if show_invoice_verify_qr is defined and show_invoice_verify_qr and invoice_verify_qr_data_uri is defined and invoice_verify_qr_data_uri %}
 <div class="rt-qr-wrap">
   <img src="{{ invoice_verify_qr_data_uri }}" width="120" height="120" alt="QR" />
 </div>
@@ -510,7 +525,7 @@ def _compile_footer_bits(sections: Dict[str, Any]) -> str:
 	if sections.get("show_print_time", True):
 		footer_bits.append("{{ generated_at }}")
 	if sections.get("show_preparer", True):
-		footer_bits.append("{{ issuer_name | default(created_by_name | default('')) }}")
+		footer_bits.append(_jinja_first_of("issuer_name", "created_by_name", default="''"))
 	if not footer_bits:
 		return ""
 	return f"""
@@ -549,15 +564,15 @@ def _compile_document_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str
     {logo_html}
   </div>
   <div class="rt-meta-row">
-    <div class="rt-meta-item"><strong>کد:</strong> {{{{ code | default(document.code | default('-')) }}}}</div>
-    <div class="rt-meta-item"><strong>تاریخ:</strong> {{{{ document_date_display | default(document_date_jalali | default(document_date | default('-'))) }}}}</div>
-    <div class="rt-meta-item"><strong>نوع:</strong> {{{{ document.document_type_name | default(document.document_type | default('-')) }}}}</div>
+    <div class="rt-meta-item"><strong>کد:</strong> {_jinja_first_of("code", "document.code")}</div>
+    <div class="rt-meta-item"><strong>تاریخ:</strong> {_jinja_first_of("document_date_display", "document_date_jalali", "document_date")}</div>
+    <div class="rt-meta-item"><strong>نوع:</strong> {_jinja_first_of("document.document_type_name", "document.document_type")}</div>
   </div>
 </div>
 """.strip()
 	body_parts: List[str] = []
 	if sections.get("show_description", True):
-		body_parts.append("{% if description %}<div class='rt-card'>{{ description }}</div>{% endif %}")
+		body_parts.append("{% if description is defined and description %}<div class='rt-card'>{{ description }}</div>{% endif %}")
 	body_parts.append(_compile_table_block(table_cfg))
 	if sections.get("show_totals_row", True):
 		body_parts.append(_compile_totals_block(totals_cfg))
@@ -584,15 +599,15 @@ def _compile_receipt_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
 """.strip()
 	body_parts: List[str] = []
 	if sections.get("show_description", True):
-		body_parts.append("{% if description %}<div class='rt-card'>{{ description }}</div>{% endif %}")
+		body_parts.append("{% if description is defined and description %}<div class='rt-card'>{{ description }}</div>{% endif %}")
 	if sections.get("show_person_lines", True):
 		body_parts.append("""
-{% if person_lines %}
+{% if person_lines is defined and person_lines %}
 <div class="rt-card">
   <h4 style="margin:0 0 6px 0;color:var(--rt-primary);">اشخاص</h4>
   <ul style="margin:0;padding-inline-start:18px;">
   {% for p in person_lines %}
-    <li>{{ p.person_name | default(p.name | default('-')) }} — {{ p.amount | money }}</li>
+    <li>{_jinja_first_of("p.person_name", "p.name")} — {{ p.amount | money }}</li>
   {% endfor %}
   </ul>
 </div>
@@ -640,7 +655,7 @@ def _compile_transfer_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str
 </div>
 """.strip())
 	if sections.get("show_description", True):
-		body_parts.append("{% if description %}<div class='rt-card'>{{ description }}</div>{% endif %}")
+		body_parts.append("{% if description is defined and description %}<div class='rt-card'>{{ description }}</div>{% endif %}")
 	if sections.get("show_account_lines", True):
 		body_parts.append(_compile_table_block(table_cfg))
 	if sections.get("show_total", True) or sections.get("show_commission", True):
@@ -686,15 +701,15 @@ def _compile_postal_label(design: Dict[str, Any]) -> Tuple[str, str, str, str]:
   <div>{{ receiver.name | default('-') }}</div>
   <div>{{ receiver.phone | default('') }}</div>
   <div>{{ receiver.address | default('') }}</div>
-  {% if show_warehouse and receiver.warehouse_name %}<div>انبار: {{ receiver.warehouse_name }}</div>{% endif %}
+  {% if show_warehouse is defined and show_warehouse and receiver is defined and receiver.warehouse_name is defined and receiver.warehouse_name %}<div>انبار: {{ receiver.warehouse_name }}</div>{% endif %}
 </div>
 """.strip())
 	if sections.get("show_delivery", True):
-		body_parts.append("<div class='rt-card'>روش ارسال: {{ document.delivery_method_display | default('-') }}</div>")
+		body_parts.append("<div class='rt-card'>روش ارسال: {{ document.delivery_method_display | default('-', true) }}</div>")
 	if sections.get("show_tracking", True):
-		body_parts.append("{% if document.tracking_number %}<div class='rt-card'>پیگیری: {{ document.tracking_number }}</div>{% endif %}")
+		body_parts.append("{% if document is defined and document.tracking_number is defined and document.tracking_number %}<div class='rt-card'>پیگیری: {{ document.tracking_number }}</div>{% endif %}")
 	if sections.get("show_lines", True):
-		body_parts.append("{% if lines_summary %}<div class='rt-card'>{{ lines_summary }}</div>{% endif %}")
+		body_parts.append("{% if lines_summary is defined and lines_summary %}<div class='rt-card'>{{ lines_summary }}</div>{% endif %}")
 	body_html = f'<div class="rt-layout">{"".join(body_parts)}</div>'
 	html_doc = f"<!doctype html><html><head></head><body>{body_html}</body></html>"
 	return html_doc, css, header_html, ""

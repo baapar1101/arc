@@ -8,6 +8,7 @@ import '../embedded_pdf_iframe.dart';
 class ReportTemplateStudioPreviewPanel extends StatelessWidget {
   final bool loading;
   final Uint8List? pdfBytes;
+  final int previewRevision;
   final List<String> errors;
   final List<String> warnings;
   final VoidCallback? onRefresh;
@@ -16,6 +17,7 @@ class ReportTemplateStudioPreviewPanel extends StatelessWidget {
     super.key,
     required this.loading,
     required this.pdfBytes,
+    this.previewRevision = 0,
     this.errors = const [],
     this.warnings = const [],
     this.onRefresh,
@@ -71,24 +73,24 @@ class ReportTemplateStudioPreviewPanel extends StatelessWidget {
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                       ),
                     )
-                  : Container(
+                  : ColoredBox(
                       color: Colors.grey.shade200,
-                      child: Center(
-                        child: AspectRatio(
-                          aspectRatio: 1 / 1.414,
-                          child: Container(
-                            margin: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 12, offset: const Offset(0, 4)),
-                              ],
-                            ),
-                            clipBehavior: Clip.hardEdge,
-                            child: ReportTemplateEmbeddedPdf(
-                              key: ValueKey(pdfBytes!.length),
-                              bytes: pdfBytes!,
-                            ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.12),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ReportTemplateEmbeddedPdf(
+                            key: ValueKey('preview-$previewRevision'),
+                            bytes: pdfBytes!,
                           ),
                         ),
                       ),

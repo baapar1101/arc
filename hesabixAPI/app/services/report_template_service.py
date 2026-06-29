@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from jinja2.sandbox import SandboxedEnvironment
 from jinja2 import StrictUndefined, BaseLoader, TemplateSyntaxError, UndefinedError
+from jinja2.runtime import Undefined
 
 from adapters.db.models.report_template import ReportTemplate
 from adapters.db.models.report_template_status_event import ReportTemplateStatusEvent
@@ -558,7 +559,14 @@ class ReportTemplateService:
 			enable_async=False,
 		)
 		# فیلترهای ساده کاربردی
-		env.filters["default"] = lambda v, d="": v if v not in (None, "") else d
+		def _default_filter(v, d="", boolean=False):
+			if isinstance(v, Undefined):
+				return d
+			if boolean:
+				return v if v else d
+			return v if v not in (None, "") else d
+
+		env.filters["default"] = _default_filter
 		env.filters["upper"] = lambda v: str(v).upper()
 		env.filters["lower"] = lambda v: str(v).lower()
 		def _smart_number(v, max_decimals: int = 2):
@@ -582,6 +590,8 @@ class ReportTemplateService:
 			return f'<span style="direction:ltr; unicode-bidi:plaintext; font-variant-numeric: tabular-nums">{s}</span>'
 		env.filters["ltr"] = _ltr
 		def _money(v, decimals: int = 0, sep: str = ","):
+			if isinstance(v, Undefined) or v is None or v == "":
+				return ""
 			try:
 				n = float(v)
 			except Exception:
@@ -663,6 +673,15 @@ class ReportTemplateService:
 			"business_name",
 			"invoice_footer_note",
 			"invoice_verify_qr_data_uri",
+			"invoice_date_jalali",
+			"document_date_jalali",
+			"document_date_display",
+			"document_date",
+			"code",
+			"created_by_name",
+			"issuer_name",
+			"generated_at",
+			"description",
 			"title_text",
 			"date_now",
 		):

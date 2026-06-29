@@ -24,15 +24,21 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
   @override
   void initState() {
     super.initState();
-    _mountView();
+    _scheduleMount();
   }
 
   @override
   void didUpdateWidget(covariant ReportTemplateEmbeddedPdf oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(oldWidget.bytes, widget.bytes)) {
-      _mountView();
+      _scheduleMount();
     }
+  }
+
+  void _scheduleMount() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _mountView();
+    });
   }
 
   void _mountView() {
