@@ -6,6 +6,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/data_table/helpers/file_saver.dart';
 import '../../../widgets/person/file_picker_bridge.dart';
+import 'payroll_ui.dart';
 
 /// دیالوگ ورود گروهی پرسنل از Excel.
 class PayrollEmployeeImportDialog extends StatefulWidget {
@@ -80,41 +81,58 @@ class _PayrollEmployeeImportDialogState extends State<PayrollEmployeeImportDialo
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(t.importFromExcel),
-      content: SizedBox(
-        width: 480,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(t.payrollImportEmployeesHint),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _loading ? null : _downloadTemplate,
-              icon: const Icon(Icons.download_outlined),
-              label: Text(t.downloadTemplate),
-            ),
+    return PayrollUi.dialogShell(
+      context: context,
+      title: t.importFromExcel,
+      icon: Icons.upload_file_outlined,
+      maxWidth: 500,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PayrollUi.infoBanner(context: context, message: t.payrollImportEmployeesHint),
+          const SizedBox(height: 16),
+          PayrollUi.importStepCard(
+            context: context,
+            icon: Icons.download_outlined,
+            title: t.downloadTemplate,
+            subtitle: t.payrollImportEmployeesHint,
+            onPressed: _loading ? null : _downloadTemplate,
+            buttonLabel: t.downloadTemplate,
+          ),
+          const SizedBox(height: 10),
+          PayrollUi.importStepCard(
+            context: context,
+            icon: Icons.insert_drive_file_outlined,
+            title: _file?.name ?? t.chooseFile,
+            subtitle: t.chooseFile,
+            selected: _file != null,
+            onPressed: _loading ? null : _pickFile,
+            buttonLabel: t.chooseFile,
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.dryRun),
+            value: _dryRun,
+            onChanged: _loading ? null : (v) => setState(() => _dryRun = v),
+          ),
+          if (_result != null) ...[
             const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _loading ? null : _pickFile,
-              icon: const Icon(Icons.upload_file_outlined),
-              label: Text(_file?.name ?? t.chooseFile),
+            PayrollUi.sectionCard(
+              context: context,
+              title: t.preview,
+              icon: Icons.fact_check_outlined,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${t.payrollImportCreated}: ${_result!['created'] ?? 0}'),
+                  Text('${t.payrollImportUpdated}: ${_result!['updated'] ?? 0}'),
+                  Text('${t.payrollImportErrorCount}: ${_result!['error_count'] ?? 0}'),
+                ],
+              ),
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(t.dryRun),
-              value: _dryRun,
-              onChanged: _loading ? null : (v) => setState(() => _dryRun = v),
-            ),
-            if (_result != null) ...[
-              const Divider(),
-              Text('${t.payrollImportCreated}: ${_result!['created'] ?? 0}'),
-              Text('${t.payrollImportUpdated}: ${_result!['updated'] ?? 0}'),
-              Text('${t.payrollImportErrorCount}: ${_result!['error_count'] ?? 0}'),
-            ],
           ],
-        ),
+        ],
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
@@ -10,6 +9,7 @@ import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import 'payroll_calendar_utils.dart';
+import 'payroll_ui.dart';
 
 /// گزارش‌های پیشرفته حقوق و دستمزد (فاز ۴).
 class PayrollReportsPage extends StatefulWidget {
@@ -30,7 +30,6 @@ class PayrollReportsPage extends StatefulWidget {
 
 class _PayrollReportsPageState extends State<PayrollReportsPage> {
   final PayrollService _svc = PayrollService();
-  final NumberFormat _money = NumberFormat('#,###');
 
   bool _loading = true;
   bool _loadingReports = false;
@@ -162,7 +161,7 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
 
   String _periodLabel(Map<String, dynamic> p) => PayrollCalendarUtils.periodTitle(p, _isJalali);
 
-  String _fmt(dynamic v) => _money.format((v as num?)?.toDouble() ?? 0);
+  String _fmt(dynamic v) => PayrollUi.formatMoney(v);
 
   @override
   Widget build(BuildContext context) {
@@ -181,55 +180,55 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: PayrollUi.pagePadding,
               children: [
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(t.payrollReportsFilters, style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 12),
-                        if (_periods.isNotEmpty)
-                          DropdownButtonFormField<int>(
-                            value: _selectedPeriodId,
-                            decoration: InputDecoration(labelText: t.payrollPeriod),
-                            items: _periods
-                                .map(
-                                  (p) => DropdownMenuItem<int>(
-                                    value: (p['id'] as num).toInt(),
-                                    child: Text(_periodLabel(p)),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: (v) {
-                              setState(() => _selectedPeriodId = v);
-                              _loadReports();
-                            },
-                          ),
-                        const SizedBox(height: 12),
+                PayrollUi.sectionCard(
+                  context: context,
+                  title: t.payrollReportsFilters,
+                  icon: Icons.filter_list,
+                  child: Column(
+                    children: [
+                      if (_periods.isNotEmpty)
                         DropdownButtonFormField<int>(
-                          value: _selectedYear,
-                          decoration: InputDecoration(labelText: t.payrollPeriodYear),
-                          items: _availableYears()
+                          initialValue: _selectedPeriodId,
+                          decoration: PayrollUi.fieldDecoration(context, t.payrollPeriod, prefixIcon: Icons.calendar_month),
+                          items: _periods
                               .map(
-                                (y) => DropdownMenuItem<int>(
-                                  value: y,
-                                  child: Text('$y'),
+                                (p) => DropdownMenuItem<int>(
+                                  value: (p['id'] as num).toInt(),
+                                  child: Text(_periodLabel(p)),
                                 ),
                               )
                               .toList(),
                           onChanged: (v) {
-                            setState(() => _selectedYear = v);
+                            setState(() => _selectedPeriodId = v);
                             _loadReports();
                           },
                         ),
-                      ],
-                    ),
+                      if (_periods.isNotEmpty) const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: _selectedYear,
+                        decoration: PayrollUi.fieldDecoration(context, t.payrollPeriodYear, prefixIcon: Icons.date_range),
+                        items: _availableYears()
+                            .map(
+                              (y) => DropdownMenuItem<int>(
+                                value: y,
+                                child: Text('$y'),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) {
+                          setState(() => _selectedYear = v);
+                          _loadReports();
+                        },
+                      ),
+                    ],
                   ),
                 ),
-                if (_loadingReports) const LinearProgressIndicator(),
+                if (_loadingReports) ...[
+                  const SizedBox(height: 12),
+                  const LinearProgressIndicator(),
+                ],
                 const SizedBox(height: 16),
                 if (_statutorySummary != null && _statutorySummary!.isNotEmpty) ...[
                   Text(t.payrollStatutorySummary, style: Theme.of(context).textTheme.titleMedium),
@@ -281,17 +280,17 @@ class _StatutoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _row(t.payrollGrossTotal, fmt(summary['gross_earnings_total'])),
-            _row(t.payrollInsuranceEmployee, fmt(summary['insurance_employee_total'])),
-            _row(t.payrollInsuranceEmployer, fmt(summary['insurance_employer_total'])),
-            _row(t.payrollTaxTotal, fmt(summary['tax_total'])),
-          ],
-        ),
+    return PayrollUi.sectionCard(
+      context: context,
+      title: t.payrollStatutorySummary,
+      icon: Icons.gavel_outlined,
+      child: Column(
+        children: [
+          _row(t.payrollGrossTotal, fmt(summary['gross_earnings_total'])),
+          _row(t.payrollInsuranceEmployee, fmt(summary['insurance_employee_total'])),
+          _row(t.payrollInsuranceEmployer, fmt(summary['insurance_employer_total'])),
+          _row(t.payrollTaxTotal, fmt(summary['tax_total'])),
+        ],
       ),
     );
   }
@@ -318,7 +317,11 @@ class _ItemSummaryTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return PayrollUi.sectionCard(
+      context: context,
+      title: t.payrollItemSummaryReport,
+      icon: Icons.table_chart_outlined,
+      padding: const EdgeInsets.all(8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
@@ -353,7 +356,11 @@ class _EmployeeSummaryTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return PayrollUi.sectionCard(
+      context: context,
+      title: t.payrollEmployeeSummaryReport,
+      icon: Icons.people_outline,
+      padding: const EdgeInsets.all(8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
@@ -398,7 +405,11 @@ class _PeriodOverviewTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return PayrollUi.sectionCard(
+      context: context,
+      title: t.payrollPeriodOverviewReport,
+      icon: Icons.calendar_view_month,
+      padding: const EdgeInsets.all(8),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(

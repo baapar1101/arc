@@ -3,6 +3,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../models/account_model.dart';
 import '../../../widgets/invoice/account_tree_combobox_widget.dart';
+import 'payroll_ui.dart';
 
 /// دیالوگ انتخاب حساب پرداخت برای ثبت سند پرداخت حقوق.
 class PayrollPostPaymentDialog extends StatefulWidget {
@@ -27,25 +28,25 @@ class _PayrollPostPaymentDialogState extends State<PayrollPostPaymentDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(t.payrollPostPayment),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(t.payrollPostPaymentHint),
-            const SizedBox(height: 12),
-            AccountTreeComboboxWidget(
-              businessId: widget.businessId,
-              selectedAccount: _paymentAccount,
-              label: t.payrollPaymentAccount,
-              dense: true,
-              onChanged: (a) => setState(() => _paymentAccount = a),
-            ),
-          ],
-        ),
+    return PayrollUi.dialogShell(
+      context: context,
+      title: t.payrollPostPayment,
+      icon: Icons.payments_outlined,
+      maxWidth: 460,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PayrollUi.infoBanner(context: context, message: t.payrollPostPaymentHint),
+          const SizedBox(height: 16),
+          AccountTreeComboboxWidget(
+            businessId: widget.businessId,
+            selectedAccount: _paymentAccount,
+            label: t.payrollPaymentAccount,
+            dense: true,
+            onChanged: (a) => setState(() => _paymentAccount = a),
+          ),
+        ],
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: Text(t.cancel)),

@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../models/account_model.dart';
 import '../../../widgets/invoice/account_tree_combobox_widget.dart';
+import 'payroll_ui.dart';
 
 /// دیالوگ ویرایش/ایجاد آیتم حقوق.
 class PayrollItemEditDialog extends StatefulWidget {
@@ -115,115 +116,115 @@ class _PayrollItemEditDialogState extends State<PayrollItemEditDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(_isEdit ? t.payrollEditItem : t.payrollAddItem),
-      content: SizedBox(
-        width: 480,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: _codeCtrl,
-                  enabled: !_isSystem,
-                  decoration: InputDecoration(labelText: t.code),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _nameCtrl,
-                  decoration: InputDecoration(labelText: t.payrollItemName),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
-                ),
-                const SizedBox(height: 12),
-                if (!_isSystem)
-                  DropdownButtonFormField<String>(
-                    value: _itemKind,
-                    decoration: InputDecoration(labelText: t.payrollItemKindLabel),
-                    items: [
-                      DropdownMenuItem(value: 'earning', child: Text(t.payrollItemKindEarning)),
-                      DropdownMenuItem(value: 'deduction', child: Text(t.payrollItemKindDeduction)),
-                      DropdownMenuItem(
-                        value: 'employer_cost',
-                        child: Text(t.payrollItemKindEmployerCost),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _itemKind = v ?? 'earning'),
-                  ),
-                if (!_isSystem) const SizedBox(height: 12),
-                if (widget.categories.isNotEmpty)
-                  DropdownButtonFormField<int?>(
-                    value: _categoryId,
-                    decoration: InputDecoration(labelText: t.payrollItemCategories),
-                    items: [
-                      DropdownMenuItem<int?>(value: null, child: Text('—')),
-                      ...widget.categories.map(
-                        (c) => DropdownMenuItem<int?>(
-                          value: (c['id'] as num).toInt(),
-                          child: Text('${c['name']}'),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _categoryId = v),
-                  ),
-                const SizedBox(height: 12),
-                AccountTreeComboboxWidget(
-                  businessId: widget.businessId,
-                  selectedAccount: _selectedAccount,
-                  label: t.payrollSelectAccount,
-                  dense: true,
-                  onChanged: (a) => setState(() => _selectedAccount = a),
-                ),
-                const SizedBox(height: 12),
-                if (!_isSystem)
-                  DropdownButtonFormField<String>(
-                    value: _calculationType,
-                    decoration: InputDecoration(labelText: t.payrollCalculationType),
-                    items: [
-                      DropdownMenuItem(value: 'manual', child: Text(t.payrollCalcManual)),
-                      DropdownMenuItem(value: 'fixed', child: Text(t.payrollCalcFixed)),
-                      DropdownMenuItem(
-                        value: 'percent_of_base',
-                        child: Text(t.payrollCalcPercentBase),
-                      ),
-                      DropdownMenuItem(value: 'statutory', child: Text(t.payrollCalcStatutory)),
-                    ],
-                    onChanged: (v) => setState(() => _calculationType = v ?? 'manual'),
-                  ),
-                if (!_isSystem) const SizedBox(height: 12),
-                if (_calculationType == 'fixed')
-                  TextFormField(
-                    controller: _defaultAmountCtrl,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(labelText: t.payrollDefaultAmount),
-                  ),
-                if (_calculationType == 'percent_of_base') ...[
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _percentCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(labelText: t.payrollPercentValue),
+    return PayrollUi.dialogShell(
+      context: context,
+      title: _isEdit ? t.payrollEditItem : t.payrollAddItem,
+      icon: Icons.list_alt_outlined,
+      maxWidth: 500,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_isSystem)
+              PayrollUi.infoBanner(
+                context: context,
+                message: t.payrollSystemItem,
+                icon: Icons.lock_outline,
+              ),
+            if (_isSystem) const SizedBox(height: 12),
+            TextFormField(
+              controller: _codeCtrl,
+              enabled: !_isSystem,
+              decoration: PayrollUi.fieldDecoration(context, t.code, prefixIcon: Icons.tag),
+              validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _nameCtrl,
+              decoration: PayrollUi.fieldDecoration(context, t.payrollItemName, prefixIcon: Icons.label_outline),
+              validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
+            ),
+            const SizedBox(height: 12),
+            if (!_isSystem)
+              DropdownButtonFormField<String>(
+                initialValue: _itemKind,
+                decoration: PayrollUi.fieldDecoration(context, t.payrollItemKindLabel, prefixIcon: Icons.category_outlined),
+                items: [
+                  DropdownMenuItem(value: 'earning', child: Text(t.payrollItemKindEarning)),
+                  DropdownMenuItem(value: 'deduction', child: Text(t.payrollItemKindDeduction)),
+                  DropdownMenuItem(value: 'employer_cost', child: Text(t.payrollItemKindEmployerCost)),
+                ],
+                onChanged: (v) => setState(() => _itemKind = v ?? 'earning'),
+              ),
+            if (!_isSystem) const SizedBox(height: 12),
+            if (widget.categories.isNotEmpty)
+              DropdownButtonFormField<int?>(
+                initialValue: _categoryId,
+                decoration: PayrollUi.fieldDecoration(context, t.payrollItemCategories, prefixIcon: Icons.folder_outlined),
+                items: [
+                  DropdownMenuItem<int?>(value: null, child: Text('—')),
+                  ...widget.categories.map(
+                    (c) => DropdownMenuItem<int?>(
+                      value: (c['id'] as num).toInt(),
+                      child: Text('${c['name']}'),
+                    ),
                   ),
                 ],
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(t.payrollShowOnPayslip),
-                  value: _showOnPayslip,
-                  onChanged: (v) => setState(() => _showOnPayslip = v),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(t.active),
-                  value: _isActive,
-                  onChanged: (v) => setState(() => _isActive = v),
-                ),
-              ],
+                onChanged: (v) => setState(() => _categoryId = v),
+              ),
+            if (widget.categories.isNotEmpty) const SizedBox(height: 12),
+            AccountTreeComboboxWidget(
+              businessId: widget.businessId,
+              selectedAccount: _selectedAccount,
+              label: t.payrollSelectAccount,
+              dense: true,
+              onChanged: (a) => setState(() => _selectedAccount = a),
             ),
-          ),
+            const SizedBox(height: 12),
+            if (!_isSystem)
+              DropdownButtonFormField<String>(
+                initialValue: _calculationType,
+                decoration: PayrollUi.fieldDecoration(context, t.payrollCalculationType, prefixIcon: Icons.calculate_outlined),
+                items: [
+                  DropdownMenuItem(value: 'manual', child: Text(t.payrollCalcManual)),
+                  DropdownMenuItem(value: 'fixed', child: Text(t.payrollCalcFixed)),
+                  DropdownMenuItem(value: 'percent_of_base', child: Text(t.payrollCalcPercentBase)),
+                  DropdownMenuItem(value: 'statutory', child: Text(t.payrollCalcStatutory)),
+                ],
+                onChanged: (v) => setState(() => _calculationType = v ?? 'manual'),
+              ),
+            if (!_isSystem) const SizedBox(height: 12),
+            if (_calculationType == 'fixed')
+              TextFormField(
+                controller: _defaultAmountCtrl,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: PayrollUi.fieldDecoration(context, t.payrollDefaultAmount, prefixIcon: Icons.attach_money),
+              ),
+            if (_calculationType == 'percent_of_base') ...[
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _percentCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: PayrollUi.fieldDecoration(context, t.payrollPercentValue, prefixIcon: Icons.percent),
+              ),
+            ],
+            const SizedBox(height: 12),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.payrollShowOnPayslip),
+              value: _showOnPayslip,
+              onChanged: (v) => setState(() => _showOnPayslip = v),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.active),
+              value: _isActive,
+              onChanged: (v) => setState(() => _isActive = v),
+            ),
+          ],
         ),
       ),
       actions: [

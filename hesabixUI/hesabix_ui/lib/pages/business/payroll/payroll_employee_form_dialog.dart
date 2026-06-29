@@ -8,6 +8,7 @@ import '../../../models/person_model.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/date_input_field.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
+import 'payroll_ui.dart';
 
 /// دیالوگ ثبت/ویرایش پرسنل حقوق.
 class PayrollEmployeeFormDialog extends StatefulWidget {
@@ -134,117 +135,106 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(_isEdit ? t.payrollEditEmployee : t.payrollAddEmployee),
-      content: SizedBox(
-        width: 440,
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (!_isEdit) ...[
-                  PersonComboboxWidget(
-                    businessId: widget.businessId,
-                    selectedPerson: _person,
-                    onChanged: (p) => setState(() => _person = p),
-                    label: t.customerClubPerson,
-                    isRequired: true,
-                    personTypes: [PersonType.employee.persianName],
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Text(
-                        t.payrollEmployeePersonHint,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.outline,
-                            ),
-                      ),
+    return PayrollUi.dialogShell(
+      context: context,
+      title: _isEdit ? t.payrollEditEmployee : t.payrollAddEmployee,
+      icon: Icons.badge_outlined,
+      maxWidth: 500,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!_isEdit) ...[
+              PersonComboboxWidget(
+                businessId: widget.businessId,
+                selectedPerson: _person,
+                onChanged: (p) => setState(() => _person = p),
+                label: t.customerClubPerson,
+                isRequired: true,
+                personTypes: [PersonType.employee.persianName],
+              ),
+              const SizedBox(height: 8),
+              PayrollUi.infoBanner(context: context, message: t.payrollEmployeePersonHint, icon: Icons.info_outline),
+              const SizedBox(height: 16),
+            ],
+            TextFormField(
+              controller: _codeCtrl,
+              decoration: PayrollUi.fieldDecoration(context, t.payrollEmployeeCode, prefixIcon: Icons.pin),
+              validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
+            ),
+            const SizedBox(height: 12),
+            if (_activeDepartments.isNotEmpty) ...[
+              DropdownButtonFormField<int?>(
+                initialValue: _departmentId,
+                decoration: PayrollUi.fieldDecoration(context, t.payrollEmployeeDepartment, prefixIcon: Icons.apartment),
+                items: [
+                  DropdownMenuItem<int?>(value: null, child: Text('—')),
+                  ..._activeDepartments.map(
+                    (d) => DropdownMenuItem<int?>(
+                      value: (d['id'] as num).toInt(),
+                      child: Text('${d['name'] ?? d['code']}'),
                     ),
                   ),
-                  const SizedBox(height: 12),
                 ],
-                TextFormField(
-                  controller: _codeCtrl,
-                  decoration: InputDecoration(labelText: t.payrollEmployeeCode),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
-                ),
-                const SizedBox(height: 12),
-                if (_activeDepartments.isNotEmpty) ...[
-                  DropdownButtonFormField<int?>(
-                    initialValue: _departmentId,
-                    decoration: InputDecoration(labelText: t.payrollEmployeeDepartment),
-                    items: [
-                      DropdownMenuItem<int?>(value: null, child: Text('—')),
-                      ..._activeDepartments.map(
-                        (d) => DropdownMenuItem<int?>(
-                          value: (d['id'] as num).toInt(),
-                          child: Text('${d['name'] ?? d['code']}'),
-                        ),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _departmentId = v),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                TextFormField(
-                  controller: _jobCtrl,
-                  decoration: InputDecoration(labelText: t.payrollJobTitle),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _salaryCtrl,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(labelText: t.payrollBaseSalary),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: _employmentType,
-                  decoration: InputDecoration(labelText: t.payrollEmploymentType),
-                  items: [
-                    DropdownMenuItem(value: 'full_time', child: Text(t.payrollEmploymentFullTime)),
-                    DropdownMenuItem(value: 'part_time', child: Text(t.payrollEmploymentPartTime)),
-                    DropdownMenuItem(value: 'contract', child: Text(t.payrollEmploymentContract)),
-                  ],
-                  onChanged: (v) => setState(() => _employmentType = v ?? 'full_time'),
-                ),
-                const SizedBox(height: 12),
-                DateInputField(
-                  value: _hireDate,
-                  calendarController: widget.calendarController,
-                  labelText: t.payrollHireDate,
-                  onChanged: (d) => setState(() => _hireDate = d),
-                ),
-                const SizedBox(height: 12),
-                DateInputField(
-                  value: _terminationDate,
-                  calendarController: widget.calendarController,
-                  labelText: t.payrollTerminationDate,
-                  onChanged: (d) => setState(() => _terminationDate = d),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _insuranceCtrl,
-                  decoration: InputDecoration(labelText: t.payrollInsuranceNumber),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _taxCtrl,
-                  decoration: InputDecoration(labelText: t.payrollTaxId),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(t.active),
-                  value: _isActive,
-                  onChanged: (v) => setState(() => _isActive = v),
-                ),
-              ],
+                onChanged: (v) => setState(() => _departmentId = v),
+              ),
+              const SizedBox(height: 12),
+            ],
+            TextFormField(
+              controller: _jobCtrl,
+              decoration: PayrollUi.fieldDecoration(context, t.payrollJobTitle, prefixIcon: Icons.work_outline),
             ),
-          ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _salaryCtrl,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: PayrollUi.fieldDecoration(context, t.payrollBaseSalary, prefixIcon: Icons.payments_outlined),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _employmentType,
+              decoration: PayrollUi.fieldDecoration(context, t.payrollEmploymentType, prefixIcon: Icons.schedule),
+              items: [
+                DropdownMenuItem(value: 'full_time', child: Text(t.payrollEmploymentFullTime)),
+                DropdownMenuItem(value: 'part_time', child: Text(t.payrollEmploymentPartTime)),
+                DropdownMenuItem(value: 'contract', child: Text(t.payrollEmploymentContract)),
+              ],
+              onChanged: (v) => setState(() => _employmentType = v ?? 'full_time'),
+            ),
+            const SizedBox(height: 12),
+            DateInputField(
+              value: _hireDate,
+              calendarController: widget.calendarController,
+              labelText: t.payrollHireDate,
+              onChanged: (d) => setState(() => _hireDate = d),
+            ),
+            const SizedBox(height: 12),
+            DateInputField(
+              value: _terminationDate,
+              calendarController: widget.calendarController,
+              labelText: t.payrollTerminationDate,
+              onChanged: (d) => setState(() => _terminationDate = d),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _insuranceCtrl,
+              decoration: PayrollUi.fieldDecoration(context, t.payrollInsuranceNumber, prefixIcon: Icons.health_and_safety_outlined),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _taxCtrl,
+              decoration: PayrollUi.fieldDecoration(context, t.payrollTaxId, prefixIcon: Icons.receipt_long_outlined),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(t.active),
+              value: _isActive,
+              onChanged: (v) => setState(() => _isActive = v),
+            ),
+          ],
         ),
       ),
       actions: [

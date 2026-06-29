@@ -15,6 +15,7 @@ import '../../../widgets/invoice/invoice_pdf_print_flow.dart';
 import 'payroll_calendar_utils.dart';
 import 'payroll_post_payment_dialog.dart';
 import 'payroll_run_import_dialog.dart';
+import 'payroll_ui.dart';
 
 /// ایجاد یا ویرایش سند حقوق (اجرای حقوق).
 class PayrollRunEditPage extends StatefulWidget {
@@ -483,16 +484,13 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
   Future<void> _deleteRun() async {
     if (widget.runId == null || !_isDraft) return;
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await PayrollUi.showConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.delete),
-        content: Text(t.payrollDeleteRunConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
-        ],
-      ),
+      title: t.delete,
+      message: t.payrollDeleteRunConfirm,
+      icon: Icons.delete_outline,
+      destructive: true,
+      confirmLabel: t.delete,
     );
     if (ok != true) return;
     try {
@@ -505,28 +503,10 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
     }
   }
 
-  String _statusLabel(AppLocalizations t, String? status) {
-    switch (status) {
-      case 'draft':
-        return t.payrollStatusDraft;
-      case 'finalized':
-        return t.payrollStatusFinalized;
-      case 'pending_approval':
-        return t.payrollStatusPendingApproval;
-      case 'approved':
-        return t.payrollStatusApproved;
-      case 'posted':
-        return t.payrollStatusPosted;
-      case 'cancelled':
-        return t.payrollStatusCancelled;
-      default:
-        return status ?? '';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final status = _run?['status'] as String?;
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isNew ? t.payrollNewRun : t.payrollEditRun),
@@ -558,7 +538,13 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
           if (_run != null)
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 8),
-              child: Chip(label: Text(_statusLabel(t, _run!['status'] as String?))),
+              child: Center(
+                child: PayrollUi.statusChip(
+                  context,
+                  PayrollUi.runStatusLabel(t, status),
+                  color: PayrollUi.runStatusColor(context, status),
+                ),
+              ),
             ),
           if (_isDraft && _canOperate && !widget.isNew)
             IconButton(
@@ -573,44 +559,53 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
           : Form(
               key: _formKey,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: PayrollUi.pagePadding,
                 children: [
-                  TextFormField(
-                    controller: _titleCtrl,
-                    enabled: _isDraft,
-                    decoration: InputDecoration(labelText: t.payrollRunTitle),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DateInputField(
-                    value: _runDate,
-                    enabled: _isDraft,
-                    calendarController: widget.calendarController,
-                    labelText: t.payrollRunDate,
-                    validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
-                    onChanged: _isDraft ? (d) => setState(() => _runDate = d) : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int?>(
-                    value: _periodId,
-                    decoration: InputDecoration(labelText: t.payrollPeriod),
-                    items: [
-                      DropdownMenuItem<int?>(value: null, child: Text('—')),
-                      ..._periods.map(
-                        (p) => DropdownMenuItem<int?>(
-                          value: (p['id'] as num).toInt(),
-                          child: Text(PayrollCalendarUtils.periodTitle(p, _isJalali)),
+                  PayrollUi.sectionCard(
+                    context: context,
+                    title: t.payrollRunTitle,
+                    icon: Icons.description_outlined,
+                    child: Column(
+                      children: [
+                        TextFormField(
+                          controller: _titleCtrl,
+                          enabled: _isDraft,
+                          decoration: PayrollUi.fieldDecoration(context, t.payrollRunTitle, prefixIcon: Icons.title),
+                          validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
                         ),
-                      ),
-                    ],
-                    onChanged: _isDraft ? (v) => setState(() => _periodId = v) : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _descCtrl,
-                    enabled: _isDraft,
-                    maxLines: 2,
-                    decoration: InputDecoration(labelText: t.description),
+                        const SizedBox(height: 12),
+                        DateInputField(
+                          value: _runDate,
+                          enabled: _isDraft,
+                          calendarController: widget.calendarController,
+                          labelText: t.payrollRunDate,
+                          validator: (v) => (v == null || v.trim().isEmpty) ? t.required : null,
+                          onChanged: _isDraft ? (d) => setState(() => _runDate = d) : null,
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<int?>(
+                          initialValue: _periodId,
+                          decoration: PayrollUi.fieldDecoration(context, t.payrollPeriod, prefixIcon: Icons.calendar_month),
+                          items: [
+                            DropdownMenuItem<int?>(value: null, child: Text('—')),
+                            ..._periods.map(
+                              (p) => DropdownMenuItem<int?>(
+                                value: (p['id'] as num).toInt(),
+                                child: Text(PayrollCalendarUtils.periodTitle(p, _isJalali)),
+                              ),
+                            ),
+                          ],
+                          onChanged: _isDraft ? (v) => setState(() => _periodId = v) : null,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: _descCtrl,
+                          enabled: _isDraft,
+                          maxLines: 2,
+                          decoration: PayrollUi.fieldDecoration(context, t.description, prefixIcon: Icons.notes),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   if (_run != null) ...[
@@ -626,28 +621,45 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
                     if (_deptSummary != null) _DepartmentSummaryCard(summary: _deptSummary!, t: t),
                     if (_deptSummary != null) const SizedBox(height: 16),
                   ],
-                  Text(t.payrollEmployeesTab, style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  if (widget.isNew)
-                    ..._employees.map((emp) {
-                      final id = (emp['id'] as num).toInt();
-                      return CheckboxListTile(
-                        value: _selectedEmployeeIds.contains(id),
-                        onChanged: (v) {
-                          setState(() {
-                            if (v == true) {
-                              _selectedEmployeeIds.add(id);
-                            } else {
-                              _selectedEmployeeIds.remove(id);
-                            }
-                          });
-                        },
-                        title: Text('${emp['person_name'] ?? emp['employee_code']}'),
-                        subtitle: Text('${emp['employee_code']}'),
-                      );
-                    }),
-                  if (!widget.isNew)
-                    ..._buildEmployeeLineEditors(t),
+                  PayrollUi.sectionCard(
+                    context: context,
+                    title: t.payrollEmployeesTab,
+                    icon: Icons.people_outline,
+                    child: Column(
+                      children: [
+                        if (widget.isNew)
+                          ..._employees.map((emp) {
+                            final id = (emp['id'] as num).toInt();
+                            final selected = _selectedEmployeeIds.contains(id);
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Material(
+                                color: selected
+                                    ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35)
+                                    : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+                                borderRadius: BorderRadius.circular(12),
+                                child: CheckboxListTile(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  value: selected,
+                                  onChanged: (v) {
+                                    setState(() {
+                                      if (v == true) {
+                                        _selectedEmployeeIds.add(id);
+                                      } else {
+                                        _selectedEmployeeIds.remove(id);
+                                      }
+                                    });
+                                  },
+                                  title: Text('${emp['person_name'] ?? emp['employee_code']}'),
+                                  subtitle: Text('${emp['employee_code']}'),
+                                ),
+                              ),
+                            );
+                          }),
+                        if (!widget.isNew) ..._buildEmployeeLineEditors(t),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 80),
                 ],
               ),
@@ -658,29 +670,24 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
 
   Widget? _buildBottomBar(AppLocalizations t) {
     if (_run != null && _run!['status'] == 'pending_approval' && _canApprove) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _saving ? null : _rejectRun,
-                  child: Text(t.payrollRejectRun),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: _saving ? null : _approveRun,
-                  child: _saving
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(t.payrollApproveRun),
-                ),
-              ),
-            ],
+      return PayrollUi.bottomActionBar(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _saving ? null : _rejectRun,
+              child: Text(t.payrollRejectRun),
+            ),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton(
+              onPressed: _saving ? null : _approveRun,
+              child: _saving
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(t.payrollApproveRun),
+            ),
+          ),
+        ],
       );
     }
 
@@ -688,63 +695,60 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
         _run!['status'] == 'finalized' &&
         !_hasAccrualLink &&
         _canPost) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilledButton(
-            onPressed: _saving ? null : _postAccounting,
-            child: _saving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(t.payrollPostAccounting),
+      return PayrollUi.bottomActionBar(
+        children: [
+          Expanded(
+            child: FilledButton(
+              onPressed: _saving ? null : _postAccounting,
+              child: _saving
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(t.payrollPostAccounting),
+            ),
           ),
-        ),
+        ],
       );
     }
 
     if (_run != null && _hasAccrualLink && !_hasPaymentLink && _canPost) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: FilledButton(
-            onPressed: _saving ? null : _postPayment,
-            child: _saving
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(t.payrollPostPayment),
+      return PayrollUi.bottomActionBar(
+        children: [
+          Expanded(
+            child: FilledButton(
+              onPressed: _saving ? null : _postPayment,
+              child: _saving
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(t.payrollPostPayment),
+            ),
           ),
-        ),
+        ],
       );
     }
 
     if (_isDraft && _canOperate) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _saving ? null : () => _save(),
-                  child: Text(t.save),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: _saving
-                      ? null
-                      : () => widget.isNew ? _save(finalize: true) : _finalizeExisting(),
-                  child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(t.payrollFinalizeRun),
-                ),
-              ),
-            ],
+      return PayrollUi.bottomActionBar(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _saving ? null : () => _save(),
+              child: Text(t.save),
+            ),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton(
+              onPressed: _saving
+                  ? null
+                  : () => widget.isNew ? _save(finalize: true) : _finalizeExisting(),
+              child: _saving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(t.payrollFinalizeRun),
+            ),
+          ),
+        ],
       );
     }
     return null;
@@ -755,37 +759,47 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
     return lines.map((line) {
       final empId = (line['employee_id'] as num).toInt();
       final name = line['person_name'] ?? line['employee_code'] ?? '';
-      return Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ExpansionTile(
-          title: Text('$name'),
-          subtitle: Text(
-            '${t.payrollNetAmount}: ${formatWithThousands(line['net_amount'])}',
-          ),
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: _items.map((item) {
-                  final itemId = (item['id'] as num).toInt();
-                  final ctrl = _controllerFor(empId, itemId);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: TextFormField(
-                      controller: ctrl,
-                      enabled: _isDraft,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: '${item['name']}',
-                        isDense: true,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                  );
-                }).toList(),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Material(
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(PayrollUi.cardRadius),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(PayrollUi.cardRadius),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.35),
               ),
             ),
-          ],
+            child: ExpansionTile(
+              leading: CircleAvatar(
+                radius: 18,
+                child: Text(name.toString().isNotEmpty ? name.toString().substring(0, 1) : '?'),
+              ),
+              title: Text('$name'),
+              subtitle: Text('${t.payrollNetAmount}: ${formatWithThousands(line['net_amount'])}'),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                  child: Column(
+                    children: _items.map((item) {
+                      final itemId = (item['id'] as num).toInt();
+                      final ctrl = _controllerFor(empId, itemId);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: TextFormField(
+                          controller: ctrl,
+                          enabled: _isDraft,
+                          keyboardType: TextInputType.number,
+                          decoration: PayrollUi.fieldDecoration(context, '${item['name']}'),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }).toList();
@@ -816,33 +830,29 @@ class _AccountingLinksCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.payrollAccountingLinks, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            ...links.map((link) {
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                leading: Icon(
-                  link['link_type'] == 'payment' ? Icons.payments_outlined : Icons.account_balance_outlined,
-                ),
-                title: Text(_linkLabel(link['link_type'] as String?)),
-                subtitle: Text(
-                  [
-                    '${link['document_code'] ?? link['document_id']}',
-                    if (link['document_date'] != null)
-                      PayrollCalendarUtils.formatRunDate(link['document_date'], isJalali),
-                  ].join(' · '),
-                ),
-              );
-            }),
-          ],
-        ),
+    return PayrollUi.sectionCard(
+      context: context,
+      title: t.payrollAccountingLinks,
+      icon: Icons.account_balance_outlined,
+      child: Column(
+        children: links.map((link) {
+          return ListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            leading: Icon(
+              link['link_type'] == 'payment' ? Icons.payments_outlined : Icons.account_balance_outlined,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            title: Text(_linkLabel(link['link_type'] as String?)),
+            subtitle: Text(
+              [
+                '${link['document_code'] ?? link['document_id']}',
+                if (link['document_date'] != null)
+                  PayrollCalendarUtils.formatRunDate(link['document_date'], isJalali),
+              ].join(' · '),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -858,30 +868,25 @@ class _DepartmentSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = (summary['items'] as List?) ?? [];
     if (items.isEmpty) return const SizedBox.shrink();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(t.payrollDepartmentSummary, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 8),
-            ...items.map((raw) {
-              final row = Map<String, dynamic>.from(raw as Map);
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Expanded(child: Text('${row['department_name'] ?? '—'}')),
-                    Text('${row['employee_count'] ?? 0}'),
-                    const SizedBox(width: 12),
-                    Text(formatWithThousands(row['net_total'])),
-                  ],
-                ),
-              );
-            }),
-          ],
-        ),
+    return PayrollUi.sectionCard(
+      context: context,
+      title: t.payrollDepartmentSummary,
+      icon: Icons.apartment_outlined,
+      child: Column(
+        children: items.map((raw) {
+          final row = Map<String, dynamic>.from(raw as Map);
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Row(
+              children: [
+                Expanded(child: Text('${row['department_name'] ?? '—'}')),
+                Text('${row['employee_count'] ?? 0}'),
+                const SizedBox(width: 12),
+                Text(formatWithThousands(row['net_total'])),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -895,25 +900,48 @@ class _TotalsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Wrap(
-          spacing: 24,
-          runSpacing: 8,
-          children: [
-            _totalChip(t.payrollGrossTotal, run['gross_total']),
-            _totalChip(t.payrollDeductionTotal, run['deduction_total']),
-            _totalChip(t.payrollNetTotal, run['net_total']),
-          ],
-        ),
+    return PayrollUi.sectionCard(
+      context: context,
+      title: t.payrollGrossTotal,
+      icon: Icons.summarize_outlined,
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          _totalChip(context, t.payrollGrossTotal, run['gross_total'], Icons.trending_up),
+          _totalChip(context, t.payrollDeductionTotal, run['deduction_total'], Icons.remove_circle_outline),
+          _totalChip(context, t.payrollNetTotal, run['net_total'], Icons.payments_outlined),
+        ],
       ),
     );
   }
 
-  Widget _totalChip(String label, dynamic value) {
-    return Chip(
-      label: Text('$label: ${formatWithThousands(value)}'),
+  Widget _totalChip(BuildContext context, String label, dynamic value, IconData icon) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: cs.primary),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.bodySmall),
+              Text(
+                PayrollUi.formatMoney(value),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

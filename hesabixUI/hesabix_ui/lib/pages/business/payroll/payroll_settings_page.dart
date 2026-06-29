@@ -11,6 +11,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/account_tree_combobox_widget.dart';
 import '../../../core/permission_guard.dart';
 import 'payroll_item_edit_dialog.dart';
+import 'payroll_ui.dart';
 
 /// تنظیمات افزونه حقوق و دستمزد: آیتم‌ها، حساب‌های پیش‌فرض و قوانین.
 class PayrollSettingsPage extends StatefulWidget {
@@ -238,207 +239,212 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: PayrollUi.pagePadding,
               children: [
-                SwitchListTile(
-                  title: Text(t.payrollSettingsEnabled),
-                  subtitle: Text(t.payrollSettingsEnabledDescription),
-                  value: _settings['enabled'] == true,
-                  onChanged: _canManage && !_saving ? _toggleEnabled : null,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(t.payrollItemsTab, style: Theme.of(context).textTheme.titleMedium),
-                    ),
-                    TextButton.icon(
-                      onPressed: _canManage ? () => _editItem(null) : null,
-                      icon: const Icon(Icons.add),
-                      label: Text(t.payrollAddItem),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  t.payrollSettingsItemsDescription,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                ..._items.map((item) {
-                  final hasAccount = item['account_id'] != null;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: Icon(
-                        hasAccount ? Icons.account_balance : Icons.link_off,
-                        color: hasAccount
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.outline,
-                      ),
-                      title: Text('${item['name']}'),
-                      subtitle: Text(
-                        '${_kindLabel(t, item['item_kind'] as String?)} · ${item['code'] ?? ''}',
-                      ),
-                      trailing: item['is_system'] == true
-                          ? Chip(
-                              label: Text(t.payrollSystemItem),
-                              visualDensity: VisualDensity.compact,
-                            )
-                          : const Icon(Icons.chevron_left),
-                      onTap: _canManage ? () => _editItem(item) : null,
-                    ),
-                  );
-                }),
-                const SizedBox(height: 24),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(t.payrollWorkflowSettings, style: Theme.of(context).textTheme.titleSmall),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(t.payrollRequireApproval),
-                          subtitle: Text(t.payrollRequireApprovalHint),
-                          value: _requireApproval,
-                          onChanged: _canManage && !_saving
-                              ? (v) => setState(() => _requireApproval = v)
-                              : null,
-                        ),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(t.payrollAutoPostOnFinalize),
-                          subtitle: Text(t.payrollAutoPostOnFinalizeHint),
-                          value: _autoPostOnFinalize,
-                          onChanged: _canManage && !_saving
-                              ? (v) => setState(() => _autoPostOnFinalize = v)
-                              : null,
-                        ),
-                      ],
-                    ),
+                PayrollUi.sectionCard(
+                  context: context,
+                  title: t.payrollSettingsEnabled,
+                  icon: Icons.power_settings_new,
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(t.payrollSettingsEnabled),
+                    subtitle: Text(t.payrollSettingsEnabledDescription),
+                    value: _settings['enabled'] == true,
+                    onChanged: _canManage && !_saving ? _toggleEnabled : null,
                   ),
                 ),
                 const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(t.payrollStatutoryRules, style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 8),
-                        Text(t.payrollStatutoryRulesHint, style: Theme.of(context).textTheme.bodySmall),
-                        const SizedBox(height: 12),
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(t.payrollStatutoryEnabled),
-                          value: _statutoryEnabled,
-                          onChanged: _canManage && !_saving
-                              ? (v) => setState(() => _statutoryEnabled = v)
-                              : null,
-                        ),
-                        TextFormField(
-                          controller: _insEmpRateCtrl,
-                          enabled: _canManage && !_saving,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(labelText: t.payrollInsuranceEmployeeRate),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _insErRateCtrl,
-                          enabled: _canManage && !_saving,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(labelText: t.payrollInsuranceEmployerRate),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _insUnempRateCtrl,
-                          enabled: _canManage && !_saving,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(labelText: t.payrollInsuranceUnemploymentRate),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _taxFlatRateCtrl,
-                          enabled: _canManage && !_saving,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: InputDecoration(labelText: t.payrollTaxFlatRate),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _taxExemptionCtrl,
-                          enabled: _canManage && !_saving,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(labelText: t.payrollTaxExemption),
-                        ),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: FilledButton(
-                            onPressed: _canManage && !_saving ? _saveStatutoryRules : null,
-                            child: Text(t.save),
+                PayrollUi.sectionCard(
+                  context: context,
+                  title: t.payrollItemsTab,
+                  icon: Icons.list_alt_outlined,
+                  trailing: TextButton.icon(
+                    onPressed: _canManage ? () => _editItem(null) : null,
+                    icon: const Icon(Icons.add),
+                    label: Text(t.payrollAddItem),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        t.payrollSettingsItemsDescription,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      ..._items.map((item) {
+                        final hasAccount = item['account_id'] != null;
+                        final kind = item['item_kind'] as String?;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: PayrollUi.listTileCard(
+                            context: context,
+                            leading: Icon(
+                              hasAccount ? Icons.account_balance_outlined : Icons.link_off,
+                              color: hasAccount
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.outline,
+                            ),
+                            title: Text('${item['name']}'),
+                            subtitle: Text('${item['code'] ?? ''}'),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (item['is_system'] == true)
+                                  PayrollUi.statusChip(context, t.payrollSystemItem),
+                                if (item['is_system'] != true)
+                                  PayrollUi.kindChip(context, _kindLabel(t, kind), kind),
+                              ],
+                            ),
+                            onTap: _canManage ? () => _editItem(item) : null,
                           ),
-                        ),
-                      ],
-                    ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(t.payrollDefaultAccounts, style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(height: 12),
-                        AccountTreeComboboxWidget(
-                          businessId: widget.businessId,
-                          selectedAccount: _wagesPayableAccount,
-                          label: t.payrollAccountWagesPayable,
-                          dense: true,
-                          onChanged: (a) => setState(() => _wagesPayableAccount = a),
+                const SizedBox(height: 16),
+                PayrollUi.sectionCard(
+                  context: context,
+                  title: t.payrollWorkflowSettings,
+                  icon: Icons.account_tree_outlined,
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(t.payrollRequireApproval),
+                        subtitle: Text(t.payrollRequireApprovalHint),
+                        value: _requireApproval,
+                        onChanged: _canManage && !_saving
+                            ? (v) => setState(() => _requireApproval = v)
+                            : null,
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(t.payrollAutoPostOnFinalize),
+                        subtitle: Text(t.payrollAutoPostOnFinalizeHint),
+                        value: _autoPostOnFinalize,
+                        onChanged: _canManage && !_saving
+                            ? (v) => setState(() => _autoPostOnFinalize = v)
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                PayrollUi.sectionCard(
+                  context: context,
+                  title: t.payrollStatutoryRules,
+                  icon: Icons.gavel_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(t.payrollStatutoryRulesHint, style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(t.payrollStatutoryEnabled),
+                        value: _statutoryEnabled,
+                        onChanged: _canManage && !_saving
+                            ? (v) => setState(() => _statutoryEnabled = v)
+                            : null,
+                      ),
+                      TextFormField(
+                        controller: _insEmpRateCtrl,
+                        enabled: _canManage && !_saving,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: PayrollUi.fieldDecoration(context, t.payrollInsuranceEmployeeRate),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _insErRateCtrl,
+                        enabled: _canManage && !_saving,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: PayrollUi.fieldDecoration(context, t.payrollInsuranceEmployerRate),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _insUnempRateCtrl,
+                        enabled: _canManage && !_saving,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: PayrollUi.fieldDecoration(context, t.payrollInsuranceUnemploymentRate),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _taxFlatRateCtrl,
+                        enabled: _canManage && !_saving,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        decoration: PayrollUi.fieldDecoration(context, t.payrollTaxFlatRate),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _taxExemptionCtrl,
+                        enabled: _canManage && !_saving,
+                        keyboardType: TextInputType.number,
+                        decoration: PayrollUi.fieldDecoration(context, t.payrollTaxExemption),
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: FilledButton(
+                          onPressed: _canManage && !_saving ? _saveStatutoryRules : null,
+                          child: Text(t.save),
                         ),
-                        const SizedBox(height: 12),
-                        AccountTreeComboboxWidget(
-                          businessId: widget.businessId,
-                          selectedAccount: _expenseAccount,
-                          label: t.payrollAccountExpense,
-                          dense: true,
-                          onChanged: (a) => setState(() => _expenseAccount = a),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                PayrollUi.sectionCard(
+                  context: context,
+                  title: t.payrollDefaultAccounts,
+                  icon: Icons.account_balance_outlined,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AccountTreeComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedAccount: _wagesPayableAccount,
+                        label: t.payrollAccountWagesPayable,
+                        dense: true,
+                        onChanged: (a) => setState(() => _wagesPayableAccount = a),
+                      ),
+                      const SizedBox(height: 12),
+                      AccountTreeComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedAccount: _expenseAccount,
+                        label: t.payrollAccountExpense,
+                        dense: true,
+                        onChanged: (a) => setState(() => _expenseAccount = a),
+                      ),
+                      const SizedBox(height: 12),
+                      AccountTreeComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedAccount: _taxAccount,
+                        label: t.payrollAccountTaxPayable,
+                        dense: true,
+                        onChanged: (a) => setState(() => _taxAccount = a),
+                      ),
+                      const SizedBox(height: 12),
+                      AccountTreeComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedAccount: _insuranceAccount,
+                        label: t.payrollAccountInsurancePayable,
+                        dense: true,
+                        onChanged: (a) => setState(() => _insuranceAccount = a),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(t.payrollDefaultAccountsHint, style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: FilledButton(
+                          onPressed: _canManage && !_saving ? _saveDefaultAccounts : null,
+                          child: Text(t.save),
                         ),
-                        const SizedBox(height: 12),
-                        AccountTreeComboboxWidget(
-                          businessId: widget.businessId,
-                          selectedAccount: _taxAccount,
-                          label: t.payrollAccountTaxPayable,
-                          dense: true,
-                          onChanged: (a) => setState(() => _taxAccount = a),
-                        ),
-                        const SizedBox(height: 12),
-                        AccountTreeComboboxWidget(
-                          businessId: widget.businessId,
-                          selectedAccount: _insuranceAccount,
-                          label: t.payrollAccountInsurancePayable,
-                          dense: true,
-                          onChanged: (a) => setState(() => _insuranceAccount = a),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(t.payrollDefaultAccountsHint, style: Theme.of(context).textTheme.bodySmall),
-                        const SizedBox(height: 12),
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: FilledButton(
-                            onPressed: _canManage && !_saving ? _saveDefaultAccounts : null,
-                            child: Text(t.save),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ],

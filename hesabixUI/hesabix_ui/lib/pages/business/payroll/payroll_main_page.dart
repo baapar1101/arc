@@ -15,6 +15,7 @@ import 'payroll_department_form_dialog.dart';
 import 'payroll_employee_form_dialog.dart';
 import 'payroll_employee_import_dialog.dart';
 import 'payroll_item_edit_dialog.dart';
+import 'payroll_ui.dart';
 
 /// داشبورد اصلی حقوق و دستمزد.
 class PayrollMainPage extends StatefulWidget {
@@ -138,6 +139,7 @@ class _PayrollMainPageState extends State<PayrollMainPage> with SingleTickerProv
         ],
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
           tabs: [
             Tab(text: t.payrollRunsTab, icon: const Icon(Icons.receipt_long_outlined)),
             Tab(text: t.payrollPeriodsTab, icon: const Icon(Icons.calendar_month_outlined)),
@@ -148,11 +150,13 @@ class _PayrollMainPageState extends State<PayrollMainPage> with SingleTickerProv
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                _SummaryCards(dashboard: _dashboard, t: t),
-                Expanded(
-                  child: TabBarView(
+          : RefreshIndicator(
+              onRefresh: _loadAll,
+              child: Column(
+                children: [
+                  _SummaryCards(dashboard: _dashboard, t: t),
+                  Expanded(
+                    child: TabBarView(
                     controller: _tabController,
                     children: [
                       _RunsTab(
@@ -193,6 +197,7 @@ class _PayrollMainPageState extends State<PayrollMainPage> with SingleTickerProv
                 ),
               ],
             ),
+          ),
       floatingActionButton: _canOperate && _tabController.index == 0
           ? FloatingActionButton.extended(
               onPressed: () => context.go(
@@ -226,90 +231,68 @@ class _SummaryCards extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final pending = (dashboard['pending_approvals'] as num?)?.toInt() ?? 0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isNarrow = constraints.maxWidth < 520;
+              final cards = [
+                PayrollUi.statCard(
+                  context: context,
                   label: t.payrollDashboardActiveEmployees,
                   value: '${dashboard['active_employees'] ?? 0}',
-                  icon: Icons.people,
+                  icon: Icons.people_outline,
                   color: theme.colorScheme.primary,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
+                PayrollUi.statCard(
+                  context: context,
                   label: t.payrollItemsTab,
                   value: '${dashboard['active_items'] ?? 0}',
-                  icon: Icons.list_alt,
+                  icon: Icons.list_alt_outlined,
                   color: theme.colorScheme.tertiary,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
+                PayrollUi.statCard(
+                  context: context,
                   label: t.payrollDashboardDraftRuns,
                   value: '${dashboard['draft_runs'] ?? 0}',
-                  icon: Icons.edit_note,
+                  icon: Icons.edit_note_outlined,
                   color: theme.colorScheme.secondary,
                 ),
-              ),
-            ],
+              ];
+              if (isNarrow) {
+                return Column(
+                  children: [
+                    for (var i = 0; i < cards.length; i++) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      cards[i],
+                    ],
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  for (var i = 0; i < cards.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 12),
+                    Expanded(child: cards[i]),
+                  ],
+                ],
+              );
+            },
           ),
-          if (((dashboard['pending_approvals'] as num?)?.toInt() ?? 0) > 0) ...[
+          if (pending > 0) ...[
             const SizedBox(height: 12),
-            Card(
-              color: theme.colorScheme.errorContainer,
-              child: ListTile(
-                leading: Icon(Icons.pending_actions, color: theme.colorScheme.onErrorContainer),
-                title: Text(
-                  t.payrollDashboardPendingApprovals,
-                  style: TextStyle(color: theme.colorScheme.onErrorContainer),
-                ),
-                trailing: Text(
-                  '${dashboard['pending_approvals'] ?? 0}',
-                  style: theme.textTheme.titleLarge?.copyWith(color: theme.colorScheme.onErrorContainer),
-                ),
-              ),
+            PayrollUi.infoBanner(
+              context: context,
+              message: '${t.payrollDashboardPendingApprovals}: $pending',
+              icon: Icons.pending_actions,
+              backgroundColor: theme.colorScheme.errorContainer.withValues(alpha: 0.55),
+              foregroundColor: theme.colorScheme.onErrorContainer,
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 8),
-            Text(value, style: Theme.of(context).textTheme.titleLarge),
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
       ),
     );
   }
@@ -335,24 +318,44 @@ class _RunsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (runs.isEmpty) {
-      return Center(child: Text(t.payrollNoRunsYet));
+      return PayrollUi.emptyState(
+        context: context,
+        icon: Icons.receipt_long_outlined,
+        title: t.payrollNoRunsYet,
+        subtitle: canOperate ? t.payrollCreateRun : null,
+      );
     }
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: PayrollUi.pagePadding,
       itemCount: runs.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final run = runs[i];
         final id = (run['id'] as num).toInt();
-        return ListTile(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          tileColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-          leading: const Icon(Icons.receipt_long_outlined),
+        final status = run['status'] as String?;
+        return PayrollUi.listTileCard(
+          context: context,
+          leading: Icon(Icons.receipt_long_outlined, color: PayrollUi.runStatusColor(context, status)),
           title: Text('${run['title'] ?? run['code'] ?? ''}'),
           subtitle: Text(
-            '${PayrollCalendarUtils.formatRunDate(run['run_date'], isJalali)} · ${run['status'] ?? ''}',
+            PayrollCalendarUtils.formatRunDate(run['run_date'], isJalali),
           ),
-          trailing: Text('${run['net_total'] ?? 0}'),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              PayrollUi.statusChip(
+                context,
+                PayrollUi.runStatusLabel(t, status),
+                color: PayrollUi.runStatusColor(context, status),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                PayrollUi.formatMoney(run['net_total']),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
           onTap: () => context.go(context.businessPanelUrl(businessId, 'payroll/$id')),
         );
       },
@@ -391,52 +394,60 @@ class _PeriodsTab extends StatelessWidget {
     final titleCtrl = TextEditingController();
     DateTime? startDate;
     DateTime? endDate;
-    final result = await showDialog<bool>(
+    final result = await PayrollUi.showFormDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(t.payrollAddPeriod),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      title: t.payrollAddPeriod,
+      icon: Icons.calendar_month_outlined,
+      maxWidth: 480,
+      content: StatefulBuilder(
+        builder: (ctx, setDialogState) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
               children: [
-                TextField(
-                  controller: yearCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(labelText: t.payrollPeriodYear),
+                Expanded(
+                  child: TextField(
+                    controller: yearCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: PayrollUi.fieldDecoration(ctx, t.payrollPeriodYear, prefixIcon: Icons.date_range),
+                  ),
                 ),
-                TextField(
-                  controller: monthCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(labelText: t.payrollPeriodMonth),
-                ),
-                TextField(
-                  controller: titleCtrl,
-                  decoration: InputDecoration(labelText: t.payrollRunTitle),
-                ),
-                const SizedBox(height: 12),
-                DateInputField(
-                  value: startDate,
-                  calendarController: calendarController,
-                  labelText: t.payrollPeriodStartDate,
-                  onChanged: (d) => setDialogState(() => startDate = d),
-                ),
-                const SizedBox(height: 12),
-                DateInputField(
-                  value: endDate,
-                  calendarController: calendarController,
-                  labelText: t.payrollPeriodEndDate,
-                  onChanged: (d) => setDialogState(() => endDate = d),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: monthCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: PayrollUi.fieldDecoration(ctx, t.payrollPeriodMonth, prefixIcon: Icons.calendar_view_month),
+                  ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: titleCtrl,
+              decoration: PayrollUi.fieldDecoration(ctx, t.payrollRunTitle, prefixIcon: Icons.title),
+            ),
+            const SizedBox(height: 12),
+            DateInputField(
+              value: startDate,
+              calendarController: calendarController,
+              labelText: t.payrollPeriodStartDate,
+              onChanged: (d) => setDialogState(() => startDate = d),
+            ),
+            const SizedBox(height: 12),
+            DateInputField(
+              value: endDate,
+              calendarController: calendarController,
+              labelText: t.payrollPeriodEndDate,
+              onChanged: (d) => setDialogState(() => endDate = d),
+            ),
           ],
         ),
       ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(t.save)),
+      ],
     );
     if (result != true) {
       yearCtrl.dispose();
@@ -472,16 +483,12 @@ class _PeriodsTab extends StatelessWidget {
 
   Future<void> _closePeriod(BuildContext context, Map<String, dynamic> period) async {
     final id = (period['id'] as num).toInt();
-    final confirm = await showDialog<bool>(
+    final confirm = await PayrollUi.showConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.payrollClosePeriod),
-        content: Text(t.payrollClosePeriodConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.confirm)),
-        ],
-      ),
+      title: t.payrollClosePeriod,
+      message: t.payrollClosePeriodConfirm,
+      icon: Icons.lock_outline,
+      destructive: true,
     );
     if (confirm != true) return;
     try {
@@ -497,27 +504,30 @@ class _PeriodsTab extends StatelessWidget {
     }
   }
 
-  String _statusLabel(String? status) {
-    if (status == 'closed') return t.payrollPeriodStatusClosed;
-    return t.payrollPeriodStatusOpen;
-  }
+  String _statusLabel(String? status) => PayrollUi.periodStatusLabel(t, status);
 
   @override
   Widget build(BuildContext context) {
     final isJalali = calendarController.isJalali;
     if (periods.isEmpty) {
-      return Center(child: Text(t.payrollNoPeriodsYet));
+      return PayrollUi.emptyState(
+        context: context,
+        icon: Icons.calendar_month_outlined,
+        title: t.payrollNoPeriodsYet,
+        subtitle: canOperate ? t.payrollAddPeriod : null,
+      );
     }
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: PayrollUi.pagePadding,
       itemCount: periods.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
         final period = periods[i];
         final isOpen = period['status'] != 'closed';
-        return ListTile(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          tileColor: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+        final status = period['status'] as String?;
+        return PayrollUi.listTileCard(
+          context: context,
+          accentColor: isOpen ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outline,
           leading: Icon(
             isOpen ? Icons.lock_open_outlined : Icons.lock_outline,
             color: isOpen ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outline,
@@ -530,16 +540,31 @@ class _PeriodsTab extends StatelessWidget {
                 (period['month'] as num).toInt(),
                 isJalali,
               ),
-              _statusLabel(period['status'] as String?),
               if (period['start_date'] != null)
                 PayrollCalendarUtils.formatRunDate(period['start_date'], isJalali),
               if (period['end_date'] != null)
                 PayrollCalendarUtils.formatRunDate(period['end_date'], isJalali),
             ].where((s) => s.isNotEmpty).join(' · '),
           ),
-          trailing: canOperate && isOpen
-              ? TextButton(onPressed: () => _closePeriod(context, period), child: Text(t.payrollClosePeriod))
-              : null,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PayrollUi.statusChip(
+                context,
+                _statusLabel(status),
+                color: isOpen ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outline,
+                icon: isOpen ? Icons.lock_open : Icons.lock,
+              ),
+              if (canOperate && isOpen) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: t.payrollClosePeriod,
+                  onPressed: () => _closePeriod(context, period),
+                  icon: const Icon(Icons.lock_outline),
+                ),
+              ],
+            ],
+          ),
         );
       },
     );
@@ -563,18 +588,7 @@ class _ItemsTab extends StatelessWidget {
     required this.onChanged,
   });
 
-  String _kindLabel(String? kind) {
-    switch (kind) {
-      case 'earning':
-        return t.payrollItemKindEarning;
-      case 'deduction':
-        return t.payrollItemKindDeduction;
-      case 'employer_cost':
-        return t.payrollItemKindEmployerCost;
-      default:
-        return kind ?? '';
-    }
-  }
+  String _kindLabel(String? kind) => PayrollUi.itemKindLabel(t, kind);
 
   Future<void> _editItem(BuildContext context, Map<String, dynamic>? existing) async {
     final payload = await PayrollItemEditDialog.show(
@@ -608,39 +622,43 @@ class _ItemsTab extends StatelessWidget {
     return Column(
       children: [
         if (canManage)
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: TextButton.icon(
-              onPressed: () => _editItem(context, null),
-              icon: const Icon(Icons.add),
-              label: Text(t.payrollAddItem),
-            ),
+          PayrollUi.toolbar(
+            actions: [
+              PayrollUi.actionButton(
+                onPressed: () => _editItem(context, null),
+                icon: Icons.add,
+                label: t.payrollAddItem,
+                filled: true,
+              ),
+            ],
           ),
         Expanded(
           child: items.isEmpty
-              ? Center(child: Text(t.payrollNoItemsYet))
+              ? PayrollUi.emptyState(
+                  context: context,
+                  icon: Icons.list_alt_outlined,
+                  title: t.payrollNoItemsYet,
+                  subtitle: canManage ? t.payrollAddItem : null,
+                )
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: PayrollUi.pagePadding,
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, i) {
                     final item = items[i];
-                    return ListTile(
-                      title: Text('${item['name'] ?? ''}'),
-                      subtitle: Text(
-                        '${_kindLabel(item['item_kind'] as String?)} · ${item['code'] ?? ''}',
+                    final kind = item['item_kind'] as String?;
+                    final hasAccount = item['account_id'] != null;
+                    return PayrollUi.listTileCard(
+                      context: context,
+                      leading: Icon(
+                        hasAccount ? Icons.account_balance_outlined : Icons.link_off,
+                        color: hasAccount
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.outline,
                       ),
-                      trailing: item['account_id'] != null
-                          ? Icon(
-                              Icons.account_balance,
-                              color: Theme.of(context).colorScheme.primary,
-                              size: 20,
-                            )
-                          : Icon(
-                              Icons.link_off,
-                              color: Theme.of(context).colorScheme.outline,
-                              size: 20,
-                            ),
+                      title: Text('${item['name'] ?? ''}'),
+                      subtitle: Text('${item['code'] ?? ''}'),
+                      trailing: PayrollUi.kindChip(context, _kindLabel(kind), kind),
                       onTap: canManage ? () => _editItem(context, item) : null,
                     );
                   },
@@ -746,63 +764,68 @@ class _EmployeesTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (canManage)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Row(
-              children: [
-                Text(t.payrollDepartmentsTab, style: Theme.of(context).textTheme.titleSmall),
-                const Spacer(),
-                TextButton.icon(
-                  onPressed: () => _editDepartment(context, null),
-                  icon: const Icon(Icons.add_business_outlined, size: 18),
-                  label: Text(t.payrollAddDepartment),
-                ),
-              ],
+          PayrollUi.sectionCard(
+            context: context,
+            title: t.payrollDepartmentsTab,
+            icon: Icons.apartment_outlined,
+            trailing: TextButton.icon(
+              onPressed: () => _editDepartment(context, null),
+              icon: const Icon(Icons.add_business_outlined, size: 18),
+              label: Text(t.payrollAddDepartment),
             ),
-          ),
-        if (departments.isNotEmpty)
-          SizedBox(
-            height: 44,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: departments.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final d = departments[i];
-                return ActionChip(
-                  label: Text('${d['name'] ?? d['code']}'),
-                  onPressed: canManage ? () => _editDepartment(context, d) : null,
-                );
-              },
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: departments.isEmpty
+                ? Text(
+                    t.payrollAddDepartment,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  )
+                : SizedBox(
+                    height: 40,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: departments.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) {
+                        final d = departments[i];
+                        return FilterChip(
+                          label: Text('${d['name'] ?? d['code']}'),
+                          selected: d['is_active'] != false,
+                          onSelected: canManage ? (_) => _editDepartment(context, d) : null,
+                        );
+                      },
+                    ),
+                  ),
           ),
         if (canManage)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () => _importEmployees(context),
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: Text(t.importFromExcel),
-                ),
-                TextButton.icon(
-                  onPressed: () => _addEmployee(context),
-                  icon: const Icon(Icons.person_add_outlined),
-                  label: Text(t.payrollAddEmployee),
-                ),
-              ],
-            ),
+          PayrollUi.toolbar(
+            actions: [
+              PayrollUi.actionButton(
+                onPressed: () => _importEmployees(context),
+                icon: Icons.upload_file_outlined,
+                label: t.importFromExcel,
+              ),
+              PayrollUi.actionButton(
+                onPressed: () => _addEmployee(context),
+                icon: Icons.person_add_outlined,
+                label: t.payrollAddEmployee,
+                filled: true,
+              ),
+            ],
           ),
         Expanded(
           child: employees.isEmpty
-              ? Center(child: Text(t.payrollNoEmployeesYet))
+              ? PayrollUi.emptyState(
+                  context: context,
+                  icon: Icons.people_outline,
+                  title: t.payrollNoEmployeesYet,
+                  subtitle: canManage ? t.payrollAddEmployee : null,
+                )
               : ListView.separated(
-                  padding: const EdgeInsets.all(16),
+                  padding: PayrollUi.pagePadding,
                   itemCount: employees.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
                   itemBuilder: (context, i) {
                     final emp = employees[i];
                     final code = '${emp['employee_code'] ?? '?'}';
@@ -819,9 +842,14 @@ class _EmployeesTab extends StatelessWidget {
                         }
                       }
                     }
-                    return ListTile(
-                      leading: CircleAvatar(
-                        child: Text(code.isNotEmpty ? code.substring(0, 1) : '?'),
+                    return PayrollUi.listTileCard(
+                      context: context,
+                      leading: Text(
+                        code.isNotEmpty ? code.substring(0, 1) : '?',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
                       ),
                       title: Text('${emp['person_name'] ?? emp['employee_code'] ?? ''}'),
                       subtitle: Text(
@@ -832,7 +860,12 @@ class _EmployeesTab extends StatelessWidget {
                           if (hireLabel != null) '${t.payrollHireDate}: $hireLabel',
                         ].join(' · '),
                       ),
-                      trailing: emp['base_salary'] != null ? Text('${emp['base_salary']}') : null,
+                      trailing: emp['base_salary'] != null
+                          ? Text(
+                              PayrollUi.formatMoney(emp['base_salary']),
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                            )
+                          : null,
                       onTap: canManage ? () => _editEmployee(context, emp) : null,
                     );
                   },

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import 'payroll_ui.dart';
+
 /// دیالوگ ایجاد یا ویرایش بخش سازمانی.
 class PayrollDepartmentFormDialog extends StatefulWidget {
   final Map<String, dynamic>? existing;
@@ -66,40 +68,45 @@ class _PayrollDepartmentFormDialogState extends State<PayrollDepartmentFormDialo
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(_isEdit ? t.payrollEditDepartment : t.payrollAddDepartment),
-      content: SizedBox(
-        width: 400,
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!_isEdit)
-                TextFormField(
-                  controller: _codeCtrl,
-                  decoration: InputDecoration(labelText: t.payrollDepartmentCode),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? t.requiredField : null,
-                ),
+    return PayrollUi.dialogShell(
+      context: context,
+      title: _isEdit ? t.payrollEditDepartment : t.payrollAddDepartment,
+      icon: Icons.apartment_outlined,
+      maxWidth: 440,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!_isEdit)
               TextFormField(
-                controller: _nameCtrl,
-                decoration: InputDecoration(labelText: t.payrollDepartmentName),
+                controller: _codeCtrl,
+                decoration: PayrollUi.fieldDecoration(context, t.payrollDepartmentCode, prefixIcon: Icons.tag),
                 validator: (v) => (v == null || v.trim().isEmpty) ? t.requiredField : null,
               ),
-              TextFormField(
-                controller: _sortCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: t.payrollSortOrder),
+            if (!_isEdit) const SizedBox(height: 12),
+            TextFormField(
+              controller: _nameCtrl,
+              decoration: PayrollUi.fieldDecoration(context, t.payrollDepartmentName, prefixIcon: Icons.badge_outlined),
+              validator: (v) => (v == null || v.trim().isEmpty) ? t.requiredField : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _sortCtrl,
+              keyboardType: TextInputType.number,
+              decoration: PayrollUi.fieldDecoration(context, t.payrollSortOrder, prefixIcon: Icons.sort),
+            ),
+            if (_isEdit) ...[
+              const SizedBox(height: 8),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(t.active),
+                value: _isActive,
+                onChanged: (v) => setState(() => _isActive = v),
               ),
-              if (_isEdit)
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(t.active),
-                  value: _isActive,
-                  onChanged: (v) => setState(() => _isActive = v),
-                ),
             ],
-          ),
+          ],
         ),
       ),
       actions: [
