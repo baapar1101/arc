@@ -9,7 +9,7 @@ from collections import defaultdict, deque
 
 from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy.orm.attributes import flag_modified
-from sqlalchemy import and_, or_, func, cast
+from sqlalchemy import and_, or_, func, cast, Integer
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 
