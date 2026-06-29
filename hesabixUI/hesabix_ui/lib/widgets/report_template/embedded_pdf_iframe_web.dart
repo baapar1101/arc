@@ -1,4 +1,3 @@
-import 'dart:js_interop';
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
@@ -6,7 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:web/web.dart' as web;
 
+import '../../utils/web/web_utils.dart' as web_utils;
+
 /// نمایش PDF داخل صفحه (وب) با iframe و blob URL.
+///
+/// ریشهٔ DOM باید ظرفی با ابعاد قطعی باشد؛ فقط iframe با height:100% کافی نیست
+/// چون در platform view والد اغلب ارتفاع محاسبه‌شده ندارد.
+/// همچنین revoke زودهنگام blob URL باعث صفحهٔ سفید در iframe می‌شود.
 class ReportTemplateEmbeddedPdf extends StatefulWidget {
   final Uint8List bytes;
 
@@ -42,7 +47,12 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
   }
 
   void _mountView() {
-    _revokeBlob();
+    final previousUrl = _objectUrl;
+    if (previousUrl != null) {
+      _scheduleRevoke(previousUrl);
+    }
+
+    _objectUrl = null;
     _viewType = null;
 
     if (widget.bytes.isEmpty) {
@@ -51,46 +61,61 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
     }
 
     final seq = ++_seq;
-    final bytes = widget.bytes;
-    final blob = web.Blob(
-      [bytes.toJS].toJS,
-      web.BlobPropertyBag(type: 'application/pdf'),
+    final url = web_utils.createObjectUrlFromBytes(
+      widget.bytes,
+      mimeType: 'application/pdf',
     );
-    final url = web.URL.createObjectURL(blob);
     final vt = 'report-pdf-$seq-${DateTime.now().microsecondsSinceEpoch}';
 
     ui_web.platformViewRegistry.registerViewFactory(vt, (int viewId) {
-      final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement;
-      iframe.src = url;
-      iframe.title = 'PDF preview';
-      iframe.style.border = 'none';
-      iframe.style.width = '100%';
-      iframe.style.height = '100%';
-      iframe.style.display = 'block';
-      return iframe;
+      final root = web.document.createElement('div') as web.HTMLDivElement
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.position = 'relative'
+        ..style.overflow = 'hidden'
+        ..style.display = 'block';
+
+      final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement
+        ..src = url
+        ..title = 'PDF preview'
+        ..style.border = 'none'
+        ..style.position = 'absolute'
+        ..style.left = '0'
+        ..style.top = '0'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.display = 'block';
+
+      root.append(iframe);
+      return root;
     });
 
-    if (mounted) {
-      setState(() {
-        _objectUrl = url;
-        _viewType = vt;
-      });
+    if (!mounted || seq != _seq) {
+      _scheduleRevoke(url);
+      return;
     }
+
+    setState(() {
+      _objectUrl = url;
+      _viewType = vt;
+    });
   }
 
-  void _revokeBlob() {
-    final url = _objectUrl;
-    if (url == null || url.isEmpty) return;
-    try {
-      web.URL.revokeObjectURL(url);
-    } catch (_) {}
-    _objectUrl = null;
+  void _scheduleRevoke(String url) {
+    if (url.isEmpty) return;
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      web_utils.revokeBlobUrl(url);
+    });
   }
 
   @override
   void dispose() {
-    _revokeBlob();
+    final url = _objectUrl;
+    _objectUrl = null;
     super.dispose();
+    if (url != null) {
+      _scheduleRevoke(url);
+    }
   }
 
   @override

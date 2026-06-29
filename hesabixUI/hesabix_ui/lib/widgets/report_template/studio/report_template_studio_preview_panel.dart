@@ -77,20 +77,22 @@ class ReportTemplateStudioPreviewPanel extends StatelessWidget {
                       color: Colors.grey.shade200,
                       child: Padding(
                         padding: const EdgeInsets.all(12),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.12),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: ReportTemplateEmbeddedPdf(
-                            key: ValueKey('preview-$previewRevision'),
-                            bytes: pdfBytes!,
+                        child: SizedBox.expand(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: ReportTemplateEmbeddedPdf(
+                              key: ValueKey('preview-$previewRevision'),
+                              bytes: pdfBytes!,
+                            ),
                           ),
                         ),
                       ),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/report_template_constants.dart';
+import '../../core/business_named_route_locations.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
@@ -253,6 +254,19 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
     return ok == true;
   }
 
+  void _navigateBackAfterSave() {
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop(true);
+      return;
+    }
+    BusinessNamedRoutes.goNamed(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_report_templates',
+    );
+  }
+
   Future<void> _save() async {
     final t = AppLocalizations.of(context);
     final name = _nameCtrl.text.trim();
@@ -310,7 +324,7 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
       _lastSavedFingerprint = _fingerprint();
       if (mounted) {
         SnackBarHelper.show(context, message: t.save);
-        context.pop(true);
+        _navigateBackAfterSave();
       }
     } catch (e) {
       if (mounted) {
