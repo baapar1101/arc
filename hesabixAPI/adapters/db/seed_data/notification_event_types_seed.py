@@ -558,6 +558,41 @@ NOTIFICATION_EVENT_TYPES_ROWS: list[dict] = [
         "is_active": True,
         "requires_approval": True,
     },
+    {
+        "code": "payroll.run.finalized",
+        "name": "قطعی‌سازی اجرای حقوق",
+        "description": "پس از قطعی‌سازی سند حقوق ماهانه",
+        "category": "payroll",
+        "available_variables": [
+            {"key": "run_code", "type": "string", "description": "کد اجرای حقوق"},
+            {"key": "period_title", "type": "string", "description": "عنوان دوره"},
+            {"key": "net_total", "type": "number", "description": "جمع خالص پرداختی"},
+            {"key": "employee_count", "type": "number", "description": "تعداد پرسنل"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "اجرای حقوق {{ run_code }} برای {{ period_title }} قطعی شد. جمع خالص: {{ net_total | format_currency }}. {{ business_name }}",
+        "default_email_template": "اجرای حقوق {{ run_code }} برای دوره {{ period_title }} قطعی شد.\nتعداد پرسنل: {{ employee_count }}\nجمع خالص: {{ net_total | format_currency }}\n\n{{ business_name }}",
+        "default_email_subject": "قطعی‌سازی حقوق — {{ period_title }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
+    {
+        "code": "payroll.run.posted",
+        "name": "ثبت سند حسابداری حقوق",
+        "description": "پس از صدور سند حسابداری حقوق",
+        "category": "payroll",
+        "available_variables": [
+            {"key": "run_code", "type": "string", "description": "کد اجرای حقوق"},
+            {"key": "document_code", "type": "string", "description": "شماره سند حسابداری"},
+            {"key": "period_title", "type": "string", "description": "عنوان دوره"},
+            {"key": "business_name", "type": "string", "description": "نام کسب‌وکار"},
+        ],
+        "default_sms_template": "سند حسابداری حقوق {{ document_code }} برای {{ period_title }} ثبت شد. {{ business_name }}",
+        "default_email_template": "سند حسابداری شماره {{ document_code }} برای اجرای حقوق {{ run_code }} ({{ period_title }}) ثبت شد.\n\n{{ business_name }}",
+        "default_email_subject": "ثبت سند حسابداری حقوق — {{ document_code }}",
+        "is_active": True,
+        "requires_approval": False,
+    },
 ]
 
 

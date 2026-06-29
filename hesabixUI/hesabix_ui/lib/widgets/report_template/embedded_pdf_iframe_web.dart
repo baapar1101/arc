@@ -7,11 +7,15 @@ import 'package:web/web.dart' as web;
 
 import '../../utils/web/web_utils.dart' as web_utils;
 
-/// نمایش PDF داخل صفحه (وب) با iframe و blob URL.
-///
-/// ریشهٔ DOM باید ظرفی با ابعاد قطعی باشد؛ فقط iframe با height:100% کافی نیست
-/// چون در platform view والد اغلب ارتفاع محاسبه‌شده ندارد.
-/// همچنین revoke زودهنگام blob URL باعث صفحهٔ سفید در iframe می‌شود.
+bool _isPdfBytes(Uint8List bytes) {
+  return bytes.length >= 5 &&
+      bytes[0] == 0x25 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x44 &&
+      bytes[3] == 0x46;
+}
+
+/// نمایش PDF داخل صفحه (وب) با platform view و blob URL.
 class ReportTemplateEmbeddedPdf extends StatefulWidget {
   final Uint8List bytes;
 
@@ -22,88 +26,95 @@ class ReportTemplateEmbeddedPdf extends StatefulWidget {
 }
 
 class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
-  String? _viewType;
+  static int _factorySeq = 0;
+
+  late final String _viewType;
+  web.HTMLIFrameElement? _iframe;
   String? _objectUrl;
-  int _seq = 0;
+  String? _error;
+  bool _viewMounted = false;
 
   @override
   void initState() {
     super.initState();
-    _scheduleMount();
+    _viewType = 'report-pdf-${++_factorySeq}-${identityHashCode(this)}';
+    ui_web.platformViewRegistry.registerViewFactory(_viewType, _createView);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _applyBytes();
+    });
   }
 
   @override
   void didUpdateWidget(covariant ReportTemplateEmbeddedPdf oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(oldWidget.bytes, widget.bytes)) {
-      _scheduleMount();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _applyBytes();
+      });
     }
   }
 
-  void _scheduleMount() {
+  web.Element _createView(int viewId) {
+    final root = web.document.createElement('div') as web.HTMLDivElement
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.minHeight = '320px'
+      ..style.position = 'relative'
+      ..style.overflow = 'hidden'
+      ..style.display = 'block'
+      ..style.backgroundColor = '#ffffff';
+
+    final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement
+      ..title = 'PDF preview'
+      ..style.border = 'none'
+      ..style.position = 'absolute'
+      ..style.left = '0'
+      ..style.top = '0'
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..style.display = 'block';
+
+    root.append(iframe);
+    _iframe = iframe;
+    _viewMounted = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _mountView();
+      if (mounted) _applyBytes();
     });
+    return root;
   }
 
-  void _mountView() {
-    final previousUrl = _objectUrl;
-    if (previousUrl != null) {
-      _scheduleRevoke(previousUrl);
-    }
-
-    _objectUrl = null;
-    _viewType = null;
+  void _applyBytes() {
+    if (!_viewMounted || _iframe == null) return;
 
     if (widget.bytes.isEmpty) {
-      if (mounted) setState(() {});
+      setState(() => _error = 'فایل PDF خالی است');
       return;
     }
 
-    final seq = ++_seq;
+    if (!_isPdfBytes(widget.bytes)) {
+      setState(() => _error = 'پاسخ سرور فایل PDF معتبر نیست');
+      return;
+    }
+
+    final previousUrl = _objectUrl;
     final url = web_utils.createObjectUrlFromBytes(
       widget.bytes,
       mimeType: 'application/pdf',
     );
-    final vt = 'report-pdf-$seq-${DateTime.now().microsecondsSinceEpoch}';
-
-    ui_web.platformViewRegistry.registerViewFactory(vt, (int viewId) {
-      final root = web.document.createElement('div') as web.HTMLDivElement
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.position = 'relative'
-        ..style.overflow = 'hidden'
-        ..style.display = 'block';
-
-      final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement
-        ..src = url
-        ..title = 'PDF preview'
-        ..style.border = 'none'
-        ..style.position = 'absolute'
-        ..style.left = '0'
-        ..style.top = '0'
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.display = 'block';
-
-      root.append(iframe);
-      return root;
-    });
-
-    if (!mounted || seq != _seq) {
-      _scheduleRevoke(url);
-      return;
+    _iframe!.src = url;
+    _objectUrl = url;
+    if (previousUrl != null && previousUrl != url) {
+      _scheduleRevoke(previousUrl);
     }
 
-    setState(() {
-      _objectUrl = url;
-      _viewType = vt;
-    });
+    if (_error != null) {
+      setState(() => _error = null);
+    }
   }
 
   void _scheduleRevoke(String url) {
     if (url.isEmpty) return;
-    Future<void>.delayed(const Duration(seconds: 3), () {
+    Future<void>.delayed(const Duration(seconds: 30), () {
       web_utils.revokeBlobUrl(url);
     });
   }
@@ -112,6 +123,7 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
   void dispose() {
     final url = _objectUrl;
     _objectUrl = null;
+    _iframe = null;
     super.dispose();
     if (url != null) {
       _scheduleRevoke(url);
@@ -120,6 +132,21 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
 
   @override
   Widget build(BuildContext context) {
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+          ),
+        ),
+      );
+    }
+
     if (widget.bytes.isEmpty) {
       return Center(
         child: Text(
@@ -131,16 +158,22 @@ class _ReportTemplateEmbeddedPdfState extends State<ReportTemplateEmbeddedPdf> {
       );
     }
 
-    final vt = _viewType;
-    if (vt == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return SizedBox.expand(
-      child: HtmlElementView(
-        key: ValueKey(vt),
-        viewType: vt,
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        var width = constraints.maxWidth;
+        var height = constraints.maxHeight;
+        if (!width.isFinite || width <= 0) {
+          width = MediaQuery.sizeOf(context).width;
+        }
+        if (!height.isFinite || height <= 0) {
+          height = MediaQuery.sizeOf(context).height * 0.55;
+        }
+        return SizedBox(
+          width: width,
+          height: height,
+          child: HtmlElementView(viewType: _viewType),
+        );
+      },
     );
   }
 }

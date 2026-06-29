@@ -362,9 +362,9 @@ class ApiClient {
 
   // Download PDF API
   Future<List<int>> downloadPdf(String path, {Map<String, dynamic>? query, Map<String, dynamic>? data}) async {
+    final Response<List<int>> response;
     if (data != null) {
-      // POST request with data
-      final response = await post<List<int>>(
+      response = await post<List<int>>(
         path,
         data: data,
         query: query,
@@ -375,10 +375,8 @@ class ApiClient {
           },
         ),
       );
-      return response.data ?? [];
     } else {
-      // GET request
-      final response = await get<List<int>>(
+      response = await get<List<int>>(
         path,
         query: query,
         responseType: ResponseType.bytes,
@@ -388,8 +386,29 @@ class ApiClient {
           },
         ),
       );
-      return response.data ?? [];
     }
+
+    final raw = response.data;
+    if (raw == null || raw.isEmpty) {
+      throw StateError('پاسخ PDF خالی است');
+    }
+
+    final bytes = raw is Uint8List ? raw : Uint8List.fromList(raw);
+    final contentType = response.headers.value('content-type')?.toLowerCase() ?? '';
+    final looksLikePdf = bytes.length >= 4 &&
+        bytes[0] == 0x25 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x44 &&
+        bytes[3] == 0x46;
+
+    if (!looksLikePdf) {
+      if (contentType.contains('application/json') || bytes.first == 0x7b) {
+        throw StateError('سرور به‌جای PDF پاسخ خطا برگرداند');
+      }
+      throw StateError('فایل دریافتی PDF معتبر نیست');
+    }
+
+    return bytes;
   }
 
   // Download Excel API

@@ -21000,6 +21000,858 @@ abstract class AppLocalizations {
   /// **'Customer Club'**
   String get customerClubMenu;
 
+  /// No description provided for @payrollTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get payrollTitle;
+
+  /// No description provided for @payrollMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get payrollMenu;
+
+  /// No description provided for @payrollPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'The payroll add-on is not active for this business. Activate it from the plugin marketplace.'**
+  String get payrollPluginNotActive;
+
+  /// No description provided for @businessSettingsPayroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get businessSettingsPayroll;
+
+  /// No description provided for @businessSettingsPayrollDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll items, account mapping, and calculation rules'**
+  String get businessSettingsPayrollDescription;
+
+  /// No description provided for @payrollPermissionManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage payroll settings and items'**
+  String get payrollPermissionManage;
+
+  /// No description provided for @payrollPermissionOperate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and edit payroll documents and runs'**
+  String get payrollPermissionOperate;
+
+  /// No description provided for @payrollPermissionPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Post payroll accounting documents'**
+  String get payrollPermissionPost;
+
+  /// No description provided for @payrollPermissionApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and finalize payroll runs'**
+  String get payrollPermissionApprove;
+
+  /// No description provided for @payrollDashboardActiveEmployees.
+  ///
+  /// In en, this message translates to:
+  /// **'Active employees'**
+  String get payrollDashboardActiveEmployees;
+
+  /// No description provided for @payrollDashboardDraftRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft payroll runs'**
+  String get payrollDashboardDraftRuns;
+
+  /// No description provided for @payrollItemsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll items'**
+  String get payrollItemsTab;
+
+  /// No description provided for @payrollEmployeesTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Employees'**
+  String get payrollEmployeesTab;
+
+  /// No description provided for @payrollRunsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll documents'**
+  String get payrollRunsTab;
+
+  /// No description provided for @payrollSettingsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll settings'**
+  String get payrollSettingsTab;
+
+  /// No description provided for @payrollNoRunsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No payroll documents yet.'**
+  String get payrollNoRunsYet;
+
+  /// No description provided for @payrollNoItemsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No payroll items defined.'**
+  String get payrollNoItemsYet;
+
+  /// No description provided for @payrollNoEmployeesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No employees registered.'**
+  String get payrollNoEmployeesYet;
+
+  /// No description provided for @payrollItemKindEarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Earnings'**
+  String get payrollItemKindEarning;
+
+  /// No description provided for @payrollItemKindDeduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Deductions'**
+  String get payrollItemKindDeduction;
+
+  /// No description provided for @payrollItemKindEmployerCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Employer cost'**
+  String get payrollItemKindEmployerCost;
+
+  /// No description provided for @payrollSettingsEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable payroll module'**
+  String get payrollSettingsEnabled;
+
+  /// No description provided for @payrollSettingsEnabledDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When disabled, new payroll documents cannot be created.'**
+  String get payrollSettingsEnabledDescription;
+
+  /// No description provided for @payrollSettingsItemsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The items below can be used in payroll documents. Map each item to a chart of accounts entry.'**
+  String get payrollSettingsItemsDescription;
+
+  /// No description provided for @payrollItemCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Item categories'**
+  String get payrollItemCategories;
+
+  /// No description provided for @payrollSystemItem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get payrollSystemItem;
+
+  /// No description provided for @payrollDefaultAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Default accounts'**
+  String get payrollDefaultAccounts;
+
+  /// No description provided for @payrollDefaultAccountsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Used when an item has no dedicated account mapping.'**
+  String get payrollDefaultAccountsHint;
+
+  /// No description provided for @payrollAccountWagesPayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Wages payable'**
+  String get payrollAccountWagesPayable;
+
+  /// No description provided for @payrollAccountExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll expense'**
+  String get payrollAccountExpense;
+
+  /// No description provided for @payrollAccountTaxPayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll tax payable'**
+  String get payrollAccountTaxPayable;
+
+  /// No description provided for @payrollAccountInsurancePayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance payable'**
+  String get payrollAccountInsurancePayable;
+
+  /// No description provided for @payrollAddItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add payroll item'**
+  String get payrollAddItem;
+
+  /// No description provided for @payrollEditItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit payroll item'**
+  String get payrollEditItem;
+
+  /// No description provided for @payrollItemName.
+  ///
+  /// In en, this message translates to:
+  /// **'Item name'**
+  String get payrollItemName;
+
+  /// No description provided for @payrollItemKindLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Item type'**
+  String get payrollItemKindLabel;
+
+  /// No description provided for @payrollSelectAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Select chart of accounts entry'**
+  String get payrollSelectAccount;
+
+  /// No description provided for @payrollCalculationType.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculation type'**
+  String get payrollCalculationType;
+
+  /// No description provided for @payrollCalcManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get payrollCalcManual;
+
+  /// No description provided for @payrollCalcFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed amount'**
+  String get payrollCalcFixed;
+
+  /// No description provided for @payrollCalcPercentBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent of base salary'**
+  String get payrollCalcPercentBase;
+
+  /// No description provided for @payrollDefaultAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Default amount'**
+  String get payrollDefaultAmount;
+
+  /// No description provided for @payrollPercentValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get payrollPercentValue;
+
+  /// No description provided for @payrollShowOnPayslip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on payslip'**
+  String get payrollShowOnPayslip;
+
+  /// No description provided for @payrollAddEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Add employee'**
+  String get payrollAddEmployee;
+
+  /// No description provided for @payrollEditEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit employee'**
+  String get payrollEditEmployee;
+
+  /// No description provided for @payrollEmployeeCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee code'**
+  String get payrollEmployeeCode;
+
+  /// No description provided for @payrollJobTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Job title'**
+  String get payrollJobTitle;
+
+  /// No description provided for @payrollBaseSalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Base salary'**
+  String get payrollBaseSalary;
+
+  /// No description provided for @payrollEmploymentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Employment type'**
+  String get payrollEmploymentType;
+
+  /// No description provided for @payrollEmploymentFullTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-time'**
+  String get payrollEmploymentFullTime;
+
+  /// No description provided for @payrollEmploymentPartTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Part-time'**
+  String get payrollEmploymentPartTime;
+
+  /// No description provided for @payrollEmploymentContract.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract'**
+  String get payrollEmploymentContract;
+
+  /// No description provided for @payrollInsuranceNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance number'**
+  String get payrollInsuranceNumber;
+
+  /// No description provided for @payrollTaxId.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax ID'**
+  String get payrollTaxId;
+
+  /// No description provided for @payrollNewRun.
+  ///
+  /// In en, this message translates to:
+  /// **'New payroll document'**
+  String get payrollNewRun;
+
+  /// No description provided for @payrollEditRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit payroll document'**
+  String get payrollEditRun;
+
+  /// No description provided for @payrollRunTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Document title'**
+  String get payrollRunTitle;
+
+  /// No description provided for @payrollRunDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Document date'**
+  String get payrollRunDate;
+
+  /// No description provided for @payrollPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll period'**
+  String get payrollPeriod;
+
+  /// No description provided for @payrollSelectEmployees.
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least one employee.'**
+  String get payrollSelectEmployees;
+
+  /// No description provided for @payrollFinalizeRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalize'**
+  String get payrollFinalizeRun;
+
+  /// No description provided for @payrollRunFinalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll document finalized.'**
+  String get payrollRunFinalized;
+
+  /// No description provided for @payrollDeleteRunConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this payroll document?'**
+  String get payrollDeleteRunConfirm;
+
+  /// No description provided for @payrollStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get payrollStatusDraft;
+
+  /// No description provided for @payrollStatusFinalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalized'**
+  String get payrollStatusFinalized;
+
+  /// No description provided for @payrollStatusPendingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending approval'**
+  String get payrollStatusPendingApproval;
+
+  /// No description provided for @payrollStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get payrollStatusCancelled;
+
+  /// No description provided for @payrollGrossTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross'**
+  String get payrollGrossTotal;
+
+  /// No description provided for @payrollDeductionTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Deductions'**
+  String get payrollDeductionTotal;
+
+  /// No description provided for @payrollNetTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Net pay'**
+  String get payrollNetTotal;
+
+  /// No description provided for @payrollNetAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get payrollNetAmount;
+
+  /// No description provided for @payrollCreateRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Create payroll document'**
+  String get payrollCreateRun;
+
+  /// No description provided for @payrollPeriodsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll periods'**
+  String get payrollPeriodsTab;
+
+  /// No description provided for @payrollAddPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'New period'**
+  String get payrollAddPeriod;
+
+  /// No description provided for @payrollPeriodYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get payrollPeriodYear;
+
+  /// No description provided for @payrollPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get payrollPeriodMonth;
+
+  /// No description provided for @payrollClosePeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Close period'**
+  String get payrollClosePeriod;
+
+  /// No description provided for @payrollClosePeriodConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'After closing, new payroll documents cannot be created for this month. Continue?'**
+  String get payrollClosePeriodConfirm;
+
+  /// No description provided for @payrollPeriodClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Period closed.'**
+  String get payrollPeriodClosed;
+
+  /// No description provided for @payrollPeriodStatusOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get payrollPeriodStatusOpen;
+
+  /// No description provided for @payrollPeriodStatusClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get payrollPeriodStatusClosed;
+
+  /// No description provided for @payrollNoPeriodsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No payroll periods defined yet.'**
+  String get payrollNoPeriodsYet;
+
+  /// No description provided for @payrollDepartmentsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Departments'**
+  String get payrollDepartmentsTab;
+
+  /// No description provided for @payrollAddDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add department'**
+  String get payrollAddDepartment;
+
+  /// No description provided for @payrollEditDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit department'**
+  String get payrollEditDepartment;
+
+  /// No description provided for @payrollDepartmentCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Department code'**
+  String get payrollDepartmentCode;
+
+  /// No description provided for @payrollDepartmentName.
+  ///
+  /// In en, this message translates to:
+  /// **'Department name'**
+  String get payrollDepartmentName;
+
+  /// No description provided for @payrollSortOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort order'**
+  String get payrollSortOrder;
+
+  /// No description provided for @payrollImportEmployeesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Excel must include person_id or person_code and employee_code.'**
+  String get payrollImportEmployeesHint;
+
+  /// No description provided for @payrollImportCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get payrollImportCreated;
+
+  /// No description provided for @payrollImportUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated'**
+  String get payrollImportUpdated;
+
+  /// No description provided for @payrollImportErrorCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors'**
+  String get payrollImportErrorCount;
+
+  /// No description provided for @payrollImportRunLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Import amounts from Excel'**
+  String get payrollImportRunLines;
+
+  /// No description provided for @payrollImportRunLinesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill employee_code and item:item_code columns.'**
+  String get payrollImportRunLinesHint;
+
+  /// No description provided for @payrollImportUpdatedLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated lines'**
+  String get payrollImportUpdatedLines;
+
+  /// No description provided for @payrollDownloadPayslip.
+  ///
+  /// In en, this message translates to:
+  /// **'Download payslip PDF'**
+  String get payrollDownloadPayslip;
+
+  /// No description provided for @payrollCopyRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy document'**
+  String get payrollCopyRun;
+
+  /// No description provided for @payrollCopyRunSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'New document created from copy.'**
+  String get payrollCopyRunSuccess;
+
+  /// No description provided for @payrollDepartmentSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary by department'**
+  String get payrollDepartmentSummary;
+
+  /// No description provided for @payrollPayslipSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Payslip PDF saved.'**
+  String get payrollPayslipSaved;
+
+  /// No description provided for @payrollStatusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get payrollStatusApproved;
+
+  /// No description provided for @payrollStatusPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Posted to accounting'**
+  String get payrollStatusPosted;
+
+  /// No description provided for @payrollApproveRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve payroll'**
+  String get payrollApproveRun;
+
+  /// No description provided for @payrollRunApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll document approved.'**
+  String get payrollRunApproved;
+
+  /// No description provided for @payrollPostAccounting.
+  ///
+  /// In en, this message translates to:
+  /// **'Post accounting entry'**
+  String get payrollPostAccounting;
+
+  /// No description provided for @payrollPostAccountingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'An accrual journal entry will be created. Continue?'**
+  String get payrollPostAccountingConfirm;
+
+  /// No description provided for @payrollPostedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll accounting entry posted.'**
+  String get payrollPostedSuccess;
+
+  /// No description provided for @payrollPostPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Post payment entry'**
+  String get payrollPostPayment;
+
+  /// No description provided for @payrollPostPaymentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the bank or cash account for payment.'**
+  String get payrollPostPaymentHint;
+
+  /// No description provided for @payrollPaymentAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment account'**
+  String get payrollPaymentAccount;
+
+  /// No description provided for @payrollPaymentPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll payment entry posted.'**
+  String get payrollPaymentPosted;
+
+  /// No description provided for @payrollAccountingLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Related accounting documents'**
+  String get payrollAccountingLinks;
+
+  /// No description provided for @payrollLinkAccrual.
+  ///
+  /// In en, this message translates to:
+  /// **'Accrual entry'**
+  String get payrollLinkAccrual;
+
+  /// No description provided for @payrollLinkPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment entry'**
+  String get payrollLinkPayment;
+
+  /// No description provided for @payrollDashboardPendingApprovals.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending approval'**
+  String get payrollDashboardPendingApprovals;
+
+  /// No description provided for @payrollRejectRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject payroll run'**
+  String get payrollRejectRun;
+
+  /// No description provided for @payrollRejectReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection reason (optional)'**
+  String get payrollRejectReason;
+
+  /// No description provided for @payrollRunRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll run returned to draft.'**
+  String get payrollRunRejected;
+
+  /// No description provided for @payrollReportsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll reports'**
+  String get payrollReportsTitle;
+
+  /// No description provided for @payrollReportsFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Report filters'**
+  String get payrollReportsFilters;
+
+  /// No description provided for @payrollStatutorySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance & tax summary'**
+  String get payrollStatutorySummary;
+
+  /// No description provided for @payrollItemSummaryReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Item breakdown'**
+  String get payrollItemSummaryReport;
+
+  /// No description provided for @payrollEmployeeSummaryReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee breakdown'**
+  String get payrollEmployeeSummaryReport;
+
+  /// No description provided for @payrollPeriodOverviewReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly period overview'**
+  String get payrollPeriodOverviewReport;
+
+  /// No description provided for @payrollInsuranceEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee insurance'**
+  String get payrollInsuranceEmployee;
+
+  /// No description provided for @payrollInsuranceEmployer.
+  ///
+  /// In en, this message translates to:
+  /// **'Employer insurance'**
+  String get payrollInsuranceEmployer;
+
+  /// No description provided for @payrollTaxTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total tax'**
+  String get payrollTaxTotal;
+
+  /// No description provided for @payrollStatutoryRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance & tax rules'**
+  String get payrollStatutoryRules;
+
+  /// No description provided for @payrollStatutoryRulesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, insurance and tax items are computed from eligible earnings.'**
+  String get payrollStatutoryRulesHint;
+
+  /// No description provided for @payrollStatutoryEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto insurance & tax calculation'**
+  String get payrollStatutoryEnabled;
+
+  /// No description provided for @payrollInsuranceEmployeeRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee insurance rate (%)'**
+  String get payrollInsuranceEmployeeRate;
+
+  /// No description provided for @payrollInsuranceEmployerRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Employer insurance rate (%)'**
+  String get payrollInsuranceEmployerRate;
+
+  /// No description provided for @payrollInsuranceUnemploymentRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Employer unemployment rate (%)'**
+  String get payrollInsuranceUnemploymentRate;
+
+  /// No description provided for @payrollTaxFlatRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat tax rate (%)'**
+  String get payrollTaxFlatRate;
+
+  /// No description provided for @payrollTaxExemption.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax exemption amount'**
+  String get payrollTaxExemption;
+
+  /// No description provided for @payrollCalcStatutory.
+  ///
+  /// In en, this message translates to:
+  /// **'Statutory (insurance/tax)'**
+  String get payrollCalcStatutory;
+
+  /// No description provided for @payrollWorkflowSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow'**
+  String get payrollWorkflowSettings;
+
+  /// No description provided for @payrollRequireApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Require approval before finalize'**
+  String get payrollRequireApproval;
+
+  /// No description provided for @payrollRequireApprovalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After finalize, the run stays in pending approval status.'**
+  String get payrollRequireApprovalHint;
+
+  /// No description provided for @payrollAutoPostOnFinalize.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-post accounting on finalize'**
+  String get payrollAutoPostOnFinalize;
+
+  /// No description provided for @payrollAutoPostOnFinalizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting errors do not roll back finalization.'**
+  String get payrollAutoPostOnFinalizeHint;
+
   /// No description provided for @customerClubTabLedger.
   ///
   /// In en, this message translates to:

@@ -1,0 +1,127 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <style>
+    .ps-layout { font-size: 11px; }
+    .ps-layout .payslip-page {
+      page-break-after: always;
+      margin-bottom: 16px;
+    }
+    .ps-layout .payslip-page:last-child { page-break-after: auto; }
+    .ps-layout .section-card {
+      border: 1px solid #000;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      background: #fff;
+      page-break-inside: avoid;
+    }
+    .ps-layout .title { font-size: 18px; color: #366092; margin-bottom: 4px; }
+    .ps-layout .meta { color: #333; margin: 2px 0; }
+    .ps-layout .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .ps-layout table { width: 100%; border-collapse: collapse; }
+    .ps-layout thead { background: #f0f0f0; color: #000; }
+    .ps-layout th, .ps-layout td { border: 1px solid #000; padding: 6px; text-align: center; }
+    .ps-layout .amount { font-weight: bold; }
+    .ps-layout .summary-row td { font-weight: bold; background: #f8f9fa; }
+  </style>
+
+  {% macro fmtamt(val) -%}
+    {%- set v = (val if val is not none else 0) -%}
+    {%- if v is number -%}
+      {{ '{:,.0f}'.format(v) }}
+    {%- else -%}
+      {{ v }}
+    {%- endif -%}
+  {%- endmacro %}
+
+  <div class="ps-layout">
+    {% for slip in payslips %}
+    <div class="payslip-page">
+      <div class="section-card">
+        <div class="title">{{ 'فیش حقوق' if is_fa else 'Payslip' }}</div>
+        <div class="grid-2">
+          <div>
+            <div class="meta">{{ 'کسب‌وکار' if is_fa else 'Business' }}: {{ business_name or '-' }}</div>
+            <div class="meta">{{ 'سند' if is_fa else 'Run' }}: {{ run.title or run.code or '-' }}</div>
+            <div class="meta">{{ 'کد سند' if is_fa else 'Code' }}: {{ run.code or '-' }}</div>
+            {% if period.title %}
+            <div class="meta">{{ 'دوره' if is_fa else 'Period' }}: {{ period.title }}</div>
+            {% endif %}
+          </div>
+          <div>
+            <div class="meta">{{ 'تاریخ' if is_fa else 'Date' }}: {{ run.run_date or '-' }}</div>
+            <div class="meta">{{ 'پرسنل' if is_fa else 'Employee' }}: {{ slip.person_name or '-' }}</div>
+            <div class="meta">{{ 'کد پرسنلی' if is_fa else 'Code' }}: {{ slip.employee_code or '-' }}</div>
+            {% if slip.job_title %}
+            <div class="meta">{{ 'سمت' if is_fa else 'Job' }}: {{ slip.job_title }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if slip.earnings %}
+      <div class="section-card">
+        <div class="meta" style="font-weight:bold; margin-bottom:6px;">{{ 'مزایا' if is_fa else 'Earnings' }}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'عنوان' if is_fa else 'Item' }}</th>
+              <th>{{ 'مبلغ' if is_fa else 'Amount' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in slip.earnings %}
+            <tr>
+              <td>{{ row.name or row.code }}</td>
+              <td class="amount">{{ fmtamt(row.amount) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {% if slip.deductions %}
+      <div class="section-card">
+        <div class="meta" style="font-weight:bold; margin-bottom:6px;">{{ 'کسورات' if is_fa else 'Deductions' }}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>{{ 'عنوان' if is_fa else 'Item' }}</th>
+              <th>{{ 'مبلغ' if is_fa else 'Amount' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in slip.deductions %}
+            <tr>
+              <td>{{ row.name or row.code }}</td>
+              <td class="amount">{{ fmtamt(row.amount) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      <div class="section-card">
+        <table>
+          <tbody>
+            <tr class="summary-row">
+              <td>{{ 'ناخالص' if is_fa else 'Gross' }}</td>
+              <td class="amount">{{ fmtamt(slip.gross_amount) }}</td>
+            </tr>
+            <tr class="summary-row">
+              <td>{{ 'کسورات' if is_fa else 'Deductions' }}</td>
+              <td class="amount">{{ fmtamt(slip.deduction_amount) }}</td>
+            </tr>
+            <tr class="summary-row">
+              <td>{{ 'خالص پرداختی' if is_fa else 'Net pay' }}</td>
+              <td class="amount">{{ fmtamt(slip.net_amount) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% endblock %}

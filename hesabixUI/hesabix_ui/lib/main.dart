@@ -129,8 +129,13 @@ import 'pages/business/repair_shop/repair_technicians_page.dart';
 import 'pages/business/repair_shop/repair_settings_page.dart';
 import 'pages/business/customer_club/customer_club_main_page.dart';
 import 'pages/business/customer_club/customer_club_settings_page.dart';
+import 'pages/business/payroll/payroll_main_page.dart';
+import 'pages/business/payroll/payroll_reports_page.dart';
+import 'pages/business/payroll/payroll_run_edit_page.dart';
+import 'pages/business/payroll/payroll_settings_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'widgets/marketplace/distribution_plugin_gate.dart';
+import 'widgets/marketplace/payroll_plugin_gate.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
 import 'pages/business/basalam/basalam_settings_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
@@ -2255,6 +2260,72 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: 'payroll',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  PayrollPluginGate(
+                    businessId: businessId,
+                    child: PayrollMainPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'payroll/reports',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  PayrollPluginGate(
+                    businessId: businessId,
+                    child: PayrollReportsPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'payroll/new',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  PayrollPluginGate(
+                    businessId: businessId,
+                    child: PayrollRunEditPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'payroll/:run_id',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final runId = int.parse(state.pathParameters['run_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  PayrollPluginGate(
+                    businessId: businessId,
+                    child: PayrollRunEditPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                      runId: runId,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: 'distribution',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
@@ -3354,6 +3425,35 @@ class _MyAppState extends State<MyApp> {
                 return hesabixNoTransitionPage(state, CustomerClubSettingsPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'settings/payroll',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                final isOwner = _authStore!.currentBusiness?.id == businessId &&
+                    _authStore!.currentBusiness?.isOwner == true;
+                final canAccess = isOwner ||
+                    _authStore!.hasBusinessPermission('payroll', 'view') ||
+                    _authStore!.hasBusinessPermission('payroll', 'manage');
+                if (!canAccess) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  PayrollPluginGate(
+                    businessId: businessId,
+                    child: PayrollSettingsPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
                   ),
                 );
               },

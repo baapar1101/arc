@@ -13,6 +13,7 @@ const Map<String, String> pluginSetupRouteByCode = {
   'distribution': 'business_distribution',
   'woocommerce_hesabix': 'business_woocommerce',
   'customer_club': 'business_customer_club',
+  'payroll': 'business_payroll',
 };
 
 /// دسته‌های شناخته‌شده در seed/API.
@@ -22,6 +23,7 @@ const Set<String> kPluginMarketplaceCategories = {
   'product_management',
   'sales',
   'crm_marketing',
+  'hr_payroll',
 };
 
 String pluginCategoryLabel(AppLocalizations t, String? category) {
@@ -36,6 +38,8 @@ String pluginCategoryLabel(AppLocalizations t, String? category) {
       return t.pluginMarketplaceCategorySales;
     case 'crm_marketing':
       return t.pluginMarketplaceCategoryCrmMarketing;
+    case 'hr_payroll':
+      return t.localeName.startsWith('fa') ? 'منابع انسانی و حقوق' : 'HR & Payroll';
     default:
       return category ?? t.pluginMarketplaceCategoryAll;
   }

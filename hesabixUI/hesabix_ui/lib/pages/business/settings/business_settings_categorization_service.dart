@@ -389,6 +389,17 @@ class BusinessSettingsCategorizationService {
           categoryId: 'modules',
           order: 4,
         ),
+      if (ctx.canAccessPayroll)
+        _item(
+          id: 'payroll',
+          title: 'businessSettingsPayroll',
+          description: 'businessSettingsPayrollDescription',
+          icon: Icons.payments_outlined,
+          color: const Color(0xFF283593),
+          route: ctx.panelRoute('settings/payroll'),
+          categoryId: 'modules',
+          order: 5,
+        ),
     ];
 
     return SettingsCategory(

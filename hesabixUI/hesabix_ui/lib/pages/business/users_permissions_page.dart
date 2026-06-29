@@ -1265,6 +1265,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'operate': t.distributionPermissionOperate,
         'reports_team': t.distributionPermissionReportsTeam,
       },
+      'payroll': {
+        'view': '${t.view} ${t.payrollMenu}',
+        'manage': t.payrollPermissionManage,
+        'operate': t.payrollPermissionOperate,
+        'post': t.payrollPermissionPost,
+        'approve': t.payrollPermissionApprove,
+      },
       'basalam': {
         'view': t.localeName.startsWith('fa') ? 'مشاهدهٔ اتصال باسلام' : 'View Basalam integration',
         'manage': t.localeName.startsWith('fa') ? 'مدیریت تنظیمات باسلام' : 'Manage Basalam settings',
@@ -1834,6 +1841,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['distribution'],
       },
       {
+        'title': t.payrollMenu,
+        'icon': Icons.payments_outlined,
+        'sections': ['payroll'],
+      },
+      {
         'title': t.localeName.startsWith('fa') ? 'اتصال فروشگاه' : 'Store integrations',
         'icon': Icons.store_mall_directory_outlined,
         'sections': ['basalam', 'woocommerce'],
@@ -1987,6 +1999,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.customerClubMenu;
       case 'distribution':
         return t.distributionMenu;
+      case 'payroll':
+        return t.payrollMenu;
       case 'basalam':
         return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
       case 'woocommerce':
@@ -2072,6 +2086,9 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'change_unit_price':
         return t.permissionInvoiceChangeUnitPrice;
       case 'manage':
+        if (sectionKey == 'payroll') {
+          return t.payrollPermissionManage;
+        }
         return t.manage;
       case 'adjust':
         return t.customerClubActionAdjust;
@@ -2086,7 +2103,14 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'delete_messages':
         return t.permissionCrmWebChatDeleteMessages;
       case 'operate':
+        if (sectionKey == 'payroll') {
+          return t.payrollPermissionOperate;
+        }
         return t.distributionPermissionOperate;
+      case 'post':
+        return t.payrollPermissionPost;
+      case 'approve':
+        return t.payrollPermissionApprove;
       case 'sync':
         if (sectionKey == 'basalam') {
           return t.localeName.startsWith('fa') ? 'همگام‌سازی باسلام' : 'Basalam sync';

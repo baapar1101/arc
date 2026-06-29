@@ -11285,6 +11285,447 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customerClubMenu => 'Customer Club';
 
   @override
+  String get payrollTitle => 'Payroll';
+
+  @override
+  String get payrollMenu => 'Payroll';
+
+  @override
+  String get payrollPluginNotActive =>
+      'The payroll add-on is not active for this business. Activate it from the plugin marketplace.';
+
+  @override
+  String get businessSettingsPayroll => 'Payroll';
+
+  @override
+  String get businessSettingsPayrollDescription =>
+      'Payroll items, account mapping, and calculation rules';
+
+  @override
+  String get payrollPermissionManage => 'Manage payroll settings and items';
+
+  @override
+  String get payrollPermissionOperate =>
+      'Create and edit payroll documents and runs';
+
+  @override
+  String get payrollPermissionPost => 'Post payroll accounting documents';
+
+  @override
+  String get payrollPermissionApprove => 'Approve and finalize payroll runs';
+
+  @override
+  String get payrollDashboardActiveEmployees => 'Active employees';
+
+  @override
+  String get payrollDashboardDraftRuns => 'Draft payroll runs';
+
+  @override
+  String get payrollItemsTab => 'Payroll items';
+
+  @override
+  String get payrollEmployeesTab => 'Employees';
+
+  @override
+  String get payrollRunsTab => 'Payroll documents';
+
+  @override
+  String get payrollSettingsTab => 'Payroll settings';
+
+  @override
+  String get payrollNoRunsYet => 'No payroll documents yet.';
+
+  @override
+  String get payrollNoItemsYet => 'No payroll items defined.';
+
+  @override
+  String get payrollNoEmployeesYet => 'No employees registered.';
+
+  @override
+  String get payrollItemKindEarning => 'Earnings';
+
+  @override
+  String get payrollItemKindDeduction => 'Deductions';
+
+  @override
+  String get payrollItemKindEmployerCost => 'Employer cost';
+
+  @override
+  String get payrollSettingsEnabled => 'Enable payroll module';
+
+  @override
+  String get payrollSettingsEnabledDescription =>
+      'When disabled, new payroll documents cannot be created.';
+
+  @override
+  String get payrollSettingsItemsDescription =>
+      'The items below can be used in payroll documents. Map each item to a chart of accounts entry.';
+
+  @override
+  String get payrollItemCategories => 'Item categories';
+
+  @override
+  String get payrollSystemItem => 'System';
+
+  @override
+  String get payrollDefaultAccounts => 'Default accounts';
+
+  @override
+  String get payrollDefaultAccountsHint =>
+      'Used when an item has no dedicated account mapping.';
+
+  @override
+  String get payrollAccountWagesPayable => 'Wages payable';
+
+  @override
+  String get payrollAccountExpense => 'Payroll expense';
+
+  @override
+  String get payrollAccountTaxPayable => 'Payroll tax payable';
+
+  @override
+  String get payrollAccountInsurancePayable => 'Insurance payable';
+
+  @override
+  String get payrollAddItem => 'Add payroll item';
+
+  @override
+  String get payrollEditItem => 'Edit payroll item';
+
+  @override
+  String get payrollItemName => 'Item name';
+
+  @override
+  String get payrollItemKindLabel => 'Item type';
+
+  @override
+  String get payrollSelectAccount => 'Select chart of accounts entry';
+
+  @override
+  String get payrollCalculationType => 'Calculation type';
+
+  @override
+  String get payrollCalcManual => 'Manual';
+
+  @override
+  String get payrollCalcFixed => 'Fixed amount';
+
+  @override
+  String get payrollCalcPercentBase => 'Percent of base salary';
+
+  @override
+  String get payrollDefaultAmount => 'Default amount';
+
+  @override
+  String get payrollPercentValue => 'Percent';
+
+  @override
+  String get payrollShowOnPayslip => 'Show on payslip';
+
+  @override
+  String get payrollAddEmployee => 'Add employee';
+
+  @override
+  String get payrollEditEmployee => 'Edit employee';
+
+  @override
+  String get payrollEmployeeCode => 'Employee code';
+
+  @override
+  String get payrollJobTitle => 'Job title';
+
+  @override
+  String get payrollBaseSalary => 'Base salary';
+
+  @override
+  String get payrollEmploymentType => 'Employment type';
+
+  @override
+  String get payrollEmploymentFullTime => 'Full-time';
+
+  @override
+  String get payrollEmploymentPartTime => 'Part-time';
+
+  @override
+  String get payrollEmploymentContract => 'Contract';
+
+  @override
+  String get payrollInsuranceNumber => 'Insurance number';
+
+  @override
+  String get payrollTaxId => 'Tax ID';
+
+  @override
+  String get payrollNewRun => 'New payroll document';
+
+  @override
+  String get payrollEditRun => 'Edit payroll document';
+
+  @override
+  String get payrollRunTitle => 'Document title';
+
+  @override
+  String get payrollRunDate => 'Document date';
+
+  @override
+  String get payrollPeriod => 'Payroll period';
+
+  @override
+  String get payrollSelectEmployees => 'Select at least one employee.';
+
+  @override
+  String get payrollFinalizeRun => 'Finalize';
+
+  @override
+  String get payrollRunFinalized => 'Payroll document finalized.';
+
+  @override
+  String get payrollDeleteRunConfirm => 'Delete this payroll document?';
+
+  @override
+  String get payrollStatusDraft => 'Draft';
+
+  @override
+  String get payrollStatusFinalized => 'Finalized';
+
+  @override
+  String get payrollStatusPendingApproval => 'Pending approval';
+
+  @override
+  String get payrollStatusCancelled => 'Cancelled';
+
+  @override
+  String get payrollGrossTotal => 'Gross';
+
+  @override
+  String get payrollDeductionTotal => 'Deductions';
+
+  @override
+  String get payrollNetTotal => 'Net pay';
+
+  @override
+  String get payrollNetAmount => 'Net';
+
+  @override
+  String get payrollCreateRun => 'Create payroll document';
+
+  @override
+  String get payrollPeriodsTab => 'Payroll periods';
+
+  @override
+  String get payrollAddPeriod => 'New period';
+
+  @override
+  String get payrollPeriodYear => 'Year';
+
+  @override
+  String get payrollPeriodMonth => 'Month';
+
+  @override
+  String get payrollClosePeriod => 'Close period';
+
+  @override
+  String get payrollClosePeriodConfirm =>
+      'After closing, new payroll documents cannot be created for this month. Continue?';
+
+  @override
+  String get payrollPeriodClosed => 'Period closed.';
+
+  @override
+  String get payrollPeriodStatusOpen => 'Open';
+
+  @override
+  String get payrollPeriodStatusClosed => 'Closed';
+
+  @override
+  String get payrollNoPeriodsYet => 'No payroll periods defined yet.';
+
+  @override
+  String get payrollDepartmentsTab => 'Departments';
+
+  @override
+  String get payrollAddDepartment => 'Add department';
+
+  @override
+  String get payrollEditDepartment => 'Edit department';
+
+  @override
+  String get payrollDepartmentCode => 'Department code';
+
+  @override
+  String get payrollDepartmentName => 'Department name';
+
+  @override
+  String get payrollSortOrder => 'Sort order';
+
+  @override
+  String get payrollImportEmployeesHint =>
+      'Excel must include person_id or person_code and employee_code.';
+
+  @override
+  String get payrollImportCreated => 'Created';
+
+  @override
+  String get payrollImportUpdated => 'Updated';
+
+  @override
+  String get payrollImportErrorCount => 'Errors';
+
+  @override
+  String get payrollImportRunLines => 'Import amounts from Excel';
+
+  @override
+  String get payrollImportRunLinesHint =>
+      'Fill employee_code and item:item_code columns.';
+
+  @override
+  String get payrollImportUpdatedLines => 'Updated lines';
+
+  @override
+  String get payrollDownloadPayslip => 'Download payslip PDF';
+
+  @override
+  String get payrollCopyRun => 'Copy document';
+
+  @override
+  String get payrollCopyRunSuccess => 'New document created from copy.';
+
+  @override
+  String get payrollDepartmentSummary => 'Summary by department';
+
+  @override
+  String get payrollPayslipSaved => 'Payslip PDF saved.';
+
+  @override
+  String get payrollStatusApproved => 'Approved';
+
+  @override
+  String get payrollStatusPosted => 'Posted to accounting';
+
+  @override
+  String get payrollApproveRun => 'Approve payroll';
+
+  @override
+  String get payrollRunApproved => 'Payroll document approved.';
+
+  @override
+  String get payrollPostAccounting => 'Post accounting entry';
+
+  @override
+  String get payrollPostAccountingConfirm =>
+      'An accrual journal entry will be created. Continue?';
+
+  @override
+  String get payrollPostedSuccess => 'Payroll accounting entry posted.';
+
+  @override
+  String get payrollPostPayment => 'Post payment entry';
+
+  @override
+  String get payrollPostPaymentHint =>
+      'Select the bank or cash account for payment.';
+
+  @override
+  String get payrollPaymentAccount => 'Payment account';
+
+  @override
+  String get payrollPaymentPosted => 'Payroll payment entry posted.';
+
+  @override
+  String get payrollAccountingLinks => 'Related accounting documents';
+
+  @override
+  String get payrollLinkAccrual => 'Accrual entry';
+
+  @override
+  String get payrollLinkPayment => 'Payment entry';
+
+  @override
+  String get payrollDashboardPendingApprovals => 'Pending approval';
+
+  @override
+  String get payrollRejectRun => 'Reject payroll run';
+
+  @override
+  String get payrollRejectReason => 'Rejection reason (optional)';
+
+  @override
+  String get payrollRunRejected => 'Payroll run returned to draft.';
+
+  @override
+  String get payrollReportsTitle => 'Payroll reports';
+
+  @override
+  String get payrollReportsFilters => 'Report filters';
+
+  @override
+  String get payrollStatutorySummary => 'Insurance & tax summary';
+
+  @override
+  String get payrollItemSummaryReport => 'Item breakdown';
+
+  @override
+  String get payrollEmployeeSummaryReport => 'Employee breakdown';
+
+  @override
+  String get payrollPeriodOverviewReport => 'Monthly period overview';
+
+  @override
+  String get payrollInsuranceEmployee => 'Employee insurance';
+
+  @override
+  String get payrollInsuranceEmployer => 'Employer insurance';
+
+  @override
+  String get payrollTaxTotal => 'Total tax';
+
+  @override
+  String get payrollStatutoryRules => 'Insurance & tax rules';
+
+  @override
+  String get payrollStatutoryRulesHint =>
+      'When enabled, insurance and tax items are computed from eligible earnings.';
+
+  @override
+  String get payrollStatutoryEnabled => 'Auto insurance & tax calculation';
+
+  @override
+  String get payrollInsuranceEmployeeRate => 'Employee insurance rate (%)';
+
+  @override
+  String get payrollInsuranceEmployerRate => 'Employer insurance rate (%)';
+
+  @override
+  String get payrollInsuranceUnemploymentRate =>
+      'Employer unemployment rate (%)';
+
+  @override
+  String get payrollTaxFlatRate => 'Flat tax rate (%)';
+
+  @override
+  String get payrollTaxExemption => 'Tax exemption amount';
+
+  @override
+  String get payrollCalcStatutory => 'Statutory (insurance/tax)';
+
+  @override
+  String get payrollWorkflowSettings => 'Workflow';
+
+  @override
+  String get payrollRequireApproval => 'Require approval before finalize';
+
+  @override
+  String get payrollRequireApprovalHint =>
+      'After finalize, the run stays in pending approval status.';
+
+  @override
+  String get payrollAutoPostOnFinalize => 'Auto-post accounting on finalize';
+
+  @override
+  String get payrollAutoPostOnFinalizeHint =>
+      'Accounting errors do not roll back finalization.';
+
+  @override
   String get customerClubTabLedger => 'Transactions';
 
   @override

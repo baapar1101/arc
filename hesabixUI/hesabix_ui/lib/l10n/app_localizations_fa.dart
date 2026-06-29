@@ -11223,6 +11223,445 @@ class AppLocalizationsFa extends AppLocalizations {
   String get customerClubMenu => 'باشگاه مشتریان';
 
   @override
+  String get payrollTitle => 'حقوق و دستمزد';
+
+  @override
+  String get payrollMenu => 'حقوق و دستمزد';
+
+  @override
+  String get payrollPluginNotActive =>
+      'افزونه حقوق و دستمزد برای این کسب‌وکار فعال نیست. از بازار افزونه‌ها آن را فعال کنید.';
+
+  @override
+  String get businessSettingsPayroll => 'حقوق و دستمزد';
+
+  @override
+  String get businessSettingsPayrollDescription =>
+      'آیتم‌های حقوق، نگاشت حساب و قوانین محاسبه';
+
+  @override
+  String get payrollPermissionManage => 'مدیریت تنظیمات حقوق و آیتم‌ها';
+
+  @override
+  String get payrollPermissionOperate => 'ثبت و ویرایش اسناد و اجرای حقوق';
+
+  @override
+  String get payrollPermissionPost => 'صدور و ثبت اسناد حسابداری حقوق';
+
+  @override
+  String get payrollPermissionApprove => 'تأیید و قطعی‌سازی اجرای حقوق';
+
+  @override
+  String get payrollDashboardActiveEmployees => 'پرسنل فعال';
+
+  @override
+  String get payrollDashboardDraftRuns => 'پیش‌نویس‌های حقوق';
+
+  @override
+  String get payrollItemsTab => 'آیتم‌های حقوق';
+
+  @override
+  String get payrollEmployeesTab => 'پرسنل';
+
+  @override
+  String get payrollRunsTab => 'اسناد حقوق';
+
+  @override
+  String get payrollSettingsTab => 'تنظیمات حقوق';
+
+  @override
+  String get payrollNoRunsYet => 'هنوز سند حقوقی ثبت نشده است.';
+
+  @override
+  String get payrollNoItemsYet => 'آیتم حقوقی تعریف نشده است.';
+
+  @override
+  String get payrollNoEmployeesYet => 'پرسنلی ثبت نشده است.';
+
+  @override
+  String get payrollItemKindEarning => 'مزایا / درآمد';
+
+  @override
+  String get payrollItemKindDeduction => 'کسورات';
+
+  @override
+  String get payrollItemKindEmployerCost => 'هزینه کارفرما';
+
+  @override
+  String get payrollSettingsEnabled => 'فعال بودن حقوق و دستمزد';
+
+  @override
+  String get payrollSettingsEnabledDescription =>
+      'با غیرفعال کردن، ثبت سند حقوق جدید متوقف می‌شود.';
+
+  @override
+  String get payrollSettingsItemsDescription =>
+      'آیتم‌های زیر در اسناد حقوق قابل استفاده‌اند. برای هر آیتم می‌توانید حساب مرتبط از دفتر کل انتخاب کنید.';
+
+  @override
+  String get payrollItemCategories => 'دسته‌بندی آیتم‌ها';
+
+  @override
+  String get payrollSystemItem => 'سیستمی';
+
+  @override
+  String get payrollDefaultAccounts => 'حساب‌های پیش‌فرض';
+
+  @override
+  String get payrollDefaultAccountsHint =>
+      'این حساب‌ها در صورت نبود نگاشت اختصاصی برای آیتم استفاده می‌شوند.';
+
+  @override
+  String get payrollAccountWagesPayable => 'حقوق و دستمزد پرداختنی';
+
+  @override
+  String get payrollAccountExpense => 'هزینه حقوق و دستمزد';
+
+  @override
+  String get payrollAccountTaxPayable => 'مالیات حقوق پرداختنی';
+
+  @override
+  String get payrollAccountInsurancePayable => 'بیمه پرداختنی';
+
+  @override
+  String get payrollAddItem => 'افزودن آیتم حقوق';
+
+  @override
+  String get payrollEditItem => 'ویرایش آیتم حقوق';
+
+  @override
+  String get payrollItemName => 'نام آیتم';
+
+  @override
+  String get payrollItemKindLabel => 'نوع آیتم';
+
+  @override
+  String get payrollSelectAccount => 'انتخاب حساب از دفتر کل';
+
+  @override
+  String get payrollCalculationType => 'نوع محاسبه';
+
+  @override
+  String get payrollCalcManual => 'دستی';
+
+  @override
+  String get payrollCalcFixed => 'مبلغ ثابت';
+
+  @override
+  String get payrollCalcPercentBase => 'درصد از حقوق پایه';
+
+  @override
+  String get payrollDefaultAmount => 'مبلغ پیش‌فرض';
+
+  @override
+  String get payrollPercentValue => 'درصد';
+
+  @override
+  String get payrollShowOnPayslip => 'نمایش در فیش حقوق';
+
+  @override
+  String get payrollAddEmployee => 'افزودن پرسنل';
+
+  @override
+  String get payrollEditEmployee => 'ویرایش پرسنل';
+
+  @override
+  String get payrollEmployeeCode => 'کد پرسنلی';
+
+  @override
+  String get payrollJobTitle => 'عنوان شغلی';
+
+  @override
+  String get payrollBaseSalary => 'حقوق پایه';
+
+  @override
+  String get payrollEmploymentType => 'نوع استخدام';
+
+  @override
+  String get payrollEmploymentFullTime => 'تمام‌وقت';
+
+  @override
+  String get payrollEmploymentPartTime => 'پاره‌وقت';
+
+  @override
+  String get payrollEmploymentContract => 'قراردادی';
+
+  @override
+  String get payrollInsuranceNumber => 'شماره بیمه';
+
+  @override
+  String get payrollTaxId => 'شناسه مالیاتی';
+
+  @override
+  String get payrollNewRun => 'سند حقوق جدید';
+
+  @override
+  String get payrollEditRun => 'ویرایش سند حقوق';
+
+  @override
+  String get payrollRunTitle => 'عنوان سند';
+
+  @override
+  String get payrollRunDate => 'تاریخ سند';
+
+  @override
+  String get payrollPeriod => 'دوره حقوق';
+
+  @override
+  String get payrollSelectEmployees => 'حداقل یک پرسنل انتخاب کنید.';
+
+  @override
+  String get payrollFinalizeRun => 'قطعی‌سازی';
+
+  @override
+  String get payrollRunFinalized => 'سند حقوق قطعی شد.';
+
+  @override
+  String get payrollDeleteRunConfirm => 'این سند حقوق حذف شود؟';
+
+  @override
+  String get payrollStatusDraft => 'پیش‌نویس';
+
+  @override
+  String get payrollStatusFinalized => 'قطعی';
+
+  @override
+  String get payrollStatusPendingApproval => 'در انتظار تأیید';
+
+  @override
+  String get payrollStatusCancelled => 'لغو شده';
+
+  @override
+  String get payrollGrossTotal => 'ناخالص';
+
+  @override
+  String get payrollDeductionTotal => 'کسورات';
+
+  @override
+  String get payrollNetTotal => 'خالص پرداختی';
+
+  @override
+  String get payrollNetAmount => 'خالص';
+
+  @override
+  String get payrollCreateRun => 'ثبت سند حقوق';
+
+  @override
+  String get payrollPeriodsTab => 'دوره‌های حقوق';
+
+  @override
+  String get payrollAddPeriod => 'دوره جدید';
+
+  @override
+  String get payrollPeriodYear => 'سال';
+
+  @override
+  String get payrollPeriodMonth => 'ماه';
+
+  @override
+  String get payrollClosePeriod => 'بستن دوره';
+
+  @override
+  String get payrollClosePeriodConfirm =>
+      'پس از بستن دوره، ثبت سند حقوق جدید در این ماه ممکن نیست. ادامه می‌دهید؟';
+
+  @override
+  String get payrollPeriodClosed => 'دوره بسته شد.';
+
+  @override
+  String get payrollPeriodStatusOpen => 'باز';
+
+  @override
+  String get payrollPeriodStatusClosed => 'بسته';
+
+  @override
+  String get payrollNoPeriodsYet => 'دوره حقوقی تعریف نشده است.';
+
+  @override
+  String get payrollDepartmentsTab => 'بخش‌ها';
+
+  @override
+  String get payrollAddDepartment => 'افزودن بخش';
+
+  @override
+  String get payrollEditDepartment => 'ویرایش بخش';
+
+  @override
+  String get payrollDepartmentCode => 'کد بخش';
+
+  @override
+  String get payrollDepartmentName => 'نام بخش';
+
+  @override
+  String get payrollSortOrder => 'ترتیب نمایش';
+
+  @override
+  String get payrollImportEmployeesHint =>
+      'فایل Excel باید شامل person_id یا person_code و employee_code باشد.';
+
+  @override
+  String get payrollImportCreated => 'ایجاد شده';
+
+  @override
+  String get payrollImportUpdated => 'به‌روزرسانی شده';
+
+  @override
+  String get payrollImportErrorCount => 'خطا';
+
+  @override
+  String get payrollImportRunLines => 'ورود مقادیر از Excel';
+
+  @override
+  String get payrollImportRunLinesHint =>
+      'ستون employee_code و ستون‌های item:کد_آیتم را پر کنید.';
+
+  @override
+  String get payrollImportUpdatedLines => 'ردیف‌های به‌روزرسانی‌شده';
+
+  @override
+  String get payrollDownloadPayslip => 'دانلود فیش حقوق';
+
+  @override
+  String get payrollCopyRun => 'کپی سند';
+
+  @override
+  String get payrollCopyRunSuccess => 'سند جدید از کپی ایجاد شد.';
+
+  @override
+  String get payrollDepartmentSummary => 'خلاصه به تفکیک بخش';
+
+  @override
+  String get payrollPayslipSaved => 'فایل PDF فیش حقوق ذخیره شد.';
+
+  @override
+  String get payrollStatusApproved => 'تأیید شده';
+
+  @override
+  String get payrollStatusPosted => 'ثبت حسابداری شده';
+
+  @override
+  String get payrollApproveRun => 'تأیید سند حقوق';
+
+  @override
+  String get payrollRunApproved => 'سند حقوق تأیید شد.';
+
+  @override
+  String get payrollPostAccounting => 'ثبت سند حسابداری';
+
+  @override
+  String get payrollPostAccountingConfirm =>
+      'سند تعهدی حقوق در دفتر کل ثبت می‌شود. ادامه می‌دهید؟';
+
+  @override
+  String get payrollPostedSuccess => 'سند حسابداری حقوق ثبت شد.';
+
+  @override
+  String get payrollPostPayment => 'ثبت سند پرداخت';
+
+  @override
+  String get payrollPostPaymentHint =>
+      'حساب بانکی یا صندوق پرداخت را انتخاب کنید.';
+
+  @override
+  String get payrollPaymentAccount => 'حساب پرداخت';
+
+  @override
+  String get payrollPaymentPosted => 'سند پرداخت حقوق ثبت شد.';
+
+  @override
+  String get payrollAccountingLinks => 'اسناد حسابداری مرتبط';
+
+  @override
+  String get payrollLinkAccrual => 'سند تعهدی';
+
+  @override
+  String get payrollLinkPayment => 'سند پرداخت';
+
+  @override
+  String get payrollDashboardPendingApprovals => 'در انتظار تأیید';
+
+  @override
+  String get payrollRejectRun => 'رد سند حقوق';
+
+  @override
+  String get payrollRejectReason => 'دلیل رد (اختیاری)';
+
+  @override
+  String get payrollRunRejected => 'سند حقوق به پیش‌نویس برگشت.';
+
+  @override
+  String get payrollReportsTitle => 'گزارش‌های حقوق';
+
+  @override
+  String get payrollReportsFilters => 'فیلتر گزارش';
+
+  @override
+  String get payrollStatutorySummary => 'خلاصه بیمه و مالیات';
+
+  @override
+  String get payrollItemSummaryReport => 'گزارش تفکیک آیتم‌ها';
+
+  @override
+  String get payrollEmployeeSummaryReport => 'گزارش تفکیک پرسنل';
+
+  @override
+  String get payrollPeriodOverviewReport => 'نمای ماهانه دوره‌ها';
+
+  @override
+  String get payrollInsuranceEmployee => 'بیمه سهم کارگر';
+
+  @override
+  String get payrollInsuranceEmployer => 'بیمه سهم کارفرما';
+
+  @override
+  String get payrollTaxTotal => 'جمع مالیات';
+
+  @override
+  String get payrollStatutoryRules => 'قوانین بیمه و مالیات';
+
+  @override
+  String get payrollStatutoryRulesHint =>
+      'با فعال‌سازی، آیتم‌های بیمه و مالیات بر اساس پایه مشمول محاسبه می‌شوند.';
+
+  @override
+  String get payrollStatutoryEnabled => 'محاسبه خودکار بیمه و مالیات';
+
+  @override
+  String get payrollInsuranceEmployeeRate => 'نرخ بیمه کارگر (٪)';
+
+  @override
+  String get payrollInsuranceEmployerRate => 'نرخ بیمه کارفرما (٪)';
+
+  @override
+  String get payrollInsuranceUnemploymentRate => 'نرخ بیکاری کارفرما (٪)';
+
+  @override
+  String get payrollTaxFlatRate => 'نرخ مالیات ثابت (٪)';
+
+  @override
+  String get payrollTaxExemption => 'معافیت مالیاتی';
+
+  @override
+  String get payrollCalcStatutory => 'قانونی (بیمه/مالیات)';
+
+  @override
+  String get payrollWorkflowSettings => 'گردش کار';
+
+  @override
+  String get payrollRequireApproval => 'نیاز به تأیید قبل از قطعی';
+
+  @override
+  String get payrollRequireApprovalHint =>
+      'پس از قطعی‌سازی، سند در وضعیت «در انتظار تأیید» می‌ماند.';
+
+  @override
+  String get payrollAutoPostOnFinalize => 'ثبت خودکار سند حسابداری پس از قطعی';
+
+  @override
+  String get payrollAutoPostOnFinalizeHint =>
+      'در صورت خطا در ثبت حسابداری، قطعی‌سازی حفظ می‌شود.';
+
+  @override
   String get customerClubTabLedger => 'تراکنش‌ها';
 
   @override

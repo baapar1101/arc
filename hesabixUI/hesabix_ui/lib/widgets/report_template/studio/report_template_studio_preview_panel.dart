@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../../../utils/web/web_utils.dart' as web_utils;
 import '../embedded_pdf_iframe.dart';
 
 class ReportTemplateStudioPreviewPanel extends StatelessWidget {
@@ -46,6 +48,18 @@ class ReportTemplateStudioPreviewPanel extends StatelessWidget {
                   tooltip: 'بروزرسانی پیش‌نمایش',
                   onPressed: loading ? null : onRefresh,
                 ),
+              if (kIsWeb && pdfBytes != null && pdfBytes!.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.open_in_new, size: 20),
+                  tooltip: 'باز کردن در تب جدید',
+                  onPressed: () {
+                    final url = web_utils.createObjectUrlFromBytes(
+                      pdfBytes!,
+                      mimeType: 'application/pdf',
+                    );
+                    web_utils.openUrlInNewTabWeb(url);
+                  },
+                ),
             ],
           ),
         ),
@@ -64,39 +78,50 @@ class ReportTemplateStudioPreviewPanel extends StatelessWidget {
             child: Text(warnings.join('\n'), style: TextStyle(color: Colors.orange.shade900, fontSize: 12)),
           ),
         Expanded(
-          child: loading
-              ? const Center(child: CircularProgressIndicator())
-              : pdfBytes == null
-                  ? Center(
-                      child: Text(
-                        'پیش‌نمایش آماده می‌شود…',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-                      ),
-                    )
-                  : ColoredBox(
-                      color: Colors.grey.shade200,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: SizedBox.expand(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.12),
-                                  blurRadius: 12,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: ReportTemplateEmbeddedPdf(
-                              key: ValueKey('preview-$previewRevision'),
-                              bytes: pdfBytes!,
-                            ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (pdfBytes != null && pdfBytes!.isNotEmpty)
+                ColoredBox(
+                  color: Colors.grey.shade200,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.12),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
+                        ],
+                      ),
+                      child: SizedBox.expand(
+                        child: ReportTemplateEmbeddedPdf(
+                          key: ValueKey('preview-$previewRevision'),
+                          bytes: pdfBytes!,
                         ),
                       ),
                     ),
+                  ),
+                )
+              else if (!loading)
+                Center(
+                  child: Text(
+                    'پیش‌نمایش آماده می‌شود…',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
+              if (loading)
+                ColoredBox(
+                  color: Colors.white.withValues(alpha: 0.65),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+            ],
+          ),
         ),
       ],
     );

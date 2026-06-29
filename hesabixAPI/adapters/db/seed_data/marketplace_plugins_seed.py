@@ -138,6 +138,19 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_allowed=True,
 		plans=(("monthly", 120_000), ("yearly", 1_200_000)),
 	),
+	_PluginSeed(
+		code="payroll",
+		name="حقوق و دستمزد",
+		description=(
+			"مدیریت جامع حقوق و دستمزد: تعریف انعطاف‌پذیر آیتم‌های حقوق (مزایا، کسورات، هزینه کارفرما) "
+			"با نگاشت حساب از دفتر کل، ثبت پرسنل، دوره‌های حقوق، اجرای حقوق و صدور اسناد حسابداری."
+		),
+		category="hr_payroll",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 180_000), ("yearly", 1_800_000)),
+	),
 )
 
 

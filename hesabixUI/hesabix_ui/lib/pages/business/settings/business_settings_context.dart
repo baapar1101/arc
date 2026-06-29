@@ -96,6 +96,13 @@ class BusinessSettingsContext {
     return authStore.hasBusinessPermission('distribution', 'view');
   }
 
+  bool get canAccessPayroll {
+    if (!pluginActive('payroll')) return false;
+    if (isOwner) return true;
+    return authStore.hasBusinessPermission('payroll', 'view') ||
+        authStore.hasBusinessPermission('payroll', 'manage');
+  }
+
   bool get canAccessMoadian {
     if (!pluginActive('moadian_tax_integration')) return false;
     if (isOwner) return true;

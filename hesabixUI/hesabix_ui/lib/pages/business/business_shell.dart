@@ -1063,6 +1063,18 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  bool _isPayrollPluginActive() {
+    try {
+      final plug = _businessPlugins.firstWhere(
+        (plugin) => plugin['plugin_code'] == 'payroll',
+        orElse: () => <String, dynamic>{},
+      );
+      return plug['is_active'] == true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   bool _isWooCommerceHesabixPluginActive() {
     try {
       final plug = _businessPlugins.firstWhere(
@@ -1698,6 +1710,15 @@ class _BusinessShellState extends State<BusinessShell> {
         path: _bu('customer-club'),
         type: _MenuItemType.simple,
         hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'payroll',
+        label: t.payrollMenu,
+        icon: Icons.payments_outlined,
+        selectedIcon: Icons.payments,
+        path: _bu('payroll'),
+        type: _MenuItemType.simple,
+        hasAddButton: true,
       ),
       _MenuItem(
         key: 'distribution',
@@ -3236,6 +3257,13 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    // حقوق و دستمزد
+    if (section == 'payroll') {
+      if (!_isPayrollPluginActive()) {
+        return false;
+      }
+    }
+
     // اتصال باسلام
     if (section == 'basalam') {
       if (!_isBasalamPluginActive()) {
@@ -3352,6 +3380,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
     if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
     if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
+    if (label == t.payrollMenu || label == 'Payroll') return 'payroll';
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
     if (label == t.basalamIntegrationMenuTitle) return 'basalam';
     if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';
