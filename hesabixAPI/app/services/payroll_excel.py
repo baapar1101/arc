@@ -86,7 +86,7 @@ def build_employees_import_template(db: Session, business_id: int) -> Tuple[byte
 		"hire_date",
 	]
 	_write_header_row(ws, headers)
-	ws.append([101, "P-001", "EMP001", "حسابدار", 50000000, "finance", "full_time", "", "", "1403-01-01"])
+	ws.append(["", 1, "EMP001", "حسابدار", 50000000, "finance", "full_time", "", "", "1403-01-01"])
 	for col in range(1, len(headers) + 1):
 		ws.column_dimensions[chr(64 + col)].width = 16
 	buf = io.BytesIO()
@@ -190,63 +190,70 @@ def import_employees_from_excel(
 	for row_idx, row in enumerate(rows[1:], start=2):
 		if not row or all(v is None or str(v).strip() == "" for v in row):
 			continue
-		data = {headers[i]: row[i] if i < len(row) else None for i in range(len(headers))}
-		emp_code = _cell_str(data.get("employee_code"))
-		if not emp_code:
-			errors.append({"row": row_idx, "message": "employee_code خالی است"})
-			continue
-
-		person = None
-		pid_raw = data.get("person_id")
-		if pid_raw not in (None, ""):
-			person = (
-				db.query(Person)
-				.filter(Person.business_id == business_id, Person.id == int(pid_raw))
-				.first()
-			)
-		if person is None:
-			pcode = _cell_str(data.get("person_code"))
-			if pcode:
-				person = (
-					db.query(Person)
-					.filter(Person.business_id == business_id, Person.code == pcode)
-					.first()
-				)
-		if person is None:
-			errors.append({"row": row_idx, "message": "شخص یافت نشد"})
-			continue
-
-		dept_id = None
-		dcode = _cell_str(data.get("department_code"))
-		if dcode:
-			dept_id = dept_by_code.get(dcode)
-			if dept_id is None:
-				errors.append({"row": row_idx, "message": f"بخش {dcode} یافت نشد"})
+		try:
+			data = {headers[i]: row[i] if i < len(row) else None for i in range(len(headers))}
+			emp_code = _cell_str(data.get("employee_code"))
+			if not emp_code:
+				errors.append({"row": row_idx, "message": "employee_code خالی است"})
 				continue
 
-		emp_type = _cell_str(data.get("employment_type")) or "full_time"
-		if emp_type not in _EMPLOYMENT_TYPES:
-			errors.append({"row": row_idx, "message": f"نوع استخدام نامعتبر: {emp_type}"})
-			continue
+			person = None
+			pid_raw = data.get("person_id")
+			if pid_raw not in (None, ""):
+				try:
+					person = (
+						db.query(Person)
+						.filter(Person.business_id == business_id, Person.id == int(pid_raw))
+						.first()
+					)
+				except (TypeError, ValueError):
+					person = None
+			if person is None:
+				pcode = _cell_str(data.get("person_code"))
+				if pcode:
+					try:
+						code_int = int(str(pcode).replace(",", ""))
+						person = (
+							db.query(Person)
+							.filter(Person.business_id == business_id, Person.code == code_int)
+							.first()
+						)
+					except (TypeError, ValueError):
+						person = None
+			if person is None:
+				errors.append({"row": row_idx, "message": "شخص یافت نشد"})
+				continue
 
-		payload: Dict[str, Any] = {
-			"person_id": person.id,
-			"employee_code": emp_code,
-			"job_title": _cell_str(data.get("job_title")) or None,
-			"employment_type": emp_type,
-			"insurance_number": _cell_str(data.get("insurance_number")) or None,
-			"tax_id": _cell_str(data.get("tax_id")) or None,
-		}
-		bs = _cell_decimal(data.get("base_salary"))
-		if bs is not None:
-			payload["base_salary"] = bs
-		if dept_id is not None:
-			payload["department_id"] = dept_id
-		hd = _cell_str(data.get("hire_date"))
-		if hd:
-			payload["hire_date"] = hd
+			dept_id = None
+			dcode = _cell_str(data.get("department_code"))
+			if dcode:
+				dept_id = dept_by_code.get(dcode)
+				if dept_id is None:
+					errors.append({"row": row_idx, "message": f"بخش {dcode} یافت نشد"})
+					continue
 
-		try:
+			emp_type = _cell_str(data.get("employment_type")) or "full_time"
+			if emp_type not in _EMPLOYMENT_TYPES:
+				errors.append({"row": row_idx, "message": f"نوع استخدام نامعتبر: {emp_type}"})
+				continue
+
+			payload: Dict[str, Any] = {
+				"person_id": person.id,
+				"employee_code": emp_code,
+				"job_title": _cell_str(data.get("job_title")) or None,
+				"employment_type": emp_type,
+				"insurance_number": _cell_str(data.get("insurance_number")) or None,
+				"tax_id": _cell_str(data.get("tax_id")) or None,
+			}
+			bs = _cell_decimal(data.get("base_salary"))
+			if bs is not None:
+				payload["base_salary"] = bs
+			if dept_id is not None:
+				payload["department_id"] = dept_id
+			hd = _cell_str(data.get("hire_date"))
+			if hd:
+				payload["hire_date"] = hd
+
 			if emp_code in existing_by_code:
 				if not dry_run:
 					update_employee(db, business_id, existing_by_code[emp_code].id, payload, user_id=user_id)

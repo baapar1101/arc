@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../core/calendar_controller.dart';
@@ -74,7 +73,7 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
     _codeCtrl = TextEditingController(text: '${e?['employee_code'] ?? ''}');
     _jobCtrl = TextEditingController(text: '${e?['job_title'] ?? ''}');
     _salaryCtrl = TextEditingController(
-      text: e?['base_salary'] != null ? '${e!['base_salary']}' : '',
+      text: PayrollUi.formatInputValue(e?['base_salary']),
     );
     _insuranceCtrl = TextEditingController(text: '${e?['insurance_number'] ?? ''}');
     _taxCtrl = TextEditingController(text: '${e?['tax_id'] ?? ''}');
@@ -112,7 +111,7 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
       'department_id': _departmentId,
       'base_salary': _salaryCtrl.text.trim().isEmpty
           ? null
-          : double.tryParse(_salaryCtrl.text.replaceAll(',', '')),
+          : PayrollUi.parseMoneyInput(_salaryCtrl.text),
       'insurance_number': _insuranceCtrl.text.trim().isEmpty ? null : _insuranceCtrl.text.trim(),
       'tax_id': _taxCtrl.text.trim().isEmpty ? null : _taxCtrl.text.trim(),
       'is_active': _isActive,
@@ -190,7 +189,7 @@ class _PayrollEmployeeFormDialogState extends State<PayrollEmployeeFormDialog> {
             TextFormField(
               controller: _salaryCtrl,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              inputFormatters: PayrollUi.numericInputFormatters(),
               decoration: PayrollUi.fieldDecoration(context, t.payrollBaseSalary, prefixIcon: Icons.payments_outlined),
             ),
             const SizedBox(height: 12),

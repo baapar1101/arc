@@ -243,21 +243,21 @@ class _SummaryCards extends StatelessWidget {
                 PayrollUi.statCard(
                   context: context,
                   label: t.payrollDashboardActiveEmployees,
-                  value: '${dashboard['active_employees'] ?? 0}',
+                  value: PayrollUi.formatCount(dashboard['active_employees'] ?? 0),
                   icon: Icons.people_outline,
                   color: theme.colorScheme.primary,
                 ),
                 PayrollUi.statCard(
                   context: context,
                   label: t.payrollItemsTab,
-                  value: '${dashboard['active_items'] ?? 0}',
+                  value: PayrollUi.formatCount(dashboard['active_items'] ?? 0),
                   icon: Icons.list_alt_outlined,
                   color: theme.colorScheme.tertiary,
                 ),
                 PayrollUi.statCard(
                   context: context,
                   label: t.payrollDashboardDraftRuns,
-                  value: '${dashboard['draft_runs'] ?? 0}',
+                  value: PayrollUi.formatCount(dashboard['draft_runs'] ?? 0),
                   icon: Icons.edit_note_outlined,
                   color: theme.colorScheme.secondary,
                 ),
@@ -286,7 +286,7 @@ class _SummaryCards extends StatelessWidget {
             const SizedBox(height: 12),
             PayrollUi.infoBanner(
               context: context,
-              message: '${t.payrollDashboardPendingApprovals}: $pending',
+              message: '${t.payrollDashboardPendingApprovals}: ${PayrollUi.formatCount(pending)}',
               icon: Icons.pending_actions,
               backgroundColor: theme.colorScheme.errorContainer.withValues(alpha: 0.55),
               foregroundColor: theme.colorScheme.onErrorContainer,
@@ -444,9 +444,9 @@ class _PeriodsTab extends StatelessWidget {
           ],
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
-        FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(t.save)),
+      actionsBuilder: (dialogCtx) => [
+        TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: Text(t.cancel)),
+        FilledButton(onPressed: () => Navigator.pop(dialogCtx, true), child: Text(t.save)),
       ],
     );
     if (result != true) {

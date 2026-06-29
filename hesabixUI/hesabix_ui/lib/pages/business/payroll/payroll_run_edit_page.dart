@@ -8,7 +8,6 @@ import '../../../core/calendar_controller.dart';
 import '../../../core/date_utils.dart';
 import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
-import '../../../utils/number_formatters.dart' show formatWithThousands;
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/date_input_field.dart';
 import '../../../widgets/invoice/invoice_pdf_print_flow.dart';
@@ -177,7 +176,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
         final itemId = (m['item_definition_id'] as num).toInt();
         final key = _amountKey(empId, itemId);
         _amountControllers[key] = TextEditingController(
-          text: m['amount'] != null ? '${m['amount']}' : '',
+          text: m['amount'] != null ? PayrollUi.formatInputValue(m['amount']) : '',
         );
       }
     }
@@ -203,7 +202,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
         final ctrl = _amountControllers[_amountKey(empId, itemId)];
         final text = ctrl?.text.trim() ?? '';
         if (text.isEmpty) continue;
-        final amount = double.tryParse(text.replaceAll(',', ''));
+        final amount = PayrollUi.parseMoneyInput(text);
         if (amount == null) continue;
         items.add({'item_definition_id': itemId, 'amount': amount});
       }
@@ -777,7 +776,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
                 child: Text(name.toString().isNotEmpty ? name.toString().substring(0, 1) : '?'),
               ),
               title: Text('$name'),
-              subtitle: Text('${t.payrollNetAmount}: ${formatWithThousands(line['net_amount'])}'),
+              subtitle: Text('${t.payrollNetAmount}: ${PayrollUi.formatMoney(line['net_amount'])}'),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -791,6 +790,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
                           controller: ctrl,
                           enabled: _isDraft,
                           keyboardType: TextInputType.number,
+                          inputFormatters: PayrollUi.numericInputFormatters(),
                           decoration: PayrollUi.fieldDecoration(context, '${item['name']}'),
                         ),
                       );
@@ -880,9 +880,9 @@ class _DepartmentSummaryCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: Text('${row['department_name'] ?? '—'}')),
-                Text('${row['employee_count'] ?? 0}'),
+                Text('${PayrollUi.formatCount(row['employee_count'] ?? 0)}'),
                 const SizedBox(width: 12),
-                Text(formatWithThousands(row['net_total'])),
+                Text(PayrollUi.formatMoney(row['net_total'])),
               ],
             ),
           );

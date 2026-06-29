@@ -125,9 +125,9 @@ class _PayrollEmployeeImportDialogState extends State<PayrollEmployeeImportDialo
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${t.payrollImportCreated}: ${_result!['created'] ?? 0}'),
-                  Text('${t.payrollImportUpdated}: ${_result!['updated'] ?? 0}'),
-                  Text('${t.payrollImportErrorCount}: ${_result!['error_count'] ?? 0}'),
+                  Text('${t.payrollImportCreated}: ${PayrollUi.formatCount(_result!['created'] ?? 0)}'),
+                  Text('${t.payrollImportUpdated}: ${PayrollUi.formatCount(_result!['updated'] ?? 0)}'),
+                  Text('${t.payrollImportErrorCount}: ${PayrollUi.formatCount(_result!['error_count'] ?? 0)}'),
                 ],
               ),
             ),

@@ -38,7 +38,9 @@ class _PayrollDepartmentFormDialogState extends State<PayrollDepartmentFormDialo
     final e = widget.existing;
     _codeCtrl = TextEditingController(text: '${e?['code'] ?? ''}');
     _nameCtrl = TextEditingController(text: '${e?['name'] ?? ''}');
-    _sortCtrl = TextEditingController(text: '${e?['sort_order'] ?? 0}');
+    _sortCtrl = TextEditingController(
+      text: PayrollUi.formatInputValue(e?['sort_order'], allowDecimal: false),
+    );
     _isActive = e?['is_active'] != false;
   }
 
@@ -54,7 +56,7 @@ class _PayrollDepartmentFormDialogState extends State<PayrollDepartmentFormDialo
     if (!_formKey.currentState!.validate()) return;
     final payload = <String, dynamic>{
       'name': _nameCtrl.text.trim(),
-      'sort_order': int.tryParse(_sortCtrl.text.trim()) ?? 0,
+      'sort_order': PayrollUi.parseIntInput(_sortCtrl.text.trim()) ?? 0,
     };
     if (!_isEdit) {
       payload['code'] = _codeCtrl.text.trim().toLowerCase();
@@ -95,6 +97,7 @@ class _PayrollDepartmentFormDialogState extends State<PayrollDepartmentFormDialo
             TextFormField(
               controller: _sortCtrl,
               keyboardType: TextInputType.number,
+              inputFormatters: PayrollUi.numericInputFormatters(allowDecimal: false),
               decoration: PayrollUi.fieldDecoration(context, t.payrollSortOrder, prefixIcon: Icons.sort),
             ),
             if (_isEdit) ...[

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:intl/intl.dart';
+
+import '../../../utils/number_formatters.dart' show formatWithThousands;
+import '../../../utils/number_normalizer.dart'
+    show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, formatNumberForInput, parseFormattedDouble, parseFormattedInt;
 
 /// اجزای UI مشترک افزونه حقوق و دستمزد.
 class PayrollUi {
@@ -10,9 +14,38 @@ class PayrollUi {
   static const double dialogRadius = 20;
   static const EdgeInsets pagePadding = EdgeInsets.all(16);
 
-  static NumberFormat moneyFormatter() => NumberFormat('#,###');
+  /// نمایش مبالغ و اعداد بزرگ با جداکننده هزارگان.
+  static String formatMoney(dynamic value) {
+    if (value == null || (value is String && value.trim().isEmpty)) return '-';
+    return formatWithThousands(value);
+  }
 
-  static String formatMoney(dynamic value) => moneyFormatter().format((value as num?)?.toDouble() ?? 0);
+  /// نمایش شمارنده‌ها (تعداد پرسنل، خطاها و …) با جداکننده هزارگان.
+  static String formatCount(dynamic value) => formatMoney(value);
+
+  /// مقدار اولیه فیلدهای عددی قابل ویرایش.
+  static String formatInputValue(dynamic value, {bool allowDecimal = true}) {
+    if (value == null) return '';
+    num? n;
+    if (value is num) {
+      n = value;
+    } else {
+      n = allowDecimal ? parseFormattedDouble('$value') : parseFormattedInt('$value');
+    }
+    if (n == null) return '';
+    return formatNumberForInput(n);
+  }
+
+  static List<TextInputFormatter> numericInputFormatters({bool allowDecimal = true}) => [
+        const EnglishDigitsFormatter(),
+        ThousandsSeparatorInputFormatter(allowDecimal: allowDecimal),
+      ];
+
+  static double? parseMoneyInput(String? text) => parseFormattedDouble(text);
+
+  static double? parseDecimalInput(String? text) => parseFormattedDouble(text);
+
+  static int? parseIntInput(String? text) => parseFormattedInt(text);
 
   static InputDecoration fieldDecoration(
     BuildContext context,
@@ -178,7 +211,7 @@ class PayrollUi {
     IconData? icon,
     Color? iconColor,
     required Widget content,
-    required List<Widget> actions,
+    required List<Widget> Function(BuildContext dialogContext) actionsBuilder,
     double maxWidth = 520,
   }) {
     return showDialog<T>(
@@ -190,7 +223,7 @@ class PayrollUi {
         iconColor: iconColor,
         maxWidth: maxWidth,
         child: content,
-        actions: actions,
+        actions: actionsBuilder(ctx),
       ),
     );
   }
@@ -215,11 +248,11 @@ class PayrollUi {
       iconColor: accent,
       maxWidth: 440,
       content: Text(message, style: Theme.of(context).textTheme.bodyLarge),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(t.cancel)),
+      actionsBuilder: (dialogCtx) => [
+        TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: Text(t.cancel)),
         FilledButton(
           style: destructive ? FilledButton.styleFrom(backgroundColor: cs.error) : null,
-          onPressed: () => Navigator.pop(context, true),
+          onPressed: () => Navigator.pop(dialogCtx, true),
           child: Text(confirmLabel ?? t.confirm),
         ),
       ],

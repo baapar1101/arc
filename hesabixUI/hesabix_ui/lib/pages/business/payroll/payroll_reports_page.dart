@@ -424,7 +424,7 @@ class _PeriodOverviewTable extends StatelessWidget {
                 (row) => DataRow(
                   cells: [
                     DataCell(Text(PayrollCalendarUtils.periodTitle(row, isJalali))),
-                    DataCell(Text('${row['run_count'] ?? 0}')),
+                    DataCell(Text(PayrollUi.formatCount(row['run_count'] ?? 0))),
                     DataCell(Text(fmt(row['gross_total']))),
                     DataCell(Text(fmt(row['net_total']))),
                   ],

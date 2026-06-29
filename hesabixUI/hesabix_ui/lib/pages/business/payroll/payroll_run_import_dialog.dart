@@ -139,9 +139,9 @@ class _PayrollRunImportDialogState extends State<PayrollRunImportDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${t.payrollImportUpdatedLines}: ${_result!['updated_lines'] ?? _result!['would_update_lines'] ?? 0}',
+                    '${t.payrollImportUpdatedLines}: ${PayrollUi.formatCount(_result!['updated_lines'] ?? _result!['would_update_lines'] ?? 0)}',
                   ),
-                  Text('${t.payrollImportErrorCount}: ${_result!['error_count'] ?? 0}'),
+                  Text('${t.payrollImportErrorCount}: ${PayrollUi.formatCount(_result!['error_count'] ?? 0)}'),
                 ],
               ),
             ),

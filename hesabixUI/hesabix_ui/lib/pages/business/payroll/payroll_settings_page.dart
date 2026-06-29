@@ -73,19 +73,19 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
     _statutoryEnabled = rules is Map && rules['enabled'] == true;
     _requireApproval = settings['require_approval'] == true;
     _autoPostOnFinalize = settings['auto_post_on_finalize'] == true;
-    _insEmpRateCtrl.text = '${ins is Map ? ins['employee_rate_percent'] ?? 7 : 7}';
-    _insErRateCtrl.text = '${ins is Map ? ins['employer_rate_percent'] ?? 20 : 20}';
-    _insUnempRateCtrl.text = '${ins is Map ? ins['unemployment_employer_rate_percent'] ?? 3 : 3}';
-    _taxFlatRateCtrl.text = '${tax is Map ? tax['flat_rate_percent'] ?? 10 : 10}';
-    _taxExemptionCtrl.text = '${tax is Map ? tax['exemption_amount'] ?? 0 : 0}';
+    _insEmpRateCtrl.text = PayrollUi.formatInputValue(ins is Map ? ins['employee_rate_percent'] ?? 7 : 7);
+    _insErRateCtrl.text = PayrollUi.formatInputValue(ins is Map ? ins['employer_rate_percent'] ?? 20 : 20);
+    _insUnempRateCtrl.text = PayrollUi.formatInputValue(ins is Map ? ins['unemployment_employer_rate_percent'] ?? 3 : 3);
+    _taxFlatRateCtrl.text = PayrollUi.formatInputValue(tax is Map ? tax['flat_rate_percent'] ?? 10 : 10);
+    _taxExemptionCtrl.text = PayrollUi.formatInputValue(tax is Map ? tax['exemption_amount'] ?? 0 : 0);
   }
 
   Future<void> _saveStatutoryRules() async {
-    final insEmp = double.tryParse(_insEmpRateCtrl.text.replaceAll(',', '')) ?? 7;
-    final insEr = double.tryParse(_insErRateCtrl.text.replaceAll(',', '')) ?? 20;
-    final insUnemp = double.tryParse(_insUnempRateCtrl.text.replaceAll(',', '')) ?? 3;
-    final taxRate = double.tryParse(_taxFlatRateCtrl.text.replaceAll(',', '')) ?? 10;
-    final exemption = double.tryParse(_taxExemptionCtrl.text.replaceAll(',', '')) ?? 0;
+    final insEmp = PayrollUi.parseDecimalInput(_insEmpRateCtrl.text) ?? 7;
+    final insEr = PayrollUi.parseDecimalInput(_insErRateCtrl.text) ?? 20;
+    final insUnemp = PayrollUi.parseDecimalInput(_insUnempRateCtrl.text) ?? 3;
+    final taxRate = PayrollUi.parseDecimalInput(_taxFlatRateCtrl.text) ?? 10;
+    final exemption = PayrollUi.parseMoneyInput(_taxExemptionCtrl.text) ?? 0;
     final extra = Map<String, dynamic>.from(
       _settings['extra_settings'] is Map ? _settings['extra_settings'] as Map : const {},
     );
@@ -354,6 +354,7 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
                         controller: _insEmpRateCtrl,
                         enabled: _canManage && !_saving,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: PayrollUi.numericInputFormatters(),
                         decoration: PayrollUi.fieldDecoration(context, t.payrollInsuranceEmployeeRate),
                       ),
                       const SizedBox(height: 12),
@@ -361,6 +362,7 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
                         controller: _insErRateCtrl,
                         enabled: _canManage && !_saving,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: PayrollUi.numericInputFormatters(),
                         decoration: PayrollUi.fieldDecoration(context, t.payrollInsuranceEmployerRate),
                       ),
                       const SizedBox(height: 12),
@@ -368,6 +370,7 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
                         controller: _insUnempRateCtrl,
                         enabled: _canManage && !_saving,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: PayrollUi.numericInputFormatters(),
                         decoration: PayrollUi.fieldDecoration(context, t.payrollInsuranceUnemploymentRate),
                       ),
                       const SizedBox(height: 12),
@@ -375,6 +378,7 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
                         controller: _taxFlatRateCtrl,
                         enabled: _canManage && !_saving,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: PayrollUi.numericInputFormatters(),
                         decoration: PayrollUi.fieldDecoration(context, t.payrollTaxFlatRate),
                       ),
                       const SizedBox(height: 12),
@@ -382,6 +386,7 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
                         controller: _taxExemptionCtrl,
                         enabled: _canManage && !_saving,
                         keyboardType: TextInputType.number,
+                        inputFormatters: PayrollUi.numericInputFormatters(),
                         decoration: PayrollUi.fieldDecoration(context, t.payrollTaxExemption),
                       ),
                       const SizedBox(height: 12),

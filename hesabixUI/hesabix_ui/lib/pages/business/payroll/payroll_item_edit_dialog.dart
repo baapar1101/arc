@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../models/account_model.dart';
@@ -64,12 +63,14 @@ class _PayrollItemEditDialogState extends State<PayrollItemEditDialog> {
     _codeCtrl = TextEditingController(text: '${e?['code'] ?? ''}');
     _nameCtrl = TextEditingController(text: '${e?['name'] ?? ''}');
     _defaultAmountCtrl = TextEditingController(
-      text: e?['default_amount'] != null ? '${e!['default_amount']}' : '',
+      text: PayrollUi.formatInputValue(e?['default_amount']),
     );
     _percentCtrl = TextEditingController(
-      text: e?['percent_value'] != null ? '${e!['percent_value']}' : '',
+      text: PayrollUi.formatInputValue(e?['percent_value']),
     );
-    _sortCtrl = TextEditingController(text: '${e?['sort_order'] ?? 0}');
+    _sortCtrl = TextEditingController(
+      text: PayrollUi.formatInputValue(e?['sort_order'], allowDecimal: false),
+    );
     _itemKind = '${e?['item_kind'] ?? 'earning'}';
     _calculationType = '${e?['calculation_type'] ?? 'manual'}';
     _categoryId = (e?['category_id'] as num?)?.toInt();
@@ -102,11 +103,11 @@ class _PayrollItemEditDialogState extends State<PayrollItemEditDialog> {
       'account_id': _selectedAccount?.id,
       'default_amount': _defaultAmountCtrl.text.trim().isEmpty
           ? null
-          : double.tryParse(_defaultAmountCtrl.text.replaceAll(',', '')),
+          : PayrollUi.parseMoneyInput(_defaultAmountCtrl.text),
       'percent_value': _percentCtrl.text.trim().isEmpty
           ? null
-          : double.tryParse(_percentCtrl.text.replaceAll(',', '')),
-      'sort_order': int.tryParse(_sortCtrl.text) ?? 0,
+          : PayrollUi.parseDecimalInput(_percentCtrl.text),
+      'sort_order': PayrollUi.parseIntInput(_sortCtrl.text) ?? 0,
       'show_on_payslip': _showOnPayslip,
       'is_active': _isActive,
     };
@@ -200,7 +201,7 @@ class _PayrollItemEditDialogState extends State<PayrollItemEditDialog> {
               TextFormField(
                 controller: _defaultAmountCtrl,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                inputFormatters: PayrollUi.numericInputFormatters(),
                 decoration: PayrollUi.fieldDecoration(context, t.payrollDefaultAmount, prefixIcon: Icons.attach_money),
               ),
             if (_calculationType == 'percent_of_base') ...[
@@ -208,6 +209,7 @@ class _PayrollItemEditDialogState extends State<PayrollItemEditDialog> {
               TextFormField(
                 controller: _percentCtrl,
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: PayrollUi.numericInputFormatters(),
                 decoration: PayrollUi.fieldDecoration(context, t.payrollPercentValue, prefixIcon: Icons.percent),
               ),
             ],
