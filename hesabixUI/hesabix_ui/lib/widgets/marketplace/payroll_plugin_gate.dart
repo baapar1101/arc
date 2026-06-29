@@ -40,9 +40,12 @@ class _PayrollPluginGateState extends State<PayrollPluginGate> {
         (p) => p['plugin_code'] == _pluginCode,
         orElse: () => <String, dynamic>{},
       );
+      final active = row['is_active'] == true ||
+          row['is_active'] == 1 ||
+          (row['is_trial'] == true && row['is_expired'] != true);
       if (mounted) {
         setState(() {
-          _active = row['is_active'] == true;
+          _active = active;
           _loading = false;
         });
       }

@@ -103,6 +103,7 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _pluginsLoaded = false;
   int? _pluginsLoadedForBusinessId;
   String? _lastRouteLocation;
+  int _lastPluginsRefreshNonce = 0;
   bool _isBusinessLoading = false;
   String? _businessLoadError;
   Timer? _dateTimeUpdateTimer;
@@ -114,7 +115,13 @@ class _BusinessShellState extends State<BusinessShell> {
   bool _desktopRailVisible = true;
 
   void _onBusinessPanelUiChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final nonce = BusinessPanelUiStore.instance.pluginsRefreshNonce;
+    if (nonce != _lastPluginsRefreshNonce) {
+      _lastPluginsRefreshNonce = nonce;
+      _loadBusinessPlugins(force: true);
+    }
+    setState(() {});
   }
 
   String _bu(String rel) => context.businessPanelUrl(widget.businessId, rel);
@@ -1030,9 +1037,33 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
   /// مالک کسب‌وکار منوی افزونه را می‌بیند حتی قبل از فعال‌سازی (صفحهٔ مقصد راهنمای بازار افزونه است).
+  bool _jsonBool(dynamic value) {
+    if (value == true) return true;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final v = value.trim().toLowerCase();
+      return v == 'true' || v == '1';
+    }
+    return false;
+  }
+
+  bool _isBusinessOwner() {
+    final current = widget.authStore.currentBusiness;
+    return current != null && current.id == widget.businessId && current.isOwner;
+  }
+
+  bool _isPluginCodeLicensed(String code) {
+    for (final plug in _businessPlugins) {
+      if (plug['plugin_code'] != code) continue;
+      if (_jsonBool(plug['is_active'])) return true;
+      if (_jsonBool(plug['is_trial']) && !_jsonBool(plug['is_expired'])) return true;
+    }
+    return false;
+  }
+
   bool _showPluginGatedMenu(bool isPluginActive) {
     if (isPluginActive) return true;
-    return widget.authStore.currentBusiness?.isOwner == true;
+    return _isBusinessOwner();
   }
 
   void _maybeRefreshPluginsAfterMarketplace(String location) {
@@ -1095,17 +1126,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
-  bool _isPayrollPluginActive() {
-    try {
-      final plug = _businessPlugins.firstWhere(
-        (plugin) => plugin['plugin_code'] == 'payroll',
-        orElse: () => <String, dynamic>{},
-      );
-      return plug['is_active'] == true;
-    } catch (e) {
-      return false;
-    }
-  }
+  bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
   bool _isWooCommerceHesabixPluginActive() {
     try {
@@ -3238,7 +3259,8 @@ class _BusinessShellState extends State<BusinessShell> {
   }
 
   bool _hasAccessToMenuItem(_MenuItem item) {
-    final section = _sectionForLabel(item.label, AppLocalizations.of(context));
+    final t = AppLocalizations.of(context);
+    final section = _sectionForMenuItem(item, t);
 
     if (item.path != null && item.path!.contains('/woocommerce')) {
       if (!_isWooCommerceHesabixPluginActive()) {
@@ -3318,7 +3340,7 @@ class _BusinessShellState extends State<BusinessShell> {
     
     // بررسی دسترسی‌های مختلف برای نمایش منو
     // اگر کاربر مالک است، همه منوها قابل مشاهده هستند
-    if (widget.authStore.currentBusiness?.isOwner == true) {
+    if (_isBusinessOwner()) {
       return true;
     }
     
@@ -3364,6 +3386,36 @@ class _BusinessShellState extends State<BusinessShell> {
       return widget.authStore.hasBusinessPermission(section, 'write');
     }
     return widget.authStore.hasBusinessPermission(section, 'add');
+  }
+
+  // تبدیل کلید/برچسب منو به کلید سکشن دسترسی
+  String? _sectionForMenuItem(_MenuItem item, AppLocalizations t) {
+    switch (item.key) {
+      case 'payroll':
+        return 'payroll';
+      case 'customer-club':
+        return 'customer_club';
+      case 'repair-shop':
+        return 'repair_shop';
+      case 'warranty':
+        return 'warranty';
+      case 'distribution':
+        return 'distribution';
+      case 'tax-workspace':
+        return 'moadian';
+      case 'plugin-marketplace':
+        return 'marketplace';
+    }
+    final path = item.path;
+    if (path != null) {
+      if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/customer-club')) return 'customer_club';
+      if (path.contains('/repair-shop')) return 'repair_shop';
+      if (path.contains('/warranty')) return 'warranty';
+      if (path.contains('/distribution')) return 'distribution';
+      if (path.contains('/tax-workspace')) return 'moadian';
+    }
+    return _sectionForLabel(item.label, t);
   }
 
   // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی
@@ -3413,7 +3465,12 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.warranty || label == 'گارانتی' || label == 'Warranty') return 'warranty';
     if (label == 'تعمیرگاه' || label == 'Repair Shop') return 'repair_shop';
     if (label == t.customerClubMenu || label == 'Customer Club') return 'customer_club';
-    if (label == t.payrollMenu || label == 'Payroll') return 'payroll';
+    if (label == t.payrollMenu ||
+        label == t.payrollTitle ||
+        label == 'Payroll' ||
+        label == 'حقوق و دستمزد') {
+      return 'payroll';
+    }
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
     if (label == t.basalamIntegrationMenuTitle) return 'basalam';
     if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';

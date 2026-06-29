@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
+import '../../core/business_panel_ui_store.dart';
 import '../../core/business_nav.dart';
 import '../../core/business_named_route_locations.dart';
 import '../../services/marketplace_service.dart';
@@ -181,6 +182,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
       await _marketplace.startTrial(businessId: widget.businessId, pluginId: pluginId);
       if (!mounted) return;
       SnackBarHelper.show(context, message: t.pluginMarketplaceTrialSuccess);
+      BusinessPanelUiStore.instance.requestBusinessPluginsReload();
       await _load();
       if (mounted) Navigator.of(context).maybePop();
     } catch (e) {
@@ -217,6 +219,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
       final status = (res['status'] ?? '').toString();
       if (status == 'paid') {
         await _showPurchaseSuccess(pluginId: pluginId);
+        BusinessPanelUiStore.instance.requestBusinessPluginsReload();
         await _load();
       } else if (status == 'insufficient_funds') {
         await _showInsufficientFunds(res);

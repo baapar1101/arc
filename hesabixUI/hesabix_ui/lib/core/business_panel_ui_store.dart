@@ -38,6 +38,15 @@ class BusinessPanelUiStore extends ChangeNotifier {
   bool _hydrated = false;
   Future<void>? _hydrateFuture;
   Timer? _persistDebounce;
+  int _pluginsRefreshNonce = 0;
+
+  /// برای به‌روزرسانی منوی shell پس از خرید/تریال افزونه.
+  int get pluginsRefreshNonce => _pluginsRefreshNonce;
+
+  void requestBusinessPluginsReload() {
+    _pluginsRefreshNonce++;
+    notifyListeners();
+  }
 
   BusinessPanelNavigationMode get mode => _mode;
 
