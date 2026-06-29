@@ -1690,26 +1690,28 @@ async def download_products_import_template(
         cell.font = Font(bold=True)
         cell.alignment = Alignment(horizontal="center")
 
-    # Sample data row (row 2)
+    # Sample data row (row 2) — only basic fields; no category/attribute refs that fail validation
     if locale == 'fa':
         sample = [
-            "P1001", "نمونه کالا", "کالا", "توضیح اختیاری", "",
-            "مواد اولیه > پلاستیک", "", "", "",
+            "P1001", "نمونه کالا", "کالا",
+            "ردیف نمونه — قبل از ایمپورت واقعی ویرایش یا حذف کنید",
+            "", "", "عدد", "", "",
             "150000", "120000", "TRUE",
-            "0", "0", "",
+            "", "", "",
             "FALSE", "FALSE", "", "",
             "", "", "", "", "", "", "",
-            "1,2,3", "رنگ, سایز",
+            "", "",
         ]
     else:
         sample = [
-            "P1001", "Sample product", "product", "Optional description", "",
-            "Raw materials > Plastics", "", "", "",
+            "P1001", "Sample product", "product",
+            "Sample row — edit or delete before real import",
+            "", "", "unit", "", "",
             "150000", "120000", "TRUE",
-            "0", "0", "",
+            "", "", "",
             "FALSE", "FALSE", "", "",
             "", "", "", "", "", "", "",
-            "1,2,3", "Color, Size",
+            "", "",
         ]
     for col, val in enumerate(sample, 1):
         ws.cell(row=2, column=col, value=val)
@@ -1988,6 +1990,15 @@ async def import_products_excel(
 
         headers = [header_aliases.get(_normalize_header(h), h) for h in raw_headers]
         data_rows = rows[1:]
+        mapped_keys = {h for h in headers if h in internal_keys}
+        if "name" not in mapped_keys:
+            unmapped = [raw_headers[i] for i, h in enumerate(headers) if h not in internal_keys]
+            raise ApiError(
+                "MISSING_COLUMNS",
+                f"ستون الزامی «نام» در ردیف اول یافت نشد. از تمپلیت رسمی استفاده کنید."
+                + (f" (ستون‌های ناشناخته: {', '.join(unmapped[:5])})" if unmapped else ""),
+                http_status=400,
+            )
         logger.info(f"[IMPORT] Headers parsed: {headers}, data rows count: {len(data_rows)}")
 
         def _parse_bool(v: object) -> Optional[bool]:
@@ -2345,6 +2356,9 @@ async def import_products_excel(
                     val = val.strip()
                 item[key] = val
 
+            if not any(v not in (None, "") for v in item.values()):
+                continue
+
             # normalize & cast
             if 'item_type' in item:
                 item['item_type'] = _normalize_item_type(item.get('item_type')) or 'کالا'
@@ -2463,6 +2477,16 @@ async def import_products_excel(
                 item.pop("_created_attribute_titles", None)
             if "_would_create_attribute_titles" in item:
                 item.pop("_would_create_attribute_titles", None)
+
+            # Excel-only columns used for resolve; not part of ProductCreateRequest
+            for k in (
+                "category_path", "category", "attribute_titles",
+                "tax_type_code", "tax_type_title", "tax_unit_code", "tax_unit_name",
+            ):
+                item.pop(k, None)
+            for k, v in list(item.items()):
+                if isinstance(v, str) and v.strip() == "":
+                    item[k] = None
 
             valid_items.append(item)
             logger.debug(f"[IMPORT] Row {idx} validated successfully - name={item.get('name')}, code={item.get('code')}")
