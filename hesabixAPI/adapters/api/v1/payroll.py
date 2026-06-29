@@ -52,7 +52,7 @@ def update_settings_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.update_settings(db, business_id, payload, user_id=ctx.user_id)
+		data = svc.update_settings(db, business_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -107,7 +107,7 @@ def create_item_category_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.create_item_category(db, business_id, payload, user_id=ctx.user_id)
+		data = svc.create_item_category(db, business_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -128,7 +128,7 @@ def update_item_category_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.update_item_category(db, business_id, category_id, payload, user_id=ctx.user_id)
+		data = svc.update_item_category(db, business_id, category_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -147,7 +147,7 @@ def delete_item_category_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	svc.delete_item_category(db, business_id, category_id, user_id=ctx.user_id)
+	svc.delete_item_category(db, business_id, category_id, user_id=ctx.get_user_id())
 	return success_response({"deleted": True}, request)
 
 
@@ -184,7 +184,7 @@ def create_item_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.create_item_definition(db, business_id, payload, user_id=ctx.user_id)
+		data = svc.create_item_definition(db, business_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -205,7 +205,7 @@ def update_item_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.update_item_definition(db, business_id, item_id, payload, user_id=ctx.user_id)
+		data = svc.update_item_definition(db, business_id, item_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -224,7 +224,7 @@ def delete_item_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	svc.delete_item_definition(db, business_id, item_id, user_id=ctx.user_id)
+	svc.delete_item_definition(db, business_id, item_id, user_id=ctx.get_user_id())
 	return success_response({"deleted": True}, request)
 
 
@@ -258,7 +258,7 @@ def create_department_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.create_department(db, business_id, payload, user_id=ctx.user_id)
+		data = svc.create_department(db, business_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -306,7 +306,7 @@ def create_employee_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.create_employee(db, business_id, payload, user_id=ctx.user_id)
+		data = svc.create_employee(db, business_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -345,7 +345,7 @@ def create_period_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.create_period(db, business_id, payload, user_id=ctx.user_id)
+		data = svc.create_period(db, business_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -364,7 +364,7 @@ def close_period_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	data = svc.close_period(db, business_id, period_id, user_id=ctx.user_id)
+	data = svc.close_period(db, business_id, period_id, user_id=ctx.get_user_id())
 	return success_response(data, request)
 
 
@@ -418,7 +418,7 @@ def create_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.create_run(db, business_id, payload, user_id=ctx.user_id)
+		data = svc.create_run(db, business_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -439,7 +439,7 @@ def update_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.update_run(db, business_id, run_id, payload, user_id=ctx.user_id)
+		data = svc.update_run(db, business_id, run_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -458,7 +458,7 @@ def delete_run_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	svc.delete_run(db, business_id, run_id, user_id=ctx.user_id)
+	svc.delete_run(db, business_id, run_id, user_id=ctx.get_user_id())
 	return success_response({"deleted": True}, request)
 
 
@@ -473,7 +473,7 @@ def finalize_run_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	data = svc.finalize_run(db, business_id, run_id, user_id=ctx.user_id)
+	data = svc.finalize_run(db, business_id, run_id, user_id=ctx.get_user_id())
 	return success_response(data, request)
 
 
@@ -488,7 +488,7 @@ def cancel_run_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	data = svc.cancel_run(db, business_id, run_id, user_id=ctx.user_id)
+	data = svc.cancel_run(db, business_id, run_id, user_id=ctx.get_user_id())
 	return success_response(data, request)
 
 
@@ -505,7 +505,7 @@ def copy_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.copy_run(db, business_id, run_id, payload, user_id=ctx.user_id)
+		data = svc.copy_run(db, business_id, run_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -702,7 +702,7 @@ async def import_employees_excel_endpoint(
 		raise ApiError("INVALID_FILE", "فقط فایل‌های .xlsx پشتیبانی می‌شوند", http_status=400)
 	content = await file.read()
 	data = excel_svc.import_employees_from_excel(
-		db, business_id, content, dry_run=dry_run, user_id=ctx.user_id
+		db, business_id, content, dry_run=dry_run, user_id=ctx.get_user_id()
 	)
 	return success_response(data, request)
 
@@ -746,7 +746,7 @@ async def import_run_lines_excel_endpoint(
 		raise ApiError("INVALID_FILE", "فقط فایل‌های .xlsx پشتیبانی می‌شوند", http_status=400)
 	content = await file.read()
 	data = excel_svc.import_run_lines_from_excel(
-		db, business_id, run_id, content, dry_run=dry_run, user_id=ctx.user_id
+		db, business_id, run_id, content, dry_run=dry_run, user_id=ctx.get_user_id()
 	)
 	return success_response(data, request)
 
@@ -762,7 +762,7 @@ def approve_run_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	data = svc.approve_run(db, business_id, run_id, user_id=ctx.user_id)
+	data = svc.approve_run(db, business_id, run_id, user_id=ctx.get_user_id())
 	return success_response(data, request)
 
 
@@ -779,7 +779,7 @@ def reject_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	reason = payload.get("reason") if isinstance(payload, dict) else None
-	data = svc.reject_run(db, business_id, run_id, user_id=ctx.user_id, reason=reason)
+	data = svc.reject_run(db, business_id, run_id, user_id=ctx.get_user_id(), reason=reason)
 	return success_response(data, request)
 
 
@@ -794,7 +794,7 @@ def post_run_endpoint(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
-	data = svc.post_run_to_accounting(db, business_id, run_id, user_id=ctx.user_id)
+	data = svc.post_run_to_accounting(db, business_id, run_id, user_id=ctx.get_user_id())
 	return success_response(data, request)
 
 
@@ -814,7 +814,7 @@ def post_payment_endpoint(
 	if payment_account_id is None:
 		raise ApiError("PAYMENT_ACCOUNT_REQUIRED", "payment_account_id الزامی است.", http_status=400)
 	data = svc.post_run_payment(
-		db, business_id, run_id, ctx.user_id, int(payment_account_id)
+		db, business_id, run_id, ctx.get_user_id(), int(payment_account_id)
 	)
 	return success_response(data, request)
 
@@ -832,7 +832,7 @@ def update_employee_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.update_employee(db, business_id, employee_id, payload, user_id=ctx.user_id)
+		data = svc.update_employee(db, business_id, employee_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
@@ -853,7 +853,7 @@ def update_department_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	try:
-		data = svc.update_department(db, business_id, department_id, payload, user_id=ctx.user_id)
+		data = svc.update_department(db, business_id, department_id, payload, user_id=ctx.get_user_id())
 	except ApiError:
 		raise
 	except ValueError as e:
