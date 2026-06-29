@@ -101,6 +101,8 @@ class _BusinessShellState extends State<BusinessShell> {
   final MarketplaceService _marketplaceService = MarketplaceService();
   List<Map<String, dynamic>> _businessPlugins = [];
   bool _pluginsLoaded = false;
+  int? _pluginsLoadedForBusinessId;
+  String? _lastRouteLocation;
   bool _isBusinessLoading = false;
   String? _businessLoadError;
   Timer? _dateTimeUpdateTimer;
@@ -203,8 +205,13 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairTechnicians;
       case 'repair-shop-settings':
         return t.businessPanelTabRouteRepairShopSettings;
+      case 'payroll':
+        return t.payrollMenu;
       default:
         break;
+    }
+    if (pathTailBase.startsWith('payroll/')) {
+      return t.payrollMenu;
     }
     if (RegExp(r'^price-lists/\d+/items$').hasMatch(pathTailBase)) {
       return t.businessPanelTabRoutePriceListItems;
@@ -669,6 +676,9 @@ class _BusinessShellState extends State<BusinessShell> {
   void didUpdateWidget(covariant BusinessShell oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.businessId != widget.businessId) {
+      _pluginsLoaded = false;
+      _pluginsLoadedForBusinessId = null;
+      _loadBusinessPlugins(force: true);
       _loadMenuPreferences();
     }
   }
@@ -992,15 +1002,20 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
-  Future<void> _loadBusinessPlugins() async {
-    if (_pluginsLoaded) return;
-    
+  Future<void> _loadBusinessPlugins({bool force = false}) async {
+    if (!force &&
+        _pluginsLoaded &&
+        _pluginsLoadedForBusinessId == widget.businessId) {
+      return;
+    }
+
     try {
       final plugins = await _marketplaceService.listBusinessPlugins(businessId: widget.businessId);
       if (mounted) {
         setState(() {
           _businessPlugins = plugins.map((e) => Map<String, dynamic>.from(e as Map)).toList();
           _pluginsLoaded = true;
+          _pluginsLoadedForBusinessId = widget.businessId;
         });
       }
     } catch (e) {
@@ -1008,8 +1023,25 @@ class _BusinessShellState extends State<BusinessShell> {
       if (mounted) {
         setState(() {
           _pluginsLoaded = true;
+          _pluginsLoadedForBusinessId = widget.businessId;
         });
       }
+    }
+  }
+
+  /// مالک کسب‌وکار منوی افزونه را می‌بیند حتی قبل از فعال‌سازی (صفحهٔ مقصد راهنمای بازار افزونه است).
+  bool _showPluginGatedMenu(bool isPluginActive) {
+    if (isPluginActive) return true;
+    return widget.authStore.currentBusiness?.isOwner == true;
+  }
+
+  void _maybeRefreshPluginsAfterMarketplace(String location) {
+    final prev = _lastRouteLocation;
+    _lastRouteLocation = location;
+    if (prev != null &&
+        prev.contains('/plugin-marketplace') &&
+        !location.contains('/plugin-marketplace')) {
+      _loadBusinessPlugins(force: true);
     }
   }
 
@@ -1196,6 +1228,7 @@ class _BusinessShellState extends State<BusinessShell> {
     } catch (e) {
       // اگر GoRouterState در دسترس نیست، از default استفاده کن
     }
+    _maybeRefreshPluginsAfterMarketplace(location);
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final String logoAsset = isDark
         ? 'assets/images/logo-light.png'
@@ -3231,49 +3264,49 @@ class _BusinessShellState extends State<BusinessShell> {
     
     // بررسی فعال بودن پلاگین گارانتی
     if (section == 'warranty') {
-      if (!_isWarrantyPluginActive()) {
+      if (!_showPluginGatedMenu(_isWarrantyPluginActive())) {
         return false;
       }
     }
     
     // بررسی فعال بودن پلاگین تعمیرگاه
     if (section == 'repair_shop') {
-      if (!_isRepairShopPluginActive()) {
+      if (!_showPluginGatedMenu(_isRepairShopPluginActive())) {
         return false;
       }
     }
 
     // باشگاه مشتریان
     if (section == 'customer_club') {
-      if (!_isCustomerClubPluginActive()) {
+      if (!_showPluginGatedMenu(_isCustomerClubPluginActive())) {
         return false;
       }
     }
 
     // پخش مویرگی
     if (section == 'distribution') {
-      if (!_isDistributionPluginActive()) {
+      if (!_showPluginGatedMenu(_isDistributionPluginActive())) {
         return false;
       }
     }
 
     // حقوق و دستمزد
     if (section == 'payroll') {
-      if (!_isPayrollPluginActive()) {
+      if (!_showPluginGatedMenu(_isPayrollPluginActive())) {
         return false;
       }
     }
 
     // اتصال باسلام
     if (section == 'basalam') {
-      if (!_isBasalamPluginActive()) {
+      if (!_showPluginGatedMenu(_isBasalamPluginActive())) {
         return false;
       }
     }
 
     // سامانه مودیان
     if (section == 'moadian') {
-      if (!_isMoadianPluginActive()) {
+      if (!_showPluginGatedMenu(_isMoadianPluginActive())) {
         return false;
       }
     }
