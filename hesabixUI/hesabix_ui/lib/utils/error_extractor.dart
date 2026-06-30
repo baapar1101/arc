@@ -253,6 +253,7 @@ class ErrorExtractor {
       case dio.DioExceptionType.sendTimeout:
         return t.errorSendTimeout;
       case dio.DioExceptionType.receiveTimeout:
+      case dio.DioExceptionType.transformTimeout:
         return t.errorReceiveTimeout;
       case dio.DioExceptionType.connectionError:
         return t.errorConnectionError;
