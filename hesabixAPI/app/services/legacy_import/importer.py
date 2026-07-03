@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from datetime import date
 from typing import Any, Callable, Dict, Optional
 
 from sqlalchemy import and_
@@ -31,6 +32,10 @@ from app.services.legacy_import.client import LegacyApiClient
 from app.services.legacy_import.constants import IMPORT_MODE_LEGACY_API
 from app.services.legacy_import.context import reset_legacy_import_active, set_legacy_import_active
 from app.services.legacy_import.document_importer import LegacyDocumentImporter
+from app.services.legacy_import.opening_balance_importer import LegacyApiOpeningBalanceImporter
+from app.services.legacy_import.warehouse_document_importer import LegacyApiWarehouseDocumentImporter
+from app.services.legacy_import.table_enrichment import enrich_hesabdari_tables
+from app.services.legacy_import.legacy_chart_resolver import LegacyChartResolver
 from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
 from app.services.legacy_import.mappers import (
     epoch_to_date,
@@ -99,6 +104,7 @@ class LegacyBusinessImporter:
         self.progress(15, "ایجاد کسب‌وکار جدید")
         business_id, currency_id = self._create_business(archive, connection)
         self._currency_id = currency_id
+        self._map_fiscal_years(business_id, archive)
 
         if self.options.import_persons:
             self.progress(35, "انتقال اشخاص")
@@ -126,6 +132,19 @@ class LegacyBusinessImporter:
             self._import_warehouses(business_id, archive)
 
         if self.options.import_documents:
+            self.progress(65, "انتقال تراز افتتاحیه")
+            tables = enrich_hesabdari_tables(archive, legacy_client=self.client)
+            chart = LegacyChartResolver(self.db, business_id, tables)
+            LegacyApiOpeningBalanceImporter(
+                self.db,
+                business_id,
+                self.owner_id,
+                currency_id,
+                self.id_map,
+                self.stats,
+                chart=chart,
+            ).import_all(archive)
+
             self.progress(70, "انتقال اسناد حسابداری")
             LegacyDocumentImporter(
                 self.db,
@@ -136,6 +155,20 @@ class LegacyBusinessImporter:
                 self.stats,
                 legacy_client=self.client,
             ).import_all(archive)
+
+        if self.options.import_warehouses and self.options.import_documents:
+            self.progress(82, "انتقال حواله‌های انبار")
+            LegacyApiWarehouseDocumentImporter(
+                self.db,
+                business_id,
+                self.owner_id,
+                self.id_map,
+                self.stats,
+            ).import_all(archive)
+        elif self.options.import_warehouses:
+            self.stats.add_warning(
+                "حواله‌های انبار منتقل نشدند؛ گزینه «اسناد حسابداری» را هم فعال کنید"
+            )
 
         if self.options.import_files:
             self.progress(88, "انتقال لوگو و مهر")
@@ -209,6 +242,24 @@ class LegacyBusinessImporter:
             defer_commit=True,
         )
         return int(created["id"]), currency_id
+
+    def _map_fiscal_years(self, business_id: int, archive) -> None:
+        from adapters.db.repositories.fiscal_year_repo import FiscalYearRepository
+
+        legacy_years = archive.data.get("years.json") or []
+        if not legacy_years:
+            return
+        fiscal_repo = FiscalYearRepository(self.db)
+        new_years = fiscal_repo.list_by_business(business_id)
+        new_years_sorted = sorted(new_years, key=lambda fy: fy.start_date)
+        legacy_sorted = sorted(
+            legacy_years,
+            key=lambda y: (epoch_to_date(y.get("start")) or date.min),
+        )
+        for legacy, new_fy in zip(legacy_sorted, new_years_sorted):
+            old_id = legacy.get("id")
+            if old_id is not None:
+                self.id_map.set("fiscal_years", int(old_id), int(new_fy.id))
 
     def _resolve_currency_id(self, archive) -> int:
         monies = archive.data.get("money_used.json") or []
@@ -337,12 +388,16 @@ class LegacyBusinessImporter:
                 self.id_map.set("categories", int(old_cid), int(obj.id))
             self.stats.categories_imported += 1
 
+        seen_codes: set[str] = set()
         for row in archive.data.get("commodities.json") or []:
             old_id = row.get("id")
             code = str(row.get("code") or "").strip()
             if not code:
                 self.stats.products_skipped += 1
                 continue
+            if code in seen_codes:
+                code = f"{code}-L{int(old_id)}" if old_id is not None else f"{code}-dup"
+            seen_codes.add(code)
             exists = (
                 self.db.query(Product)
                 .filter(and_(Product.business_id == business_id, Product.code == code))

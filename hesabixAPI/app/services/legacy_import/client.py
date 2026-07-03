@@ -159,8 +159,14 @@ class LegacyApiClient:
                 continue
             rid = row.get("id")
             label = row.get("label") or row.get("name")
-            if rid is not None and label:
-                mapping[int(rid)] = str(label)
+            if label:
+                if rid is not None:
+                    mapping[int(rid)] = str(label)
+                else:
+                    # API قدیم گاهی id ندارد؛ از index مبتنی بر ۱ استفاده می‌کنیم
+                    idx = items.index(row) + 1
+                    if idx not in mapping:
+                        mapping[idx] = str(label)
         return mapping
 
     def get_document_detail(self, document_id: int) -> Dict[str, Any]:

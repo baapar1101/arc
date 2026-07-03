@@ -16,6 +16,7 @@ class LegacyIdMap:
     cash_registers: Dict[int, int] = field(default_factory=dict)
     petty_cash: Dict[int, int] = field(default_factory=dict)
     fiscal_years: Dict[int, int] = field(default_factory=dict)
+    warehouse_tickets: Dict[int, int] = field(default_factory=dict)
     documents: Dict[int, int] = field(default_factory=dict)
     walk_in_person_id: Optional[int] = None
     default_cash_register_id: Optional[int] = None
@@ -56,6 +57,7 @@ class LegacyIdMap:
             "petty_cash": len(self.petty_cash),
             "fiscal_years": len(self.fiscal_years),
             "documents": len(self.documents),
+            "warehouse_tickets": len(self.warehouse_tickets),
         }
 
 
@@ -73,6 +75,9 @@ class LegacyImportStats:
     cash_registers_imported: int = 0
     documents_imported: int = 0
     documents_skipped: int = 0
+    warehouse_tickets_imported: int = 0
+    warehouse_tickets_skipped: int = 0
+    warehouse_lines_skipped: int = 0
     files_imported: int = 0
     warnings: list[str] = field(default_factory=list)
 
@@ -93,6 +98,9 @@ class LegacyImportStats:
             "cash_registers_imported": self.cash_registers_imported,
             "documents_imported": self.documents_imported,
             "documents_skipped": self.documents_skipped,
+            "warehouse_tickets_imported": self.warehouse_tickets_imported,
+            "warehouse_tickets_skipped": self.warehouse_tickets_skipped,
+            "warehouse_lines_skipped": self.warehouse_lines_skipped,
             "files_imported": self.files_imported,
             "warnings_count": len(self.warnings),
             "warnings": self.warnings[:50],

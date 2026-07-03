@@ -25,6 +25,7 @@ from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
 from app.services.legacy_import.mappers import parse_legacy_date, safe_decimal
 from app.services.receipt_payment_service import create_receipt_payment
 from app.services.transfer_service import create_transfer
+from app.services.legacy_import.table_enrichment import enrich_hesabdari_tables
 
 if TYPE_CHECKING:
     from app.services.legacy_import.archive import LegacyArchive
@@ -58,10 +59,14 @@ class LegacyDocumentImporter:
     def import_all(self, archive: "LegacyArchive") -> None:
         docs = archive.data.get("hesabdari_docs.json") or []
         rows_by_doc = archive.rows_by_doc_id()
+        tables = enrich_hesabdari_tables(
+            archive,
+            legacy_client=self._legacy_client,
+        )
         chart = LegacyChartResolver(
             self.db,
             self.business_id,
-            archive.data.get("hesabdari_tables.json") or [],
+            tables,
         )
         # Stable order: older docs first by date string then id
         docs_sorted = sorted(
@@ -71,6 +76,8 @@ class LegacyDocumentImporter:
         for doc in docs_sorted:
             doc_type = str(doc.get("type") or "").strip()
             doc_id = doc.get("id")
+            if doc_type == "open_balance":
+                continue
             try:
                 if doc_type in LEGACY_DOC_TYPE_TO_INVOICE:
                     self._import_invoice(doc, rows_by_doc.get(int(doc_id), []))
@@ -122,10 +129,10 @@ class LegacyDocumentImporter:
             "invoice_type": invoice_type,
             "document_date": document_date.isoformat(),
             "currency_id": self.currency_id,
-            "person_id": person_id,
             "description": doc.get("des") or None,
             "lines": lines,
             "extra_info": {
+                "person_id": int(person_id),
                 "post_inventory": False,
                 "auto_post_warehouse": False,
                 "legacy_import": True,

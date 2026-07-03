@@ -123,3 +123,44 @@ def test_build_expense_income_payload_income():
     )
     assert items[0]["amount"] == 100.0
     assert counterparties[0]["bank_id"] == 2002
+
+
+def test_invoice_payload_requires_person_in_extra_info():
+    """create_invoice reads person_id from extra_info, not root payload."""
+    from app.services.legacy_import.document_importer import LegacyDocumentImporter
+    from app.services.legacy_import.id_map import LegacyImportStats
+    from app.services.legacy_import.mappers import parse_legacy_date
+
+    id_map = LegacyIdMap()
+    id_map.persons[33] = 9001
+    id_map.products[769] = 5001
+    stats = LegacyImportStats()
+
+    doc = {"id": 132, "code": "1129", "type": "sell", "date": "1404/05/22"}
+    rows = [
+        {
+            "commodity_id": 769,
+            "commdityCount": 2,
+            "bs": "100000",
+            "person_id": 33,
+        }
+    ]
+
+    class _Db:
+        pass
+
+    importer = LegacyDocumentImporter(_Db(), 1, 1, 1, id_map, stats)
+    person_id = importer._resolve_person_for_doc(doc, rows)
+    lines = importer._build_invoice_lines(rows)
+    payload = {
+        "invoice_type": "invoice_sales",
+        "document_date": parse_legacy_date(doc["date"]).isoformat(),
+        "currency_id": 1,
+        "lines": lines,
+        "extra_info": {
+            "person_id": int(person_id),
+            "legacy_import": True,
+        },
+    }
+    assert payload["extra_info"]["person_id"] == 9001
+    assert "person_id" not in payload or payload.get("extra_info", {}).get("person_id")

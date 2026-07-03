@@ -32,13 +32,17 @@ def compute_import_risks(archive: LegacyArchive) -> List[Dict[str, Any]]:
     receipt_no_account = 0
     unsupported = 0
     transfers = 0
+    open_balance_count = 0
+    warehouse_tickets = len(archive.data.get("storeroom_tickets.json") or [])
 
     for doc in archive.data.get("hesabdari_docs.json") or []:
         doc_type = str(doc.get("type") or "").strip()
         doc_id = doc.get("id")
         rows = rows_by_doc.get(int(doc_id), []) if doc_id is not None else []
 
-        if doc_type in LEGACY_DOC_TYPE_TO_INVOICE:
+        if doc_type == "open_balance":
+            open_balance_count += 1
+        elif doc_type in LEGACY_DOC_TYPE_TO_INVOICE:
             has_person = bool(doc.get("person_id") or doc.get("personId"))
             if not has_person:
                 has_person = any(r.get("person_id") for r in rows)
@@ -60,6 +64,25 @@ def compute_import_risks(archive: LegacyArchive) -> List[Dict[str, Any]]:
         elif doc_type not in LEGACY_DOC_TYPE_TO_EXPENSE_INCOME and doc_type != "transfer":
             if doc_type not in ("open_balance",):
                 unsupported += 1
+
+    if warehouse_tickets > 0:
+        risks.append(
+            {
+                "code": "WAREHOUSE_TICKETS",
+                "severity": "info",
+                "message": f"{warehouse_tickets} حواله انبار در آرشیو وجود دارد؛ پس از انتقال اسناد حسابداری منتقل می‌شوند.",
+                "count": warehouse_tickets,
+            }
+        )
+    if open_balance_count > 0:
+        risks.append(
+            {
+                "code": "OPENING_BALANCE",
+                "severity": "info",
+                "message": f"{open_balance_count} سند تراز افتتاحیه در آرشیو وجود دارد و منتقل می‌شود.",
+                "count": open_balance_count,
+            }
+        )
 
     if invoice_no_person > 0:
         risks.append(
