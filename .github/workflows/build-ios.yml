@@ -1,0 +1,36 @@
+name: Build iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - run: flutter --version
+      - run: flutter pub get
+
+      - name: Install CocoaPods
+        run: |
+          cd hesabixUI/hesabix_ui/ios
+          pod install
+
+      - name: Build iOS
+        run: |
+          cd hesabixUI/hesabix_ui
+          flutter build ios --no-codesign
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: hesabixUI/hesabix_ui/build/ios
