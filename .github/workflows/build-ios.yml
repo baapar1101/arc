@@ -43,15 +43,9 @@ jobs:
           path: |
             ~/.cocoapods
             hesabixUI/hesabix_ui/ios/Pods
-          key: ${{ runner.os }}-pods-${{ hashFiles('hesabixUI/hesabix_ui/ios/Podfile.lock') }}
+          key: ${{ runner.os }}-pods-${{ hashFiles('hesabixUI/hesabix_ui/pubspec.lock') }}
           restore-keys: |
             ${{ runner.os }}-pods-
-
-      - name: Install Pods
-        working-directory: hesabixUI/hesabix_ui/ios
-        run: |
-          pod repo update
-          pod install
 
       - name: Analyze
         run: flutter analyze
