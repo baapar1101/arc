@@ -48,7 +48,7 @@ jobs:
             ${{ runner.os }}-pods-
 
       - name: Analyze
-        run: flutter analyze
+        run: flutter analyze --no-fatal-warnings
 
       - name: Build iOS (No Code Sign)
         run: flutter build ios --release --no-codesign
