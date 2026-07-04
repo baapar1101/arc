@@ -201,3 +201,109 @@ def test_invoice_payload_requires_person_in_extra_info():
     }
     assert payload["extra_info"]["person_id"] == 9001
     assert payload["lines"][0]["extra_info"]["unit_price"] == 50000.0
+
+
+def test_parse_legacy_invoice_code_patterns():
+    from app.services.legacy_import.invoice_settlement import parse_legacy_invoice_code
+
+    assert parse_legacy_invoice_code("بابت تسویه فاکتور 1192") == "1192"
+    assert parse_legacy_invoice_code("بابت تسویه فاکتور فروش 1182") == "1182"
+    assert parse_legacy_invoice_code("پرداخت وجه فاکتور شماره 1000") == "1000"
+    assert parse_legacy_invoice_code("دریافت وجه فاکتور شماره ۱٬۱۲۹") == "1129"
+    assert parse_legacy_invoice_code("بابت فاکتور فروش بارمان شیمی") is None
+
+
+def test_extract_linked_invoice_legacy_code_from_rows():
+    from app.services.legacy_import.invoice_settlement import extract_linked_invoice_legacy_code
+
+    doc = {"des": ""}
+    rows = [{"des": "بابت تسویه فاکتور فروش 1188"}]
+    assert extract_linked_invoice_legacy_code(doc, rows) == "1188"
+
+
+def test_apply_related_docs_to_link_map():
+    from app.services.legacy_import.invoice_settlement import apply_related_docs_to_link_map
+
+    link_map: dict[str, str] = {}
+    apply_related_docs_to_link_map(
+        link_map,
+        "2034",
+        [
+            {"type": "sell_receive", "code": "2035", "des": "بابت دریافت فاکتور فروش"},
+            {"type": "cost", "code": "9999", "des": "ignored"},
+        ],
+    )
+    assert link_map == {"2035": "2034"}
+
+
+def test_resolve_linked_invoice_legacy_code_prefers_related_docs():
+    from app.services.legacy_import.invoice_settlement import resolve_linked_invoice_legacy_code
+
+    doc = {"des": "توضیح قدیمی بدون کد فاکتور"}
+    rows = [{"des": "توضیح تغییر یافته"}]
+    code = resolve_linked_invoice_legacy_code(
+        receipt_payment_code="2035",
+        related_docs_link_map={"2035": "2034"},
+        doc=doc,
+        rows=rows,
+    )
+    assert code == "2034"
+
+
+def test_resolve_linked_invoice_legacy_code_falls_back_to_description():
+    from app.services.legacy_import.invoice_settlement import resolve_linked_invoice_legacy_code
+
+    code = resolve_linked_invoice_legacy_code(
+        receipt_payment_code="1194",
+        related_docs_link_map={},
+        doc={"des": "بابت تسویه فاکتور 1192"},
+        rows=[],
+    )
+    assert code == "1192"
+
+
+def test_receipt_payment_person_lines_get_invoice_id():
+    """sell_receive/buy_send must attach invoice_id to person_lines for settlement."""
+    from app.services.legacy_import.document_importer import LegacyDocumentImporter
+    from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
+
+    id_map = LegacyIdMap()
+    id_map.invoice_codes["1192"] = 7001
+    id_map.persons[33] = 9001
+    id_map.bank_accounts[36] = 1001
+    stats = LegacyImportStats()
+    importer = LegacyDocumentImporter(None, 1, 1, 1, id_map, stats)
+
+    doc = {
+        "id": 197,
+        "code": "1194",
+        "type": "sell_receive",
+        "date": "1404/06/15",
+        "des": "بابت تسویه فاکتور 1192",
+    }
+    rows = [
+        {"person_id": 33, "bs": "5000000", "des": "بابت تسویه فاکتور 1192"},
+        {"bank_id": 36, "bd": "5000000", "des": "بابت تسویه فاکتور 1192"},
+    ]
+    from app.services.legacy_import.document_rows import build_receipt_payment_lines
+    from app.services.legacy_import.invoice_settlement import (
+        INVOICE_LINKED_RECEIPT_PAYMENT_TYPES,
+        resolve_linked_invoice_legacy_code,
+    )
+
+    person_lines, account_lines = build_receipt_payment_lines(rows, id_map=id_map)
+    legacy_type = str(doc.get("type") or "").strip()
+    assert legacy_type in INVOICE_LINKED_RECEIPT_PAYMENT_TYPES
+    linked_code = resolve_linked_invoice_legacy_code(
+        receipt_payment_code=doc.get("code"),
+        related_docs_link_map={"1194": "1192"},
+        doc=doc,
+        rows=rows,
+    )
+    assert linked_code == "1192"
+    linked_id = id_map.invoice_codes.get(linked_code)
+    assert linked_id == 7001
+    for pl in person_lines:
+        pl.setdefault("extra_info", {})
+        pl["extra_info"]["invoice_id"] = int(linked_id)
+    assert person_lines[0]["extra_info"]["invoice_id"] == 7001

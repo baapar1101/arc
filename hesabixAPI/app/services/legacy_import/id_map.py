@@ -18,6 +18,7 @@ class LegacyIdMap:
     fiscal_years: Dict[int, int] = field(default_factory=dict)
     warehouse_tickets: Dict[int, int] = field(default_factory=dict)
     documents: Dict[int, int] = field(default_factory=dict)
+    invoice_codes: Dict[str, int] = field(default_factory=dict)
     walk_in_person_id: Optional[int] = None
     default_cash_register_id: Optional[int] = None
     default_bank_id: Optional[int] = None
@@ -57,6 +58,7 @@ class LegacyIdMap:
             "petty_cash": len(self.petty_cash),
             "fiscal_years": len(self.fiscal_years),
             "documents": len(self.documents),
+            "invoice_codes": len(self.invoice_codes),
             "warehouse_tickets": len(self.warehouse_tickets),
         }
 

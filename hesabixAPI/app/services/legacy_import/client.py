@@ -9,6 +9,7 @@ import httpx
 from app.core.responses import ApiError
 from app.services.legacy_import.constants import (
     DEFAULT_LEGACY_SERVER_URL,
+    LEGACY_ACCOUNTING_DOC_GET_PATH,
     LEGACY_ARCHIVE_CREATE_PATH,
     LEGACY_BUSINESS_INFO_PATH,
     LEGACY_BUSINESS_LIST_PATH,
@@ -185,6 +186,27 @@ class LegacyApiClient:
             "پاسخ نامعتبر از جزئیات سند",
             http_status=502,
         )
+
+    def get_document_by_code(self, code: str) -> Dict[str, Any]:
+        """جزئیات سند با کد (accounting/doc/get) — شامل relatedDocs."""
+        code_str = str(code or "").strip()
+        if not code_str:
+            raise ApiError(
+                "LEGACY_DOC_CODE_REQUIRED",
+                "کد سند برای دریافت جزئیات الزامی است",
+                http_status=400,
+            )
+        with self._client() as client:
+            resp = client.post(LEGACY_ACCOUNTING_DOC_GET_PATH, json={"code": code_str})
+            self._raise_for_status(resp, context="accounting/doc/get")
+            payload = resp.json()
+        if not isinstance(payload, dict):
+            raise ApiError(
+                "LEGACY_INVALID_RESPONSE",
+                "پاسخ نامعتبر از جزئیات سند",
+                http_status=502,
+            )
+        return payload
 
     def download_archive(self) -> bytes:
         """Download full business archive ZIP from legacy server."""

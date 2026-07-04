@@ -20,6 +20,12 @@ from app.services.legacy_import.expense_income_rows import (
     build_expense_income_payload,
     normalize_api_document_rows,
 )
+from app.services.legacy_import.invoice_settlement import (
+    INVOICE_LINKED_RECEIPT_PAYMENT_TYPES,
+    append_receipt_payment_to_invoice,
+    apply_related_docs_to_link_map,
+    resolve_linked_invoice_legacy_code,
+)
 from app.services.legacy_import.legacy_chart_resolver import LegacyChartResolver
 from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
 from app.services.legacy_import.mappers import parse_legacy_date, safe_decimal
@@ -55,6 +61,7 @@ class LegacyDocumentImporter:
         self.id_map = id_map
         self.stats = stats
         self._legacy_client = legacy_client
+        self._rp_to_invoice_code: Dict[str, str] = {}
 
     def import_all(self, archive: "LegacyArchive") -> None:
         docs = archive.data.get("hesabdari_docs.json") or []
@@ -73,46 +80,104 @@ class LegacyDocumentImporter:
             docs,
             key=lambda d: (str(d.get("date") or ""), int(d.get("id") or 0)),
         )
-        for doc in docs_sorted:
-            doc_type = str(doc.get("type") or "").strip()
-            doc_id = doc.get("id")
-            if doc_type == "open_balance":
+        # Import invoices and other docs first so invoice_codes map is ready for receipt/payment linking.
+        non_receipt_payment = [
+            d for d in docs_sorted
+            if str(d.get("type") or "").strip() not in LEGACY_DOC_TYPE_TO_RECEIPT_PAYMENT
+        ]
+        receipt_payment_docs = [
+            d for d in docs_sorted
+            if str(d.get("type") or "").strip() in LEGACY_DOC_TYPE_TO_RECEIPT_PAYMENT
+        ]
+        self._rp_to_invoice_code = self._build_related_docs_link_map(docs_sorted)
+        for doc in non_receipt_payment:
+            self._import_document(doc, rows_by_doc, chart)
+        for doc in receipt_payment_docs:
+            self._import_document(doc, rows_by_doc, chart)
+
+    def _build_related_docs_link_map(self, docs: List[Dict[str, Any]]) -> Dict[str, str]:
+        """Fetch relatedDocs from legacy API for each invoice (receipt/payment code → invoice code)."""
+        if not self._legacy_client:
+            return {}
+        link_map: Dict[str, str] = {}
+        invoice_docs = [
+            d for d in docs
+            if str(d.get("type") or "").strip() in LEGACY_DOC_TYPE_TO_INVOICE
+        ]
+        for doc in invoice_docs:
+            code = doc.get("code")
+            if code is None:
                 continue
             try:
-                if doc_type in LEGACY_DOC_TYPE_TO_INVOICE:
-                    self._import_invoice(doc, rows_by_doc.get(int(doc_id), []))
-                elif doc_type in LEGACY_DOC_TYPE_TO_RECEIPT_PAYMENT:
-                    self._import_receipt_payment(doc, rows_by_doc.get(int(doc_id), []))
-                elif doc_type == "transfer":
-                    self._import_transfer(doc, rows_by_doc.get(int(doc_id), []))
-                elif doc_type in LEGACY_DOC_TYPE_TO_EXPENSE_INCOME:
-                    self._import_expense_income(
-                        doc,
-                        rows_by_doc.get(int(doc_id), []),
-                        chart=chart,
-                    )
-                elif doc_type in LEGACY_DOC_TYPE_SKIP_MESSAGES:
-                    self.stats.documents_skipped += 1
-                    self.stats.add_warning(
-                        f"سند {doc_type} #{doc.get('code')}: {LEGACY_DOC_TYPE_SKIP_MESSAGES[doc_type]}"
-                    )
-                else:
-                    self.stats.documents_skipped += 1
-                    self.stats.add_warning(
-                        f"نوع سند '{doc_type}' (کد {doc.get('code')}) در انتقال API پشتیبانی نمی‌شود"
-                    )
+                detail = self._legacy_client.get_document_by_code(str(code))
+                related = detail.get("relatedDocs") or []
+                apply_related_docs_to_link_map(link_map, code, related)
             except ApiError as exc:
-                self.stats.documents_skipped += 1
-                msg = exc.detail.get("error", {}).get("message") if isinstance(exc.detail, dict) else str(exc)
-                self.stats.add_warning(
-                    f"سند {doc_type} #{doc.get('code')}: {msg}"
+                logger.warning(
+                    "legacy_related_docs_fetch_failed code=%s: %s",
+                    code,
+                    exc.detail.get("error", {}).get("message") if isinstance(exc.detail, dict) else exc,
                 )
             except Exception as exc:
-                self.stats.documents_skipped += 1
-                logger.exception("legacy_doc_import_failed doc_id=%s", doc_id)
-                self.stats.add_warning(
-                    f"سند {doc_type} #{doc.get('code')}: {exc}"
+                logger.warning("legacy_related_docs_fetch_failed code=%s: %s", code, exc)
+        logger.info(
+            "legacy_related_docs_link_map built: %s receipt/payment links from %s invoices",
+            len(link_map),
+            len(invoice_docs),
+        )
+        return link_map
+
+    def _import_document(
+        self,
+        doc: Dict[str, Any],
+        rows_by_doc: Dict[int, List[Dict[str, Any]]],
+        chart: LegacyChartResolver,
+    ) -> None:
+        doc_type = str(doc.get("type") or "").strip()
+        doc_id = doc.get("id")
+        if doc_type == "open_balance":
+            return
+        try:
+            if doc_type in LEGACY_DOC_TYPE_TO_INVOICE:
+                self._import_invoice(doc, rows_by_doc.get(int(doc_id), []))
+            elif doc_type in LEGACY_DOC_TYPE_TO_RECEIPT_PAYMENT:
+                self._import_receipt_payment(doc, rows_by_doc.get(int(doc_id), []))
+            elif doc_type == "transfer":
+                self._import_transfer(doc, rows_by_doc.get(int(doc_id), []))
+            elif doc_type in LEGACY_DOC_TYPE_TO_EXPENSE_INCOME:
+                self._import_expense_income(
+                    doc,
+                    rows_by_doc.get(int(doc_id), []),
+                    chart=chart,
                 )
+            elif doc_type in LEGACY_DOC_TYPE_SKIP_MESSAGES:
+                self.stats.documents_skipped += 1
+                self.stats.add_warning(
+                    f"سند {doc_type} #{doc.get('code')}: {LEGACY_DOC_TYPE_SKIP_MESSAGES[doc_type]}"
+                )
+            else:
+                self.stats.documents_skipped += 1
+                self.stats.add_warning(
+                    f"نوع سند '{doc_type}' (کد {doc.get('code')}) در انتقال API پشتیبانی نمی‌شود"
+                )
+        except ApiError as exc:
+            self.stats.documents_skipped += 1
+            msg = exc.detail.get("error", {}).get("message") if isinstance(exc.detail, dict) else str(exc)
+            self.stats.add_warning(
+                f"سند {doc_type} #{doc.get('code')}: {msg}"
+            )
+        except Exception as exc:
+            self.stats.documents_skipped += 1
+            logger.exception("legacy_doc_import_failed doc_id=%s", doc_id)
+            self.stats.add_warning(
+                f"سند {doc_type} #{doc.get('code')}: {exc}"
+            )
+
+    def _register_invoice_code(self, doc: Dict[str, Any], new_doc_id: int) -> None:
+        code = doc.get("code")
+        if code is None:
+            return
+        self.id_map.invoice_codes[str(code).strip()] = int(new_doc_id)
 
     def _import_invoice(self, doc: Dict[str, Any], rows: List[Dict[str, Any]]) -> None:
         invoice_type = LEGACY_DOC_TYPE_TO_INVOICE[str(doc["type"])]
@@ -159,6 +224,7 @@ class LegacyDocumentImporter:
         new_doc_id = (result.get("data") or {}).get("id") or result.get("id")
         if doc.get("id") is not None and new_doc_id:
             self.id_map.set("documents", int(doc["id"]), int(new_doc_id))
+            self._register_invoice_code(doc, int(new_doc_id))
         self.stats.documents_imported += 1
 
     def _import_receipt_payment(self, doc: Dict[str, Any], rows: List[Dict[str, Any]]) -> None:
@@ -194,6 +260,29 @@ class LegacyDocumentImporter:
         if not account_lines:
             raise ApiError("LEGACY_DOC_NO_BANK", "حساب بانکی/صندوق برای سند یافت نشد", http_status=400)
 
+        legacy_type = str(doc.get("type") or "").strip()
+        linked_invoice_id: Optional[int] = None
+        linked_legacy_code: Optional[str] = None
+        if legacy_type in INVOICE_LINKED_RECEIPT_PAYMENT_TYPES:
+            linked_legacy_code = resolve_linked_invoice_legacy_code(
+                receipt_payment_code=doc.get("code"),
+                related_docs_link_map=self._rp_to_invoice_code,
+                doc=doc,
+                rows=rows,
+            )
+            if linked_legacy_code:
+                linked_invoice_id = self.id_map.invoice_codes.get(linked_legacy_code)
+                if linked_invoice_id:
+                    for pl in person_lines:
+                        pl.setdefault("extra_info", {})
+                        pl["extra_info"]["invoice_id"] = int(linked_invoice_id)
+                        pl["extra_info"]["invoice_code"] = linked_legacy_code
+                        pl["extra_info"]["link_to_invoice"] = True
+                else:
+                    self.stats.add_warning(
+                        f"سند {legacy_type} #{doc.get('code')}: فاکتور با کد {linked_legacy_code} یافت نشد"
+                    )
+
         payload = {
             "document_type": document_type,
             "document_date": parse_legacy_date(doc.get("date")).isoformat(),
@@ -201,17 +290,35 @@ class LegacyDocumentImporter:
             "description": doc.get("des"),
             "person_lines": person_lines,
             "account_lines": account_lines,
-            "extra_info": {"legacy_import": True, "legacy_doc_id": doc.get("id")},
+            "extra_info": {
+                "legacy_import": True,
+                "legacy_doc_id": doc.get("id"),
+                "legacy_doc_code": doc.get("code"),
+                "legacy_doc_type": legacy_type,
+            },
         }
-        create_receipt_payment(
+        if linked_invoice_id:
+            payload["extra_info"]["linked_invoice_id"] = int(linked_invoice_id)
+            if linked_legacy_code:
+                payload["extra_info"]["linked_invoice_code"] = linked_legacy_code
+
+        result = create_receipt_payment(
             self.db,
             self.business_id,
             self.user_id,
             payload,
             commit=False,
         )
-        if doc.get("id"):
-            self.stats.documents_imported += 1
+        new_doc_id = (result.get("data") or {}).get("id") or result.get("id")
+        if doc.get("id") and new_doc_id:
+            self.id_map.set("documents", int(doc["id"]), int(new_doc_id))
+            if linked_invoice_id:
+                append_receipt_payment_to_invoice(
+                    self.db,
+                    int(linked_invoice_id),
+                    int(new_doc_id),
+                )
+        self.stats.documents_imported += 1
 
     def _import_transfer(self, doc: Dict[str, Any], rows: List[Dict[str, Any]]) -> None:
         bank_rows = [r for r in rows if r.get("bank_id")]

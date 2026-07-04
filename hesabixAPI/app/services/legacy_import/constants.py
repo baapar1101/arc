@@ -7,6 +7,7 @@ LEGACY_ARCHIVE_CREATE_PATH = "/api/backup/archive/create"
 LEGACY_BUSINESS_INFO_PATH = "/api/business/get/info/{bid}"
 LEGACY_BUSINESS_LIST_PATH = "/api/business/list"
 LEGACY_PERSON_TYPES_PATH = "/api/person/types/get"
+LEGACY_ACCOUNTING_DOC_GET_PATH = "/api/accounting/doc/get"
 
 # Hesabix v1 person_type.id → Persian label (fallback if API types unavailable)
 DEFAULT_LEGACY_PERSON_TYPE_ID_MAP: dict[int, str] = {
