@@ -125,10 +125,50 @@ def test_build_expense_income_payload_income():
     assert counterparties[0]["bank_id"] == 2002
 
 
+def test_build_invoice_lines_extra_info_pricing():
+    """قیمت واحد و جمع سطر باید در extra_info باشند (قرارداد create_invoice)."""
+    from app.services.legacy_import.document_importer import LegacyDocumentImporter
+    from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
+
+    id_map = LegacyIdMap()
+    id_map.products[769] = 5001
+    stats = LegacyImportStats()
+    importer = LegacyDocumentImporter(None, 1, 1, 1, id_map, stats)
+
+    rows = [
+        {
+            "commodity_id": 769,
+            "commdityCount": 20,
+            "bs": "69400000",
+            "bd": "0",
+            "discount": "0",
+            "tax": "0",
+        }
+    ]
+    lines = importer._build_invoice_lines(rows)
+    assert len(lines) == 1
+    info = lines[0]["extra_info"]
+    assert info["unit_price"] == 3470000.0
+    assert info["line_total"] == 69400000.0
+    assert "unit_price" not in lines[0] or lines[0].get("unit_price") is None
+
+
+def test_extract_invoice_header_discount():
+    from app.services.legacy_import.document_importer import LegacyDocumentImporter
+    from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
+
+    importer = LegacyDocumentImporter(None, 1, 1, 1, LegacyIdMap(), LegacyImportStats())
+    rows = [
+        {"bd": "5000", "bs": "0", "des": "تخفیف فاکتور"},
+        {"commodity_id": 1, "bs": "1000", "bd": "0", "commdityCount": 1},
+    ]
+    assert float(importer._extract_invoice_header_discount(rows)) == 5000.0
+
+
 def test_invoice_payload_requires_person_in_extra_info():
     """create_invoice reads person_id from extra_info, not root payload."""
     from app.services.legacy_import.document_importer import LegacyDocumentImporter
-    from app.services.legacy_import.id_map import LegacyImportStats
+    from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
     from app.services.legacy_import.mappers import parse_legacy_date
 
     id_map = LegacyIdMap()
@@ -146,10 +186,7 @@ def test_invoice_payload_requires_person_in_extra_info():
         }
     ]
 
-    class _Db:
-        pass
-
-    importer = LegacyDocumentImporter(_Db(), 1, 1, 1, id_map, stats)
+    importer = LegacyDocumentImporter(None, 1, 1, 1, id_map, stats)
     person_id = importer._resolve_person_for_doc(doc, rows)
     lines = importer._build_invoice_lines(rows)
     payload = {
@@ -163,4 +200,4 @@ def test_invoice_payload_requires_person_in_extra_info():
         },
     }
     assert payload["extra_info"]["person_id"] == 9001
-    assert "person_id" not in payload or payload.get("extra_info", {}).get("person_id")
+    assert payload["lines"][0]["extra_info"]["unit_price"] == 50000.0

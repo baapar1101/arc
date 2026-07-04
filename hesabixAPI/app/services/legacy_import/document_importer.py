@@ -125,20 +125,28 @@ class LegacyDocumentImporter:
             raise ApiError("LEGACY_DOC_NO_LINES", "اقلام فاکتور یافت نشد", http_status=400)
 
         document_date = parse_legacy_date(doc.get("date"))
+        extra_info: Dict[str, Any] = {
+            "person_id": int(person_id),
+            "post_inventory": False,
+            "auto_post_warehouse": False,
+            "legacy_import": True,
+            "legacy_doc_id": doc.get("id"),
+            "legacy_doc_code": doc.get("code"),
+        }
+        header_discount = self._extract_invoice_header_discount(rows)
+        if header_discount > 0:
+            extra_info["global_discount"] = {
+                "type": "amount",
+                "value": float(header_discount),
+                "amount": float(header_discount),
+            }
         payload: Dict[str, Any] = {
             "invoice_type": invoice_type,
             "document_date": document_date.isoformat(),
             "currency_id": self.currency_id,
             "description": doc.get("des") or None,
             "lines": lines,
-            "extra_info": {
-                "person_id": int(person_id),
-                "post_inventory": False,
-                "auto_post_warehouse": False,
-                "legacy_import": True,
-                "legacy_doc_id": doc.get("id"),
-                "legacy_doc_code": doc.get("code"),
-            },
+            "extra_info": extra_info,
         }
         result = create_invoice(
             self.db,
@@ -351,6 +359,20 @@ class LegacyDocumentImporter:
             return int(next(iter(self.id_map.persons.values())))
         return None
 
+    def _extract_invoice_header_discount(self, rows: List[Dict[str, Any]]) -> Decimal:
+        """تخفیف سطح فاکتور از سطرهای بدون کالا (مثل «تخفیف فاکتور»)."""
+        total = Decimal(0)
+        for r in rows:
+            if r.get("commodity_id"):
+                continue
+            des = str(r.get("des") or "")
+            if "تخفیف" not in des:
+                continue
+            amt = row_amount(r)
+            if amt > 0:
+                total += amt
+        return total
+
     def _build_invoice_lines(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         lines: List[Dict[str, Any]] = []
         for r in rows:
@@ -363,16 +385,28 @@ class LegacyDocumentImporter:
             qty = safe_decimal(r.get("commdityCount") or r.get("commodity_count") or 1)
             if qty <= 0:
                 qty = Decimal("1")
-            line_total = safe_decimal(r.get("bs") or r.get("bd"))
-            unit_price = line_total / qty if qty else line_total
+            line_gross = row_amount(r)
+            if line_gross <= 0:
+                continue
+            unit_price = line_gross / qty if qty else line_gross
+            line_discount = safe_decimal(r.get("discount") or 0)
+            tax_amount = safe_decimal(r.get("tax") or 0)
+            line_total = (qty * unit_price) - line_discount + tax_amount
+            if line_total <= 0:
+                line_total = line_gross - line_discount + tax_amount
+            desc = str(r.get("des") or "").strip() or None
             lines.append(
                 {
                     "product_id": product_id,
                     "quantity": float(qty),
-                    "unit_price": float(unit_price),
-                    "discount": 0,
-                    "tax_percent": 0,
-                    "extra_info": {"legacy_import": True},
+                    **({"description": desc} if desc else {}),
+                    "extra_info": {
+                        "legacy_import": True,
+                        "unit_price": float(unit_price),
+                        "line_discount": float(line_discount),
+                        "tax_amount": float(tax_amount),
+                        "line_total": float(line_total),
+                    },
                 }
             )
         return lines
