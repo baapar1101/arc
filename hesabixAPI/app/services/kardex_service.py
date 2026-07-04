@@ -53,9 +53,10 @@ def _apply_kardex_sort(q, query: Dict[str, Any]):
     from adapters.api.v1.schemas import QueryInfo
     from app.services.sort_resolution import effective_sort_specs
 
+    # take/skip are irrelevant for sort resolution; keep defaults to satisfy QueryInfo.
     qi = QueryInfo.model_validate({
-        "take": int(query.get("take", 20) or 20),
-        "skip": int(query.get("skip", 0) or 0),
+        "take": 20,
+        "skip": 0,
         "sort_by": query.get("sort_by"),
         "sort_desc": bool(query.get("sort_desc", True)),
         "sort": query.get("sort") if isinstance(query.get("sort"), list) else None,

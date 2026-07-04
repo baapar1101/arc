@@ -449,7 +449,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
 
   Future<_FinancialSummaryResult> _fetchLedgerTotals(int personId, int? fiscalYearId) async {
     final api = ApiClient();
-    const pageSize = 250;
+    const pageSize = 100;
     int skip = 0;
     double totalDebit = 0;
     double totalCredit = 0;
