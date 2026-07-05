@@ -137,7 +137,7 @@ def test_tax_connection_endpoint(
     تا بدون «ذخیره» قبلی هم بتوان اتصال را آزمایش کرد.
     """
     ensure_moadian_plugin_active(db, business_id)
-    from app.integrations.moadian.client import MoadianClient
+    from app.integrations.moadian.client import MoadianClient, uses_moadian_v2
     from app.core.settings import get_settings
     from app.services.tax_setting_health_service import run_extended_connection_test
 
@@ -161,11 +161,9 @@ def test_tax_connection_endpoint(
         missing_fa = "، ".join(labels.get(f, f) for f in missing)
         raise ApiError(
             "TAX_SETTINGS_INCOMPLETE",
-            f"تنظیمات ناقص است. فیلدهای الزامی: {missing_fa}. "
-            "اگر گواهی را تازه وارد کرده‌اید، ابتدا «ذخیره» بزنید یا دوباره «تست اتصال» "
-            "را بزنید تا مقادیر فرم ارسال شود.",
+            f"تنظیمات ناقص است. فیلدهای الزامی: {missing_fa}.",
             http_status=400,
-            details={"missing_fields": missing},
+            details={"missing_fields": missing, "api_mode": "v2" if uses_moadian_v2(tax_setting) else "v1"},
         )
 
     client = MoadianClient(settings=get_settings(), tax_setting=tax_setting)
@@ -182,6 +180,7 @@ def test_tax_connection_endpoint(
             token=token,
             server_info=server_info if isinstance(server_info, dict) else {},
         )
+        result["api_version"] = client.api_version
 
         message_key = "TAX_CONNECTION_SUCCESS"
         if result.get("status") == "identity_mismatch":

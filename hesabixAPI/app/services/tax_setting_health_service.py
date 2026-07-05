@@ -267,13 +267,20 @@ def run_extended_connection_test(
         tax_setting=tax_setting,
     )
     status = resolve_connection_status(warnings, identity_check)
+    from app.integrations.moadian.client import uses_moadian_v2
 
+    api_version = "v2" if uses_moadian_v2(tax_setting) else "v1"
     memory_id = (tax_setting.tax_memory_id or "").strip()
     cert_serial = extract_certificate_serial_number(tax_setting.certificate)
-    token_client_id = str((jwt_claims or {}).get("clientId") or "").strip()
+    token_client_id = str(
+        (jwt_claims or {}).get("clientId")
+        or (jwt_claims or {}).get("sub")
+        or (jwt_claims or {}).get("jti")
+        or ""
+    ).strip()
 
     message_map = {
-        "connected": "اتصال به سامانه مودیان (API v2) با موفقیت برقرار شد.",
+        "connected": f"اتصال به سامانه مودیان ({api_version.upper()}) با موفقیت برقرار شد.",
         "connected_with_warnings": "اتصال برقرار است اما هشدارهای پیکربندی وجود دارد.",
         "identity_mismatch": (
             "اتصال برقرار است، اما احتمال ناهماهنگی کلید/گواهی با حافظه مودیان وجود دارد "
@@ -284,7 +291,7 @@ def run_extended_connection_test(
     return {
         "status": status,
         "sandbox_mode": bool(tax_setting.sandbox_mode),
-        "api_version": "v2",
+        "api_version": api_version,
         "server_info": {
             "has_public_key": bool(server_info.get("publicKeys")),
             "key_count": len(server_info.get("publicKeys", [])),

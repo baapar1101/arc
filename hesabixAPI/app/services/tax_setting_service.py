@@ -6,6 +6,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from adapters.db.models.tax_setting import TaxSetting
+from app.integrations.moadian.client import uses_moadian_v2
 from app.services.encryption_service import encrypt_private_key, decrypt_private_key
 
 
@@ -97,9 +98,9 @@ def upsert_tax_setting(
 
 
 def validate_tax_setting_complete(setting: TaxSetting | None) -> list[str]:
-    """فیلدهای الزami خالی برای API v2."""
+    """فیلدهای الزامی برای اتصال (v1: کلید خصوصی؛ v2: علاوه بر آن گواهی PEM)."""
     if setting is None:
-        return ["tax_memory_id", "economic_code", "private_key", "certificate"]
+        return ["tax_memory_id", "economic_code", "private_key"]
     missing: list[str] = []
     if not (setting.tax_memory_id or "").strip():
         missing.append("tax_memory_id")
@@ -107,7 +108,7 @@ def validate_tax_setting_complete(setting: TaxSetting | None) -> list[str]:
         missing.append("economic_code")
     if not (setting.private_key or "").strip():
         missing.append("private_key")
-    if not (setting.certificate or "").strip():
+    if uses_moadian_v2(setting) and not (setting.certificate or "").strip():
         missing.append("certificate")
     return missing
 

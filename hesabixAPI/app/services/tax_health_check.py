@@ -51,10 +51,10 @@ def check_tax_system_health(
             "message": "تنظیمات مالیاتی یافت نشد",
         }
         all_healthy = False
-    elif not (tax_setting.tax_memory_id and tax_setting.private_key and tax_setting.economic_code and tax_setting.certificate):
+    elif not (tax_setting.tax_memory_id and tax_setting.private_key and tax_setting.economic_code):
         result["checks"]["settings"] = {
             "status": "error",
-            "message": "تنظیمات مالیاتی ناقص است (گواهی امضا الزامی است)",
+            "message": "تنظیمات مالیاتی ناقص است",
         }
         all_healthy = False
     else:

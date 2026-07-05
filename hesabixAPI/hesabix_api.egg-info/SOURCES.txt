@@ -407,10 +407,12 @@ app/core/woocommerce_bridge_security.py
 app/core/woocommerce_dev_flags.py
 app/core/woocommerce_plugin_dependency.py
 app/integrations/moadian/__init__.py
+app/integrations/moadian/certificate.py
 app/integrations/moadian/client.py
 app/integrations/moadian/dto.py
 app/integrations/moadian/invoice_builder.py
 app/integrations/moadian/utils.py
+app/integrations/moadian/v2_crypto.py
 app/integrations/moadian/verhoeff.py
 app/services/account_review_service.py
 app/services/account_service.py
@@ -991,6 +993,7 @@ tests/test_legacy_import.py
 tests/test_legacy_sql_account_resolver.py
 tests/test_legacy_sql_dump_reader.py
 tests/test_moadian_plugin_license_gate.py
+tests/test_moadian_v2_client.py
 tests/test_notification_event_type_defaults.py
 tests/test_payroll_accounting_lines.py
 tests/test_payroll_plugin_license_gate.py
