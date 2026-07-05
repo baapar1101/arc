@@ -652,6 +652,7 @@ app/services/ai/ai_model_seed_service.py
 app/services/ai/ai_model_service.py
 app/services/ai/ai_ops_metrics.py
 app/services/ai/ai_permission_map.py
+app/services/ai/ai_prompt_cache.py
 app/services/ai/ai_provider.py
 app/services/ai/ai_provider_service.py
 app/services/ai/ai_query_filter_catalog.py
@@ -676,6 +677,7 @@ app/services/ai/ai_skill_runtime.py
 app/services/ai/ai_skill_service.py
 app/services/ai/ai_stream_helpers.py
 app/services/ai/ai_summarize_quota.py
+app/services/ai/ai_system_prompt.py
 app/services/ai/ai_tool_cache.py
 app/services/ai/ai_tool_intent.py
 app/services/ai/ai_tool_keys.py
@@ -961,6 +963,7 @@ tests/test_ai_model_routing.py
 tests/test_ai_model_seed_service.py
 tests/test_ai_model_service.py
 tests/test_ai_permission_map.py
+tests/test_ai_prompt_cache.py
 tests/test_ai_quota_helpers.py
 tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
@@ -969,6 +972,7 @@ tests/test_ai_skill_parser.py
 tests/test_ai_subscription_lock.py
 tests/test_ai_subscription_renew.py
 tests/test_ai_tool_intent.py
+tests/test_ai_trace_content.py
 tests/test_ai_write_guard.py
 tests/test_basalam_currency.py
 tests/test_basalam_dlq.py

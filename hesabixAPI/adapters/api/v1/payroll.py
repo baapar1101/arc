@@ -24,7 +24,7 @@ def _handle_value_error(e: ValueError) -> None:
 
 
 def _payroll_response(data: Any, request: Request, **kwargs) -> dict:
-	return _payroll_response(format_datetime_fields(data, request), request, **kwargs)
+	return success_response(format_datetime_fields(data, request), request, **kwargs)
 
 
 # ─── تنظیمات ───────────────────────────────────────────────────────────────
