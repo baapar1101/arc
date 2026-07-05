@@ -5,6 +5,15 @@ from abc import ABC, abstractmethod
 import json
 import logging
 
+from app.services.ai.ai_prompt_cache import (
+    build_anthropic_system_blocks,
+    anthropic_request_cache_control,
+    extract_prompt_cache_policy,
+    normalize_anthropic_usage,
+    normalize_openai_usage,
+    split_system_messages_for_provider,
+)
+
 logger = logging.getLogger(__name__)
 
 # خروجی بیشتر از این در بسیاری از gatewayها (vLLM و مشابه) رد می‌شود؛ حتی اگر
@@ -156,6 +165,7 @@ class OpenAIProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]],
         reasoning_effort: Optional[str],
+        provider_extra: Optional[Dict[str, Any]] = None,
         *,
         stream: bool = False,
     ) -> Dict[str, Any]:
@@ -168,13 +178,27 @@ class OpenAIProvider(AIProviderBase):
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
 
+        api_messages = [
+            {k: v for k, v in msg.items() if not str(k).startswith("_")}
+            for msg in messages
+        ]
+        cache_policy = extract_prompt_cache_policy(provider_extra)
+        if cache_policy:
+            api_messages = split_system_messages_for_provider(api_messages, cache_policy)
+
         kwargs: Dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": api_messages,
             "tools": tools if tools else None,
         }
         if stream:
             kwargs["stream"] = True
+
+        if cache_policy and cache_policy.cache_key:
+            kwargs["prompt_cache_key"] = cache_policy.cache_key
+            retention = (cache_policy.openai_retention or "").strip()
+            if retention and retention not in ("in_memory", "default"):
+                kwargs["prompt_cache_retention"] = retention
 
         if reasoning_effort:
             kwargs["reasoning_effort"] = reasoning_effort
@@ -192,13 +216,20 @@ class OpenAIProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
+        provider_extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """ارسال درخواست به OpenAI"""
         try:
             from app.services.ai.ai_retry_policy import sync_retry_llm
 
             request_kwargs = self._build_request_kwargs(
-                messages, model, max_tokens, temperature, tools, reasoning_effort
+                messages,
+                model,
+                max_tokens,
+                temperature,
+                tools,
+                reasoning_effort,
+                provider_extra,
             )
 
             def _call():
@@ -207,7 +238,7 @@ class OpenAIProvider(AIProviderBase):
             response = sync_retry_llm(_call)
             
             message = response.choices[0].message
-            usage = response.usage
+            usage = normalize_openai_usage(response.usage)
             
             result = {
                 "message": {
@@ -222,11 +253,7 @@ class OpenAIProvider(AIProviderBase):
                         for fc in (message.tool_calls or [])
                     ] if message.tool_calls else None
                 },
-                "usage": {
-                    "input_tokens": usage.prompt_tokens,
-                    "output_tokens": usage.completion_tokens,
-                    "total_tokens": usage.total_tokens
-                }
+                "usage": usage.to_usage_dict(),
             }
             
             return result
@@ -246,6 +273,7 @@ class OpenAIProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
+        provider_extra: Optional[Dict[str, Any]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به OpenAI به صورت streaming با async client"""
         try:
@@ -258,6 +286,7 @@ class OpenAIProvider(AIProviderBase):
                 temperature,
                 tools,
                 reasoning_effort,
+                provider_extra,
                 stream=True,
             )
 
@@ -276,11 +305,7 @@ class OpenAIProvider(AIProviderBase):
             async for chunk in stream:
                 # بررسی usage (معمولاً در chunk آخر می‌آید)
                 if chunk.usage:
-                    final_usage = {
-                        "input_tokens": chunk.usage.prompt_tokens,
-                        "output_tokens": chunk.usage.completion_tokens,
-                        "total_tokens": chunk.usage.total_tokens
-                    }
+                    final_usage = normalize_openai_usage(chunk.usage).to_usage_dict()
                 
                 # بررسی content chunks
                 if chunk.choices and len(chunk.choices) > 0:
@@ -537,6 +562,7 @@ class AnthropicProvider(AIProviderBase):
     ) -> Dict[str, Any]:
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
+        cache_policy = extract_prompt_cache_policy(provider_extra)
         system_message, anthropic_messages = _openai_messages_to_anthropic(messages)
         anthropic_tools = _openai_tools_to_anthropic(tools)
         kwargs: Dict[str, Any] = {
@@ -562,10 +588,23 @@ class AnthropicProvider(AIProviderBase):
                     "type": "enabled",
                     "budget_tokens": budget,
                 }
-        if system_message:
+        system_blocks = (
+            build_anthropic_system_blocks(cache_policy)
+            if cache_policy
+            else None
+        )
+        if system_blocks:
+            kwargs["system"] = system_blocks
+        elif system_message:
             kwargs["system"] = system_message
         if anthropic_tools:
             kwargs["tools"] = anthropic_tools
+        auto_ctrl = anthropic_request_cache_control(
+            cache_policy,
+            has_conversation=bool(anthropic_messages),
+        ) if cache_policy else None
+        if auto_ctrl:
+            kwargs["cache_control"] = auto_ctrl
         return self._apply_skills_extra(kwargs, provider_extra)
 
     def chat_completion(
@@ -591,17 +630,14 @@ class AnthropicProvider(AIProviderBase):
                 )
             )
             content, function_calls = _anthropic_blocks_to_openai_result(response.content)
+            usage = normalize_anthropic_usage(response.usage)
             return {
                 "message": {
                     "role": "assistant",
                     "content": content,
                     "function_calls": function_calls,
                 },
-                "usage": {
-                    "input_tokens": response.usage.input_tokens,
-                    "output_tokens": response.usage.output_tokens,
-                    "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
-                },
+                "usage": usage.to_usage_dict(),
             }
         except Exception as e:
             logger.error(f"Anthropic API error: {e}", exc_info=True)
@@ -671,21 +707,13 @@ class AnthropicProvider(AIProviderBase):
                     elif etype == "message_delta":
                         usage = getattr(event, "usage", None)
                         if usage:
-                            final_usage = {
-                                "input_tokens": getattr(usage, "input_tokens", 0),
-                                "output_tokens": getattr(usage, "output_tokens", 0),
-                                "total_tokens": getattr(usage, "input_tokens", 0)
-                                + getattr(usage, "output_tokens", 0),
-                            }
+                            final_usage = normalize_anthropic_usage(usage).to_usage_dict()
 
                 final_message = await stream.get_final_message()
                 if final_usage is None and final_message.usage:
-                    final_usage = {
-                        "input_tokens": final_message.usage.input_tokens,
-                        "output_tokens": final_message.usage.output_tokens,
-                        "total_tokens": final_message.usage.input_tokens
-                        + final_message.usage.output_tokens,
-                    }
+                    final_usage = normalize_anthropic_usage(
+                        final_message.usage
+                    ).to_usage_dict()
 
             function_calls = None
             if tool_blocks:

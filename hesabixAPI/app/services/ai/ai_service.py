@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional, AsyncGenerator, AbstractSet, Set
+from typing import Dict, Any, List, Optional, AsyncGenerator, AbstractSet, Set, Union
 from decimal import Decimal
 from datetime import datetime, date
 from sqlalchemy.orm import Session
@@ -48,6 +48,7 @@ from app.services.ai.ai_tool_keys import (
 from app.services.ai.ai_trace import (
     context_trace,
     extract_citations_from_result,
+    extract_final_content_from_trace,
     extract_result_count,
     format_planned_tools,
     summarize_tool_result,
@@ -107,7 +108,13 @@ from app.services.ai.ai_tool_cache import (
     invalidate_session,
     set_cached,
 )
-from app.services.ai.ai_message_budget import trim_system_prompt, trim_system_prompt_sections
+from app.services.ai.ai_system_prompt import (
+    StructuredSystemPrompt,
+    compose_structured_system_prompt,
+    coerce_structured_system_prompt,
+    runtime_sections_from_parts,
+)
+from app.services.ai.ai_prompt_cache import build_prompt_cache_policy, merge_provider_extra
 from app.services.ai.ai_context_budget import (
     is_context_overflow_error,
     prepare_messages_for_context,
@@ -434,11 +441,29 @@ class AIService:
             logger.warning("Anthropic skills resolve failed: %s", exc)
         return None
 
-    def _provider_call_extras(self, provider: Any, provider_extra: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        from app.services.ai.ai_provider import AnthropicProvider
+    def _resolve_prompt_role(self) -> PromptRole:
+        if self.ctx.is_superadmin():
+            return PromptRole.ADMIN
+        if self.ctx.can_access_support_operator():
+            return PromptRole.OPERATOR
+        return PromptRole.USER
 
-        if provider_extra and isinstance(provider, AnthropicProvider):
-            return {"provider_extra": provider_extra}
+    def _provider_call_extras(
+        self,
+        provider: Any,
+        provider_extra: Optional[Dict[str, Any]],
+        structured_prompt: Optional[StructuredSystemPrompt] = None,
+    ) -> Dict[str, Any]:
+        merged = merge_provider_extra(provider_extra, None)
+        if structured_prompt is not None:
+            policy = build_prompt_cache_policy(
+                structured_prompt,
+                self.get_effective_provider_type(),
+                provider,
+            )
+            merged = merge_provider_extra(merged, policy)
+        if merged:
+            return {"provider_extra": merged}
         return {}
 
     def _provider_supports_tools(self, provider_type: Optional[str] = None) -> bool:
@@ -457,7 +482,7 @@ class AIService:
 
     def _prepare_llm_messages(
         self,
-        system_prompt: str,
+        system_prompt: Union[str, StructuredSystemPrompt],
         messages: List[Dict[str, Any]],
         provider: Any = None,
         *,
@@ -471,6 +496,8 @@ class AIService:
 
         if provider is None:
             provider = self._make_provider()
+
+        structured = coerce_structured_system_prompt(system_prompt)
 
         def summarize_fn(middle_msgs: List[Dict[str, Any]]) -> str:
             if use_llm_summary and self.config:
@@ -503,11 +530,13 @@ class AIService:
             return build_rule_based_history_summary(middle_msgs)
 
         return prepare_messages_for_context(
-            system_prompt,
+            structured,
             messages,
             provider,
             summarize_fn=summarize_fn,
             force_summarize=force_summarize,
+            structured_role=structured.role,
+            structured_business_id=structured.business_id,
         )
 
     def _routing_needs_tools(
@@ -902,15 +931,9 @@ class AIService:
         session_id: Optional[int] = None,
         user_query: Optional[str] = None,
         execution_mode: Optional[str] = None,
-    ) -> str:
-        """دریافت system prompt مناسب با business_id، حافظه، پیوست‌ها و دانشنامه"""
-        # تشخیص role کاربر
-        if self.ctx.is_superadmin():
-            role = PromptRole.ADMIN
-        elif self.ctx.can_access_support_operator():
-            role = PromptRole.OPERATOR
-        else:
-            role = PromptRole.USER
+    ) -> StructuredSystemPrompt:
+        """دریافت system prompt ساختاریافته با business_id، حافظه، پیوست‌ها و دانشنامه"""
+        role = self._resolve_prompt_role()
         
         # دریافت prompt پایه
         base_prompt = get_prompt(
@@ -1036,29 +1059,35 @@ class AIService:
                     logger.warning("Prompt loader %s failed: %s", key, exc)
                     parts[key] = ""
 
-            return trim_system_prompt_sections(
-                base_prompt
-                + business_info
-                + calendar_block
-                + execution_mode_prompt_block(execution_mode)
-                + plan_block,
-                [
-                    parts.get("memory", ""),
-                    parts.get("insights", ""),
-                    parts.get("knowledge", ""),
-                    parts.get("skills", ""),
-                    parts.get("connectors", ""),
-                    parts.get("attachments", ""),
-                    todos_text,
-                ],
+            runtime = runtime_sections_from_parts(
+                {
+                    "memory": parts.get("memory", ""),
+                    "insights": parts.get("insights", ""),
+                    "knowledge": parts.get("knowledge", ""),
+                    "skills": parts.get("skills", ""),
+                    "connectors": parts.get("connectors", ""),
+                    "attachments": parts.get("attachments", ""),
+                    "todos": todos_text,
+                }
+            )
+            return compose_structured_system_prompt(
+                static_core=base_prompt,
+                business_anchor=business_info + calendar_block,
+                execution_block=execution_mode_prompt_block(execution_mode),
+                plan_block=plan_block,
+                runtime_sections=runtime,
+                role=role.value,
+                business_id=bid,
             )
 
         from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
 
-        return trim_system_prompt(
-            base_prompt
-            + build_calendar_context_prompt_block(self.ctx.get_calendar_type())
-            + execution_mode_prompt_block(execution_mode)
+        return compose_structured_system_prompt(
+            static_core=base_prompt,
+            business_anchor=build_calendar_context_prompt_block(self.ctx.get_calendar_type()),
+            execution_block=execution_mode_prompt_block(execution_mode),
+            role=role.value,
+            business_id=None,
         )
 
     async def build_system_prompt_stream(
@@ -1077,6 +1106,7 @@ class AIService:
             role = PromptRole.OPERATOR
         else:
             role = PromptRole.USER
+        role_value = role.value
 
         yield context_trace("loading_prompt", "active")
         await asyncio.sleep(0)
@@ -1095,11 +1125,17 @@ class AIService:
         if not business_id:
             from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
 
+            structured = compose_structured_system_prompt(
+                static_core=base_prompt,
+                business_anchor=build_calendar_context_prompt_block(self.ctx.get_calendar_type()),
+                execution_block=execution_mode_prompt_block(execution_mode),
+                role=role_value,
+                business_id=None,
+            )
             yield {
                 "event": "prompt_ready",
-                "prompt": base_prompt
-                + build_calendar_context_prompt_block(self.ctx.get_calendar_type())
-                + execution_mode_prompt_block(execution_mode),
+                "prompt": structured.full_text(),
+                "structured_prompt": structured,
             }
             return
 
@@ -1285,23 +1321,30 @@ class AIService:
             business_id=int(bid),
         )
 
-        final_prompt = trim_system_prompt_sections(
-            base_prompt
-            + business_info
-            + calendar_block
-            + execution_mode_prompt_block(execution_mode)
-            + plan_block,
-            [
-                parts.get("loading_memory", ""),
-                parts.get("loading_insights", ""),
-                parts.get("loading_knowledge", ""),
-                parts.get("loading_skills", ""),
-                parts.get("loading_connectors", ""),
-                parts.get("loading_attachments", ""),
-                parts.get("loading_session_todos", "") or todos_text,
-            ],
+        structured = compose_structured_system_prompt(
+            static_core=base_prompt,
+            business_anchor=business_info + calendar_block,
+            execution_block=execution_mode_prompt_block(execution_mode),
+            plan_block=plan_block,
+            runtime_sections=runtime_sections_from_parts(
+                {
+                    "memory": parts.get("loading_memory", ""),
+                    "insights": parts.get("loading_insights", ""),
+                    "knowledge": parts.get("loading_knowledge", ""),
+                    "skills": parts.get("loading_skills", ""),
+                    "connectors": parts.get("loading_connectors", ""),
+                    "attachments": parts.get("loading_attachments", ""),
+                    "todos": parts.get("loading_session_todos", "") or todos_text,
+                }
+            ),
+            role=role_value,
+            business_id=bid,
         )
-        yield {"event": "prompt_ready", "prompt": final_prompt}
+        yield {
+            "event": "prompt_ready",
+            "prompt": structured.full_text(),
+            "structured_prompt": structured,
+        }
     
     @staticmethod
     def _forced_write_tool_names(
@@ -1837,7 +1880,7 @@ class AIService:
         
         try:
             # اضافه کردن system prompt با business_id از session
-            system_prompt = self.get_system_prompt(
+            structured_prompt = self.get_system_prompt(
                 session_business_id=session_business_id,
                 session_id=session_id,
                 user_query=effective_user_query,
@@ -1845,7 +1888,7 @@ class AIService:
             )
             provider = self._make_provider()
             full_messages, _context_meta = self._prepare_llm_messages(
-                system_prompt,
+                structured_prompt,
                 messages,
                 provider,
             )
@@ -1874,7 +1917,9 @@ class AIService:
             )
 
             skills_extra = self._anthropic_skills_extra(session_business_id, effective_user_query)
-            provider_extras = self._provider_call_extras(provider, skills_extra)
+            provider_extras = self._provider_call_extras(
+                provider, skills_extra, structured_prompt
+            )
 
             context_retried = False
             loop = asyncio.get_event_loop()
@@ -1903,7 +1948,7 @@ class AIService:
                     if not context_retried and is_context_overflow_error(api_exc):
                         context_retried = True
                         full_messages, _ = self._prepare_llm_messages(
-                            system_prompt,
+                            structured_prompt,
                             messages,
                             provider,
                             force_summarize=True,
@@ -1915,7 +1960,7 @@ class AIService:
                     if not context_retried and is_context_overflow_error(e):
                         context_retried = True
                         full_messages, _ = self._prepare_llm_messages(
-                            system_prompt,
+                            structured_prompt,
                             messages,
                             provider,
                             force_summarize=True,
@@ -2026,6 +2071,7 @@ class AIService:
                     pe = self._provider_call_extras(
                         provider,
                         self._anthropic_skills_extra(session_business_id, effective_user_query),
+                        structured_prompt,
                     )
                     response = await loop.run_in_executor(
                         _executor,
@@ -2131,7 +2177,7 @@ class AIService:
         exploration_mode: Optional[str] = None,
         request_model: Optional[str] = None,
         execution_mode: Optional[str] = None,
-        prebuilt_system_prompt: Optional[str] = None,
+        prebuilt_system_prompt: Optional[Union[str, StructuredSystemPrompt]] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال streaming با چند نوبت tool calling (مثل chat_completion).
 
@@ -2253,6 +2299,28 @@ class AIService:
                 )
                 return {"event": "agent_budget", **snap}
 
+            async def _emit_answer_text(text: str, *, iter_num: int):
+                stripped = (text or "").strip()
+                if not stripped:
+                    return
+                yield _emit_trace(
+                    kind="answer",
+                    state="done",
+                    title_key="aiTraceComposingAnswer",
+                    body_markdown=stripped if len(stripped) < 400 else None,
+                    iteration=iter_num,
+                    layer="answer",
+                )
+                _answer_chunk_size = 48
+                for offset in range(0, len(stripped), _answer_chunk_size):
+                    piece = stripped[offset : offset + _answer_chunk_size]
+                    yield {
+                        "delta": {"content": piece},
+                        "usage": None,
+                        "done": False,
+                    }
+                    await asyncio.sleep(0)
+
             yield status_event("thinking")
             yield _emit_trace(
                 step_id="ctx_thinking",
@@ -2261,10 +2329,13 @@ class AIService:
                 title_key="aiStatusThinking",
             )
 
+            structured_prompt: Optional[StructuredSystemPrompt] = None
             if prebuilt_system_prompt is not None:
-                system_prompt = prebuilt_system_prompt
+                structured_prompt = coerce_structured_system_prompt(
+                    prebuilt_system_prompt,
+                    business_id=session_business_id or self.business_id,
+                )
             else:
-                system_prompt = ""
                 async for build_item in self.build_system_prompt_stream(
                     session_business_id=session_business_id,
                     session_id=session_id,
@@ -2272,7 +2343,14 @@ class AIService:
                     execution_mode=effective_execution_mode,
                 ):
                     if build_item.get("event") == "prompt_ready":
-                        system_prompt = build_item.get("prompt") or ""
+                        sp = build_item.get("structured_prompt")
+                        if isinstance(sp, StructuredSystemPrompt):
+                            structured_prompt = sp
+                        else:
+                            structured_prompt = coerce_structured_system_prompt(
+                                build_item.get("prompt") or "",
+                                business_id=session_business_id or self.business_id,
+                            )
                         continue
                     if build_item.get("event") == "trace_step":
                         yield _ingest_trace_event(build_item)
@@ -2287,8 +2365,14 @@ class AIService:
                     title_key="aiStatusThinking",
                 )
 
+            if structured_prompt is None:
+                structured_prompt = coerce_structured_system_prompt(
+                    "",
+                    business_id=session_business_id or self.business_id,
+                )
+
             full_messages, context_meta = self._prepare_llm_messages(
-                system_prompt,
+                structured_prompt,
                 messages,
                 provider,
             )
@@ -2327,7 +2411,9 @@ class AIService:
             )
 
             skills_extra = self._anthropic_skills_extra(session_business_id, effective_user_query)
-            stream_provider_extras = self._provider_call_extras(provider, skills_extra)
+            stream_provider_extras = self._provider_call_extras(
+                provider, skills_extra, structured_prompt
+            )
 
             # Planning step برای سوال‌های با کافی طول
             _query_len = len(effective_user_query or "")
@@ -2470,7 +2556,7 @@ class AIService:
                         ):
                             context_compress_retried = True
                             full_messages, context_meta = self._prepare_llm_messages(
-                                system_prompt,
+                                structured_prompt,
                                 messages,
                                 provider,
                                 force_summarize=True,
@@ -3027,30 +3113,51 @@ class AIService:
                             "done": False,
                         }
                         await asyncio.sleep(0)
-                accumulated_content = round_text
-                break
+                    accumulated_content = round_text
+                    break
 
-            if not accumulated_content.strip() and budget_stop_reason:
-                if budget_stop_reason == STOP_REASON_ITERATIONS:
-                    accumulated_content = (
-                        f"به حداکثر تعداد مراحل تحلیل ({max_iterations}) رسیدم. "
-                        "با داده‌های جمع‌آوری‌شده می‌توانید سوال را دقیق‌تر تکرار کنید "
-                        "یا موضوع را در چند پیام جدا بپرسید."
+                # LLM بدون tool call و بدون متن — از یافته‌های trace پاسخ بساز
+                synthesized = extract_final_content_from_trace(trace_steps)
+                if synthesized:
+                    async for answer_chunk in _emit_answer_text(
+                        synthesized, iter_num=iteration
+                    ):
+                        yield answer_chunk
+                    accumulated_content = synthesized
+                    break
+
+                budget.note_round(productive=False)
+                continue
+
+            if not accumulated_content.strip():
+                synthesized = extract_final_content_from_trace(trace_steps)
+                if synthesized:
+                    accumulated_content = synthesized
+                    async for answer_chunk in _emit_answer_text(
+                        synthesized, iter_num=iteration
+                    ):
+                        yield answer_chunk
+                elif budget_stop_reason:
+                    if budget_stop_reason == STOP_REASON_ITERATIONS:
+                        accumulated_content = (
+                            f"به حداکثر تعداد مراحل تحلیل ({max_iterations}) رسیدم. "
+                            "با داده‌های جمع‌آوری‌شده می‌توانید سوال را دقیق‌تر تکرار کنید "
+                            "یا موضوع را در چند پیام جدا بپرسید."
+                        )
+                    else:
+                        accumulated_content = (
+                            budget_stop_message
+                            or "تحلیل این پاسخ به سقف تعیین‌شده رسید."
+                        )
+                    yield {
+                        "delta": {"content": accumulated_content},
+                        "usage": None,
+                        "done": False,
+                    }
+                    yield _emit_agent_budget(
+                        stop_reason=budget_stop_reason,
+                        stop_message_fa=budget_stop_message,
                     )
-                else:
-                    accumulated_content = (
-                        budget_stop_message
-                        or "تحلیل این پاسخ به سقف تعیین‌شده رسید."
-                    )
-                yield {
-                    "delta": {"content": accumulated_content},
-                    "usage": None,
-                    "done": False,
-                }
-                yield _emit_agent_budget(
-                    stop_reason=budget_stop_reason,
-                    stop_message_fa=budget_stop_message,
-                )
 
             final_agent_budget = budget_snapshot(
                 budget,

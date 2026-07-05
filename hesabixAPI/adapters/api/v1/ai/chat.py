@@ -69,15 +69,32 @@ def _usage_provider_and_model(ai_service: AIService) -> tuple[str, str]:
         return provider, model_name
 
 
-def _usage_log_context(ai_service: AIService) -> Optional[Dict[str, Any]]:
+def _usage_log_context(
+    ai_service: AIService,
+    usage: Optional[Dict[str, Any]] = None,
+) -> Optional[Dict[str, Any]]:
+    from app.services.ai.ai_prompt_cache import LLMUsageDetails, usage_context_fields
+
+    ctx: Dict[str, Any] = {}
     try:
         requested = ai_service.get_requested_model_code()
         resolved = ai_service.get_effective_model_code()
         if requested != resolved:
-            return {"requested_model": requested, "resolved_model": resolved}
+            ctx["requested_model"] = requested
+            ctx["resolved_model"] = resolved
     except Exception:
-        return None
-    return None
+        pass
+    if usage:
+        details = LLMUsageDetails(
+            input_tokens=int(usage.get("input_tokens", 0) or 0),
+            output_tokens=int(usage.get("output_tokens", 0) or 0),
+            total_tokens=int(usage.get("total_tokens", 0) or 0),
+            cached_tokens=int(usage.get("cached_tokens", 0) or 0),
+            cache_creation_tokens=int(usage.get("cache_creation_input_tokens", 0) or 0),
+            cache_read_tokens=int(usage.get("cache_read_input_tokens", 0) or 0),
+        )
+        ctx.update(usage_context_fields(details))
+    return ctx or None
 
 
 def _session_needs_title(session: AIChatSession) -> bool:
@@ -1136,7 +1153,7 @@ async def send_message(
             payment_method=charge_result.get("payment_method", "free"),
             wallet_transaction_id=charge_result.get("wallet_transaction_id"),
             document_id=charge_result.get("document_id"),
-            context=_usage_log_context(commit_ai_service),
+            context=_usage_log_context(commit_ai_service, usage),
         )
         commit_ai_service.clear_routing_context()
         
@@ -1210,20 +1227,10 @@ def _extract_content_from_agent_trace(
     accumulated_content: str,
     agent_trace: Optional[List[Dict[str, Any]]],
 ) -> str:
-    """اگر متن delta خالی بود، از narrative/answer در trace استفاده کن."""
-    text = (accumulated_content or "").strip()
-    if text:
-        return accumulated_content
-    if not agent_trace:
-        return accumulated_content or ""
-    for kind in ("answer", "narrative"):
-        for step in reversed(agent_trace):
-            if step.get("kind") != kind:
-                continue
-            body = (step.get("body_markdown") or "").strip()
-            if body:
-                return body
-    return accumulated_content or ""
+    """اگر متن delta خالی بود، از narrative/answer/thought در trace استفاده کن."""
+    from app.services.ai.ai_trace import merge_accumulated_and_trace_content
+
+    return merge_accumulated_and_trace_content(accumulated_content, agent_trace)
 
 
 def _estimate_stream_usage_if_missing(
@@ -1349,7 +1356,7 @@ async def _persist_stream_assistant_message(
                 payment_method=charge_result.get("payment_method", "free"),
                 wallet_transaction_id=charge_result.get("wallet_transaction_id"),
                 document_id=charge_result.get("document_id"),
-                context=_usage_log_context(new_ai_service),
+                context=_usage_log_context(new_ai_service, final_usage),
             )
             new_ai_service.clear_routing_context()
 
@@ -1502,6 +1509,7 @@ async def _stream_message_response(
     final_agent_trace: Optional[List[Dict[str, Any]]] = None
     stream_ai_config = None
     prebuilt_prompt: Optional[str] = None
+    prebuilt_structured: Optional[Any] = None
     message_id: Optional[int] = None
 
     def _capture_chunk(chunk: Dict[str, Any]) -> None:
@@ -1557,6 +1565,7 @@ async def _stream_message_response(
             ):
                 if build_item.get("event") == "prompt_ready":
                     prebuilt_prompt = build_item.get("prompt") or ""
+                    prebuilt_structured = build_item.get("structured_prompt")
                     continue
                 if build_item.get("event") == "trace_step":
                     for payload in _emit_chunk_as_sse(build_item):
@@ -1584,7 +1593,11 @@ async def _stream_message_response(
                     execution_mode=execution_mode,
                     user_query=message_content,
                     request_model=request_model,
-                    prebuilt_system_prompt=prebuilt_prompt,
+                    prebuilt_system_prompt=(
+                        prebuilt_structured
+                        if prebuilt_structured is not None
+                        else prebuilt_prompt
+                    ),
                 ):
                     yield chunk
 
@@ -1794,7 +1807,7 @@ async def regenerate_last_response(
             payment_method=charge_result.get("payment_method", "free"),
             wallet_transaction_id=charge_result.get("wallet_transaction_id"),
             document_id=charge_result.get("document_id"),
-            context=_usage_log_context(commit_ai_service),
+            context=_usage_log_context(commit_ai_service, usage),
         )
         commit_ai_service.clear_routing_context()
         from datetime import datetime
@@ -2018,7 +2031,7 @@ async def edit_user_message(
             payment_method=charge_result.get("payment_method", "free"),
             wallet_transaction_id=charge_result.get("wallet_transaction_id"),
             document_id=charge_result.get("document_id"),
-            context=_usage_log_context(commit_ai_service),
+            context=_usage_log_context(commit_ai_service, usage),
         )
         commit_ai_service.clear_routing_context()
         from datetime import datetime

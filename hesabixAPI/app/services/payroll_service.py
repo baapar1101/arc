@@ -32,6 +32,7 @@ from adapters.db.models.payroll import (
 )
 from adapters.db.models.person import Person, PersonType
 from adapters.db.models.document import Document
+from app.core.calendar import CalendarConverter, CalendarType
 from app.core.payroll_plugin_dependency import check_payroll_plugin_active
 from app.core.responses import ApiError
 
@@ -45,6 +46,26 @@ _STATUTORY_ITEM_CODES = frozenset({"insurance_employee", "insurance_employer", "
 _EMPLOYMENT_TYPES = frozenset({"full_time", "part_time", "contract", "daily", "seasonal"})
 _RUN_STATUSES = frozenset({"draft", "pending_approval", "approved", "finalized", "posted", "cancelled"})
 _CODE_RE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+def _format_payroll_date_for_display(value: Any, calendar_type: CalendarType = "jalali") -> str:
+	"""تبدیل تاریخ برای نمایش در PDF/گزارش مطابق تقویم کاربر."""
+	if value is None or value == "":
+		return "-"
+	if isinstance(value, str):
+		try:
+			dt = datetime.fromisoformat(value.split("T")[0])
+		except ValueError:
+			return value
+	elif isinstance(value, date) and not isinstance(value, datetime):
+		dt = datetime.combine(value, datetime.min.time())
+	elif isinstance(value, datetime):
+		dt = value
+	else:
+		return str(value)
+	if calendar_type == "jalali":
+		return CalendarConverter.to_jalali(dt)["date_only"]
+	return dt.date().isoformat()
 
 
 def _ensure_plugin(db: Session, business_id: int) -> None:
@@ -105,6 +126,23 @@ def _validate_account(db: Session, business_id: int, account_id: Optional[int]) 
 		raise ApiError("ACCOUNT_NOT_FOUND", "حساب یافت نشد یا متعلق به این کسب‌وکار نیست.", http_status=404)
 
 
+def _json_safe(value: Any) -> Any:
+	"""تبدیل مقادیر غیرقابل سریالایز JSON برای ذخیره در audit log."""
+	if value is None or isinstance(value, (str, int, float, bool)):
+		return value
+	if isinstance(value, datetime):
+		return value.isoformat()
+	if isinstance(value, date):
+		return value.isoformat()
+	if isinstance(value, Decimal):
+		return str(value)
+	if isinstance(value, dict):
+		return {str(k): _json_safe(v) for k, v in value.items()}
+	if isinstance(value, (list, tuple)):
+		return [_json_safe(v) for v in value]
+	return str(value)
+
+
 def _audit(
 	db: Session,
 	business_id: int,
@@ -122,8 +160,8 @@ def _audit(
 			entity_id=entity_id,
 			action=action,
 			user_id=user_id,
-			old_values=old_values,
-			new_values=new_values,
+			old_values=_json_safe(old_values) if old_values is not None else None,
+			new_values=_json_safe(new_values) if new_values is not None else None,
 		)
 	)
 
@@ -748,8 +786,8 @@ def _employee_to_dict(row: PayrollEmployee, person: Optional[Person] = None) -> 
 		"employee_code": row.employee_code,
 		"job_title": row.job_title,
 		"employment_type": row.employment_type,
-		"hire_date": row.hire_date.isoformat() if row.hire_date else None,
-		"termination_date": row.termination_date.isoformat() if row.termination_date else None,
+		"hire_date": row.hire_date,
+		"termination_date": row.termination_date,
 		"base_salary": float(row.base_salary) if row.base_salary is not None else None,
 		"insurance_number": row.insurance_number,
 		"tax_id": row.tax_id,
@@ -863,8 +901,8 @@ def _period_to_dict(row: PayrollPeriod) -> Dict[str, Any]:
 		"year": row.year,
 		"month": row.month,
 		"title": row.title,
-		"start_date": row.start_date.isoformat() if row.start_date else None,
-		"end_date": row.end_date.isoformat() if row.end_date else None,
+		"start_date": row.start_date,
+		"end_date": row.end_date,
 		"status": row.status,
 		"closed_at": row.closed_at,
 	}
@@ -925,7 +963,7 @@ def _run_to_dict(row: PayrollRun) -> Dict[str, Any]:
 		"period_id": row.period_id,
 		"code": row.code,
 		"title": row.title,
-		"run_date": row.run_date.isoformat() if row.run_date else None,
+		"run_date": row.run_date,
 		"description": row.description,
 		"status": row.status,
 		"gross_total": float(row.gross_total),
@@ -1198,7 +1236,7 @@ def _document_link_to_dict(link: PayrollDocumentLink, document: Optional[Documen
 	}
 	if document:
 		data["document_code"] = document.code
-		data["document_date"] = document.document_date.isoformat() if document.document_date else None
+		data["document_date"] = document.document_date
 	return data
 
 
@@ -1797,6 +1835,7 @@ def build_payslip_render_context(
 	run_id: int,
 	*,
 	line_id: Optional[int] = None,
+	calendar_type: CalendarType = "jalali",
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
 	run_detail = get_run(db, business_id, run_id)
@@ -1844,18 +1883,23 @@ def build_payslip_render_context(
 		)
 
 	period = run_detail.get("period") or {}
+	period_display = dict(period)
+	if period:
+		for key in ("start_date", "end_date"):
+			if period.get(key) is not None:
+				period_display[key] = _format_payroll_date_for_display(period.get(key), calendar_type)
 	return {
 		"business_name": business_name,
 		"run": {
 			"code": run_detail.get("code"),
 			"title": run_detail.get("title"),
-			"run_date": run_detail.get("run_date"),
+			"run_date": _format_payroll_date_for_display(run_detail.get("run_date"), calendar_type),
 			"status": run_detail.get("status"),
 			"gross_total": run_detail.get("gross_total"),
 			"deduction_total": run_detail.get("deduction_total"),
 			"net_total": run_detail.get("net_total"),
 		},
-		"period": period,
+		"period": period_display,
 		"payslips": payslips,
 	}
 

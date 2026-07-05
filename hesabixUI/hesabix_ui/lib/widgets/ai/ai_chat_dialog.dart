@@ -1313,8 +1313,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
       }
 
       if (!mounted) return;
+      var resolvedContent = accumulatedContent;
+      if (resolvedContent.trim().isEmpty && _stream.traceSteps.isNotEmpty) {
+        resolvedContent = extractContentFromTraceSteps(_stream.traceSteps);
+      }
       setState(() {
-        if (accumulatedContent.isNotEmpty ||
+        if (resolvedContent.isNotEmpty ||
             _stream.toolActivities.isNotEmpty ||
             _stream.traceSteps.isNotEmpty) {
           _messages = List<AIChatMessage>.from(_messages)
@@ -1323,7 +1327,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 id: assistantMessageId,
                 sessionId: _currentSession!.id!,
                 role: MessageRole.assistant,
-                content: accumulatedContent,
+                content: resolvedContent,
                 functionCalls: finalFunctionCalls,
                 functionResults: _stream.functionResultsWithTrace(
                   finalFunctionResults,

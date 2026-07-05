@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from app.services.ai.ai_constants import (
     CONTEXT_INPUT_TOKEN_BUDGET,
@@ -13,6 +13,10 @@ from app.services.ai.ai_constants import (
     CONTEXT_SUMMARIZE_THRESHOLD_RATIO,
 )
 from app.services.ai.ai_message_budget import trim_messages_for_llm, trim_system_prompt
+from app.services.ai.ai_system_prompt import (
+    StructuredSystemPrompt,
+    coerce_structured_system_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -143,20 +147,31 @@ def compress_history_messages(
 
 
 def prepare_messages_for_context(
-    system_prompt: str,
+    system_prompt: Union[str, StructuredSystemPrompt],
     messages: List[Dict[str, Any]],
     provider: Any = None,
     *,
     budget_tokens: int = CONTEXT_INPUT_TOKEN_BUDGET,
     summarize_fn: Optional[SummarizeFn] = None,
     force_summarize: bool = False,
+    structured_role: str = "user",
+    structured_business_id: Optional[int] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     آماده‌سازی پیام‌ها: در صورت نزدیک شدن به سقف، خلاصه‌سازی تاریخچه و trim.
     """
-    system_content = trim_system_prompt(system_prompt)
+    structured = coerce_structured_system_prompt(
+        system_prompt,
+        role=structured_role,
+        business_id=structured_business_id,
+    )
+    system_content = structured.full_text()
     bundled: List[Dict[str, Any]] = [
-        {"role": "system", "content": system_content},
+        {
+            "role": "system",
+            "content": system_content,
+            "_structured_system": structured,
+        },
         *messages,
     ]
 
@@ -174,5 +189,8 @@ def prepare_messages_for_context(
     trimmed = trim_messages_for_llm(bundled)
     usage["history_summarized"] = history_summarized
     usage["message_count"] = len(trimmed)
+    usage["structured_system"] = structured
+    usage["static_token_estimate"] = structured.estimate_static_tokens(provider)
+    usage["prompt_cache_key"] = structured.cache_key()
     return trimmed, usage
 

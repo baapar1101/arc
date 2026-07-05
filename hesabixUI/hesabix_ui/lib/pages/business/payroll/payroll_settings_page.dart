@@ -9,8 +9,10 @@ import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/account_tree_combobox_widget.dart';
+import '../../../widgets/data_table/data_table_widget.dart';
 import '../../../core/permission_guard.dart';
 import 'payroll_item_edit_dialog.dart';
+import 'payroll_table_configs.dart';
 import 'payroll_ui.dart';
 
 /// تنظیمات افزونه حقوق و دستمزد: آیتم‌ها، حساب‌های پیش‌فرض و قوانین.
@@ -273,34 +275,24 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
                             ),
                       ),
                       const SizedBox(height: 12),
-                      ..._items.map((item) {
-                        final hasAccount = item['account_id'] != null;
-                        final kind = item['item_kind'] as String?;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: PayrollUi.listTileCard(
-                            context: context,
-                            leading: Icon(
-                              hasAccount ? Icons.account_balance_outlined : Icons.link_off,
-                              color: hasAccount
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.outline,
-                            ),
-                            title: Text('${item['name']}'),
-                            subtitle: Text('${item['code'] ?? ''}'),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (item['is_system'] == true)
-                                  PayrollUi.statusChip(context, t.payrollSystemItem),
-                                if (item['is_system'] != true)
-                                  PayrollUi.kindChip(context, _kindLabel(t, kind), kind),
-                              ],
-                            ),
-                            onTap: _canManage ? () => _editItem(item) : null,
+                      if (_items.isEmpty)
+                        Text(
+                          t.payrollNoItemsYet,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                        )
+                      else
+                        DataTableWidget<Map<String, dynamic>>(
+                          config: PayrollTableConfigs.settingsItems(
+                            t: t,
+                            canManage: _canManage,
+                            kindLabel: (kind) => _kindLabel(t, kind),
+                            onEdit: _canManage ? (item) => _editItem(item) : null,
                           ),
-                        );
-                      }),
+                          fromJson: (json) => json,
+                          localRawItems: _items,
+                        ),
                     ],
                   ),
                 ),

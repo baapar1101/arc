@@ -399,3 +399,44 @@ def extract_trace_from_function_results(
     if isinstance(trace, list):
         return trace
     return []
+
+
+# اولویت استخراج متن نهایی از trace وقتی delta/stream خالی است
+TRACE_CONTENT_FALLBACK_KINDS: tuple[str, ...] = (
+    "answer",
+    "narrative",
+    "thought",
+    "explored",
+    "observation",
+)
+
+
+def extract_final_content_from_trace(
+    trace_steps: Optional[List[Dict[str, Any]]],
+    *,
+    min_body_len: int = 20,
+) -> str:
+    """متن قابل‌نمایش از trace agent (برای persist و fallback پاسخ)."""
+    if not trace_steps:
+        return ""
+    for kind in TRACE_CONTENT_FALLBACK_KINDS:
+        min_len = 8 if kind == "observation" else min_body_len
+        for step in reversed(trace_steps):
+            if step.get("kind") != kind:
+                continue
+            body = (step.get("body_markdown") or "").strip()
+            if len(body) >= min_len:
+                return body
+    return ""
+
+
+def merge_accumulated_and_trace_content(
+    accumulated_content: str,
+    trace_steps: Optional[List[Dict[str, Any]]],
+) -> str:
+    """ترکیب متن stream شده با fallback از trace."""
+    text = (accumulated_content or "").strip()
+    if text:
+        return accumulated_content
+    synthesized = extract_final_content_from_trace(trace_steps)
+    return synthesized or (accumulated_content or "")

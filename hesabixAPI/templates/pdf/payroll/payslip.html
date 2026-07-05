@@ -47,6 +47,12 @@
             {% if period.title %}
             <div class="meta">{{ 'دوره' if is_fa else 'Period' }}: {{ period.title }}</div>
             {% endif %}
+            {% if period.start_date %}
+            <div class="meta">{{ 'از' if is_fa else 'From' }}: {{ period.start_date }}</div>
+            {% endif %}
+            {% if period.end_date %}
+            <div class="meta">{{ 'تا' if is_fa else 'To' }}: {{ period.end_date }}</div>
+            {% endif %}
           </div>
           <div>
             <div class="meta">{{ 'تاریخ' if is_fa else 'Date' }}: {{ run.run_date or '-' }}</div>

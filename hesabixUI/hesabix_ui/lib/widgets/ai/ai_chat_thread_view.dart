@@ -539,7 +539,7 @@ class _StreamingRow extends StatelessWidget {
         toolActivities.isNotEmpty ||
         agentBudget != null;
     final showStatusLine =
-        content.isEmpty && !hasReasoningPanel;
+        content.isEmpty && statusPhase != 'writing';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -569,6 +569,8 @@ class _StreamingRow extends StatelessWidget {
                     initiallyExpanded: todoSnapshot?.hasActiveItem == true ||
                         traceSteps.any((s) => s.isActive),
                   ),
+                if (hasReasoningPanel && showStatusLine)
+                  const SizedBox(height: 8),
                 if (content.isNotEmpty)
                   AIChatMessageBody(
                     content: content,

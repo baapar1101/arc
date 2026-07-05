@@ -14,6 +14,33 @@ List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
       .toList();
 }
 
+const _traceContentFallbackKinds = [
+  'answer',
+  'narrative',
+  'thought',
+  'explored',
+  'observation',
+];
+
+/// متن پاسخ از trace وقتی content پیام خالی است (هم‌تراز بک‌اند).
+String extractContentFromTraceSteps(List<AIAgentTraceStep> steps) {
+  for (final kind in _traceContentFallbackKinds) {
+    final minLen = kind == 'observation' ? 8 : 20;
+    for (final step in steps.reversed) {
+      if (step.kind != kind) continue;
+      final body = step.bodyMarkdown?.trim() ?? '';
+      if (body.length >= minLen) return body;
+    }
+  }
+  return '';
+}
+
+String extractContentFromAgentTraceResults(Object? functionResults) {
+  return extractContentFromTraceSteps(
+    extractAgentTraceFromResults(functionResults),
+  );
+}
+
 AIStreamAgentBudget? extractAgentBudgetFromResults(Object? functionResults) {
   if (functionResults is! Map) return null;
   final raw = functionResults[kAgentBudgetStorageKey];

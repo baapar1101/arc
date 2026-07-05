@@ -710,10 +710,14 @@ app/services/legacy_import/document_rows.py
 app/services/legacy_import/expense_income_rows.py
 app/services/legacy_import/id_map.py
 app/services/legacy_import/importer.py
+app/services/legacy_import/invoice_settlement.py
 app/services/legacy_import/legacy_chart_resolver.py
 app/services/legacy_import/mappers.py
+app/services/legacy_import/opening_balance_importer.py
 app/services/legacy_import/preview_risks.py
 app/services/legacy_import/preview_service.py
+app/services/legacy_import/table_enrichment.py
+app/services/legacy_import/warehouse_document_importer.py
 app/services/legacy_sql/__init__.py
 app/services/legacy_sql/business_purge.py
 app/services/legacy_sql/check_importer.py

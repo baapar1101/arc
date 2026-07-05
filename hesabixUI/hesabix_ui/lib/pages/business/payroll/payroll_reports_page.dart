@@ -8,7 +8,9 @@ import '../../../core/calendar_controller.dart';
 import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/data_table/data_table_widget.dart';
 import 'payroll_calendar_utils.dart';
+import 'payroll_table_configs.dart';
 import 'payroll_ui.dart';
 
 /// گزارش‌های پیشرفته حقوق و دستمزد (فاز ۴).
@@ -239,27 +241,37 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
                 if (_itemSummary != null && (_itemSummary!['items'] as List?)?.isNotEmpty == true) ...[
                   Text(t.payrollItemSummaryReport, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  _ItemSummaryTable(items: List<Map<String, dynamic>>.from(_itemSummary!['items'] as List), fmt: _fmt, t: t),
+                  DataTableWidget<Map<String, dynamic>>(
+                    config: PayrollTableConfigs.itemSummaryReport(t: t, fmtMoney: _fmt),
+                    fromJson: (json) => json,
+                    calendarController: widget.calendarController,
+                    localRawItems: List<Map<String, dynamic>>.from(_itemSummary!['items'] as List),
+                  ),
                   const SizedBox(height: 24),
                 ],
                 if (_employeeSummary != null && (_employeeSummary!['items'] as List?)?.isNotEmpty == true) ...[
                   Text(t.payrollEmployeeSummaryReport, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  _EmployeeSummaryTable(
-                    items: List<Map<String, dynamic>>.from(_employeeSummary!['items'] as List),
-                    fmt: _fmt,
-                    t: t,
+                  DataTableWidget<Map<String, dynamic>>(
+                    config: PayrollTableConfigs.employeeSummaryReport(t: t, fmtMoney: _fmt),
+                    fromJson: (json) => json,
+                    calendarController: widget.calendarController,
+                    localRawItems: List<Map<String, dynamic>>.from(_employeeSummary!['items'] as List),
                   ),
                   const SizedBox(height: 24),
                 ],
                 if (_periodOverview != null && (_periodOverview!['periods'] as List?)?.isNotEmpty == true) ...[
                   Text(t.payrollPeriodOverviewReport, style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  _PeriodOverviewTable(
-                    periods: List<Map<String, dynamic>>.from(_periodOverview!['periods'] as List),
-                    fmt: _fmt,
-                    t: t,
-                    isJalali: _isJalali,
+                  DataTableWidget<Map<String, dynamic>>(
+                    config: PayrollTableConfigs.periodOverviewReport(
+                      t: t,
+                      isJalali: _isJalali,
+                      fmtMoney: _fmt,
+                    ),
+                    fromJson: (json) => json,
+                    calendarController: widget.calendarController,
+                    localRawItems: List<Map<String, dynamic>>.from(_periodOverview!['periods'] as List),
                   ),
                 ],
               ],
@@ -303,135 +315,6 @@ class _StatutoryCard extends StatelessWidget {
           Expanded(child: Text(label)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
-      ),
-    );
-  }
-}
-
-class _ItemSummaryTable extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
-  final String Function(dynamic) fmt;
-  final AppLocalizations t;
-
-  const _ItemSummaryTable({required this.items, required this.fmt, required this.t});
-
-  @override
-  Widget build(BuildContext context) {
-    return PayrollUi.sectionCard(
-      context: context,
-      title: t.payrollItemSummaryReport,
-      icon: Icons.table_chart_outlined,
-      padding: const EdgeInsets.all(8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: [
-            DataColumn(label: Text(t.payrollItemName)),
-            DataColumn(label: Text(t.payrollItemKindLabel)),
-            DataColumn(label: Text(t.payrollGrossTotal)),
-          ],
-          rows: items
-              .map(
-                (row) => DataRow(
-                  cells: [
-                    DataCell(Text('${row['item_name'] ?? row['item_code']}')),
-                    DataCell(Text('${row['item_kind'] ?? ''}')),
-                    DataCell(Text(fmt(row['total_amount']))),
-                  ],
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmployeeSummaryTable extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
-  final String Function(dynamic) fmt;
-  final AppLocalizations t;
-
-  const _EmployeeSummaryTable({required this.items, required this.fmt, required this.t});
-
-  @override
-  Widget build(BuildContext context) {
-    return PayrollUi.sectionCard(
-      context: context,
-      title: t.payrollEmployeeSummaryReport,
-      icon: Icons.people_outline,
-      padding: const EdgeInsets.all(8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: [
-            DataColumn(label: Text(t.payrollEmployeeCode)),
-            DataColumn(label: Text(t.payrollEmployeesTab)),
-            DataColumn(label: Text(t.payrollGrossTotal)),
-            DataColumn(label: Text(t.payrollDeductionTotal)),
-            DataColumn(label: Text(t.payrollNetTotal)),
-          ],
-          rows: items
-              .map(
-                (row) => DataRow(
-                  cells: [
-                    DataCell(Text('${row['employee_code'] ?? ''}')),
-                    DataCell(Text('${row['person_name'] ?? ''}')),
-                    DataCell(Text(fmt(row['gross_total']))),
-                    DataCell(Text(fmt(row['deduction_total']))),
-                    DataCell(Text(fmt(row['net_total']))),
-                  ],
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _PeriodOverviewTable extends StatelessWidget {
-  final List<Map<String, dynamic>> periods;
-  final String Function(dynamic) fmt;
-  final AppLocalizations t;
-  final bool isJalali;
-
-  const _PeriodOverviewTable({
-    required this.periods,
-    required this.fmt,
-    required this.t,
-    required this.isJalali,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return PayrollUi.sectionCard(
-      context: context,
-      title: t.payrollPeriodOverviewReport,
-      icon: Icons.calendar_view_month,
-      padding: const EdgeInsets.all(8),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          columns: [
-            DataColumn(label: Text(t.payrollPeriod)),
-            DataColumn(label: Text(t.payrollRunsTab)),
-            DataColumn(label: Text(t.payrollGrossTotal)),
-            DataColumn(label: Text(t.payrollNetTotal)),
-          ],
-          rows: periods
-              .map(
-                (row) => DataRow(
-                  cells: [
-                    DataCell(Text(PayrollCalendarUtils.periodTitle(row, isJalali))),
-                    DataCell(Text(PayrollUi.formatCount(row['run_count'] ?? 0))),
-                    DataCell(Text(fmt(row['gross_total']))),
-                    DataCell(Text(fmt(row['net_total']))),
-                  ],
-                ),
-              )
-              .toList(),
-        ),
       ),
     );
   }

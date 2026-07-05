@@ -47,6 +47,12 @@ class AIChatMessageBody extends StatelessWidget {
           toolActivities.where((a) => !a.approvalRequired).toList();
     }
 
+    var displayContent = content;
+    if (!isUser && displayContent.trim().isEmpty) {
+      final fromTrace = extractContentFromAgentTraceResults(functionResults);
+      if (fromTrace.isNotEmpty) displayContent = fromTrace;
+    }
+
     return Column(
       crossAxisAlignment:
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -66,7 +72,7 @@ class AIChatMessageBody extends StatelessWidget {
           ),
           const SizedBox(height: 8),
         ],
-        if (content.trim().isNotEmpty) ...[
+        if (displayContent.trim().isNotEmpty) ...[
           isUser
               ? SelectableText(
                   content,
@@ -76,7 +82,7 @@ class AIChatMessageBody extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _AssistantRichContent(
-                      content: content,
+                      content: displayContent,
                       theme: theme,
                       scheme: scheme,
                       businessId: businessId,
@@ -85,7 +91,7 @@ class AIChatMessageBody extends StatelessWidget {
                       AIWorkflowChatActions(
                         businessId: businessId,
                         functionResults: functionResults,
-                        assistantContent: content,
+                        assistantContent: displayContent,
                       ),
                   ],
                 ),

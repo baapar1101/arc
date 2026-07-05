@@ -139,3 +139,13 @@ REASONING_EFFORT_BY_COMPLEXITY: dict[str, str] = {
 
 # حداکثر انتظار برای هر loader زمینهٔ prompt (ثانیه)
 PROMPT_LOADER_TIMEOUT_SEC = 4.0
+
+# ---- Prompt Caching (Provider-level) ----
+# فعال‌سازی cache_control (Anthropic) و prompt_cache_key (OpenAI)
+PROMPT_CACHE_ENABLED = True
+# حداقل توکن تخمینی prefix ثابت برای فعال‌سازی (Anthropic Sonnet ≈1024)
+PROMPT_CACHE_MIN_STATIC_TOKENS = 1024
+# TTL Anthropic: "5m" (پیش‌فرض) یا "1h"
+ANTHROPIC_PROMPT_CACHE_TTL = "5m"
+# OpenAI extended retention: "in_memory" (پیش‌فرض) یا "24h"
+OPENAI_PROMPT_CACHE_RETENTION = "in_memory"

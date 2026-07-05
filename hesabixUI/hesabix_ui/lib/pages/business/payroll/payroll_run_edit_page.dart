@@ -848,7 +848,7 @@ class _AccountingLinksCard extends StatelessWidget {
               [
                 '${link['document_code'] ?? link['document_id']}',
                 if (link['document_date'] != null)
-                  PayrollCalendarUtils.formatRunDate(link['document_date'], isJalali),
+                  PayrollCalendarUtils.formatRowDate(link, 'document_date', isJalali),
               ].join(' · '),
             ),
           );

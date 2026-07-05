@@ -105,6 +105,25 @@ def get_item_summary_report(
 	}
 
 
+def _person_name_expr():
+	"""نام نمایشی شخص در SQL (مدل Person فیلد name ندارد)."""
+	return func.coalesce(
+		func.nullif(Person.alias_name, ""),
+		func.nullif(
+			func.trim(
+				func.concat(
+					func.coalesce(Person.first_name, ""),
+					" ",
+					func.coalesce(Person.last_name, ""),
+				)
+			),
+			"",
+		),
+		Person.company_name,
+		"",
+	)
+
+
 def get_employee_summary_report(
 	db: Session,
 	business_id: int,
@@ -122,7 +141,7 @@ def get_employee_summary_report(
 		db.query(
 			PayrollEmployee.id,
 			PayrollEmployee.employee_code,
-			Person.name,
+			_person_name_expr().label("person_name"),
 			func.coalesce(func.sum(PayrollRunLine.gross_amount), 0),
 			func.coalesce(func.sum(PayrollRunLine.deduction_amount), 0),
 			func.coalesce(func.sum(PayrollRunLine.net_amount), 0),
@@ -140,7 +159,8 @@ def get_employee_summary_report(
 	if period_id is not None:
 		q = q.filter(PayrollRun.period_id == int(period_id))
 
-	q = q.group_by(PayrollEmployee.id, PayrollEmployee.employee_code, Person.name)
+	person_name = _person_name_expr()
+	q = q.group_by(PayrollEmployee.id, PayrollEmployee.employee_code, person_name)
 	total = (
 		db.query(func.count(distinct(PayrollEmployee.id)))
 		.select_from(PayrollRunLine)

@@ -10,11 +10,13 @@ import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/date_input_field.dart';
+import '../../../widgets/data_table/data_table_widget.dart';
 import 'payroll_calendar_utils.dart';
 import 'payroll_department_form_dialog.dart';
 import 'payroll_employee_form_dialog.dart';
 import 'payroll_employee_import_dialog.dart';
 import 'payroll_item_edit_dialog.dart';
+import 'payroll_table_configs.dart';
 import 'payroll_ui.dart';
 
 /// داشبورد اصلی حقوق و دستمزد.
@@ -165,6 +167,7 @@ class _PayrollMainPageState extends State<PayrollMainPage> with SingleTickerProv
                         businessId: widget.businessId,
                         canOperate: _canOperate,
                         isJalali: _isJalali,
+                        calendarController: widget.calendarController,
                         onChanged: _loadAll,
                       ),
                       _PeriodsTab(
@@ -304,6 +307,7 @@ class _RunsTab extends StatelessWidget {
   final int businessId;
   final bool canOperate;
   final bool isJalali;
+  final CalendarController calendarController;
   final VoidCallback onChanged;
 
   const _RunsTab({
@@ -312,6 +316,7 @@ class _RunsTab extends StatelessWidget {
     required this.businessId,
     required this.canOperate,
     required this.isJalali,
+    required this.calendarController,
     required this.onChanged,
   });
 
@@ -325,40 +330,18 @@ class _RunsTab extends StatelessWidget {
         subtitle: canOperate ? t.payrollCreateRun : null,
       );
     }
-    return ListView.separated(
-      padding: PayrollUi.pagePadding,
-      itemCount: runs.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final run = runs[i];
-        final id = (run['id'] as num).toInt();
-        final status = run['status'] as String?;
-        return PayrollUi.listTileCard(
-          context: context,
-          leading: Icon(Icons.receipt_long_outlined, color: PayrollUi.runStatusColor(context, status)),
-          title: Text('${run['title'] ?? run['code'] ?? ''}'),
-          subtitle: Text(
-            PayrollCalendarUtils.formatRunDate(run['run_date'], isJalali),
-          ),
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              PayrollUi.statusChip(
-                context,
-                PayrollUi.runStatusLabel(t, status),
-                color: PayrollUi.runStatusColor(context, status),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                PayrollUi.formatMoney(run['net_total']),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          onTap: () => context.go(context.businessPanelUrl(businessId, 'payroll/$id')),
-        );
-      },
+    return DataTableWidget<Map<String, dynamic>>(
+      config: PayrollTableConfigs.runs(
+        t: t,
+        isJalali: isJalali,
+        onOpen: (run) {
+          final id = (run['id'] as num).toInt();
+          context.go(context.businessPanelUrl(businessId, 'payroll/$id'));
+        },
+      ),
+      fromJson: (json) => json,
+      calendarController: calendarController,
+      localRawItems: runs,
     );
   }
 }
@@ -504,8 +487,6 @@ class _PeriodsTab extends StatelessWidget {
     }
   }
 
-  String _statusLabel(String? status) => PayrollUi.periodStatusLabel(t, status);
-
   @override
   Widget build(BuildContext context) {
     final isJalali = calendarController.isJalali;
@@ -517,56 +498,16 @@ class _PeriodsTab extends StatelessWidget {
         subtitle: canOperate ? t.payrollAddPeriod : null,
       );
     }
-    return ListView.separated(
-      padding: PayrollUi.pagePadding,
-      itemCount: periods.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        final period = periods[i];
-        final isOpen = period['status'] != 'closed';
-        final status = period['status'] as String?;
-        return PayrollUi.listTileCard(
-          context: context,
-          accentColor: isOpen ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outline,
-          leading: Icon(
-            isOpen ? Icons.lock_open_outlined : Icons.lock_outline,
-            color: isOpen ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outline,
-          ),
-          title: Text(PayrollCalendarUtils.periodTitle(period, isJalali)),
-          subtitle: Text(
-            [
-              PayrollCalendarUtils.formatPeriodYearMonth(
-                (period['year'] as num).toInt(),
-                (period['month'] as num).toInt(),
-                isJalali,
-              ),
-              if (period['start_date'] != null)
-                PayrollCalendarUtils.formatRunDate(period['start_date'], isJalali),
-              if (period['end_date'] != null)
-                PayrollCalendarUtils.formatRunDate(period['end_date'], isJalali),
-            ].where((s) => s.isNotEmpty).join(' · '),
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PayrollUi.statusChip(
-                context,
-                _statusLabel(status),
-                color: isOpen ? Theme.of(context).colorScheme.primary : Theme.of(context).colorScheme.outline,
-                icon: isOpen ? Icons.lock_open : Icons.lock,
-              ),
-              if (canOperate && isOpen) ...[
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: t.payrollClosePeriod,
-                  onPressed: () => _closePeriod(context, period),
-                  icon: const Icon(Icons.lock_outline),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
+    return DataTableWidget<Map<String, dynamic>>(
+      config: PayrollTableConfigs.periods(
+        t: t,
+        isJalali: isJalali,
+        canOperate: canOperate,
+        onClose: (period) => _closePeriod(context, period),
+      ),
+      fromJson: (json) => json,
+      calendarController: calendarController,
+      localRawItems: periods,
     );
   }
 }
@@ -640,28 +581,15 @@ class _ItemsTab extends StatelessWidget {
                   title: t.payrollNoItemsYet,
                   subtitle: canManage ? t.payrollAddItem : null,
                 )
-              : ListView.separated(
-                  padding: PayrollUi.pagePadding,
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, i) {
-                    final item = items[i];
-                    final kind = item['item_kind'] as String?;
-                    final hasAccount = item['account_id'] != null;
-                    return PayrollUi.listTileCard(
-                      context: context,
-                      leading: Icon(
-                        hasAccount ? Icons.account_balance_outlined : Icons.link_off,
-                        color: hasAccount
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.outline,
-                      ),
-                      title: Text('${item['name'] ?? ''}'),
-                      subtitle: Text('${item['code'] ?? ''}'),
-                      trailing: PayrollUi.kindChip(context, _kindLabel(kind), kind),
-                      onTap: canManage ? () => _editItem(context, item) : null,
-                    );
-                  },
+              : DataTableWidget<Map<String, dynamic>>(
+                  config: PayrollTableConfigs.items(
+                    t: t,
+                    canManage: canManage,
+                    kindLabel: (kind) => _kindLabel(kind),
+                    onEdit: (item) => _editItem(context, item),
+                  ),
+                  fromJson: (json) => json,
+                  localRawItems: items,
                 ),
         ),
       ],
@@ -822,53 +750,17 @@ class _EmployeesTab extends StatelessWidget {
                   title: t.payrollNoEmployeesYet,
                   subtitle: canManage ? t.payrollAddEmployee : null,
                 )
-              : ListView.separated(
-                  padding: PayrollUi.pagePadding,
-                  itemCount: employees.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, i) {
-                    final emp = employees[i];
-                    final code = '${emp['employee_code'] ?? '?'}';
-                    final hireLabel = emp['hire_date'] != null
-                        ? PayrollCalendarUtils.formatRunDate(emp['hire_date'], _isJalali)
-                        : null;
-                    final deptId = (emp['department_id'] as num?)?.toInt();
-                    String? deptName;
-                    if (deptId != null) {
-                      for (final d in departments) {
-                        if ((d['id'] as num?)?.toInt() == deptId) {
-                          deptName = '${d['name'] ?? d['code']}';
-                          break;
-                        }
-                      }
-                    }
-                    return PayrollUi.listTileCard(
-                      context: context,
-                      leading: Text(
-                        code.isNotEmpty ? code.substring(0, 1) : '?',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                      ),
-                      title: Text('${emp['person_name'] ?? emp['employee_code'] ?? ''}'),
-                      subtitle: Text(
-                        [
-                          if ('${emp['job_title'] ?? ''}'.isNotEmpty) '${emp['job_title']}',
-                          if (deptName != null) deptName,
-                          code,
-                          if (hireLabel != null) '${t.payrollHireDate}: $hireLabel',
-                        ].join(' · '),
-                      ),
-                      trailing: emp['base_salary'] != null
-                          ? Text(
-                              PayrollUi.formatMoney(emp['base_salary']),
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                            )
-                          : null,
-                      onTap: canManage ? () => _editEmployee(context, emp) : null,
-                    );
-                  },
+              : DataTableWidget<Map<String, dynamic>>(
+                  config: PayrollTableConfigs.employees(
+                    t: t,
+                    isJalali: _isJalali,
+                    canManage: canManage,
+                    departments: departments,
+                    onEdit: (emp) => _editEmployee(context, emp),
+                  ),
+                  fromJson: (json) => json,
+                  calendarController: calendarController,
+                  localRawItems: employees,
                 ),
         ),
       ],

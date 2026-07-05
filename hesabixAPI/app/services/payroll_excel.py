@@ -21,12 +21,14 @@ from adapters.db.models.payroll import (
 	PayrollRunLine,
 )
 from adapters.db.models.person import Person
+from app.core.calendar import CalendarType
 from app.core.responses import ApiError
 from app.services.payroll_service import (
 	_EMPLOYMENT_TYPES,
 	_decimal,
 	_ensure_plugin,
 	_ensure_run_editable,
+	_format_payroll_date_for_display,
 	_get_run_row,
 	_persist_run_lines,
 	_get_or_create_settings,
@@ -96,7 +98,12 @@ def build_employees_import_template(db: Session, business_id: int) -> Tuple[byte
 	return buf.getvalue(), filename
 
 
-def export_employees_excel(db: Session, business_id: int) -> Tuple[bytes, str]:
+def export_employees_excel(
+	db: Session,
+	business_id: int,
+	*,
+	calendar_type: CalendarType = "jalali",
+) -> Tuple[bytes, str]:
 	_ensure_plugin(db, business_id)
 	rows = (
 		db.query(PayrollEmployee, Person, PayrollDepartment)
@@ -135,7 +142,7 @@ def export_employees_excel(db: Session, business_id: int) -> Tuple[bytes, str]:
 				emp.employment_type,
 				emp.insurance_number,
 				emp.tax_id,
-				emp.hire_date.isoformat() if emp.hire_date else None,
+				_format_payroll_date_for_display(emp.hire_date, calendar_type) if emp.hire_date else None,
 				"yes" if emp.is_active else "no",
 			]
 		)

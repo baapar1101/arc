@@ -7,8 +7,32 @@ import '../../../core/date_utils.dart';
 class PayrollCalendarUtils {
   PayrollCalendarUtils._();
 
-  static String formatRunDate(dynamic value, bool isJalali, {String fallback = '-'}) {
-    return HesabixDateUtils.formatApiDateForDisplay(value, isJalali, fallback: fallback);
+  static String formatRunDate(
+    dynamic value,
+    bool isJalali, {
+    String fallback = '-',
+    dynamic rawValue,
+  }) {
+    return HesabixDateUtils.formatApiDateForDisplay(
+      value,
+      isJalali,
+      fallback: fallback,
+      rawValue: rawValue,
+    );
+  }
+
+  static String formatRowDate(
+    Map<String, dynamic> row,
+    String key,
+    bool isJalali, {
+    String fallback = '-',
+  }) {
+    return HesabixDateUtils.formatApiDateForDisplay(
+      row[key],
+      isJalali,
+      fallback: fallback,
+      rawValue: row['${key}_raw'],
+    );
   }
 
   /// نمایش سال/ماه دوره ذخیره‌شده (شمسی) در تقویم فعال کاربر.

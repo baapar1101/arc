@@ -11,7 +11,7 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.i18n import locale_dependency, negotiate_locale
 from app.core.permissions import require_business_access_dep, require_business_permission_dep
-from app.core.responses import ApiError, success_response
+from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services import payroll_service as svc
 from app.services import payroll_excel as excel_svc
 from app.services import payroll_reports as reports_svc
@@ -21,6 +21,10 @@ router = APIRouter(prefix="/payroll", tags=["payroll"])
 
 def _handle_value_error(e: ValueError) -> None:
 	raise ApiError("VALIDATION_ERROR", str(e), http_status=400)
+
+
+def _payroll_response(data: Any, request: Request, **kwargs) -> dict:
+	return _payroll_response(format_datetime_fields(data, request), request, **kwargs)
 
 
 # ─── تنظیمات ───────────────────────────────────────────────────────────────
@@ -37,7 +41,7 @@ def get_settings_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.get_settings(db, business_id)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.put("/business/{business_id}/settings")
@@ -57,7 +61,7 @@ def update_settings_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 # ─── داشبورد ───────────────────────────────────────────────────────────────
@@ -74,7 +78,7 @@ def dashboard_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.get_dashboard_summary(db, business_id)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 # ─── دسته‌بندی آیتم‌ها ─────────────────────────────────────────────────────
@@ -92,7 +96,7 @@ def list_item_categories_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	items = svc.list_item_categories(db, business_id, include_inactive=include_inactive)
-	return success_response({"items": items}, request)
+	return _payroll_response({"items": items}, request)
 
 
 @router.post("/business/{business_id}/item-categories")
@@ -112,7 +116,7 @@ def create_item_category_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.put("/business/{business_id}/item-categories/{category_id}")
@@ -133,7 +137,7 @@ def update_item_category_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.delete("/business/{business_id}/item-categories/{category_id}")
@@ -148,7 +152,7 @@ def delete_item_category_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	svc.delete_item_category(db, business_id, category_id, user_id=ctx.get_user_id())
-	return success_response({"deleted": True}, request)
+	return _payroll_response({"deleted": True}, request)
 
 
 # ─── آیتم‌های حقوق ─────────────────────────────────────────────────────────
@@ -169,7 +173,7 @@ def list_items_endpoint(
 	items = svc.list_item_definitions(
 		db, business_id, item_kind=item_kind, include_inactive=include_inactive
 	)
-	return success_response({"items": items}, request)
+	return _payroll_response({"items": items}, request)
 
 
 @router.post("/business/{business_id}/items")
@@ -189,7 +193,7 @@ def create_item_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.put("/business/{business_id}/items/{item_id}")
@@ -210,7 +214,7 @@ def update_item_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.delete("/business/{business_id}/items/{item_id}")
@@ -225,7 +229,7 @@ def delete_item_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	svc.delete_item_definition(db, business_id, item_id, user_id=ctx.get_user_id())
-	return success_response({"deleted": True}, request)
+	return _payroll_response({"deleted": True}, request)
 
 
 # ─── بخش‌ها ────────────────────────────────────────────────────────────────
@@ -243,7 +247,7 @@ def list_departments_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	items = svc.list_departments(db, business_id, include_inactive=include_inactive)
-	return success_response({"items": items}, request)
+	return _payroll_response({"items": items}, request)
 
 
 @router.post("/business/{business_id}/departments")
@@ -263,7 +267,7 @@ def create_department_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 # ─── پرسنل ──────────────────────────────────────────────────────────────────
@@ -291,7 +295,7 @@ def list_employees_endpoint(
 		limit=limit,
 		skip=skip,
 	)
-	return success_response({"items": items, "total": total}, request)
+	return _payroll_response({"items": items, "total": total}, request)
 
 
 @router.post("/business/{business_id}/employees")
@@ -311,7 +315,7 @@ def create_employee_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 # ─── دوره‌ها ─────────────────────────────────────────────────────────────────
@@ -330,7 +334,7 @@ def list_periods_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	items, total = svc.list_periods(db, business_id, limit=limit, skip=skip)
-	return success_response({"items": items, "total": total}, request)
+	return _payroll_response({"items": items, "total": total}, request)
 
 
 @router.post("/business/{business_id}/periods")
@@ -350,7 +354,7 @@ def create_period_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.post("/business/{business_id}/periods/{period_id}/close")
@@ -365,7 +369,7 @@ def close_period_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.close_period(db, business_id, period_id, user_id=ctx.get_user_id())
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 # ─── اجرای حقوق ─────────────────────────────────────────────────────────────
@@ -388,7 +392,7 @@ def list_runs_endpoint(
 	items, total = svc.list_runs(
 		db, business_id, status=status, period_id=period_id, limit=limit, skip=skip
 	)
-	return success_response({"items": items, "total": total}, request)
+	return _payroll_response({"items": items, "total": total}, request)
 
 
 @router.get("/business/{business_id}/runs/{run_id}")
@@ -403,7 +407,7 @@ def get_run_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.get_run(db, business_id, run_id)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.post("/business/{business_id}/runs")
@@ -423,7 +427,7 @@ def create_run_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.put("/business/{business_id}/runs/{run_id}")
@@ -444,7 +448,7 @@ def update_run_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.delete("/business/{business_id}/runs/{run_id}")
@@ -459,7 +463,7 @@ def delete_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	svc.delete_run(db, business_id, run_id, user_id=ctx.get_user_id())
-	return success_response({"deleted": True}, request)
+	return _payroll_response({"deleted": True}, request)
 
 
 @router.post("/business/{business_id}/runs/{run_id}/finalize")
@@ -474,7 +478,7 @@ def finalize_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.finalize_run(db, business_id, run_id, user_id=ctx.get_user_id())
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.post("/business/{business_id}/runs/{run_id}/cancel")
@@ -489,7 +493,7 @@ def cancel_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.cancel_run(db, business_id, run_id, user_id=ctx.get_user_id())
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.post("/business/{business_id}/runs/{run_id}/copy")
@@ -510,7 +514,7 @@ def copy_run_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.get("/business/{business_id}/runs/{run_id}/payslip/pdf")
@@ -531,7 +535,10 @@ async def payslip_pdf_endpoint(
 
 	locale = negotiate_locale(request.headers.get("Accept-Language"))
 	is_fa = locale == "fa"
-	ctx_data = svc.build_payslip_render_context(db, business_id, run_id, line_id=line_id)
+	calendar_type = getattr(request.state, "calendar_type", "jalali") or "jalali"
+	ctx_data = svc.build_payslip_render_context(
+		db, business_id, run_id, line_id=line_id, calendar_type=calendar_type
+	)
 	fa_reg, fa_bold = load_farsi_font_data_uris()
 	html_content = render_template(
 		"pdf/payroll/payslip.html",
@@ -573,7 +580,7 @@ def department_summary_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.get_run_department_summary(db, business_id, period_id=period_id, run_id=run_id)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.get("/business/{business_id}/reports/item-summary")
@@ -589,7 +596,7 @@ def item_summary_report_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = reports_svc.get_item_summary_report(db, business_id, period_id=period_id, run_id=run_id)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.get("/business/{business_id}/reports/employee-summary")
@@ -609,7 +616,7 @@ def employee_summary_report_endpoint(
 	data = reports_svc.get_employee_summary_report(
 		db, business_id, period_id=period_id, run_id=run_id, limit=limit, skip=skip
 	)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.get("/business/{business_id}/reports/statutory-summary")
@@ -625,7 +632,7 @@ def statutory_summary_report_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = reports_svc.get_statutory_summary_report(db, business_id, period_id=period_id, run_id=run_id)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.get("/business/{business_id}/reports/period-overview")
@@ -640,7 +647,7 @@ def period_overview_report_endpoint(
 	_ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = reports_svc.get_period_overview_report(db, business_id, year=year)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.get("/business/{business_id}/employees/import/template")
@@ -675,7 +682,11 @@ def export_employees_excel_endpoint(
 	db: Session = Depends(get_db),
 	_ctx: AuthContext = Depends(get_current_user),
 ):
-	content, filename = excel_svc.export_employees_excel(db, business_id)
+	content, filename = excel_svc.export_employees_excel(
+		db,
+		business_id,
+		calendar_type=getattr(request.state, "calendar_type", "jalali") or "jalali",
+	)
 	return Response(
 		content=content,
 		media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -704,7 +715,7 @@ async def import_employees_excel_endpoint(
 	data = excel_svc.import_employees_from_excel(
 		db, business_id, content, dry_run=dry_run, user_id=ctx.get_user_id()
 	)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.get("/business/{business_id}/runs/{run_id}/import/template")
@@ -748,7 +759,7 @@ async def import_run_lines_excel_endpoint(
 	data = excel_svc.import_run_lines_from_excel(
 		db, business_id, run_id, content, dry_run=dry_run, user_id=ctx.get_user_id()
 	)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.post("/business/{business_id}/runs/{run_id}/approve")
@@ -763,7 +774,7 @@ def approve_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.approve_run(db, business_id, run_id, user_id=ctx.get_user_id())
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.post("/business/{business_id}/runs/{run_id}/reject")
@@ -780,7 +791,7 @@ def reject_run_endpoint(
 ) -> dict:
 	reason = payload.get("reason") if isinstance(payload, dict) else None
 	data = svc.reject_run(db, business_id, run_id, user_id=ctx.get_user_id(), reason=reason)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.post("/business/{business_id}/runs/{run_id}/post")
@@ -795,7 +806,7 @@ def post_run_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
 	data = svc.post_run_to_accounting(db, business_id, run_id, user_id=ctx.get_user_id())
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.post("/business/{business_id}/runs/{run_id}/post-payment")
@@ -816,7 +827,7 @@ def post_payment_endpoint(
 	data = svc.post_run_payment(
 		db, business_id, run_id, ctx.get_user_id(), int(payment_account_id)
 	)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.put("/business/{business_id}/employees/{employee_id}")
@@ -837,7 +848,7 @@ def update_employee_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
 
 
 @router.put("/business/{business_id}/departments/{department_id}")
@@ -858,4 +869,4 @@ def update_department_endpoint(
 		raise
 	except ValueError as e:
 		_handle_value_error(e)
-	return success_response(data, request)
+	return _payroll_response(data, request)
