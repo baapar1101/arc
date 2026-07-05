@@ -219,12 +219,17 @@ class ProductFormData {
       'is_public_catalog': isPublicCatalog,
     };
     // Remove only nulls we intentionally kept nullable
-    // اما default_warehouse_id و attribute_ids را همیشه نگه می‌داریم (حتی اگر null/خالی باشند) تا بک‌اند بتواند آن‌ها را به‌روزرسانی کند
+    // فیلدهای زیر حتی با null هم ارسال می‌شوند تا بک‌اند بتواند آن‌ها را به‌روزرسانی/پاک کند
     payload.removeWhere((k, v) =>
         v == null &&
         k != 'default_warehouse_id' &&
         k != 'attribute_ids' &&
-        k != 'general_barcodes');
+        k != 'general_barcodes' &&
+        k != 'tax_type_id' &&
+        k != 'tax_code' &&
+        k != 'tax_unit_id' &&
+        k != 'sales_tax_rate' &&
+        k != 'purchase_tax_rate');
     return payload;
   }
 
@@ -255,9 +260,9 @@ class ProductFormData {
       isPurchaseTaxable: (product['is_purchase_taxable'] == true),
       salesTaxRate: _parseNumeric(product['sales_tax_rate']),
       purchaseTaxRate: _parseNumeric(product['purchase_tax_rate']),
-      taxTypeId: product['tax_type_id'] as int?,
+      taxTypeId: _parseInt(product['tax_type_id']),
       taxCode: product['tax_code']?.toString(),
-      taxUnitId: product['tax_unit_id'] as int?,
+      taxUnitId: _parseInt(product['tax_unit_id']),
       selectedAttributeIds: _parseAttributeIds(product['attribute_ids']),
       imageFileId: product['image_file_id']?.toString(),
       imageUrl: product['image_url']?.toString(),

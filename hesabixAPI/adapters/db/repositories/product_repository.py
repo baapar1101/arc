@@ -434,6 +434,11 @@ class ProductRepository(BaseRepository[Product]):
             "base_sales_price",
             "base_purchase_price",
             "general_barcodes",
+            "sales_tax_rate",
+            "purchase_tax_rate",
+            "tax_type_id",
+            "tax_code",
+            "tax_unit_id",
         }
         # فیلدهای بولی NOT NULL: فقط با مقدار bool واقعی به‌روزرسانی شوند (None = بدون تغییر)
         boolean_fields = {"is_public_catalog", "is_active", "track_inventory", "track_serial", "track_barcode", "is_sales_taxable", "is_purchase_taxable"}

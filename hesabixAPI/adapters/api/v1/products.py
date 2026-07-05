@@ -931,12 +931,21 @@ async def update_product_endpoint(
                 # اگر null است، آن را به صورت صریح None set می‌کنیم
                 body_data['default_warehouse_id'] = default_warehouse_id_value
             payload = ProductUpdateRequest(**body_data)
-            # اضافه کردن به fields_set برای Pydantic v2 (حتی اگر null باشد)
-            if 'default_warehouse_id' in body_data:
-                if hasattr(payload, 'model_fields_set'):
-                    payload.model_fields_set.add('default_warehouse_id')
-                elif hasattr(payload, '__fields_set__'):
-                    payload.__fields_set__.add('default_warehouse_id')
+            # اضافه کردن به fields_set برای Pydantic v2 (حتی اگر null باشند)
+            _explicit_nullable_fields = (
+                'default_warehouse_id',
+                'tax_type_id',
+                'tax_code',
+                'tax_unit_id',
+                'sales_tax_rate',
+                'purchase_tax_rate',
+            )
+            for field_name in _explicit_nullable_fields:
+                if field_name in body_data:
+                    if hasattr(payload, 'model_fields_set'):
+                        payload.model_fields_set.add(field_name)
+                    elif hasattr(payload, '__fields_set__'):
+                        payload.__fields_set__.add(field_name)
         except ValueError as e:
             raise ApiError("INVALID_PAYLOAD", f"خطا در parse کردن JSON: {str(e)}", http_status=400)
         except Exception as e:

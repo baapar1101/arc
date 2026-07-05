@@ -412,6 +412,8 @@ app/integrations/moadian/client.py
 app/integrations/moadian/dto.py
 app/integrations/moadian/invoice_builder.py
 app/integrations/moadian/utils.py
+app/integrations/moadian/v1_client.py
+app/integrations/moadian/v2_client.py
 app/integrations/moadian/v2_crypto.py
 app/integrations/moadian/verhoeff.py
 app/services/account_review_service.py

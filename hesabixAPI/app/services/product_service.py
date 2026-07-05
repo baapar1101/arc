@@ -102,6 +102,18 @@ def invalidate_products_cache(business_id: int, product_id: Optional[int] = None
 			"category_id": category_id,
 			"timestamp": None
 		}
+		# روش 4: حذف response cache برای GET /api/v1/products/* (middleware ResponseCacheMiddleware)
+		try:
+			from app.core.response_cache import invalidate_response_cache
+			deleted_response_cache = invalidate_response_cache(path="/api/v1/products")
+			if deleted_response_cache > 0:
+				logger.info(
+					f"Invalidated {deleted_response_cache} response cache keys for /api/v1/products "
+					f"(business_id={business_id}, product_id={product_id})"
+				)
+		except Exception as exc:
+			logger.warning(f"Failed to invalidate product response cache: {exc}")
+
 		try:
 			import time
 			invalidation_message["timestamp"] = time.time()
@@ -789,11 +801,11 @@ def update_product(
         is_purchase_taxable=(
             payload.is_purchase_taxable if payload.is_purchase_taxable is not None else False
         ) if 'is_purchase_taxable' in fields_set else None,
-        sales_tax_rate=payload.sales_tax_rate,
-        purchase_tax_rate=payload.purchase_tax_rate,
-        tax_type_id=payload.tax_type_id,
-        tax_code=payload.tax_code,
-        tax_unit_id=payload.tax_unit_id,
+        sales_tax_rate=payload.sales_tax_rate if 'sales_tax_rate' in fields_set else None,
+        purchase_tax_rate=payload.purchase_tax_rate if 'purchase_tax_rate' in fields_set else None,
+        tax_type_id=payload.tax_type_id if 'tax_type_id' in fields_set else None,
+        tax_code=payload.tax_code if 'tax_code' in fields_set else None,
+        tax_unit_id=payload.tax_unit_id if 'tax_unit_id' in fields_set else None,
         image_file_id=payload.image_file_id if 'image_file_id' in fields_set else None,
         is_active=(
             payload.is_active if payload.is_active is not None else True

@@ -85,6 +85,36 @@ void main() {
       expect(payload.containsKey('description'), false); // null values removed
     });
 
+    test('should always include tax fields in payload for backend update', () {
+      final formData = ProductFormData(
+        name: 'کالای تست',
+        taxTypeId: 5,
+        taxCode: '1234567890123',
+        taxUnitId: 3,
+        isSalesTaxable: true,
+        salesTaxRate: 9,
+      );
+
+      final payload = formData.toPayload();
+
+      expect(payload['tax_type_id'], 5);
+      expect(payload['tax_code'], '1234567890123');
+      expect(payload['tax_unit_id'], 3);
+      expect(payload['is_sales_taxable'], true);
+      expect(payload['sales_tax_rate'], 9);
+    });
+
+    test('should parse tax ids from numeric API values', () {
+      final formData = ProductFormData.fromProduct({
+        'name': 'کالا',
+        'tax_type_id': 5.0,
+        'tax_unit_id': 3,
+      });
+
+      expect(formData.taxTypeId, 5);
+      expect(formData.taxUnitId, 3);
+    });
+
     test('auto code mode never sends manual code in payload', () {
       final formData = ProductFormData(
         name: 'کالای تست',
