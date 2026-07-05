@@ -10,6 +10,10 @@ import 'payroll_ui.dart';
 class PayrollTableConfigs {
   PayrollTableConfigs._();
 
+  /// نمایش همه سطرها بدون اسکرول داخل جدول؛ اسکرول عمودی به والد (صفحه/ListView) منتقل می‌شود.
+  static const bool _expandBodyHeightToFitRows = true;
+  static const bool _deferVerticalScrollToParent = true;
+
   static String _formatApiDate(
     Map<String, dynamic> row,
     String key,
@@ -42,6 +46,8 @@ class PayrollTableConfigs {
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
+      expandBodyHeightToFitRows: _expandBodyHeightToFitRows,
+      deferVerticalScrollToParent: _deferVerticalScrollToParent,
       onRowTap: onOpen == null ? null : (item) => onOpen(Map<String, dynamic>.from(item as Map)),
       columns: [
         TextColumn(
@@ -109,6 +115,8 @@ class PayrollTableConfigs {
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
+      expandBodyHeightToFitRows: _expandBodyHeightToFitRows,
+      deferVerticalScrollToParent: _deferVerticalScrollToParent,
       columns: [
         TextColumn(
           'title',
@@ -182,6 +190,8 @@ class PayrollTableConfigs {
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
+      expandBodyHeightToFitRows: _expandBodyHeightToFitRows,
+      deferVerticalScrollToParent: _deferVerticalScrollToParent,
       onRowTap: canManage && onEdit != null
           ? (item) => onEdit(Map<String, dynamic>.from(item as Map))
           : null,
@@ -248,6 +258,8 @@ class PayrollTableConfigs {
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
+      expandBodyHeightToFitRows: _expandBodyHeightToFitRows,
+      deferVerticalScrollToParent: _deferVerticalScrollToParent,
       onRowTap: canManage && onEdit != null
           ? (item) => onEdit(Map<String, dynamic>.from(item as Map))
           : null,
@@ -331,6 +343,8 @@ class PayrollTableConfigs {
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
+      expandBodyHeightToFitRows: _expandBodyHeightToFitRows,
+      deferVerticalScrollToParent: _deferVerticalScrollToParent,
       columns: [
         TextColumn(
           'item_name',
@@ -374,6 +388,8 @@ class PayrollTableConfigs {
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
+      expandBodyHeightToFitRows: _expandBodyHeightToFitRows,
+      deferVerticalScrollToParent: _deferVerticalScrollToParent,
       columns: [
         TextColumn(
           'employee_code',
@@ -427,6 +443,8 @@ class PayrollTableConfigs {
       showRowNumbers: true,
       enableRowSelection: false,
       enableHorizontalScroll: true,
+      expandBodyHeightToFitRows: _expandBodyHeightToFitRows,
+      deferVerticalScrollToParent: _deferVerticalScrollToParent,
       columns: [
         TextColumn(
           'title',

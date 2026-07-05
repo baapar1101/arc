@@ -330,18 +330,24 @@ class _RunsTab extends StatelessWidget {
         subtitle: canOperate ? t.payrollCreateRun : null,
       );
     }
-    return DataTableWidget<Map<String, dynamic>>(
-      config: PayrollTableConfigs.runs(
-        t: t,
-        isJalali: isJalali,
-        onOpen: (run) {
-          final id = (run['id'] as num).toInt();
-          context.go(context.businessPanelUrl(businessId, 'payroll/$id'));
-        },
-      ),
-      fromJson: (json) => json,
-      calendarController: calendarController,
-      localRawItems: runs,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      children: [
+        DataTableWidget<Map<String, dynamic>>(
+          config: PayrollTableConfigs.runs(
+            t: t,
+            isJalali: isJalali,
+            onOpen: (run) {
+              final id = (run['id'] as num).toInt();
+              context.go(context.businessPanelUrl(businessId, 'payroll/$id'));
+            },
+          ),
+          fromJson: (json) => json,
+          calendarController: calendarController,
+          localRawItems: runs,
+        ),
+      ],
     );
   }
 }
@@ -498,16 +504,22 @@ class _PeriodsTab extends StatelessWidget {
         subtitle: canOperate ? t.payrollAddPeriod : null,
       );
     }
-    return DataTableWidget<Map<String, dynamic>>(
-      config: PayrollTableConfigs.periods(
-        t: t,
-        isJalali: isJalali,
-        canOperate: canOperate,
-        onClose: (period) => _closePeriod(context, period),
-      ),
-      fromJson: (json) => json,
-      calendarController: calendarController,
-      localRawItems: periods,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      children: [
+        DataTableWidget<Map<String, dynamic>>(
+          config: PayrollTableConfigs.periods(
+            t: t,
+            isJalali: isJalali,
+            canOperate: canOperate,
+            onClose: (period) => _closePeriod(context, period),
+          ),
+          fromJson: (json) => json,
+          calendarController: calendarController,
+          localRawItems: periods,
+        ),
+      ],
     );
   }
 }
@@ -560,7 +572,9 @@ class _ItemsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       children: [
         if (canManage)
           PayrollUi.toolbar(
@@ -573,25 +587,24 @@ class _ItemsTab extends StatelessWidget {
               ),
             ],
           ),
-        Expanded(
-          child: items.isEmpty
-              ? PayrollUi.emptyState(
-                  context: context,
-                  icon: Icons.list_alt_outlined,
-                  title: t.payrollNoItemsYet,
-                  subtitle: canManage ? t.payrollAddItem : null,
-                )
-              : DataTableWidget<Map<String, dynamic>>(
-                  config: PayrollTableConfigs.items(
-                    t: t,
-                    canManage: canManage,
-                    kindLabel: (kind) => _kindLabel(kind),
-                    onEdit: (item) => _editItem(context, item),
-                  ),
-                  fromJson: (json) => json,
-                  localRawItems: items,
-                ),
-        ),
+        if (items.isEmpty)
+          PayrollUi.emptyState(
+            context: context,
+            icon: Icons.list_alt_outlined,
+            title: t.payrollNoItemsYet,
+            subtitle: canManage ? t.payrollAddItem : null,
+          )
+        else
+          DataTableWidget<Map<String, dynamic>>(
+            config: PayrollTableConfigs.items(
+              t: t,
+              canManage: canManage,
+              kindLabel: (kind) => _kindLabel(kind),
+              onEdit: (item) => _editItem(context, item),
+            ),
+            fromJson: (json) => json,
+            localRawItems: items,
+          ),
       ],
     );
   }
@@ -688,8 +701,9 @@ class _EmployeesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
       children: [
         if (canManage)
           PayrollUi.sectionCard(
@@ -742,27 +756,26 @@ class _EmployeesTab extends StatelessWidget {
               ),
             ],
           ),
-        Expanded(
-          child: employees.isEmpty
-              ? PayrollUi.emptyState(
-                  context: context,
-                  icon: Icons.people_outline,
-                  title: t.payrollNoEmployeesYet,
-                  subtitle: canManage ? t.payrollAddEmployee : null,
-                )
-              : DataTableWidget<Map<String, dynamic>>(
-                  config: PayrollTableConfigs.employees(
-                    t: t,
-                    isJalali: _isJalali,
-                    canManage: canManage,
-                    departments: departments,
-                    onEdit: (emp) => _editEmployee(context, emp),
-                  ),
-                  fromJson: (json) => json,
-                  calendarController: calendarController,
-                  localRawItems: employees,
-                ),
-        ),
+        if (employees.isEmpty)
+          PayrollUi.emptyState(
+            context: context,
+            icon: Icons.people_outline,
+            title: t.payrollNoEmployeesYet,
+            subtitle: canManage ? t.payrollAddEmployee : null,
+          )
+        else
+          DataTableWidget<Map<String, dynamic>>(
+            config: PayrollTableConfigs.employees(
+              t: t,
+              isJalali: _isJalali,
+              canManage: canManage,
+              departments: departments,
+              onEdit: (emp) => _editEmployee(context, emp),
+            ),
+            fromJson: (json) => json,
+            calendarController: calendarController,
+            localRawItems: employees,
+          ),
       ],
     );
   }
