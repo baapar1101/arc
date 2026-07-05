@@ -15,7 +15,7 @@ from app.core.responses import ApiError
 from app.core.settings import get_settings
 from app.integrations.moadian.client import MoadianClient
 from app.integrations.moadian.invoice_builder import build_invoice_for_moadian
-from app.services.invoice_service import invoice_document_to_dict
+from app.services.invoice_service import invoice_document_to_dict, refresh_invoice_line_tax_snapshots
 from app.services.tax_validation_service import validate_document_for_tax, validate_tax_submission_scenario
 from app.integrations.moadian.utils import extract_moadian_error_message
 from app.services.tax_reference_service import (
@@ -112,6 +112,9 @@ def send_document_to_tax_system(
     """
     ensure_moadian_plugin_active(db, int(document.business_id))
     mode = _resolve_submission_mode(document, submission_mode)
+
+    # snapshot مالیاتی خطوط ممکن است قدیمی باشد (فاکتور قبل از تکمیل کد مالیاتی کالا)
+    refresh_invoice_line_tax_snapshots(db, document)
 
     validation = validate_document_for_tax(db, document)
     if not validation["valid"]:

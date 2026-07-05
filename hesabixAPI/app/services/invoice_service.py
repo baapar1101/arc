@@ -969,6 +969,46 @@ def _build_product_tax_snapshot_map(
     return result
 
 
+def refresh_invoice_line_tax_snapshots(db: Session, document: Document) -> int:
+    """
+    به‌روزرسانی snapshot مالیاتی خطوط فاکتور از اطلاعات فعلی کالا.
+
+    فاکتور هنگام ثبت/ویرایش، وضعیت مالیاتی کالا را در extra_info هر ردیف ذخیره می‌کند.
+    اگر بعداً کد مالیاتی کالا تکمیل شود، بدون ویرایش مجدد فاکتور snapshot قدیمی
+    (بدون tax_code) باقی می‌ماند و ارسال به مودیان با خطا متوقف می‌شود.
+    """
+    lines = (
+        db.query(InvoiceItemLine)
+        .filter(InvoiceItemLine.document_id == document.id)
+        .all()
+    )
+    if not lines:
+        return 0
+
+    product_ids = [int(line.product_id) for line in lines if line.product_id]
+    tax_map = _build_product_tax_snapshot_map(db, int(document.business_id), product_ids)
+    updated = 0
+    for line in lines:
+        if not line.product_id:
+            continue
+        tax_meta = tax_map.get(int(line.product_id))
+        if not tax_meta:
+            continue
+        snapshot = {k: v for k, v in tax_meta.items() if v is not None}
+        if not snapshot:
+            continue
+        snapshot["captured_at"] = datetime.utcnow().isoformat()
+        info = dict(line.extra_info or {})
+        info["tax_snapshot"] = snapshot
+        line.extra_info = info
+        flag_modified(line, "extra_info")
+        updated += 1
+
+    if updated:
+        db.flush()
+    return updated
+
+
 def _iter_product_movements(
     db: Session,
     business_id: int,
@@ -6539,6 +6579,8 @@ def invoice_document_to_dict(
             "product_name": getattr(product, "name", None),
             "product_main_unit": getattr(product, "main_unit", None) if product else None,
             "product_secondary_unit": getattr(product, "secondary_unit", None) if product else None,
+            "product_tax_code": getattr(product, "tax_code", None) if product else None,
+            "product_tax_unit_id": getattr(product, "tax_unit_id", None) if product else None,
             "quantity": float(it.quantity) if it.quantity else None,
             "description": it.description,
             "extra_info": it.extra_info,

@@ -252,7 +252,7 @@ class InvoiceBuilder:
             line_extra = line.get("extra_info") or {}
             tax_snapshot = line_extra.get("tax_snapshot") or {}
 
-            tax_code = tax_snapshot.get("tax_code", "").strip()
+            tax_code = (tax_snapshot.get("tax_code") or line.get("product_tax_code") or "").strip()
             if not tax_code:
                 product_name = line.get("product_name", "محصول")
                 from app.core.responses import ApiError
@@ -267,6 +267,9 @@ class InvoiceBuilder:
                         "line_number": idx,
                     },
                 )
+            if not tax_snapshot.get("tax_code"):
+                tax_snapshot = dict(tax_snapshot)
+                tax_snapshot["tax_code"] = tax_code
 
             product_name = line.get("product_name", "محصول")
 
@@ -274,6 +277,7 @@ class InvoiceBuilder:
             tax_unit_code = (
                 tax_snapshot.get("tax_unit_code")
                 or tax_snapshot.get("product_main_unit")
+                or line.get("product_main_unit")
                 or "164"
             )
 

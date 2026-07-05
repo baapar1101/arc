@@ -1006,6 +1006,7 @@ tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
 tests/test_physical_stock.py
 tests/test_product_inventory_tracking_sync.py
+tests/test_product_tax_update.py
 tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
 tests/test_quick_sales_service.py
