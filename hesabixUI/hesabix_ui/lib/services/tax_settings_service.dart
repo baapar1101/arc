@@ -86,11 +86,14 @@ class TaxSettingsService {
     }
   }
 
-  Future<Map<String, dynamic>> testConnection(int businessId) async {
+  Future<Map<String, dynamic>> testConnection(
+    int businessId, {
+    Map<String, dynamic>? formPayload,
+  }) async {
     try {
       final response = await _apiClient.post<Map<String, dynamic>>(
         '/tax-settings/business/$businessId/test-connection',
-        data: const <String, dynamic>{},
+        data: formPayload ?? const <String, dynamic>{},
       );
       final data = response.data?['data'];
       if (data is Map<String, dynamic>) {

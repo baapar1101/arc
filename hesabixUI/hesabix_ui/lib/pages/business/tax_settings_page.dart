@@ -174,14 +174,34 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
 
   Future<void> _testConnection() async {
     final t = AppLocalizations.of(context);
-    
+
     setState(() {
       _saving = true;
       _error = null;
     });
-    
+
     try {
-      final result = await _service.testConnection(widget.businessId);
+      final memoryId = _normalizeTaxMemoryId(_taxMemoryIdController.text);
+      final economicCode = _convertDigitsToEnglish(
+        _economicCodeController.text.trim(),
+      );
+      final formPayload = <String, dynamic>{
+        'tax_memory_id': memoryId,
+        'economic_code': economicCode,
+        'private_key': _privateKeyController.text.trim(),
+        if (_publicKeyController.text.trim().isNotEmpty)
+          'public_key': _publicKeyController.text.trim(),
+        if (_certificateController.text.trim().isNotEmpty)
+          'certificate': _certificateController.text.trim(),
+        if (_certificateRequestController.text.trim().isNotEmpty)
+          'certificate_request': _certificateRequestController.text.trim(),
+        'sandbox_mode': _sandboxMode,
+      };
+
+      final result = await _service.testConnection(
+        widget.businessId,
+        formPayload: formPayload,
+      );
       
       if (!mounted) return;
       

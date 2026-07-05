@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from adapters.db.session import get_db
 from adapters.api.v1.schema_models.tax_settings import (
     TaxSettingsSaveRequest,
+    TaxSettingsTestConnectionRequest,
     GenerateKeysRequest,
     GenerateKeysResponse,
 )
@@ -17,6 +18,8 @@ from app.services.tax_setting_service import (
     get_tax_setting,
     serialize_tax_setting,
     upsert_tax_setting,
+    merge_tax_setting_for_test,
+    validate_tax_setting_complete,
 )
 from app.services.tax_data_quality_service import (
     get_tax_data_quality,
@@ -122,49 +125,49 @@ def tax_data_quality_endpoint(
 def test_tax_connection_endpoint(
     request: Request,
     business_id: int,
+    payload: TaxSettingsTestConnectionRequest | None = Body(default=None),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("moadian", "manage_settings")),
 ):
     """
-    تست اتصال به سامانه مودیان
-    
-    این endpoint:
-    - تنظیمات را بررسی می‌کند
-    - به سامانه متصل می‌شود
-    - اطلاعات سرور را دریافت می‌کند
-    - لاگین تست می‌کند
-    
-    Returns:
-        نتیجه تست شامل وضعیت اتصال
+    تست اتصال به سامانه مودیان (API v2).
+
+    اگر body ارسال شود، مقادیر فرم UI با تنظیمات ذخیره‌شده ادغام می‌شود
+    تا بدون «ذخیره» قبلی هم بتوان اتصال را آزمایش کرد.
     """
     ensure_moadian_plugin_active(db, business_id)
     from app.integrations.moadian.client import MoadianClient
     from app.core.settings import get_settings
     from app.services.tax_setting_health_service import run_extended_connection_test
-    
-    # بررسی تنظیمات
-    tax_setting = get_tax_setting(db, business_id)
-    if not tax_setting:
+
+    stored = get_tax_setting(db, business_id)
+    if stored is None and payload is None:
         raise ApiError(
             "TAX_SETTINGS_NOT_CONFIGURED",
             "تنظیمات سامانه مودیان یافت نشد.",
             http_status=400,
         )
-    
-    if not (
-        tax_setting.tax_memory_id
-        and tax_setting.economic_code
-        and tax_setting.private_key
-        and tax_setting.certificate
-    ):
+
+    tax_setting = merge_tax_setting_for_test(stored, payload, business_id=business_id)
+    missing = validate_tax_setting_complete(tax_setting)
+    if missing:
+        labels = {
+            "tax_memory_id": "شناسه حافظه مالیاتی",
+            "economic_code": "کد اقتصادی",
+            "private_key": "کلید خصوصی",
+            "certificate": "گواهی امضای الکترونیک (PEM)",
+        }
+        missing_fa = "، ".join(labels.get(f, f) for f in missing)
         raise ApiError(
             "TAX_SETTINGS_INCOMPLETE",
-            "تنظیمات ناقص است. شناسه حافظه، کد اقتصادی، کلید خصوصی و گواهی امضا الزامی است.",
+            f"تنظیمات ناقص است. فیلدهای الزامی: {missing_fa}. "
+            "اگر گواهی را تازه وارد کرده‌اید، ابتدا «ذخیره» بزنید یا دوباره «تست اتصال» "
+            "را بزنید تا مقادیر فرم ارسال شود.",
             http_status=400,
+            details={"missing_fields": missing},
         )
-    
-    # تست اتصال
+
     client = MoadianClient(settings=get_settings(), tax_setting=tax_setting)
     
     try:
