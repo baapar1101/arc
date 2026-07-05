@@ -152,10 +152,15 @@ def test_tax_connection_endpoint(
             http_status=400,
         )
     
-    if not (tax_setting.tax_memory_id and tax_setting.economic_code and tax_setting.private_key):
+    if not (
+        tax_setting.tax_memory_id
+        and tax_setting.economic_code
+        and tax_setting.private_key
+        and tax_setting.certificate
+    ):
         raise ApiError(
             "TAX_SETTINGS_INCOMPLETE",
-            "تنظیمات ناقص است. شناسه حافظه، کد اقتصادی و کلید خصوصی الزامی است.",
+            "تنظیمات ناقص است. شناسه حافظه، کد اقتصادی، کلید خصوصی و گواهی امضا الزامی است.",
             http_status=400,
         )
     

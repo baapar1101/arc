@@ -18,7 +18,7 @@ from app.services.tax_submission_service import extract_moadian_errors_from_extr
 
 
 def decode_jwt_payload(token: str) -> Optional[Dict[str, Any]]:
-    """استخراج payload از JWT بدون اعتبارسنجی امضا."""
+    """استخراج payload از JWT/JWS compact بدون اعتبارسنجی امضا."""
     if not token or "." not in token:
         return None
     try:
@@ -28,6 +28,14 @@ def decode_jwt_payload(token: str) -> Optional[Dict[str, Any]]:
         return json.loads(raw.decode("utf-8"))
     except Exception:
         return None
+
+
+def decode_auth_token_claims(token: str) -> Optional[Dict[str, Any]]:
+    """
+    Claims توکن احراز هویت مودیان.
+    API v2: JWS با payload {nonce, clientId}
+    """
+    return decode_jwt_payload(token)
 
 
 def _digits_only(value: Any) -> str:
@@ -134,24 +142,37 @@ def build_configuration_warnings(
         })
 
     if jwt_claims:
-        token_sub = str(jwt_claims.get("sub") or jwt_claims.get("jti") or "").strip()
+        token_client = str(
+            jwt_claims.get("clientId") or jwt_claims.get("sub") or jwt_claims.get("jti") or ""
+        ).strip()
         token_taxpayer = str(jwt_claims.get("taxpayerId") or "").strip()
+        cert_serial = extract_certificate_serial_number(tax_setting.certificate)
 
-        if memory_id and token_sub and token_sub.upper() != memory_id.upper():
+        if memory_id and token_client and token_client.upper() != memory_id.upper():
             warnings.append({
                 "code": "JWT_MEMORY_MISMATCH",
                 "level": "error",
                 "message": (
-                    f"شناسه حافظه در توکن ({token_sub}) با تنظیمات ({memory_id}) مطابقت ندارد."
+                    f"شناسه حافظه در توکن ({token_client}) با تنظیمات ({memory_id}) مطابقت ندارد."
                 ),
             })
 
-        if economic and token_taxpayer and not economic_codes_align(economic, token_taxpayer):
+        if token_taxpayer and economic and not economic_codes_align(economic, token_taxpayer):
             warnings.append({
                 "code": "JWT_TAXPAYER_MISMATCH",
                 "level": "error",
                 "message": (
                     f"کد اقتصادی توکن مودیان ({token_taxpayer}) با مقدار ذخیره‌شده "
+                    f"({economic}) هم‌خوان نیست."
+                ),
+            })
+
+        if cert_serial and economic and not economic_codes_align(economic, cert_serial):
+            warnings.append({
+                "code": "CERT_ECONOMIC_MISMATCH",
+                "level": "error",
+                "message": (
+                    f"کد ملی/شناسه داخل گواهی ({cert_serial}) با کد اقتصادی تنظیمات "
                     f"({economic}) هم‌خوان نیست."
                 ),
             })
@@ -164,6 +185,7 @@ def build_identity_check(
     business_id: int,
     *,
     jwt_claims: Optional[Dict[str, Any]] = None,
+    tax_setting: TaxSetting | None = None,
 ) -> Dict[str, Any]:
     """
     بررسی احتمال خطای 4103 بر اساس سوابق ارسال.
@@ -182,12 +204,28 @@ def build_identity_check(
         }
 
     if jwt_claims:
+        client_id = str(jwt_claims.get("clientId") or jwt_claims.get("sub") or jwt_claims.get("jti") or "").strip()
+        memory_ok = (
+            not tax_setting
+            or not (tax_setting.tax_memory_id or "").strip()
+            or client_id.upper() == (tax_setting.tax_memory_id or "").strip().upper()
+        )
+        if memory_ok:
+            return {
+                "status": "ok",
+                "code": None,
+                "message": (
+                    "احراز هویت API v2 موفق بود. برای اطمینان کامل یک فاکتور تست ارسال "
+                    "و استعلام وضعیت کنید."
+                ),
+                "recent_failures": [],
+            }
         return {
-            "status": "ok",
-            "code": None,
+            "status": "failed",
+            "code": "CLIENT_ID_MISMATCH",
             "message": (
-                "لاگین موفق بود و مورد 4103 در ارسال‌های اخیر این کسب‌وکار دیده نشد. "
-                "برای اطمینان کامل، یک فاکتور تست ارسال و استعلام وضعیت کنید."
+                f"شناسه clientId در توکن ({client_id}) با شناسه حافظه "
+                f"({tax_setting.tax_memory_id if tax_setting else '?'}) مطابقت ندارد."
             ),
             "recent_failures": [],
         }
@@ -220,17 +258,22 @@ def run_extended_connection_test(
     token: str,
     server_info: Dict[str, Any],
 ) -> Dict[str, Any]:
-    jwt_claims = decode_jwt_payload(token)
+    jwt_claims = decode_auth_token_claims(token)
     warnings = build_configuration_warnings(tax_setting, jwt_claims=jwt_claims)
     identity_check = build_identity_check(
         db,
         tax_setting.business_id,
         jwt_claims=jwt_claims,
+        tax_setting=tax_setting,
     )
     status = resolve_connection_status(warnings, identity_check)
 
+    memory_id = (tax_setting.tax_memory_id or "").strip()
+    cert_serial = extract_certificate_serial_number(tax_setting.certificate)
+    token_client_id = str((jwt_claims or {}).get("clientId") or "").strip()
+
     message_map = {
-        "connected": "اتصال به سامانه مودیان با موفقیت برقرار شد.",
+        "connected": "اتصال به سامانه مودیان (API v2) با موفقیت برقرار شد.",
         "connected_with_warnings": "اتصال برقرار است اما هشدارهای پیکربندی وجود دارد.",
         "identity_mismatch": (
             "اتصال برقرار است، اما احتمال ناهماهنگی کلید/گواهی با حافظه مودیان وجود دارد "
@@ -241,6 +284,7 @@ def run_extended_connection_test(
     return {
         "status": status,
         "sandbox_mode": bool(tax_setting.sandbox_mode),
+        "api_version": "v2",
         "server_info": {
             "has_public_key": bool(server_info.get("publicKeys")),
             "key_count": len(server_info.get("publicKeys", [])),
@@ -250,16 +294,14 @@ def run_extended_connection_test(
             "token_length": len(token) if token else 0,
             "jwt_claims": jwt_claims,
             "tax_memory_id_match": (
-                not jwt_claims
-                or str(jwt_claims.get("sub") or jwt_claims.get("jti") or "").strip().upper()
-                == (tax_setting.tax_memory_id or "").strip().upper()
+                not token_client_id
+                or token_client_id.upper() == memory_id.upper()
             ),
+            "certificate_serial": cert_serial,
             "economic_code_match": (
-                not jwt_claims
-                or economic_codes_align(
-                    tax_setting.economic_code,
-                    str(jwt_claims.get("taxpayerId") or ""),
-                )
+                not cert_serial
+                or not tax_setting.economic_code
+                or economic_codes_align(tax_setting.economic_code, cert_serial)
             ),
         },
         "warnings": warnings,

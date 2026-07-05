@@ -134,10 +134,16 @@ def send_document_to_tax_system(
             http_status=400,
         )
 
-    if not (tax_setting.tax_memory_id and tax_setting.private_key and tax_setting.economic_code):
+    if not (
+        tax_setting.tax_memory_id
+        and tax_setting.private_key
+        and tax_setting.economic_code
+        and tax_setting.certificate
+    ):
         raise ApiError(
             "TAX_SETTINGS_INCOMPLETE",
-            "تنظیمات سامانه مودیان ناقص است. شناسه حافظه، کد اقتصادی و کلید خصوصی الزامی است.",
+            "تنظیمات سامانه مودیان ناقص است. شناسه حافظه، کد اقتصادی، کلید خصوصی و "
+            "گواهی امضای الکترونیک (PEM) الزامی است.",
             http_status=400,
         )
 

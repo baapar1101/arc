@@ -51,10 +51,10 @@ def check_tax_system_health(
             "message": "تنظیمات مالیاتی یافت نشد",
         }
         all_healthy = False
-    elif not (tax_setting.tax_memory_id and tax_setting.private_key and tax_setting.economic_code):
+    elif not (tax_setting.tax_memory_id and tax_setting.private_key and tax_setting.economic_code and tax_setting.certificate):
         result["checks"]["settings"] = {
             "status": "error",
-            "message": "تنظیمات مالیاتی ناقص است",
+            "message": "تنظیمات مالیاتی ناقص است (گواهی امضا الزامی است)",
         }
         all_healthy = False
     else:
@@ -81,7 +81,7 @@ def check_tax_system_health(
                 # بررسی token
                 from app.core.cache import get_cache
                 cache = get_cache()
-                cache_key = f"moadian_token:{tax_setting.tax_memory_id}"
+                cache_key = f"tax_token_v2:{tax_setting.tax_memory_id}"
                 token_data = cache.get(cache_key) if cache.enabled else None
                 
                 if token_data:
