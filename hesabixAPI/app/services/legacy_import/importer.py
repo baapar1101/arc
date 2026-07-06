@@ -186,6 +186,15 @@ class LegacyBusinessImporter:
             target_business_id=business_id,
         )
 
+        from app.services.business_service import ensure_business_default_document_policies
+
+        ensure_business_default_document_policies(
+            self.db,
+            business_id,
+            user_id=self.owner_id,
+            commit=True,
+        )
+
         self.progress(100, "انتقال تکمیل شد")
         return {
             "business_id": business_id,

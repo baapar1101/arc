@@ -416,6 +416,14 @@ async def import_business_from_backup(
                             else None,
                             target_business_id=new_business_id,
                         )
+                        from app.services.business_service import ensure_business_default_document_policies
+
+                        ensure_business_default_document_policies(
+                            db,
+                            new_business_id,
+                            user_id=ctx.get_user_id(),
+                            commit=True,
+                        )
                     except Exception:
                         db.rollback()
                         _reset_session_replication_role(conn, replica_role_ok)

@@ -69,6 +69,31 @@ def _normalize_purchase_accounting_mode_for_response(value) -> str:
     return normalize_purchase_accounting_mode(value)
 
 
+def ensure_business_default_document_policies(
+    db: Session,
+    business_id: int,
+    user_id: int | None = None,
+    *,
+    commit: bool = True,
+) -> None:
+    """اعمال idempotent سیاست‌های پیش‌فرض درآمدزایی اسناد برای یک کسب‌وکار."""
+    try:
+        # Lazy import to avoid circular imports (document_monetization_service <-> wallet_service <-> business_service)
+        from app.services.document_monetization_service import apply_default_policies_to_business
+
+        apply_default_policies_to_business(
+            db,
+            int(business_id),
+            user_id=user_id,
+            commit=commit,
+        )
+    except Exception:
+        logger.exception(
+            "failed_to_apply_default_policies business_id=%s",
+            business_id,
+        )
+
+
 def ensure_wallet_currency_in_business(db: Session, business_id: int) -> bool:
     """
     بررسی و اضافه کردن ارز کیف پول به لیست ارزهای کسب و کار در صورت عدم وجود
@@ -317,15 +342,12 @@ def create_business(
 
     # اعمال خودکار سیاست‌های پیش‌فرض درآمدزایی اسناد
     if not defer_commit:
-        try:
-            # Lazy import to avoid circular imports (document_monetization_service <-> wallet_service <-> business_service)
-            from app.services.document_monetization_service import apply_default_policies_to_business
-            apply_default_policies_to_business(db, created_business.id, user_id=owner_id)
-        except Exception as e:
-            # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
-            import structlog
-            logger = structlog.get_logger()
-            logger.warning("failed_to_apply_default_policies", business_id=created_business.id, error=str(e))
+        ensure_business_default_document_policies(
+            db,
+            created_business.id,
+            user_id=owner_id,
+            commit=True,
+        )
 
     # تبدیل به response format (+ دادهٔ نمونه در صورت درخواست)
     result = _business_to_dict(created_business)

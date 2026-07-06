@@ -182,8 +182,9 @@ class LegacySqlImportService:
 					self.stats["purge"] = {"dry_run": True}
 
 			self._progress(25, "کسب‌وکار و سال مالی")
+			created_business_ids: List[int] = []
 			business_map, fiscal_map = self._import_business(
-				data, options, user_map, currency_map
+				data, options, user_map, currency_map, created_business_ids
 			)
 
 			if options.import_master_data:
@@ -287,6 +288,15 @@ class LegacySqlImportService:
 
 			self._progress(100, "پایان")
 			if not options.dry_run:
+				from app.services.business_service import ensure_business_default_document_policies
+
+				for business_id in created_business_ids:
+					ensure_business_default_document_policies(
+						self.db,
+						business_id,
+						user_id=options.owner_user_id,
+						commit=False,
+					)
 				self.db.commit()
 			else:
 				self.db.rollback()
@@ -406,6 +416,7 @@ class LegacySqlImportService:
 		options: LegacyImportOptions,
 		user_map: Dict[int, int],
 		currency_map: Dict[int, int],
+		created_business_ids: List[int],
 	) -> Tuple[Dict[int, int], Dict[Tuple[int, int], int]]:
 		business_map: Dict[int, int] = {}
 		fiscal_map: Dict[Tuple[int, int], int] = {}
@@ -498,6 +509,7 @@ class LegacySqlImportService:
 				if default_cur:
 					self.db.add(BusinessCurrency(business_id=biz.id, currency_id=default_cur))
 				business_map[old_bid] = biz.id
+				created_business_ids.append(int(biz.id))
 				self.stats["business"]["created"] += 1
 
 			new_bid = business_map[old_bid]
