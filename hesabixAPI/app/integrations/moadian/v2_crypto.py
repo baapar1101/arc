@@ -7,15 +7,14 @@ from datetime import datetime, timezone
 
 from authlib.jose import JsonWebEncryption, JsonWebSignature
 
-_SIG_TIME = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
 
 def sign_jws(payload: str, private_key, cert_x5c_base64: str) -> str:
     """Create compact JWS with x5c certificate chain (moadian2 format)."""
+    sig_time = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     headers = {
         "alg": "RS256",
         "x5c": [cert_x5c_base64],
-        "sigT": _SIG_TIME,
+        "sigT": sig_time,
         "typ": "jose",
         "crit": ["sigT"],
         "cty": "text/plain",

@@ -169,6 +169,8 @@ async def create_ticket(
         # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
         logger = logging.getLogger(__name__)
         logger.error(f"خطا در ارسال ناتیفیکیشن برای تیکت جدید {ticket.id}: {e}", exc_info=True)
+        db.rollback()
+        ticket_with_details = ticket_repo.get_ticket_with_details(ticket.id, current_user.get_user_id())
 
     try:
         broadcast_ticket_created(db, ticket)
@@ -337,6 +339,9 @@ async def send_message(
     except Exception as e:
         logger = logging.getLogger(__name__)
         logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ کاربر به تیکت {ticket_id}: {e}")
+        db.rollback()
+        from adapters.db.models.support.message import Message
+        message = db.get(Message, message.id)
 
     try:
         from app.services.support.support_broadcast import broadcast_message_created

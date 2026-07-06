@@ -174,7 +174,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
     );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,

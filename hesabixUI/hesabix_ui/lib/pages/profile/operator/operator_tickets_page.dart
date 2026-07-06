@@ -375,130 +375,174 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         },
         child: Focus(
           autofocus: true,
-          child: Scaffold(
-      appBar: AppBar(
-        title: Text(t.operatorPanel),
-        actions: [
-          IconButton(
-            tooltip: 'پالت دستورات (Ctrl+K)',
-            icon: const Icon(Icons.search),
-            onPressed: _showCommandPalette,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildCompactToolbar(t, theme),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final useSplit = constraints.maxWidth >= 960;
+                    final inbox = _displayMode == OperatorInboxDisplayMode.list
+                        ? OperatorInboxList(
+                            view: _inboxView,
+                            currentUserId: _currentUserId,
+                            selectedTicketId: _selectedTicketId,
+                            refreshToken: _refreshCounter,
+                            calendarController: widget.calendarController,
+                            extraFilters: _extraFilters(),
+                            onTicketTap: _navigateToTicketDetail,
+                          )
+                        : _buildTicketsTable();
+
+                    if (!useSplit) return inbox;
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(width: 300, child: inbox),
+                        VerticalDivider(width: 1, color: theme.dividerColor),
+                        Expanded(child: _buildSplitDetailPanel()),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            tooltip: 'میانبرها',
-            icon: const Icon(Icons.keyboard_outlined),
-            onPressed: _showShortcutsHelp,
-          ),
-          IconButton(
-            tooltip: 'بروزرسانی',
-            icon: const Icon(Icons.refresh),
-            onPressed: () => _safeSetState(() => _refreshCounter++),
-          ),
-          TextButton.icon(
-            onPressed: () => context.push('/user/profile/operator/dashboard'),
-            icon: const Icon(Icons.dashboard_outlined, size: 18),
-            label: const Text('داشبورد'),
-          ),
-          const SizedBox(width: 8),
-        ],
+        ),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Material(
-            color: theme.colorScheme.surfaceContainerLow,
-            child: Column(
+    );
+  }
+
+  Widget _buildCompactToolbar(AppLocalizations t, ThemeData theme) {
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Row(
-                    children: OperatorInboxView.values.map((view) {
-                      final selected = _inboxView == view;
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 6),
-                        child: FilterChip(
-                          avatar: Icon(view.icon, size: 16),
-                          label: Text(view.label),
-                          selected: selected,
-                          onSelected: (_) => _safeSetState(() => _inboxView = view),
-                        ),
-                      );
-                    }).toList(),
+                Text(
+                  t.operatorPanel,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'پالت دستورات (Ctrl+K)',
+                  icon: const Icon(Icons.search, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _showCommandPalette,
+                ),
+                IconButton(
+                  tooltip: 'میانبرها',
+                  icon: const Icon(Icons.keyboard_outlined, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _showShortcutsHelp,
+                ),
+                IconButton(
+                  tooltip: 'بروزرسانی',
+                  icon: const Icon(Icons.refresh, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _safeSetState(() => _refreshCounter++),
+                ),
+                IconButton(
+                  tooltip: 'داشبورد',
+                  icon: const Icon(Icons.dashboard_outlined, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => context.push('/user/profile/operator/dashboard'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: OperatorInboxView.values.map((view) {
+                        final selected = _inboxView == view;
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: FilterChip(
+                            avatar: Icon(view.icon, size: 14),
+                            label: Text(view.label, style: const TextStyle(fontSize: 12)),
+                            selected: selected,
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            onSelected: (_) => _safeSetState(() => _inboxView = view),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                  child: Row(
-                    children: [
-                      SegmentedButton<OperatorInboxDisplayMode>(
-                        segments: const [
-                          ButtonSegment(value: OperatorInboxDisplayMode.list, icon: Icon(Icons.view_list), label: Text('لیست')),
-                          ButtonSegment(value: OperatorInboxDisplayMode.table, icon: Icon(Icons.table_rows), label: Text('جدول')),
-                        ],
-                        selected: {_displayMode},
-                        onSelectionChanged: (s) => _safeSetState(() => _displayMode = s.first),
-                      ),
-                      const Spacer(),
-                      if (_selectedRows.isNotEmpty) ...[
-                        FilledButton.tonalIcon(
-                          onPressed: _assignToMe,
-                          icon: const Icon(Icons.person_add_outlined, size: 18),
-                          label: Text('تخصیص (${_selectedRows.length})'),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton.tonalIcon(
-                          onPressed: _markResolved,
-                          icon: const Icon(Icons.check_circle_outline, size: 18),
-                          label: Text('حل‌شده (${_selectedRows.length})'),
-                        ),
-                        if (_isSuperAdmin) ...[
-                          const SizedBox(width: 8),
-                          FilledButton.tonalIcon(
-                            onPressed: () => _deleteTicket(_selectedRows.first),
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            label: Text('حذف (${_selectedRows.length})'),
-                          ),
-                        ],
-                      ],
-                    ],
+                const SizedBox(width: 8),
+                SegmentedButton<OperatorInboxDisplayMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: OperatorInboxDisplayMode.list,
+                      icon: Icon(Icons.view_list, size: 16),
+                    ),
+                    ButtonSegment(
+                      value: OperatorInboxDisplayMode.table,
+                      icon: Icon(Icons.table_rows, size: 16),
+                    ),
+                  ],
+                  selected: {_displayMode},
+                  onSelectionChanged: (s) => _safeSetState(() => _displayMode = s.first),
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final useSplit = constraints.maxWidth >= 960;
-                final inbox = _displayMode == OperatorInboxDisplayMode.list
-                    ? OperatorInboxList(
-                        view: _inboxView,
-                        currentUserId: _currentUserId,
-                        selectedTicketId: _selectedTicketId,
-                        refreshToken: _refreshCounter,
-                        calendarController: widget.calendarController,
-                        extraFilters: _extraFilters(),
-                        onTicketTap: _navigateToTicketDetail,
-                      )
-                    : _buildTicketsTable();
-
-                if (!useSplit) return inbox;
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+            if (_selectedRows.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    Expanded(flex: 5, child: inbox),
-                    VerticalDivider(width: 1, color: theme.dividerColor),
-                    Expanded(flex: 6, child: _buildSplitDetailPanel()),
+                    FilledButton.tonalIcon(
+                      onPressed: _assignToMe,
+                      icon: const Icon(Icons.person_add_outlined, size: 16),
+                      label: Text('تخصیص (${_selectedRows.length})'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    FilledButton.tonalIcon(
+                      onPressed: _markResolved,
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: Text('حل‌شده (${_selectedRows.length})'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    if (_isSuperAdmin) ...[
+                      const SizedBox(width: 6),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _deleteTicket(_selectedRows.first),
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        label: Text('حذف (${_selectedRows.length})'),
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
                   ],
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-          ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -511,11 +555,14 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_outlined, size: 56, color: theme.colorScheme.outline),
-            const SizedBox(height: 12),
-            Text('تیکتی انتخاب نشده', style: theme.textTheme.titleMedium),
+            Icon(Icons.inbox_outlined, size: 48, color: theme.colorScheme.outline),
+            const SizedBox(height: 10),
+            Text('تیکتی انتخاب نشده', style: theme.textTheme.titleSmall),
             const SizedBox(height: 4),
-            Text('از لیست سمت راست یک تیکت را انتخاب کنید', style: theme.textTheme.bodySmall),
+            Text(
+              'از لیست یک تیکت را انتخاب کنید',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
           ],
         ),
       );

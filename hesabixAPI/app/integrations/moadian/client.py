@@ -12,12 +12,29 @@ from typing import Any, Dict, List
 from adapters.db.models.tax_setting import TaxSetting
 from app.core.settings import Settings
 from app.integrations.moadian.dto import InvoiceDto
+from app.integrations.moadian.certificate import is_usable_signing_certificate_pem
 from app.integrations.moadian.v1_client import MoadianV1Client
 from app.integrations.moadian.v2_client import MoadianV2Client
+from app.services.encryption_service import decrypt_private_key
 
 
 def uses_moadian_v2(tax_setting: TaxSetting | None) -> bool:
-    return bool((tax_setting.certificate or "").strip()) if tax_setting else False
+    """
+    API v2 فقط وقتی فعال است که گواهی X.509 معتبر (و هم‌جفت با کلید خصوصی) داشته باشیم.
+    در غیر این صورت v1 (مشابه SDK قدیمی PHP / Snapp-Market moadian) استفاده می‌شود.
+    """
+    if not tax_setting:
+        return False
+    private_key = (tax_setting.private_key or "").strip()
+    if private_key:
+        try:
+            private_key = decrypt_private_key(private_key)
+        except Exception:
+            pass
+    return is_usable_signing_certificate_pem(
+        tax_setting.certificate,
+        private_key_pem=private_key or None,
+    )
 
 
 class MoadianClient:

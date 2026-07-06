@@ -23,6 +23,7 @@ class TicketComposer extends StatelessWidget {
   final ValueChanged<int> onRemoveAttachment;
   final VoidCallback? onShowTemplates;
   final void Function(ResponseTemplate template)? onApplyTemplate;
+  final bool compact;
 
   const TicketComposer({
     super.key,
@@ -40,6 +41,7 @@ class TicketComposer extends StatelessWidget {
     required this.onRemoveAttachment,
     this.onShowTemplates,
     this.onApplyTemplate,
+    this.compact = false,
   });
 
   @override
@@ -56,22 +58,22 @@ class TicketComposer extends StatelessWidget {
         color: isInternal ? colors.internalNoteBg : colors.composerBg,
         border: Border(top: BorderSide(color: colors.composerBorder)),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      padding: EdgeInsets.fromLTRB(compact ? 8 : 12, compact ? 6 : 8, compact ? 8 : 12, compact ? 8 : 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (isOperator)
             SegmentedButton<TicketComposeMode>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: TicketComposeMode.publicReply,
-                  icon: Icon(Icons.reply_outlined, size: 18),
-                  label: Text('پاسخ عمومی'),
+                  icon: Icon(Icons.reply_outlined, size: compact ? 16 : 18),
+                  label: compact ? const SizedBox.shrink() : const Text('پاسخ عمومی'),
                 ),
                 ButtonSegment(
                   value: TicketComposeMode.internalNote,
-                  icon: Icon(Icons.lock_outline, size: 18),
-                  label: Text('یادداشت داخلی'),
+                  icon: Icon(Icons.lock_outline, size: compact ? 16 : 18),
+                  label: compact ? const SizedBox.shrink() : const Text('یادداشت داخلی'),
                 ),
               ],
               selected: {mode},
@@ -81,7 +83,7 @@ class TicketComposer extends StatelessWidget {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
-          if (isInternal)
+          if (isInternal && !compact)
             Padding(
               padding: const EdgeInsets.only(top: 6, bottom: 4),
               child: Text(
@@ -89,7 +91,7 @@ class TicketComposer extends StatelessWidget {
                 style: theme.textTheme.bodySmall?.copyWith(color: colors.internalNoteFg),
               ),
             ),
-          if (isOperator && templates.isNotEmpty) ...[
+          if (isOperator && templates.isNotEmpty && !compact) ...[
             const SizedBox(height: 8),
             SizedBox(
               height: 34,
@@ -146,21 +148,24 @@ class TicketComposer extends StatelessWidget {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
                   minLines: 1,
-                  maxLines: 6,
+                  maxLines: compact ? 4 : 6,
                   textInputAction: TextInputAction.newline,
                 ),
               ),
-              const SizedBox(width: 8),
-              FilledButton.icon(
+              const SizedBox(width: 6),
+              FilledButton(
                 onPressed: isSending ? null : onSend,
-                icon: isSending
+                style: FilledButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 16, vertical: compact ? 10 : 12),
+                  minimumSize: Size(compact ? 44 : 64, compact ? 40 : 48),
+                ),
+                child: isSending
                     ? const SizedBox(
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
                     : Icon(isInternal ? Icons.lock : Icons.send, size: 18),
-                label: Text(isInternal ? 'ذخیره' : 'ارسال'),
               ),
             ],
           ),

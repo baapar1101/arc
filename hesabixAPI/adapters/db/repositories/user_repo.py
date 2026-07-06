@@ -156,10 +156,16 @@ class UserRepository(BaseRepository[User]):
 	
 	def get_support_operators(self) -> List[User]:
 		"""دریافت لیست تمام اپراتورهای پشتیبانی فعال"""
-		from sqlalchemy import cast, Boolean
+		from sqlalchemy import cast, or_
+		from sqlalchemy.dialects.postgresql import JSONB
+		permissions = cast(User.app_permissions, JSONB)
 		stmt = select(User).where(
-			cast(User.app_permissions['support_operator'], Boolean) == True
-		).where(User.is_active == True)
+			User.is_active == True,
+			or_(
+				permissions.contains({"support_operator": True}),
+				permissions.contains({"superadmin": True}),
+			),
+		)
 		return list(self.db.execute(stmt).scalars().all())
 	
 	def is_support_operator(self, user_id: int) -> bool:

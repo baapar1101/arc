@@ -512,19 +512,111 @@ class _TicketDetailViewState extends State<TicketDetailView> {
   }
 
 
-  int _listItemCount(bool showSidePanel, {bool compactUser = false}) {
-    var count = 1 + _messages.length; // pinned request + messages
-    if (!showSidePanel && !compactUser) count += 1; // conversation info
-    if (_messages.isEmpty) count += 1; // empty state
-    return count;
+  Widget _buildCompactOperatorHeader(ThemeData theme, AppLocalizations l10n) {
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.6))),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _ticket.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        l10n.ticketNumber(_ticket.id.toString()),
+                        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(width: 8),
+                      SlaIndicator(slaStatus: _ticket.slaStatus),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (_ticket.status != null) TicketStatusChip(status: _ticket.status!, isSmall: true),
+          ],
+        ),
+      ),
+    );
   }
 
-  int _pinnedRequestIndex(bool showSidePanel, {bool compactUser = false}) =>
-      (!showSidePanel && !compactUser) ? 1 : 0;
+  Widget _buildEmbeddedMetaPanel(ThemeData theme) {
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+        childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+        initiallyExpanded: false,
+        leading: Icon(Icons.info_outline, size: 18, color: theme.colorScheme.primary),
+        title: Text('اطلاعات تیکت', style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600)),
+        children: [
+          TicketMetaSidebar(
+            ticket: _ticket,
+            events: _events,
+            userTicketHistory: _userTicketHistory,
+            calendarController: widget.calendarController,
+            isOperator: widget.isOperator,
+          ),
+        ],
+      ),
+    );
+  }
 
-  int? _emptyStateIndex(bool showSidePanel, {bool compactUser = false}) {
-    if (_messages.isNotEmpty) return null;
-    return (!showSidePanel && !compactUser) ? 2 : 1;
+  Widget _buildComposer({bool compact = false}) {
+    return TicketComposer(
+      messageController: _messageController,
+      isOperator: widget.isOperator,
+      canCompose: _canComposeMessage,
+      isSending: _isSending,
+      isUploadingAttachment: _isUploadingAttachment,
+      mode: _composeMode,
+      pendingAttachments: _pendingAttachments,
+      templates: _templates,
+      compact: compact,
+      onModeChanged: (m) => setState(() => _composeMode = m),
+      onSend: _sendMessage,
+      onPickAttachment: _pickAttachment,
+      onRemoveAttachment: (id) => setState(
+        () => _pendingAttachments = _pendingAttachments.where((a) => a.id != id).toList(),
+      ),
+      onShowTemplates: widget.isOperator && _templates.isNotEmpty ? _showTemplatesDialog : null,
+      onApplyTemplate: (template) {
+        final variables = {
+          'user_name': _ticket.user?.displayName ?? 'کاربر',
+          'ticket_id': _ticket.id.toString(),
+          'ticket_title': _ticket.title,
+        };
+        _messageController.text = template.format(variables);
+      },
+    );
+  }
+
+  int _listItemCount({
+    required bool showSidePanel,
+    required bool compactUser,
+    required bool showMetaInThread,
+    required bool showAiInThread,
+  }) {
+    var count = 1 + _messages.length;
+    if (!showSidePanel && !compactUser) count += 1;
+    if (showMetaInThread) count += 1;
+    if (_messages.isEmpty) count += 1;
+    if (showAiInThread) count += 1;
+    return count;
   }
 
   Widget _buildListItem(
@@ -534,45 +626,77 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     AppLocalizations l10n,
     ThemeData theme, {
     bool compactUser = false,
+    bool showMetaInThread = false,
+    bool showAiInThread = false,
   }) {
-    if (!showSidePanel && !compactUser && index == 0) {
-      return _buildConversationInfo(l10n, theme);
+    var cursor = 0;
+
+    if (showMetaInThread) {
+      if (index == cursor) return _buildEmbeddedMetaPanel(theme);
+      cursor++;
     }
 
-    final pinnedIndex = _pinnedRequestIndex(showSidePanel, compactUser: compactUser);
-    if (index == pinnedIndex) {
-      return TicketPinnedRequest(ticket: _ticket);
+    if (!showSidePanel && !compactUser) {
+      if (index == cursor) return _buildConversationInfo(l10n, theme);
+      cursor++;
     }
 
-    final emptyIndex = _emptyStateIndex(showSidePanel, compactUser: compactUser);
-    if (emptyIndex != null && index == emptyIndex) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[400]),
-              const SizedBox(height: 16),
-              Text(
-                l10n.noMessagesFound,
-                style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
-              ),
-            ],
+    if (index == cursor) return TicketPinnedRequest(ticket: _ticket);
+    cursor++;
+
+    if (_messages.isEmpty) {
+      if (index == cursor) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: Center(
+            child: Column(
+              children: [
+                Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  l10n.noMessagesFound,
+                  style: theme.textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
+                ),
+              ],
+            ),
           ),
+        );
+      }
+      cursor++;
+    }
+
+    final messageStart = cursor;
+    if (index >= messageStart && index < messageStart + _messages.length) {
+      final message = _messages[index - messageStart];
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: MessageBubble(
+          message: message,
+          calendarController: widget.calendarController,
+          isOperator: widget.isOperator,
+        ),
+      );
+    }
+    cursor += _messages.length;
+
+    if (showAiInThread && index == cursor) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 4, bottom: 8),
+        child: AITicketAssistant(
+          ticketId: _ticket.id,
+          ticketContext: _ticket.description,
+          onReplySuggested: (suggestedReply) {
+            _messageController.text = suggestedReply;
+          },
+          onAutoReply: (replyText) {
+            _loadMessages();
+            widget.onTicketUpdated?.call();
+          },
         ),
       );
     }
 
-    final messageOffset = pinnedIndex + 1 + (_messages.isEmpty ? 1 : 0);
-    final message = _messages[index - messageOffset];
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: MessageBubble(
-        message: message,
-        calendarController: widget.calendarController,
-        isOperator: widget.isOperator,
-      ),
-    );
+    return const SizedBox.shrink();
   }
 
   Widget _buildInfoChip(String label, String value, IconData icon) {
@@ -748,6 +872,8 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     final isDialog = widget.displayMode == TicketDetailDisplayMode.dialog;
     final isPage = widget.displayMode == TicketDetailDisplayMode.page;
     final compactUser = !widget.isOperator && (isEmbedded || isPage);
+    final compactOperator = widget.isOperator && isEmbedded;
+    final useCompactChrome = compactUser || compactOperator;
 
     final body = Container(
         width: isDialog ? MediaQuery.of(context).size.width * 0.9 : null,
@@ -760,6 +886,8 @@ class _TicketDetailViewState extends State<TicketDetailView> {
           children: [
             if (compactUser)
               _buildCompactUserHeader(theme, l10n, isPage)
+            else if (compactOperator)
+              _buildCompactOperatorHeader(theme, l10n)
             else
               Container(
               padding: EdgeInsets.all(isEmbedded ? 14 : 20),
@@ -881,6 +1009,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                 priorities: _priorities,
                 operators: _operators,
                 isBusy: _isActionBusy,
+                compact: useCompactChrome,
                 onStatusChanged: (v) {
                   if (v != null) _handleStatusChange(v);
                 },
@@ -902,16 +1031,16 @@ class _TicketDetailViewState extends State<TicketDetailView> {
             if (!_canComposeMessage)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: useCompactChrome ? 6 : 10),
                 color: Colors.orange.shade50,
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.orange.shade800, size: 18),
+                    Icon(Icons.info_outline, color: Colors.orange.shade800, size: 16),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'این تیکت بسته شده است. برای ادامه گفتگو آن را بازگشایی کنید.',
-                        style: TextStyle(color: Colors.orange.shade900, fontSize: 13),
+                        style: TextStyle(color: Colors.orange.shade900, fontSize: useCompactChrome ? 12 : 13),
                       ),
                     ),
                     if (!widget.isOperator)
@@ -920,100 +1049,54 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                 ),
               ),
 
-            // Messages Section (Main Focus) + AI Panel
             Expanded(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: compactUser ? 8 : 16),
+                padding: EdgeInsets.symmetric(horizontal: useCompactChrome ? 6 : 16),
                 child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final showSidePanel = widget.isOperator && constraints.maxWidth > 900;
-                  final conversationColumn = Column(
-                    children: [
-                      // Messages List
-                      Expanded(
-                        child: _isLoading
-                            ? const Center(
-                                child: CircularProgressIndicator(),
-                              )
-                            : Scrollbar(
-                                controller: _scrollController,
-                                thumbVisibility: true,
-                                child: ListView.builder(
-                                  controller: _scrollController,
-                                  primary: false,
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.all(12),
-                                  itemCount: _listItemCount(showSidePanel, compactUser: compactUser),
-                                  itemBuilder: (context, index) => _buildListItem(
-                                        context,
-                                        index,
-                                        showSidePanel,
-                                        l10n,
-                                        theme,
-                                        compactUser: compactUser,
-                                      ),
-                                ),
-                              ),
+                  final showSidePanel = widget.isOperator && !isEmbedded && constraints.maxWidth > 900;
+                  final showMetaInThread = compactOperator;
+                  final showAiInThread = widget.isOperator && !showSidePanel;
+
+                  Widget buildThread() {
+                    if (_isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    return Scrollbar(
+                      controller: _scrollController,
+                      thumbVisibility: true,
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        primary: false,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                        itemCount: _listItemCount(
+                          showSidePanel: showSidePanel,
+                          compactUser: compactUser,
+                          showMetaInThread: showMetaInThread,
+                          showAiInThread: showAiInThread,
+                        ),
+                        itemBuilder: (context, index) => _buildListItem(
+                          context,
+                          index,
+                          showSidePanel,
+                          l10n,
+                          theme,
+                          compactUser: compactUser,
+                          showMetaInThread: showMetaInThread,
+                          showAiInThread: showAiInThread,
+                        ),
                       ),
-
-                      if (!showSidePanel && widget.isOperator)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          child: AITicketAssistant(
-                            ticketId: _ticket.id,
-                            ticketContext: _ticket.description,
-                            onReplySuggested: (suggestedReply) {
-                              _messageController.text = suggestedReply;
-                            },
-                            onAutoReply: (replyText) {
-                              _loadMessages();
-                              widget.onTicketUpdated?.call();
-                            },
-                          ),
-                        ),
-
-                      if (_canComposeMessage)
-                        TicketComposer(
-                          messageController: _messageController,
-                          isOperator: widget.isOperator,
-                          canCompose: _canComposeMessage,
-                          isSending: _isSending,
-                          isUploadingAttachment: _isUploadingAttachment,
-                          mode: _composeMode,
-                          pendingAttachments: _pendingAttachments,
-                          templates: _templates,
-                          onModeChanged: (m) => setState(() => _composeMode = m),
-                          onSend: _sendMessage,
-                          onPickAttachment: _pickAttachment,
-                          onRemoveAttachment: (id) => setState(
-                            () => _pendingAttachments = _pendingAttachments.where((a) => a.id != id).toList(),
-                          ),
-                          onShowTemplates: widget.isOperator && _templates.isNotEmpty ? _showTemplatesDialog : null,
-                          onApplyTemplate: (template) {
-                            final variables = {
-                              'user_name': _ticket.user?.displayName ?? 'کاربر',
-                              'ticket_id': _ticket.id.toString(),
-                              'ticket_title': _ticket.title,
-                            };
-                            _messageController.text = template.format(variables);
-                          },
-                        ),
-                    ],
-                  );
-
-                  final sizedConversation = SizedBox(
-                    height: constraints.maxHeight,
-                    width: constraints.maxWidth,
-                    child: conversationColumn,
-                  );
+                    );
+                  }
 
                   if (!showSidePanel) {
-                    return sizedConversation;
+                    return buildThread();
                   }
 
                   final sidePanelWidth = math.min(
-                    360.0,
-                    math.max(280.0, constraints.maxWidth * 0.28),
+                    300.0,
+                    math.max(240.0, constraints.maxWidth * 0.26),
                   );
 
                   return Row(
@@ -1024,7 +1107,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                         child: Scrollbar(
                           thumbVisibility: true,
                           child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(10),
                             child: TicketMetaSidebar(
                               ticket: _ticket,
                               events: _events,
@@ -1035,14 +1118,16 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(child: sizedConversation),
+                      VerticalDivider(width: 1, color: theme.dividerColor.withValues(alpha: 0.5)),
+                      Expanded(child: buildThread()),
                     ],
                   );
                 },
               ),
               ),
             ),
+
+            if (_canComposeMessage) _buildComposer(compact: useCompactChrome),
           ],
         ),
       );

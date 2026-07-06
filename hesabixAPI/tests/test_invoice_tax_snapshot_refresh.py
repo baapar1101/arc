@@ -56,7 +56,7 @@ def test_refresh_invoice_line_tax_snapshots_updates_lines() -> None:
     with patch(
         "app.services.invoice_service._build_product_tax_snapshot_map",
         return_value=tax_map,
-    ), patch("sqlalchemy.orm.attributes.flag_modified"):
+    ), patch("app.services.invoice_service.flag_modified"):
         updated = refresh_invoice_line_tax_snapshots(db, document)
 
     assert updated == 1
