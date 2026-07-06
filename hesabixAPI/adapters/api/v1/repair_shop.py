@@ -2,12 +2,14 @@
 API Endpoints برای افزونه مدیریت تعمیرگاه
 """
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, Depends, Request, Query
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.responses import success_response, ApiError
+from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.date_input import normalize_date_range, DateParseError
 from app.core.repair_shop_plugin_dependency import (
     check_repair_shop_plugin_active,
     get_business_plugin_status
@@ -37,6 +39,11 @@ from app.services import repair_shop_operations
 router = APIRouter(prefix="/repair-shop", tags=["Repair Shop"])
 
 
+def _format_response(data, request: Request):
+    """فرمت تاریخ‌ها مطابق تقویم انتخاب‌شده کاربر."""
+    return format_datetime_fields(data, request)
+
+
 # ========== Plugin Status ==========
 
 @router.get("/businesses/{business_id}/plugin-status")
@@ -51,7 +58,7 @@ def get_plugin_status(
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار ندارید", http_status=403)
     
     status = get_business_plugin_status(db, business_id)
-    return success_response(data=status, request=request)
+    return success_response(data=_format_response(status, request), request=request)
 
 
 # ========== Settings ==========
@@ -71,7 +78,7 @@ def get_settings(
         raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
     
     result = repair_shop_service.get_repair_shop_settings(db, business_id)
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.put("/businesses/{business_id}/settings")
@@ -92,7 +99,7 @@ def update_settings(
     result = repair_shop_service.update_repair_shop_settings(
         db, business_id, settings_data.dict(exclude_unset=True)
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 # ========== Technicians ==========
@@ -115,7 +122,7 @@ def list_technicians(
         raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
     
     result = repair_shop_service.list_technicians(db, business_id, only_active, offset, limit)
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.get("/businesses/{business_id}/technicians/{technician_id}")
@@ -134,7 +141,7 @@ def get_technician(
         raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
     
     result = repair_shop_service.get_technician(db, business_id, technician_id)
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.post("/businesses/{business_id}/technicians")
@@ -155,7 +162,7 @@ def create_technician(
     result = repair_shop_service.create_technician(
         db, business_id, data.dict(), ctx.user.id
     )
-    return success_response(data=result, request=request, http_status=201)
+    return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
 @router.put("/businesses/{business_id}/technicians/{technician_id}")
@@ -177,7 +184,7 @@ def update_technician(
     result = repair_shop_service.update_technician(
         db, business_id, technician_id, data.dict(exclude_unset=True), ctx.user.id
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.delete("/businesses/{business_id}/technicians/{technician_id}")
@@ -198,7 +205,7 @@ def delete_technician(
     result = repair_shop_service.delete_technician(
         db, business_id, technician_id, ctx.user.id
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 # ========== Repair Orders ==========
@@ -212,6 +219,8 @@ def list_repair_orders(
     assigned_technician_id: Optional[int] = Query(None),
     warranty_code_id: Optional[int] = Query(None),
     search: Optional[str] = Query(None),
+    from_date: Optional[str] = Query(None, description="از تاریخ (مطابق تقویم کاربر)"),
+    to_date: Optional[str] = Query(None, description="تا تاریخ (مطابق تقویم کاربر)"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     ctx: AuthContext = Depends(get_current_user),
@@ -224,16 +233,33 @@ def list_repair_orders(
     if not ctx.has_business_permission("repair_shop", "read"):
         raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
     
+    calendar_type = ctx.get_calendar_type()
+    parsed_from = None
+    parsed_to = None
+    if from_date or to_date:
+        try:
+            parsed_from, parsed_to = normalize_date_range(
+                from_date, to_date, calendar_type=calendar_type
+            )
+        except (DateParseError, ValueError) as exc:
+            raise ApiError("INVALID_DATE", str(exc), http_status=400) from exc
+    
     filters = {
         "status": status,
         "customer_person_id": customer_person_id,
         "assigned_technician_id": assigned_technician_id,
         "warranty_code_id": warranty_code_id,
         "search": search,
+        "from_date": (
+            datetime.combine(parsed_from, datetime.min.time()) if parsed_from else None
+        ),
+        "to_date": (
+            datetime.combine(parsed_to, datetime.max.time()) if parsed_to else None
+        ),
     }
     
     result = repair_shop_service.list_repair_orders(db, business_id, filters, offset, limit)
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.get("/businesses/{business_id}/orders/{order_id}")
@@ -252,7 +278,7 @@ def get_repair_order(
         raise ApiError("FORBIDDEN", "دسترسی به بخش تعمیرگاه ندارید", http_status=403)
     
     result = repair_shop_service.get_repair_order(db, business_id, order_id)
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.post("/businesses/{business_id}/orders")
@@ -271,9 +297,10 @@ def create_repair_order(
         raise ApiError("FORBIDDEN", "دسترسی ثبت سفارش تعمیر ندارید", http_status=403)
     
     result = repair_shop_service.create_repair_order(
-        db, business_id, data.dict(), ctx.user.id
+        db, business_id, data.dict(), ctx.user.id,
+        calendar_type=ctx.get_calendar_type(),
     )
-    return success_response(data=result, request=request, http_status=201)
+    return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
 @router.put("/businesses/{business_id}/orders/{order_id}")
@@ -295,7 +322,7 @@ def update_repair_order(
     result = repair_shop_service.update_repair_order(
         db, business_id, order_id, data.dict(exclude_unset=True), ctx.user.id
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.delete("/businesses/{business_id}/orders/{order_id}")
@@ -316,7 +343,7 @@ def delete_repair_order(
     result = repair_shop_service.delete_repair_order(
         db, business_id, order_id, ctx.user.id
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 # ========== Operations ==========
@@ -340,7 +367,7 @@ def assign_technician(
     result = repair_shop_operations.assign_technician_to_order(
         db, business_id, order_id, data.technician_id, ctx.user.id
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.post("/businesses/{business_id}/orders/{order_id}/update-status")
@@ -360,9 +387,10 @@ def update_status(
         raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
     
     result = repair_shop_operations.update_repair_order_status(
-        db, business_id, order_id, data.status, data.notes, ctx.user.id, data.send_notification
+        db, business_id, order_id, data.status, data.notes, ctx.user.id, data.send_notification,
+        calendar_type=ctx.get_calendar_type(),
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.post("/businesses/{business_id}/orders/{order_id}/add-parts")
@@ -385,7 +413,7 @@ def add_parts(
     result = repair_shop_operations.add_parts_to_repair_order(
         db, business_id, order_id, parts_list, ctx.user.id
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.post("/businesses/{business_id}/orders/{order_id}/calculate-costs")
@@ -407,7 +435,7 @@ def calculate_costs(
     result = repair_shop_operations.calculate_repair_costs(
         db, business_id, order_id, data.labor_cost, ctx.user.id
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.post("/businesses/{business_id}/orders/{order_id}/complete")
@@ -427,9 +455,10 @@ def complete_repair(
         raise ApiError("FORBIDDEN", "دسترسی ویرایش سفارش تعمیر ندارید", http_status=403)
     
     result = repair_shop_operations.complete_repair_order(
-        db, business_id, order_id, data.is_fixed, ctx.user.id, data.notes
+        db, business_id, order_id, data.is_fixed, ctx.user.id, data.notes,
+        calendar_type=ctx.get_calendar_type(),
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 @router.post("/businesses/{business_id}/orders/{order_id}/deliver")
@@ -451,7 +480,7 @@ def deliver_repair(
     result = repair_shop_operations.deliver_repair_order(
         db, business_id, order_id, ctx.user.id, data.notes
     )
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 # ========== Accounting ==========
@@ -483,7 +512,7 @@ def create_repair_invoice(
     result = create_repair_invoice_accounting(db, business_id, repair_order, ctx.user.id)
     db.commit()
     
-    return success_response(data=result, request=request, http_status=201)
+    return success_response(data=_format_response(result, request), request=request, http_status=201)
 
 
 @router.get("/businesses/{business_id}/orders/{order_id}/accounting-summary")
@@ -504,7 +533,7 @@ def get_accounting_summary(
     from app.services.repair_shop_accounting import get_repair_accounting_summary
     
     result = get_repair_accounting_summary(db, business_id, order_id)
-    return success_response(data=result, request=request)
+    return success_response(data=_format_response(result, request), request=request)
 
 
 # ========== Reports ==========
@@ -527,5 +556,5 @@ def get_warranty_repair_history(
     result = repair_shop_operations.get_repair_history_by_warranty(
         db, business_id, warranty_code_id
     )
-    return success_response(data={"items": result}, request=request)
+    return success_response(data=_format_response({"items": result}, request), request=request)
 

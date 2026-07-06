@@ -1,5 +1,24 @@
 import 'package:intl/intl.dart' as intl;
 
+import '../core/date_utils.dart';
+
+DateTime _parseOrderDate(Map<String, dynamic> json, String key) {
+  return HesabixDateUtils.parseApiDate(
+        json[key],
+        rawValue: json['${key}_raw'],
+      ) ??
+      DateTime.tryParse(json[key]?.toString() ?? '') ??
+      DateTime.now();
+}
+
+DateTime? _parseOptionalOrderDate(Map<String, dynamic> json, String key) {
+  return HesabixDateUtils.parseApiDate(
+        json[key],
+        rawValue: json['${key}_raw'],
+      ) ??
+      DateTime.tryParse(json[key]?.toString() ?? '');
+}
+
 /// مدل سفارش تعمیر
 class RepairOrder {
   final int id;
@@ -97,16 +116,10 @@ class RepairOrder {
       currencyId: json['currency_id'] as int,
       currencySymbol: json['currency_symbol'] as String? ?? 'تومان',
       currencyCode: json['currency_code'] as String?,
-      receivedAt: DateTime.parse(json['received_at'] as String),
-      estimatedDeliveryAt: json['estimated_delivery_at'] != null
-          ? DateTime.parse(json['estimated_delivery_at'] as String)
-          : null,
-      completedAt: json['completed_at'] != null
-          ? DateTime.parse(json['completed_at'] as String)
-          : null,
-      deliveredAt: json['delivered_at'] != null
-          ? DateTime.parse(json['delivered_at'] as String)
-          : null,
+      receivedAt: _parseOrderDate(json, 'received_at'),
+      estimatedDeliveryAt: _parseOptionalOrderDate(json, 'estimated_delivery_at'),
+      completedAt: _parseOptionalOrderDate(json, 'completed_at'),
+      deliveredAt: _parseOptionalOrderDate(json, 'delivered_at'),
       extraInfo: (json['extra_info'] as Map<String, dynamic>?) ?? {},
       parts: (json['parts'] as List<dynamic>?)
               ?.map((e) => RepairOrderPart.fromJson(e as Map<String, dynamic>))
@@ -302,13 +315,9 @@ class RepairOrderListItem {
       finalCost: (json['final_cost'] as num).toDouble(),
       currencyId: json['currency_id'] as int,
       currencySymbol: json['currency_symbol'] as String? ?? 'تومان',
-      receivedAt: DateTime.parse(json['received_at'] as String),
-      estimatedDeliveryAt: json['estimated_delivery_at'] != null
-          ? DateTime.parse(json['estimated_delivery_at'] as String)
-          : null,
-      completedAt: json['completed_at'] != null
-          ? DateTime.parse(json['completed_at'] as String)
-          : null,
+      receivedAt: _parseOrderDate(json, 'received_at'),
+      estimatedDeliveryAt: _parseOptionalOrderDate(json, 'estimated_delivery_at'),
+      completedAt: _parseOptionalOrderDate(json, 'completed_at'),
     );
   }
 
@@ -413,7 +422,7 @@ class RepairOrderStatusItem {
       id: json['id'] as int,
       status: json['status'] as String,
       notes: json['notes'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _parseOrderDate(json, 'created_at'),
       smsSent: json['sms_sent'] as bool,
       emailSent: json['email_sent'] as bool,
     );

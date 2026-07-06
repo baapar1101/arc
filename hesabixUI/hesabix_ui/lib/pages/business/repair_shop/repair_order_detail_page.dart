@@ -4,19 +4,23 @@ import '../../../services/repair_shop_service.dart';
 import '../../../models/repair_order_model.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../core/api_client.dart';
+import '../../../core/calendar_controller.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
+import 'repair_shop_calendar_utils.dart';
 
 
 /// صفحه جزئیات و عملیات سفارش تعمیر
 class RepairOrderDetailPage extends StatefulWidget {
   final int businessId;
   final int orderId;
+  final CalendarController calendarController;
 
   const RepairOrderDetailPage({
     super.key,
     required this.businessId,
     required this.orderId,
+    required this.calendarController,
   });
 
   @override
@@ -307,80 +311,89 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    return ListenableBuilder(
+      listenable: widget.calendarController,
+      builder: (context, _) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_order?.code ?? 'جزئیات سفارش'),
-        actions: [
-          if (_order != null)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert),
-              onSelected: (value) {
-                if (value == 'status') {
-                  _showStatusMenu();
-                } else if (value == 'delete') {
-                  _deleteOrder();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'status',
-                  child: Row(
-                    children: [
-                      Icon(Icons.swap_horiz),
-                      SizedBox(width: 8),
-                      Text('تغییر وضعیت'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('لغو سفارش', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadOrder,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error, size: 64, color: colorScheme.error),
-                      const SizedBox(height: 16),
-                      Text(_errorMessage!),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadOrder,
-                        child: const Text('تلاش مجدد'),
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(_order?.code ?? 'جزئیات سفارش'),
+            actions: [
+              if (_order != null)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'status') {
+                      _showStatusMenu();
+                    } else if (value == 'delete') {
+                      _deleteOrder();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'status',
+                      child: Row(
+                        children: [
+                          Icon(Icons.swap_horiz),
+                          SizedBox(width: 8),
+                          Text('تغییر وضعیت'),
+                        ],
                       ),
-                    ],
-                  ),
-                )
-              : _order == null
-                  ? const Center(child: Text('سفارش یافت نشد'))
-                  : _buildContent(theme, colorScheme),
-      floatingActionButton: _floatingActionButton,
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('لغو سفارش', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: _loadOrder,
+              ),
+            ],
+          ),
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _errorMessage != null
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error, size: 64, color: colorScheme.error),
+                          const SizedBox(height: 16),
+                          Text(_errorMessage!),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _loadOrder,
+                            child: const Text('تلاش مجدد'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _order == null
+                      ? const Center(child: Text('سفارش یافت نشد'))
+                      : _buildContent(theme, colorScheme),
+          floatingActionButton: _floatingActionButton,
+        );
+      },
     );
   }
 
   Widget _buildContent(ThemeData theme, ColorScheme colorScheme) {
     final order = _order!;
-    final dateFormat = intl.DateFormat('yyyy/MM/dd HH:mm', 'fa');
+    final isJalali = widget.calendarController.isJalali;
+    String fmt(DateTime dt) =>
+        RepairShopCalendarUtils.formatDateTime(dt, isJalali);
+    String fmtOptional(DateTime? dt) =>
+        dt == null ? '-' : RepairShopCalendarUtils.formatDateTime(dt, isJalali);
 
     return SingleChildScrollView(
       child: Column(
@@ -554,7 +567,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(dateFormat.format(status.createdAt)),
+                      Text(fmt(status.createdAt)),
                       if (status.notes != null) Text(status.notes!),
                     ],
                   ),
@@ -568,13 +581,13 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
             Icons.calendar_today,
             colorScheme,
             [
-              _buildInfoRow('دریافت', dateFormat.format(order.receivedAt)),
+              _buildInfoRow('دریافت', fmt(order.receivedAt)),
               if (order.estimatedDeliveryAt != null)
-                _buildInfoRow('تحویل تقریبی', dateFormat.format(order.estimatedDeliveryAt!)),
+                _buildInfoRow('تحویل تقریبی', fmtOptional(order.estimatedDeliveryAt)),
               if (order.completedAt != null)
-                _buildInfoRow('تکمیل تعمیر', dateFormat.format(order.completedAt!)),
+                _buildInfoRow('تکمیل تعمیر', fmtOptional(order.completedAt)),
               if (order.deliveredAt != null)
-                _buildInfoRow('تحویل شده', dateFormat.format(order.deliveredAt!)),
+                _buildInfoRow('تحویل شده', fmtOptional(order.deliveredAt)),
             ],
           ),
 

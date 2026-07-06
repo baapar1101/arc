@@ -84,7 +84,8 @@ def update_repair_order_status(
     new_status: str,
     notes: Optional[str],
     user_id: int,
-    send_notification: bool = True
+    send_notification: bool = True,
+    calendar_type: str = "jalali",
 ) -> Dict[str, Any]:
     """تغییر وضعیت سفارش تعمیر"""
     from app.services.repair_shop_service import get_repair_order, VALID_STATUSES
@@ -142,7 +143,8 @@ def update_repair_order_status(
                 business_id=business_id,
                 repair_order=order,
                 event_type=event,
-                triggered_by_user_id=user_id
+                triggered_by_user_id=user_id,
+                calendar_type=calendar_type,
             )
         except Exception as e:
             logger.error(f"خطا در ارسال نوتیفیکیشن تغییر وضعیت: {e}")
@@ -356,7 +358,8 @@ def complete_repair_order(
     repair_order_id: int,
     is_fixed: bool,
     user_id: int,
-    notes: Optional[str] = None
+    notes: Optional[str] = None,
+    calendar_type: str = "jalali",
 ) -> Dict[str, Any]:
     """اتمام تعمیر و پست حواله"""
     from app.services.repair_shop_service import get_repair_order
@@ -421,7 +424,8 @@ def complete_repair_order(
             business_id=business_id,
             repair_order=order,
             event_type=event,
-            triggered_by_user_id=user_id
+            triggered_by_user_id=user_id,
+            calendar_type=calendar_type,
         )
     except Exception as e:
         logger.error(f"خطا در ارسال نوتیفیکیشن اتمام تعمیر: {e}")
@@ -478,6 +482,7 @@ def get_repair_history_by_warranty(
 ) -> List[Dict[str, Any]]:
     """دریافت تاریخچه تعمیرات براساس کد گارانتی"""
     from adapters.db.models.person import Person
+    from app.services.repair_shop_service import _person_display_name
     
     orders = db.query(RepairOrder).filter(
         and_(
@@ -493,12 +498,12 @@ def get_repair_history_by_warranty(
         result.append({
             "id": order.id,
             "code": order.code,
-            "customer_name": customer.name if customer else "",
+            "customer_name": _person_display_name(customer) if customer else "",
             "problem_description": order.problem_description,
             "status": order.status,
             "final_cost": float(order.final_cost),
-            "received_at": order.received_at.isoformat(),
-            "completed_at": order.completed_at.isoformat() if order.completed_at else None,
+            "received_at": order.received_at,
+            "completed_at": order.completed_at,
         })
     
     return result

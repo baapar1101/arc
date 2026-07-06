@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Dict, Optional
-from datetime import datetime
+
+from app.core.calendar import CalendarType
+from app.core.date_input import format_user_date
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +19,17 @@ from adapters.db.models.business import Business
 from app.services.business_notification_service import BusinessNotificationService
 
 logger = logging.getLogger(__name__)
+
+
+def _person_display_name(person: Person) -> str:
+    parts = [person.first_name, person.last_name]
+    full = " ".join(p for p in parts if p)
+    return (
+        person.alias_name
+        or full.strip()
+        or person.company_name
+        or ""
+    )
 
 
 class RepairShopNotificationService:
@@ -47,7 +60,8 @@ class RepairShopNotificationService:
         business_id: int,
         repair_order: RepairOrder,
         event_type: str,
-        triggered_by_user_id: Optional[int] = None
+        triggered_by_user_id: Optional[int] = None,
+        calendar_type: CalendarType = "jalali",
     ) -> Dict[str, Any]:
         """
         ارسال نوتیفیکیشن به مشتری با استفاده از سیستم جامع
@@ -73,7 +87,7 @@ class RepairShopNotificationService:
         # ساخت context برای قالب
         context = {
             "repair_code": repair_order.code,
-            "customer_name": customer.name,
+            "customer_name": _person_display_name(customer),
             "product_name": repair_order.product_name,
             "product_serial": repair_order.product_serial or "",
             "status": self._get_status_label(repair_order.status),
@@ -82,10 +96,14 @@ class RepairShopNotificationService:
         }
         
         if repair_order.received_at:
-            context["received_date"] = repair_order.received_at.strftime("%Y/%m/%d")
-        
+            context["received_date"] = format_user_date(
+                repair_order.received_at, calendar_type=calendar_type
+            ) or ""
+
         if repair_order.estimated_delivery_at:
-            context["estimated_delivery"] = repair_order.estimated_delivery_at.strftime("%Y/%m/%d")
+            context["estimated_delivery"] = format_user_date(
+                repair_order.estimated_delivery_at, calendar_type=calendar_type
+            ) or ""
         
         if repair_order.final_cost > 0:
             context["final_cost"] = float(repair_order.final_cost)
@@ -108,7 +126,8 @@ def send_repair_notification(
     business_id: int,
     repair_order: RepairOrder,
     event_type: str,
-    triggered_by_user_id: Optional[int] = None
+    triggered_by_user_id: Optional[int] = None,
+    calendar_type: CalendarType = "jalali",
 ) -> Dict[str, Any]:
     """
     تابع helper برای ارسال نوتیفیکیشن تعمیرگاه
@@ -129,6 +148,7 @@ def send_repair_notification(
         business_id=business_id,
         repair_order=repair_order,
         event_type=event_type,
-        triggered_by_user_id=triggered_by_user_id
+        triggered_by_user_id=triggered_by_user_id,
+        calendar_type=calendar_type,
     )
 

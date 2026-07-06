@@ -2201,6 +2201,7 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return hesabixNoTransitionPage(state, RepairOrdersListPage(
                     businessId: businessId,
+                    calendarController: _calendarController!,
                   ),
                 );
               },
@@ -2211,6 +2212,7 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return hesabixNoTransitionPage(state, RepairOrderFormPage(
                     businessId: businessId,
+                    calendarController: _calendarController!,
                   ),
                 );
               },
@@ -2223,6 +2225,7 @@ class _MyAppState extends State<MyApp> {
                 return hesabixNoTransitionPage(state, RepairOrderDetailPage(
                     businessId: businessId,
                     orderId: orderId,
+                    calendarController: _calendarController!,
                   ),
                 );
               },
@@ -2233,6 +2236,7 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return hesabixNoTransitionPage(state, RepairTechniciansPage(
                     businessId: businessId,
+                    calendarController: _calendarController!,
                   ),
                 );
               },
@@ -2243,6 +2247,7 @@ class _MyAppState extends State<MyApp> {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return hesabixNoTransitionPage(state, RepairSettingsPage(
                     businessId: businessId,
+                    calendarController: _calendarController!,
                   ),
                 );
               },

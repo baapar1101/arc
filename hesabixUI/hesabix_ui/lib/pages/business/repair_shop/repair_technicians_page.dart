@@ -4,6 +4,7 @@ import '../../../services/person_service.dart';
 import '../../../models/repair_technician_model.dart';
 import '../../../models/person_model.dart';
 import '../../../core/api_client.dart';
+import '../../../core/calendar_controller.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
 
@@ -11,10 +12,12 @@ import '../../../utils/error_extractor.dart';
 /// صفحه مدیریت تعمیرکاران
 class RepairTechniciansPage extends StatefulWidget {
   final int businessId;
+  final CalendarController calendarController;
 
   const RepairTechniciansPage({
     super.key,
     required this.businessId,
+    required this.calendarController,
   });
 
   @override

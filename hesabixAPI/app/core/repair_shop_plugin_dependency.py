@@ -42,8 +42,14 @@ def check_repair_shop_plugin_active(db: Session, business_id: int) -> bool:
         return False
     
     # بررسی تاریخ انقضا
-    if license.ends_at and license.ends_at < datetime.utcnow():
-        return False
+    if license.ends_at:
+        ends_at_val = (
+            license.ends_at.date()
+            if isinstance(license.ends_at, datetime)
+            else license.ends_at
+        )
+        if ends_at_val < datetime.utcnow().date():
+            return False
     
     return True
 
@@ -158,15 +164,21 @@ def get_business_plugin_status(db: Session, business_id: int) -> dict:
     
     # بررسی انقضا
     is_expired = False
-    if license.ends_at and license.ends_at < datetime.utcnow():
-        is_expired = True
+    if license.ends_at:
+        ends_at_val = (
+            license.ends_at.date()
+            if isinstance(license.ends_at, datetime)
+            else license.ends_at
+        )
+        if ends_at_val < datetime.utcnow().date():
+            is_expired = True
     
     return {
         "is_active": license.status == 'active' and not is_expired,
         "status": license.status,
         "is_trial": license.is_trial,
-        "starts_at": license.starts_at.isoformat() if license.starts_at else None,
-        "ends_at": license.ends_at.isoformat() if license.ends_at else None,
+        "starts_at": license.starts_at,
+        "ends_at": license.ends_at,
         "is_expired": is_expired,
         "auto_renew": license.auto_renew,
         "message": "افزونه فعال است" if (license.status == 'active' and not is_expired) else "افزونه منقضی شده است"
