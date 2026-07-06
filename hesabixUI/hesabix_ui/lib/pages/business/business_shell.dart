@@ -1036,7 +1036,6 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
-  /// مالک کسب‌وکار منوی افزونه را می‌بیند حتی قبل از فعال‌سازی (صفحهٔ مقصد راهنمای بازار افزونه است).
   bool _jsonBool(dynamic value) {
     if (value == true) return true;
     if (value is num) return value != 0;
@@ -1061,10 +1060,7 @@ class _BusinessShellState extends State<BusinessShell> {
     return false;
   }
 
-  bool _showPluginGatedMenu(bool isPluginActive) {
-    if (isPluginActive) return true;
-    return _isBusinessOwner();
-  }
+  bool _showPluginGatedMenu(bool isPluginActive) => isPluginActive;
 
   void _maybeRefreshPluginsAfterMarketplace(String location) {
     final prev = _lastRouteLocation;
