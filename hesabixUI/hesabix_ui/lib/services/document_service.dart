@@ -77,10 +77,7 @@ class DocumentService {
       }
 
       throw Exception(response.data['message'] ?? 'خطا در دریافت لیست اسناد');
-    } catch (e) {
-      if (e is DioException) {
-        throw Exception(e.response?.data['message'] ?? 'خطا در ارتباط با سرور');
-      }
+    } on DioException {
       rethrow;
     }
   }
@@ -95,10 +92,7 @@ class DocumentService {
       }
 
       throw Exception(response.data['message'] ?? 'خطا در دریافت جزئیات سند');
-    } catch (e) {
-      if (e is DioException) {
-        throw Exception(e.response?.data['message'] ?? 'خطا در ارتباط با سرور');
-      }
+    } on DioException {
       rethrow;
     }
   }
@@ -113,11 +107,7 @@ class DocumentService {
       }
 
       throw Exception(response.data['message'] ?? 'خطا در حذف سند');
-    } catch (e) {
-      if (e is DioException) {
-        final errorMessage = e.response?.data['message'] ?? 'خطا در ارتباط با سرور';
-        throw Exception(errorMessage);
-      }
+    } on DioException {
       rethrow;
     }
   }
@@ -135,10 +125,7 @@ class DocumentService {
       }
 
       throw Exception(response.data['message'] ?? 'خطا در حذف گروهی اسناد');
-    } catch (e) {
-      if (e is DioException) {
-        throw Exception(e.response?.data['message'] ?? 'خطا در ارتباط با سرور');
-      }
+    } on DioException {
       rethrow;
     }
   }
@@ -156,10 +143,7 @@ class DocumentService {
       }
 
       throw Exception(response.data['message'] ?? 'خطا در دریافت آمار');
-    } catch (e) {
-      if (e is DioException) {
-        throw Exception(e.response?.data['message'] ?? 'خطا در ارتباط با سرور');
-      }
+    } on DioException {
       rethrow;
     }
   }
@@ -196,10 +180,7 @@ class DocumentService {
       // TODO: پیاده‌سازی ذخیره فایل
       // می‌توان از file_picker یا path_provider استفاده کرد
       throw UnimplementedError('Export to Excel is not implemented yet');
-    } catch (e) {
-      if (e is DioException) {
-        throw Exception(e.response?.data['message'] ?? 'خطا در دریافت فایل Excel');
-      }
+    } on DioException {
       rethrow;
     }
   }
@@ -234,10 +215,7 @@ class DocumentService {
       );
 
       return response.data as Uint8List;
-    } catch (e) {
-      if (e is DioException) {
-        throw Exception(e.response?.data['message'] ?? 'خطا در دریافت فایل PDF');
-      }
+    } on DioException {
       rethrow;
     }
   }
@@ -275,11 +253,7 @@ class DocumentService {
       }
 
       throw Exception(response.data['message'] ?? 'خطا در ایجاد سند');
-    } catch (e) {
-      if (e is DioException) {
-        final errorMessage = e.response?.data['message'] ?? 'خطا در ارتباط با سرور';
-        throw Exception(errorMessage);
-      }
+    } on DioException {
       rethrow;
     }
   }
@@ -310,11 +284,7 @@ class DocumentService {
       }
 
       throw Exception(response.data['message'] ?? 'خطا در ویرایش سند');
-    } catch (e) {
-      if (e is DioException) {
-        final errorMessage = e.response?.data['message'] ?? 'خطا در ارتباط با سرور';
-        throw Exception(errorMessage);
-      }
+    } on DioException {
       rethrow;
     }
   }
