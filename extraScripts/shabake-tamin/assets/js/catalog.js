@@ -28,6 +28,41 @@
 		return esc(s).replace(/\n/g, '<br />');
 	}
 
+	function sanitizeHtmlBasic(html) {
+		if (!html) return '';
+		var d = document.createElement('div');
+		d.innerHTML = String(html);
+		var bad = d.querySelectorAll('script,style,iframe,object,embed');
+		for (var i = 0; i < bad.length; i++) {
+			bad[i].parentNode.removeChild(bad[i]);
+		}
+		return d.innerHTML;
+	}
+
+	function renderGallery(p) {
+		var thumbs = p.gallery_thumbnail_urls || [];
+		var full = p.gallery_urls || [];
+		if (!thumbs.length) return '';
+		var items = '';
+		for (var gi = 0; gi < thumbs.length; gi++) {
+			var tu = absUrl(thumbs[gi]);
+			var fu = absUrl(full[gi] || thumbs[gi]);
+			items +=
+				'<button type="button" class="st-gallery-thumb" data-full="' +
+				esc(fu) +
+				'"><img src="' +
+				esc(tu) +
+				'" alt="" loading="lazy" /></button>';
+		}
+		return (
+			'<div class="st-detail-gallery-wrap"><strong class="st-detail-gallery-label">' +
+			esc(t('galleryLabel')) +
+			'</strong><div class="st-detail-gallery">' +
+			items +
+			'</div></div>'
+		);
+	}
+
 	function parseCfg(root) {
 		var el = root.querySelector('.st-json-config');
 		if (!el || !el.textContent) return {};
@@ -73,6 +108,31 @@
 		if (r && r.detail && r.detail.message) return r.detail.message;
 		if (r && r.detail && typeof r.detail === 'string') return r.detail;
 		return t('errorGeneric');
+	}
+
+	function renderSpecsTable(specs) {
+		if (!specs || !specs.length) return '';
+		var rows = '';
+		for (var i = 0; i < specs.length; i++) {
+			var s = specs[i] || {};
+			var label = s.label || s.key || '';
+			var value = s.value || '';
+			if (!label || !value) continue;
+			rows +=
+				'<tr><th scope="row">' +
+				esc(label) +
+				'</th><td>' +
+				esc(value) +
+				'</td></tr>';
+		}
+		if (!rows) return '';
+		return (
+			'<div class="st-detail-specs-wrap"><strong class="st-detail-specs-label">' +
+			esc(t('specsLabel')) +
+			'</strong><table class="st-detail-specs"><tbody>' +
+			rows +
+			'</tbody></table></div>'
+		);
 	}
 
 	function initRoot(root) {
@@ -121,7 +181,10 @@
 
 		var provInput = root.querySelector('.st-filter-province');
 		var cityInput = root.querySelector('.st-filter-city');
+		var brandInput = root.querySelector('.st-filter-brand');
 		var filterBtn = root.querySelector('.st-filter-apply');
+
+		if (brandInput) brandInput.placeholder = t('brandFilterPlaceholder');
 
 		function effectiveProvince() {
 			if (provInput) return String(provInput.value || '').trim();
@@ -133,6 +196,11 @@
 			return cfg.city != null && cfg.city !== '' ? String(cfg.city) : '';
 		}
 
+		function effectiveBrand() {
+			if (brandInput) return String(brandInput.value || '').trim();
+			return cfg.brand != null && cfg.brand !== '' ? String(cfg.brand) : '';
+		}
+
 		function params() {
 			var p = new URLSearchParams();
 			p.set('skip', String(skip));
@@ -141,8 +209,10 @@
 			if (cfg.categoryId) p.set('category_id', String(cfg.categoryId));
 			var pv = effectiveProvince();
 			var cv = effectiveCity();
+			var bv = effectiveBrand();
 			if (pv) p.set('province', pv);
 			if (cv) p.set('city', cv);
+			if (bv) p.set('brand', bv);
 			if (q) p.set('search', q);
 			return p.toString();
 		}
@@ -169,6 +239,12 @@
 			html += '</div>';
 			html += '<div class="st-card-body">';
 			html += '<h3 class="st-card-title">' + esc(p.name || '') + '</h3>';
+			if (p.short_description) {
+				html += '<div class="st-card-short">' + esc(p.short_description) + '</div>';
+			}
+			if (p.brand || p.model) {
+				html += '<div class="st-card-brand">' + esc([p.brand, p.model].filter(Boolean).join(' — ')) + '</div>';
+			}
 			if (p.category_name) html += '<div class="st-card-meta">' + esc(p.category_name) + '</div>';
 			html += '<div class="st-card-price">' + esc(price) + '</div>';
 			if (sup.business_name) html += '<div class="st-card-supplier">' + esc(sup.business_name) + '</div>';
@@ -266,11 +342,12 @@
 					parts.push('<h2 class="st-modal-title st-detail-title">' + esc(p.name || '') + '</h2>');
 					if (imgSrc) {
 						parts.push(
-							'<div class="st-detail-img-wrap"><img class="st-detail-img" src="' +
+							'<div class="st-detail-img-wrap" id="st-detail-main-img-wrap"><img class="st-detail-img" id="st-detail-main-img" src="' +
 								esc(imgSrc) +
 								'" alt="" /></div>'
 						);
 					}
+					parts.push(renderGallery(p));
 					if (p.category_name) {
 						parts.push('<div class="st-detail-meta">' + esc(p.category_name) + '</div>');
 					}
@@ -320,6 +397,54 @@
 								'</div>'
 						);
 					}
+					if (p.min_order_qty != null && p.min_order_qty !== '') {
+						parts.push(
+							'<div class="st-detail-min-order"><strong>' +
+								esc(t('minOrderLabel')) +
+								'</strong> ' +
+								esc(fmtCount(p.min_order_qty)) +
+								'</div>'
+						);
+					}
+					if (p.lead_time_days != null && p.lead_time_days !== '') {
+						parts.push(
+							'<div class="st-detail-lead-time"><strong>' +
+								esc(t('leadTimeLabel')) +
+								'</strong> ' +
+								esc(fmtCount(p.lead_time_days)) +
+								' ' +
+								esc(t('daysSuffix')) +
+								'</div>'
+						);
+					}
+					if (p.brand || p.model) {
+						var bm = [p.brand, p.model].filter(Boolean).join(' — ');
+						parts.push(
+							'<div class="st-detail-brand"><strong>' +
+								esc(t('brandModelLabel')) +
+								'</strong> ' +
+								esc(bm) +
+								'</div>'
+						);
+					}
+					if (p.country_of_origin) {
+						parts.push(
+							'<div class="st-detail-origin"><strong>' +
+								esc(t('originLabel')) +
+								'</strong> ' +
+								esc(p.country_of_origin) +
+								'</div>'
+						);
+					}
+					if (p.video_url) {
+						parts.push(
+							'<div class="st-detail-video"><a href="' +
+								esc(p.video_url) +
+								'" target="_blank" rel="noopener noreferrer">' +
+								esc(t('videoLabel')) +
+								'</a></div>'
+						);
+					}
 					if (p.updated_at) {
 						parts.push(
 							'<div class="st-detail-updated"><strong>' +
@@ -327,6 +452,15 @@
 								'</strong> ' +
 								esc(p.updated_at) +
 								'</div>'
+						);
+					}
+					if (p.short_description) {
+						parts.push(
+							'<div class="st-detail-short-wrap"><strong class="st-detail-short-label">' +
+								esc(t('shortDescriptionLabel')) +
+								'</strong><div class="st-detail-short">' +
+								nl2br(p.short_description) +
+								'</div></div>'
 						);
 					}
 					if (p.description) {
@@ -338,6 +472,14 @@
 								'</div></div>'
 						);
 					}
+					if (p.expert_review) {
+						parts.push(
+							'<div class="st-detail-expert-wrap"><strong class="st-detail-expert-label">' +
+								esc(t('expertReviewLabel')) +
+								'</strong><div class="st-detail-expert st-detail-expert-html"></div></div>'
+						);
+					}
+					parts.push(renderSpecsTable(p.specifications));
 					parts.push('<div class="st-detail-actions">');
 					if (bid > 0) {
 						parts.push(
@@ -350,6 +492,17 @@
 
 					var modal = overlay.querySelector('.st-detail-modal');
 					modal.innerHTML = parts.join('');
+					var expertEl = modal.querySelector('.st-detail-expert-html');
+					if (expertEl && p.expert_review) {
+						expertEl.innerHTML = sanitizeHtmlBasic(p.expert_review);
+					}
+					Array.prototype.forEach.call(modal.querySelectorAll('.st-gallery-thumb'), function (btn) {
+						btn.addEventListener('click', function () {
+							var main = modal.querySelector('#st-detail-main-img');
+							var full = btn.getAttribute('data-full');
+							if (main && full) main.src = full;
+						});
+					});
 					modal.querySelector('.st-modal-close').addEventListener('click', closeDetail);
 					var cbtn = modal.querySelector('.st-detail-contact');
 					if (cbtn) {
@@ -568,24 +721,25 @@
 			load(true);
 		}
 
-		function doApplyLocation() {
+		function doApplyFilters() {
 			load(true);
 		}
 
 		if (filterBtn) {
-			filterBtn.addEventListener('click', doApplyLocation);
+			filterBtn.addEventListener('click', doApplyFilters);
 		}
 		function bindEnterApply(el) {
 			if (!el) return;
 			el.addEventListener('keydown', function (e) {
 				if (e.key === 'Enter') {
 					e.preventDefault();
-					doApplyLocation();
+					doApplyFilters();
 				}
 			});
 		}
 		bindEnterApply(provInput);
 		bindEnterApply(cityInput);
+		bindEnterApply(brandInput);
 
 		if (searchBtn && searchInp) {
 			searchBtn.addEventListener('click', doSearch);

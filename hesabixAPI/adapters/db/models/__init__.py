@@ -56,6 +56,7 @@ from .document_line import DocumentLine  # noqa: F401
 from .account import Account  # noqa: F401
 from .category import BusinessCategory  # noqa: F401
 from .product_attribute import ProductAttribute  # noqa: F401
+from .business_catalog_spec_field import BusinessCatalogSpecField  # noqa: F401
 from .product import Product  # noqa: F401
 from .public_catalog_contact_message import PublicCatalogContactMessage  # noqa: F401
 from .product_general_barcode_alias import ProductGeneralBarcodeAlias  # noqa: F401

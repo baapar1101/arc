@@ -1315,6 +1315,15 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
+          _MenuItem(
+            key: 'catalog-spec-fields',
+            label: 'قالب مشخصات تأمین',
+            icon: Icons.view_list_outlined,
+            selectedIcon: Icons.view_list,
+            path: _bu('catalog-spec-fields'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
         ],
       ),
       _MenuItem(

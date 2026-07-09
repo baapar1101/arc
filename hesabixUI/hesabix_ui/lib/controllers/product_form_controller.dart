@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/product_form_data.dart';
 import '../services/product_service.dart';
 import '../services/category_service.dart';
+import '../services/catalog_spec_field_service.dart';
 import '../services/product_attribute_service.dart';
 import '../services/tax_service.dart';
 import '../services/price_list_service.dart';
@@ -19,6 +20,7 @@ class ProductFormController extends ChangeNotifier {
   late final ProductService _productService;
   late final CategoryService _categoryService;
   late final ProductAttributeService _attributeService;
+  late final CatalogSpecFieldService _catalogSpecFieldService;
   late final TaxService _taxService;
   late final PriceListService _priceListService;
   late final CurrencyService _currencyService;
@@ -34,6 +36,7 @@ class ProductFormController extends ChangeNotifier {
   // Reference data
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _attributes = [];
+  List<Map<String, dynamic>> _catalogSpecFields = [];
   List<Map<String, dynamic>> _taxTypes = [];
   List<Map<String, dynamic>> _taxUnits = [];
   List<Map<String, dynamic>> _priceLists = [];
@@ -62,6 +65,7 @@ class ProductFormController extends ChangeNotifier {
     _productService = ProductService(apiClient: _apiClient);
     _categoryService = CategoryService(_apiClient);
     _attributeService = ProductAttributeService(apiClient: _apiClient);
+    _catalogSpecFieldService = CatalogSpecFieldService(apiClient: _apiClient);
     _taxService = TaxService(apiClient: _apiClient);
     _priceListService = PriceListService(apiClient: _apiClient);
     _currencyService = CurrencyService(_apiClient);
@@ -76,6 +80,7 @@ class ProductFormController extends ChangeNotifier {
   int? get lastCreatedProductId => _lastCreatedProductId;
   List<Map<String, dynamic>> get categories => _categories;
   List<Map<String, dynamic>> get attributes => _attributes;
+  List<Map<String, dynamic>> get catalogSpecFields => _catalogSpecFields;
   List<Map<String, dynamic>> get taxTypes => _taxTypes;
   List<Map<String, dynamic>> get taxUnits => _taxUnits;
   List<Map<String, dynamic>> get priceLists => _priceLists;
@@ -212,14 +217,17 @@ class ProductFormController extends ChangeNotifier {
         _attributeService.search(businessId: businessId, limit: 100)
             .then((res) => List<Map<String, dynamic>>.from(res['items'] ?? const []))
             .catchError((_) => <Map<String, dynamic>>[]),
+        _catalogSpecFieldService.list(businessId: businessId, activeOnly: true)
+            .catchError((_) => <Map<String, dynamic>>[]),
         _taxService.getTaxTypes().catchError((_) => <Map<String, dynamic>>[]),
         _taxService.getTaxUnits().catchError((_) => <Map<String, dynamic>>[]),
       ]);
       
       _categories = results[0] as List<Map<String, dynamic>>;
       _attributes = results[1] as List<Map<String, dynamic>>;
-      _taxTypes = results[2] as List<Map<String, dynamic>>;
-      _taxUnits = results[3] as List<Map<String, dynamic>>;
+      _catalogSpecFields = results[2] as List<Map<String, dynamic>>;
+      _taxTypes = results[3] as List<Map<String, dynamic>>;
+      _taxUnits = results[4] as List<Map<String, dynamic>>;
     } catch (e) {
       throw Exception('خطا در بارگذاری اطلاعات مرجع: $e');
     }
@@ -232,6 +240,18 @@ class ProductFormController extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       // Silently fail - categories will be refreshed on next form load
+    }
+  }
+
+  Future<void> refreshCatalogSpecFields() async {
+    try {
+      _catalogSpecFields = await _catalogSpecFieldService.list(
+        businessId: businessId,
+        activeOnly: true,
+      );
+      notifyListeners();
+    } catch (e) {
+      // Silently fail - templates refresh on next form load
     }
   }
 

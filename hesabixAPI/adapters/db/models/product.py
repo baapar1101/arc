@@ -4,6 +4,8 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
+from typing import Any, Dict, List
+
 from sqlalchemy import (
     String,
     Integer,
@@ -13,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Boolean,
     Numeric,
+    JSON,
     Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -115,6 +118,32 @@ class Product(Base):
         unique=True,
         index=True,
         comment="شناسهٔ عمومی برای لینک کاتالوگ",
+    )
+
+    # پروفایل شبکهٔ تأمین (کاتالوگ عمومی)
+    catalog_short_description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="خلاصه کوتاه برای کاتالوگ عمومی",
+    )
+    catalog_expert_review: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="بررسی تخصصی برای کاتالوگ عمومی",
+    )
+    catalog_specifications: Mapped[List[Dict[str, Any]] | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="مشخصات فنی کاتالوگ",
+    )
+    catalog_brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    catalog_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    catalog_country_of_origin: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    catalog_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    catalog_gallery_file_ids: Mapped[List[str] | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="شناسه‌های فایل گالری کاتالوگ",
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

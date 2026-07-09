@@ -16,6 +16,7 @@ from ..models.product_attribute_link import ProductAttributeLink
 from ..models.category import BusinessCategory
 
 from app.services.product_general_barcode_service import split_raw_general_barcodes
+from app.services.product_catalog_profile_service import catalog_profile_from_product
 
 # فاصله، خط جدید، انواع خط تیره (بدون نیم‌فاصلهٔ ZWNJ که در فارسی پیوند واژه است)
 _SEARCH_SPLIT_RE = re.compile(r"(?:\s+|(?:[\-‐‑–—])+)+")
@@ -376,6 +377,7 @@ class ProductRepository(BaseRepository[Product]):
                 "is_active": getattr(p, 'is_active', True),  # اضافه کردن فیلد is_active
                 "is_public_catalog": bool(getattr(p, "is_public_catalog", False)),
                 "catalog_public_uuid": getattr(p, "catalog_public_uuid", None),
+                **catalog_profile_from_product(p),
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,
             }
@@ -439,6 +441,14 @@ class ProductRepository(BaseRepository[Product]):
             "tax_type_id",
             "tax_code",
             "tax_unit_id",
+            "catalog_short_description",
+            "catalog_expert_review",
+            "catalog_specifications",
+            "catalog_brand",
+            "catalog_model",
+            "catalog_country_of_origin",
+            "catalog_video_url",
+            "catalog_gallery_file_ids",
         }
         # فیلدهای بولی NOT NULL: فقط با مقدار bool واقعی به‌روزرسانی شوند (None = بدون تغییر)
         boolean_fields = {"is_public_catalog", "is_active", "track_inventory", "track_serial", "track_barcode", "is_sales_taxable", "is_purchase_taxable"}

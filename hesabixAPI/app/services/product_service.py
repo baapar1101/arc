@@ -28,6 +28,12 @@ from app.services.product_general_barcode_service import (
     split_raw_general_barcodes,
 )
 from app.services.public_catalog_service import invalidate_public_catalog_caches
+from app.services.product_catalog_profile_service import (
+    catalog_profile_from_product,
+    normalize_catalog_gallery_file_ids,
+    normalize_catalog_specifications,
+    validate_catalog_profile_for_publish,
+)
 from app.services.product_inventory_tracking_sync import (
     product_has_stale_inventory_tracking_lines,
     sync_product_inventory_tracking_change,
@@ -48,6 +54,59 @@ def _resolve_create_general_barcodes_raw(payload: ProductCreateRequest) -> Optio
 def _legacy_barcode_field_from_general_csv(csv_val: Optional[str]) -> Optional[str]:
     tokens = split_raw_general_barcodes(csv_val)
     return tokens[0] if tokens else None
+
+
+def _catalog_profile_create_kwargs(payload: ProductCreateRequest) -> Dict[str, Any]:
+    specs = None
+    if payload.catalog_specifications is not None:
+        specs = normalize_catalog_specifications(
+            [item.model_dump() for item in payload.catalog_specifications]
+        )
+    gallery = None
+    if payload.catalog_gallery_file_ids is not None:
+        gallery = normalize_catalog_gallery_file_ids(payload.catalog_gallery_file_ids)
+    return {
+        "catalog_short_description": (payload.catalog_short_description or "").strip() or None,
+        "catalog_expert_review": (payload.catalog_expert_review or "").strip() or None,
+        "catalog_specifications": specs,
+        "catalog_brand": (payload.catalog_brand or "").strip() or None,
+        "catalog_model": (payload.catalog_model or "").strip() or None,
+        "catalog_country_of_origin": (payload.catalog_country_of_origin or "").strip() or None,
+        "catalog_video_url": (payload.catalog_video_url or "").strip() or None,
+        "catalog_gallery_file_ids": gallery,
+    }
+
+
+def _catalog_profile_update_kwargs(payload: ProductUpdateRequest, fields_set: set) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+    if "catalog_short_description" in fields_set:
+        v = payload.catalog_short_description
+        out["catalog_short_description"] = (v or "").strip() or None if v is not None else None
+    if "catalog_expert_review" in fields_set:
+        v = payload.catalog_expert_review
+        out["catalog_expert_review"] = (v or "").strip() or None if v is not None else None
+    if "catalog_specifications" in fields_set:
+        if payload.catalog_specifications is None:
+            out["catalog_specifications"] = None
+        else:
+            out["catalog_specifications"] = normalize_catalog_specifications(
+                [item.model_dump() for item in payload.catalog_specifications]
+            )
+    for key in (
+        "catalog_brand",
+        "catalog_model",
+        "catalog_country_of_origin",
+        "catalog_video_url",
+    ):
+        if key in fields_set:
+            v = getattr(payload, key)
+            out[key] = (v or "").strip() or None if v is not None else None
+    if "catalog_gallery_file_ids" in fields_set:
+        if payload.catalog_gallery_file_ids is None:
+            out["catalog_gallery_file_ids"] = None
+        else:
+            out["catalog_gallery_file_ids"] = normalize_catalog_gallery_file_ids(payload.catalog_gallery_file_ids)
+    return out
 
 
 def invalidate_products_cache(business_id: int, product_id: Optional[int] = None, category_id: Optional[int] = None):
@@ -401,6 +460,13 @@ def create_product(
             else:
                 logger.info(f"[CREATE_PRODUCT] Using manual code: '{code}'")
 
+            validate_catalog_profile_for_publish(
+                db,
+                business_id,
+                is_public_catalog=bool(payload.is_public_catalog),
+                catalog_specifications=_catalog_profile_create_kwargs(payload).get("catalog_specifications"),
+            )
+
             # ایجاد Product مستقیماً (بدون استفاده از repo.create که commit می‌کند)
             # تا همه چیز در یک transaction باشد و بتوانیم در صورت خطا rollback کنیم
             obj = Product(
@@ -437,6 +503,7 @@ def create_product(
                 general_barcodes=stored_gb_create,
                 is_public_catalog=bool(payload.is_public_catalog),
                 catalog_public_uuid=str(uuid_module.uuid4()) if payload.is_public_catalog else None,
+                **_catalog_profile_create_kwargs(payload),
             )
             logger.debug(f"[CREATE_PRODUCT] Adding product to session - code='{code}', name='{payload.name}'")
             db.add(obj)
@@ -769,6 +836,22 @@ def update_product(
     if "is_public_catalog" in fields_set and payload.is_public_catalog and not getattr(obj, "catalog_public_uuid", None):
         catalog_uuid_kw["catalog_public_uuid"] = str(uuid_module.uuid4())
 
+    catalog_profile_kw = _catalog_profile_update_kwargs(payload, fields_set)
+    effective_public = (
+        bool(payload.is_public_catalog)
+        if "is_public_catalog" in fields_set and payload.is_public_catalog is not None
+        else bool(getattr(obj, "is_public_catalog", False))
+    )
+    effective_specs = catalog_profile_kw.get("catalog_specifications")
+    if effective_specs is None and "catalog_specifications" not in fields_set:
+        effective_specs = getattr(obj, "catalog_specifications", None)
+    validate_catalog_profile_for_publish(
+        db,
+        business_id,
+        is_public_catalog=effective_public,
+        catalog_specifications=effective_specs,
+    )
+
     updated = repo.update(
         product_id,
         commit=False,
@@ -821,6 +904,7 @@ def update_product(
             )
         ),
         **catalog_uuid_kw,
+        **catalog_profile_kw,
         **gb_kw,
     )
     if not updated:
@@ -1287,6 +1371,7 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "is_active": obj.is_active if hasattr(obj, 'is_active') else True,  # مقدار پیش‌فرض True در صورت عدم وجود فیلد
         "is_public_catalog": bool(getattr(obj, "is_public_catalog", False)),
         "catalog_public_uuid": getattr(obj, "catalog_public_uuid", None),
+        **catalog_profile_from_product(obj),
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }

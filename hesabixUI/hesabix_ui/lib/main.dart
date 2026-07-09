@@ -117,6 +117,7 @@ import 'pages/business/pnl_cumulative_report_page.dart';
 import 'pages/business/account_review_report_page.dart';
 import 'pages/business/persons_page.dart';
 import 'pages/business/product_attributes_page.dart';
+import 'pages/business/catalog_spec_fields_page.dart';
 import 'pages/business/products_page.dart';
 import 'pages/business/product_bulk_prices_sheet_page.dart';
 import 'pages/business/projects_page.dart';
@@ -3560,6 +3561,20 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return hesabixNoTransitionPage(state, ProductAttributesPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'catalog-spec-fields',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('products', 'view')) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                }
+                return hesabixNoTransitionPage(state, CatalogSpecFieldsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

@@ -8,7 +8,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from adapters.db.models.business import Business
@@ -17,6 +17,7 @@ from adapters.db.models.product import Product
 from adapters.db.models.public_catalog_contact_message import PublicCatalogContactMessage
 from app.core.cache import get_cache
 from app.services.public_catalog_utils import normalize_catalog_public_uuid
+from app.services.product_catalog_profile_service import catalog_profile_from_product
 
 logger = logging.getLogger(__name__)
 
@@ -88,16 +89,40 @@ def _business_contact_block(b: Business) -> Dict[str, Any]:
 	return out
 
 
+def _catalog_gallery_urls(p: Product) -> List[str]:
+	uuid = getattr(p, "catalog_public_uuid", None)
+	ids = getattr(p, "catalog_gallery_file_ids", None) or []
+	if not uuid or not isinstance(ids, list):
+		return []
+	out: List[str] = []
+	for idx, _ in enumerate(ids):
+		if str(_).strip():
+			out.append(f"/api/v1/public/catalog/products/{uuid}/gallery/{idx}/image")
+	return out
+
+
 def _product_public_core(p: Product, cat: BusinessCategory | None, b: Business) -> Dict[str, Any]:
 	show_price = bool(getattr(b, "public_catalog_show_base_sales_price", True))
+	profile = catalog_profile_from_product(p)
+	gallery_urls = _catalog_gallery_urls(p)
+	gallery_thumbs = [f"{u}?size=small" for u in gallery_urls]
 	return {
 		"catalog_public_uuid": p.catalog_public_uuid,
 		"name": p.name,
 		"item_type": p.item_type.value if hasattr(p.item_type, "value") else str(p.item_type),
 		"description": p.description,
+		"short_description": profile.get("catalog_short_description"),
+		"expert_review": profile.get("catalog_expert_review"),
+		"specifications": profile.get("catalog_specifications"),
+		"brand": profile.get("catalog_brand"),
+		"model": profile.get("catalog_model"),
+		"country_of_origin": profile.get("catalog_country_of_origin"),
+		"video_url": profile.get("catalog_video_url"),
 		"category_id": p.category_id,
 		"category_name": _category_display_name(cat),
 		"main_unit": p.main_unit,
+		"min_order_qty": p.min_order_qty,
+		"lead_time_days": p.lead_time_days,
 		"base_sales_price": (
 			float(p.base_sales_price) if show_price and p.base_sales_price is not None else None
 		),
@@ -112,6 +137,8 @@ def _product_public_core(p: Product, cat: BusinessCategory | None, b: Business) 
 			if p.catalog_public_uuid and p.image_file_id
 			else None
 		),
+		"gallery_urls": gallery_urls or None,
+		"gallery_thumbnail_urls": gallery_thumbs or None,
 	}
 
 
@@ -119,6 +146,7 @@ def search_public_catalog(
 	db: Session,
 	*,
 	search: Optional[str] = None,
+	brand: Optional[str] = None,
 	business_id: Optional[int] = None,
 	category_id: Optional[int] = None,
 	province: Optional[str] = None,
@@ -131,6 +159,7 @@ def search_public_catalog(
 
 	cache_params = {
 		"search": (search or "").strip(),
+		"brand": (brand or "").strip() or None,
 		"business_id": business_id,
 		"category_id": category_id,
 		"province": (province or "").strip() or None,
@@ -161,13 +190,35 @@ def search_public_catalog(
 	if city:
 		where_extra.append(Business.city.ilike(f"%{_like_escape(city.strip())}%", escape="\\"))
 
+	brand_q = (brand or "").strip()
+	if brand_q:
+		b = _like_escape(brand_q)
+		where_extra.append(
+			or_(
+				Product.catalog_brand.ilike(f"%{b}%", escape="\\"),
+				Product.catalog_model.ilike(f"%{b}%", escape="\\"),
+			)
+		)
+
 	tokens = _search_tokens(search or "")
 	if tokens:
 		desc_col = func.coalesce(Product.description, "")
+		short_col = func.coalesce(Product.catalog_short_description, "")
+		expert_col = func.coalesce(Product.catalog_expert_review, "")
+		brand_col = func.coalesce(Product.catalog_brand, "")
+		model_col = func.coalesce(Product.catalog_model, "")
+		origin_col = func.coalesce(Product.catalog_country_of_origin, "")
+		spec_col = func.coalesce(cast(Product.catalog_specifications, String), "")
 		where_extra.append(
 			or_(
 				_column_contains_all_tokens(Product.name, tokens),
 				_column_contains_all_tokens(desc_col, tokens),
+				_column_contains_all_tokens(short_col, tokens),
+				_column_contains_all_tokens(expert_col, tokens),
+				_column_contains_all_tokens(brand_col, tokens),
+				_column_contains_all_tokens(model_col, tokens),
+				_column_contains_all_tokens(origin_col, tokens),
+				_column_contains_all_tokens(spec_col, tokens),
 			)
 		)
 
@@ -306,6 +357,40 @@ def resolve_public_catalog_product_image(
 	if not p or not p.image_file_id:
 		return None, None
 	return p, str(p.image_file_id)
+
+
+def resolve_public_catalog_gallery_image(
+	db: Session,
+	catalog_public_uuid: str,
+	index: int,
+) -> Tuple[Optional[Product], Optional[str]]:
+	"""برمی‌گرداند (Product, gallery_file_id) برای تصویر گالری در اندیس داده‌شده."""
+	try:
+		u = normalize_catalog_public_uuid(catalog_public_uuid)
+	except ValueError:
+		return None, None
+	if index < 0:
+		return None, None
+	p = (
+		db.query(Product)
+		.join(Business, Business.id == Product.business_id)
+		.filter(
+			Product.catalog_public_uuid == u,
+			Product.is_public_catalog.is_(True),
+			Product.is_active.is_(True),
+			Business.deleted_at.is_(None),
+		)
+		.first()
+	)
+	if not p:
+		return None, None
+	ids = getattr(p, "catalog_gallery_file_ids", None) or []
+	if not isinstance(ids, list) or index >= len(ids):
+		return None, None
+	fid = str(ids[index] or "").strip()
+	if not fid:
+		return None, None
+	return p, fid
 
 
 def create_public_catalog_contact_message(

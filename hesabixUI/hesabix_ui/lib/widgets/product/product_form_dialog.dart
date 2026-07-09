@@ -5,6 +5,7 @@ import '../../controllers/product_form_controller.dart';
 import 'sections/product_basic_info_section.dart';
 import 'sections/product_pricing_inventory_section.dart';
 import 'sections/product_tax_section.dart';
+import 'sections/product_supply_network_section.dart';
 import 'sections/product_bom_section.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
@@ -170,7 +171,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   Widget _buildFormContent() {
     final isMobile = ResponsiveHelper.isMobile(context);
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -185,6 +186,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                   _buildBasicInfoTab(),
                   _buildPricingInventoryTab(),
                   _buildTaxTab(),
+                  _buildSupplyNetworkTab(),
                   _buildBomTab(),
                 ],
               ),
@@ -205,6 +207,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         Tab(text: t.productGeneralInfo),
         Tab(text: t.pricingAndInventory),
         Tab(text: t.tax),
+        const Tab(text: 'شبکهٔ تأمین'),
         const Tab(text: 'فرمول تولید'),
       ],
     );
@@ -261,6 +264,20 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         onChanged: _controller.updateFormData,
         taxTypes: _controller.taxTypes,
         taxUnits: _controller.taxUnits,
+      ),
+    );
+  }
+
+  Widget _buildSupplyNetworkTab() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
+      child: ProductSupplyNetworkSection(
+        businessId: widget.businessId,
+        formData: _controller.formData,
+        onChanged: _controller.updateFormData,
+        controller: _controller,
+        authStore: widget.authStore,
       ),
     );
   }

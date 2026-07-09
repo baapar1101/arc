@@ -22,7 +22,42 @@ class ProductAttributeValue(BaseModel):
     value: str = Field(..., description="مقدار ویژگی", max_length=200)
 
 
-class ProductCreateRequest(BaseModel):
+class CatalogSpecificationItem(BaseModel):
+    """یک ردیف مشخصات فنی کاتالوگ"""
+    field_id: Optional[int] = Field(None, description="شناسه قالب فیلد کسب‌وکار (اختیاری)")
+    label: str = Field(..., min_length=1, max_length=255, description="عنوان مشخصه")
+    value: str = Field(default="", max_length=2000, description="مقدار مشخصه")
+    sort_order: int = Field(default=0, ge=0)
+
+
+class ProductCatalogProfileMixin(BaseModel):
+    """فیلدهای پروفایل شبکهٔ تأمین (کاتالوگ عمومی)"""
+    catalog_short_description: Optional[str] = Field(
+        None,
+        description="خلاصه کوتاه برای نمایش در کاتالوگ",
+        max_length=1000,
+    )
+    catalog_expert_review: Optional[str] = Field(
+        None,
+        description="بررسی تخصصی محصول",
+        max_length=16000,
+    )
+    catalog_specifications: Optional[List[CatalogSpecificationItem]] = Field(
+        None,
+        description="مشخصات فنی (جدول key-value)",
+    )
+    catalog_brand: Optional[str] = Field(None, max_length=255)
+    catalog_model: Optional[str] = Field(None, max_length=255)
+    catalog_country_of_origin: Optional[str] = Field(None, max_length=128)
+    catalog_video_url: Optional[str] = Field(None, max_length=512)
+    catalog_gallery_file_ids: Optional[List[str]] = Field(
+        None,
+        description="شناسه‌های فایل گالری کاتالوگ (حداکثر ۱۲ تصویر)",
+        max_length=12,
+    )
+
+
+class ProductCreateRequest(ProductCatalogProfileMixin):
     """درخواست ایجاد محصول جدید"""
     code: Optional[str] = Field(
         None, 
@@ -236,7 +271,7 @@ class ProductCreateRequest(BaseModel):
         }
 
 
-class ProductUpdateRequest(BaseModel):
+class ProductUpdateRequest(ProductCatalogProfileMixin):
     """درخواست ویرایش محصول"""
     code: Optional[str] = Field(None, max_length=50)
     name: Optional[str] = Field(None, max_length=200)
@@ -395,6 +430,15 @@ class ProductResponse(BaseModel):
         None,
         description="شناسهٔ عمومی برای لینک کاتالوگ (پس از فعال‌سازی انتشار)",
     )
+
+    catalog_short_description: Optional[str] = None
+    catalog_expert_review: Optional[str] = None
+    catalog_specifications: Optional[List[CatalogSpecificationItem]] = None
+    catalog_brand: Optional[str] = None
+    catalog_model: Optional[str] = None
+    catalog_country_of_origin: Optional[str] = None
+    catalog_video_url: Optional[str] = None
+    catalog_gallery_file_ids: Optional[List[str]] = None
     
     # اطلاعات موجودی (اختیاری - بسته به درخواست)
     inventory: Optional[List[ProductInventoryInfo]] = Field(

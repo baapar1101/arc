@@ -129,6 +129,7 @@ abstract final class BusinessNamedRoutes {
     'business_settings_installments': 'settings/installments',
     'business_document_monetization': 'document-monetization',
     'business_product_attributes': 'product-attributes',
+    'business_catalog_spec_fields': 'catalog-spec-fields',
     'business_product_bulk_prices_sheet': 'products/bulk-prices-sheet',
     'business_products': 'products',
     'business_price_lists': 'price-lists',

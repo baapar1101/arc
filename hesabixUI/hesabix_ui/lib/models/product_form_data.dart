@@ -1,3 +1,5 @@
+import 'catalog_specification_item.dart';
+
 const Object _kProductFormCodeUnset = Object();
 const Object _kProductFormFieldUnset = Object();
 
@@ -59,8 +61,18 @@ class ProductFormData {
   // Warehouse
   int? defaultWarehouseId;
 
-  /// انتشار در API عمومی کاتالوگ (شبکهٔ انتشار کالا)
+  /// انتشار در API عمومی کاتالوگ (شبکهٔ تأمین کالا)
   bool isPublicCatalog;
+
+  // پروفایل شبکهٔ تأمین
+  String? catalogShortDescription;
+  String? catalogExpertReview;
+  List<CatalogSpecificationItem> catalogSpecifications;
+  String? catalogBrand;
+  String? catalogModel;
+  String? catalogCountryOfOrigin;
+  String? catalogVideoUrl;
+  List<String> catalogGalleryFileIds;
 
   ProductFormData({
     this.itemType = 'کالا',
@@ -96,7 +108,17 @@ class ProductFormData {
     this.imageUrl,
     this.defaultWarehouseId,
     this.isPublicCatalog = false,
-  }) : selectedAttributeIds = selectedAttributeIds ?? <int>{};
+    this.catalogShortDescription,
+    this.catalogExpertReview,
+    List<CatalogSpecificationItem>? catalogSpecifications,
+    this.catalogBrand,
+    this.catalogModel,
+    this.catalogCountryOfOrigin,
+    this.catalogVideoUrl,
+    List<String>? catalogGalleryFileIds,
+  })  : selectedAttributeIds = selectedAttributeIds ?? <int>{},
+        catalogSpecifications = catalogSpecifications ?? <CatalogSpecificationItem>[],
+        catalogGalleryFileIds = catalogGalleryFileIds ?? <String>[];
 
   ProductFormData copyWith({
     String? itemType,
@@ -132,6 +154,14 @@ class ProductFormData {
     Object? imageUrl = _kProductFormFieldUnset,
     Object? defaultWarehouseId = _kProductFormFieldUnset,
     bool? isPublicCatalog,
+    Object? catalogShortDescription = _kProductFormFieldUnset,
+    Object? catalogExpertReview = _kProductFormFieldUnset,
+    Object? catalogSpecifications = _kProductFormFieldUnset,
+    Object? catalogBrand = _kProductFormFieldUnset,
+    Object? catalogModel = _kProductFormFieldUnset,
+    Object? catalogCountryOfOrigin = _kProductFormFieldUnset,
+    Object? catalogVideoUrl = _kProductFormFieldUnset,
+    Object? catalogGalleryFileIds = _kProductFormFieldUnset,
   }) {
     return ProductFormData(
       itemType: itemType ?? this.itemType,
@@ -169,6 +199,20 @@ class ProductFormData {
       imageUrl: _nullableCopyField<String>(imageUrl, this.imageUrl),
       defaultWarehouseId: _nullableCopyField<int>(defaultWarehouseId, this.defaultWarehouseId),
       isPublicCatalog: isPublicCatalog ?? this.isPublicCatalog,
+      catalogShortDescription: _nullableCopyField<String>(catalogShortDescription, this.catalogShortDescription),
+      catalogExpertReview: _nullableCopyField<String>(catalogExpertReview, this.catalogExpertReview),
+      catalogSpecifications: identical(catalogSpecifications, _kProductFormFieldUnset)
+          ? this.catalogSpecifications
+          : List<CatalogSpecificationItem>.from(
+              (catalogSpecifications as List<CatalogSpecificationItem>?) ?? const <CatalogSpecificationItem>[],
+            ),
+      catalogBrand: _nullableCopyField<String>(catalogBrand, this.catalogBrand),
+      catalogModel: _nullableCopyField<String>(catalogModel, this.catalogModel),
+      catalogCountryOfOrigin: _nullableCopyField<String>(catalogCountryOfOrigin, this.catalogCountryOfOrigin),
+      catalogVideoUrl: _nullableCopyField<String>(catalogVideoUrl, this.catalogVideoUrl),
+      catalogGalleryFileIds: identical(catalogGalleryFileIds, _kProductFormFieldUnset)
+          ? this.catalogGalleryFileIds
+          : List<String>.from((catalogGalleryFileIds as List<String>?) ?? const <String>[]),
     );
   }
 
@@ -217,6 +261,22 @@ class ProductFormData {
       'image_file_id': imageFileId,
       'default_warehouse_id': defaultWarehouseId,
       'is_public_catalog': isPublicCatalog,
+      'catalog_short_description': catalogShortDescription?.trim().isEmpty == true
+          ? null
+          : catalogShortDescription?.trim(),
+      'catalog_expert_review': catalogExpertReview?.trim().isEmpty == true
+          ? null
+          : catalogExpertReview?.trim(),
+      'catalog_specifications': catalogSpecifications.isEmpty
+          ? null
+          : catalogSpecifications.map((e) => e.toJson()).toList(),
+      'catalog_brand': catalogBrand?.trim().isEmpty == true ? null : catalogBrand?.trim(),
+      'catalog_model': catalogModel?.trim().isEmpty == true ? null : catalogModel?.trim(),
+      'catalog_country_of_origin': catalogCountryOfOrigin?.trim().isEmpty == true
+          ? null
+          : catalogCountryOfOrigin?.trim(),
+      'catalog_video_url': catalogVideoUrl?.trim().isEmpty == true ? null : catalogVideoUrl?.trim(),
+      'catalog_gallery_file_ids': catalogGalleryFileIds.isEmpty ? null : catalogGalleryFileIds,
     };
     // Remove only nulls we intentionally kept nullable
     // فیلدهای زیر حتی با null هم ارسال می‌شوند تا بک‌اند بتواند آن‌ها را به‌روزرسانی/پاک کند
@@ -268,6 +328,14 @@ class ProductFormData {
       imageUrl: product['image_url']?.toString(),
       defaultWarehouseId: _parseInt(product['default_warehouse_id']),
       isPublicCatalog: product['is_public_catalog'] == true,
+      catalogShortDescription: product['catalog_short_description']?.toString(),
+      catalogExpertReview: product['catalog_expert_review']?.toString(),
+      catalogSpecifications: _parseCatalogSpecifications(product['catalog_specifications']),
+      catalogBrand: product['catalog_brand']?.toString(),
+      catalogModel: product['catalog_model']?.toString(),
+      catalogCountryOfOrigin: product['catalog_country_of_origin']?.toString(),
+      catalogVideoUrl: product['catalog_video_url']?.toString(),
+      catalogGalleryFileIds: _parseStringList(product['catalog_gallery_file_ids']),
     );
   }
 
@@ -289,5 +357,18 @@ class ProductFormData {
       return value.whereType<int>().toSet();
     }
     return <int>{};
+  }
+
+  static List<CatalogSpecificationItem> _parseCatalogSpecifications(dynamic value) {
+    if (value is! List) return <CatalogSpecificationItem>[];
+    return value
+        .whereType<Map>()
+        .map((e) => CatalogSpecificationItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  static List<String> _parseStringList(dynamic value) {
+    if (value is! List) return <String>[];
+    return value.map((e) => e.toString()).where((s) => s.trim().isNotEmpty).toList();
   }
 }
