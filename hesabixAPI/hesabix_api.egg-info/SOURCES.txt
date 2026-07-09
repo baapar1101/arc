@@ -127,6 +127,7 @@ adapters/api/v1/ai/voice_ws.py
 adapters/api/v1/business/document_monetization.py
 adapters/api/v1/business/storage.py
 adapters/api/v1/helpers/product_request_helper.py
+adapters/api/v1/helpers/storage_upload_errors.py
 adapters/api/v1/integrations/bale.py
 adapters/api/v1/integrations/telegram.py
 adapters/api/v1/public/crm_chat_public.py
@@ -997,6 +998,7 @@ tests/test_chat_message_builder.py
 tests/test_distribution_service.py
 tests/test_health.py
 tests/test_hs60_loader.py
+tests/test_invoice_payment_remaining.py
 tests/test_invoice_profit_costing.py
 tests/test_invoice_tax_snapshot_refresh.py
 tests/test_legacy_import.py

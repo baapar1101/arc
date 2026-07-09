@@ -97,6 +97,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   OverlayEntry? _desktopOverlayEntry;
   int _highlightedIndex = -1;
   double _desktopFieldWidth = 0;
+  bool _suppressFieldNotifications = false;
 
   double _desktopOverlayHeight(_CustomerPickerState state) {
     if (state.isLoading && state.customers.isEmpty) return 120;
@@ -121,8 +122,17 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   void didUpdateWidget(covariant CustomerComboboxWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedCustomer?.id != widget.selectedCustomer?.id) {
-      _searchController.text = widget.selectedCustomer?.name ?? '';
+      _setFieldQuiet(widget.selectedCustomer?.name ?? '');
     }
+  }
+
+  void _setFieldQuiet(String text) {
+    _suppressFieldNotifications = true;
+    _searchController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _suppressFieldNotifications = false;
   }
 
   @override
@@ -148,7 +158,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         _loadRecentCustomers();
       }
     } else {
-      Future.delayed(const Duration(milliseconds: 150), () {
+      Future.delayed(const Duration(milliseconds: 180), () {
         if (!mounted || _fieldFocus.hasFocus) return;
         _removeDesktopOverlay();
       });
@@ -189,7 +199,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onTap: () {
+            onTapDown: (_) {
               _fieldFocus.unfocus();
               _removeDesktopOverlay();
             },
@@ -258,11 +268,13 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
               final selected = index == _highlightedIndex;
               return Material(
                 color: selected ? cs.primary.withValues(alpha: 0.10) : Colors.transparent,
-                child: ListTile(
-                  dense: true,
-                  title: Text(customer.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: customer.code != null ? Text('کد: ${customer.code}') : null,
-                  onTap: () => _selectCustomerFromOverlay(customer),
+                child: InkWell(
+                  onTapDown: (_) => _selectCustomerFromOverlay(customer),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(customer.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: customer.code != null ? Text('کد: ${customer.code}') : null,
+                  ),
                 ),
               );
             },
@@ -273,7 +285,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   }
 
   void _selectCustomerFromOverlay(Customer customer) {
-    _searchController.text = customer.name;
+    _setFieldQuiet(customer.name);
     widget.onCustomerChanged(customer);
     _removeDesktopOverlay();
     _fieldFocus.unfocus();
@@ -602,6 +614,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
           pickerStateNotifier: _pickerStateNotifier,
           selectedCustomer: widget.selectedCustomer,
           onCustomerSelected: (customer) {
+            _setFieldQuiet(customer.name);
             widget.onCustomerChanged(customer);
             Navigator.pop(bottomSheetContext);
           },
@@ -765,6 +778,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                 }
               },
               onChanged: (query) {
+                if (_suppressFieldNotifications) return;
                 final trimmed = query.trim();
                 if (trimmed.isEmpty && widget.selectedCustomer != null) {
                   widget.onCustomerChanged(null);

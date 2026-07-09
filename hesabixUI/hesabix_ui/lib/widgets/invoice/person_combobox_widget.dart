@@ -105,6 +105,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   OverlayEntry? _desktopOverlayEntry;
   int _highlightedIndex = -1;
   double _desktopFieldWidth = 0;
+  bool _suppressFieldNotifications = false;
 
   double _desktopOverlayHeight(_PersonPickerState state) {
     if (state.isLoading && state.persons.isEmpty) return 120;
@@ -129,8 +130,17 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   void didUpdateWidget(covariant PersonComboboxWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedPerson?.id != widget.selectedPerson?.id) {
-      _searchController.text = widget.selectedPerson?.displayName ?? '';
+      _setFieldQuiet(widget.selectedPerson?.displayName ?? '');
     }
+  }
+
+  void _setFieldQuiet(String text) {
+    _suppressFieldNotifications = true;
+    _searchController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _suppressFieldNotifications = false;
   }
 
   @override
@@ -156,7 +166,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         _loadRecentPersons();
       }
     } else {
-      Future.delayed(const Duration(milliseconds: 150), () {
+      Future.delayed(const Duration(milliseconds: 180), () {
         if (!mounted || _fieldFocus.hasFocus) return;
         _removeDesktopOverlay();
       });
@@ -197,7 +207,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onTap: () {
+            onTapDown: (_) {
               _fieldFocus.unfocus();
               _removeDesktopOverlay();
             },
@@ -261,11 +271,13 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
               final selected = index == _highlightedIndex;
               return Material(
                 color: selected ? cs.primary.withValues(alpha: 0.10) : Colors.transparent,
-                child: ListTile(
-                  dense: true,
-                  title: Text(person.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: person.personTypes.isNotEmpty ? Text(person.personTypes.first.persianName) : null,
-                  onTap: () => _selectPersonFromOverlay(person),
+                child: InkWell(
+                  onTapDown: (_) => _selectPersonFromOverlay(person),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(person.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: person.personTypes.isNotEmpty ? Text(person.personTypes.first.persianName) : null,
+                  ),
                 ),
               );
             },
@@ -524,12 +536,12 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
 
   void _selectPerson(Person? person) {
     if (person == null) {
-      _searchController.clear();
+      _setFieldQuiet('');
       widget.onChanged(null);
       return;
     }
-    
-    _searchController.text = person.displayName;
+
+    _setFieldQuiet(person.displayName);
     widget.onChanged(person);
   }
 
@@ -775,6 +787,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
                 }
               },
               onChanged: (query) {
+                if (_suppressFieldNotifications) return;
                 final trimmed = query.trim();
                 if (trimmed.isEmpty && widget.selectedPerson != null) {
                   widget.onChanged(null);

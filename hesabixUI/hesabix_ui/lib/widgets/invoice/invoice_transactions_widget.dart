@@ -690,16 +690,35 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     widget.onChanged(newTransactions);
   }
 
-  void _showTransactionDialog({
+  List<TransactionType> _availableTransactionTypesForInvoice() {
+    final showCheckExpense = widget.invoiceType == InvoiceType.purchase ||
+        widget.invoiceType == InvoiceType.salesReturn;
+    final all = TransactionType.allTypes;
+    if (showCheckExpense) return all;
+    return all.where((t) => t != TransactionType.checkExpense).toList();
+  }
+
+  Future<void> _showTransactionDialog({
     InvoiceTransaction? transaction,
     int? index,
     num? initialAmount,
-  }) {
+  }) async {
+    TransactionType? initialTransactionType;
+    if (transaction == null) {
+      initialTransactionType =
+          await InvoiceTransactionPreferences.resolveInitialTransactionType(
+        widget.businessId,
+        _availableTransactionTypesForInvoice(),
+      );
+      if (!mounted) return;
+    }
+
     showDialog(
       context: context,
       builder: (context) => TransactionDialog(
         transaction: transaction,
         initialAmount: initialAmount,
+        initialTransactionType: initialTransactionType,
         businessId: widget.businessId,
         calendarController: widget.calendarController,
         invoiceType: widget.invoiceType,
@@ -1047,6 +1066,8 @@ class TransactionDialog extends StatefulWidget {
   final InvoiceTransaction? transaction;
   /// هنگام افزودن تراکنش جدید، مقدار اولیهٔ فیلد مبلغ (مثلاً ماندهٔ فاکتور).
   final num? initialAmount;
+  /// نوع تراکنش پیش‌فرض (قبل از باز شدن دیالوگ resolve شده تا setState میانی فوکوس را نگیرد).
+  final TransactionType? initialTransactionType;
   final int businessId;
   final CalendarController calendarController;
   final ValueChanged<InvoiceTransaction> onSave;
@@ -1061,6 +1082,7 @@ class TransactionDialog extends StatefulWidget {
     super.key,
     this.transaction,
     this.initialAmount,
+    this.initialTransactionType,
     required this.businessId,
     required this.calendarController,
     required this.invoiceType,
@@ -1107,20 +1129,13 @@ class _TransactionDialogState extends State<TransactionDialog> {
   List<Map<String, dynamic>> _cashRegisters = [];
   List<Map<String, dynamic>> _pettyCashList = [];
   List<Map<String, dynamic>> _persons = [];
-  
-  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    if (widget.transaction != null) {
-      _selectedType = widget.transaction!.type;
-    } else {
-      _selectedType = TransactionType.bank;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _applySavedDefaultTransactionType();
-      });
-    }
+    _selectedType = widget.transaction?.type ??
+        widget.initialTransactionType ??
+        TransactionType.bank;
     _transactionDate = widget.transaction?.transactionDate ?? DateTime.now();
     if (widget.transaction != null) {
       _amountController.text =
@@ -1153,17 +1168,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
     _loadData();
   }
 
-  Future<void> _applySavedDefaultTransactionType() async {
-    if (!mounted || widget.transaction != null) return;
-    final allowed = _availableTransactionTypes();
-    final resolved = await InvoiceTransactionPreferences.resolveInitialTransactionType(
-      widget.businessId,
-      allowed,
-    );
-    if (!mounted || widget.transaction != null) return;
-    setState(() => _selectedType = resolved);
-  }
-  
   Future<void> _loadSelectedAccount() async {
     try {
       final response = await _accountService.getAccountsTree(businessId: widget.businessId);
@@ -1196,10 +1200,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
   }
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
-    
     try {
       // لود کردن بانک‌ها
       final bankResponse = await _bankService.list(
@@ -1231,10 +1231,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
       
     } catch (e) {
       // در صورت خطا، لیست‌ها خالی باقی می‌مانند
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
 
@@ -1303,7 +1299,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
                     children: [
                       // انتخاب نوع تراکنش
                       DropdownButtonFormField<TransactionType>(
-                        key: ValueKey(_selectedType),
                         initialValue: _selectedType,
                         decoration: const InputDecoration(
                           labelText: 'نوع تراکنش *',
@@ -1326,10 +1321,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                       const SizedBox(height: 16),
                       
                       // فیلدهای خاص بر اساس نوع تراکنش
-                      if (_isLoading)
-                        const Center(child: CircularProgressIndicator())
-                      else
-                        _buildTypeSpecificFields(),
+                      _buildTypeSpecificFields(),
                       const SizedBox(height: 16),
                       
                       // تاریخ تراکنش
@@ -1364,6 +1356,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                               controller: _amountController,
                               currencyUnit: widget.currencyUnit,
                               child: TextFormField(
+                                key: const ValueKey('transaction_amount_field'),
                                 controller: _amountController,
                                 decoration: InputDecoration(
                                   labelText: 'مبلغ *',
@@ -1395,6 +1388,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
                               controller: _commissionController,
                               currencyUnit: widget.currencyUnit,
                               child: TextFormField(
+                                key: const ValueKey('transaction_commission_field'),
                                 controller: _commissionController,
                                 decoration: InputDecoration(
                                   labelText: 'کارمزد',
