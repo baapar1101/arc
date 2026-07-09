@@ -12,6 +12,7 @@ WorkingDirectory=/opt/hesabix/app/hesabixAPI
 
 # Environment
 Environment="PYTHONUNBUFFERED=1"
+Environment="TZ=UTC"
 Environment="PYTHONPATH=/opt/hesabix/app/hesabixAPI"
 Environment="PATH=/opt/hesabix/app/hesabixAPI/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 

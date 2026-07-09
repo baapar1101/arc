@@ -9,10 +9,15 @@ from zoneinfo import ZoneInfo
 DEFAULT_BUSINESS_TIMEZONE = "Asia/Tehran"
 
 
-def business_timezone_name(_business_id: Optional[int] = None) -> str:
-	"""نام منطقهٔ زمانی کسب‌وکار؛ فعلاً پیش‌فرض تهران."""
-	# TODO: خواندن از تنظیمات کسب‌وکار وقتی فیلد timezone اضافه شد.
-	return DEFAULT_BUSINESS_TIMEZONE
+def business_timezone_name(business_id: Optional[int] = None) -> str:
+	"""نام منطقهٔ زمانی کسب‌وکار (یا پیش‌فرض سیستم)."""
+	if business_id is not None:
+		from app.services.business_timezone_service import get_business_display_timezone_cached
+
+		return get_business_display_timezone_cached(int(business_id))
+	from app.services.system_settings_service import get_system_display_timezone_cached
+
+	return get_system_display_timezone_cached()
 
 
 def business_today(business_id: Optional[int] = None) -> date:

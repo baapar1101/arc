@@ -1811,6 +1811,7 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=/usr/bin:/usr/local/bin:${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
+Environment=TZ=UTC
 # ! = run as root: daemon-reload + pip from deploy mirrors if needed (before alembic)
 ExecStartPre=!${api_dir}/deployment/systemd/hesabix-api-prestart.sh
 # Before start/restart: run migrations; service does not start if migrations fail
@@ -1864,6 +1865,7 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
+Environment=TZ=UTC
 ExecStart=${api_dir}/.venv/bin/python ${api_dir}/rq_worker.py
 Restart=on-failure
 RestartSec=10
@@ -1910,6 +1912,7 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
+Environment=TZ=UTC
 Environment=PYTHONPATH=${api_dir}
 ExecStart=${api_dir}/.venv/bin/python -m app.workers.notification_moderation_worker
 Restart=always

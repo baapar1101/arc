@@ -360,6 +360,8 @@ class BusinessResponse {
   final bool checkCreditEnabledByDefault;
   final bool publicCatalogShowContact;
   final bool publicCatalogShowBaseSalesPrice;
+  /// منطقهٔ زمانی نمایش (IANA)؛ null = پیش‌فرض سیستم
+  final String? displayTimezone;
   // تنظیمات محاسبه سود فاکتور
   final String? invoiceProfitCalculationMethod;
   final String? invoiceProfitCalculationBasis;
@@ -431,6 +433,7 @@ class BusinessResponse {
     this.checkCreditEnabledByDefault = false,
     this.publicCatalogShowContact = false,
     this.publicCatalogShowBaseSalesPrice = true,
+    this.displayTimezone,
     this.invoiceProfitCalculationMethod,
     this.invoiceProfitCalculationBasis,
     this.invoiceProfitIncludeOverhead = false,
@@ -513,6 +516,7 @@ class BusinessResponse {
       checkCreditEnabledByDefault: (json['check_credit_enabled_by_default'] as bool?) ?? false,
       publicCatalogShowContact: (json['public_catalog_show_contact'] as bool?) ?? false,
       publicCatalogShowBaseSalesPrice: (json['public_catalog_show_base_sales_price'] as bool?) ?? true,
+      displayTimezone: json['display_timezone'] as String?,
       invoiceProfitCalculationMethod: json['invoice_profit_calculation_method'] as String?,
       invoiceProfitCalculationBasis: json['invoice_profit_calculation_basis'] as String?,
       invoiceProfitIncludeOverhead: (json['invoice_profit_include_overhead'] as bool?) ?? false,

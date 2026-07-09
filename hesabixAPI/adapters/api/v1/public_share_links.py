@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.person import Person
 from adapters.db.session import get_db
-from app.core.responses import ApiError, success_response
+from app.core.responses import ApiError, success_response, format_datetime_fields
 from app.core.settings import get_settings
 from app.core.calendar import CalendarConverter
 from app.services.invoice_adjustments_service import payable_total_from_totals_dict
@@ -160,8 +160,14 @@ async def get_public_invoice_document_link(
 		payload = resolve_invoice_document_share_by_code(db, code)
 	except ApiError as exc:
 		raise HTTPException(status_code=exc.status_code, detail=exc.detail)
+	business_id = None
+	try:
+		business_id = int(((payload or {}).get("business") or {}).get("id"))
+	except Exception:
+		business_id = None
+	formatted_payload = format_datetime_fields(payload, request, business_id=business_id)
 	return success_response(
-		data=payload,
+		data=formatted_payload,
 		request=request,
 		message="اطلاعات فاکتور دریافت شد",
 	)

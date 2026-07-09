@@ -885,11 +885,24 @@ class BusinessUpdateRequest(BaseModel):
 		ge=0,
 		description="سقف مبلغ تخفیف کلی (اختیاری)",
 	)
+	display_timezone: Optional[str] = Field(
+		default=None,
+		max_length=80,
+		description="منطقهٔ زمانی نمایش (IANA مثل Asia/Tehran)؛ خالی = پیش‌فرض سیستم",
+	)
 	# تسعیر ارز فاکتور: as_of_source، document_date_effective، when_no_rate
 	fx_revaluation_policy: Optional[Dict[str, Any]] = Field(
 		default=None,
 		description="سیاست تسعیر ارز (JSON): document_date/registered_at، start/end of day، block یا allow_without_fx",
 	)
+
+	@validator("display_timezone", pre=True)
+	def _validate_display_timezone(cls, v):  # noqa: N805
+		if v is None:
+			return None
+		from app.services.business_timezone_service import normalize_business_display_timezone
+
+		return normalize_business_display_timezone(v)
 
 	@validator("fx_revaluation_policy", pre=True)
 	def _validate_fx_revaluation_policy_field(cls, v):  # noqa: N805

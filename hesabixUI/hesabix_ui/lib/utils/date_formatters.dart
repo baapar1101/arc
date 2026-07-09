@@ -83,31 +83,33 @@ class DateFormatters {
     
     // If it's a string, try to parse it as ISO datetime and format based on calendar
     if (dateData is String) {
+      final trimmed = dateData.trim();
+      if (trimmed.isEmpty) return '-';
+      // رشتهٔ جلالی از API (قبلاً localize شده) — بدون تبدیل مجدد
+      if (RegExp(r'^\d{4}/').hasMatch(trimmed)) {
+        return trimmed;
+      }
       try {
-        // Try to parse ISO format datetime
         DateTime? parsedDate;
-        if (dateData.contains('T') || dateData.contains(' ')) {
-          // ISO format with time: 2024-01-15T10:30:00 or 2024-01-15 10:30:00
-          final normalized = dateData.replaceAll(' ', 'T');
+        if (trimmed.contains('T') || trimmed.contains(' ')) {
+          final normalized = trimmed.replaceAll(' ', 'T');
           if (normalized.endsWith('Z')) {
-            parsedDate = DateTime.parse(normalized.substring(0, normalized.length - 1) + '+00:00').toLocal();
-          } else if (!normalized.contains('+') && !normalized.contains('-', 10)) {
-            // No timezone info, assume UTC
-            parsedDate = DateTime.parse(normalized + 'Z').toLocal();
-          } else {
             parsedDate = DateTime.parse(normalized).toLocal();
+          } else if (normalized.contains('+') || normalized.contains('-', 10)) {
+            parsedDate = DateTime.parse(normalized).toLocal();
+          } else {
+            // بدون offset: ساعت دیوار از API (قبلاً localize شده) — تبدیل UTC مجدد نکن
+            parsedDate = DateTime.parse(normalized);
           }
         } else {
-          // Date only: 2024-01-15
-          parsedDate = DateTime.parse(dateData).toLocal();
+          parsedDate = DateTime.parse(trimmed);
         }
-        
+
         if (parsedDate != null) {
           return HesabixDateUtils.formatDateTime(parsedDate, isJalali);
         }
       } catch (e) {
-        // If parsing fails, return the original string
-        return dateData;
+        return trimmed;
       }
     }
     
@@ -118,19 +120,23 @@ class DateFormatters {
   static String formatRelativeOrAbsoluteDateTime(String? dateString, {int relativeDaysThreshold = 7}) {
     if (dateString == null || dateString.isEmpty) return '-';
 
+    if (RegExp(r'^\d{4}/').hasMatch(dateString.trim())) {
+      return dateString;
+    }
+
     late final DateTime date;
     try {
       if (dateString.contains('T') || dateString.contains(' ')) {
         final normalized = dateString.replaceAll(' ', 'T');
         if (normalized.endsWith('Z')) {
-          date = DateTime.parse(normalized.substring(0, normalized.length - 1) + '+00:00').toLocal();
+          date = DateTime.parse(normalized).toLocal();
         } else if (!normalized.contains('+') && !normalized.contains('-', 10)) {
-          date = DateTime.parse(normalized + 'Z').toLocal();
+          date = DateTime.parse(normalized);
         } else {
           date = DateTime.parse(normalized).toLocal();
         }
       } else {
-        date = DateTime.parse(dateString).toLocal();
+        date = DateTime.parse(dateString);
       }
     } catch (_) {
       return dateString;

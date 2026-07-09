@@ -618,6 +618,11 @@ def get_current_user(
 	# تشخیص سال مالی از هدر X-Fiscal-Year-ID (آینده)
 	fiscal_year_id = _detect_fiscal_year_id(request)
 
+	try:
+		request.state.business_id = business_id
+	except Exception:
+		pass
+
 	auth_context = AuthContext(
 		user=user, 
 		api_key_id=obj.id,

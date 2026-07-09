@@ -45,6 +45,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   final _countryController = TextEditingController();
   final _provinceController = TextEditingController();
   final _cityController = TextEditingController();
+  final _displayTimezoneController = TextEditingController();
 
   BusinessType? _businessType;
   BusinessField? _businessField;
@@ -129,6 +130,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     _countryController.dispose();
     _provinceController.dispose();
     _cityController.dispose();
+    _displayTimezoneController.dispose();
     _defaultCreditLimitController.dispose();
     _invoiceProfitOverheadPercentController.dispose();
     _invoiceGlobalDiscountMaxPercentController.dispose();
@@ -155,6 +157,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _countryController.text = resp.country ?? '';
       _provinceController.text = resp.province ?? '';
       _cityController.text = resp.city ?? '';
+      _displayTimezoneController.text = resp.displayTimezone ?? '';
       _businessType = _resolveBusinessType(resp.businessType);
       _businessField = _resolveBusinessField(resp.businessField);
       _checkCreditEnabledByDefault = resp.checkCreditEnabledByDefault;
@@ -281,6 +284,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if ((orig.province ?? '') != province) payload['province'] = province.isEmpty ? null : province;
     final city = _cityController.text.trim();
     if ((orig.city ?? '') != city) payload['city'] = city.isEmpty ? null : city;
+    final displayTz = _displayTimezoneController.text.trim();
+    if ((orig.displayTimezone ?? '') != displayTz) {
+      payload['display_timezone'] = displayTz.isEmpty ? null : displayTz;
+    }
     // تنظیمات اعتبار
     final defaultCreditLimitStr = _defaultCreditLimitController.text.trim();
     final parsedLimit = double.tryParse(defaultCreditLimitStr.replaceAll(',', ''));
@@ -1057,6 +1064,13 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               ),
               const SizedBox(height: 12),
               _buildTextField(controller: _cityController, label: t.city),
+              const SizedBox(height: 12),
+              _buildTextField(
+                controller: _displayTimezoneController,
+                label: 'منطقهٔ زمانی نمایش',
+                hint: 'Asia/Tehran',
+                helperText: 'خالی = پیش‌فرض سیستم. فرمت IANA (مثل Asia/Tehran، Europe/Berlin)',
+              ),
               
               // بخش ارز پیش‌فرض (فقط برای کسب‌وکارهایی که ارز پیش‌فرض ندارند)
               if (_original?.defaultCurrency == null) ...[
@@ -2079,11 +2093,17 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     required String label,
     bool required = false,
     int maxLines = 1,
+    String? hint,
+    String? helperText,
   }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        helperText: helperText,
+      ),
       validator: (val) {
         if (required && (val == null || val.trim().isEmpty)) {
           return label;

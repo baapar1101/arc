@@ -615,12 +615,27 @@ def update_business(db: Session, business_id: int, business_data, owner_id: int)
                 db.flush()
     
     # به‌روزرسانی سایر فیلدها
+    if "display_timezone" in update_data:
+        from app.services.business_timezone_service import (
+            invalidate_business_display_timezone_cache,
+            normalize_business_display_timezone,
+        )
+
+        update_data["display_timezone"] = normalize_business_display_timezone(
+            update_data.get("display_timezone")
+        )
+
     for field, value in update_data.items():
         setattr(business, field, value)
-    
+
     # ذخیره تغییرات
     updated_business = business_repo.update(business)
-    
+
+    if "display_timezone" in update_data:
+        from app.services.business_timezone_service import invalidate_business_display_timezone_cache
+
+        invalidate_business_display_timezone_cache(business_id)
+
     return _business_to_dict(updated_business)
 
 
@@ -1441,6 +1456,7 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "check_credit_enabled_by_default": bool(getattr(business, "check_credit_enabled_by_default", False)),
         "public_catalog_show_contact": bool(getattr(business, "public_catalog_show_contact", False)),
         "public_catalog_show_base_sales_price": bool(getattr(business, "public_catalog_show_base_sales_price", True)),
+        "display_timezone": getattr(business, "display_timezone", None),
         # تنظیمات محاسبه سود فاکتور
         "invoice_profit_calculation_method": getattr(business, "invoice_profit_calculation_method", None),
         "invoice_profit_calculation_basis": getattr(business, "invoice_profit_calculation_basis", None),

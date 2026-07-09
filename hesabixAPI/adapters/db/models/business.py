@@ -219,7 +219,12 @@ class Business(Base):
         server_default="1",
         comment="نمایش قیمت فروش پایه در API عمومی کاتالوگ",
     )
-    
+    display_timezone: Mapped[str | None] = mapped_column(
+        String(80),
+        nullable=True,
+        comment="IANA timezone for datetime display; null = use system default",
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     

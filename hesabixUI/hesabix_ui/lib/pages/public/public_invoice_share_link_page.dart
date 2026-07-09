@@ -11,6 +11,7 @@ import 'package:hesabix_ui/config/app_config.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/services/public_invoice_share_service.dart';
+import 'package:hesabix_ui/utils/api_datetime_display.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart'
     show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, formatNumberForInput, parseFormattedDouble;
@@ -129,13 +130,21 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     return HesabixDateUtils.formatForDisplay(dt.toLocal(), _useJalaliCalendar);
   }
 
-  String _formatDateTimeField(dynamic raw) {
+  String _formatDateTimeField(dynamic raw, {Map<String, dynamic>? map, String key = 'registered_at'}) {
+    if (map != null) {
+      final display = resolveApiDateTimeDisplay(map, key);
+      if (display.isNotEmpty) return display;
+    }
     if (raw == null) return '—';
     final s = raw.toString();
     if (s.isEmpty) return '—';
-    final dt = DateTime.tryParse(s);
-    if (dt == null) return s;
-    return HesabixDateUtils.formatDateTime(dt.toLocal(), _useJalaliCalendar);
+    if (RegExp(r'^\d{4}/').hasMatch(s.trim())) return s;
+    try {
+      final dt = s.endsWith('Z') ? DateTime.parse(s).toLocal() : DateTime.parse(s);
+      return HesabixDateUtils.formatDateTime(dt, _useJalaliCalendar);
+    } catch (_) {
+      return s;
+    }
   }
 
   String _documentTypeLabel(String? type) {
@@ -658,7 +667,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   ) {
     final rows = <_MetaPair>[
       _MetaPair('تاریخ سند', _formatDateField(inv['document_date'])),
-      _MetaPair('زمان ثبت', _formatDateTimeField(inv['registered_at'])),
+      _MetaPair('زمان ثبت', _formatDateTimeField(inv['registered_at'], map: inv, key: 'registered_at')),
     ];
 
     final due = extra['due_date'];

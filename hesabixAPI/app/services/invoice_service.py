@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date, timedelta, timezone
+from app.core.datetime_utils import utc_now, utc_now_aware, utc_naive_to_iso_z
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 import re
@@ -4177,7 +4178,7 @@ def create_invoice(
             document_date=document_date,
             currency_id=int(currency_id),
             created_by_user_id=user_id,
-            registered_at=datetime.utcnow(),
+            registered_at=utc_now_aware(),
             is_proforma=bool(data.get("is_proforma", False)),
             description=data.get("description"),
             extra_info=new_extra_info,
@@ -4209,7 +4210,7 @@ def create_invoice(
                 document_date=document_date,
                 currency_id=int(currency_id),
                 created_by_user_id=user_id,
-                registered_at=datetime.utcnow(),
+                registered_at=utc_now_aware(),
                 is_proforma=bool(data.get("is_proforma", False)),
                 description=data.get("description"),
                 extra_info=new_extra_info,
@@ -6692,7 +6693,7 @@ def invoice_document_to_dict(
         "business_id": document.business_id,
         "document_type": document.document_type,
         "document_date": document.document_date.isoformat(),
-        "registered_at": document.registered_at.isoformat(),
+        "registered_at": utc_naive_to_iso_z(document.registered_at),
         "currency_id": document.currency_id,
         "currency_code": getattr(currency, "code", None),
         "created_by_user_id": document.created_by_user_id,
@@ -9224,7 +9225,7 @@ def invoice_documents_to_list_dicts(
                 "business_id": doc.business_id,
                 "document_type": doc.document_type,
                 "document_date": doc.document_date.isoformat(),
-                "registered_at": doc.registered_at.isoformat(),
+                "registered_at": utc_naive_to_iso_z(doc.registered_at),
                 "currency_id": doc.currency_id,
                 "currency_code": getattr(currency, "code", None),
                 "created_by_user_id": doc.created_by_user_id,

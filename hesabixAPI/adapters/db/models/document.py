@@ -6,6 +6,7 @@ from sqlalchemy import String, Integer, DateTime, Boolean, ForeignKey, JSON, Dat
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from adapters.db.session import Base
+from app.core.datetime_utils import utc_now_aware
 
 
 class Document(Base):
@@ -20,7 +21,7 @@ class Document(Base):
 	fiscal_year_id: Mapped[int] = mapped_column(Integer, ForeignKey("fiscal_years.id", ondelete="RESTRICT"), nullable=False, index=True)
 	currency_id: Mapped[int] = mapped_column(Integer, ForeignKey("currencies.id", ondelete="RESTRICT"), nullable=False, index=True)
 	created_by_user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
-	registered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	registered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now_aware, nullable=False)
 	document_date: Mapped[date] = mapped_column(Date, nullable=False)
 	document_type: Mapped[str] = mapped_column(String(50), nullable=False)
 	is_proforma: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
@@ -28,8 +29,8 @@ class Document(Base):
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	developer_settings: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	project_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
-	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now_aware, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now_aware, onupdate=utc_now_aware, nullable=False)
 
 	# Relationships
 	business = relationship("Business", back_populates="documents")

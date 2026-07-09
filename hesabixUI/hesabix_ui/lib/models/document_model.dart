@@ -94,7 +94,7 @@ class DocumentModel {
       fiscalYearId: json['fiscal_year_id'] as int,
       currencyId: json['currency_id'] as int,
       createdByUserId: json['created_by_user_id'] as int,
-      registeredAt: _parseDateTime(json['registered_at']),
+      registeredAt: _parseDateTime(json['registered_at_raw'] ?? json['registered_at']),
       // document_date در بسیاری از پاسخ‌ها (به‌خصوص جلالی) رشته‌ی غیر-ISO است و قابل parse نیست.
       // برای داشتن DateTime معتبر، از document_date_raw (ISO/Gregorian) استفاده می‌کنیم.
       documentDate: documentDateRawIso != null
@@ -220,27 +220,22 @@ class DocumentModel {
   /// دریافت وضعیت سند
   String get statusText => isProforma ? 'پیش‌نویس' : 'قطعی';
 
-  /// Parse DateTime from various formats
+  /// Parse DateTime from various formats (prefers UTC ISO with Z from API *_raw fields).
   static DateTime _parseDateTime(dynamic value) {
-    if (value == null) return DateTime.now();
+    if (value == null) return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
     if (value is DateTime) return value;
-    
-    String dateStr = value.toString();
-    
-    // Try ISO format first
+
+    final dateStr = value.toString().trim();
+    if (dateStr.isEmpty) return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
+
     try {
-      return DateTime.parse(dateStr);
-    } catch (e) {
-      // If ISO parse fails, try other formats
-      // Format: "1404/07/23 14:02:20" or "1404/07/23"
-      try {
-        // Remove time if exists and just use current datetime
-        // Since we can't easily parse Jalali dates without conversion
-        // we'll just return a valid DateTime
-        return DateTime.now();
-      } catch (e) {
-        return DateTime.now();
+      if (dateStr.endsWith('Z')) {
+        return DateTime.parse(dateStr).toLocal();
       }
+      return DateTime.parse(dateStr).toLocal();
+    } catch (_) {
+      // Jalali display string from API — cannot convert to DateTime reliably
+      return DateTime.fromMillisecondsSinceEpoch(0, isUtc: true);
     }
   }
 }

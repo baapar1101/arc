@@ -69,6 +69,19 @@ class InvoiceListItem {
       return DateTime.tryParse(s) ?? DateTime.now();
     }
 
+    DateTime? _parseRegisteredAt(Map<String, dynamic> json) {
+      final raw = json['registered_at_raw'] ?? json['registered_at'];
+      if (raw == null) return null;
+      final s = raw.toString().trim();
+      if (s.isEmpty) return null;
+      if (RegExp(r'^\d{4}/').hasMatch(s)) return null;
+      try {
+        return (s.endsWith('Z') ? DateTime.parse(s) : DateTime.parse(s)).toLocal();
+      } catch (_) {
+        return null;
+      }
+    }
+
     double? _toDouble(dynamic v) {
       if (v == null) return null;
       if (v is num) return v.toDouble();
@@ -81,7 +94,7 @@ class InvoiceListItem {
       documentType: json['document_type']?.toString() ?? '',
       documentTypeName: json['document_type_name']?.toString() ?? json['document_type']?.toString() ?? '',
       documentDate: _parseDate(json['document_date']),
-      registeredAt: json['registered_at'] != null ? DateTime.tryParse(json['registered_at'].toString()) : null,
+      registeredAt: _parseRegisteredAt(json),
       totalAmount: _toDouble(json['total_amount']),
       currencyCode: json['currency_code']?.toString(),
       createdByName: json['created_by_name']?.toString(),

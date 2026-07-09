@@ -1,76 +1,109 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 from datetime import datetime, date, timezone as dt_timezone
 
 from fastapi import HTTPException, status, Request
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .calendar import CalendarConverter
+from .datetime_utils import (
+	localize_assumed_utc_naive_for_display,
+	resolve_display_timezone_from_request,
+	resolve_display_timezone_name,
+	utc_naive_to_iso_z,
+)
 
 
-def success_response(data: Any, request: Request = None, message: str = None, **kwargs) -> dict[str, Any]:
-	response = {"success": True}
-	
-	# Add data if provided
-	if data is not None:
-		response["data"] = data
-	
-	# Add extra fields (e.g. restricted_to_self)
-	response.update(kwargs)
-	
-	# Add message if provided (translate if translator exists)
-	if message is not None:
-		translated = message
-		try:
-			if request is not None and hasattr(request.state, 'translator') and request.state.translator is not None:
-				translated = request.state.translator.t(message, default=message)
-		except Exception:
-			translated = message
-		response["message"] = translated
-	
-	# Add calendar type information if request is available
-	if request and hasattr(request.state, 'calendar_type'):
-		response["calendar_type"] = request.state.calendar_type
-	
-	return response
+# Backward-compatible alias
+_localize_assumed_utc_naive_for_display = localize_assumed_utc_naive_for_display
+
+_DATETIME_STRING_FIELDS = frozenset({
+	"registered_at",
+	"created_at",
+	"updated_at",
+	"deleted_at",
+	"deletion_requested_at",
+	"completed_at",
+	"sent_at",
+	"read_at",
+	"last_login_at",
+	"expires_at",
+	"revoked_at",
+	"paid_at",
+	"viewed_at",
+	"last_viewed_at",
+})
 
 
-def _localize_assumed_utc_naive_for_display(dt: datetime, tz_name: str) -> datetime:
-	"""
-	قرارداد: datetime بدون tz در DB به‌عنوان UTC ذخیره شده است.
-	خروجی: همان لحظه به‌صورت «ساعت دیوار» در منطقهٔ نمایش سیستم (naive برای تبدیل تقویم).
-	"""
-	name = (tz_name or "Asia/Tehran").strip() or "Asia/Tehran"
+def _try_parse_stored_utc_naive(value: Any, field_key: str) -> datetime | None:
+	if isinstance(value, datetime):
+		return value
+	if field_key not in _DATETIME_STRING_FIELDS and not field_key.endswith("_at"):
+		return None
+	if not isinstance(value, str):
+		return None
+	s = value.strip()
+	if not s:
+		return None
 	try:
-		tz = ZoneInfo(name)
-	except ZoneInfoNotFoundError:
-		tz = ZoneInfo("Asia/Tehran")
-	if dt.tzinfo is None:
-		utc_dt = dt.replace(tzinfo=dt_timezone.utc)
-	else:
-		utc_dt = dt.astimezone(dt_timezone.utc)
-	return utc_dt.astimezone(tz).replace(tzinfo=None)
+		dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+	except Exception:
+		return None
+	if dt.tzinfo is not None:
+		return dt.astimezone(dt_timezone.utc).replace(tzinfo=None)
+	return dt
 
 
-def format_datetime_fields(data: Any, request: Request) -> Any:
-	"""Recursively format datetime fields based on calendar type and system display timezone."""
-	if not request or not hasattr(request.state, 'calendar_type'):
+def _resolve_business_id_for_formatting(
+	data: Any,
+	request: Request | None,
+	business_id: Optional[int],
+) -> Optional[int]:
+	if business_id is not None:
+		return int(business_id)
+	if request is not None:
+		try:
+			if hasattr(request.state, "business_id") and request.state.business_id is not None:
+				return int(request.state.business_id)
+		except Exception:
+			pass
+	if isinstance(data, dict):
+		raw = data.get("business_id")
+		if raw is not None:
+			try:
+				return int(raw)
+			except Exception:
+				pass
+	return None
+
+
+def format_datetime_fields(
+	data: Any,
+	request: Request,
+	business_id: Optional[int] = None,
+) -> Any:
+	"""Recursively format datetime fields based on calendar type and business/system timezone."""
+	if not request or not hasattr(request.state, "calendar_type"):
 		return data
 
-	from app.services.system_settings_service import get_system_display_timezone_cached
-
-	tz_name = get_system_display_timezone_cached()
+	resolved_business_id = _resolve_business_id_for_formatting(data, request, business_id)
+	tz_name = resolve_display_timezone_name(resolved_business_id)
 	return _format_datetime_fields_impl(data, request, tz_name)
 
 
 def _format_datetime_fields_impl(data: Any, request: Request, tz_name: str) -> Any:
 	calendar_type = request.state.calendar_type
 
-	# Fields that should show only date (no time) and return as string (not object)
 	DATE_ONLY_FIELDS = {
-		'issue_date', 'due_date', 'start_date', 'end_date', 'document_date', 'occurs_on',
-		'run_date', 'hire_date', 'termination_date',
+		"issue_date",
+		"due_date",
+		"start_date",
+		"end_date",
+		"document_date",
+		"occurs_on",
+		"run_date",
+		"hire_date",
+		"termination_date",
 	}
 
 	if isinstance(data, dict):
@@ -78,55 +111,48 @@ def _format_datetime_fields_impl(data: Any, request: Request, tz_name: str) -> A
 		for key, value in data.items():
 			if value is None:
 				formatted_data[key] = None
-			elif isinstance(value, datetime):
-				value = _localize_assumed_utc_naive_for_display(value, tz_name)
-				# For date-only fields (like issue_date, due_date), use date_only format
+				continue
+
+			parsed_dt = _try_parse_stored_utc_naive(value, key)
+			if parsed_dt is not None:
+				value = parsed_dt
+
+			if isinstance(value, datetime):
+				utc_source = value
+				value = localize_assumed_utc_naive_for_display(value, tz_name)
 				is_date_only = key in DATE_ONLY_FIELDS
 				if is_date_only:
-					# Format the main date field as date only (no time)
 					if calendar_type == "jalali":
 						formatted_data[key] = CalendarConverter.to_jalali(value)["date_only"]
 					else:
-						# Extract date part only (YYYY-MM-DD)
 						formatted_data[key] = value.date().isoformat()
 				else:
-					# Format the main date field based on calendar type (with time)
 					if calendar_type == "jalali":
 						formatted_data[key] = CalendarConverter.to_jalali(value)["formatted"]
 					else:
 						formatted_data[key] = value.isoformat()
-				
-				# Add formatted date as additional field
+
 				formatted_data[f"{key}_formatted"] = CalendarConverter.format_datetime(value, calendar_type)
-				# Convert raw date to the same calendar type as the formatted date
-				if calendar_type == "jalali":
-					if is_date_only:
-						formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(value)["date_only"]
-					else:
-						formatted_data[f"{key}_raw"] = CalendarConverter.to_jalali(value)["formatted"]
+				# *_raw همیشه UTC ISO با Z برای پارس ماشینی در کلاینت
+				if is_date_only:
+					local_date = localize_assumed_utc_naive_for_display(
+						datetime.combine(utc_source.date(), datetime.min.time()),
+						tz_name,
+					)
+					formatted_data[f"{key}_raw"] = local_date.date().isoformat()
 				else:
-					if is_date_only:
-						formatted_data[f"{key}_raw"] = value.date().isoformat()
-					else:
-						formatted_data[f"{key}_raw"] = value.isoformat()
+					formatted_data[f"{key}_raw"] = utc_naive_to_iso_z(utc_source)
 			elif isinstance(value, date):
-				# Convert date to datetime for processing
 				dt_value = datetime.combine(value, datetime.min.time())
-				dt_value = _localize_assumed_utc_naive_for_display(dt_value, tz_name)
-				# Check if this is a date-only field
+				dt_value = localize_assumed_utc_naive_for_display(dt_value, tz_name)
 				is_date_only = key in DATE_ONLY_FIELDS
-				
-				# Format the main date field based on calendar type
+
 				if calendar_type == "jalali":
 					formatted_data[key] = CalendarConverter.to_jalali(dt_value)["date_only"]
 				else:
 					formatted_data[key] = dt_value.date().isoformat()
-				
-				# Add formatted and raw fields for all date fields (including DATE_ONLY_FIELDS)
-				# This allows frontend to properly parse dates in both formats
+
 				formatted_data[f"{key}_formatted"] = CalendarConverter.format_datetime(dt_value, calendar_type)
-				# Raw date should always be in ISO format (Gregorian) for parsing
-				# This allows frontend to use DateTime.tryParse() or similar methods
 				if is_date_only:
 					formatted_data[f"{key}_raw"] = dt_value.date().isoformat()
 				else:
@@ -136,12 +162,34 @@ def _format_datetime_fields_impl(data: Any, request: Request, tz_name: str) -> A
 			else:
 				formatted_data[key] = value
 		return formatted_data
-	
-	elif isinstance(data, list):
+
+	if isinstance(data, list):
 		return [_format_datetime_fields_impl(item, request, tz_name) for item in data]
-	
-	else:
-		return data
+
+	return data
+
+
+def success_response(data: Any, request: Request = None, message: str = None, **kwargs) -> dict[str, Any]:
+	response = {"success": True}
+
+	if data is not None:
+		response["data"] = data
+
+	response.update(kwargs)
+
+	if message is not None:
+		translated = message
+		try:
+			if request is not None and hasattr(request.state, "translator") and request.state.translator is not None:
+				translated = request.state.translator.t(message, default=message)
+		except Exception:
+			translated = message
+		response["message"] = translated
+
+	if request and hasattr(request.state, "calendar_type"):
+		response["calendar_type"] = request.state.calendar_type
+
+	return response
 
 
 class ApiError(HTTPException):
@@ -176,4 +224,3 @@ class ApiError(HTTPException):
 				"error": error_payload,
 			},
 		)
-

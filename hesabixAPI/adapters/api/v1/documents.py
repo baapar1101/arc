@@ -13,6 +13,11 @@ from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.datetime_utils import (
+	export_filename_timestamp,
+	format_generated_at_for_pdf,
+	resolve_calendar_type_for_request,
+)
 from app.core.cache import get_cache
 from app.core.response_cache import cache_response
 from app.services.document_service import (
@@ -202,7 +207,8 @@ async def export_documents_pdf_endpoint(
     # Locale
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     is_fa = locale == "fa"
-    now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    calendar_type = resolve_calendar_type_for_request(request, is_fa)
+    now = format_generated_at_for_pdf(business_id, calendar_type)
     title_text = "لیست اسناد حسابداری" if is_fa else "Documents List"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
@@ -291,7 +297,7 @@ async def export_documents_pdf_endpoint(
         },
     )
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
-    filename = f"documents_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"documents_{business_id}_{export_filename_timestamp(business_id)}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -567,7 +573,14 @@ async def get_document_pdf_endpoint(
     # Locale
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     is_fa = locale == "fa"
-    now_dt = datetime.datetime.now()
+    from app.core.datetime_utils import (
+        localize_assumed_utc_naive_for_display,
+        resolve_display_timezone_name,
+    )
+    from app.core.business_calendar import business_now
+
+    tz_name = resolve_display_timezone_name(business_id)
+    now_dt = business_now(business_id).replace(tzinfo=None)
 
     # فونت فارسی (data URI) برای خروجی بهتر در PDF
     fa_font_url_regular, fa_font_url_bold = load_farsi_font_data_uris()
@@ -634,6 +647,9 @@ async def get_document_pdf_endpoint(
                 reg_dt = reg_raw
             else:
                 reg_dt = datetime.datetime.fromisoformat(str(reg_raw).replace("Z", "+00:00"))
+                if reg_dt.tzinfo is not None:
+                    reg_dt = reg_dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+            reg_dt = localize_assumed_utc_naive_for_display(reg_dt, tz_name)
             reg_fmt = CalendarConverter.format_datetime(reg_dt, calendar_type)
             registered_at_display = _trim_seconds(reg_fmt.get("formatted"))
         except Exception:
@@ -897,7 +913,7 @@ async def get_document_pdf_endpoint(
 
     def _slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "document"
-    filename = f"document_{_slugify(doc.get('code'))}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"document_{_slugify(doc.get('code'))}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -1794,7 +1810,7 @@ async def export_top_suppliers_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
     
     return Response(
@@ -2210,7 +2226,7 @@ async def export_daily_purchases_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
     
     return Response(
@@ -2440,13 +2456,7 @@ async def export_daily_purchases_report_pdf(
         paper_size = None
         orientation = None
 
-    generated_at = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
-    if is_fa:
-        try:
-            out = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
-            generated_at = str(out.get("formatted") or generated_at)
-        except Exception:
-            pass
+    generated_at = format_generated_at_for_pdf(business_id, calendar_type)
 
     title_text = "گزارش خرید روزانه" if is_fa else "Daily Purchases Report"
     try:
@@ -2498,7 +2508,7 @@ async def export_daily_purchases_report_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -3192,7 +3202,7 @@ async def export_trial_balance_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
 
     return Response(
@@ -3639,12 +3649,7 @@ async def export_trial_balance_report_pdf(
         cal_header = (request.headers.get("X-Calendar-Type", "jalali") or "jalali").lower()
         calendar_type = "jalali" if cal_header in ["jalali", "persian", "shamsi"] else "gregorian"
     
-    try:
-        from app.core.calendar import CalendarConverter
-        formatted_now = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
-        now = formatted_now.get("formatted") or formatted_now.get("date_time") or datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
-    except Exception:
-        now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    now = format_generated_at_for_pdf(business_id, calendar_type)
 
     # Build filters summary (show selected filters in PDF)
     filters: list[tuple[str, str]] = []
@@ -3935,7 +3940,7 @@ async def export_trial_balance_report_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -4305,7 +4310,7 @@ async def export_general_ledger_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
 
     return Response(
         content=content,
@@ -4593,12 +4598,7 @@ async def export_general_ledger_report_pdf(
     headers_html = "".join(f"<th>{esc(h)}</th>" for h in headers)
 
     # Date report (calendar-aware)
-    try:
-        from app.core.calendar import CalendarConverter
-        formatted_now = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
-        now_str = formatted_now.get("formatted") or formatted_now.get("date_time") or datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
-    except Exception:
-        now_str = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+    now_str = format_generated_at_for_pdf(business_id, calendar_type)
 
     title_text = "گزارش دفتر کل" if is_fa else "General Ledger Report"
     label_biz = "نام کسب‌وکار" if is_fa else "Business Name"
@@ -4757,7 +4757,7 @@ async def export_general_ledger_report_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -5275,7 +5275,7 @@ async def export_accounts_review_report_excel(
     def slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", str(text)).strip("_")
 
-    filename = f"accounts_review_{slugify(biz_name) or business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"accounts_review_{slugify(biz_name) or business_id}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
 
     return Response(
@@ -5482,12 +5482,7 @@ async def export_accounts_review_report_pdf(
     if not calendar_type:
         cal_header = (request.headers.get("X-Calendar-Type", "jalali") or "jalali").lower()
         calendar_type = "jalali" if cal_header in ["jalali", "persian", "shamsi"] else "gregorian"
-    try:
-        from app.core.calendar import CalendarConverter
-        formatted_now = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
-        now = formatted_now.get("formatted") or formatted_now.get("date_time") or datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
-    except Exception:
-        now = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+    now = format_generated_at_for_pdf(business_id, calendar_type)
 
     filters = []
     fy_obj = None
@@ -5607,7 +5602,7 @@ async def export_accounts_review_report_pdf(
     def slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", str(text)).strip("_")
 
-    filename = f"accounts_review_{slugify(business_name) or business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"accounts_review_{slugify(business_name) or business_id}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -6160,7 +6155,7 @@ async def export_journal_ledger_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
     
     return Response(
@@ -6445,7 +6440,8 @@ async def export_journal_ledger_report_pdf(
         business_name = ""
     
     # Prepare data for HTML
-    now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    calendar_type = resolve_calendar_type_for_request(request, is_fa)
+    now = format_generated_at_for_pdf(business_id, calendar_type)
     title_text = "گزارش دفتر روزنامه" if is_fa else "Journal Ledger Report"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
@@ -6769,7 +6765,7 @@ async def export_journal_ledger_report_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.pdf"
     
     return Response(
         content=pdf_bytes,
