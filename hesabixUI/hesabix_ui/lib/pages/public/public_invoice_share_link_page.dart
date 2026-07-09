@@ -12,6 +12,8 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/services/public_invoice_share_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart'
+    show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, formatNumberForInput, parseFormattedDouble;
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
@@ -1193,7 +1195,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
               ),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: _payBusy ? null : () => _onOnlinePay(rem),
+              onPressed: _payBusy ? null : () => _onOnlinePay(rem, curSuffix),
               icon: _payBusy
                   ? const SizedBox(
                       width: 18,
@@ -1209,27 +1211,49 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     );
   }
 
-  Future<void> _onOnlinePay(double maxRemaining) async {
+  Future<void> _onOnlinePay(double maxRemaining, String? currencyCode) async {
     if (maxRemaining <= 0 || !mounted) return;
-    final ctrl = TextEditingController(text: maxRemaining.toStringAsFixed(0));
+    final currency = currencyCode?.trim();
+    final currencyLabel = currency != null && currency.isNotEmpty ? ' ($currency)' : '';
+    final maxFormatted = _formatInt(maxRemaining);
+    final maxHint = currency != null && currency.isNotEmpty ? '$maxFormatted $currency' : maxFormatted;
+    final ctrl = TextEditingController(text: formatNumberForInput(maxRemaining.round()));
     double? amount;
     try {
       amount = await showDialog<double>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('مبلغ پرداخت (ریال)'),
-          content: TextField(
-            controller: ctrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: false),
-            decoration: InputDecoration(
-              hintText: 'حداکثر ${_formatInt(maxRemaining)}',
-            ),
+          title: Text('مبلغ پرداخت$currencyLabel'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'مانده قابل پرداخت: $maxHint',
+                style: Theme.of(ctx).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                inputFormatters: const [
+                  EnglishDigitsFormatter(),
+                  ThousandsSeparatorInputFormatter(allowDecimal: false),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'مبلغ',
+                  hintText: 'حداکثر $maxHint',
+                  suffixText: currency,
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
             FilledButton(
               onPressed: () {
-                final v = double.tryParse(ctrl.text.replaceAll(',', ''));
+                final v = parseFormattedDouble(ctrl.text);
                 if (v == null || v <= 0) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     const SnackBar(content: Text('مبلغ معتبر وارد کنید')),
@@ -1238,7 +1262,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                 }
                 if (v - maxRemaining > 0.01) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('مبلغ نمی‌تواند از مانده (${_formatInt(maxRemaining)}) بیشتر باشد')),
+                    SnackBar(content: Text('مبلغ نمی‌تواند از مانده ($maxHint) بیشتر باشد')),
                   );
                   return;
                 }

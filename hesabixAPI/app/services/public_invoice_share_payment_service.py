@@ -145,9 +145,9 @@ def start_public_invoice_share_payment(
 	if amt <= 0:
 		raise ApiError("INVALID_AMOUNT", "مبلغ باید بزرگتر از صفر باشد", http_status=400)
 
-	# حداقل عملی برای درگاه‌های رایج (ریال)
-	if amt < Decimal("1000"):
-		raise ApiError("AMOUNT_TOO_SMALL", "حداقل مبلغ پرداخت ۱۰۰۰ ریال است", http_status=400)
+	# حداقل عملی برای درگاه‌های رایج ایران (بیت‌پی و زرین‌پال: ۵۰۰۰ ریال)
+	if amt < Decimal("5000"):
+		raise ApiError("AMOUNT_TOO_SMALL", "حداقل مبلغ پرداخت ۵٬۰۰۰ ریال است", http_status=400)
 
 	remaining_info = calculate_invoice_remaining(db, int(link.business_id), int(document.id))
 	remaining = Decimal(str(remaining_info.get("remaining") or 0))
@@ -220,11 +220,15 @@ def start_public_invoice_share_payment(
 			amount=float(amt),
 			gateway_id=int(gateway_id),
 		)
+	except ApiError:
+		tx.status = "failed"
+		db.flush()
+		raise
 	except Exception as ex:
 		logger.exception("public_invoice_share_gateway_init_failed", exc_info=ex)
 		tx.status = "failed"
 		db.flush()
-		raise ApiError("GATEWAY_INIT_FAILED", f"خطا در ایجاد لینک پرداخت: {ex}", http_status=502) from ex
+		raise ApiError("GATEWAY_INIT_FAILED", "خطا در ایجاد لینک پرداخت", http_status=502) from ex
 
 	db.flush()
 	return {

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 
@@ -11,6 +12,16 @@ from app.core.responses import ApiError
 from adapters.db.models.payment_gateway import PaymentGateway
 from adapters.db.models.wallet import WalletTransaction
 from app.services.wallet_service import confirm_top_up
+
+logger = logging.getLogger(__name__)
+
+_BITPAY_ERROR_MESSAGES: Dict[int, str] = {
+	-1: "کلید API بیت‌پی نامعتبر است",
+	-2: "مبلغ کمتر از حداقل ۵٬۰۰۰ ریال است",
+	-3: "آدرس بازگشت (callback) نامعتبر است",
+	-4: "درگاه بیت‌پی فعال نیست",
+	-5: "شناسه فاکتور تکراری است",
+}
 
 
 @dataclass
@@ -387,6 +398,7 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 	# توضیحات از تراکنش
 	data["description"] = str(user_description)
 	id_get: Optional[str] = None
+	response_text = ""
 	try:
 		with httpx.Client(timeout=10.0) as client:
 			# ارسال به صورت form data (نه JSON)
@@ -402,11 +414,28 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 				# اگر عدد نبود، ممکن است خطا باشد
 				id_get = None
 	except Exception as e:
-		# در محیط توسعه، می‌توان یک id_get تستی تولید کرد
+		logger.warning("bitpay_gateway_send_request_failed tx_id=%s amount=%s error=%s", tx_id, amount, e)
 		id_get = None
 	if not id_get:
-		# بررسی خطاهای احتمالی بر اساس مستندات
 		error_msg = "امکان ایجاد تراکنش در بیت‌پی نیست"
+		try:
+			err_code = int(response_text)
+			if err_code < 0:
+				error_msg = _BITPAY_ERROR_MESSAGES.get(err_code, f"خطای بیت‌پی (کد {err_code})")
+				logger.warning(
+					"bitpay_gateway_send_rejected tx_id=%s amount=%s code=%s",
+					tx_id,
+					amount,
+					err_code,
+				)
+		except ValueError:
+			if response_text:
+				logger.warning(
+					"bitpay_gateway_send_unexpected_response tx_id=%s amount=%s response=%s",
+					tx_id,
+					amount,
+					response_text[:200],
+				)
 		raise ApiError("GATEWAY_INIT_FAILED", error_msg, http_status=502)
 	# ساخت لینک پرداخت
 	payment_url = f"{base_url}/gateway-{id_get}-get"

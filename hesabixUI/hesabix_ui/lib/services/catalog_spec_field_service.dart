@@ -11,7 +11,7 @@ class CatalogSpecFieldService {
   }) async {
     final res = await _apiClient.get<Map<String, dynamic>>(
       '/api/v1/catalog-spec-fields/business/$businessId',
-      queryParameters: {
+      query: {
         'active_only': activeOnly,
         'take': take,
         'skip': 0,
