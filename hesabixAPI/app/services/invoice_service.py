@@ -9146,10 +9146,10 @@ def _invoice_total_amount_for_document(
     extra_info = document.extra_info or {}
     totals = extra_info.get("totals", {})
     if isinstance(totals, dict):
-        if any(k in totals for k in ("tax", "adjustments_net", "adjustments_tax")):
+        if "net" in totals or "gross" in totals:
             try:
-                from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
-                return total_with_tax_from_totals_dict(totals)
+                from app.services.invoice_adjustments_service import payable_total_from_totals_dict
+                return payable_total_from_totals_dict(totals)
             except (ValueError, TypeError):
                 pass
         if "net" in totals:

@@ -14,6 +14,7 @@ import 'package:hesabix_ui/services/public_invoice_share_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart'
     show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, formatNumberForInput, parseFormattedDouble;
+import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
@@ -1088,7 +1089,12 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                 strong: true,
               )
             else if (totals['net'] != null)
-              _totRow('مبلغ قابل پرداخت${s != '' ? s : ''}', totals['net'], theme, strong: true),
+              _totRow(
+                'مبلغ قابل پرداخت${s != '' ? s : ''}',
+                invoicePayableTotalFromTotals(Map<String, dynamic>.from(totals)) ?? totals['net'],
+                theme,
+                strong: true,
+              ),
             if (totals.isEmpty && !hasAdjustments)
               const Text('جمعی ثبت نشده است.'),
           ],

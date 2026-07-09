@@ -41,8 +41,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.business_print_settings import BusinessPrintSettings
 from adapters.db.models.user import User
 from app.core.responses import ApiError
-from app.services import invoice_service
-from app.services.invoice_bulk_upsert_service import bulk_upsert_invoices_integration
+from app.services.invoice_adjustments_service import payable_total_from_extra_info
 from app.services.invoice_service import (
     create_invoice,
     update_invoice,
@@ -2808,12 +2807,12 @@ async def search_invoices_endpoint(
 		except Exception:
 			item["is_installment_sale"] = False
 
-		# total_amount from extra_info.totals.net if available
+		# total_amount = مبلغ قابل پرداخت (شامل اضافات/کسورات)
 		total_amount = None
 		try:
-			totals = (item.get('extra_info') or {}).get('totals') or {}
-			if isinstance(totals, dict) and 'net' in totals:
-				total_amount = totals.get('net')
+			payable = payable_total_from_extra_info(item.get("extra_info"))
+			if payable is not None:
+				total_amount = float(payable)
 		except Exception:
 			total_amount = None
 		if total_amount is None:
@@ -3106,12 +3105,12 @@ async def search_tax_workspace_endpoint(
         item["tax_last_send_at"] = extra.get("tax_last_send_at")
         item.update(build_tax_status_fields_for_api(extra))
 
-        # total_amount from totals.net
+        # total_amount = مبلغ قابل پرداخت (شامل اضافات/کسورات)
         total_amount = None
         try:
-            totals = (item.get("extra_info") or {}).get("totals") or {}
-            if isinstance(totals, dict) and "net" in totals:
-                total_amount = totals.get("net")
+            payable = payable_total_from_extra_info(item.get("extra_info"))
+            if payable is not None:
+                total_amount = float(payable)
         except Exception:
             total_amount = None
 
@@ -4247,12 +4246,12 @@ async def export_invoices_excel(
     items: List[Dict[str, Any]] = []
     list_dicts = invoice_documents_to_list_dicts(db, docs)
     for item in list_dicts:
-        # total_amount
+        # total_amount = مبلغ قابل پرداخت (شامل اضافات/کسورات)
         total_amount = None
         try:
-            totals = (item.get('extra_info') or {}).get('totals') or {}
-            if isinstance(totals, dict) and 'net' in totals:
-                total_amount = totals.get('net')
+            payable = payable_total_from_extra_info(item.get("extra_info"))
+            if payable is not None:
+                total_amount = float(payable)
         except Exception:
             total_amount = None
 
@@ -4543,9 +4542,9 @@ async def export_invoices_pdf(
         item = invoice_document_to_dict(db, d, include_tags=False)
         total_amount = None
         try:
-            totals = (item.get('extra_info') or {}).get('totals') or {}
-            if isinstance(totals, dict) and 'net' in totals:
-                total_amount = totals.get('net')
+            payable = payable_total_from_extra_info(item.get("extra_info"))
+            if payable is not None:
+                total_amount = float(payable)
         except Exception:
             total_amount = None
         if total_amount is None:

@@ -6,6 +6,7 @@ import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -896,13 +897,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   double _invoicePayableTotal(Map<String, dynamic>? extraInfo) {
-    final totals = extraInfo?['totals'];
-    if (totals is! Map<String, dynamic>) return 0;
-    final net = (totals['net'] as num?)?.toDouble() ?? 0;
-    final tax = (totals['tax'] as num?)?.toDouble() ?? 0;
-    final adjNet = (totals['adjustments_net'] as num?)?.toDouble() ?? 0;
-    final adjTax = (totals['adjustments_tax'] as num?)?.toDouble() ?? 0;
-    return net + tax + adjNet + adjTax;
+    return invoicePayableTotalFromExtraInfo(extraInfo) ?? 0;
   }
 
   @override
@@ -2415,6 +2410,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final discount = (totals['discount'] as num?)?.toDouble() ?? 0.0;
     final tax = (totals['tax'] as num?)?.toDouble() ?? 0.0;
     final net = (totals['net'] as num?)?.toDouble() ?? 0.0;
+    final adjNet = (totals['adjustments_net'] as num?)?.toDouble() ?? 0.0;
+    final adjTax = (totals['adjustments_tax'] as num?)?.toDouble() ?? 0.0;
+    final payable = invoicePayableTotalFromTotals(totals) ?? net;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -2458,10 +2456,27 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 ),
                 _buildSummaryStat(
                   theme,
-                  label: 'خالص',
+                  label: 'خالص ردیف‌ها',
                   value: net,
                   color: Colors.green[700],
                   icon: Icons.account_balance_wallet,
+                  formatter: formatter,
+                ),
+                if (adjNet != 0 || adjTax != 0)
+                  _buildSummaryStat(
+                    theme,
+                    label: 'اضافات/کسورات',
+                    value: adjNet + adjTax,
+                    color: theme.colorScheme.tertiary,
+                    icon: Icons.tune,
+                    formatter: formatter,
+                  ),
+                _buildSummaryStat(
+                  theme,
+                  label: 'قابل پرداخت',
+                  value: payable,
+                  color: theme.colorScheme.primary,
+                  icon: Icons.payments_outlined,
                   formatter: formatter,
                 ),
               ],
@@ -3748,7 +3763,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       final discount = (totals['discount'] as num?)?.toDouble() ?? 0.0;
       final tax = (totals['tax'] as num?)?.toDouble() ?? 0.0;
       final net = (totals['net'] as num?)?.toDouble() ?? 0.0;
-      
+      final adjNet = (totals['adjustments_net'] as num?)?.toDouble() ?? 0.0;
+      final adjTax = (totals['adjustments_tax'] as num?)?.toDouble() ?? 0.0;
+      final payable = invoicePayableTotalFromTotals(totals) ?? net;
       return Card(
         elevation: 2,
         color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
@@ -3767,7 +3784,17 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   Container(width: 2, height: 40, color: theme.dividerColor),
                   _buildTotalItem('مالیات', formatWithThousands(tax.toInt()), Colors.blue),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('خالص', formatWithThousands(net.toInt()), Colors.green),
+                  _buildTotalItem('خالص ردیف‌ها', formatWithThousands(net.toInt()), Colors.green),
+                  if (adjNet != 0 || adjTax != 0) ...[
+                    Container(width: 2, height: 40, color: theme.dividerColor),
+                    _buildTotalItem(
+                      'اضافات/کسورات',
+                      formatWithThousands((adjNet + adjTax).toInt()),
+                      theme.colorScheme.tertiary,
+                    ),
+                  ],
+                  Container(width: 2, height: 40, color: theme.dividerColor),
+                  _buildTotalItem('قابل پرداخت', formatWithThousands(payable.toInt()), theme.colorScheme.primary),
                 ],
               ),
               const Divider(height: 24),
@@ -5468,7 +5495,7 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
 
   /// اعتبارسنجی مبلغ
   bool _validateAmount(double amount) {
-    final invoiceTotal = (widget.document.extraInfo?['totals']?['net'] as num?)?.toDouble() ?? 0;
+    final invoiceTotal = invoicePayableTotalFromExtraInfo(widget.document.extraInfo) ?? 0;
     final currentTotal = widget.existingDocuments.fold<double>(
       0,
       (sum, doc) => sum + doc.totalAmount,

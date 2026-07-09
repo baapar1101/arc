@@ -22,6 +22,7 @@ import 'package:hesabix_ui/widgets/invoice/invoice_transactions_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
+import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/invoice_transaction.dart';
@@ -3255,35 +3256,10 @@ class _PersonLineTileState extends State<_PersonLineTile> {
     }
   }
 
-  /// استخراج مبلغ کل فاکتور
+  /// استخراج مبلغ کل فاکتور (شامل اضافات/کسورات)
   double _getInvoiceTotal(Map<String, dynamic> invoice) {
     try {
-      // اول از total_amount
-      if (invoice['total_amount'] != null) {
-        final total = invoice['total_amount'];
-        if (total is num) return total.toDouble();
-        if (total is String) return double.tryParse(total) ?? 0;
-      }
-      
-      // سپس از extra_info.totals.net
-      final extraInfo = invoice['extra_info'] as Map<String, dynamic>?;
-      if (extraInfo != null) {
-        final totals = extraInfo['totals'] as Map<String, dynamic>?;
-        if (totals != null && totals['net'] != null) {
-          final net = totals['net'];
-          if (net is num) return net.toDouble();
-          if (net is String) return double.tryParse(net) ?? 0;
-        }
-      }
-      
-      // در نهایت از total
-      if (invoice['total'] != null) {
-        final total = invoice['total'];
-        if (total is num) return total.toDouble();
-        if (total is String) return double.tryParse(total) ?? 0;
-      }
-      
-      return 0;
+      return invoicePayableTotalFromInvoiceMap(invoice);
     } catch (e) {
       return 0;
     }

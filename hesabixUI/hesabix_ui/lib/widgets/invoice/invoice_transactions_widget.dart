@@ -1352,56 +1352,22 @@ class _TransactionDialogState extends State<TransactionDialog> {
                       Row(
                         children: [
                           Expanded(
-                            child: AmountFieldWordsTooltip(
+                            child: _TransactionDialogMoneyField(
+                              key: const ValueKey('transaction_amount_field'),
                               controller: _amountController,
+                              label: 'مبلغ *',
                               currencyUnit: widget.currencyUnit,
-                              child: TextFormField(
-                                key: const ValueKey('transaction_amount_field'),
-                                controller: _amountController,
-                                decoration: InputDecoration(
-                                  labelText: 'مبلغ *',
-                                  border: const OutlineInputBorder(),
-                                  suffixText: widget.currencyUnit,
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                                  ThousandsSeparatorInputFormatter(allowDecimal: false),
-                                ],
-                                validator: (value) {
-                                  if (value == null || value.isEmpty) {
-                                    return 'مبلغ الزامی است';
-                                  }
-                                  final cleanValue = value.replaceAll(',', '');
-                                  if (double.tryParse(cleanValue) == null) {
-                                    return 'مبلغ باید عدد باشد';
-                                  }
-                                  return null;
-                                },
-                              ),
+                              isRequired: true,
                             ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
-                            child: AmountFieldWordsTooltip(
+                            child: _TransactionDialogMoneyField(
+                              key: const ValueKey('transaction_commission_field'),
                               controller: _commissionController,
+                              label: 'کارمزد',
                               currencyUnit: widget.currencyUnit,
-                              child: TextFormField(
-                                key: const ValueKey('transaction_commission_field'),
-                                controller: _commissionController,
-                                decoration: InputDecoration(
-                                  labelText: 'کارمزد',
-                                  border: const OutlineInputBorder(),
-                                  suffixText: widget.currencyUnit,
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  EnglishDigitsFormatter(),
-                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                                  ThousandsSeparatorInputFormatter(allowDecimal: false),
-                                ],
-                              ),
+                              isRequired: false,
                             ),
                           ),
                         ],
@@ -1781,4 +1747,60 @@ class _TransactionDialogState extends State<TransactionDialog> {
     return person['alias_name']?.toString() ?? person['name']?.toString();
   }
 
+}
+
+/// فیلد مبلغ/کارمزد با State جدا تا بازسازی فرم دیالوگ فوکوس را نگیرد.
+class _TransactionDialogMoneyField extends StatefulWidget {
+  final TextEditingController controller;
+  final String label;
+  final String currencyUnit;
+  final bool isRequired;
+
+  const _TransactionDialogMoneyField({
+    super.key,
+    required this.controller,
+    required this.label,
+    required this.currencyUnit,
+    this.isRequired = true,
+  });
+
+  @override
+  State<_TransactionDialogMoneyField> createState() =>
+      _TransactionDialogMoneyFieldState();
+}
+
+class _TransactionDialogMoneyFieldState extends State<_TransactionDialogMoneyField> {
+  @override
+  Widget build(BuildContext context) {
+    return AmountFieldWordsTooltip(
+      controller: widget.controller,
+      currencyUnit: widget.currencyUnit,
+      child: TextFormField(
+        controller: widget.controller,
+        decoration: InputDecoration(
+          labelText: widget.label,
+          border: const OutlineInputBorder(),
+          suffixText: widget.currencyUnit,
+        ),
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          EnglishDigitsFormatter(),
+          FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+          ThousandsSeparatorInputFormatter(allowDecimal: false),
+        ],
+        validator: widget.isRequired
+            ? (value) {
+                if (value == null || value.isEmpty) {
+                  return 'مبلغ الزامی است';
+                }
+                final cleanValue = value.replaceAll(',', '');
+                if (double.tryParse(cleanValue) == null) {
+                  return 'مبلغ باید عدد باشد';
+                }
+                return null;
+              }
+            : null,
+      ),
+    );
+  }
 }

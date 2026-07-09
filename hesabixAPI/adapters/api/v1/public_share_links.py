@@ -16,6 +16,7 @@ from adapters.db.session import get_db
 from app.core.responses import ApiError, success_response
 from app.core.settings import get_settings
 from app.core.calendar import CalendarConverter
+from app.services.invoice_adjustments_service import payable_total_from_totals_dict
 from app.services.pdf.template_renderer import render_template
 from app.services.person_share_link_service import (
     get_public_invoice_details,
@@ -402,7 +403,7 @@ async def get_public_invoice_document_pdf(
 	invoice_view["subtotal"] = _num(totals.get("gross"))
 	invoice_view["discount_total"] = _num(totals.get("discount"))
 	invoice_view["tax_total"] = _num(totals.get("tax"))
-	invoice_view["payable_total"] = _num(totals.get("net"))
+	invoice_view["payable_total"] = float(payable_total_from_totals_dict(totals))
 	invoice_view["amount_before_discount_and_tax"] = _num(totals.get("gross"))
 	invoice_view["amount_without_tax"] = _num(totals.get("gross")) - _num(totals.get("discount"))
 
@@ -496,12 +497,7 @@ async def get_public_invoice_document_pdf(
 		adjustments_tax_signed = round(adjustments_tax_signed, 2)
 		adjustments_additions_total = round(adjustments_additions_total, 2)
 		adjustments_deductions_total = round(adjustments_deductions_total, 2)
-		final_payable_total = round(
-			float(invoice_view.get("payable_total") or 0)
-			+ adjustments_net_signed
-			+ adjustments_tax_signed,
-			2,
-		)
+		final_payable_total = round(float(payable_total_from_totals_dict(totals)), 2)
 	except Exception:
 		invoice_adjustments_rows = []
 		adjustments_net_signed = 0.0
