@@ -6792,6 +6792,24 @@ abstract class AppLocalizations {
   /// **'Document number conflict. Please try again.'**
   String get apiErrorDocumentCodeRace;
 
+  /// No description provided for @apiErrorNoActiveStoragePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'This business has no active storage plan. Activate a storage plan before uploading files.'**
+  String get apiErrorNoActiveStoragePlan;
+
+  /// No description provided for @apiErrorStorageLimitExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough storage space. The file exceeds your remaining storage limit.'**
+  String get apiErrorStorageLimitExceeded;
+
+  /// No description provided for @apiErrorFileSizeExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'The file exceeds the maximum allowed size.'**
+  String get apiErrorFileSizeExceeded;
+
   /// No description provided for @byteUnitB.
   ///
   /// In en, this message translates to:

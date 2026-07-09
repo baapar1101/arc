@@ -3577,6 +3577,18 @@ class AppLocalizationsFa extends AppLocalizations {
       'تداخل در شماره سند. لطفاً دوباره تلاش کنید.';
 
   @override
+  String get apiErrorNoActiveStoragePlan =>
+      'هیچ پلن فعال ذخیره‌سازی برای این کسب‌وکار وجود ندارد. برای آپلود فایل، ابتدا از بخش فضای ذخیره‌سازی یک پلن فعال کنید.';
+
+  @override
+  String get apiErrorStorageLimitExceeded =>
+      'فضای ذخیره‌سازی کافی نیست. حجم فایل از محدودیت باقی‌مانده تجاوز می‌کند.';
+
+  @override
+  String get apiErrorFileSizeExceeded =>
+      'حجم فایل از حداکثر مجاز سیستم تجاوز می‌کند.';
+
+  @override
   String get byteUnitB => 'بایت';
 
   @override

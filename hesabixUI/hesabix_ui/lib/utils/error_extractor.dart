@@ -135,6 +135,48 @@ class ErrorExtractor {
       case 'TITLE_REQUIRED':
         return t.loanFacilityValidationTitleRequired;
 
+      case 'NO_ACTIVE_STORAGE_PLAN':
+        return t.apiErrorNoActiveStoragePlan;
+      case 'STORAGE_LIMIT_EXCEEDED':
+        return t.apiErrorStorageLimitExceeded;
+      case 'FILE_SIZE_EXCEEDED':
+        return t.apiErrorFileSizeExceeded;
+
+      default:
+        return null;
+    }
+  }
+
+  static String? _messageForStorageError(Map error, AppLocalizations t) {
+    final code = error['code'];
+    if (code is! String) return null;
+
+    switch (code) {
+      case 'NO_ACTIVE_STORAGE_PLAN':
+        final noPlanMsg = error['message'];
+        if (noPlanMsg is String && noPlanMsg.isNotEmpty) return noPlanMsg;
+        return t.apiErrorNoActiveStoragePlan;
+      case 'FILE_SIZE_EXCEEDED':
+        final sizeMsg = error['message'];
+        if (sizeMsg is String && sizeMsg.isNotEmpty) return sizeMsg;
+        return t.apiErrorFileSizeExceeded;
+      case 'STORAGE_LIMIT_EXCEEDED':
+        final base = (error['message'] is String && (error['message'] as String).isNotEmpty)
+            ? error['message'] as String
+            : t.apiErrorStorageLimitExceeded;
+        final available = error['available_gb'];
+        final required = error['required_gb'];
+        if (available != null && required != null) {
+          try {
+            final availGb = (available is num) ? available.toDouble() : double.parse('$available');
+            final reqGb = (required is num) ? required.toDouble() : double.parse('$required');
+            return '$base (فضای آزاد: ${availGb.toStringAsFixed(2)} گیگابایت، '
+                'حجم موردنیاز: ${reqGb.toStringAsFixed(2)} گیگابایت)';
+          } catch (_) {
+            return base;
+          }
+        }
+        return base;
       default:
         return null;
     }
@@ -157,11 +199,14 @@ class ErrorExtractor {
     if (error is Map) {
       final code = error['code'];
       final codeStr = code is String ? code : null;
+      if (codeStr == 'STORAGE_LIMIT_EXCEEDED' ||
+          codeStr == 'NO_ACTIVE_STORAGE_PLAN' ||
+          codeStr == 'FILE_SIZE_EXCEEDED') {
+        final storageMsg = _messageForStorageError(error, t);
+        if (storageMsg != null) return storageMsg;
+      }
       final fromCode = _messageForKnownApiErrorCode(codeStr, t);
       if (fromCode != null) return fromCode;
-    }
-    if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
-      return error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند';
     }
     if (error is Map && error['message'] is String) {
       final message = error['message'] as String;

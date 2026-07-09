@@ -4870,9 +4870,16 @@ def create_invoice(
                 else:
                     is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
                     person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+                    from app.services.receipt_payment_service import (
+                        resolve_receipt_document_date_from_account_lines,
+                    )
+                    rp_document_date = resolve_receipt_document_date_from_account_lines(
+                        document.document_date,
+                        account_lines,
+                    )
                     rp_data = {
                         "document_type": "receipt" if is_receipt else "payment",
-                        "document_date": document.document_date.isoformat(),
+                        "document_date": rp_document_date.isoformat(),
                         "currency_id": document.currency_id,
                         "description": f"تسویه مرتبط با فاکتور {document.code}",
                         "person_lines": [{
@@ -5806,14 +5813,22 @@ def update_invoice(
     payments_provided = "payments" in data and isinstance(data.get("payments"), list)
     payments = list(data["payments"]) if payments_provided else []
     if payments_provided and not document.is_proforma:
-        from app.services.receipt_payment_service import create_receipt_payment, delete_receipt_payment
+        from app.services.receipt_payment_service import (
+            create_receipt_payment,
+            delete_receipt_payment,
+            resolve_receipt_document_date_from_account_lines,
+        )
 
         # person_id از extra_info مرج‌شده روی خود سند (نه فقط payload خام) تا با API ناقص هم‌خوان باشد
         header_extra_pm = document.extra_info or {}
         person_id_pm = _person_id_from_header({"extra_info": header_extra_pm})
 
-        old_links = dict(header_extra_pm.get("links") or {})
-        old_receipt_payment_ids = list(old_links.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS) or [])
+        old_receipt_payment_ids = _get_receipt_payment_ids_linked_to_invoice(
+            db,
+            document.business_id,
+            int(document.id),
+            extra_info=header_extra_pm,
+        )
 
         has_positive_payment = any(
             Decimal(str(p.get("amount", 0) or 0)) > 0 for p in payments
@@ -5918,9 +5933,13 @@ def update_invoice(
             if total_amount > 0 and account_lines:
                 is_receipt = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
                 person_is_receivable = inv_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+                rp_document_date = resolve_receipt_document_date_from_account_lines(
+                    document.document_date,
+                    account_lines,
+                )
                 rp_data = {
                     "document_type": "receipt" if is_receipt else "payment",
-                    "document_date": document.document_date.isoformat(),
+                    "document_date": rp_document_date.isoformat(),
                     "currency_id": document.currency_id,
                     "description": f"تسویه مرتبط با فاکتور {document.code}",
                     "person_lines": [{
@@ -9034,6 +9053,10 @@ def get_production_report(
 
 def _is_account_payment_line(line: DocumentLine) -> bool:
     line_extra = line.extra_info or {}
+    if line_extra.get("is_commission_line"):
+        return False
+    if line_extra.get("is_check_target_account") or line_extra.get("is_check_source_account"):
+        return False
     tt = str(line_extra.get("transaction_type") or "").strip().lower()
     is_wallet_line = line.person_id is None and tt == "wallet"
     if line.person_id is None and (
@@ -9043,8 +9066,7 @@ def _is_account_payment_line(line: DocumentLine) -> bool:
         or line.check_id is not None
         or is_wallet_line
     ):
-        if not line_extra.get("is_commission_line"):
-            return True
+        return True
     return False
 
 
@@ -9056,6 +9078,66 @@ def _sum_receipt_doc_account_payments(doc: Document) -> Decimal:
     return total
 
 
+def _sum_receipt_doc_payments_for_invoice(doc: Document, invoice_id: int, *, via_person_line: bool) -> Decimal:
+    """مبلغ پرداخت‌شدهٔ سند دریافت/پرداخت نسبت به یک فاکتور."""
+    if via_person_line:
+        total = Decimal(0)
+        inv_id = int(invoice_id)
+        for line in doc.lines:
+            if line.person_id is None:
+                continue
+            extra = line.extra_info or {}
+            raw_inv = extra.get("invoice_id")
+            if raw_inv is None:
+                continue
+            try:
+                if int(raw_inv) != inv_id:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            total += Decimal(str(line.debit)) + Decimal(str(line.credit))
+        return total
+    return _sum_receipt_doc_account_payments(doc)
+
+
+def _get_receipt_payment_ids_linked_to_invoice(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+    *,
+    extra_info: Optional[Dict[str, Any]] = None,
+) -> List[int]:
+    """شناسهٔ اسناد دریافت/پرداخت مرتبط با فاکتور (لینک مستقیم + person_line.invoice_id)."""
+    ids: set[int] = set()
+    if isinstance(extra_info, dict):
+        links = extra_info.get("links") or {}
+        for raw in links.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS) or []:
+            try:
+                ids.add(int(raw))
+            except (TypeError, ValueError):
+                continue
+
+    line_invoice_id_expr = cast(
+        cast(DocumentLine.extra_info, JSONB)["invoice_id"].astext,
+        Integer,
+    )
+    rows = (
+        db.query(DocumentLine.document_id)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            Document.business_id == business_id,
+            Document.document_type.in_(["receipt", "payment"]),
+            DocumentLine.person_id.isnot(None),
+            line_invoice_id_expr == int(invoice_id),
+        )
+        .distinct()
+        .all()
+    )
+    for row in rows:
+        ids.add(int(row[0]))
+    return list(ids)
+
+
 def _invoice_total_amount_for_document(
     document: Document,
     item_lines: Optional[List[InvoiceItemLine]] = None,
@@ -9063,11 +9145,18 @@ def _invoice_total_amount_for_document(
     total_amount = Decimal(0)
     extra_info = document.extra_info or {}
     totals = extra_info.get("totals", {})
-    if isinstance(totals, dict) and "net" in totals:
-        try:
-            total_amount = Decimal(str(totals["net"]))
-        except (ValueError, TypeError):
-            pass
+    if isinstance(totals, dict):
+        if any(k in totals for k in ("tax", "adjustments_net", "adjustments_tax")):
+            try:
+                from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+                return total_with_tax_from_totals_dict(totals)
+            except (ValueError, TypeError):
+                pass
+        if "net" in totals:
+            try:
+                total_amount = Decimal(str(totals["net"]))
+            except (ValueError, TypeError):
+                pass
     if total_amount != 0:
         return total_amount
     if item_lines is None:
@@ -9309,7 +9398,7 @@ def batch_calculate_invoices_remaining(
             if not rp_doc:
                 continue
             processed_doc_ids.add(doc_id_int)
-            total_paid += _sum_receipt_doc_account_payments(rp_doc)
+            total_paid += _sum_receipt_doc_payments_for_invoice(rp_doc, inv_id, via_person_line=False)
 
         for doc_id_int in invoice_to_person_rp.get(inv_id, set()):
             if doc_id_int in processed_doc_ids:
@@ -9318,7 +9407,7 @@ def batch_calculate_invoices_remaining(
             if not rp_doc:
                 continue
             processed_doc_ids.add(doc_id_int)
-            total_paid += _sum_receipt_doc_account_payments(rp_doc)
+            total_paid += _sum_receipt_doc_payments_for_invoice(rp_doc, inv_id, via_person_line=True)
 
         remaining = total_amount - total_paid
         results[inv_id] = {
@@ -9410,7 +9499,7 @@ def calculate_invoice_remaining(
                     continue
                 
                 processed_doc_ids.add(doc_id_int)
-                total_paid += _sum_receipt_doc_account_payments(doc)
+                total_paid += _sum_receipt_doc_payments_for_invoice(doc, invoice_id, via_person_line=False)
             except (ValueError, TypeError) as e:
                 logger.warning("receipt_payment_id parse error %s: %s", doc_id, e)
                 continue
@@ -9447,7 +9536,7 @@ def calculate_invoice_remaining(
                 if doc.id in processed_doc_ids:
                     continue
                 processed_doc_ids.add(doc.id)
-                total_paid += _sum_receipt_doc_account_payments(doc)
+                total_paid += _sum_receipt_doc_payments_for_invoice(doc, invoice_id, via_person_line=True)
         
         remaining = total_amount - total_paid
         

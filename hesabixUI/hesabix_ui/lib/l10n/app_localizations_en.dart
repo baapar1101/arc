@@ -3600,6 +3600,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Document number conflict. Please try again.';
 
   @override
+  String get apiErrorNoActiveStoragePlan =>
+      'This business has no active storage plan. Activate a storage plan before uploading files.';
+
+  @override
+  String get apiErrorStorageLimitExceeded =>
+      'Not enough storage space. The file exceeds your remaining storage limit.';
+
+  @override
+  String get apiErrorFileSizeExceeded =>
+      'The file exceeds the maximum allowed size.';
+
+  @override
   String get byteUnitB => 'B';
 
   @override

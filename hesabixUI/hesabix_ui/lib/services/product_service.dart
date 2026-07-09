@@ -9,6 +9,29 @@ class ProductService {
 
   ProductService({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 
+  /// فیلدهای لیستی/ساختاریافته باید به JSON تبدیل شوند؛ در غیر این صورت
+  /// `.toString()` در Dart خروجی نامعتبر مثل `[uuid]` تولید می‌کند.
+  static Map<String, dynamic> _prepareMultipartPayload(Map<String, dynamic> payload) {
+    final prepared = Map<String, dynamic>.from(payload);
+    for (final key in const [
+      'attribute_ids',
+      'catalog_gallery_file_ids',
+      'catalog_specifications',
+    ]) {
+      final value = prepared[key];
+      if (value is List || value is Map) {
+        prepared[key] = jsonEncode(value);
+      }
+    }
+    return prepared;
+  }
+
+  static Map<String, String> _multipartFormFields(Map<String, dynamic> payload) {
+    return _prepareMultipartPayload(payload).map(
+      (key, value) => MapEntry(key, value == null ? '' : value.toString()),
+    );
+  }
+
   Future<Map<String, dynamic>> createProduct({
     required int businessId,
     required Map<String, dynamic> payload,
@@ -16,15 +39,8 @@ class ProductService {
     String? imageFilename,
   }) async {
     if (imageBytes != null && imageFilename != null) {
-      // استفاده از multipart/form-data برای آپلود فایل
-      // تبدیل attribute_ids به JSON string برای ارسال صحیح
-      final payloadForForm = Map<String, dynamic>.from(payload);
-      if (payloadForForm.containsKey('attribute_ids') && payloadForForm['attribute_ids'] is List) {
-        payloadForForm['attribute_ids'] = jsonEncode(payloadForForm['attribute_ids']);
-      }
-      
       final formData = dio.FormData.fromMap({
-        ...payloadForForm.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+        ..._multipartFormFields(payload),
         if (imageBytes.isNotEmpty && imageFilename.isNotEmpty)
           'file': dio.MultipartFile.fromBytes(
             imageBytes,
@@ -77,15 +93,8 @@ class ProductService {
     String? imageFilename,
   }) async {
     if (imageBytes != null && imageFilename != null) {
-      // استفاده از multipart/form-data برای آپلود فایل
-      // تبدیل attribute_ids به JSON string برای ارسال صحیح
-      final payloadForForm = Map<String, dynamic>.from(payload);
-      if (payloadForForm.containsKey('attribute_ids') && payloadForForm['attribute_ids'] is List) {
-        payloadForForm['attribute_ids'] = jsonEncode(payloadForForm['attribute_ids']);
-      }
-      
       final formData = dio.FormData.fromMap({
-        ...payloadForForm.map((key, value) => MapEntry(key, value?.toString() ?? '')),
+        ..._multipartFormFields(payload),
         if (imageBytes.isNotEmpty && imageFilename.isNotEmpty)
           'file': dio.MultipartFile.fromBytes(
             imageBytes,

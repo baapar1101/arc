@@ -105,6 +105,65 @@ def _parse_iso_date(dt: str | datetime | date) -> date:
     raise ApiError("INVALID_DATE", f"Invalid date format: {dt}", http_status=400)
 
 
+def resolve_receipt_document_date_from_account_lines(
+    default_date: date,
+    account_lines: List[Dict[str, Any]],
+) -> date:
+    """تاریخ سند دریافت/پرداخت: بیشینهٔ تاریخ پیش‌فرض و transaction_date خطوط حساب."""
+    dates: List[date] = [default_date]
+    for line in account_lines or []:
+        raw = line.get("transaction_date")
+        if raw is None:
+            continue
+        try:
+            dates.append(_parse_iso_date(raw))
+        except ApiError:
+            continue
+    return max(dates)
+
+
+def _link_receipt_payment_to_invoices(
+    db: Session,
+    receipt_payment_document_id: int,
+    person_lines: List[Dict[str, Any]],
+    extra_info: Optional[Dict[str, Any]] = None,
+) -> None:
+    """لینک دوطرفه سند دریافت/پرداخت به فاکتور(ها) از person_lines، extra_info و settlements."""
+    from app.services.legacy_import.invoice_settlement import append_receipt_payment_to_invoice
+
+    invoice_ids: set[int] = set()
+    for pl in person_lines or []:
+        pl_extra = pl.get("extra_info") if isinstance(pl.get("extra_info"), dict) else {}
+        inv_id = pl_extra.get("invoice_id")
+        if inv_id is None:
+            continue
+        try:
+            invoice_ids.add(int(inv_id))
+        except (TypeError, ValueError):
+            continue
+
+    if isinstance(extra_info, dict):
+        doc_inv = extra_info.get("invoice_id")
+        if doc_inv is not None:
+            try:
+                invoice_ids.add(int(doc_inv))
+            except (TypeError, ValueError):
+                pass
+        for st in extra_info.get("settlements") or []:
+            if not isinstance(st, dict):
+                continue
+            st_inv = st.get("invoice_id")
+            if st_inv is None:
+                continue
+            try:
+                invoice_ids.add(int(st_inv))
+            except (TypeError, ValueError):
+                continue
+
+    for inv_id in invoice_ids:
+        append_receipt_payment_to_invoice(db, inv_id, int(receipt_payment_document_id))
+
+
 def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
     """دریافت سال مالی فعلی برای کسب‌وکار"""
     fiscal_year = db.query(FiscalYear).filter(
@@ -313,8 +372,8 @@ def create_receipt_payment(
         # پیش‌فرض: دریافت → دریافتنی، پرداخت → پرداختنی
         is_person_receivable = is_receipt
     
-    # اعتبارسنجی تاریخ
-    document_date = _parse_iso_date(data.get("document_date", datetime.now()))
+    # اعتبارسنجی تاریخ (پس از خواندن account_lines)
+    parsed_doc_date = _parse_iso_date(data.get("document_date", datetime.now()))
     
     # اعتبارسنجی ارز
     currency_id = data.get("currency_id")
@@ -344,6 +403,8 @@ def create_receipt_payment(
     logger.info(f"خطوط حساب‌ها: {account_lines}")
     if not account_lines or not isinstance(account_lines, list):
         raise ApiError("ACCOUNT_LINES_REQUIRED", "At least one account line is required", http_status=400)
+
+    document_date = resolve_receipt_document_date_from_account_lines(parsed_doc_date, account_lines)
     
     # محاسبه مجموع مبالغ
     person_total = sum(float(line.get("amount", 0)) for line in person_lines)
@@ -1134,6 +1195,14 @@ def create_receipt_payment(
                 extra_info={"installment": True, "reclassification": True},
             ))
 
+    # لینک دوطرفه به فاکتور(ها) — person_line.invoice_id، extra_info.invoice_id، settlements
+    _link_receipt_payment_to_invoices(
+        db,
+        int(document.id),
+        person_lines,
+        extra_info_all if isinstance(extra_info_all, dict) else None,
+    )
+
     # ذخیره تغییرات
     logger.info(f"=== ذخیره تغییرات ===")
     # flush کردن تغییرات قبل از commit برای اطمینان از ذخیره شدن
@@ -1652,7 +1721,7 @@ def update_receipt_payment(
         pass
 
     # 2) اعتبارسنجی ورودی‌ها (مشابه create)
-    document_date = _parse_iso_date(data.get("document_date", document.document_date))
+    parsed_doc_date = _parse_iso_date(data.get("document_date", document.document_date))
     currency_id = data.get("currency_id", document.currency_id)
     if not currency_id:
         raise ApiError("CURRENCY_REQUIRED", "currency_id is required", http_status=400)
@@ -1671,6 +1740,8 @@ def update_receipt_payment(
     account_total = sum(float(line.get("amount", 0)) for line in account_lines)
     if abs(person_total - account_total) > 0.01:
         raise ApiError("UNBALANCED_AMOUNTS", "Totals must be balanced", http_status=400)
+
+    document_date = resolve_receipt_document_date_from_account_lines(parsed_doc_date, account_lines)
 
     # 3) اعمال تغییرات در سند (بدون تغییر code و document_type)
     document.document_date = document_date
@@ -2280,6 +2351,13 @@ def update_receipt_payment(
         except Exception as e:
             logger.error(f"[UPDATE_RECEIPT_PAYMENT] خطا در تغییر وضعیت چک {check_id}: {e}", exc_info=True)
     
+    _link_receipt_payment_to_invoices(
+        db,
+        int(document.id),
+        person_lines,
+        extra_info_all if isinstance(extra_info_all, dict) else None,
+    )
+
     db.commit()
     db.refresh(document)
     # refresh کردن فاکتورهای اقساطی که به‌روزرسانی شدند

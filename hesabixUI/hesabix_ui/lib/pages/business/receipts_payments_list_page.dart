@@ -3458,8 +3458,17 @@ class _PersonLineTileState extends State<_PersonLineTile> {
               continue;
             }
             
-            final remaining = remainingMap[invoiceId] ?? 0.0;
+            final remaining = remainingMap[invoiceId];
             debugPrint('🔍 [LoadInvoices] فاکتور ID: $invoiceId, remaining: $remaining, remainingMap.containsKey: ${remainingMap.containsKey(invoiceId)}');
+            
+            // اگر مانده محاسبه نشده، فاکتور را حذف نکن (فرض تسویه‌نشده)
+            if (remaining == null) {
+              validInvoices.add({
+                ...invoice,
+              });
+              debugPrint('⚠️ [LoadInvoices] فاکتور ID: $invoiceId بدون مانده محاسبه‌شده اضافه شد');
+              continue;
+            }
             
             // فقط فاکتورهایی که مانده > 0 دارند (تسویه نشده‌اند)
             if (remaining > 0.01) { // tolerance برای خطای ممیز شناور

@@ -250,6 +250,71 @@ class ReceiptPaymentService {
       search: search,
     );
   }
+
+  /// اسناد دریافت/پرداخت مرتبط با فاکتور (لینک مستقیم + person_line.invoice_id)
+  Future<List<ReceiptPaymentDocument>> listPaymentDocumentsForInvoice({
+    required int businessId,
+    required int invoiceId,
+    Map<String, dynamic>? invoiceLinks,
+  }) async {
+    final processedDocIds = <int>{};
+    final documents = <ReceiptPaymentDocument>[];
+
+    Future<void> tryAddDoc(int docId) async {
+      if (processedDocIds.contains(docId)) return;
+      try {
+        final doc = await getById(docId);
+        if (doc == null) return;
+        processedDocIds.add(docId);
+        documents.add(doc);
+      } catch (_) {}
+    }
+
+    final rawIds = invoiceLinks?['receipt_payment_document_ids'];
+    if (rawIds is List) {
+      for (final id in rawIds) {
+        final docId = id is int ? id : int.tryParse(id.toString());
+        if (docId != null) {
+          await tryAddDoc(docId);
+        }
+      }
+    }
+
+    try {
+      final receiptPaymentList = await listReceiptsPayments(
+        businessId: businessId,
+        skip: 0,
+        take: 1000,
+      );
+      final items = (receiptPaymentList['items'] as List<dynamic>?) ?? [];
+      for (final item in items) {
+        final docId = (item['id'] as num?)?.toInt();
+        if (docId == null || processedDocIds.contains(docId)) continue;
+
+        final personLines = item['person_lines'] as List<dynamic>?;
+        if (personLines == null) continue;
+
+        var hasInvoiceLink = false;
+        for (final pl in personLines) {
+          final extraInfo = pl['extra_info'] as Map<String, dynamic>?;
+          if (extraInfo == null) continue;
+          final linkedInvoiceId = extraInfo['invoice_id'];
+          if (linkedInvoiceId is int && linkedInvoiceId == invoiceId) {
+            hasInvoiceLink = true;
+            break;
+          }
+          if (linkedInvoiceId is num && linkedInvoiceId.toInt() == invoiceId) {
+            hasInvoiceLink = true;
+            break;
+          }
+        }
+        if (!hasInvoiceLink) continue;
+        await tryAddDoc(docId);
+      }
+    } catch (_) {}
+
+    return documents;
+  }
 }
 
 num _sumLineAmounts(List<Map<String, dynamic>> lines) {

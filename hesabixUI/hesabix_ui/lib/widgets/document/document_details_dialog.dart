@@ -867,38 +867,19 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final effectiveExtra = extraInfoOverride ?? doc.extraInfo;
     if (effectiveExtra == null) return;
 
-    final links = effectiveExtra['links'];
-    if (links is! Map<String, dynamic>) return;
-
-    final receiptPaymentIds =
-        _documentDetailsParseReceiptPaymentIdList(links['receipt_payment_document_ids']);
-    if (receiptPaymentIds.isEmpty) {
-      if (mounted) {
-        setState(() {
-          _paymentDocuments = [];
-          _loadingPayments = false;
-        });
-      }
-      return;
-    }
-
     setState(() {
       _loadingPayments = true;
     });
 
     try {
-      final List<ReceiptPaymentDocument> documents = [];
-      for (final id in receiptPaymentIds) {
-        try {
-          final paymentDoc = await _receiptPaymentService.getById(id);
-          if (paymentDoc != null) {
-            documents.add(paymentDoc);
-          }
-        } catch (e) {
-          // اگر خطا رخ داد، ادامه بده
-        }
-      }
-      
+      final links = effectiveExtra['links'];
+      final invoiceLinks = links is Map<String, dynamic> ? links : null;
+      final documents = await _receiptPaymentService.listPaymentDocumentsForInvoice(
+        businessId: doc.businessId,
+        invoiceId: doc.id,
+        invoiceLinks: invoiceLinks,
+      );
+
       if (mounted) {
         setState(() {
           _paymentDocuments = documents;
@@ -912,6 +893,16 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         });
       }
     }
+  }
+
+  double _invoicePayableTotal(Map<String, dynamic>? extraInfo) {
+    final totals = extraInfo?['totals'];
+    if (totals is! Map<String, dynamic>) return 0;
+    final net = (totals['net'] as num?)?.toDouble() ?? 0;
+    final tax = (totals['tax'] as num?)?.toDouble() ?? 0;
+    final adjNet = (totals['adjustments_net'] as num?)?.toDouble() ?? 0;
+    final adjTax = (totals['adjustments_tax'] as num?)?.toDouble() ?? 0;
+    return net + tax + adjNet + adjTax;
   }
 
   @override
@@ -4156,7 +4147,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
   /// محاسبه مانده قابل پرداخت
   num _calculateRemainingBalance() {
-    final invoiceTotal = (_document?.extraInfo?['totals']?['net'] as num?)?.toDouble() ?? 0;
+    final invoiceTotal = _invoicePayableTotal(_document?.extraInfo);
     final currentTotal = _paymentDocuments.fold<num>(0, (sum, doc) => sum + doc.totalAmount);
     return invoiceTotal - currentTotal;
   }
@@ -4188,13 +4179,13 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// بررسی اینکه آیا باید خلاصه مالی نمایش داده شود
   bool _canShowBalanceSummary() {
     if (_document == null) return false;
-    final invoiceTotal = (_document!.extraInfo?['totals']?['net'] as num?)?.toDouble() ?? 0;
+    final invoiceTotal = _invoicePayableTotal(_document!.extraInfo);
     return invoiceTotal > 0;
   }
 
   /// اعتبارسنجی مبلغ تراکنش
   bool _validateTransactionAmount(num amount) {
-    final invoiceTotal = (_document?.extraInfo?['totals']?['net'] as num?)?.toDouble() ?? 0;
+    final invoiceTotal = _invoicePayableTotal(_document?.extraInfo);
     final currentTotal = _calculateTotalPaid();
     final maxAllowed = invoiceTotal * 1.1; // 10% tolerance
     return (currentTotal + amount) <= maxAllowed;
@@ -4202,7 +4193,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
 
   /// ساخت کارت خلاصه مالی
   Widget _buildBalanceSummaryCard(ThemeData theme) {
-    final invoiceTotal = (_document?.extraInfo?['totals']?['net'] as num?)?.toDouble() ?? 0;
+    final invoiceTotal = _invoicePayableTotal(_document?.extraInfo);
     final totalPaid = _calculateTotalPaid();
     final remaining = _calculateRemainingBalance();
     final paidPercentage = invoiceTotal > 0 ? (totalPaid / invoiceTotal) * 100 : 0;
