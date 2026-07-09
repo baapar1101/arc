@@ -98,6 +98,7 @@ $show_province_datalist  = $show_loc_ui && ! empty( $cfg['provinceSuggestions'] 
 			<span class="st-pub-result-stats"></span>
 		</div>
 	<?php endif; ?>
+	<div class="st-supplier-banner" hidden aria-live="polite"></div>
 	<div class="st-catalog-status" hidden></div>
 	<div class="st-grid" aria-live="polite"></div>
 	<div class="st-loadmore-wrap">

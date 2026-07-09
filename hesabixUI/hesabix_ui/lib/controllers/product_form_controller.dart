@@ -12,6 +12,8 @@ import '../core/api_client.dart';
 import '../utils/error_extractor.dart';
 import '../utils/product_form_auto_save.dart';
 import '../utils/product_form_validator.dart';
+import '../utils/catalog_business_contact_validator.dart';
+import '../services/business_api_service.dart';
 
 class ProductFormController extends ChangeNotifier {
   final int businessId;
@@ -341,10 +343,32 @@ class ProductFormController extends ChangeNotifier {
     return isValid;
   }
 
+  Future<bool> _ensureCatalogBusinessContactReady() async {
+    if (!_formData.isPublicCatalog) return true;
+    try {
+      final business = await BusinessApiService.getBusiness(businessId);
+      final message = CatalogBusinessContactValidator.blockingMessage(business);
+      if (message.isNotEmpty) {
+        _setError(message);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      _setError(
+        'بارگذاری اطلاعات تماس کسب‌وکار ناموفق بود. قبل از انتشار در شبکهٔ تأمین، تنظیمات کسب‌وکار را بررسی کنید.',
+      );
+      return false;
+    }
+  }
+
   // Submit form (create new product only). For editing, call updateProduct.
   Future<bool> submitForm() async {
     if (!_formData.name.trim().isNotEmpty) {
       _setError('نام کالا الزامی است');
+      return false;
+    }
+
+    if (!await _ensureCatalogBusinessContactReady()) {
       return false;
     }
 
@@ -401,6 +425,10 @@ class ProductFormController extends ChangeNotifier {
   Future<bool> updateProduct(int productId) async {
     if (!_formData.name.trim().isNotEmpty) {
       _setError('نام کالا الزامی است');
+      return false;
+    }
+
+    if (!await _ensureCatalogBusinessContactReady()) {
       return false;
     }
 

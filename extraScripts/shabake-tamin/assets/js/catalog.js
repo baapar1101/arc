@@ -18,6 +18,90 @@
 		return base.replace(/\/$/, '') + (path.charAt(0) === '/' ? path : '/' + path);
 	}
 
+	function noImageUrl() {
+		return (window.shabakeTamin && window.shabakeTamin.noImageUrl) || '';
+	}
+
+	function productImageSrc(p) {
+		var img = (p && (p.thumbnail_url || p.image_url)) || '';
+		return img ? absUrl(img) : noImageUrl();
+	}
+
+	function telHref(num) {
+		if (!num) return '';
+		return 'tel:' + String(num).replace(/[^\d+]/g, '');
+	}
+
+	function renderSupplierContactBlock(sup, opts) {
+		opts = opts || {};
+		var compact = !!opts.compact;
+		if (!sup) return '';
+		var hasContact =
+			sup.business_name ||
+			sup.address ||
+			sup.province ||
+			sup.city ||
+			sup.country ||
+			(sup.show_contact && (sup.phone || sup.mobile));
+		if (!hasContact) return '';
+
+		var loc = [sup.province, sup.city].filter(Boolean).join(' — ');
+		var country = sup.country ? String(sup.country) : '';
+		var locationLine = [loc, country].filter(Boolean).join(' · ');
+
+		var parts = [];
+		parts.push(
+			'<div class="st-supplier-contact' + (compact ? ' st-supplier-contact--compact' : '') + '">'
+		);
+		if (!compact) {
+			parts.push(
+				'<div class="st-supplier-contact-title">' + esc(t('supplierContactTitle')) + '</div>'
+			);
+		}
+		if (sup.business_name) {
+			parts.push(
+				'<div class="st-supplier-contact-name">' + esc(sup.business_name) + '</div>'
+			);
+		}
+		parts.push('<div class="st-supplier-contact-rows">');
+		if (sup.address) {
+			parts.push(
+				'<div class="st-supplier-contact-row"><span class="st-supplier-contact-icon" aria-hidden="true">📍</span><span class="st-supplier-contact-text">' +
+					nl2br(sup.address) +
+					'</span></div>'
+			);
+		}
+		if (locationLine) {
+			parts.push(
+				'<div class="st-supplier-contact-row"><span class="st-supplier-contact-icon" aria-hidden="true">🗺</span><span class="st-supplier-contact-text">' +
+					esc(locationLine) +
+					'</span></div>'
+			);
+		}
+		if (sup.show_contact) {
+			if (sup.phone) {
+				parts.push(
+					'<div class="st-supplier-contact-row"><span class="st-supplier-contact-icon" aria-hidden="true">☎</span><a class="st-supplier-contact-link" href="' +
+						esc(telHref(sup.phone)) +
+						'">' +
+						esc(sup.phone) +
+						'</a></div>'
+				);
+			}
+			if (sup.mobile) {
+				parts.push(
+					'<div class="st-supplier-contact-row"><span class="st-supplier-contact-icon" aria-hidden="true">📱</span><a class="st-supplier-contact-link" href="' +
+						esc(telHref(sup.mobile)) +
+						'">' +
+						esc(sup.mobile) +
+						'</a></div>'
+				);
+			}
+		}
+		parts.push('</div></div>');
+		return parts.join('');
+	}
+
 	function esc(s) {
 		var d = document.createElement('div');
 		d.textContent = s == null ? '' : String(s);
@@ -221,8 +305,7 @@
 			var p = row.product || {};
 			var sup = row.supplier || {};
 			var uuid = p.catalog_public_uuid || '';
-			var img = p.thumbnail_url || p.image_url || '';
-			var imgSrc = img ? absUrl(img) : '';
+			var imgSrc = productImageSrc(p);
 			var price = fmtPrice(p.base_sales_price);
 			var card = document.createElement('article');
 			card.className = 'st-card';
@@ -231,11 +314,12 @@
 
 			var html = '';
 			html += '<div class="st-card-img-wrap">';
-			if (imgSrc) {
-				html += '<img class="st-card-img" src="' + esc(imgSrc) + '" alt="" loading="lazy" />';
-			} else {
-				html += '<div class="st-card-img st-card-img--ph"></div>';
-			}
+			html +=
+				'<img class="st-card-img' +
+				(imgSrc === noImageUrl() ? ' st-card-img--fallback' : '') +
+				'" src="' +
+				esc(imgSrc) +
+				'" alt="" loading="lazy" />';
 			html += '</div>';
 			html += '<div class="st-card-body">';
 			html += '<h3 class="st-card-title">' + esc(p.name || '') + '</h3>';
@@ -247,7 +331,7 @@
 			}
 			if (p.category_name) html += '<div class="st-card-meta">' + esc(p.category_name) + '</div>';
 			html += '<div class="st-card-price">' + esc(price) + '</div>';
-			if (sup.business_name) html += '<div class="st-card-supplier">' + esc(sup.business_name) + '</div>';
+			html += renderSupplierContactBlock(sup, { compact: true });
 			html += '<div class="st-card-actions">';
 			if (cfg.showProductDetails !== false) {
 				html += '<button type="button" class="st-btn-details button">' + esc(t('details')) + '</button>';
@@ -331,8 +415,7 @@
 					var p = row.product || {};
 					var sup = row.supplier || {};
 					var bid = parseInt(row.business_id, 10) || 0;
-					var img = p.thumbnail_url || p.image_url || '';
-					var imgSrc = img ? absUrl(img) : '';
+					var imgSrc = productImageSrc(p);
 					var parts = [];
 					parts.push(
 						'<button type="button" class="st-modal-close" aria-label="' +
@@ -340,54 +423,19 @@
 							'">&times;</button>'
 					);
 					parts.push('<h2 class="st-modal-title st-detail-title">' + esc(p.name || '') + '</h2>');
-					if (imgSrc) {
-						parts.push(
-							'<div class="st-detail-img-wrap" id="st-detail-main-img-wrap"><img class="st-detail-img" id="st-detail-main-img" src="' +
-								esc(imgSrc) +
-								'" alt="" /></div>'
-						);
-					}
+					parts.push(
+						'<div class="st-detail-img-wrap" id="st-detail-main-img-wrap"><img class="st-detail-img' +
+							(imgSrc === noImageUrl() ? ' st-detail-img--fallback' : '') +
+							'" id="st-detail-main-img" src="' +
+							esc(imgSrc) +
+							'" alt="" /></div>'
+					);
 					parts.push(renderGallery(p));
 					if (p.category_name) {
 						parts.push('<div class="st-detail-meta">' + esc(p.category_name) + '</div>');
 					}
 					parts.push('<div class="st-detail-price">' + esc(fmtPrice(p.base_sales_price)) + '</div>');
-					if (sup.business_name) {
-						parts.push(
-							'<div class="st-detail-supplier"><strong>' +
-								esc(t('supplierLabel')) +
-								'</strong> ' +
-								esc(sup.business_name) +
-								'</div>'
-						);
-					}
-					var addrBits = [];
-					if (sup.address) addrBits.push(esc(sup.address));
-					var loc = [sup.province, sup.city].filter(Boolean).join(' — ');
-					if (loc) addrBits.push(esc(loc));
-					if (addrBits.length) {
-						parts.push('<div class="st-detail-address">' + addrBits.join('<br />') + '</div>');
-					}
-					if (sup.show_contact) {
-						if (sup.phone) {
-							parts.push(
-								'<div class="st-detail-phone"><strong>' +
-									esc(t('phoneLabel')) +
-									'</strong> ' +
-									esc(sup.phone) +
-									'</div>'
-							);
-						}
-						if (sup.mobile) {
-							parts.push(
-								'<div class="st-detail-mobile"><strong>' +
-									esc(t('mobileLabel')) +
-									'</strong> ' +
-									esc(sup.mobile) +
-									'</div>'
-							);
-						}
-					}
+					parts.push(renderSupplierContactBlock(sup));
 					if (p.main_unit) {
 						parts.push(
 							'<div class="st-detail-unit"><strong>' +
@@ -658,6 +706,41 @@
 			});
 		}
 
+		function updateSupplierBanner(items, reset) {
+			var bannerEl = root.querySelector('.st-supplier-banner');
+			if (!bannerEl) return;
+			if (!reset) return;
+			var sup = null;
+			if (cfg.businessId && items.length && items[0].supplier) {
+				sup = items[0].supplier;
+			} else if (items.length) {
+				var bid = items[0].business_id;
+				var allSame = true;
+				for (var bi = 0; bi < items.length; bi++) {
+					if (items[bi].business_id !== bid) {
+						allSame = false;
+						break;
+					}
+				}
+				if (allSame && items[0].supplier) {
+					sup = items[0].supplier;
+				}
+			}
+			if (!sup) {
+				bannerEl.hidden = true;
+				bannerEl.innerHTML = '';
+				return;
+			}
+			var html = renderSupplierContactBlock(sup);
+			if (!html) {
+				bannerEl.hidden = true;
+				bannerEl.innerHTML = '';
+				return;
+			}
+			bannerEl.innerHTML = html;
+			bannerEl.hidden = false;
+		}
+
 		function load(reset) {
 			if (!configured) {
 				setStatus(t('notConfigured'), true);
@@ -669,6 +752,11 @@
 				skip = 0;
 				total = Infinity;
 				if (grid) grid.innerHTML = '';
+				var bannerEl = root.querySelector('.st-supplier-banner');
+				if (bannerEl) {
+					bannerEl.hidden = true;
+					bannerEl.innerHTML = '';
+				}
 			}
 			setStatus('');
 			setLoading(true);
@@ -687,6 +775,7 @@
 					var items = data.items || [];
 					total = typeof data.total_count === 'number' ? data.total_count : total;
 					appendItems(items);
+					updateSupplierBanner(items, reset);
 					skip += items.length;
 					if (loadBtn) {
 						loadBtn.hidden = skip >= total;

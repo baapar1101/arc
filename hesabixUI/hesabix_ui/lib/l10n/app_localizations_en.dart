@@ -15826,11 +15826,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get frequentDescriptionsUseInField => 'Insert into field';
 
   @override
-  String get productPublicCatalogTitle => 'Public product catalog';
+  String get productPublicCatalogTitle => 'Supply network catalog';
 
   @override
   String get productPublicCatalogSubtitle =>
-      'When enabled, product name/description and contact info (if allowed in business settings) are exposed via the public catalog API.';
+      'When enabled, catalog profile fields (summary, expert review, specifications, contact) are exposed via the public catalog API.';
 
   @override
   String get publicCatalogShowContactTitle =>

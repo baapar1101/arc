@@ -192,11 +192,11 @@
 	object-fit: contain;
 }
 
-.st-card-img--ph {
-	width: 48%;
-	height: 48%;
-	background: linear-gradient(135deg, #eee 0%, #ddd 100%);
-	border-radius: 8px;
+.st-card-img--fallback,
+.st-detail-img--fallback {
+	object-fit: contain;
+	padding: 12%;
+	opacity: 0.92;
 }
 
 .st-card-body {
@@ -239,6 +239,82 @@
 .st-card-supplier {
 	font-size: 0.8rem;
 	color: var(--st-muted);
+}
+
+.st-supplier-contact {
+	margin-top: 0.45rem;
+	padding: 0.65rem 0.75rem;
+	border: 1px solid var(--st-border);
+	border-radius: 10px;
+	background: linear-gradient(180deg, #fafcff 0%, #f5f7fa 100%);
+}
+
+.st-supplier-contact--compact {
+	padding: 0.5rem 0.6rem;
+	margin-top: 0.35rem;
+}
+
+.st-supplier-contact-title {
+	font-size: 0.75rem;
+	font-weight: 700;
+	color: var(--st-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+	margin-bottom: 0.35rem;
+}
+
+.st-supplier-contact-name {
+	font-size: 0.9rem;
+	font-weight: 800;
+	color: var(--st-text);
+	margin-bottom: 0.35rem;
+	line-height: 1.35;
+}
+
+.st-supplier-contact--compact .st-supplier-contact-name {
+	font-size: 0.82rem;
+	margin-bottom: 0.25rem;
+}
+
+.st-supplier-contact-rows {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+}
+
+.st-supplier-contact-row {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.45rem;
+	font-size: 0.82rem;
+	line-height: 1.45;
+	color: var(--st-text);
+}
+
+.st-supplier-contact--compact .st-supplier-contact-row {
+	font-size: 0.78rem;
+}
+
+.st-supplier-contact-icon {
+	flex: 0 0 auto;
+	line-height: 1.35;
+	opacity: 0.85;
+}
+
+.st-supplier-contact-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.st-supplier-contact-link {
+	color: #1565c0;
+	font-weight: 700;
+	text-decoration: none;
+	word-break: break-word;
+}
+
+.st-supplier-contact-link:hover {
+	text-decoration: underline;
 }
 
 .st-card-actions {
@@ -336,10 +412,6 @@
 
 .st-detail-meta,
 .st-detail-price,
-.st-detail-supplier,
-.st-detail-address,
-.st-detail-phone,
-.st-detail-mobile,
 .st-detail-unit,
 .st-detail-updated,
 .st-detail-brand,
@@ -348,6 +420,10 @@
 	font-size: 0.88rem;
 	margin-bottom: 0.4rem;
 	line-height: 1.45;
+}
+
+.st-detail-modal .st-supplier-contact {
+	margin: 0.75rem 0 0.5rem;
 }
 
 .st-detail-price {

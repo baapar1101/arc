@@ -29215,13 +29215,13 @@ abstract class AppLocalizations {
   /// No description provided for @productPublicCatalogTitle.
   ///
   /// In en, this message translates to:
-  /// **'Public product catalog'**
+  /// **'Supply network catalog'**
   String get productPublicCatalogTitle;
 
   /// No description provided for @productPublicCatalogSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'When enabled, product name/description and contact info (if allowed in business settings) are exposed via the public catalog API.'**
+  /// **'When enabled, catalog profile fields (summary, expert review, specifications, contact) are exposed via the public catalog API.'**
   String get productPublicCatalogSubtitle;
 
   /// No description provided for @publicCatalogShowContactTitle.

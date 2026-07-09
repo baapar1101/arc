@@ -20,6 +20,7 @@ adapters/api/v1/business_notifications.py
 adapters/api/v1/business_users.py
 adapters/api/v1/businesses.py
 adapters/api/v1/cash_registers.py
+adapters/api/v1/catalog_spec_fields.py
 adapters/api/v1/categories.py
 adapters/api/v1/checks.py
 adapters/api/v1/credit.py
@@ -133,6 +134,7 @@ adapters/api/v1/schema_models/__init__.py
 adapters/api/v1/schema_models/account.py
 adapters/api/v1/schema_models/bank_account.py
 adapters/api/v1/schema_models/business_notification.py
+adapters/api/v1/schema_models/catalog_spec_field.py
 adapters/api/v1/schema_models/check.py
 adapters/api/v1/schema_models/common.py
 adapters/api/v1/schema_models/crm.py
@@ -209,6 +211,7 @@ adapters/db/models/bale.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
 adapters/db/models/business_backup_import_log.py
+adapters/db/models/business_catalog_spec_field.py
 adapters/db/models/business_crm_settings.py
 adapters/db/models/business_currency_rate.py
 adapters/db/models/business_dashboard_layout.py
@@ -458,6 +461,7 @@ app/services/business_service.py
 app/services/cache_invalidation_subscriber.py
 app/services/captcha_service.py
 app/services/cash_register_service.py
+app/services/catalog_spec_field_service.py
 app/services/check_reconciliation_service.py
 app/services/check_service.py
 app/services/credit_service.py
@@ -535,6 +539,7 @@ app/services/price_list_service.py
 app/services/print_footer_settings.py
 app/services/product_attribute_service.py
 app/services/product_bulk_upsert_service.py
+app/services/product_catalog_profile_service.py
 app/services/product_commercial_insights_service.py
 app/services/product_general_barcode_service.py
 app/services/product_inventory_tracking_sync.py
@@ -948,6 +953,8 @@ migrations/versions/20260705_000001_merge_support_and_documents_heads.py
 migrations/versions/20260705_000002_support_phase3_sla_realtime.py
 migrations/versions/20260706_000001_support_read_csat.py
 migrations/versions/20260707_000001_payroll_plugin_tables.py
+migrations/versions/20260709_000001_product_supply_network_catalog.py
+migrations/versions/20260710_000001_product_catalog_gallery.py
 tests/__init__.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
@@ -1007,6 +1014,7 @@ tests/test_permissions.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
 tests/test_physical_stock.py
+tests/test_product_catalog_profile.py
 tests/test_product_inventory_tracking_sync.py
 tests/test_product_tax_update.py
 tests/test_product_update_inventory_import.py

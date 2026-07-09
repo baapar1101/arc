@@ -5,9 +5,12 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
 import '../../../controllers/product_form_controller.dart';
+import '../../../models/business_models.dart';
 import '../../../models/catalog_specification_item.dart';
 import '../../../models/product_form_data.dart';
+import '../../../services/business_api_service.dart';
 import '../../../services/catalog_spec_field_service.dart';
+import '../../../utils/catalog_business_contact_validator.dart';
 import '../../../utils/responsive_helper.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../catalog_gallery_editor.dart';
@@ -37,6 +40,8 @@ class _ProductSupplyNetworkSectionState extends State<ProductSupplyNetworkSectio
   final _specFieldService = CatalogSpecFieldService();
   bool _loadingTemplates = false;
   bool _templatesExpanded = false;
+  bool _loadingBusinessContact = false;
+  List<String> _businessContactWarnings = const [];
 
   bool get _canEditProducts => widget.authStore.hasBusinessPermission('products', 'edit');
 
@@ -48,15 +53,135 @@ class _ProductSupplyNetworkSectionState extends State<ProductSupplyNetworkSectio
   void initState() {
     super.initState();
     _ensureTemplateRows();
+    if (widget.formData.isPublicCatalog) {
+      _loadBusinessContactInfo();
+    }
   }
 
   @override
   void didUpdateWidget(covariant ProductSupplyNetworkSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.formData.isPublicCatalog != widget.formData.isPublicCatalog ||
-        oldWidget.controller?.catalogSpecFields != widget.controller?.catalogSpecFields) {
+    if (oldWidget.formData.isPublicCatalog != widget.formData.isPublicCatalog) {
+      if (widget.formData.isPublicCatalog) {
+        _loadBusinessContactInfo();
+        _ensureTemplateRows();
+      } else {
+        setState(() => _businessContactWarnings = const []);
+      }
+    }
+    if (oldWidget.controller?.catalogSpecFields != widget.controller?.catalogSpecFields) {
       _ensureTemplateRows();
     }
+  }
+
+  Future<void> _loadBusinessContactInfo() async {
+    setState(() => _loadingBusinessContact = true);
+    try {
+      final business = await BusinessApiService.getBusiness(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _businessContactWarnings = _buildBusinessContactWarnings(business);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _businessContactWarnings = const [
+          'بارگذاری اطلاعات تماس کسب‌وکار ناموفق بود. قبل از انتشار، تنظیمات کسب‌وکار را بررسی کنید.',
+        ];
+      });
+    } finally {
+      if (mounted) setState(() => _loadingBusinessContact = false);
+    }
+  }
+
+  List<String> _buildBusinessContactWarnings(BusinessResponse business) {
+    return CatalogBusinessContactValidator.warnings(business);
+  }
+
+  Widget _buildBusinessContactWarningBanner() {
+    if (!widget.formData.isPublicCatalog) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    if (_loadingBusinessContact) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'در حال بررسی اطلاعات تماس کسب‌وکار…',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ),
+      );
+    }
+    if (_businessContactWarnings.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Material(
+        color: theme.colorScheme.errorContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: theme.colorScheme.error,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'اطلاعات تماس کسب‌وکار برای نمایش در شبکهٔ تأمین ناقص است',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ..._businessContactWarnings.map(
+                (w) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '• $w',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+              ),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: TextButton.icon(
+                  onPressed: () => context.push(
+                    context.businessPanelUrl(widget.businessId, 'settings/business'),
+                  ),
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  label: const Text('تکمیل اطلاعات کسب‌وکار'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _ensureTemplateRows() {
@@ -275,8 +400,16 @@ class _ProductSupplyNetworkSectionState extends State<ProductSupplyNetworkSectio
           title: const Text('شبکهٔ تأمین کالا'),
           subtitle: Text(t.productPublicCatalogSubtitle),
           value: widget.formData.isPublicCatalog,
-          onChanged: (v) => _update(widget.formData.copyWith(isPublicCatalog: v)),
+          onChanged: (v) {
+            _update(widget.formData.copyWith(isPublicCatalog: v));
+            if (v) {
+              _loadBusinessContactInfo();
+            } else {
+              setState(() => _businessContactWarnings = const []);
+            }
+          },
         ),
+        _buildBusinessContactWarningBanner(),
         if (!widget.formData.isPublicCatalog) ...[
           SizedBox(height: spacing),
           Text(

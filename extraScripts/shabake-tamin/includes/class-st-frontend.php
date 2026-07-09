@@ -87,6 +87,7 @@ final class Shabake_Tamin_Frontend {
 				'restBase'      => esc_url_raw( rest_url( Shabake_Tamin_REST::NS . '/' ) ),
 				'apiPublicBase' => $base,
 				'configured'    => Shabake_Tamin_Hesabix_API::is_configured(),
+				'noImageUrl'    => esc_url_raw( ST_PLUGIN_URL . 'assets/images/noimage.png' ),
 				'i18n'          => array(
 					'loadMore'       => __( 'بارگذاری بیشتر', 'shabake-tamin' ),
 					'search'         => __( 'جستجو در کاتالوگ…', 'shabake-tamin' ),
@@ -123,6 +124,11 @@ final class Shabake_Tamin_Frontend {
 					'updatedLabel'   => __( 'به‌روزرسانی', 'shabake-tamin' ),
 					'phoneLabel'     => __( 'تلفن', 'shabake-tamin' ),
 					'mobileLabel'    => __( 'موبایل', 'shabake-tamin' ),
+					'addressLabel'   => __( 'نشانی', 'shabake-tamin' ),
+					'locationLabel'  => __( 'موقعیت', 'shabake-tamin' ),
+					'supplierContactTitle' => __( 'اطلاعات تماس تأمین‌کننده', 'shabake-tamin' ),
+					'callPhone'      => __( 'تماس تلفنی', 'shabake-tamin' ),
+					'callMobile'     => __( 'تماس با موبایل', 'shabake-tamin' ),
 					'resultCountTemplate' => __( '{shown} کالا از {total} نتیجه', 'shabake-tamin' ),
 				),
 			)

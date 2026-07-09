@@ -42,6 +42,17 @@
 	line-height: 1.6;
 }
 
+.st-public-hero__contact-hint {
+	margin: 0.65rem 0 0;
+	font-size: 0.85rem;
+	opacity: 0.88;
+	line-height: 1.55;
+	padding: 0.55rem 0.75rem;
+	background: rgba(255, 255, 255, 0.12);
+	border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
 .st-public-page__body {
 	min-height: 40vh;
 }
@@ -70,6 +81,24 @@
 
 .st-pub-result-stats:empty {
 	display: none;
+}
+
+.st-supplier-banner {
+	margin-bottom: 1rem;
+}
+
+.st-supplier-banner[hidden] {
+	display: none !important;
+}
+
+.st-public-page .st-supplier-banner .st-supplier-contact {
+	border-color: rgba(198, 30, 58, 0.18);
+	background: linear-gradient(180deg, #fff 0%, #fff8f9 100%);
+	box-shadow: 0 2px 12px rgba(198, 30, 58, 0.08);
+}
+
+.st-public-page .st-card .st-supplier-contact {
+	border-color: rgba(198, 30, 58, 0.12);
 }
 
 body.st-public-catalog-body .st-public-page {

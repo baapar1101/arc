@@ -15738,11 +15738,11 @@ class AppLocalizationsFa extends AppLocalizations {
   String get frequentDescriptionsUseInField => 'درج در فیلد شرح';
 
   @override
-  String get productPublicCatalogTitle => 'شبکهٔ انتشار کالا';
+  String get productPublicCatalogTitle => 'شبکهٔ تأمین کالا';
 
   @override
   String get productPublicCatalogSubtitle =>
-      'با فعال‌سازی، نام و توضیحات کالا و اطلاعات تماس (در صورت تنظیم) از طریق API عمومی در اختیار سایت‌های جانبی قرار می‌گیرد.';
+      'با فعال‌سازی، اطلاعات کاتالوگ (خلاصه، بررسی تخصصی، مشخصات فنی و تماس) از طریق API عمومی در اختیار شبکهٔ تأمین قرار می‌گیرد.';
 
   @override
   String get publicCatalogShowContactTitle => 'نمایش تماس در کاتالوگ عمومی';
