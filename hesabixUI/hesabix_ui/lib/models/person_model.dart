@@ -1,3 +1,5 @@
+import 'package:shamsi_date/shamsi_date.dart';
+
 /// Converts JSON value to bool safely (handles int 0/1 and string 'true'/'false' from API).
 bool _fromJsonBool(dynamic v, [bool defaultValue = false]) {
   if (v == null) return defaultValue;
@@ -5,6 +7,59 @@ bool _fromJsonBool(dynamic v, [bool defaultValue = false]) {
   if (v is int) return v != 0;
   if (v is String) return v.toLowerCase() == 'true' || v == '1';
   return defaultValue;
+}
+
+DateTime _parsePersonDateTime(dynamic value) {
+  if (value == null) return DateTime.now();
+  if (value is DateTime) return value;
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value);
+  }
+
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return DateTime.now();
+
+  // First try ISO-compatible date parsing.
+  try {
+    return DateTime.parse(raw);
+  } catch (_) {}
+
+  // Handle Jalali or Gregorian slash dates like 1405/04/18 17:08:49.
+  final parts = raw.split(' ');
+  final datePart = parts[0];
+  final timePart = parts.length > 1 ? parts[1] : '';
+  final dateSegments = datePart.split('/');
+  if (dateSegments.length == 3) {
+    final year = int.tryParse(dateSegments[0]);
+    final month = int.tryParse(dateSegments[1]);
+    final day = int.tryParse(dateSegments[2]);
+    if (year != null && month != null && day != null) {
+      int hour = 0;
+      int minute = 0;
+      int second = 0;
+      if (timePart.isNotEmpty) {
+        final timeSegments = timePart.split(':');
+        if (timeSegments.length >= 2) {
+          hour = int.tryParse(timeSegments[0]) ?? 0;
+          minute = int.tryParse(timeSegments[1]) ?? 0;
+          if (timeSegments.length >= 3) {
+            second = int.tryParse(timeSegments[2]) ?? 0;
+          }
+        }
+      }
+      try {
+        if (year >= 1200 && year <= 1600) {
+          final dt = Jalali(year, month, day).toDateTime();
+          return DateTime(dt.year, dt.month, dt.day, hour, minute, second);
+        }
+        return DateTime(year, month, day, hour, minute, second);
+      } catch (_) {
+        // fallthrough to default
+      }
+    }
+  }
+
+  return DateTime.now();
 }
 
 class PersonBankAccount {
@@ -318,8 +373,8 @@ class Person {
       email: json['email'],
       website: json['website'],
       isActive: _fromJsonBool(json['is_active'], true),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      createdAt: _parsePersonDateTime(json['created_at'] ?? json['created_at_raw']),
+      updatedAt: _parsePersonDateTime(json['updated_at'] ?? json['updated_at_raw']),
       bankAccounts: (json['bank_accounts'] as List<dynamic>?)
           ?.map((ba) => PersonBankAccount.fromJson(ba))
           .toList() ?? [],
