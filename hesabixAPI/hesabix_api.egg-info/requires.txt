@@ -34,6 +34,9 @@ paramiko>=3.4.0
 qrcode>=7.4.2
 basalam-sdk>=0.1.0
 
+[:python_version >= "3.13"]
+audioop-lts>=0.2.1
+
 [dev]
 pytest>=8.2.0
 httpx>=0.27.0

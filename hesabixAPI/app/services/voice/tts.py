@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncGenerator, Optional
 import asyncio
-import audioop
+import audioop  # stdlib <3.13; audioop-lts on 3.13+ (see pyproject.toml)
 import re
 
 
