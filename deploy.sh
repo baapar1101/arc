@@ -1681,12 +1681,14 @@ deploy_backend() {
     exit 1
   fi
 
-  # env.example as base, then merge production keys (DB_PASSWORD etc. safe for special chars)
+  # env.example as base for first install; later deploys only merge keys (preserve secrets).
   local env_file=".env"
-  if [[ -f "env.example" ]]; then
-    cp env.example "${env_file}"
-  else
-    : > "${env_file}"
+  if [[ ! -f "${env_file}" ]]; then
+    if [[ -f "env.example" ]]; then
+      cp env.example "${env_file}"
+    else
+      : > "${env_file}"
+    fi
   fi
   merge_hesabix_api_env_file "${env_file}"
   local ensure_secrets="${DEPLOY_SCRIPT_DIR}/scripts/ensure_api_production_secrets.sh"
