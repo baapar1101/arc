@@ -33,6 +33,7 @@ import '../../services/price_list_service.dart';
 import '../../utils/image_cache.dart';
 import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/bulk_delete_feedback.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/general_barcode_utils.dart';
@@ -1887,13 +1888,20 @@ class _ProductsPageState extends State<ProductsPage> {
                       if (confirm != true) return;
 
                       final api = ApiClient();
-                      await api.post<Map<String, dynamic>>(
+                      final response = await api.post<Map<String, dynamic>>(
                         '/products/business/${widget.businessId}/bulk-delete',
                         data: { 'ids': ids },
                       );
                       try { ( _tableKey.currentState as dynamic)?.refresh(); } catch (_) {}
                       if (!context.mounted) return;
-                      SnackBarHelper.show(context, message: t.productsDeletedSuccessfully);
+
+                      final result = BulkDeleteResult.fromResponseBody(response.data);
+                      await BulkDeleteFeedback.show(
+                        context,
+                        t,
+                        result: result,
+                        allDeletedMessage: t.productsDeletedSuccessfully,
+                      );
                     } catch (e) {
                       if (!context.mounted) return;
                       SnackBarHelper.showError(

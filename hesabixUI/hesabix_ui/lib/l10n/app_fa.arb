@@ -1961,6 +1961,39 @@
   "editPriceTitle": "ویرایش قیمت",
   "productDeletedSuccessfully": "کالا/خدمت با موفقیت حذف شد",
   "productsDeletedSuccessfully": "آیتم‌های انتخاب‌شده با موفقیت حذف شدند",
+  "personsDeletedSuccessfully": "اشخاص انتخاب‌شده با موفقیت حذف شدند",
+  "bulkDeleteResultTitle": "نتیجه حذف گروهی",
+  "bulkDeleteDeletedLabel": "حذف شده:",
+  "bulkDeleteSkippedLabel": "حذف نشده:",
+  "bulkDeleteSkippedDetails": "مواردی که حذف نشدند:",
+  "bulkDeletePartialSnack": "{deleted} مورد حذف شد؛ {skipped} مورد حذف نشد",
+  "@bulkDeletePartialSnack": {
+    "placeholders": {
+      "deleted": {"type": "int"},
+      "skipped": {"type": "int"}
+    }
+  },
+  "bulkDeleteFailedSnack": "هیچ موردی حذف نشد",
+  "bulkDeletePartialWithSample": "{deleted} مورد حذف شد؛ {skipped} مورد حذف نشد: {sample}",
+  "@bulkDeletePartialWithSample": {
+    "placeholders": {
+      "deleted": {"type": "int"},
+      "skipped": {"type": "int"},
+      "sample": {"type": "String"}
+    }
+  },
+  "bulkDeleteFailedWithSample": "هیچ موردی حذف نشد: {sample}",
+  "@bulkDeleteFailedWithSample": {
+    "placeholders": {
+      "sample": {"type": "String"}
+    }
+  },
+  "bulkDeleteAndMore": "... و {count} مورد دیگر",
+  "@bulkDeleteAndMore": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "noRowsSelectedError": "هیچ سطری انتخاب نشده است",
   "deleteSelected": "حذف انتخاب‌شده‌ها",
   "deletedSuccessfully": "با موفقیت حذف شد",

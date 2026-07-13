@@ -1831,6 +1831,39 @@
   "editPriceTitle": "Edit price",
   "productDeletedSuccessfully": "Product or service deleted successfully",
   "productsDeletedSuccessfully": "Selected items deleted successfully",
+  "personsDeletedSuccessfully": "Selected persons deleted successfully",
+  "bulkDeleteResultTitle": "Bulk delete result",
+  "bulkDeleteDeletedLabel": "Deleted:",
+  "bulkDeleteSkippedLabel": "Could not delete:",
+  "bulkDeleteSkippedDetails": "Items that could not be deleted:",
+  "bulkDeletePartialSnack": "{deleted} deleted; {skipped} could not be deleted",
+  "@bulkDeletePartialSnack": {
+    "placeholders": {
+      "deleted": {"type": "int"},
+      "skipped": {"type": "int"}
+    }
+  },
+  "bulkDeleteFailedSnack": "No items could be deleted",
+  "bulkDeletePartialWithSample": "{deleted} deleted; {skipped} could not be deleted: {sample}",
+  "@bulkDeletePartialWithSample": {
+    "placeholders": {
+      "deleted": {"type": "int"},
+      "skipped": {"type": "int"},
+      "sample": {"type": "String"}
+    }
+  },
+  "bulkDeleteFailedWithSample": "No items could be deleted: {sample}",
+  "@bulkDeleteFailedWithSample": {
+    "placeholders": {
+      "sample": {"type": "String"}
+    }
+  },
+  "bulkDeleteAndMore": "... and {count} more",
+  "@bulkDeleteAndMore": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
   "noRowsSelectedError": "No rows selected"
   ,
   "deleteSelected": "Delete Selected",

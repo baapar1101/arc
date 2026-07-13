@@ -256,6 +256,17 @@ def refresh_sales_ledgers_after_inventory_invoice_change(
                 e,
                 exc_info=True,
             )
+        try:
+            from app.services.invoice_cogs_gl_service import resync_invoice_cogs_gl_lines
+
+            resync_invoice_cogs_gl_lines(db, did)
+        except Exception as cogs_exc:
+            logger.warning(
+                "invoice_cogs_gl refresh after inventory change failed doc_id=%s err=%s",
+                did,
+                cogs_exc,
+                exc_info=True,
+            )
     return updated
 
 
@@ -286,6 +297,10 @@ def on_warehouse_document_posted(db: Session, warehouse_document_id: int) -> Non
             exc_info=True,
         )
 
+    from app.services.invoice_cogs_gl_service import on_warehouse_invoice_cogs_gl_sync
+
+    on_warehouse_invoice_cogs_gl_sync(db, int(warehouse_document_id))
+
 
 def on_sales_invoice_document_finalized(db: Session, invoice_document_id: int) -> None:
     """پس از ذخیرهٔ فاکتور قطعی وقتی مبنای شناسایی «فاکتور» است."""
@@ -308,6 +323,10 @@ def on_sales_invoice_document_finalized(db: Session, invoice_document_id: int) -
             e,
             exc_info=True,
         )
+
+    from app.services.invoice_cogs_gl_service import on_sales_invoice_cogs_gl_sync
+
+    on_sales_invoice_cogs_gl_sync(db, int(invoice_document_id))
 
 
 def build_recognized_profit_summary(db: Session, *, document_id: int) -> Optional[Dict[str, Any]]:
@@ -411,7 +430,10 @@ def backfill_recognized_profit_for_business(
     for doc in docs:
         try:
             if basis == LEDGER_BASIS_WAREHOUSE_DOCUMENT_POSTING:
-                if not document_has_any_posted_warehouse(db, document_id=int(doc.id)):
+                extra_info = doc.extra_info if isinstance(doc.extra_info, dict) else {}
+                has_posted_wh = document_has_any_posted_warehouse(db, document_id=int(doc.id))
+                post_inventory_enabled = bool(extra_info.get("post_inventory", True))
+                if not has_posted_wh and post_inventory_enabled:
                     skipped += 1
                     continue
                 ok = apply_recognized_profit_to_invoice_lines(

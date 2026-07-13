@@ -649,6 +649,14 @@ def update_invoice_endpoint(
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
     if not has_invoice_type_permission_for_business(ctx, db, business_id, doc.document_type, "edit"):
         raise ApiError("FORBIDDEN", f"Missing invoice type permission for {doc.document_type}", http_status=403)
+    requested_type = str(payload.get("invoice_type") or doc.document_type or "").strip()
+    if requested_type not in SUPPORTED_INVOICE_TYPES:
+        requested_type = str(doc.document_type or "")
+    if (
+        requested_type != doc.document_type
+        and not has_invoice_type_permission_for_business(ctx, db, business_id, requested_type, "edit")
+    ):
+        raise ApiError("FORBIDDEN", f"Missing invoice type permission for {requested_type}", http_status=403)
     try:
         can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
         can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)

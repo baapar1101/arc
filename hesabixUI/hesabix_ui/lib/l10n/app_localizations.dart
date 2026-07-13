@@ -9318,6 +9318,66 @@ abstract class AppLocalizations {
   /// **'Selected items deleted successfully'**
   String get productsDeletedSuccessfully;
 
+  /// No description provided for @personsDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected persons deleted successfully'**
+  String get personsDeletedSuccessfully;
+
+  /// No description provided for @bulkDeleteResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk delete result'**
+  String get bulkDeleteResultTitle;
+
+  /// No description provided for @bulkDeleteDeletedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted:'**
+  String get bulkDeleteDeletedLabel;
+
+  /// No description provided for @bulkDeleteSkippedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete:'**
+  String get bulkDeleteSkippedLabel;
+
+  /// No description provided for @bulkDeleteSkippedDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Items that could not be deleted:'**
+  String get bulkDeleteSkippedDetails;
+
+  /// No description provided for @bulkDeletePartialSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'{deleted} deleted; {skipped} could not be deleted'**
+  String bulkDeletePartialSnack(int deleted, int skipped);
+
+  /// No description provided for @bulkDeleteFailedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'No items could be deleted'**
+  String get bulkDeleteFailedSnack;
+
+  /// No description provided for @bulkDeletePartialWithSample.
+  ///
+  /// In en, this message translates to:
+  /// **'{deleted} deleted; {skipped} could not be deleted: {sample}'**
+  String bulkDeletePartialWithSample(int deleted, int skipped, String sample);
+
+  /// No description provided for @bulkDeleteFailedWithSample.
+  ///
+  /// In en, this message translates to:
+  /// **'No items could be deleted: {sample}'**
+  String bulkDeleteFailedWithSample(String sample);
+
+  /// No description provided for @bulkDeleteAndMore.
+  ///
+  /// In en, this message translates to:
+  /// **'... and {count} more'**
+  String bulkDeleteAndMore(int count);
+
   /// No description provided for @noRowsSelectedError.
   ///
   /// In en, this message translates to:

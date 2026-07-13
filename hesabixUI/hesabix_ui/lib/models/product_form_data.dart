@@ -372,3 +372,28 @@ class ProductFormData {
     return value.map((e) => e.toString()).where((s) => s.trim().isNotEmpty).toList();
   }
 }
+
+/// تعداد اولیه کالا — فقط در سند تراز افتتاحیه ذخیره می‌شود.
+class ProductOpeningBalanceInput {
+  final double quantity;
+  final double costPrice;
+  final int? warehouseId;
+  final int? fiscalYearId;
+  final bool clear;
+
+  const ProductOpeningBalanceInput({
+    this.quantity = 0,
+    this.costPrice = 0,
+    this.warehouseId,
+    this.fiscalYearId,
+    this.clear = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+        if (clear) 'clear': true,
+        if (!clear) 'quantity': quantity,
+        if (!clear && costPrice > 0) 'cost_price': costPrice,
+        if (warehouseId != null) 'warehouse_id': warehouseId,
+        if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+      };
+}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 
+import '../../../controllers/product_form_controller.dart';
 import '../../../models/product_form_data.dart';
 import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
@@ -47,6 +48,9 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
   late TextEditingController _purchasePriceController;
   late TextEditingController _salesNoteController;
   late TextEditingController _purchaseNoteController;
+  late TextEditingController _openingQuantityController;
+  late TextEditingController _openingCostPriceController;
+  ProductFormController? _boundController;
 
   @override
   void initState() {
@@ -59,11 +63,40 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     );
     _salesNoteController = TextEditingController(text: widget.formData.baseSalesNote ?? '');
     _purchaseNoteController = TextEditingController(text: widget.formData.basePurchaseNote ?? '');
+    _openingQuantityController = TextEditingController();
+    _openingCostPriceController = TextEditingController();
+    _bindController(widget.controller);
+  }
+
+  void _bindController(dynamic controller) {
+    if (controller is! ProductFormController) return;
+    if (identical(_boundController, controller)) return;
+    _boundController?.removeListener(_syncOpeningBalanceFromController);
+    _boundController = controller;
+    controller.addListener(_syncOpeningBalanceFromController);
+    _syncOpeningBalanceFromController();
+  }
+
+  void _syncOpeningBalanceFromController() {
+    final controller = _boundController;
+    if (controller == null) return;
+    final qty = controller.openingBalanceQuantity;
+    final cost = controller.openingBalanceCostPrice;
+    if (_openingQuantityController.text != qty) {
+      _openingQuantityController.text = qty;
+    }
+    if (_openingCostPriceController.text != cost) {
+      _openingCostPriceController.text = cost;
+    }
+    if (mounted) setState(() {});
   }
 
   @override
   void didUpdateWidget(ProductPricingInventorySection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      _bindController(widget.controller);
+    }
     // به‌روزرسانی کنترلرها فقط وقتی مقدار واقعاً تغییر کرده (نه از طریق تایپ کاربر)
     // این برای حفظ جداکننده هزارگان بعد از تغییر تب‌ها مهم است
     if (oldWidget.formData.baseSalesPrice != widget.formData.baseSalesPrice) {
@@ -94,10 +127,13 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
 
   @override
   void dispose() {
+    _boundController?.removeListener(_syncOpeningBalanceFromController);
     _salesPriceController.dispose();
     _purchasePriceController.dispose();
     _salesNoteController.dispose();
     _purchaseNoteController.dispose();
+    _openingQuantityController.dispose();
+    _openingCostPriceController.dispose();
     super.dispose();
   }
 
@@ -346,8 +382,160 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
               );
             },
           ),
+          const SizedBox(height: 16),
+          _buildOpeningBalanceSection(context),
         ],
       ],
+    );
+  }
+
+  Widget _buildOpeningBalanceSection(BuildContext context) {
+    final controller = _boundController;
+    if (controller == null || !controller.showOpeningBalanceSection) {
+      return const SizedBox.shrink();
+    }
+
+    final eligibility = controller.obEligibility;
+    final fyTitle = eligibility?['fiscal_year_title']?.toString();
+    final statusMessage = eligibility?['message']?.toString();
+    final readonly = !controller.obEditable;
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final spacing = ResponsiveHelper.getGridSpacing(context);
+
+    return Card(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'تعداد اولیه (تراز افتتاحیه)',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            if (controller.obEligibilityLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: LinearProgressIndicator(),
+              ),
+            if (fyTitle != null && fyTitle.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('سال مالی: $fyTitle'),
+              ),
+            if (statusMessage != null && statusMessage.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  statusMessage,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            if (readonly)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'تعداد اولیه قابل ویرایش نیست؛ از صفحه تراز افتتاحیه مشاهده کنید.',
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Text(
+                'مقدار در سند تراز افتتاحیه سال مالی جاری ثبت می‌شود. برای ثبت ارزش حسابداری، بهای تمام‌شده را وارد کنید.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            const SizedBox(height: 12),
+            if (isMobile) ...[
+              TextFormField(
+                controller: _openingQuantityController,
+                readOnly: readonly,
+                decoration: const InputDecoration(
+                  labelText: 'تعداد اولیه',
+                  hintText: 'مثلاً ۱۰۰',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  ThousandsSeparatorInputFormatter(),
+                ],
+                onChanged: readonly ? null : controller.setOpeningBalanceQuantity,
+              ),
+              SizedBox(height: spacing),
+              TextFormField(
+                controller: _openingCostPriceController,
+                readOnly: readonly,
+                decoration: const InputDecoration(
+                  labelText: 'بهای تمام‌شده (هر واحد)',
+                  hintText: 'برای ثبت بدهکار حساب موجودی',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  ThousandsSeparatorInputFormatter(),
+                ],
+                onChanged: readonly ? null : controller.setOpeningBalanceCostPrice,
+              ),
+            ] else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _openingQuantityController,
+                      readOnly: readonly,
+                      decoration: const InputDecoration(
+                        labelText: 'تعداد اولیه',
+                        hintText: 'مثلاً ۱۰۰',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(),
+                      ],
+                      onChanged: readonly ? null : controller.setOpeningBalanceQuantity,
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _openingCostPriceController,
+                      readOnly: readonly,
+                      decoration: const InputDecoration(
+                        labelText: 'بهای تمام‌شده (هر واحد)',
+                        hintText: 'برای ثبت بدهکار حساب موجودی',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(),
+                      ],
+                      onChanged: readonly ? null : controller.setOpeningBalanceCostPrice,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 

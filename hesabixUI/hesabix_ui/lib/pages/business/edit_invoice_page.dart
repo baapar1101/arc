@@ -643,6 +643,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
         }
       }
       
+      transactions.sort((a, b) => a.transactionDate.compareTo(b.transactionDate));
+
       if (mounted) {
         setState(() {
           _transactions = transactions;

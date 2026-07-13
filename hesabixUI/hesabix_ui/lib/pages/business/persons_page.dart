@@ -21,6 +21,7 @@ import '../../core/auth_store.dart';
 import 'person_details_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/bulk_delete_feedback.dart';
 import '../../services/marketplace_service.dart';
 
 class PersonsPage extends StatefulWidget {
@@ -673,15 +674,20 @@ class _PersonsPageState extends State<PersonsPage> {
                   if (confirm != true) return;
 
                   final client = ApiClient();
-                  await client.post<Map<String, dynamic>>(
+                  final response = await client.post<Map<String, dynamic>>(
                     '/api/v1/persons/businesses/${widget.businessId}/persons/bulk-delete',
                     data: { 'ids': ids },
                   );
                   try { ( _personsTableKey.currentState as dynamic)?.refresh(); } catch (_) {}
-                  if (mounted) {
-                    // Reuse generic success text available in l10n
-                    SnackBarHelper.show(context, message: t.productsDeletedSuccessfully);
-                  }
+                  if (!context.mounted) return;
+
+                  final result = BulkDeleteResult.fromResponseBody(response.data);
+                  await BulkDeleteFeedback.show(
+                    context,
+                    t,
+                    result: result,
+                    allDeletedMessage: t.personsDeletedSuccessfully,
+                  );
                 } catch (e) {
                   if (mounted) {
                     final t = AppLocalizations.of(context);

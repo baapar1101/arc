@@ -3887,8 +3887,33 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     );
   }
 
+  List<_InvoicePaymentDisplayEntry> _paymentDisplayEntries() {
+    final entries = <_InvoicePaymentDisplayEntry>[];
+    for (final doc in _paymentDocuments) {
+      if (doc.accountLines.isEmpty) {
+        entries.add(_InvoicePaymentDisplayEntry(document: doc));
+        continue;
+      }
+      for (final line in doc.accountLines) {
+        entries.add(_InvoicePaymentDisplayEntry(document: doc, accountLine: line));
+      }
+    }
+    entries.sort((a, b) => _paymentEntryDisplayDate(a).compareTo(_paymentEntryDisplayDate(b)));
+    return entries;
+  }
+
+  DateTime _paymentEntryDisplayDate(_InvoicePaymentDisplayEntry entry) {
+    return entry.accountLine?.transactionDate ?? entry.document.documentDate;
+  }
+
+  num _paymentEntryDisplayAmount(_InvoicePaymentDisplayEntry entry) {
+    return entry.accountLine?.amount ?? entry.document.totalAmount;
+  }
+
   /// ساخت بخش تراکنش‌های پرداخت
   Widget _buildPaymentTransactions(ThemeData theme) {
+    final displayEntries = _paymentDisplayEntries();
+
     if (_loadingPayments) {
       return Card(
         elevation: 2,
@@ -3934,7 +3959,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 ),
                 const Spacer(),
                 Text(
-                  '${_paymentDocuments.length} تراکنش',
+                  '${displayEntries.length} تراکنش',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -3947,11 +3972,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
-            itemCount: _paymentDocuments.length,
+            itemCount: displayEntries.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              final paymentDoc = _paymentDocuments[index];
-              return _buildPaymentCard(theme, paymentDoc);
+              final entry = displayEntries[index];
+              return _buildPaymentCard(theme, entry);
             },
           ),
         ],
@@ -3960,64 +3985,79 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   /// ساخت کارت یک تراکنش پرداخت
-  Widget _buildPaymentCard(ThemeData theme, ReceiptPaymentDocument doc) {
+  Widget _buildPaymentCard(ThemeData theme, _InvoicePaymentDisplayEntry entry) {
+    final doc = entry.document;
+    final line = entry.accountLine;
     final isReceipt = doc.documentType == 'receipt';
-    final totalAmount = doc.totalAmount;
+    final displayAmount = _paymentEntryDisplayAmount(entry);
+    final displayDate = _paymentEntryDisplayDate(entry);
     
-    // جمع‌آوری اطلاعات تراکنش‌ها از account_lines
+    // جمع‌آوری اطلاعات روش پرداخت
     final transactionMethods = <String>[];
-    String? eiStr(AccountLine line, String key) {
-      final v = line.extraInfo?[key];
+    String? eiStr(AccountLine accountLine, String key) {
+      final v = accountLine.extraInfo?[key];
       if (v == null) return null;
       final s = v.toString().trim();
       return s.isEmpty ? null : s;
     }
 
-    String? accountTitle(AccountLine line) {
-      final n = line.accountName.trim();
+    String? accountTitle(AccountLine accountLine) {
+      final n = accountLine.accountName.trim();
       return n.isEmpty ? null : n;
     }
 
-    for (final line in doc.accountLines) {
-      if (line.transactionType != null) {
-        String methodName;
-        switch (line.transactionType) {
-          case 'bank':
-            final detail = eiStr(line, 'bank_name') ?? accountTitle(line);
-            methodName = detail != null ? 'بانک ($detail)' : 'بانک';
-            break;
-          case 'cash_register':
-            final detail = eiStr(line, 'cash_register_name') ?? accountTitle(line);
-            methodName = detail != null ? 'صندوق ($detail)' : 'صندوق';
-            break;
-          case 'petty_cash':
-            final detail = eiStr(line, 'petty_cash_name') ?? accountTitle(line);
-            methodName = detail != null ? 'تنخواهگردان ($detail)' : 'تنخواهگردان';
-            break;
-          case 'check':
-          case 'check_expense':
-            final detail = eiStr(line, 'check_number') ?? accountTitle(line);
-            methodName = detail != null ? 'چک ($detail)' : 'چک';
-            break;
-          case 'person':
-            final detail = eiStr(line, 'person_name') ?? accountTitle(line);
-            methodName = detail != null ? 'شخص ($detail)' : 'شخص';
-            break;
-          case 'wallet':
-            final detail = accountTitle(line);
-            methodName = detail != null ? 'کیف پول ($detail)' : 'کیف پول';
-            break;
-          case 'account':
-            methodName = line.accountName.trim().isNotEmpty ? line.accountName : 'حساب';
-            break;
-          default:
-            methodName = line.transactionType ?? 'نامشخص';
-        }
-        if (!transactionMethods.contains(methodName)) {
-          transactionMethods.add(methodName);
-        }
+    void addMethodFromLine(AccountLine accountLine) {
+      if (accountLine.transactionType == null) return;
+      String methodName;
+      switch (accountLine.transactionType) {
+        case 'bank':
+          final detail = eiStr(accountLine, 'bank_name') ?? accountTitle(accountLine);
+          methodName = detail != null ? 'بانک ($detail)' : 'بانک';
+          break;
+        case 'cash_register':
+          final detail = eiStr(accountLine, 'cash_register_name') ?? accountTitle(accountLine);
+          methodName = detail != null ? 'صندوق ($detail)' : 'صندوق';
+          break;
+        case 'petty_cash':
+          final detail = eiStr(accountLine, 'petty_cash_name') ?? accountTitle(accountLine);
+          methodName = detail != null ? 'تنخواهگردان ($detail)' : 'تنخواهگردان';
+          break;
+        case 'check':
+        case 'check_expense':
+          final detail = eiStr(accountLine, 'check_number') ?? accountTitle(accountLine);
+          methodName = detail != null ? 'چک ($detail)' : 'چک';
+          break;
+        case 'person':
+          final detail = eiStr(accountLine, 'person_name') ?? accountTitle(accountLine);
+          methodName = detail != null ? 'شخص ($detail)' : 'شخص';
+          break;
+        case 'wallet':
+          final detail = accountTitle(accountLine);
+          methodName = detail != null ? 'کیف پول ($detail)' : 'کیف پول';
+          break;
+        case 'account':
+          methodName = accountLine.accountName.trim().isNotEmpty ? accountLine.accountName : 'حساب';
+          break;
+        default:
+          methodName = accountLine.transactionType ?? 'نامشخص';
+      }
+      if (!transactionMethods.contains(methodName)) {
+        transactionMethods.add(methodName);
       }
     }
+
+    if (line != null) {
+      addMethodFromLine(line);
+    } else {
+      for (final accountLine in doc.accountLines) {
+        addMethodFromLine(accountLine);
+      }
+    }
+
+    final lineDescription = line?.description?.trim();
+    final displayDescription = (lineDescription != null && lineDescription.isNotEmpty)
+        ? lineDescription
+        : doc.description;
 
     return Card(
       elevation: 1,
@@ -4085,7 +4125,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   child: _buildPaymentInfoRow(
                     'تاریخ:',
                     HesabixDateUtils.formatForDisplay(
-                      doc.documentDate,
+                      displayDate,
                       widget.calendarController.isJalali == true,
                     ),
                   ),
@@ -4093,7 +4133,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 Expanded(
                   child: _buildPaymentInfoRow(
                     'مبلغ:',
-                    formatWithThousands(totalAmount.toInt()),
+                    formatWithThousands(displayAmount.toInt()),
                     isAmount: true,
                   ),
                 ),
@@ -4106,11 +4146,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 transactionMethods.join('، '),
               ),
             ],
-            if (doc.description != null && doc.description!.isNotEmpty) ...[
+            if (displayDescription != null && displayDescription.isNotEmpty) ...[
               const SizedBox(height: 8),
               _buildPaymentInfoRow(
                 'توضیحات:',
-                doc.description!,
+                displayDescription,
               ),
             ],
           ],
@@ -5674,5 +5714,15 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
       }
     }
   }
+}
+
+class _InvoicePaymentDisplayEntry {
+  final ReceiptPaymentDocument document;
+  final AccountLine? accountLine;
+
+  const _InvoicePaymentDisplayEntry({
+    required this.document,
+    this.accountLine,
+  });
 }
 

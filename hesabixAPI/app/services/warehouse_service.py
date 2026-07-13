@@ -712,8 +712,8 @@ def create_from_invoice(
 			continue
 
 		extra = ln.get("extra_info") or {}
-		movement_override = ln.get("movement")
-		mv = movement_override or extra.get("movement") or ("out" if wh_doc_type in ("issue", "production_out") else "in")
+		# حرکت خط حواله باید با نوع حواله (issue/receipt) هم‌خوان باشد، نه movement ذخیره‌شده در فاکتور.
+		mv = "out" if wh_doc_type in ("issue", "production_out") else "in"
 
 		# دریافت warehouse_id از سطح ردیف خط یا از extra_info
 		# منطق fallback: اگر انبار در سطح ردیف مشخص نشده باشد، از انبار سطح سند حواله استفاده می‌شود
@@ -2466,8 +2466,7 @@ def post_warehouse_document(
 		wh.extra_info["accounting_document_id"] = accounting_doc.id
 		db.flush()
 	
-	# توجه: محاسبات COGS و ثبت سطرهای حسابداری در بخش فاکتورها انجام می‌شود
-	# بخش انبارداری فقط مسئولیت مدیریت موجودی فیزیکی را دارد
+	# شناسایی بهای تمام‌شده قطعی روی خطوط فاکتور و ثبت COGS در دفتر کل
 
 	# ورک‌فلو: موجودی کم (reorder_point)
 	try:
@@ -3179,6 +3178,22 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 	# تغییر وضعیت حواله اصلی به cancelled
 	wh.status = "cancelled"
 	wh.touch()
+
+	try:
+		from app.services.invoice_cogs_gl_service import on_warehouse_invoice_cogs_gl_cancel_sync
+
+		on_warehouse_invoice_cogs_gl_cancel_sync(
+			db,
+			source_type=getattr(wh, "source_type", None),
+			source_document_id=getattr(wh, "source_document_id", None),
+		)
+	except Exception as cogs_cancel_err:
+		logger.warning(
+			"invoice_cogs_gl sync after warehouse cancel failed wh_id=%s err=%s",
+			wh.id,
+			cogs_cancel_err,
+			exc_info=True,
+		)
 	
 	db.flush()
 	

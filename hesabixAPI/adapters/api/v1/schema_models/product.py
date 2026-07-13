@@ -4,7 +4,7 @@ Schema models کامل برای محصولات (Products)
 این ماژول شامل تمام schema های مورد نیاز برای مدیریت محصولات است.
 """
 from typing import Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, field_validator, model_validator, ValidationInfo
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationInfo, ConfigDict
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -28,6 +28,39 @@ class CatalogSpecificationItem(BaseModel):
     label: str = Field(..., min_length=1, max_length=255, description="عنوان مشخصه")
     value: str = Field(default="", max_length=2000, description="مقدار مشخصه")
     sort_order: int = Field(default=0, ge=0)
+
+
+class ProductOpeningBalanceInput(BaseModel):
+    """تعداد اولیه کالا — فقط در سند تراز افتتاحیه ذخیره می‌شود."""
+    model_config = ConfigDict(extra="ignore")
+
+    quantity: float = Field(default=0, ge=0, description="تعداد اولیه (۰ همراه clear برای حذف)")
+    cost_price: float = Field(
+        default=0,
+        ge=0,
+        description="بهای تمام‌شده هر واحد برای ارزش‌گذاری حساب موجودی کالا",
+    )
+    warehouse_id: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="انبار (در صورت عدم ارسال، از default_warehouse_id کالا استفاده می‌شود)",
+    )
+    fiscal_year_id: Optional[int] = Field(
+        default=None,
+        description="سال مالی (در صورت عدم ارسال، سال جاری)",
+    )
+    clear: bool = Field(
+        default=False,
+        description="حذف خط موجودی اولیه از سند تراز افتتاحیه (فقط در ویرایش)",
+    )
+
+    @model_validator(mode="after")
+    def _validate_quantity_or_clear(self):
+        if self.clear:
+            return self
+        if self.quantity <= 0:
+            raise ValueError("تعداد اولیه باید بزرگتر از صفر باشد")
+        return self
 
 
 class ProductCatalogProfileMixin(BaseModel):
@@ -249,6 +282,11 @@ class ProductCreateRequest(ProductCatalogProfileMixin):
         default=False,
         description="انتشار عمومی در شبکهٔ کاتالوگ (API عمومی بدون احراز هویت)",
     )
+
+    opening_balance: Optional[ProductOpeningBalanceInput] = Field(
+        default=None,
+        description="تعداد اولیه — در سند تراز افتتاحیه سال مالی جاری ثبت می‌شود",
+    )
     
     class Config:
         json_schema_extra = {
@@ -313,6 +351,11 @@ class ProductUpdateRequest(ProductCatalogProfileMixin):
     general_barcodes: Optional[str] = Field(None, max_length=8192)
     is_active: Optional[bool] = None
     is_public_catalog: Optional[bool] = None
+
+    opening_balance: Optional[ProductOpeningBalanceInput] = Field(
+        default=None,
+        description="تعداد اولیه — در سند تراز افتتاحیه سال مالی جاری ثبت/به‌روزرسانی می‌شود",
+    )
 
 
 class BulkDefaultWarehouseApplyScope(str, Enum):

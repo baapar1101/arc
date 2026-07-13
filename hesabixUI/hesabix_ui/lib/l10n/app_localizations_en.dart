@@ -4924,6 +4924,45 @@ class AppLocalizationsEn extends AppLocalizations {
       'Selected items deleted successfully';
 
   @override
+  String get personsDeletedSuccessfully =>
+      'Selected persons deleted successfully';
+
+  @override
+  String get bulkDeleteResultTitle => 'Bulk delete result';
+
+  @override
+  String get bulkDeleteDeletedLabel => 'Deleted:';
+
+  @override
+  String get bulkDeleteSkippedLabel => 'Could not delete:';
+
+  @override
+  String get bulkDeleteSkippedDetails => 'Items that could not be deleted:';
+
+  @override
+  String bulkDeletePartialSnack(int deleted, int skipped) {
+    return '$deleted deleted; $skipped could not be deleted';
+  }
+
+  @override
+  String get bulkDeleteFailedSnack => 'No items could be deleted';
+
+  @override
+  String bulkDeletePartialWithSample(int deleted, int skipped, String sample) {
+    return '$deleted deleted; $skipped could not be deleted: $sample';
+  }
+
+  @override
+  String bulkDeleteFailedWithSample(String sample) {
+    return 'No items could be deleted: $sample';
+  }
+
+  @override
+  String bulkDeleteAndMore(int count) {
+    return '... and $count more';
+  }
+
+  @override
   String get noRowsSelectedError => 'No rows selected';
 
   @override

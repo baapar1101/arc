@@ -4892,6 +4892,45 @@ class AppLocalizationsFa extends AppLocalizations {
       'آیتم‌های انتخاب‌شده با موفقیت حذف شدند';
 
   @override
+  String get personsDeletedSuccessfully =>
+      'اشخاص انتخاب‌شده با موفقیت حذف شدند';
+
+  @override
+  String get bulkDeleteResultTitle => 'نتیجه حذف گروهی';
+
+  @override
+  String get bulkDeleteDeletedLabel => 'حذف شده:';
+
+  @override
+  String get bulkDeleteSkippedLabel => 'حذف نشده:';
+
+  @override
+  String get bulkDeleteSkippedDetails => 'مواردی که حذف نشدند:';
+
+  @override
+  String bulkDeletePartialSnack(int deleted, int skipped) {
+    return '$deleted مورد حذف شد؛ $skipped مورد حذف نشد';
+  }
+
+  @override
+  String get bulkDeleteFailedSnack => 'هیچ موردی حذف نشد';
+
+  @override
+  String bulkDeletePartialWithSample(int deleted, int skipped, String sample) {
+    return '$deleted مورد حذف شد؛ $skipped مورد حذف نشد: $sample';
+  }
+
+  @override
+  String bulkDeleteFailedWithSample(String sample) {
+    return 'هیچ موردی حذف نشد: $sample';
+  }
+
+  @override
+  String bulkDeleteAndMore(int count) {
+    return '... و $count مورد دیگر';
+  }
+
+  @override
   String get noRowsSelectedError => 'هیچ سطری انتخاب نشده است';
 
   @override

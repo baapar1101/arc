@@ -47,6 +47,10 @@ from app.services.product_service import (
     get_inventory_kardex_report,
     get_inventory_stock_report,
 )
+from app.services.product_opening_balance_service import (
+    create_product_with_opening_balance,
+    update_product_with_opening_balance,
+)
 from app.services.product_commercial_insights_service import get_product_commercial_insights
 from app.services.bulk_price_update_service import (
     preview_bulk_price_update,
@@ -274,8 +278,26 @@ async def create_product_endpoint(
     
     if not payload:
         raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)
-    
-    result = create_product(db, business_id, payload)
+
+    if payload.opening_balance is not None:
+        if not has_business_permission_for_business(
+            ctx, db, business_id, "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای ثبت تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+        result = create_product_with_opening_balance(
+            db,
+            business_id,
+            ctx.get_user_id(),
+            payload,
+            create_product_fn=create_product,
+            delete_product_fn=delete_product,
+        )
+    else:
+        result = create_product(db, business_id, payload)
     
     # به‌روزرسانی context_id فایل با product_id
     if image_file_id and result.get("data", {}).get("id"):
@@ -286,10 +308,6 @@ async def create_product_endpoint(
             db.commit()
     
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
-
-
-@router.post(
-    "/business/{business_id}/bulk-upsert",
     summary="ایجاد/ویرایش گروهی کالا (یکپارچه‌سازی)",
     description=(
         "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در حسابیکس,"
@@ -858,8 +876,29 @@ async def update_product_endpoint(
     
     if not payload:
         raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)
-    
-    result = update_product(db, product_id, business_id, payload, user_id=ctx.get_user_id())
+
+    previous_warehouse_id = product.default_warehouse_id
+
+    if payload.opening_balance is not None:
+        if not has_business_permission_for_business(
+            ctx, db, business_id, "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای ثبت تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+        result = update_product_with_opening_balance(
+            db,
+            business_id,
+            ctx.get_user_id(),
+            product_id,
+            payload,
+            update_product_fn=update_product,
+            previous_warehouse_id=previous_warehouse_id,
+        )
+    else:
+        result = update_product(db, product_id, business_id, payload, user_id=ctx.get_user_id())
     if not result:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
     
