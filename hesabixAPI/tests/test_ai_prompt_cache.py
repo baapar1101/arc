@@ -8,6 +8,7 @@ from app.services.ai.ai_prompt_cache import (
     build_prompt_cache_policy,
     merge_provider_extra,
     normalize_openai_usage,
+    openai_supports_prompt_cache,
     split_system_messages_for_provider,
     usage_context_fields,
     LLMUsageDetails,
@@ -64,6 +65,26 @@ def test_prompt_cache_policy_disabled_when_static_too_small():
         business_id=1,
     )
     policy = build_prompt_cache_policy(structured, "anthropic", _FakeProvider())
+    assert policy.enabled is False
+
+
+def test_openai_prompt_cache_disabled_for_custom_base_url():
+    assert openai_supports_prompt_cache("https://api.openai.com/v1") is True
+    assert openai_supports_prompt_cache(None) is True
+    assert openai_supports_prompt_cache("https://ai.arvancloud.ir/v1") is False
+
+    structured = compose_structured_system_prompt(
+        static_core="A" * (PROMPT_CACHE_MIN_STATIC_TOKENS * 4 + 100),
+        business_anchor="\n\nbiz",
+        role="user",
+        business_id=2,
+    )
+    policy = build_prompt_cache_policy(
+        structured,
+        "openai",
+        _FakeProvider(),
+        api_base_url="https://ai.arvancloud.ir/v1",
+    )
     assert policy.enabled is False
 
 

@@ -11,6 +11,7 @@ from app.services.ai.ai_prompt_cache import (
     extract_prompt_cache_policy,
     normalize_anthropic_usage,
     normalize_openai_usage,
+    openai_supports_prompt_cache,
     split_system_messages_for_provider,
 )
 
@@ -194,7 +195,11 @@ class OpenAIProvider(AIProviderBase):
         if stream:
             kwargs["stream"] = True
 
-        if cache_policy and cache_policy.cache_key:
+        if (
+            cache_policy
+            and cache_policy.cache_key
+            and openai_supports_prompt_cache(self.api_base_url)
+        ):
             kwargs["prompt_cache_key"] = cache_policy.cache_key
             retention = (cache_policy.openai_retention or "").strip()
             if retention and retention not in ("in_memory", "default"):

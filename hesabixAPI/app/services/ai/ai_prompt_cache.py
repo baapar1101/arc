@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
 from app.services.ai.ai_constants import (
     ANTHROPIC_PROMPT_CACHE_TTL,
@@ -23,6 +24,22 @@ from app.services.ai.ai_system_prompt import StructuredSystemPrompt
 logger = logging.getLogger(__name__)
 
 ANTHROPIC_EPHEMERAL_CACHE = {"type": "ephemeral"}
+
+_OPENAI_OFFICIAL_HOSTS = frozenset({"api.openai.com"})
+
+
+def openai_supports_prompt_cache(api_base_url: Optional[str]) -> bool:
+    """`prompt_cache_key` فقط در API رسمی OpenAI پشتیبانی می‌شود.
+
+    Gatewayهای سازگار با OpenAI (مثل آروان کلاد / vLLM) این پارامتر را نمی‌پذیرند.
+    """
+    if not api_base_url or not str(api_base_url).strip():
+        return True
+    try:
+        host = (urlparse(str(api_base_url).strip()).hostname or "").lower()
+    except Exception:
+        return False
+    return host in _OPENAI_OFFICIAL_HOSTS
 
 
 @dataclass(frozen=True)
@@ -68,13 +85,18 @@ class PromptCachePolicy:
         *,
         static_token_estimate: int,
         auto_cache_conversation: bool = True,
+        api_base_url: Optional[str] = None,
     ) -> PromptCachePolicy:
         provider = (provider_type or "").strip().lower()
         static_text = structured.static_cacheable_text()
         dynamic_text = structured.dynamic_system_text()
+        provider_cache_ok = (
+            provider == "anthropic"
+            or (provider == "openai" and openai_supports_prompt_cache(api_base_url))
+        )
         eligible = (
             PROMPT_CACHE_ENABLED
-            and provider in ("openai", "anthropic")
+            and provider_cache_ok
             and bool(static_text.strip())
             and static_token_estimate >= PROMPT_CACHE_MIN_STATIC_TOKENS
         )
@@ -95,13 +117,17 @@ def build_prompt_cache_policy(
     provider: Any = None,
     *,
     auto_cache_conversation: bool = True,
+    api_base_url: Optional[str] = None,
 ) -> PromptCachePolicy:
     estimate = structured.estimate_static_tokens(provider)
+    if api_base_url is None and provider is not None:
+        api_base_url = getattr(provider, "api_base_url", None)
     return PromptCachePolicy.from_structured_prompt(
         structured,
         provider_type,
         static_token_estimate=estimate,
         auto_cache_conversation=auto_cache_conversation,
+        api_base_url=api_base_url,
     )
 
 
