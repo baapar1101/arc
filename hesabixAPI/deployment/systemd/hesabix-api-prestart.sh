@@ -14,6 +14,16 @@ PIP="${API_DIR}/.venv/bin/pip"
 
 log() { echo "hesabix-api-prestart: $*" >&2; }
 
+APP_ROOT="$(cd "${API_DIR}/../.." && pwd)"
+ENSURE_SECRETS="${APP_ROOT}/app/scripts/ensure_api_production_secrets.sh"
+if [[ -f "${ENSURE_SECRETS}" ]]; then
+  chmod +x "${ENSURE_SECRETS}" 2>/dev/null || true
+  if ! APP_ROOT="${APP_ROOT}" bash "${ENSURE_SECRETS}"; then
+    log "ensure_api_production_secrets failed"
+    exit 1
+  fi
+fi
+
 if ! command -v systemctl >/dev/null 2>&1; then
   log "systemctl not found; skipping daemon-reload"
 else

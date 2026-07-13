@@ -36,8 +36,8 @@ IFS=$'\n\t'
 # Notes:
 # - Designed for Ubuntu 22.04+/Debian 12+
 # - Minimum install RAM: ~5.5 GiB — see check_minimum_ram
-# - Nginx: after SSL, use scripts/update_nginx_domains.sh to change domains only;
-#   this script configures listen 443 and /p/ and /i/ paths with Let's Encrypt (or SSL_LETSENCRYPT_LIVE in .deploy_env).
+# - Nginx/domains: after install, use `sudo hesabix -domains set` or `sudo hesabix -domains apply`;
+#   legacy: scripts/update_nginx_domains.sh. SSL: `sudo hesabix -ssl enable`. Let's Encrypt or SSL_LETSENCRYPT_LIVE in .deploy_env.
 # - Web build API URL: auto http/https from certificate at
 #   /etc/letsencrypt/live/<API_DOMAIN>; for TLS without that path, export API_PUBLIC_SCHEME.
 #   Manual hesabix-api HTTP-only config can send https traffic to the wrong default 443 vhost (e.g. pgAdmin).
@@ -1065,7 +1065,7 @@ ENV
     cp -f "${cli_src}" "${bin_hesabix}"
     chmod 755 "${bin_hesabix}" 2>/dev/null || true
   fi
-  log_success "Command installed: hesabix (e.g. sudo hesabix -update | sudo hesabix -services restart | sudo hesabix -cli reload)"
+  log_success "Command installed: hesabix (e.g. sudo hesabix -update | sudo hesabix -domains show | sudo hesabix -ssl status | sudo hesabix -cli reload)"
 }
 
 reset_deployment_state() {
@@ -1681,12 +1681,14 @@ deploy_backend() {
     exit 1
   fi
 
-  # env.example as base, then merge production keys (DB_PASSWORD etc. safe for special chars)
+  # env.example as base for first install; later deploys only merge keys (preserve secrets).
   local env_file=".env"
-  if [[ -f "env.example" ]]; then
-    cp env.example "${env_file}"
-  else
-    : > "${env_file}"
+  if [[ ! -f "${env_file}" ]]; then
+    if [[ -f "env.example" ]]; then
+      cp env.example "${env_file}"
+    else
+      : > "${env_file}"
+    fi
   fi
   merge_hesabix_api_env_file "${env_file}"
   local ensure_secrets="${DEPLOY_SCRIPT_DIR}/scripts/ensure_api_production_secrets.sh"
@@ -3428,6 +3430,13 @@ main() {
   echo "  sudo hesabix -update"
   echo "  sudo hesabix -update -source https://source.hesabix.ir/hesabix/arc.git   # override repo"
   echo "  sudo hesabix -cli reload                              # update /usr/local/bin/hesabix from repo"
+  echo
+  log_info "To change domains or SSL after install:"
+  echo "  sudo hesabix -domains show"
+  echo "  sudo hesabix -domains set --api api.example.com --ui app.example.com --ssl"
+  echo "  sudo hesabix -domains apply                           # refresh Nginx from .deploy_env"
+  echo "  sudo hesabix -ssl status"
+  echo "  sudo hesabix -ssl enable --all"
   echo
   log_info "To start/stop/restart all Hesabix app services (systemd):"
   echo "  sudo hesabix -services start"

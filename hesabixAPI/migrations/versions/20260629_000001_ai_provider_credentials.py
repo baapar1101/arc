@@ -78,6 +78,25 @@ def upgrade() -> None:
             },
         )
 
+    # ستون‌های reasoning باید قبل از seed با ORM وجود داشته باشند (مدل SQLAlchemy هم‌سو است).
+    insp = sa.inspect(bind)
+    ai_model_columns = {col["name"] for col in insp.get_columns("ai_models")}
+    if "supports_reasoning" not in ai_model_columns:
+        op.add_column(
+            "ai_models",
+            sa.Column(
+                "supports_reasoning",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+        )
+    if "reasoning_effort" not in ai_model_columns:
+        op.add_column(
+            "ai_models",
+            sa.Column("reasoning_effort", sa.String(20), nullable=True),
+        )
+
     # seed مدل‌ها اگر خالی باشد
     from app.services.ai.ai_model_seed_service import seed_models_from_config
     from adapters.db.session import SessionLocal
