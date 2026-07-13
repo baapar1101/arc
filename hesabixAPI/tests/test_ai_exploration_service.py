@@ -16,10 +16,10 @@ from app.services.ai.ai_exploration_service import (
     resolve_exploration_enabled,
     should_continue_exploring,
     assess_tool_round_productivity,
+)
 from app.services.ai.ai_goal_assessment import (
     AgentGoalTracker,
     should_agent_continue_after_text_round,
-)
 )
 from app.services.ai.ai_trace import trace_step
 
@@ -136,6 +136,17 @@ def test_should_continue_exploring():
         )
     )
     assert should_continue_exploring(store, 2, 8) is False
+
+
+def test_should_not_continue_on_substantive_text_without_evidence():
+    store = ObservationStore()
+    long_answer = "سلام! " + ("این یک پاسخ بلند است. " * 30)
+    assert should_continue_exploring(store, 1, 4, round_text=long_answer) is False
+
+
+def test_should_continue_on_empty_evidence_and_short_text():
+    store = ObservationStore()
+    assert should_continue_exploring(store, 1, 4, round_text="سلام") is True
 
 
 def test_assess_tool_round_productivity():

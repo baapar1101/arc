@@ -100,8 +100,14 @@ from app.services.ai.ai_constants import MAX_LLM_RETRIES
 from app.services.ai.ai_budget import (
     AgentBudget,
     STOP_REASON_ITERATIONS,
+    STOP_REASON_WALL_CLOCK,
     build_agent_budget,
     budget_snapshot,
+)
+from app.services.ai.ai_stream_budget import WallClockExceeded, iter_stream_with_wall_clock
+from app.services.ai.ai_tool_catalog import (
+    build_tool_catalog_system_section,
+    is_tool_discovery_query,
 )
 from app.services.ai.ai_tool_cache import (
     get_cached,
@@ -2406,6 +2412,21 @@ class AIService:
             elif not eff_tools:
                 tools = None
 
+            if eff_tools and tools and is_tool_discovery_query(effective_user_query):
+                readonly_catalog = not exposes_write_tools(effective_execution_mode)
+                catalog_section = build_tool_catalog_system_section(
+                    tools,
+                    readonly_only=readonly_catalog,
+                )
+                insert_at = 0
+                for idx, msg in enumerate(full_messages):
+                    if msg.get("role") == "system":
+                        insert_at = idx + 1
+                full_messages.insert(
+                    insert_at,
+                    {"role": "system", "content": catalog_section},
+                )
+
             goal_tracker: Optional[AgentGoalTracker] = (
                 AgentGoalTracker() if eff_tools and tools else None
             )
@@ -2487,14 +2508,18 @@ class AIService:
                     iteration=iteration,
                 )
                 narrative_step_id = f"narrative_{iteration}"
+                reasoning_step_id = f"reasoning_{iteration}"
                 narrative_started = False
+                reasoning_started = False
+                round_reasoning = ""
                 last_narrative_emit = 0.0
+                last_reasoning_emit = 0.0
                 llm_stream_retry_count = 0
 
                 llm_round_complete = False
                 while not llm_round_complete:
                     try:
-                        async for chunk in provider.chat_completion_stream(
+                        stream_source = provider.chat_completion_stream(
                             messages=full_messages,
                             model=self.get_effective_model_api_id(),
                             max_tokens=max_tokens_override or self.config.max_tokens,
@@ -2502,9 +2527,20 @@ class AIService:
                             tools=tools if use_tools else None,
                             reasoning_effort=reasoning_effort,
                             **stream_provider_extras,
+                        )
+                        async for chunk in iter_stream_with_wall_clock(
+                            stream_source,
+                            budget,
                         ):
                             if chunk.get("event") == "tool_planning":
                                 yield status_event("planning_tools")
+                                yield _emit_trace(
+                                    step_id=f"tool_planning_{iteration}",
+                                    kind="plan",
+                                    state="active",
+                                    title_key="aiTracePlanningTools",
+                                    iteration=iteration,
+                                )
                                 await asyncio.sleep(0)
                                 continue
                             if chunk.get("usage"):
@@ -2515,6 +2551,35 @@ class AIService:
 
                             delta = chunk.get("delta", {})
                             content_chunk = delta.get("content", "")
+                            reasoning_chunk = delta.get("reasoning_content", "")
+                            if reasoning_chunk:
+                                round_reasoning += reasoning_chunk
+                                if not reasoning_started:
+                                    reasoning_started = True
+                                    yield _emit_trace(
+                                        step_id=reasoning_step_id,
+                                        kind="reasoning",
+                                        state="active",
+                                        title_key="aiTraceReasoning",
+                                        iteration=iteration,
+                                        layer="reasoning",
+                                    )
+                                now_mono = time.monotonic()
+                                if (
+                                    now_mono - last_reasoning_emit >= 0.06
+                                    or len(reasoning_chunk) > 48
+                                ):
+                                    last_reasoning_emit = now_mono
+                                    yield _emit_trace(
+                                        step_id=reasoning_step_id,
+                                        kind="reasoning",
+                                        state="active",
+                                        title_key="aiTraceReasoning",
+                                        body_markdown=round_reasoning,
+                                        iteration=iteration,
+                                        layer="reasoning",
+                                    )
+                                    await asyncio.sleep(0)
                             if content_chunk:
                                 round_text += content_chunk
                                 if not writing_status_sent:
@@ -2549,6 +2614,13 @@ class AIService:
                             if chunk.get("done", False):
                                 break
                         llm_round_complete = True
+                    except WallClockExceeded as wall_exc:
+                        budget_stop_reason = STOP_REASON_WALL_CLOCK
+                        budget_stop_message = wall_exc.message_fa
+                        if round_text.strip() or round_reasoning.strip():
+                            llm_round_complete = True
+                        else:
+                            break
                     except (ApiError, Exception) as stream_exc:
                         if (
                             not context_compress_retried
@@ -2603,6 +2675,17 @@ class AIService:
                             continue
                         raise
 
+                if reasoning_started and round_reasoning.strip():
+                    yield _emit_trace(
+                        step_id=reasoning_step_id,
+                        kind="reasoning",
+                        state="done",
+                        title_key="aiTraceReasoning",
+                        body_markdown=round_reasoning.strip(),
+                        iteration=iteration,
+                        layer="reasoning",
+                    )
+
                 if narrative_started and round_text.strip():
                     yield _emit_trace(
                         step_id=narrative_step_id,
@@ -2633,6 +2716,19 @@ class AIService:
                 if final_usage:
                     budget.add_tokens(final_usage.get("total_tokens"))
                     yield _emit_agent_budget()
+
+                if budget_stop_reason == STOP_REASON_WALL_CLOCK:
+                    yield _emit_agent_budget(
+                        stop_reason=budget_stop_reason,
+                        stop_message_fa=budget_stop_message,
+                    )
+                    if round_text.strip():
+                        async for answer_chunk in _emit_answer_text(
+                            round_text.strip(), iter_num=iteration
+                        ):
+                            yield answer_chunk
+                        accumulated_content = round_text.strip()
+                    break
 
                 if function_calls and use_tools:
                     accumulated_function_calls.extend(function_calls)
@@ -3061,12 +3157,20 @@ class AIService:
                     continue
 
                 if round_text.strip():
+                    if goal_tracker is not None:
+                        goal_tracker.assess_after_text_round(
+                            round_text,
+                            user_query=effective_user_query,
+                            observation_store=observation_store,
+                        )
                     if should_agent_continue_after_text_round(
                         goal_tracker=goal_tracker,
                         exploration_enabled=exploration_enabled,
                         observation_store=observation_store,
                         iteration=iteration,
                         budget=budget,
+                        round_text=round_text,
+                        user_query=effective_user_query,
                     ):
                         max_iterations = budget.max_iterations
                         yield _emit_trace(

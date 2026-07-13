@@ -17,6 +17,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from app.services.ai.ai_constants import (
+    SUBSTANTIVE_TEXT_MIN_CHARS,
+    TEXT_ANSWER_SHORT_THRESHOLD_CHARS,
+)
+
 from app.services.ai.ai_tool_intent import estimate_query_complexity
 from app.services.ai.ai_tool_keys import tool_label_fa
 from app.services.ai.ai_trace import summarize_tool_result, extract_result_count
@@ -290,16 +295,56 @@ def build_thought_markdown_rule_based(
     return body, hypothesis, confidence, open_questions
 
 
+def is_substantive_text_answer(
+    text: str,
+    *,
+    min_chars: int = SUBSTANTIVE_TEXT_MIN_CHARS,
+) -> bool:
+    """آیا پاسخ متنی مدل به‌تنهایی برای کاربر کافی است؟
+
+    الگوی Anthropic/Cursor: پاسخ متنی بدون tool call = سیگنال اتمام،
+    مگر اینکه خیلی کوتاه یا فاقد محتوا باشد.
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    if len(stripped) >= min_chars:
+        return True
+    if "|" in stripped and stripped.count("|") >= 4:
+        return True
+    if stripped.count("\n- ") >= 2 or stripped.count("\n1.") >= 2:
+        return True
+    if re.search(r"^###\s+", stripped, re.MULTILINE) and len(stripped) >= 80:
+        return True
+    return False
+
+
+def observation_store_has_evidence(store: ObservationStore) -> bool:
+    return bool(store.bundles) or bool(store.thoughts)
+
+
 def should_continue_exploring(
     store: ObservationStore,
     iteration: int,
     max_iterations: int,
+    *,
+    round_text: str = "",
 ) -> bool:
-    """آیا پس از Thought هنوز کاوش لازم است؟"""
+    """آیا پس از Thought یا پاسخ متنی هنوز کاوش لازم است؟"""
     if iteration >= max_iterations:
         return False
+
+    if not observation_store_has_evidence(store):
+        stripped = (round_text or "").strip()
+        if is_substantive_text_answer(stripped):
+            return False
+        if len(stripped) < TEXT_ANSWER_SHORT_THRESHOLD_CHARS:
+            return iteration < max_iterations - 1
+        return False
+
     if not store.thoughts:
         return True
+
     last = store.thoughts[-1]
     if last.confidence == "high" and not last.open_questions:
         return False
@@ -336,6 +381,7 @@ def should_agent_continue_after_text(
     iteration: int,
     max_iterations: int,
     budget: Any = None,
+    round_text: str = "",
 ) -> bool:
     """
     توقف/ادامهٔ سراسری پس از پاسخ متنی مدل (بدون tool call).
@@ -348,7 +394,12 @@ def should_agent_continue_after_text(
         return False
     if not exploration_enabled or observation_store is None:
         return False
-    return should_continue_exploring(observation_store, iteration, max_iterations)
+    return should_continue_exploring(
+        observation_store,
+        iteration,
+        max_iterations,
+        round_text=round_text,
+    )
 
 
 async def synthesize_thought_with_llm(

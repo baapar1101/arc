@@ -140,6 +140,11 @@ REASONING_EFFORT_BY_COMPLEXITY: dict[str, str] = {
 # حداکثر انتظار برای هر loader زمینهٔ prompt (ثانیه)
 PROMPT_LOADER_TIMEOUT_SEC = 4.0
 
+# حداقل طول پاسخ متنی برای «کافی بودن» بدون فراخوانی ابزار (agent loop)
+SUBSTANTIVE_TEXT_MIN_CHARS = 160
+# پاسخ کوتاه‌تر از این — ممکن است یک نوبت دیگر مجاز باشد
+TEXT_ANSWER_SHORT_THRESHOLD_CHARS = 80
+
 # ---- Prompt Caching (Provider-level) ----
 # فعال‌سازی cache_control (Anthropic) و prompt_cache_key (OpenAI)
 PROMPT_CACHE_ENABLED = True

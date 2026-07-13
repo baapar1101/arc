@@ -101,4 +101,30 @@ def test_should_continue_after_text_with_goal_tracker():
         exploration_enabled=False,
         iteration=2,
         budget=budget,
+        round_text="",
     ) is True
+
+
+def test_text_round_substantive_answer_stops_exploration():
+    budget = build_agent_budget("simple", max_iterations=6)
+    store = ObservationStore()
+    long_answer = "### ابزارها\n\n" + ("| a | b |\n" * 5)
+    assert should_agent_continue_after_text_round(
+        goal_tracker=AgentGoalTracker(),
+        observation_store=store,
+        exploration_enabled=True,
+        iteration=1,
+        budget=budget,
+        round_text=long_answer,
+        user_query="چه ابزارهایی داری؟",
+    ) is False
+
+
+def test_assess_after_text_round_tool_discovery():
+    tracker = AgentGoalTracker()
+    assessment = tracker.assess_after_text_round(
+        "### Tools\n\n| `get_tax_settings` | ok |",
+        user_query="چه ابزارهایی برای مودیان داری؟",
+    )
+    assert assessment.goal_reached is True
+    assert assessment.should_continue is False

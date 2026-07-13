@@ -303,6 +303,7 @@ class OpenAIProvider(AIProviderBase):
             stream = await async_retry_llm(_open_stream)
             
             accumulated_content = ""
+            accumulated_reasoning = ""
             final_usage = None
             tool_calls_accumulator = {}  # برای جمع‌آوری tool_calls از chunks مختلف
             tool_planning_sent = False
@@ -322,6 +323,17 @@ class OpenAIProvider(AIProviderBase):
                         yield {
                             "delta": {
                                 "content": delta.content
+                            },
+                            "usage": None,
+                            "done": False
+                        }
+
+                    reasoning_piece = getattr(delta, "reasoning_content", None) or ""
+                    if reasoning_piece:
+                        accumulated_reasoning += reasoning_piece
+                        yield {
+                            "delta": {
+                                "reasoning_content": reasoning_piece
                             },
                             "usage": None,
                             "done": False
@@ -392,11 +404,13 @@ class OpenAIProvider(AIProviderBase):
             # ارسال chunk نهایی با usage و function_calls
             yield {
                 "delta": {
-                    "content": ""
+                    "content": "",
+                    "reasoning_content": "",
                 },
                 "usage": final_usage,
                 "function_calls": function_calls,
                 "tool_call_id_map": tool_call_id_map,  # برای استفاده در ai_service
+                "reasoning_content_full": accumulated_reasoning or None,
                 "done": True
             }
             
