@@ -105,16 +105,7 @@
     var s = t();
     var map = {
       'loader-title': s.title,
-      'loader-brand-title': s.title,
-      'loader-subtitle': s.subtitle,
-      'loader-brand-subtitle': s.subtitle,
       'loading-status': s.statusDefault,
-      'loader-trust-cloud': s.trustCloud,
-      'loader-trust-secure': s.trustSecure,
-      'loader-trust-support': s.trustSupport,
-      'loader-trust-cloud-m': s.trustCloud,
-      'loader-trust-secure-m': s.trustSecure,
-      'loader-trust-support-m': s.trustSupport,
       'loader-step-0-label': s.stepConnect,
       'loader-step-1-label': s.stepAssets,
       'loader-step-2-label': s.stepReady,
@@ -127,10 +118,9 @@
     var quoteEl = document.getElementById('loading-quote-text');
     if (quoteEl && s.quotes.length) quoteEl.textContent = s.quotes[0];
 
-    var logo = document.querySelector('.loader-logo');
-    if (logo) {
+    document.querySelectorAll('.loader-logo').forEach(function (logo) {
       logo.src = detectDark() ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png';
-    }
+    });
   }
 
   function applyLoadingPhase(phase) {
@@ -138,6 +128,8 @@
     var p = parseInt(phase, 10);
     if (isNaN(p)) p = 0;
     p = Math.max(0, Math.min(2, p));
+    var skel = document.querySelector('.app-skeleton');
+    if (skel) skel.setAttribute('data-phase', String(p));
     for (var i = 0; i < steps.length; i++) {
       var el = steps[i];
       var idx = parseInt(el.getAttribute('data-step') || String(i), 10);
@@ -165,7 +157,10 @@
     var clamped = Math.max(0, Math.min(100, percent));
     bar.style.width = clamped + '%';
     var pctEl = document.getElementById('loading-progress-pct');
-    if (pctEl) pctEl.textContent = Math.round(clamped) + '%';
+    if (pctEl) {
+      pctEl.textContent = Math.round(clamped) + '%';
+      pctEl.setAttribute('aria-hidden', 'false');
+    }
   }
 
   function setStatus(line) {
@@ -231,11 +226,16 @@
     if (!loadingScreen) return;
     stopQuoteRotation();
     loadingScreen.setAttribute('aria-busy', 'false');
+    loadingScreen.classList.add('is-exiting');
     loadingScreen.classList.add('hidden');
+    var dark = detectDark();
+    try {
+      document.body.style.backgroundColor = dark ? '#101c2a' : '#f4f7fb';
+    } catch (_) {}
     setTimeout(function () {
       loadingScreen.remove();
       document.body.classList.add('flutter-ready');
-    }, 420);
+    }, 460);
   }
 
   window.__hesabixLoaderUI = {
@@ -267,6 +267,22 @@
 
     setTimeout(markSlowLoad, SLOW_MS);
     setTimeout(showRetry, RETRY_MS);
+
+    if (window.matchMedia) {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      var onScheme = function () {
+        var mode = storageGet('flutter.theme_mode');
+        if (mode === null || mode === '0') {
+          applyTheme();
+          applyStaticCopy();
+        }
+      };
+      if (typeof mq.addEventListener === 'function') {
+        mq.addEventListener('change', onScheme);
+      } else if (typeof mq.addListener === 'function') {
+        mq.addListener(onScheme);
+      }
+    }
   }
 
   if (document.readyState === 'loading') {

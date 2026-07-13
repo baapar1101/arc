@@ -106,30 +106,85 @@
 
   <div id="flutter-loading-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Loading Hesabix">
     <div class="loader-bg" aria-hidden="true"></div>
-    <div class="loader-layout">
-      <aside class="loader-brand" aria-hidden="true">
-        <img class="loader-brand__logo" src="assets/images/logo-light.svg" width="52" height="52" alt="" decoding="async" />
-        <h1 class="loader-brand__title" id="loader-brand-title">حسابیکس</h1>
-        <p class="loader-brand__subtitle" id="loader-brand-subtitle">حسابداری ابری هوشمند، امن و همیشه در دسترس برای کسب‌وکار شما.</p>
-        <div class="loader-brand__trust">
-          <div class="loader-brand__trust-item"><span class="loader-brand__trust-dot"></span><span id="loader-trust-cloud">دسترسی ابری</span></div>
-          <div class="loader-brand__trust-item"><span class="loader-brand__trust-dot"></span><span id="loader-trust-secure">رمزنگاری‌شده</span></div>
-          <div class="loader-brand__trust-item"><span class="loader-brand__trust-dot"></span><span id="loader-trust-support">پشتیبانی ۲۴/۷</span></div>
+
+    <!-- App shell skeleton — پیش‌نمایش ساختار Hesabix -->
+    <div class="app-skeleton" data-phase="0" aria-hidden="true">
+      <aside class="app-skeleton__rail">
+        <div class="sk-block sk-block--logo skeleton-shimmer"></div>
+        <div class="app-skeleton__nav">
+          <div class="sk-nav-item"><span class="sk-block sk-block--icon skeleton-shimmer"></span><span class="sk-block sk-block--nav-label skeleton-shimmer"></span></div>
+          <div class="sk-nav-item"><span class="sk-block sk-block--icon skeleton-shimmer"></span><span class="sk-block sk-block--nav-label skeleton-shimmer"></span></div>
+          <div class="sk-nav-item sk-nav-item--active"><span class="sk-block sk-block--icon skeleton-shimmer"></span><span class="sk-block sk-block--nav-label skeleton-shimmer"></span></div>
+          <div class="sk-nav-item"><span class="sk-block sk-block--icon skeleton-shimmer"></span><span class="sk-block sk-block--nav-label skeleton-shimmer"></span></div>
+          <div class="sk-nav-item"><span class="sk-block sk-block--icon skeleton-shimmer"></span><span class="sk-block sk-block--nav-label skeleton-shimmer"></span></div>
+          <div class="sk-nav-item"><span class="sk-block sk-block--icon skeleton-shimmer"></span><span class="sk-block sk-block--nav-label skeleton-shimmer"></span></div>
         </div>
+        <div class="sk-block sk-block--avatar skeleton-shimmer"></div>
       </aside>
 
-      <main class="loader-main">
-        <div class="loader-panel">
-          <img class="loader-logo" src="assets/images/logo-blue.png" width="64" height="64" alt="Hesabix" decoding="async" fetchpriority="high" />
-          <h2 class="loader-title" id="loader-title">حسابیکس</h2>
-          <p class="loader-subtitle" id="loader-subtitle">حسابداری ابری هوشمند برای کسب‌وکار شما</p>
+      <div class="app-skeleton__main">
+        <header class="app-skeleton__topbar">
+          <div class="sk-block sk-block--menu skeleton-shimmer"></div>
+          <div class="app-skeleton__breadcrumbs">
+            <span class="sk-block sk-block--crumb skeleton-shimmer"></span>
+            <span class="sk-block sk-block--crumb sk-block--crumb-short skeleton-shimmer"></span>
+          </div>
+          <div class="app-skeleton__topbar-actions">
+            <span class="sk-block sk-block--action skeleton-shimmer"></span>
+            <span class="sk-block sk-block--action skeleton-shimmer"></span>
+          </div>
+        </header>
 
-          <div class="loader-trust-mobile" aria-hidden="true">
-            <span class="loader-trust-chip" id="loader-trust-cloud-m">ابری</span>
-            <span class="loader-trust-chip" id="loader-trust-secure-m">امن</span>
-            <span class="loader-trust-chip" id="loader-trust-support-m">پشتیبانی</span>
+        <div class="app-skeleton__content">
+          <div class="app-skeleton__stats">
+            <div class="sk-stat-card skeleton-shimmer"><span class="sk-stat-card__line"></span><span class="sk-stat-card__line sk-stat-card__line--short"></span></div>
+            <div class="sk-stat-card skeleton-shimmer"><span class="sk-stat-card__line"></span><span class="sk-stat-card__line sk-stat-card__line--short"></span></div>
+            <div class="sk-stat-card skeleton-shimmer"><span class="sk-stat-card__line"></span><span class="sk-stat-card__line sk-stat-card__line--short"></span></div>
           </div>
 
+          <div class="sk-panel skeleton-shimmer">
+            <div class="sk-panel__header">
+              <span class="sk-block sk-block--title skeleton-shimmer"></span>
+              <span class="sk-block sk-block--btn skeleton-shimmer"></span>
+            </div>
+            <div class="sk-table">
+              <div class="sk-table__row sk-table__row--head">
+                <span class="sk-block sk-block--cell skeleton-shimmer"></span>
+                <span class="sk-block sk-block--cell skeleton-shimmer"></span>
+                <span class="sk-block sk-block--cell skeleton-shimmer"></span>
+                <span class="sk-block sk-block--cell skeleton-shimmer"></span>
+              </div>
+              <div class="sk-table__row"><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span></div>
+              <div class="sk-table__row"><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span></div>
+              <div class="sk-table__row"><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span></div>
+              <div class="sk-table__row"><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span><span class="sk-block sk-block--cell skeleton-shimmer"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating progress dock -->
+    <div class="loader-dock">
+      <div class="loader-dock__card">
+        <div class="loader-dock__header">
+          <img class="loader-dock__logo loader-logo" src="assets/images/logo-blue.png" width="36" height="36" alt="" decoding="async" />
+          <div class="loader-dock__meta">
+            <strong class="loader-dock__title" id="loader-title">حسابیکس</strong>
+            <p class="loader-dock__status" id="loading-status">در حال بارگذاری…</p>
+          </div>
+          <span class="loader-progress-pct" id="loading-progress-pct" aria-hidden="true"></span>
+        </div>
+
+        <div class="loader-progress-wrap is-indeterminate" id="loading-progress-wrap">
+          <div class="loader-progress-track">
+            <div class="loader-progress-bar" id="loading-progress-bar">
+              <span class="loader-progress-shimmer" aria-hidden="true"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="loader-dock__footer">
           <div class="loading-steps" aria-hidden="true">
             <div class="loading-step is-active" data-step="0">
               <div class="loading-step__icon"><span class="loading-step__num">1</span></div>
@@ -144,28 +199,14 @@
               <span class="loading-step__label" id="loader-step-2-label">آماده‌سازی</span>
             </div>
           </div>
-
-          <p class="loading-quote" id="loading-quote" aria-hidden="true">
-            <span id="loading-quote-text">…</span>
-          </p>
-
-          <div class="loader-spinner" aria-hidden="true"></div>
-
-          <div class="loader-progress-row">
-            <div class="loader-progress-wrap is-indeterminate" id="loading-progress-wrap">
-              <div class="loader-progress-bar" id="loading-progress-bar"></div>
-            </div>
-            <span class="loader-progress-pct" id="loading-progress-pct" aria-hidden="true"></span>
-          </div>
-
-          <p class="loader-status" id="loading-status">در حال بارگذاری…</p>
+          <p class="loading-quote" id="loading-quote" aria-hidden="true"><span id="loading-quote-text">…</span></p>
           <p class="loader-version" id="loader-version" aria-hidden="true"></p>
-
+          <div class="loader-spinner" aria-hidden="true"></div>
           <div id="loader-retry-wrap" hidden>
             <button type="button" id="loader-retry-btn" onclick="window.location.reload()">تلاش مجدد</button>
           </div>
         </div>
-      </main>
+      </div>
     </div>
   </div>
 
