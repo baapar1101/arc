@@ -12,6 +12,10 @@ from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.account import Account
 from adapters.db.models.fiscal_year import FiscalYear
 from app.services.opening_balance_service import _ensure_fiscal_year
+from app.services.pnl_account_classification import (
+    is_pnl_expense_gl_account,
+    is_pnl_revenue_gl_account,
+)
 
 
 def _parse_iso_date(dt: str | date) -> date:
@@ -30,6 +34,7 @@ def _turnover_by_account_in_base_currency(
     date_to_obj: date,
     currency_id: Optional[int],
     project_id: Optional[int],
+    fiscal_year_id: Optional[int] = None,
 ) -> Dict[int, Dict[str, Decimal]]:
     """گردش هر حساب در بازه، با تبدیل مبالغ خط به ارز پایهٔ کسب‌وکار."""
     from app.services.person_service import _person_line_amount_to_base
@@ -52,6 +57,8 @@ def _turnover_by_account_in_base_currency(
         q = q.filter(Document.project_id == project_id)
     if currency_id:
         q = q.filter(Document.currency_id == currency_id)
+    if fiscal_year_id:
+        q = q.filter(Document.fiscal_year_id == fiscal_year_id)
 
     rows = q.all()
     rate_cache: Dict[int, Decimal] = {}
@@ -71,25 +78,6 @@ def _turnover_by_account_in_base_currency(
             db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
         )
     return turnover_by_account
-
-
-def _is_revenue_account(code: str) -> bool:
-    """تشخیص اینکه آیا یک حساب، حساب درآمد است یا نه (بر اساس کد)"""
-    if not code:
-        return False
-    # حساب‌های درآمد معمولاً با 5 شروع می‌شوند (مثلاً 50001, 50002, ...)
-    code_clean = code.strip()
-    return code_clean.startswith('5') or code_clean.startswith('۶')  # Support Persian digits
-
-
-def _is_expense_account(code: str) -> bool:
-    """تشخیص اینکه آیا یک حساب، حساب هزینه است یا نه (بر اساس کد)"""
-    if not code:
-        return False
-    # حساب‌های هزینه معمولاً با 4 یا 7 شروع می‌شوند (مثلاً 40001, 70406, ...)
-    code_clean = code.strip()
-    return (code_clean.startswith('4') or code_clean.startswith('۷') or
-            code_clean.startswith('7') or code_clean.startswith('۴'))
 
 
 def get_pnl_period_report(
@@ -162,8 +150,8 @@ def get_pnl_period_report(
     ).order_by(Account.code.asc()).all()
     
     # جدا کردن حساب‌های درآمد و هزینه
-    revenue_accounts = [acc for acc in all_accounts if _is_revenue_account(acc.code)]
-    expense_accounts = [acc for acc in all_accounts if _is_expense_account(acc.code)]
+    revenue_accounts = [acc for acc in all_accounts if is_pnl_revenue_gl_account(acc)]
+    expense_accounts = [acc for acc in all_accounts if is_pnl_expense_gl_account(acc)]
     
     account_ids = [acc.id for acc in revenue_accounts + expense_accounts]
     
@@ -195,6 +183,7 @@ def get_pnl_period_report(
         date_to_obj,
         currency_id,
         project_id,
+        fiscal_year_id=fy_id,
     )
 
     # ساخت آیتم‌های درآمد
@@ -326,8 +315,8 @@ def get_pnl_cumulative_report(
     ).order_by(Account.code.asc()).all()
     
     # جدا کردن حساب‌های درآمد و هزینه
-    revenue_accounts = [acc for acc in all_accounts if _is_revenue_account(acc.code)]
-    expense_accounts = [acc for acc in all_accounts if _is_expense_account(acc.code)]
+    revenue_accounts = [acc for acc in all_accounts if is_pnl_revenue_gl_account(acc)]
+    expense_accounts = [acc for acc in all_accounts if is_pnl_expense_gl_account(acc)]
     
     account_ids = [acc.id for acc in revenue_accounts + expense_accounts]
     
@@ -359,6 +348,7 @@ def get_pnl_cumulative_report(
         date_to_obj,
         currency_id,
         project_id,
+        fiscal_year_id=fy_id,
     )
 
     # ساخت آیتم‌های درآمد

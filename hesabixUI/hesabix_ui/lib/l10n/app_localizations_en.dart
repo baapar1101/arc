@@ -6763,6 +6763,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get creditTabTitle => 'Credit';
 
   @override
+  String get personOpeningBalanceTabTitle => 'Opening balance';
+
+  @override
+  String get personOpeningBalanceSectionTitle =>
+      'Opening balance (opening document)';
+
+  @override
+  String get personOpeningBalanceAmountLabel => 'Balance amount';
+
+  @override
+  String get personOpeningBalanceTypeLabel => 'Balance type';
+
+  @override
+  String get personOpeningBalanceTypeDebit =>
+      'Debit (person owes the business)';
+
+  @override
+  String get personOpeningBalanceTypeCredit =>
+      'Credit (business owes the person)';
+
+  @override
+  String get personOpeningBalanceHint =>
+      'The balance is recorded in the fiscal year opening document, not on the person profile.';
+
+  @override
+  String get personOpeningBalanceFiscalYear => 'Fiscal year';
+
+  @override
+  String get personOpeningBalanceAmountRequired =>
+      'Opening balance amount must be greater than zero';
+
+  @override
+  String get personOpeningBalanceSaved =>
+      'Balance recorded in the opening document';
+
+  @override
+  String get personOpeningBalanceNotEligiblePosted =>
+      'Opening balance is finalized; initial balance cannot be set from this form.';
+
+  @override
+  String get personOpeningBalanceNotEligibleOtherDocs =>
+      'Other documents exist in this fiscal year; use invoice, receipt/payment, or manual entry.';
+
+  @override
+  String get personOpeningBalanceNotEligibleNoPermission =>
+      'Editing opening balance permission is required to set an opening balance.';
+
+  @override
+  String get personOpeningBalanceReadonlyBanner =>
+      'Opening balance is read-only and cannot be edited.';
+
+  @override
+  String get personOpeningBalanceClearHint =>
+      'To remove the opening balance line, clear the amount and save.';
+
+  @override
+  String get personOpeningBalanceUpdated =>
+      'Opening balance updated in the opening document';
+
+  @override
+  String get personOpeningBalanceRemoved =>
+      'Opening balance removed from the opening document';
+
+  @override
   String get creditPersonPolicyTitle => 'Person credit policy';
 
   @override

@@ -12684,6 +12684,108 @@ abstract class AppLocalizations {
   /// **'Credit'**
   String get creditTabTitle;
 
+  /// No description provided for @personOpeningBalanceTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance'**
+  String get personOpeningBalanceTabTitle;
+
+  /// No description provided for @personOpeningBalanceSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance (opening document)'**
+  String get personOpeningBalanceSectionTitle;
+
+  /// No description provided for @personOpeningBalanceAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance amount'**
+  String get personOpeningBalanceAmountLabel;
+
+  /// No description provided for @personOpeningBalanceTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance type'**
+  String get personOpeningBalanceTypeLabel;
+
+  /// No description provided for @personOpeningBalanceTypeDebit.
+  ///
+  /// In en, this message translates to:
+  /// **'Debit (person owes the business)'**
+  String get personOpeningBalanceTypeDebit;
+
+  /// No description provided for @personOpeningBalanceTypeCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit (business owes the person)'**
+  String get personOpeningBalanceTypeCredit;
+
+  /// No description provided for @personOpeningBalanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The balance is recorded in the fiscal year opening document, not on the person profile.'**
+  String get personOpeningBalanceHint;
+
+  /// No description provided for @personOpeningBalanceFiscalYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year'**
+  String get personOpeningBalanceFiscalYear;
+
+  /// No description provided for @personOpeningBalanceAmountRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance amount must be greater than zero'**
+  String get personOpeningBalanceAmountRequired;
+
+  /// No description provided for @personOpeningBalanceSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance recorded in the opening document'**
+  String get personOpeningBalanceSaved;
+
+  /// No description provided for @personOpeningBalanceNotEligiblePosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance is finalized; initial balance cannot be set from this form.'**
+  String get personOpeningBalanceNotEligiblePosted;
+
+  /// No description provided for @personOpeningBalanceNotEligibleOtherDocs.
+  ///
+  /// In en, this message translates to:
+  /// **'Other documents exist in this fiscal year; use invoice, receipt/payment, or manual entry.'**
+  String get personOpeningBalanceNotEligibleOtherDocs;
+
+  /// No description provided for @personOpeningBalanceNotEligibleNoPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Editing opening balance permission is required to set an opening balance.'**
+  String get personOpeningBalanceNotEligibleNoPermission;
+
+  /// No description provided for @personOpeningBalanceReadonlyBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance is read-only and cannot be edited.'**
+  String get personOpeningBalanceReadonlyBanner;
+
+  /// No description provided for @personOpeningBalanceClearHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To remove the opening balance line, clear the amount and save.'**
+  String get personOpeningBalanceClearHint;
+
+  /// No description provided for @personOpeningBalanceUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance updated in the opening document'**
+  String get personOpeningBalanceUpdated;
+
+  /// No description provided for @personOpeningBalanceRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance removed from the opening document'**
+  String get personOpeningBalanceRemoved;
+
   /// No description provided for @creditPersonPolicyTitle.
   ///
   /// In en, this message translates to:

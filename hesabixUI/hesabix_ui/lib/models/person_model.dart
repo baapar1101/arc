@@ -541,6 +541,28 @@ class Person {
   }
 }
 
+/// مانده افتتاحیه شخص — فقط در سند تراز افتتاحیه ذخیره می‌شود.
+class PersonOpeningBalanceInput {
+  final double amount;
+  final String balanceType; // debit | credit
+  final int? fiscalYearId;
+  final bool clear;
+
+  const PersonOpeningBalanceInput({
+    this.amount = 0,
+    required this.balanceType,
+    this.fiscalYearId,
+    this.clear = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+        if (clear) 'clear': true,
+        if (!clear) 'amount': amount,
+        'balance_type': balanceType,
+        if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+      };
+}
+
 class PersonCreateRequest {
   final String aliasName;
   final int? code;
@@ -577,6 +599,7 @@ class PersonCreateRequest {
   final bool? commissionExcludeAdditionsDeductions;
   final bool? commissionPostInInvoiceDocument;
   final int? personGroupId;
+  final PersonOpeningBalanceInput? openingBalance;
 
   PersonCreateRequest({
     required this.aliasName,
@@ -614,6 +637,7 @@ class PersonCreateRequest {
     this.commissionExcludeAdditionsDeductions,
     this.commissionPostInInvoiceDocument,
     this.personGroupId,
+    this.openingBalance,
   });
 
   Map<String, dynamic> toJson() {
@@ -677,6 +701,7 @@ class PersonCreateRequest {
       if (commissionExcludeAdditionsDeductions != null) 'commission_exclude_additions_deductions': commissionExcludeAdditionsDeductions,
       if (commissionPostInInvoiceDocument != null) 'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       if (personGroupId != null) 'person_group_id': personGroupId,
+      if (openingBalance != null) 'opening_balance': openingBalance!.toJson(),
     };
   }
 }
@@ -718,6 +743,7 @@ class PersonUpdateRequest {
   final int? personGroupId;
   /// اگر ارسال شود، لیست راه‌های ارتباطی به‌طور کامل جایگزین می‌شود.
   final List<Map<String, dynamic>>? socialContacts;
+  final PersonOpeningBalanceInput? openingBalance;
 
   PersonUpdateRequest({
     this.code,
@@ -755,6 +781,7 @@ class PersonUpdateRequest {
     this.commissionPostInInvoiceDocument,
     this.personGroupId,
     this.socialContacts,
+    this.openingBalance,
   });
 
   Map<String, dynamic> toJson() {
@@ -803,6 +830,7 @@ class PersonUpdateRequest {
         'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       'person_group_id': personGroupId,
       if (socialContacts != null) 'social_contacts': socialContacts,
+      if (openingBalance != null) 'opening_balance': openingBalance!.toJson(),
     };
   }
 }

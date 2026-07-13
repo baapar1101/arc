@@ -687,10 +687,12 @@ app/services/ai/ai_skill_git_import.py
 app/services/ai/ai_skill_parser.py
 app/services/ai/ai_skill_runtime.py
 app/services/ai/ai_skill_service.py
+app/services/ai/ai_stream_budget.py
 app/services/ai/ai_stream_helpers.py
 app/services/ai/ai_summarize_quota.py
 app/services/ai/ai_system_prompt.py
 app/services/ai/ai_tool_cache.py
+app/services/ai/ai_tool_catalog.py
 app/services/ai/ai_tool_intent.py
 app/services/ai/ai_tool_keys.py
 app/services/ai/ai_tool_query_params.py
@@ -985,8 +987,10 @@ tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
 tests/test_ai_session_todo_service.py
 tests/test_ai_skill_parser.py
+tests/test_ai_stream_budget.py
 tests/test_ai_subscription_lock.py
 tests/test_ai_subscription_renew.py
+tests/test_ai_tool_catalog.py
 tests/test_ai_tool_intent.py
 tests/test_ai_trace_content.py
 tests/test_ai_write_guard.py

@@ -665,6 +665,8 @@ def update_person(
     sync_social: Optional[List[Any]] = None
     if "social_contacts" in update_data:
         sync_social = update_data.pop("social_contacts")
+    # مانده افتتاحیه روی persons ذخیره نمی‌شود؛ در person_opening_balance_service مدیریت می‌شود
+    update_data.pop("opening_balance", None)
 
     # مدیریت کد یکتا (شامل پاک کردن صریح با null)
     if 'code' in update_data:

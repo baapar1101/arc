@@ -32,6 +32,12 @@ from adapters.db.models.warehouse import Warehouse
 from adapters.db.models.warehouse_document import WarehouseDocument
 from app.core.responses import ApiError
 from app.services.opening_balance_service import post_opening_balance, upsert_opening_balance
+from app.services.pnl_account_classification import (
+    is_pnl_expense_account,
+    is_pnl_expense_gl_account,
+    is_pnl_revenue_account,
+    is_pnl_revenue_gl_account,
+)
 from app.services.invoice_service import _compute_available_stock, _iter_product_movements
 from app.services.file_storage_service import FileStorageService
 from collections import defaultdict, deque
@@ -259,22 +265,6 @@ def _get_fixed_account_by_code(db: Session, account_code: str) -> Account:
     return account
 
 
-def _is_revenue_account(code: str) -> bool:
-    """تشخیص اینکه آیا یک حساب، حساب درآمد است یا نه (گروه 5 و 6)"""
-    if not code:
-        return False
-    code_clean = str(code).strip()
-    return code_clean.startswith('5') or code_clean.startswith('6')
-
-
-def _is_expense_account(code: str) -> bool:
-    """تشخیص اینکه آیا یک حساب، حساب هزینه است یا نه (گروه 4 و 7)"""
-    if not code:
-        return False
-    code_clean = str(code).strip()
-    return code_clean.startswith('4') or code_clean.startswith('7')
-
-
 def _is_permanent_account(code: str) -> bool:
     """تشخیص اینکه آیا یک حساب، حساب دائمی است یا نه (گروه 1، 2، 3)"""
     if not code:
@@ -408,10 +398,10 @@ def _calculate_account_balance(
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         closing_balance = Decimal(0)
-    elif _is_revenue_account(account.code):
+    elif is_pnl_revenue_account(account.code):
         # برای حساب‌های درآمد: مانده = Credit - Debit
         closing_balance = (opening_credit + period_credit) - (opening_debit + period_debit)
-    elif _is_expense_account(account.code):
+    elif is_pnl_expense_account(account.code):
         # برای حساب‌های هزینه: مانده = Debit - Credit
         closing_balance = (opening_debit + period_debit) - (opening_credit + period_credit)
     else:
@@ -500,8 +490,8 @@ def preview_year_end_closing(
     ).order_by(Account.code.asc()).all()
     
     # جدا کردن حساب‌های درآمد و هزینه
-    revenue_accounts = [acc for acc in all_accounts if _is_revenue_account(acc.code)]
-    expense_accounts = [acc for acc in all_accounts if _is_expense_account(acc.code)]
+    revenue_accounts = [acc for acc in all_accounts if is_pnl_revenue_gl_account(acc)]
+    expense_accounts = [acc for acc in all_accounts if is_pnl_expense_gl_account(acc)]
     
     # محاسبه مانده حساب‌های درآمد
     revenue_items = []
@@ -750,15 +740,6 @@ async def close_fiscal_year(
                 })
                 total_expense += abs(balance)
     
-    # خط بستانکار خلاصه سود و زیان (جمع درآمدها)
-    if total_revenue > 0:
-        lines.append({
-            'account_id': summary_account.id,
-            'debit': 0.0,
-            'credit': float(total_revenue),
-            'description': 'جمع درآمدهای سال',
-        })
-    
     # بستن حساب‌های هزینه (هم مثبت هم منفی)
     for expense_item in preview_data['expense_accounts']:
         balance = Decimal(str(expense_item['closing_balance']))
@@ -782,7 +763,14 @@ async def close_fiscal_year(
                 })
                 total_revenue += abs(balance)
     
-    # خط بدهکار خلاصه سود و زیان (جمع هزینه‌ها)
+    # خطوط خلاصه سود و زیان پس از محاسبه نهایی درآمد/هزینه (شامل مانده‌های منفی)
+    if total_revenue > 0:
+        lines.append({
+            'account_id': summary_account.id,
+            'debit': 0.0,
+            'credit': float(total_revenue),
+            'description': 'جمع درآمدهای سال',
+        })
     if total_expense > 0:
         lines.append({
             'account_id': summary_account.id,
@@ -805,21 +793,37 @@ async def close_fiscal_year(
     # سود/زیان خالص پس از مالیات
     net_profit_loss_after_tax = net_profit_loss_before_tax - tax_amount_calculated
     
-    # ثبت مالیات (اگر وجود داشته باشد)
+    # ثبت مالیات: شناسایی هزینه + بدهی پرداختنی + بستن هزینه در خلاصه سود و زیان
     if tax_amount_calculated > 0:
-        tax_account = _get_fixed_account_by_code(db, "50101")  # مالیات بر درآمد
-        lines.append({
-            'account_id': summary_account.id,
-            'debit': float(tax_amount_calculated),
-            'credit': 0.0,
-            'description': 'مالیات بر درآمد',
-        })
-        lines.append({
-            'account_id': tax_account.id,
-            'debit': 0.0,
-            'credit': float(tax_amount_calculated),
-            'description': 'ثبت مالیات بر درآمد',
-        })
+        tax_expense_account = _get_fixed_account_by_code(db, "50101")  # هزینه مالیات بر درآمد
+        tax_payable_account = _get_fixed_account_by_code(db, "20302")  # مالیات بر درآمد پرداختنی
+        tax_amount_f = float(tax_amount_calculated)
+        lines.extend([
+            {
+                'account_id': tax_expense_account.id,
+                'debit': tax_amount_f,
+                'credit': 0.0,
+                'description': 'هزینه مالیات بر درآمد',
+            },
+            {
+                'account_id': tax_payable_account.id,
+                'debit': 0.0,
+                'credit': tax_amount_f,
+                'description': 'مالیات بر درآمد پرداختنی',
+            },
+            {
+                'account_id': summary_account.id,
+                'debit': tax_amount_f,
+                'credit': 0.0,
+                'description': 'بستن هزینه مالیات در خلاصه سود و زیان',
+            },
+            {
+                'account_id': tax_expense_account.id,
+                'debit': 0.0,
+                'credit': tax_amount_f,
+                'description': 'بستن حساب هزینه مالیات بر درآمد',
+            },
+        ])
     
     # بستن خلاصه سود و زیان
     if net_profit_loss_after_tax > 0:  # سود
@@ -1004,6 +1008,14 @@ async def close_fiscal_year(
         'lines': lines,
     }
     
+    is_valid, balance_error = doc_repo.validate_document_balance(lines)
+    if not is_valid:
+        raise ApiError(
+            "UNBALANCED_CLOSING_DOCUMENT",
+            f"سند بستن سال مالی متوازن نیست: {balance_error}",
+            http_status=400,
+        )
+
     closing_document = doc_repo.create_document(closing_document_payload)
     
     # ایجاد سند توازن اشخاص (در صورت نیاز)

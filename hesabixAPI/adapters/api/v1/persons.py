@@ -45,6 +45,12 @@ from app.services.person_service import (
     get_creditors_report,
     get_people_transactions_report,
 )
+from app.services.person_opening_balance_service import (
+    create_person_with_opening_balance,
+    get_person_opening_balance_eligibility,
+    update_person_with_opening_balance,
+)
+from app.core.permissions import has_business_permission_for_business
 from app.services.person_bulk_upsert_service import bulk_upsert_persons_integration
 from app.services.person_share_link_service import (
     create_share_link as create_person_share_link_service,
@@ -229,7 +235,25 @@ async def create_person_endpoint(
     _: None = Depends(require_business_access_dep),
 ):
     """ایجاد شخص جدید برای کسب و کار"""
-    result = create_person(db, business_id, person_data)
+    if person_data.opening_balance is not None:
+        if not has_business_permission_for_business(
+            auth_context, db, business_id, "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای ثبت مانده افتتاحیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+        result = create_person_with_opening_balance(
+            db,
+            business_id,
+            auth_context.get_user_id(),
+            person_data,
+            create_person_fn=create_person,
+            delete_person_fn=delete_person,
+        )
+    else:
+        result = create_person(db, business_id, person_data)
     return success_response(
         data=format_datetime_fields(result['data'], request),
         request=request,
@@ -969,8 +993,26 @@ async def update_person_endpoint(
     person = db.query(Person).filter(Person.id == person_id).first()
     if not person:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
-    
-    result = update_person(db, person_id, person.business_id, person_data)
+
+    if person_data.opening_balance is not None:
+        if not has_business_permission_for_business(
+            auth_context, db, person.business_id, "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای تغییر مانده افتتاحیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+        result = update_person_with_opening_balance(
+            db,
+            person.business_id,
+            auth_context.get_user_id(),
+            person_id,
+            person_data,
+            update_person_fn=update_person,
+        )
+    else:
+        result = update_person(db, person_id, person.business_id, person_data)
     if not result:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     

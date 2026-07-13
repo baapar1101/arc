@@ -16,6 +16,8 @@ from app.services.opening_balance_service import (
     preview_opening_balance,
     unpost_opening_balance,
 )
+from app.services.person_opening_balance_service import get_person_opening_balance_eligibility
+from app.core.permissions import has_business_permission_for_business
 
 
 router = APIRouter(tags=["opening_balance"], prefix="")
@@ -36,6 +38,35 @@ async def get_opening_balance_endpoint(
 ):
     result = get_opening_balance(db, business_id, fiscal_year_id)
     return success_response(data=format_datetime_fields(result, request), request=request, message="OPENING_BALANCE_FETCHED")
+
+
+@router.get(
+    "/businesses/{business_id}/opening-balance/person-line-eligibility",
+    summary="وضعیت ثبت مانده افتتاحیه شخص",
+    description="بررسی امکان نمایش/ثبت مانده افتتاحیه در فرم افزودن شخص",
+)
+async def get_person_opening_balance_eligibility_endpoint(
+    request: Request,
+    business_id: int,
+    fiscal_year_id: Optional[int] = Query(None, description="شناسه سال مالی (در غیر این صورت سال جاری)"),
+    person_id: Optional[int] = Query(None, description="شناسه شخص (برای فرم ویرایش)"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("opening_balance", "view")),
+):
+    can_edit = has_business_permission_for_business(ctx, db, business_id, "opening_balance", "edit")
+    result = get_person_opening_balance_eligibility(
+        db,
+        business_id,
+        fiscal_year_id,
+        can_edit_opening_balance=can_edit,
+        person_id=person_id,
+    )
+    return success_response(
+        data=format_datetime_fields(result, request),
+        request=request,
+        message="PERSON_OPENING_BALANCE_ELIGIBILITY",
+    )
 
 
 @router.put(

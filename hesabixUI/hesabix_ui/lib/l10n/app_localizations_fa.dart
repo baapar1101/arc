@@ -6719,6 +6719,66 @@ class AppLocalizationsFa extends AppLocalizations {
   String get creditTabTitle => 'اعتبار';
 
   @override
+  String get personOpeningBalanceTabTitle => 'مانده افتتاحیه';
+
+  @override
+  String get personOpeningBalanceSectionTitle =>
+      'مانده ابتدای دوره (سند افتتاحیه)';
+
+  @override
+  String get personOpeningBalanceAmountLabel => 'مبلغ مانده';
+
+  @override
+  String get personOpeningBalanceTypeLabel => 'نوع مانده';
+
+  @override
+  String get personOpeningBalanceTypeDebit => 'بدهکار (شخص به ما بدهکار است)';
+
+  @override
+  String get personOpeningBalanceTypeCredit => 'بستانکار (ما به شخص بدهکاریم)';
+
+  @override
+  String get personOpeningBalanceHint =>
+      'مانده در سند تراز افتتاحیه سال مالی ثبت می‌شود و روی اطلاعات شخص ذخیره نمی‌شود.';
+
+  @override
+  String get personOpeningBalanceFiscalYear => 'سال مالی';
+
+  @override
+  String get personOpeningBalanceAmountRequired =>
+      'مبلغ مانده افتتاحیه باید بزرگتر از صفر باشد';
+
+  @override
+  String get personOpeningBalanceSaved => 'مانده در سند تراز افتتاحیه ثبت شد';
+
+  @override
+  String get personOpeningBalanceNotEligiblePosted =>
+      'سند تراز افتتاحیه نهایی شده؛ مانده اولیه از این فرم قابل ثبت نیست.';
+
+  @override
+  String get personOpeningBalanceNotEligibleOtherDocs =>
+      'اسناد دیگری در این سال مالی ثبت شده؛ از فاکتور، دریافت/پرداخت یا سند دستی استفاده کنید.';
+
+  @override
+  String get personOpeningBalanceNotEligibleNoPermission =>
+      'برای ثبت مانده افتتاحیه به دسترسی ویرایش تراز افتتاحیه نیاز است.';
+
+  @override
+  String get personOpeningBalanceReadonlyBanner =>
+      'مانده افتتاحیه قابل ویرایش نیست (فقط مشاهده).';
+
+  @override
+  String get personOpeningBalanceClearHint =>
+      'برای حذف مانده از سند افتتاحیه، مبلغ را خالی کنید و ذخیره کنید.';
+
+  @override
+  String get personOpeningBalanceUpdated =>
+      'مانده در سند تراز افتتاحیه به‌روزرسانی شد';
+
+  @override
+  String get personOpeningBalanceRemoved => 'مانده از سند تراز افتتاحیه حذف شد';
+
+  @override
   String get creditPersonPolicyTitle => 'سیاست اعتبار شخص';
 
   @override

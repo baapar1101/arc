@@ -1,7 +1,34 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 from enum import Enum
 from datetime import datetime
+
+
+class PersonOpeningBalanceInput(BaseModel):
+    """مانده افتتاحیه شخص — فقط در سند تراز افتتاحیه ذخیره می‌شود."""
+    model_config = ConfigDict(extra="ignore")
+
+    amount: float = Field(default=0, ge=0, description="مبلغ مانده افتتاحیه (۰ همراه clear برای حذف)")
+    balance_type: Literal["debit", "credit"] = Field(
+        default="debit",
+        description="debit=شخص بدهکار (دریافتنی)، credit=شخص بستانکار (پرداختنی)",
+    )
+    fiscal_year_id: Optional[int] = Field(
+        default=None,
+        description="سال مالی (در صورت عدم ارسال، سال جاری)",
+    )
+    clear: bool = Field(
+        default=False,
+        description="حذف خط مانده شخص از سند تراز افتتاحیه (فقط در ویرایش)",
+    )
+
+    @model_validator(mode="after")
+    def _validate_amount_or_clear(self):
+        if self.clear:
+            return self
+        if self.amount <= 0:
+            raise ValueError("مبلغ مانده افتتاحیه باید بزرگتر از صفر باشد")
+        return self
 
 
 # پیشوندهای مجاز برای اشخاص (همسان با UI)
@@ -193,6 +220,11 @@ class PersonCreateRequest(BaseModel):
     # اعتبار
     credit_limit: Optional[float] = Field(default=None, ge=0, description="سقف اعتبار شخص")
     credit_check_enabled: Optional[bool] = Field(default=None, description="فعال بودن بررسی اعتبار برای شخص (در صورت عدم ارسال، از تنظیمات کسب‌وکار تبعیت می‌کند)")
+    # مانده افتتاحیه (فقط در سند opening_balance ذخیره می‌شود؛ روی جدول persons ذخیره نمی‌شود)
+    opening_balance: Optional[PersonOpeningBalanceInput] = Field(
+        default=None,
+        description="مانده ابتدای دوره در سند تراز افتتاحیه سال مالی",
+    )
 
     @classmethod
     def __get_validators__(cls):
@@ -292,6 +324,11 @@ class PersonUpdateRequest(BaseModel):
     credit_check_enabled: Optional[bool] = Field(default=None, description="فعال بودن بررسی اعتبار برای شخص (خالی یعنی تبعیت از تنظیمات کسب‌وکار)")
     # پیام‌رسان / شبکه‌های اجتماعی (در صورت ارسال، کل لیست جایگزین قبلی می‌شود)
     social_contacts: Optional[List[PersonSocialContactInput]] = Field(default=None, description="راه‌های ارتباط؛ اگر ارسال شود جایگزین کامل است")
+    # مانده افتتاحیه سال جاری (فقط در سند opening_balance؛ در صورت عدم ارسال تغییری نمی‌کند)
+    opening_balance: Optional[PersonOpeningBalanceInput] = Field(
+        default=None,
+        description="به‌روزرسانی یا حذف مانده افتتاحیه در سند تراز افتتاحیه",
+    )
 
     @classmethod
     def __get_validators__(cls):

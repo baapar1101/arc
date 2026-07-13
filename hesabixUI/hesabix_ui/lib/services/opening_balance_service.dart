@@ -58,6 +58,23 @@ class OpeningBalanceService {
     throw Exception('خطا در لغو نهایی‌سازی تراز افتتاحیه: ${resp.statusMessage}');
   }
 
+  Future<Map<String, dynamic>> fetchPersonLineEligibility({
+    required int businessId,
+    int? fiscalYearId,
+    int? personId,
+  }) async {
+    final resp = await _apiClient.get(
+      '/businesses/$businessId/opening-balance/person-line-eligibility',
+      query: {
+        if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+        if (personId != null) 'person_id': personId,
+      },
+    );
+    if (resp.statusCode == 200) {
+      return Map<String, dynamic>.from((resp.data?['data'] as Map?) ?? {});
+    }
+    throw Exception('خطا در بررسی امکان مانده افتتاحیه: ${resp.statusMessage}');
+  }
 }
 
 
