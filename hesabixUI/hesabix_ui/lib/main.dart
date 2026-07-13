@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'core/hesabix_router_pages.dart';
 import 'core/business_route_paths.dart';
@@ -191,6 +192,7 @@ import 'widgets/url_tracker.dart';
 import 'widgets/user_activity_heartbeat.dart';
 import 'utils/responsive_helper.dart';
 import 'utils/route_prefetcher.dart';
+import 'utils/web/web_utils.dart';
 import 'pages/business/opening_balance_page.dart';
 import 'pages/business/year_end_closing_page.dart';
 import 'pages/business/currency_revaluation_page.dart';
@@ -328,11 +330,13 @@ class _MyAppState extends State<MyApp> {
     // همچنین صفحات از Route Registry را preload کن
     RouteRegistry().preloadAll();
     
-    // اطمینان از حداقل 1 ثانیه نمایش splash screen
-    final elapsed = DateTime.now().difference(_loadStartTime!);
-    const minimumDuration = Duration(seconds: 1);
-    if (elapsed < minimumDuration) {
-      await Future.delayed(minimumDuration - elapsed);
+    // اطمینان از حداقل نمایش splash — روی وب HTML loader کافی است
+    if (!kIsWeb) {
+      final elapsed = DateTime.now().difference(_loadStartTime!);
+      const minimumDuration = Duration(seconds: 1);
+      if (elapsed < minimumDuration) {
+        await Future.delayed(minimumDuration - elapsed);
+      }
     }
     
     // ذخیره URL فعلی قبل از اتمام loading
@@ -359,6 +363,9 @@ class _MyAppState extends State<MyApp> {
       setState(() {
         _isLoading = false;
       });
+      if (kIsWeb) {
+        notifyWebAppReady();
+      }
     }
     
     // در Flutter Web، تمام صفحات به صورت eager load می‌شوند
@@ -795,6 +802,10 @@ class _MyAppState extends State<MyApp> {
                       localizedMessage = loadingMessage;
                   }
                   
+                  if (kIsWeb) {
+                    return const SizedBox.shrink();
+                  }
+
                   return SimpleSplashScreen(
                     message: localizedMessage,
                     showLogo: true,

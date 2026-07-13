@@ -1,0 +1,419 @@
+@font-face {
+  font-family: 'YekanBakhFaNum';
+  src: url('assets/fonts/YekanBakhFaNum-Regular.ttf') format('truetype');
+  font-weight: 400 600;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'YekanBakhFaNum';
+  src: url('assets/fonts/YekanBakhFaNum-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  --brand: #0F4C81;
+  --brand-light: #1a6aad;
+  --brand-glow: rgba(15, 76, 129, 0.22);
+  --loader-font-fa: 'YekanBakhFaNum', Tahoma, 'Segoe UI', sans-serif;
+  --loader-font-en: Roboto, 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html[data-loader-theme='light'] {
+  --loader-bg: #eef3f9;
+  --loader-bg-accent: #dce8f4;
+  --loader-fg: #0c1f33;
+  --loader-fg-muted: #3d556d;
+  --loader-fg-subtle: #5c7288;
+  --loader-card: rgba(255, 255, 255, 0.88);
+  --loader-card-border: rgba(15, 76, 129, 0.12);
+  --loader-progress-track: rgba(15, 76, 129, 0.12);
+  --loader-progress-fill: linear-gradient(90deg, #0F4C81, #2d8fd4);
+  --loader-trust-bg: rgba(15, 76, 129, 0.08);
+}
+
+html[data-loader-theme='dark'] {
+  --loader-bg: #0b1520;
+  --loader-bg-accent: #122436;
+  --loader-fg: #eef4fb;
+  --loader-fg-muted: #b8c9dc;
+  --loader-fg-subtle: #8fa3ba;
+  --loader-card: rgba(18, 32, 48, 0.82);
+  --loader-card-border: rgba(255, 255, 255, 0.08);
+  --loader-progress-track: rgba(255, 255, 255, 0.1);
+  --loader-progress-fill: linear-gradient(90deg, #3d8fd4, #7ec8ff);
+  --loader-trust-bg: rgba(255, 255, 255, 0.06);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+  background-color: var(--loader-bg, #eef3f9);
+  min-height: var(--app-height, 100vh);
+  font-family: var(--loader-font-fa);
+}
+
+html[lang='en'] body {
+  font-family: var(--loader-font-en);
+}
+
+body.flutter-ready {
+  overflow: auto;
+  background-color: #ffffff;
+}
+
+@supports (height: 100dvh) {
+  body { min-height: 100dvh; }
+}
+
+flt-glass-pane, flt-scene-host {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#flutter-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  background: var(--loader-bg);
+  transition: opacity 0.42s ease, visibility 0.42s ease;
+  overflow: hidden;
+}
+
+#flutter-loading-screen.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.loader-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, var(--loader-bg-accent) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 90%, var(--brand-glow) 0%, transparent 50%),
+    var(--loader-bg);
+  pointer-events: none;
+}
+
+.loader-layout {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  max-width: 960px;
+  min-height: min(520px, 90vh);
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid var(--loader-card-border);
+  box-shadow: 0 24px 64px rgba(8, 20, 40, 0.14);
+  background: var(--loader-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.loader-brand {
+  display: none;
+  flex: 1;
+  padding: 48px 40px;
+  background: linear-gradient(145deg, var(--brand) 0%, #0a3d66 100%);
+  color: #fff;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+}
+
+.loader-brand__logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+}
+
+.loader-brand__title {
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.loader-brand__subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  opacity: 0.9;
+  max-width: 22rem;
+}
+
+.loader-brand__trust {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.loader-brand__trust-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+  opacity: 0.92;
+}
+
+.loader-brand__trust-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7ec8ff;
+  flex-shrink: 0;
+}
+
+.loader-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 28px;
+}
+
+.loader-panel {
+  width: 100%;
+  max-width: 22rem;
+  text-align: center;
+}
+
+.loader-logo {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 16px;
+  object-fit: contain;
+}
+
+.loader-title {
+  margin: 0 0 6px;
+  color: var(--loader-fg);
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.loader-subtitle {
+  margin: 0 0 28px;
+  color: var(--loader-fg-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.loader-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.loader-progress-wrap {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--loader-progress-track);
+  overflow: hidden;
+}
+
+.loader-progress-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--loader-progress-fill);
+  transition: width 0.2s ease-out;
+}
+
+.loader-progress-wrap.is-indeterminate .loader-progress-bar {
+  width: 36% !important;
+  animation: loaderIndeterminate 1.15s ease-in-out infinite;
+}
+
+.loader-progress-pct {
+  min-width: 2.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--loader-fg-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.loader-status {
+  margin: 0 0 8px;
+  color: var(--loader-fg-muted);
+  font-size: 0.88rem;
+  min-height: 1.4em;
+}
+
+.loader-version {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--loader-fg-subtle);
+  opacity: 0.85;
+}
+
+.loader-spinner {
+  width: 36px;
+  height: 36px;
+  margin: 0 auto 14px;
+  border: 2.5px solid var(--loader-progress-track);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 0.85s linear infinite;
+}
+
+#flutter-loading-screen.has-definite-progress .loader-spinner {
+  display: none;
+}
+
+.loading-steps,
+.loading-quote,
+.loader-trust-mobile {
+  display: none;
+}
+
+#flutter-loading-screen.is-slow .loading-steps,
+#flutter-loading-screen.is-slow .loading-quote {
+  display: flex;
+}
+
+#flutter-loading-screen.is-slow .loader-trust-mobile {
+  display: flex;
+}
+
+.loading-steps {
+  justify-content: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  width: 100%;
+}
+
+.loading-step {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.loading-step__icon {
+  width: 26px;
+  height: 26px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  border: 2px solid var(--loader-progress-track);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--loader-fg-subtle);
+  transition: all 0.2s ease;
+}
+
+.loading-step.is-active .loading-step__icon {
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-glow);
+}
+
+.loading-step.is-done .loading-step__icon {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+}
+
+.loading-step.is-done .loading-step__num { display: none; }
+
+.loading-step.is-done .loading-step__icon::after {
+  content: '✓';
+  font-size: 0.75rem;
+}
+
+.loading-step__label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--loader-fg-subtle);
+}
+
+.loading-step.is-active .loading-step__label { color: var(--loader-fg-muted); }
+
+.loading-quote {
+  flex-direction: column;
+  margin: 0 0 1rem;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--loader-trust-bg);
+  color: var(--loader-fg-muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  font-style: italic;
+}
+
+.loader-trust-mobile {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.loader-trust-chip {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--loader-trust-bg);
+  color: var(--loader-fg-subtle);
+}
+
+#loader-retry-wrap {
+  margin-top: 12px;
+}
+
+#loader-retry-wrap[hidden] { display: none !important; }
+
+#loader-retry-btn {
+  background: transparent;
+  border: 1px solid var(--loader-card-border);
+  color: var(--loader-fg-muted);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+#loader-retry-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes loaderIndeterminate {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
+@media (min-width: 900px) {
+  .loader-brand { display: flex; }
+  .loader-logo { display: none; }
+  .loader-trust-mobile { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #flutter-loading-screen { transition: none; }
+  .loader-spinner,
+  .loader-progress-wrap.is-indeterminate .loader-progress-bar {
+    animation: none;
+  }
+}

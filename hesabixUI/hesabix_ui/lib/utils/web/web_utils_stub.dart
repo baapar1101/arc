@@ -23,3 +23,6 @@ String? getLocalStorageValue(String key) => null;
 
 void setLocalStorageValue(String key, String value) {}
 
+/// Signals the HTML boot loader to hide (web only).
+void notifyWebAppReady() {}
+

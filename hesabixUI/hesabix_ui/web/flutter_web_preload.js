@@ -1,5 +1,5 @@
 /**
- * پیش‌بار منابع سنگین Flutter Web با fetch و به‌روزرسانی UI لودینگ (متن، نوار، مرحله).
+ * پیش‌بار منابع Flutter Web + پیام‌های کاربرپسند.
  */
 (function () {
   'use strict';
@@ -12,19 +12,20 @@
     }
   }
 
-  function formatBytes(n) {
-    if (n < 1024) return n + ' B';
-    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
-    return (n / 1048576).toFixed(2) + ' MB';
-  }
-
   function ui() {
     return window.__hesabixLoaderUI;
   }
 
-  function setStatus(line) {
-    var el = document.getElementById('loading-status');
-    if (el) el.textContent = line;
+  function setStatusKey(key) {
+    var L = ui();
+    if (L && typeof L.setStatusKey === 'function') {
+      L.setStatusKey(key);
+      return;
+    }
+    if (L && typeof L.setStatus === 'function') {
+      var s = L.t ? L.t() : null;
+      if (s && s[key]) L.setStatus(s[key]);
+    }
   }
 
   function setBarOverall(received, total, rangeStart, rangeEnd) {
@@ -90,9 +91,10 @@
     return null;
   }
 
-  async function fetchWithProgress(url, label, rangeStart, rangeEnd) {
+  async function fetchWithProgress(url, statusKey, rangeStart, rangeEnd) {
+    setStatusKey(statusKey);
     var res = await fetch(url);
-    if (!res.ok) throw new Error(label + ': ' + res.status);
+    if (!res.ok) throw new Error(statusKey + ': ' + res.status);
     var total = 0;
     var cl = res.headers.get('Content-Length');
     if (cl) total = parseInt(cl, 10) || 0;
@@ -108,7 +110,6 @@
     if (!reader) {
       await res.arrayBuffer();
       setBarEnd(rangeEnd);
-      setStatus(label + ' — انجام شد');
       return;
     }
 
@@ -116,34 +117,31 @@
     for (;;) {
       var step = await reader.read();
       if (step.done) break;
-      var chunk = step.value;
-      received += chunk.length;
+      received += step.value.length;
       if (total > 0) {
         setBarOverall(received, total, rangeStart, rangeEnd);
-        var pct = Math.min(100, Math.round((received / total) * 100));
-        setStatus(label + ' — ' + pct + '% (' + formatBytes(received) + ' / ' + formatBytes(total) + ')');
-      } else {
-        setStatus(label + ' — ' + formatBytes(received));
       }
     }
     setBarEnd(rangeEnd);
-    setStatus(label + ' — انجام شد');
   }
 
   window.__hesabixFlutterWebPreload = async function () {
     var cfg = window._flutter && window._flutter.buildConfig;
     if (!cfg || !cfg.builds) {
       setLoadingPhase(2);
+      setStatusKey('statusEngine');
       return;
     }
 
     var build = pickDart2JsBuild(cfg.builds);
     if (!build || build.compileTarget !== 'dart2js') {
       setLoadingPhase(2);
+      setStatusKey('statusEngine');
       return;
     }
 
     setLoadingPhase(1);
+    setStatusKey('statusApp');
 
     var userConfig = window._flutterConfig || {};
     var mainPath = build.mainJsPath || 'main.dart.js';
@@ -152,18 +150,15 @@
     var ckJs = resolveUrl(ckDir + 'canvaskit.js');
     var ckWasm = resolveUrl(ckDir + 'canvaskit.wasm');
 
-    setStatus('در حال دریافت ' + mainPath + '…');
-    await fetchWithProgress(mainUrl, mainPath, 0, 38);
-    setStatus('در حال دریافت canvaskit.js…');
-    await fetchWithProgress(ckJs, 'canvaskit.js', 38, 48);
-    setStatus('در حال دریافت canvaskit.wasm…');
-    await fetchWithProgress(ckWasm, 'canvaskit.wasm', 48, 92);
+    await fetchWithProgress(mainUrl, 'statusApp', 0, 42);
+    await fetchWithProgress(ckJs, 'statusUi', 42, 58);
+    await fetchWithProgress(ckWasm, 'statusUi', 58, 94);
 
     setLoadingPhase(2);
-    setStatus('آماده‌سازی موتور Flutter…');
+    setStatusKey('statusEngine');
     var L = ui();
     if (L && typeof L.setDownloadProgress === 'function') {
-      L.setDownloadProgress(100);
+      L.setDownloadProgress(96);
     }
   };
 })();

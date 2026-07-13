@@ -1,6 +1,9 @@
-import 'dart:typed_data';
 import 'dart:js_interop';
+import 'dart:typed_data';
 import 'package:web/web.dart' as web;
+
+@JS('window.__hesabixSignalAppReady')
+external void _hesabixSignalAppReady();
 
 /// آدرس object URL برای استفاده در iframe یا پنجره جدید؛ بعد از استفاده [revokeBlobUrl] را صدا بزنید.
 String createObjectUrlFromBytes(
@@ -52,6 +55,13 @@ String? getLocalStorageValue(String key) {
 void setLocalStorageValue(String key, String value) {
   try {
     web.window.localStorage.setItem(key, value);
+  } catch (_) {}
+}
+
+/// پنهان کردن لودر HTML پس از آماده‌شدن Flutter.
+void notifyWebAppReady() {
+  try {
+    _hesabixSignalAppReady();
   } catch (_) {}
 }
 
