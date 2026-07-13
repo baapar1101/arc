@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Hesabix CLI – update from repo / control systemd units / reload itself.
+# Hesabix CLI – update / services / domains / SSL / reload itself.
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
+HESABIX_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-  echo "Run as root (e.g. sudo hesabix -update or sudo hesabix -services start)" >&2
+  echo "Run as root (e.g. sudo hesabix -update or sudo hesabix -domains show)" >&2
   exit 1
 fi
 
@@ -14,13 +15,31 @@ usage() {
 Usage:
   hesabix -update [-source REPO_URL] [-branch BRANCH]
   hesabix -services {start|stop|restart|status}
+  hesabix -domains {show|set|apply} [options]
+  hesabix -ssl {status|enable|renew} [options]
   hesabix -cli reload
 
   -update           Run update (pull, migrate, restart, rebuild frontend, reload nginx)
   -source URL       Override repo URL (default: from initial deploy)
   -branch NAME      Override branch (default: from initial deploy)
-  -services ACTION  Control Hesabix systemd units (API, RQ worker, notification worker; pgadmin4 too if installed)
-  -cli reload       Reload /usr/local/bin/hesabix from the deployed repo (APP_ROOT/app/scripts/hesabix)
+  -services ACTION  Control Hesabix systemd units (API, RQ worker, notification worker; pgadmin4 if installed)
+
+  -domains show     Show configured API/UI/pgAdmin domains and URLs
+  -domains set      Change domain(s); updates .deploy_env, Nginx, and rebuilds frontend
+      --api DOMAIN       New API domain
+      --ui DOMAIN        New UI domain
+      --pgadmin DOMAIN   New pgAdmin4 domain
+      --ssl              Issue Let's Encrypt certs for changed domain(s)
+      --no-rebuild       Skip Flutter web rebuild (not recommended when API/UI domain changes)
+  -domains apply    Regenerate Nginx from current .deploy_env (no domain change)
+
+  -ssl status       Show TLS status for configured domains
+  -ssl enable       Request Let's Encrypt certificates via certbot
+      --api | --ui | --pgadmin | --all
+      --email ADDRESS    Contact email for Let's Encrypt (default: admin@<domain>)
+  -ssl renew        Run certbot renew [--dry-run]
+
+  -cli reload       Reload /usr/local/bin/hesabix from the deployed repo
 USAGE
 }
 
@@ -63,7 +82,6 @@ reload_hesabix_cli() {
   return 0
 }
 
-# Ensure API service gets journalctl sudo fallback env.
 ensure_api_journalctl_env() {
   local dropin_dir="/etc/systemd/system/hesabix-api.service.d"
   local dropin_file="${dropin_dir}/10-journalctl-env.conf"
@@ -75,7 +93,6 @@ EOF
   systemctl daemon-reload
 }
 
-# Core application units (order: start forward, stop reverse). pgadmin4 is optional if installed.
 run_hesabix_services() {
   local action="$1"
   local -a core=( hesabix-api hesabix-rq-worker hesabix-notification-moderation )
@@ -95,32 +112,20 @@ run_hesabix_services() {
 
   case "${action}" in
     start)
-      for u in "${core[@]}"; do
-        systemctl start "${u}.service"
-      done
-      for u in "${extra[@]}"; do
-        systemctl start "${u}.service"
-      done
+      for u in "${core[@]}"; do systemctl start "${u}.service"; done
+      for u in "${extra[@]}"; do systemctl start "${u}.service"; done
       echo "Started Hesabix services."
       ;;
     stop)
-      for (( i = ${#extra[@]} - 1; i >= 0; i-- )); do
-        systemctl stop "${extra[i]}.service"
-      done
-      for (( i = ${#core[@]} - 1; i >= 0; i-- )); do
-        systemctl stop "${core[i]}.service"
-      done
+      for (( i = ${#extra[@]} - 1; i >= 0; i-- )); do systemctl stop "${extra[i]}.service"; done
+      for (( i = ${#core[@]} - 1; i >= 0; i-- )); do systemctl stop "${core[i]}.service"; done
       echo "Stopped Hesabix services."
       ;;
     restart)
       ensure_api_journalctl_env
       systemctl daemon-reload
-      for u in "${core[@]}"; do
-        systemctl restart "${u}.service"
-      done
-      for u in "${extra[@]}"; do
-        systemctl restart "${u}.service"
-      done
+      for u in "${core[@]}"; do systemctl restart "${u}.service"; done
+      for u in "${extra[@]}"; do systemctl restart "${u}.service"; done
       echo "Restarted Hesabix services."
       ;;
     status)
@@ -140,11 +145,50 @@ run_hesabix_services() {
   esac
 }
 
+run_domains_command() {
+  local action="$1"
+  shift
+  # shellcheck source=lib/hesabix_domains.sh
+  source "${HESABIX_SCRIPT_DIR}/lib/hesabix_domains.sh"
+  case "${action}" in
+    show) hesabix_domains_show ;;
+    set) hesabix_domains_set "$@" ;;
+    apply)
+      hesabix_load_deploy_env
+      hesabix_apply_nginx_domain_configs
+      ;;
+    *)
+      echo "Invalid -domains action: ${action}. Use: show|set|apply" >&2
+      return 1
+      ;;
+  esac
+}
+
+run_ssl_command() {
+  local action="$1"
+  shift
+  # shellcheck source=lib/hesabix_ssl.sh
+  source "${HESABIX_SCRIPT_DIR}/lib/hesabix_ssl.sh"
+  case "${action}" in
+    status) hesabix_ssl_status ;;
+    enable) hesabix_ssl_enable_targets "$@" ;;
+    renew) hesabix_ssl_renew "$@" ;;
+    *)
+      echo "Invalid -ssl action: ${action}. Use: status|enable|renew" >&2
+      return 1
+      ;;
+  esac
+}
+
 UPDATE_MODE=""
 SERVICES_ACTION=""
 CLI_ACTION=""
+DOMAINS_ACTION=""
+SSL_ACTION=""
 SOURCE_URL=""
 BRANCH_OVERRIDE=""
+DOMAINS_ARGS=()
+SSL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -181,6 +225,26 @@ while [[ $# -gt 0 ]]; do
       SERVICES_ACTION="$2"
       shift 2
       ;;
+    -domains)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "hesabix -domains requires an action: show|set|apply" >&2
+        exit 1
+      fi
+      DOMAINS_ACTION="$2"
+      shift 2
+      DOMAINS_ARGS=("$@")
+      break
+      ;;
+    -ssl)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "hesabix -ssl requires an action: status|enable|renew" >&2
+        exit 1
+      fi
+      SSL_ACTION="$2"
+      shift 2
+      SSL_ARGS=("$@")
+      break
+      ;;
     -h|--help)
       usage
       exit 0
@@ -193,14 +257,40 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "${CLI_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" ]]; then
-    echo "Use -cli alone (do not combine with -update or -services)." >&2
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" ]]; then
+    echo "Use -cli alone." >&2
     exit 1
   fi
   case "${CLI_ACTION}" in
     reload) reload_hesabix_cli ;;
     *) echo "Invalid -cli action: ${CLI_ACTION}. Use: reload" >&2; exit 1 ;;
   esac
+  exit $?
+fi
+
+if [[ -n "${DOMAINS_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${SSL_ACTION}" ]]; then
+    echo "Use -domains alone." >&2
+    exit 1
+  fi
+  if [[ "${DOMAINS_ACTION}" != "show" ]] && [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+    echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+    exit 1
+  fi
+  run_domains_command "${DOMAINS_ACTION}" "${DOMAINS_ARGS[@]}"
+  exit $?
+fi
+
+if [[ -n "${SSL_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" ]]; then
+    echo "Use -ssl alone." >&2
+    exit 1
+  fi
+  if [[ "${SSL_ACTION}" != "status" ]] && [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+    echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+    exit 1
+  fi
+  run_ssl_command "${SSL_ACTION}" "${SSL_ARGS[@]}"
   exit $?
 fi
 
@@ -245,4 +335,3 @@ if [[ ! -f "${APP_ROOT}/app/update.sh" ]]; then
 fi
 
 exec bash "${APP_ROOT}/app/update.sh"
-

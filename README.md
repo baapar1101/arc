@@ -204,6 +204,12 @@ sudo hesabix -update -source https://example.com/your/repo.git -branch develop
 Other `hesabix` commands:
 
 - `sudo hesabix -services {start|stop|restart|status}` — control Hesabix-related systemd units without updating code.
+- `sudo hesabix -domains show` — show configured API/UI/pgAdmin domains and URLs.
+- `sudo hesabix -domains set --api api.example.com --ui app.example.com [--ssl]` — change domain(s), update Nginx, rebuild frontend, optionally issue Let's Encrypt certs.
+- `sudo hesabix -domains apply` — regenerate Nginx from current `/opt/hesabix/.deploy_env` without changing domains.
+- `sudo hesabix -ssl status` — show TLS certificate status.
+- `sudo hesabix -ssl enable [--api|--ui|--pgadmin|--all] [--email you@example.com]` — request Let's Encrypt certificates.
+- `sudo hesabix -ssl renew [--dry-run]` — run certbot renewal.
 - `sudo hesabix -cli reload` — refresh `/usr/local/bin/hesabix` from the repo if the CLI script was updated.
 
 `hesabix -update` requires a completed prior deploy (`/opt/hesabix/.deploy_env`, app clone under `/opt/hesabix/app`, and `/opt/hesabix/app/update.sh`). If those are missing, use the installer method above.
