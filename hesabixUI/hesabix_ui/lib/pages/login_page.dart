@@ -2,32 +2,32 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/gestures.dart';
-import 'package:url_launcher/url_launcher_string.dart';
-
-import '../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../core/api_client.dart';
 import '../core/calendar_controller.dart';
 import '../core/auth_store.dart';
 import '../core/locale_controller.dart';
 import '../core/mobile_launcher_prefs.dart';
 import '../core/referral_store.dart';
 import '../theme/theme_controller.dart';
-import '../theme/tokens/extensions.dart';
 import '../utils/number_normalizer.dart';
 import '../utils/password_validator.dart';
-import '../widgets/auth_footer.dart';
-import '../../utils/snackbar_helper.dart';
-import '../utils/responsive_helper.dart';
 import '../services/otp_login_service.dart';
 import '../services/password_reset_otp_service.dart';
 import '../services/errors/api_error.dart';
 import '../utils/error_extractor.dart';
 import '../widgets/auth/otp_input_dialog.dart';
+import '../../utils/snackbar_helper.dart';
+import 'auth/auth_flow.dart';
+import 'auth/widgets/auth_shell.dart';
+import 'auth/widgets/forgot_password_form.dart';
+import 'auth/widgets/otp_login_form.dart';
+import 'auth/widgets/sign_in_form.dart';
+import 'auth/widgets/sign_up_wizard.dart';
 
-enum _LoginTabKind { login, register, forgot, otp }
 
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
@@ -40,7 +40,7 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage> {
   // Login
   final _formKey = GlobalKey<FormState>();
   final _identifierCtrl = TextEditingController();
@@ -99,7 +99,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   /// از پاسخ `/auth/captcha` — همه کپچاهای صفحه از یک تنظیم سرور تبعیت می‌کنند.
   String _captchaMode = 'numeric';
 
-  late TabController _tabController;
+  AuthFlow _flow = AuthFlow.signIn;
   bool _registrationEnabled = true;
 
   List<TextInputFormatter> get _captchaInputFormatters => _captchaMode == 'alphanumeric'
@@ -136,9 +136,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _otpLoginCaptchaFocus.dispose();
     _privacyTapRecognizer.dispose();
     _termsTapRecognizer.dispose();
-    _tabController.removeListener(_onAuthTabChanged);
-    _tabController.dispose();
     super.dispose();
+  }
+
+  void _goToFlow(AuthFlow flow) {
+    if (_flow == flow) return;
+    setState(() => _flow = flow);
   }
 
   Future<void> _refreshCaptcha(String scope, {bool clearOtpChannels = true}) async {
@@ -205,79 +208,40 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(_onAuthTabChanged);
-    // پیش‌بارگذاری کپچا برای هر چهار تب
     _refreshCaptcha('login');
     _refreshCaptcha('register');
     _refreshCaptcha('forgot');
     _refreshCaptcha('otpLogin');
     unawaited(_loadOtpChannelStatus());
-    // ذخیره کد معرف از URL (اگر وجود داشت)
     unawaited(ReferralStore.captureFromCurrentUrl());
     unawaited(_loadPublicAuthSettings());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _readFlowFromUrl());
   }
 
-  void _onAuthTabChanged() {
-    if (_tabController.indexIsChanging) return;
-    setState(() {});
-  }
-
-  _LoginTabKind _tabKindAt(int index) {
-    if (_registrationEnabled) {
-      switch (index) {
-        case 0:
-          return _LoginTabKind.login;
-        case 1:
-          return _LoginTabKind.register;
-        case 2:
-          return _LoginTabKind.forgot;
-        default:
-          return _LoginTabKind.otp;
+  void _readFlowFromUrl() {
+    if (!mounted) return;
+    try {
+      final view = GoRouterState.of(context).uri.queryParameters['view'];
+      switch (view) {
+        case 'signup':
+        case 'register':
+          if (_registrationEnabled) _goToFlow(AuthFlow.signUp);
+        case 'forgot':
+          _goToFlow(AuthFlow.forgotPassword);
+        case 'otp':
+          _goToFlow(AuthFlow.otpLogin);
       }
-    }
-    switch (index) {
-      case 0:
-        return _LoginTabKind.login;
-      case 1:
-        return _LoginTabKind.forgot;
-      default:
-        return _LoginTabKind.otp;
-    }
+    } catch (_) {}
   }
 
   void _applyRegistrationEnabledFromServer(bool enabled) {
     if (_registrationEnabled == enabled) return;
-    final oldLen = _tabController.length;
-    final oldIndex = _tabController.index;
-    _registrationEnabled = enabled;
-    final newLen = enabled ? 4 : 3;
-    if (oldLen == newLen) {
-      setState(() {});
-      return;
-    }
-    _tabController.removeListener(_onAuthTabChanged);
-    _tabController.dispose();
-    var newIndex = oldIndex;
-    if (oldLen == 4 && newLen == 3) {
-      if (oldIndex <= 0) {
-        newIndex = 0;
-      } else if (oldIndex == 1) {
-        newIndex = 0;
-      } else {
-        newIndex = oldIndex - 1;
+    setState(() {
+      _registrationEnabled = enabled;
+      if (!enabled && _flow == AuthFlow.signUp) {
+        _flow = AuthFlow.signIn;
       }
-    } else if (oldLen == 3 && newLen == 4) {
-      if (oldIndex <= 0) {
-        newIndex = 0;
-      } else {
-        newIndex = oldIndex + 1;
-      }
-    }
-    newIndex = newIndex.clamp(0, newLen - 1);
-    _tabController = TabController(length: newLen, vsync: this, initialIndex: newIndex);
-    _tabController.addListener(_onAuthTabChanged);
-    setState(() {});
+    });
   }
 
   Future<void> _loadPublicAuthSettings() async {
@@ -1258,664 +1222,119 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    final t = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final String logoAsset = isDark
-        ? 'assets/images/logo-light.png'
-        : 'assets/images/logo-blue.png';
-    return Scaffold(
-        resizeToAvoidBottomInset: true,
-        body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-              return SingleChildScrollView(
-                padding: EdgeInsets.only(bottom: bottomInset + 16),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: ResponsiveHelper.getCardMaxWidth(context),
-                      minHeight: constraints.maxHeight - 32, // to keep card vertically centered when possible
-                    ),
-                    child: Card(
-                      elevation: 2,
-                      margin: EdgeInsets.all(ResponsiveHelper.isMobile(context) ? 8 : 16),
-                      child: Padding(
-                        padding: EdgeInsets.all(context.appSpacing.lg),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Image.asset(logoAsset, height: 28),
-                                const SizedBox(width: 8),
-                                Text(t.welcomeTitle, style: Theme.of(context).textTheme.titleMedium),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Text(t.welcomeSubtitle, style: Theme.of(context).textTheme.bodySmall),
-                            const SizedBox(height: 12),
-                            TabBar(
-                              controller: _tabController,
-                              isScrollable: true,
-                              tabs: [
-                                Tab(text: t.login),
-                                if (_registrationEnabled) Tab(text: t.register),
-                                Tab(text: t.forgotPassword),
-                                Tab(text: t.otpLogin),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            AnimatedBuilder(
-                              animation: _tabController,
-                              builder: (context, _) {
-                                final idx = _tabController.index;
-                                Widget body;
-                                switch (_tabKindAt(idx)) {
-                                  case _LoginTabKind.login:
-                                    body = Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    child: Stack(
-                                      children: [
-                                        AbsorbPointer(
-                                          absorbing: _loadingLogin,
-                                          child: Form(
-                                            key: _formKey,
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                                              children: [
-                                                TextFormField(
-                                                  controller: _identifierCtrl,
-                                                  decoration: InputDecoration(labelText: t.identifier),
-                                                  validator: (v) => (v == null || v.trim().isEmpty) ? '${t.identifier} ${t.requiredField}' : null,
-                                                  textInputAction: TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      FocusScope.of(context).nextFocus(),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                TextFormField(
-                                                  controller: _passwordCtrl,
-                                                  decoration: InputDecoration(labelText: t.password),
-                                                  obscureText: true,
-                                                  validator: (v) {
-                                                    if (v == null || v.isEmpty) return '${t.password} ${t.requiredField}';
-                                                    if (passwordExceedsMaxBytes(v)) return t.passwordMaxLength;
-                                                    return null;
-                                                  },
-                                                  textInputAction: TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      FocusScope.of(context).nextFocus(),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: TextFormField(
-                                                        controller: _loginCaptchaCtrl,
-                                                        decoration: InputDecoration(labelText: t.captcha),
-                                                        validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
-                                                        keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
-                                                        inputFormatters: _captchaInputFormatters,
-                                                        textInputAction: TextInputAction.done,
-                                                        onFieldSubmitted: (_) {
-                                                          if (_loadingLogin) return;
-                                                          unawaited(_onSubmit());
-                                                        },
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    if (_loginCaptchaImage != null)
-                                                      ClipRRect(
-                                                        borderRadius: BorderRadius.circular(4),
-                                                        child: Image.memory(
-                                                          _loginCaptchaImage!,
-                                                          height: 40,
-                                                          width: 120,
-                                                          fit: BoxFit.contain,
-                                                        ),
-                                                      )
-                                                    else
-                                                      const SizedBox(height: 40, width: 120),
-                                                    const SizedBox(width: 8),
-                                                    IconButton(
-                                                      onPressed: _loadingLogin ? null : () => _refreshCaptcha('login'),
-                                                      icon: const Icon(Icons.refresh),
-                                                      tooltip: t.refresh,
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 16),
-                                                // در تب ورود، فقط Snackbar نمایش داده می‌شود (بدون ویجت خطا)
-                                                const SizedBox(height: 12),
-                                                FilledButton(
-                                                  onPressed: _loadingLogin ? null : _onSubmit,
-                                                  child: _loadingLogin
-                                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                                                      : Text(t.login),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        if (_loadingLogin)
-                                          Positioned.fill(
-                                            child: Container(
-                                              color: Colors.black26,
-                                              alignment: Alignment.center,
-                                              child: const CircularProgressIndicator(),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                    break;
-                                  case _LoginTabKind.register:
-                                    body = Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    child: Stack(
-                                      children: [
-                                        AbsorbPointer(
-                                          absorbing: _loadingRegister,
-                                          child: Form(
-                                            key: _registerKey,
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                                              children: [
-                                                TextFormField(
-                                                  controller: _firstNameCtrl,
-                                                  decoration: InputDecoration(labelText: t.firstName),
-                                                  validator: (v) => (v == null || v.trim().isEmpty) ? '${t.firstName} ${t.requiredField}' : null,
-                                                  textInputAction: TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      FocusScope.of(context).nextFocus(),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                TextFormField(
-                                                  controller: _lastNameCtrl,
-                                                  decoration: InputDecoration(labelText: t.lastName),
-                                                  validator: (v) => (v == null || v.trim().isEmpty) ? '${t.lastName} ${t.requiredField}' : null,
-                                                  textInputAction: TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      FocusScope.of(context).nextFocus(),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                TextFormField(
-                                                  controller: _emailCtrl,
-                                                  decoration: InputDecoration(labelText: t.email),
-                                                  keyboardType: TextInputType.emailAddress,
-                                                  validator: (v) => (v == null || v.trim().isEmpty) ? '${t.email} ${t.requiredField}' : null,
-                                                  textInputAction: TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      FocusScope.of(context).nextFocus(),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                TextFormField(
-                                                  controller: _mobileCtrl,
-                                                  decoration: InputDecoration(labelText: t.mobile),
-                                                  keyboardType: TextInputType.phone,
-                                                  validator: (v) => (v == null || v.trim().isEmpty) ? '${t.mobile} ${t.requiredField}' : null,
-                                                  textInputAction: TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      FocusScope.of(context).nextFocus(),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                TextFormField(
-                                                  controller: _registerPasswordCtrl,
-                                                  decoration: InputDecoration(labelText: t.password),
-                                                  obscureText: true,
-                                                  validator: (v) => validatePassword(
-                                                    value: v,
-                                                    getRequiredError: () => '${t.password} ${t.requiredField}',
-                                                    getMinLengthError: () => t.passwordMinLength,
-                                                    getMaxLengthError: () => t.passwordMaxLength,
-                                                    minLength: 8,
-                                                  ),
-                                                  textInputAction: TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      FocusScope.of(context).nextFocus(),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: TextFormField(
-                                                        controller: _registerCaptchaCtrl,
-                                                        decoration: InputDecoration(labelText: t.captcha),
-                                                        validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
-                                                        keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
-                                                        inputFormatters: _captchaInputFormatters,
-                                                        textInputAction: TextInputAction.done,
-                                                        onFieldSubmitted: (_) {
-                                                          if (_loadingRegister) return;
-                                                          unawaited(_onRegister());
-                                                        },
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    if (_registerCaptchaImage != null)
-                                                      ClipRRect(
-                                                        borderRadius: BorderRadius.circular(4),
-                                                        child: Image.memory(
-                                                          _registerCaptchaImage!,
-                                                          height: 40,
-                                                          width: 120,
-                                                          fit: BoxFit.contain,
-                                                        ),
-                                                      )
-                                                    else
-                                                      const SizedBox(height: 40, width: 120),
-                                                    const SizedBox(width: 8),
-                                                    IconButton(
-                                                      onPressed: _loadingRegister ? null : () => _refreshCaptcha('register'),
-                                                      icon: const Icon(Icons.refresh),
-                                                      tooltip: t.refresh,
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 12),
-                                                CheckboxListTile(
-                                                  value: _acceptedTerms,
-                                                  onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
-                                                  controlAffinity: ListTileControlAffinity.leading,
-                                                  contentPadding: EdgeInsets.zero,
-                                                  dense: true,
-                                                  visualDensity: const VisualDensity(vertical: -2),
-                                                  title: RichText(
-                                                    text: TextSpan(
-                                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                        color: Theme.of(context).textTheme.bodyMedium?.color,
-                                                      ),
-                                                      children: [
-                                                        TextSpan(text: t.acceptTermsPrefix),
-                                                        TextSpan(
-                                                          text: t.privacyPolicy,
-                                                          style: TextStyle(color: Theme.of(context).colorScheme.primary),
-                                                          recognizer: _privacyTapRecognizer..onTap = () => launchUrlString('https://hesabix.ir/page/privacy/'),
-                                                        ),
-                                                        TextSpan(text: ' ${t.and} '),
-                                                        TextSpan(
-                                                          text: t.termsOfService,
-                                                          style: TextStyle(color: Theme.of(context).colorScheme.primary),
-                                                          recognizer: _termsTapRecognizer..onTap = () => launchUrlString('https://hesabix.ir/page/terms/'),
-                                                        ),
-                                                        TextSpan(text: t.acceptTermsSuffix),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                FilledButton(
-                                                  onPressed: _loadingRegister ? null : _onRegister,
-                                                  child: _loadingRegister
-                                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                                                      : Text(t.register),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        if (_loadingRegister)
-                                          Positioned.fill(
-                                            child: Container(
-                                              color: Colors.black26,
-                                              alignment: Alignment.center,
-                                              child: const CircularProgressIndicator(),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                    break;
-                                  case _LoginTabKind.forgot:
-                                    body = Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    child: Stack(
-                                      children: [
-                                        AbsorbPointer(
-                                          absorbing: _loadingForgot,
-                                          child: Form(
-                                            key: _forgotKey,
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                                              children: [
-                                                TextFormField(
-                                                  controller: _forgotIdentifierCtrl,
-                                                  decoration: InputDecoration(labelText: t.identifier),
-                                                  validator: (v) => (v == null || v.trim().isEmpty) ? '${t.identifier} ${t.requiredField}' : null,
-                                                  textInputAction: TextInputAction.next,
-                                                  onFieldSubmitted: (_) =>
-                                                      FocusScope.of(context).nextFocus(),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: TextFormField(
-                                                        controller: _forgotCaptchaCtrl,
-                                                        decoration: InputDecoration(labelText: t.captcha),
-                                                        validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
-                                                        keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
-                                                        inputFormatters: _captchaInputFormatters,
-                                                        textInputAction: TextInputAction.done,
-                                                        onFieldSubmitted: (_) {
-                                                          if (_loadingForgot) return;
-                                                          unawaited(_onForgot());
-                                                        },
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    if (_forgotCaptchaImage != null)
-                                                      ClipRRect(
-                                                        borderRadius: BorderRadius.circular(4),
-                                                        child: Image.memory(
-                                                          _forgotCaptchaImage!,
-                                                          height: 40,
-                                                          width: 120,
-                                                          fit: BoxFit.contain,
-                                                        ),
-                                                      )
-                                                    else
-                                                      const SizedBox(height: 40, width: 120),
-                                                    const SizedBox(width: 8),
-                                                    IconButton(
-                                                      onPressed: _loadingForgot ? null : () => _refreshCaptcha('forgot'),
-                                                      icon: const Icon(Icons.refresh),
-                                                      tooltip: t.refresh,
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(height: 12),
-                                                FilledButton(
-                                                  onPressed: _loadingForgot ? null : _onForgot,
-                                                  child: _loadingForgot
-                                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                                                      : Text(t.sendReset),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        if (_loadingForgot)
-                                          Positioned.fill(
-                                            child: Container(
-                                              color: Colors.black26,
-                                              alignment: Alignment.center,
-                                              child: const CircularProgressIndicator(),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                    break;
-                                  case _LoginTabKind.otp:
-                                  // OTP Login Tab
-                                  body = Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    child: Stack(
-                                      children: [
-                                        AbsorbPointer(
-                                          absorbing: _loadingOtpLogin || _loadingOtpChannelStatus,
-                                          child: Form(
-                                            key: _otpLoginKey,
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                                              children: [
-                                                Text(
-                                                  AppLocalizations.of(context).otpLoginTitle,
-                                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  AppLocalizations.of(context).otpLoginSubtitle,
-                                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                  ),
-                                                ),
-                                                if (_loadingOtpChannelStatus) ...[
-                                                  const SizedBox(height: 12),
-                                                  const LinearProgressIndicator(),
-                                                ],
-                                                const SizedBox(height: 16),
-                                                TextFormField(
-                                                  controller: _otpLoginIdentifierCtrl,
-                                                  enabled: _otpLoginSessionId == null,
-                                                  decoration: InputDecoration(
-                                                    labelText: AppLocalizations.of(context).identifier,
-                                                    prefixIcon: const Icon(Icons.person),
-                                                    helperText: _otpLoginSessionId != null
-                                                        ? AppLocalizations.of(context).otpCodeSent
-                                                        : AppLocalizations.of(context).otpLoginIdentifierHint,
-                                                  ),
-                                                  keyboardType: TextInputType.emailAddress,
-                                                  textInputAction: TextInputAction.next,
-                                                  validator: (v) {
-                                                    if (v == null || v.trim().isEmpty) {
-                                                      return AppLocalizations.of(context).otpLoginIdentifierRequired;
-                                                    }
-                                                    return null;
-                                                  },
-                                                  onFieldSubmitted: (_) {
-                                                    if (_otpLoginSessionId == null) {
-                                                      _otpLoginCaptchaFocus.requestFocus();
-                                                    } else {
-                                                      FocusScope.of(context).nextFocus();
-                                                    }
-                                                  },
-                                                ),
-                                                if (_otpLoginSessionId == null) ...[
-                                                  const SizedBox(height: 16),
-                                                  Text(
-                                                    AppLocalizations.of(context).otpChannelSelectionTitle,
-                                                    style: const TextStyle(fontWeight: FontWeight.bold),
-                                                  ),
-                                                  const SizedBox(height: 4),
-                                                  Text(
-                                                    'روش‌های غیرفعال روی سرور قابل انتخاب نیستند.',
-                                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                        ),
-                                                  ),
-                                                  const SizedBox(height: 8),
-                                                  ..._otpAllChannels.map((channel) {
-                                                    final t = AppLocalizations.of(context);
-                                                    final channelNames = {
-                                                      'sms': t.otpChannelSms,
-                                                      'email': t.otpChannelEmail,
-                                                      'telegram': t.otpChannelTelegram,
-                                                      'bale': 'بله',
-                                                    };
-                                                    final channelIcons = {
-                                                      'sms': Icons.sms,
-                                                      'email': Icons.email,
-                                                      'telegram': Icons.telegram,
-                                                      'bale': Icons.chat,
-                                                    };
-                                                    final configured = _otpChannelOnServer[channel] == true;
-                                                    final subStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                        );
-                                                    return RadioListTile<String>(
-                                                      title: Text(channelNames[channel] ?? channel),
-                                                      subtitle: configured
-                                                          ? null
-                                                          : Text('روی این سرور پیکربندی نشده است', style: subStyle),
-                                                      value: channel,
-                                                      groupValue: _selectedChannel,
-                                                      onChanged: (!configured || _loadingOtpChannelStatus)
-                                                          ? null
-                                                          : (value) {
-                                                              setState(() {
-                                                                _selectedChannel = value;
-                                                              });
-                                                            },
-                                                      secondary: Icon(channelIcons[channel] ?? Icons.send),
-                                                      dense: true,
-                                                    );
-                                                  }),
-                                                  const SizedBox(height: 16),
-                                                  Row(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      Expanded(
-                                                        child: TextFormField(
-                                                          controller: _otpLoginCaptchaCtrl,
-                                                          focusNode: _otpLoginCaptchaFocus,
-                                                          enabled: !_loadingOtpLogin,
-                                                          decoration: InputDecoration(
-                                                            labelText: AppLocalizations.of(context).captcha,
-                                                            prefixIcon: const Icon(Icons.security),
-                                                          ),
-                                                          keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
-                                                          textInputAction: TextInputAction.done,
-                                                          inputFormatters: _captchaInputFormatters,
-                                                          validator: (v) {
-                                                            if (v == null || v.trim().isEmpty) {
-                                                              return AppLocalizations.of(context).captchaRequired;
-                                                            }
-                                                            return null;
-                                                          },
-                                                          onFieldSubmitted: (_) {
-                                                            if (_loadingOtpLogin ||
-                                                                _loadingOtpChannelStatus ||
-                                                                _otpLoginSessionId != null ||
-                                                                _selectedChannel == null ||
-                                                                _otpChannelOnServer[_selectedChannel!] != true) {
-                                                              return;
-                                                            }
-                                                            unawaited(_sendOtpLogin());
-                                                          },
-                                                        ),
-                                                      ),
-                                                      const SizedBox(width: 8),
-                                                      if (_otpLoginCaptchaImage != null)
-                                                        ClipRRect(
-                                                          borderRadius: BorderRadius.circular(4),
-                                                          child: Image.memory(
-                                                            _otpLoginCaptchaImage!,
-                                                            height: 40,
-                                                            width: 120,
-                                                            fit: BoxFit.contain,
-                                                          ),
-                                                        )
-                                                      else
-                                                        const SizedBox(height: 40, width: 120),
-                                                      const SizedBox(width: 8),
-                                                      IconButton(
-                                                        onPressed: _loadingOtpLogin ? null : () => _refreshCaptcha('otpLogin'),
-                                                        icon: const Icon(Icons.refresh),
-                                                        tooltip: AppLocalizations.of(context).refresh,
-                                                      ),
-                                                    ],
-                                                  ),
-                                                  const SizedBox(height: 16),
-                                                  FilledButton.icon(
-                                                    onPressed: (_loadingOtpLogin ||
-                                                            _selectedChannel == null ||
-                                                            _otpChannelOnServer[_selectedChannel!] != true)
-                                                        ? null
-                                                        : _sendOtpLogin,
-                                                    icon: _loadingOtpLogin
-                                                        ? const SizedBox(
-                                                            width: 20,
-                                                            height: 20,
-                                                            child: CircularProgressIndicator(strokeWidth: 2),
-                                                          )
-                                                        : const Icon(Icons.send),
-                                                    label: Text(AppLocalizations.of(context).otpSendCodeButton),
-                                                  ),
-                                                ] else ...[
-                                                  if (_availableChannels.length > 1) ...[
-                                                    const SizedBox(height: 8),
-                                                    Text(
-                                                      AppLocalizations.of(context).otpChangeChannelTitle,
-                                                      style: const TextStyle(fontSize: 12),
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    Wrap(
-                                                      spacing: 8,
-                                                      runSpacing: 8,
-                                                      children: _availableChannels.map((channel) {
-                                                        final t = AppLocalizations.of(context);
-                                                        final channelNames = {
-                                                          'sms': t.otpChannelSms,
-                                                          'email': t.otpChannelEmail,
-                                                          'telegram': t.otpChannelTelegram,
-                                                          'bale': 'بله',
-                                                        };
-                                                        return OutlinedButton(
-                                                          onPressed: _loadingOtpLogin ? null : () async {
-                                                            setState(() {
-                                                              _selectedChannel = channel;
-                                                            });
-                                                            await _sendOtpLogin(changeChannel: true);
-                                                          },
-                                                          child: Text(channelNames[channel] ?? channel),
-                                                        );
-                                                      }).toList(),
-                                                    ),
-                                                  ],
-                                                  const SizedBox(height: 8),
-                                                  OutlinedButton.icon(
-                                                    onPressed: () {
-                                                      setState(() {
-                                                        _otpLoginSessionId = null;
-                                                        _otpLoginIdentifierCtrl.clear();
-                                                        _availableChannels = [];
-                                                        _ensureOtpChannelSelection();
-                                                      });
-                                                    },
-                                                    icon: const Icon(Icons.edit),
-                                                    label: Text(AppLocalizations.of(context).otpChangeIdentifier),
-                                                  ),
-                                                ],
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        if (_loadingOtpLogin)
-                                          Positioned.fill(
-                                            child: Container(
-                                              color: Colors.black26,
-                                              alignment: Alignment.center,
-                                              child: const CircularProgressIndicator(),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                    break;
-                                }
-                                return AnimatedSize(
-                                  duration: const Duration(milliseconds: 200),
-                                  curve: Curves.easeInOut,
-                                  alignment: Alignment.topCenter,
-                                  child: body,
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 8),
-                            Text(t.brandTagline, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
-                            const SizedBox(height: 12),
-                            AuthFooter(
-                              localeController: widget.localeController,
-                              calendarController: widget.calendarController,
-                              themeController: widget.themeController,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
+    final logoAsset = isDark ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png';
+
+    return AuthShell(
+      logoAsset: logoAsset,
+      localeController: widget.localeController,
+      calendarController: widget.calendarController,
+      themeController: widget.themeController,
+      formPanel: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(animation),
+            child: child,
           ),
         ),
+        child: KeyedSubtree(
+          key: ValueKey(_flow),
+          child: _buildFlowContent(),
+        ),
+      ),
     );
   }
+
+  Widget _buildFlowContent() {
+    switch (_flow) {
+      case AuthFlow.signIn:
+        return SignInForm(
+          formKey: _formKey,
+          identifierController: _identifierCtrl,
+          passwordController: _passwordCtrl,
+          captchaController: _loginCaptchaCtrl,
+          captchaImage: _loginCaptchaImage,
+          captchaMode: _captchaMode,
+          captchaFormatters: _captchaInputFormatters,
+          loading: _loadingLogin,
+          registrationEnabled: _registrationEnabled,
+          onSubmit: _onSubmit,
+          onRefreshCaptcha: () => _refreshCaptcha('login'),
+          onForgotPassword: () => _goToFlow(AuthFlow.forgotPassword),
+          onOtpLogin: () => _goToFlow(AuthFlow.otpLogin),
+          onSignUp: _registrationEnabled ? () => _goToFlow(AuthFlow.signUp) : null,
+        );
+      case AuthFlow.signUp:
+        return SignUpWizard(
+          formKey: _registerKey,
+          firstNameController: _firstNameCtrl,
+          lastNameController: _lastNameCtrl,
+          emailController: _emailCtrl,
+          mobileController: _mobileCtrl,
+          passwordController: _registerPasswordCtrl,
+          captchaController: _registerCaptchaCtrl,
+          captchaImage: _registerCaptchaImage,
+          captchaMode: _captchaMode,
+          captchaFormatters: _captchaInputFormatters,
+          loading: _loadingRegister,
+          acceptedTerms: _acceptedTerms,
+          onAcceptedTermsChanged: (v) => setState(() => _acceptedTerms = v),
+          privacyRecognizer: _privacyTapRecognizer,
+          termsRecognizer: _termsTapRecognizer,
+          onSubmit: _onRegister,
+          onRefreshCaptcha: () => _refreshCaptcha('register'),
+          onBackToSignIn: () => _goToFlow(AuthFlow.signIn),
+        );
+      case AuthFlow.forgotPassword:
+        return ForgotPasswordForm(
+          formKey: _forgotKey,
+          identifierController: _forgotIdentifierCtrl,
+          captchaController: _forgotCaptchaCtrl,
+          captchaImage: _forgotCaptchaImage,
+          captchaMode: _captchaMode,
+          captchaFormatters: _captchaInputFormatters,
+          loading: _loadingForgot,
+          onSubmit: _onForgot,
+          onRefreshCaptcha: () => _refreshCaptcha('forgot'),
+          onBackToSignIn: () => _goToFlow(AuthFlow.signIn),
+        );
+      case AuthFlow.otpLogin:
+        return OtpLoginForm(
+          formKey: _otpLoginKey,
+          identifierController: _otpLoginIdentifierCtrl,
+          captchaController: _otpLoginCaptchaCtrl,
+          captchaFocusNode: _otpLoginCaptchaFocus,
+          captchaImage: _otpLoginCaptchaImage,
+          captchaMode: _captchaMode,
+          captchaFormatters: _captchaInputFormatters,
+          allChannels: _otpAllChannels,
+          channelOnServer: _otpChannelOnServer,
+          selectedChannel: _selectedChannel,
+          sessionId: _otpLoginSessionId,
+          availableChannels: _availableChannels,
+          loading: _loadingOtpLogin,
+          loadingChannelStatus: _loadingOtpChannelStatus,
+          onSendOtp: _sendOtpLogin,
+          onRefreshCaptcha: () => _refreshCaptcha('otpLogin'),
+          onBackToSignIn: () => _goToFlow(AuthFlow.signIn),
+          onChannelSelected: (ch) => setState(() => _selectedChannel = ch),
+          onChangeIdentifier: () {
+            setState(() {
+              _otpLoginSessionId = null;
+              _otpLoginIdentifierCtrl.clear();
+              _availableChannels = [];
+              _ensureOtpChannelSelection();
+            });
+          },
+          onChangeChannel: (channel) async {
+            setState(() => _selectedChannel = channel);
+            await _sendOtpLogin(changeChannel: true);
+          },
+        );
+    }
+  }
 }
-
-

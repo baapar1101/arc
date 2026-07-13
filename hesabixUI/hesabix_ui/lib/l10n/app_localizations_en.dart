@@ -86,6 +86,62 @@ class AppLocalizationsEn extends AppLocalizations {
       'Manage your finances anywhere, anytime with confidence.';
 
   @override
+  String get authSignInTitle => 'Sign in';
+
+  @override
+  String get authSignInSubtitle => 'Enter your account details to continue.';
+
+  @override
+  String get authSignUpTitle => 'Create account';
+
+  @override
+  String get authSignUpStepContactHint =>
+      'Enter your email or mobile number. At least one is required.';
+
+  @override
+  String get authForgotTitle => 'Reset password';
+
+  @override
+  String get authForgotSubtitle =>
+      'Enter your account identifier to receive a reset code.';
+
+  @override
+  String get authNoAccount => 'Do not have an account?';
+
+  @override
+  String get authHaveAccount => 'Already have an account?';
+
+  @override
+  String get authOrDivider => 'or';
+
+  @override
+  String get authBackToSignIn => 'Back to sign in';
+
+  @override
+  String get authTrustCloud => 'Cloud access from any device';
+
+  @override
+  String get authTrustEncrypted => 'Your data is encrypted';
+
+  @override
+  String get authTrustSupport => 'Support at every step';
+
+  @override
+  String get authStepContact => 'Contact';
+
+  @override
+  String get authStepProfile => 'Profile';
+
+  @override
+  String get authStepSecurity => 'Security';
+
+  @override
+  String get authContinue => 'Continue';
+
+  @override
+  String get authChannelUnavailable => 'Unavailable';
+
+  @override
   String get captcha => 'Captcha';
 
   @override

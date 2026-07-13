@@ -85,6 +85,62 @@ class AppLocalizationsFa extends AppLocalizations {
   String get brandTagline => 'مدیریت مالی هرجا و هر زمان با اطمینان.';
 
   @override
+  String get authSignInTitle => 'ورود به حساب';
+
+  @override
+  String get authSignInSubtitle => 'برای ادامه، اطلاعات حساب خود را وارد کنید.';
+
+  @override
+  String get authSignUpTitle => 'ایجاد حساب جدید';
+
+  @override
+  String get authSignUpStepContactHint =>
+      'ایمیل یا شماره موبایل خود را وارد کنید. حداقل یکی الزامی است.';
+
+  @override
+  String get authForgotTitle => 'بازیابی رمز عبور';
+
+  @override
+  String get authForgotSubtitle =>
+      'شناسه حساب خود را وارد کنید تا کد بازیابی ارسال شود.';
+
+  @override
+  String get authNoAccount => 'حساب ندارید؟';
+
+  @override
+  String get authHaveAccount => 'حساب دارید؟';
+
+  @override
+  String get authOrDivider => 'یا';
+
+  @override
+  String get authBackToSignIn => 'بازگشت به ورود';
+
+  @override
+  String get authTrustCloud => 'دسترسی ابری از هر دستگاه';
+
+  @override
+  String get authTrustEncrypted => 'اطلاعات شما رمزنگاری‌شده است';
+
+  @override
+  String get authTrustSupport => 'پشتیبانی در تمام مراحل';
+
+  @override
+  String get authStepContact => 'تماس';
+
+  @override
+  String get authStepProfile => 'مشخصات';
+
+  @override
+  String get authStepSecurity => 'امنیت';
+
+  @override
+  String get authContinue => 'ادامه';
+
+  @override
+  String get authChannelUnavailable => 'غیرفعال';
+
+  @override
   String get captcha => 'کد امنیتی';
 
   @override

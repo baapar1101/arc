@@ -248,6 +248,114 @@ abstract class AppLocalizations {
   /// **'Manage your finances anywhere, anytime with confidence.'**
   String get brandTagline;
 
+  /// No description provided for @authSignInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get authSignInTitle;
+
+  /// No description provided for @authSignInSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your account details to continue.'**
+  String get authSignInSubtitle;
+
+  /// No description provided for @authSignUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get authSignUpTitle;
+
+  /// No description provided for @authSignUpStepContactHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email or mobile number. At least one is required.'**
+  String get authSignUpStepContactHint;
+
+  /// No description provided for @authForgotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get authForgotTitle;
+
+  /// No description provided for @authForgotSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your account identifier to receive a reset code.'**
+  String get authForgotSubtitle;
+
+  /// No description provided for @authNoAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Do not have an account?'**
+  String get authNoAccount;
+
+  /// No description provided for @authHaveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account?'**
+  String get authHaveAccount;
+
+  /// No description provided for @authOrDivider.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get authOrDivider;
+
+  /// No description provided for @authBackToSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to sign in'**
+  String get authBackToSignIn;
+
+  /// No description provided for @authTrustCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud access from any device'**
+  String get authTrustCloud;
+
+  /// No description provided for @authTrustEncrypted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data is encrypted'**
+  String get authTrustEncrypted;
+
+  /// No description provided for @authTrustSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support at every step'**
+  String get authTrustSupport;
+
+  /// No description provided for @authStepContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact'**
+  String get authStepContact;
+
+  /// No description provided for @authStepProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get authStepProfile;
+
+  /// No description provided for @authStepSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get authStepSecurity;
+
+  /// No description provided for @authContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get authContinue;
+
+  /// No description provided for @authChannelUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get authChannelUnavailable;
+
   /// No description provided for @captcha.
   ///
   /// In en, this message translates to:

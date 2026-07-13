@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
-import '../../utils/number_normalizer.dart';
 
-/// Dialog برای وارد کردن کد OTP
+import '../../pages/auth/widgets/otp_pin_input.dart';
+
+/// Dialog برای وارد کردن کد OTP — با ۶ باکس جدا.
 class OtpInputDialog extends StatefulWidget {
   final String title;
   final String message;
@@ -24,17 +25,11 @@ class OtpInputDialog extends StatefulWidget {
 }
 
 class _OtpInputDialogState extends State<OtpInputDialog> {
-  final _otpController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  final _pinKey = GlobalKey<OtpPinInputState>();
   bool _verifying = false;
   bool _resending = false;
   int _resendCooldown = 0;
-
-  @override
-  void dispose() {
-    _otpController.dispose();
-    super.dispose();
-  }
+  String _otp = '';
 
   void _startResendCooldown() {
     setState(() => _resendCooldown = 60);
@@ -49,51 +44,53 @@ class _OtpInputDialogState extends State<OtpInputDialog> {
   }
 
   Future<void> _handleVerify() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (_otp.length != 6) {
+      SnackBarHelper.showError(context, message: 'کد تایید باید ۶ رقم باشد');
+      return;
+    }
 
     setState(() => _verifying = true);
     try {
-      final otp = toEnglishDigits(_otpController.text.trim());
-      final success = await widget.onVerify(otp);
+      final success = await widget.onVerify(_otp);
       if (!mounted) return;
-      
+
       if (success) {
         Navigator.of(context).pop(true);
       } else {
         SnackBarHelper.showError(context, message: 'کد تایید اشتباه است');
+        _pinKey.currentState?.clear();
+        setState(() => _otp = '');
       }
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
-      context,
-      message: 'خطا در تایید: ${ErrorExtractor.forContext(e, context)}',
-    );
+        context,
+        message: 'خطا در تایید: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
-      if (mounted) {
-        setState(() => _verifying = false);
-      }
+      if (mounted) setState(() => _verifying = false);
     }
   }
 
   Future<void> _handleResend() async {
     if (widget.onResend == null) return;
-    
+
     setState(() => _resending = true);
     try {
       await widget.onResend!();
       if (!mounted) return;
       SnackBarHelper.show(context, message: 'کد جدید ارسال شد');
       _startResendCooldown();
+      _pinKey.currentState?.clear();
+      setState(() => _otp = '');
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
-      context,
-      message: 'خطا در ارسال مجدد: ${ErrorExtractor.forContext(e, context)}',
-    );
+        context,
+        message: 'خطا در ارسال مجدد: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
-      if (mounted) {
-        setState(() => _resending = false);
-      }
+      if (mounted) setState(() => _resending = false);
     }
   }
 
@@ -101,123 +98,95 @@ class _OtpInputDialogState extends State<OtpInputDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final t = AppLocalizations.of(context);
 
     return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.message, color: colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: _verifying ? null : () => Navigator.of(context).pop(false),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                widget.message,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextFormField(
-                controller: _otpController,
-                enabled: !_verifying,
-                decoration: InputDecoration(
-                  labelText: 'کد تایید (6 رقم)',
-                  hintText: '123456',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(12),
                   ),
+                  child: Icon(Icons.mark_email_unread_outlined, color: colorScheme.primary),
                 ),
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  letterSpacing: 8,
-                  fontWeight: FontWeight.bold,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    widget.title,
+                    style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                 ),
-                maxLength: 6,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(6),
-                ],
-                validator: (v) {
-                  final value = v?.trim() ?? '';
-                  if (value.isEmpty) {
-                    return 'لطفاً کد تایید را وارد کنید';
-                  }
-                  if (value.length != 6) {
-                    return 'کد تایید باید 6 رقم باشد';
-                  }
-                  return null;
-                },
-                onFieldSubmitted: (_) => _handleVerify(),
-              ),
-              const SizedBox(height: 16),
-              if (widget.onResend != null) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      'کد را دریافت نکردید؟',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: (_resendCooldown > 0 || _resending)
-                          ? null
-                          : _handleResend,
-                      child: _resending
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(
-                              _resendCooldown > 0
-                                  ? 'ارسال مجدد (${_resendCooldown}s)'
-                                  : 'ارسال مجدد',
-                            ),
-                    ),
-                  ],
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: _verifying ? null : () => Navigator.of(context).pop(false),
                 ),
-                const SizedBox(height: 8),
               ],
-              FilledButton.icon(
-                onPressed: _verifying ? null : _handleVerify,
-                icon: _verifying
+            ),
+            const SizedBox(height: 16),
+            Text(
+              widget.message,
+              style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 28),
+            OtpPinInput(
+              key: _pinKey,
+              enabled: !_verifying,
+              onChanged: (v) => setState(() => _otp = v),
+              onCompleted: (_) => _handleVerify(),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 48,
+              child: FilledButton(
+                onPressed: _verifying || _otp.length != 6 ? null : _handleVerify,
+                style: FilledButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _verifying
                     ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
                       )
-                    : const Icon(Icons.check),
-                label: const Text('تایید'),
+                    : Text(t.login),
+              ),
+            ),
+            if (widget.onResend != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'کد را دریافت نکردید؟',
+                    style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  TextButton(
+                    onPressed: (_resending || _resendCooldown > 0) ? null : _handleResend,
+                    child: _resending
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            _resendCooldown > 0 ? 'ارسال مجدد (${_resendCooldown}s)' : 'ارسال مجدد',
+                          ),
+                  ),
+                ],
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
-
