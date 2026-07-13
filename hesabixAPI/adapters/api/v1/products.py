@@ -308,6 +308,10 @@ async def create_product_endpoint(
             db.commit()
     
     return success_response(data=format_datetime_fields(result["data"], request), request=request, message=result.get("message"))
+
+
+@router.post(
+    "/business/{business_id}/bulk-upsert",
     summary="ایجاد/ویرایش گروهی کالا (یکپارچه‌سازی)",
     description=(
         "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در حسابیکس,"

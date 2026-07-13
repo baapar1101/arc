@@ -502,6 +502,7 @@ app/services/fiscal_year_rollback_service.py
 app/services/general_ledger_service.py
 app/services/invoice_adjustments_service.py
 app/services/invoice_bulk_upsert_service.py
+app/services/invoice_cogs_gl_service.py
 app/services/invoice_fx_revaluation.py
 app/services/invoice_global_discount_service.py
 app/services/invoice_line_unit_price_guard.py
@@ -534,9 +535,11 @@ app/services/payroll_statutory.py
 app/services/person_bulk_upsert_service.py
 app/services/person_excel_import.py
 app/services/person_group_service.py
+app/services/person_opening_balance_service.py
 app/services/person_service.py
 app/services/person_share_link_service.py
 app/services/petty_cash_service.py
+app/services/pnl_account_classification.py
 app/services/pnl_service.py
 app/services/price_list_service.py
 app/services/print_footer_settings.py
@@ -546,6 +549,7 @@ app/services/product_catalog_profile_service.py
 app/services/product_commercial_insights_service.py
 app/services/product_general_barcode_service.py
 app/services/product_inventory_tracking_sync.py
+app/services/product_opening_balance_service.py
 app/services/product_service.py
 app/services/profile_dashboard_widgets_service.py
 app/services/project_service.py
@@ -1007,10 +1011,13 @@ tests/test_datetime_timezone.py
 tests/test_distribution_service.py
 tests/test_health.py
 tests/test_hs60_loader.py
+tests/test_invoice_cogs_gl_service.py
 tests/test_invoice_payable_total.py
+tests/test_invoice_payment_documents.py
 tests/test_invoice_payment_remaining.py
 tests/test_invoice_profit_costing.py
 tests/test_invoice_tax_snapshot_refresh.py
+tests/test_invoice_type_change_stock.py
 tests/test_legacy_import.py
 tests/test_legacy_sql_account_resolver.py
 tests/test_legacy_sql_dump_reader.py
@@ -1023,11 +1030,13 @@ tests/test_payroll_plugin_license_gate.py
 tests/test_payroll_run_calculations.py
 tests/test_payroll_statutory.py
 tests/test_permissions.py
+tests/test_person_opening_balance.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
 tests/test_physical_stock.py
 tests/test_product_catalog_profile.py
 tests/test_product_inventory_tracking_sync.py
+tests/test_product_opening_balance.py
 tests/test_product_tax_update.py
 tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
@@ -1039,3 +1048,5 @@ tests/test_tax_key_material_service.py
 tests/test_template_design_v2_compiler.py
 tests/test_voice_ws_helpers.py
 tests/test_webm_decode.py
+tests/test_workflow_trigger_enrichment.py
+tests/test_year_end_pnl_account_classification.py
