@@ -3,7 +3,24 @@
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
-HESABIX_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Installed copy lives in /usr/local/bin; libs stay in the deployed repo.
+hesabix_resolve_script_dir() {
+  if [[ -d "${APP_ROOT}/app/scripts/lib" ]]; then
+    printf '%s' "${APP_ROOT}/app/scripts"
+    return 0
+  fi
+  local self_dir
+  self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -d "${self_dir}/lib" ]]; then
+    printf '%s' "${self_dir}"
+    return 0
+  fi
+  echo "Hesabix scripts not found (expected ${APP_ROOT}/app/scripts/lib)." >&2
+  return 1
+}
+
+HESABIX_SCRIPT_DIR="$(hesabix_resolve_script_dir)" || exit 1
 
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
   echo "Run as root (e.g. sudo hesabix -update or sudo hesabix -domains show)" >&2
