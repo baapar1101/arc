@@ -10356,8 +10356,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiConfidenceLow => 'داده ناکافی';
 
   @override
-  String get aiStatusAwaitingApproval =>
-      'منتظر تأیید شما برای اجرای عملیات';
+  String get aiStatusAwaitingApproval => 'منتظر تأیید شما برای اجرای عملیات';
 
   @override
   String get aiAnswerPanelTitle => 'پاسخ نهایی';

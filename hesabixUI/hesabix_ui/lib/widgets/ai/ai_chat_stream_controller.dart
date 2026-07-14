@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
 
 /// برچسب ابزار برای رویدادهای استریم (معمولاً از l10n).
 typedef AIChatToolLabelResolver =
@@ -103,7 +104,9 @@ class AIChatStreamController extends ChangeNotifier {
         ? Map<String, dynamic>.from(functionResults)
         : <String, dynamic>{};
     if (traceSteps.isNotEmpty) {
-      map[kAgentTraceStorageKey] = traceSteps.map((e) => e.toJson()).toList();
+      map[kAgentTraceStorageKey] = finalizeAgentTraceForDisplay(traceSteps)
+          .map((e) => e.toJson())
+          .toList();
     }
     if (agentBudget != null) {
       map[kAgentBudgetStorageKey] = agentBudget!.toJson();
@@ -203,7 +206,7 @@ class AIChatStreamController extends ChangeNotifier {
         chunk.agentBudget != null;
 
     if (immediate) {
-      content = accumulated;
+      content = sanitizeAssistantContent(accumulated);
       notifyListeners();
       return true;
     }
@@ -220,7 +223,7 @@ class AIChatStreamController extends ChangeNotifier {
     if (!shouldUpdate) return false;
 
     _lastUiUpdate = now;
-    content = accumulated;
+    content = sanitizeAssistantContent(accumulated);
     notifyListeners();
     return true;
   }
@@ -228,7 +231,7 @@ class AIChatStreamController extends ChangeNotifier {
   void mergeAgentTraceFromDone(List<AIAgentTraceStep>? agentTrace) {
     if (agentTrace == null || agentTrace.isEmpty) return;
     if (traceSteps.isEmpty) {
-      traceSteps = List<AIAgentTraceStep>.from(agentTrace);
+      traceSteps = finalizeAgentTraceForDisplay(agentTrace);
       notifyListeners();
       return;
     }
@@ -253,30 +256,38 @@ class AIChatStreamController extends ChangeNotifier {
       merged.addAll(existingById.values);
     }
 
-    traceSteps = merged;
+    traceSteps = finalizeAgentTraceForDisplay(merged);
     notifyListeners();
   }
 
   void _applyTraceStep(AIAgentTraceStep step) {
-    if (step.kind == 'observation' && step.tool != null) {
+    var next = step;
+    final body = next.bodyMarkdown;
+    if (body != null && body.isNotEmpty) {
+      final clean = sanitizeAssistantContent(body);
+      if (clean != body) {
+        next = next.copyWith(bodyMarkdown: clean);
+      }
+    }
+    if (next.kind == 'observation' && next.tool != null) {
       for (var i = 0; i < traceSteps.length; i++) {
         final existing = traceSteps[i];
         if (existing.kind == 'tool' &&
-            existing.tool == step.tool &&
+            existing.tool == next.tool &&
             existing.isActive) {
           traceSteps[i] = existing.copyWith(state: 'done');
         }
       }
     }
-    if (step.stepId.isEmpty) {
-      traceSteps.add(step);
+    if (next.stepId.isEmpty) {
+      traceSteps.add(next);
       return;
     }
-    final idx = traceSteps.indexWhere((s) => s.stepId == step.stepId);
+    final idx = traceSteps.indexWhere((s) => s.stepId == next.stepId);
     if (idx >= 0) {
-      traceSteps[idx] = step;
+      traceSteps[idx] = next;
     } else {
-      traceSteps.add(step);
+      traceSteps.add(next);
     }
   }
 

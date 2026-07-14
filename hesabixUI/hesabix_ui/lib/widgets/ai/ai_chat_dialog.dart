@@ -15,6 +15,7 @@ import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
 import 'package:hesabix_ui/services/voice/voice_phase.dart';
+import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -1313,7 +1314,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       }
 
       if (!mounted) return;
-      var resolvedContent = accumulatedContent;
+      var resolvedContent = sanitizeAssistantContent(accumulatedContent);
       if (resolvedContent.trim().isEmpty && _stream.traceSteps.isNotEmpty) {
         resolvedContent = extractContentFromTraceSteps(_stream.traceSteps);
       }

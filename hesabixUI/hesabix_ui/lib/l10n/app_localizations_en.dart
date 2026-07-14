@@ -10416,8 +10416,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiConfidenceLow => 'Insufficient data';
 
   @override
-  String get aiStatusAwaitingApproval =>
-      'Waiting for your approval to proceed';
+  String get aiStatusAwaitingApproval => 'Waiting for your approval to proceed';
 
   @override
   String get aiAnswerPanelTitle => 'Final answer';

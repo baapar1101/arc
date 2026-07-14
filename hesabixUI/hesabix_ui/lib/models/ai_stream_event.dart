@@ -1,3 +1,5 @@
+import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
+
 /// کلید ذخیره trace در function_results (بک‌اند).
 const kAgentTraceStorageKey = '_agent_trace';
 const kAgentBudgetStorageKey = '_agent_budget';
@@ -8,10 +10,11 @@ List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
   if (functionResults is! Map) return [];
   final raw = functionResults[kAgentTraceStorageKey];
   if (raw is! List) return [];
-  return raw
+  final steps = raw
       .whereType<Map>()
       .map((e) => AIAgentTraceStep.fromJson(Map<String, dynamic>.from(e)))
       .toList();
+  return finalizeAgentTraceForDisplay(steps);
 }
 
 const _traceContentFallbackKinds = [
@@ -28,7 +31,7 @@ String extractContentFromTraceSteps(List<AIAgentTraceStep> steps) {
     final minLen = kind == 'observation' ? 8 : 20;
     for (final step in steps.reversed) {
       if (step.kind != kind) continue;
-      final body = step.bodyMarkdown?.trim() ?? '';
+      final body = sanitizeAssistantContent(step.bodyMarkdown?.trim() ?? '');
       if (body.length >= minLen) return body;
     }
   }
@@ -241,9 +244,13 @@ class AIAgentTraceStep {
     int? resultCount,
   }) {
     return AIAgentTraceStep(
+      traceId: traceId,
       stepId: stepId,
       kind: kind,
       state: state ?? this.state,
+      layer: layer,
+      visibility: visibility,
+      retryAttempt: retryAttempt,
       titleKey: titleKey,
       titleParams: titleParams,
       bodyMarkdown: bodyMarkdown ?? this.bodyMarkdown,
@@ -253,6 +260,12 @@ class AIAgentTraceStep {
       elapsedMs: elapsedMs ?? this.elapsedMs,
       resultCount: resultCount ?? this.resultCount,
       citations: citations,
+      bundleId: bundleId,
+      exploreTarget: exploreTarget,
+      entityRefs: entityRefs,
+      findingsCount: findingsCount,
+      hypothesis: hypothesis,
+      confidence: confidence,
     );
   }
 }

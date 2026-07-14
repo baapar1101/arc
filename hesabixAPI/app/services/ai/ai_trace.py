@@ -377,14 +377,35 @@ def split_trace_layers(
     return trace_steps, reasoning
 
 
+def finalize_trace_steps_for_persist(
+    trace_steps: Optional[List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    """بستن stepهای active و پاک‌سازی body_markdown قبل از ذخیره در DB."""
+    if not trace_steps:
+        return []
+    from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+
+    finalized: List[Dict[str, Any]] = []
+    for step in trace_steps:
+        record = dict(step)
+        if record.get("state") == "active":
+            record["state"] = "done"
+        body = record.get("body_markdown")
+        if isinstance(body, str) and body:
+            record["body_markdown"] = sanitize_assistant_content(body)
+        finalized.append(record)
+    return finalized
+
+
 def merge_trace_into_function_results(
     function_results: Optional[Dict[str, Any]],
     trace_steps: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     merged = dict(function_results or {})
-    if trace_steps:
-        merged[TRACE_AGENT_KEY] = trace_steps
-        _, reasoning = split_trace_layers(trace_steps)
+    finalized = finalize_trace_steps_for_persist(trace_steps)
+    if finalized:
+        merged[TRACE_AGENT_KEY] = finalized
+        _, reasoning = split_trace_layers(finalized)
         if reasoning:
             merged[TRACE_REASONING_KEY] = reasoning
     return merged
@@ -419,12 +440,16 @@ def extract_final_content_from_trace(
     """متن قابل‌نمایش از trace agent (برای persist و fallback پاسخ)."""
     if not trace_steps:
         return ""
+    from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+
     for kind in TRACE_CONTENT_FALLBACK_KINDS:
         min_len = 8 if kind == "observation" else min_body_len
         for step in reversed(trace_steps):
             if step.get("kind") != kind:
                 continue
-            body = (step.get("body_markdown") or "").strip()
+            body = sanitize_assistant_content(
+                (step.get("body_markdown") or "").strip()
+            )
             if len(body) >= min_len:
                 return body
     return ""

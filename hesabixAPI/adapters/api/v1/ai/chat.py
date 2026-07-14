@@ -97,6 +97,34 @@ def _usage_log_context(
     return ctx or None
 
 
+def _prepare_assistant_persist_fields(
+    raw_content: str,
+    function_calls: Optional[List[Dict[str, Any]]],
+    function_results: Optional[Dict[str, Any]],
+) -> tuple[str, Optional[List[Dict[str, Any]]], Optional[Dict[str, Any]]]:
+    """پاک‌سازی content و نهایی‌سازی trace قبل از ذخیره assistant."""
+    from app.services.ai.ai_content_sanitize import (
+        extract_leaked_function_calls,
+        sanitize_assistant_content,
+    )
+    from app.services.ai.ai_trace import (
+        extract_trace_from_function_results,
+        merge_trace_into_function_results,
+    )
+
+    content = sanitize_assistant_content(raw_content or "")
+    calls = function_calls
+    if not calls:
+        leaked = extract_leaked_function_calls(f"{raw_content or ''}\n{content}")
+        if leaked:
+            calls = leaked
+    trace = extract_trace_from_function_results(function_results)
+    merged_results = function_results
+    if trace:
+        merged_results = merge_trace_into_function_results(function_results, trace)
+    return content, calls, merged_results
+
+
 def _session_needs_title(session: AIChatSession) -> bool:
     title = (session.title or "").strip()
     return not title or title == DEFAULT_CHAT_TITLE
@@ -1129,13 +1157,18 @@ async def send_message(
         
         fc_meta = response.get("_function_calls")
         fr_meta = response.get("_function_results")
-        fc_json, fr_json = serialize_function_metadata(fc_meta, fr_meta)
+        persist_content, persist_calls, persist_results = _prepare_assistant_persist_fields(
+            response["message"]["content"] or "",
+            fc_meta,
+            fr_meta,
+        )
+        fc_json, fr_json = serialize_function_metadata(persist_calls, persist_results)
 
         # ذخیره پاسخ AI
         assistant_message = AIChatMessage(
             session_id=session_id,
             role=MessageRole.ASSISTANT.value,
-            content=response["message"]["content"] or "",
+            content=persist_content,
             function_calls=fc_json,
             function_results=fr_json,
             tokens_used=input_tokens + output_tokens
@@ -1296,10 +1329,23 @@ async def _persist_stream_assistant_message(
 ) -> tuple[Optional[int], Optional[Dict[str, Any]]]:
     """ذخیره پاسخ assistant و ثبت usage. برمی‌گرداند (message_id, usage)."""
     from adapters.db.session import get_db_session
-    from app.services.ai.ai_trace import merge_trace_into_function_results
+    from app.services.ai.ai_content_sanitize import (
+        extract_leaked_function_calls,
+        prepare_assistant_content_for_persist,
+    )
+    from app.services.ai.ai_trace import finalize_trace_steps_for_persist, merge_trace_into_function_results
 
-    content = _extract_content_from_agent_trace(
-        accumulated_content, final_agent_trace
+    finalized_trace = finalize_trace_steps_for_persist(final_agent_trace or [])
+    content = prepare_assistant_content_for_persist(accumulated_content, finalized_trace)
+    function_calls = final_function_calls
+    if not function_calls:
+        leaked = extract_leaked_function_calls(
+            f"{accumulated_content or ''}\n{content or ''}"
+        )
+        if leaked:
+            function_calls = leaked
+    merged_function_results = merge_trace_into_function_results(
+        final_function_results, finalized_trace
     )
     usage = _estimate_stream_usage_if_missing(
         final_usage, stream_ai_config, messages, content
@@ -1330,11 +1376,9 @@ async def _persist_stream_assistant_message(
                 model_code=new_ai_service.get_effective_model_code(),
             )
 
-            merged_results = merge_trace_into_function_results(
-                final_function_results, final_agent_trace or []
-            )
+            merged_results = merged_function_results or {}
             fc_json, fr_json = serialize_function_metadata(
-                final_function_calls, merged_results
+                function_calls, merged_results
             )
             assistant_message = AIChatMessage(
                 session_id=session_id,
@@ -1785,13 +1829,16 @@ async def regenerate_last_response(
         charge_result = commit_ai_service.check_quota_and_charge(
             input_tokens, output_tokens, model_code=commit_ai_service.get_effective_model_code()
         )
-        fc_json, fr_json = serialize_function_metadata(
-            response.get("_function_calls"), response.get("_function_results")
+        persist_content, persist_calls, persist_results = _prepare_assistant_persist_fields(
+            response["message"]["content"] or "",
+            response.get("_function_calls"),
+            response.get("_function_results"),
         )
+        fc_json, fr_json = serialize_function_metadata(persist_calls, persist_results)
         assistant_message = AIChatMessage(
             session_id=session_id,
             role=MessageRole.ASSISTANT.value,
-            content=response["message"]["content"] or "",
+            content=persist_content,
             function_calls=fc_json,
             function_results=fr_json,
             tokens_used=input_tokens + output_tokens,
@@ -2009,13 +2056,16 @@ async def edit_user_message(
         charge_result = commit_ai_service.check_quota_and_charge(
             input_tokens, output_tokens, model_code=commit_ai_service.get_effective_model_code()
         )
-        fc_json, fr_json = serialize_function_metadata(
-            response.get("_function_calls"), response.get("_function_results")
+        persist_content, persist_calls, persist_results = _prepare_assistant_persist_fields(
+            response["message"]["content"] or "",
+            response.get("_function_calls"),
+            response.get("_function_results"),
         )
+        fc_json, fr_json = serialize_function_metadata(persist_calls, persist_results)
         assistant_message = AIChatMessage(
             session_id=session_id,
             role=MessageRole.ASSISTANT.value,
-            content=response["message"]["content"] or "",
+            content=persist_content,
             function_calls=fc_json,
             function_results=fr_json,
             tokens_used=input_tokens + output_tokens,

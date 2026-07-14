@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
 import 'ai_reasoning_panel.dart';
 import 'ai_chat_chart_widget.dart';
 import 'ai_chat_l10n.dart';
@@ -47,7 +48,7 @@ class AIChatMessageBody extends StatelessWidget {
           toolActivities.where((a) => !a.approvalRequired).toList();
     }
 
-    var displayContent = content;
+    var displayContent = sanitizeAssistantContent(content);
     if (!isUser && displayContent.trim().isEmpty) {
       final fromTrace = extractContentFromAgentTraceResults(functionResults);
       if (fromTrace.isNotEmpty) displayContent = fromTrace;

@@ -45,11 +45,16 @@ from app.services.ai.ai_tool_keys import (
     tool_label_fa,
     tool_l10n_key,
 )
+from app.services.ai.ai_content_sanitize import (
+    extract_leaked_function_calls,
+    sanitize_assistant_content,
+)
 from app.services.ai.ai_trace import (
     context_trace,
     extract_citations_from_result,
     extract_final_content_from_trace,
     extract_result_count,
+    finalize_trace_steps_for_persist,
     format_planned_tools,
     summarize_tool_result,
     summarize_tool_result_for_llm,
@@ -2349,7 +2354,7 @@ class AIService:
                 return {"event": "agent_budget", **snap}
 
             async def _emit_answer_text(text: str, *, iter_num: int):
-                stripped = (text or "").strip()
+                stripped = sanitize_assistant_content((text or "").strip())
                 if not stripped:
                     return
                 yield _emit_trace(
@@ -2383,6 +2388,12 @@ class AIService:
                 structured_prompt = coerce_structured_system_prompt(
                     prebuilt_system_prompt,
                     business_id=session_business_id or self.business_id,
+                )
+                yield _emit_trace(
+                    step_id="ctx_thinking",
+                    kind="context",
+                    state="done",
+                    title_key="aiStatusThinking",
                 )
             else:
                 async for build_item in self.build_system_prompt_stream(
@@ -2717,6 +2728,12 @@ class AIService:
                             narrative_started = False
                             continue
                         raise
+
+                leaked_calls = extract_leaked_function_calls(round_text)
+                if leaked_calls and not function_calls:
+                    function_calls = leaked_calls
+                if round_text:
+                    round_text = sanitize_assistant_content(round_text)
 
                 if reasoning_started and round_reasoning.strip():
                     yield _emit_trace(
@@ -3376,7 +3393,7 @@ class AIService:
                     if accumulated_function_results
                     else None
                 ),
-                "agent_trace": trace_steps or None,
+                "agent_trace": finalize_trace_steps_for_persist(trace_steps) or None,
                 "agent_budget": final_agent_budget,
                 "citations_context": citations_context or None,
                 "requested_model": requested_model_code,

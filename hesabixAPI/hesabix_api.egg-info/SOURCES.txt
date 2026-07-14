@@ -656,6 +656,7 @@ app/services/ai/ai_history_summarizer.py
 app/services/ai/ai_insight_service.py
 app/services/ai/ai_invoice_service.py
 app/services/ai/ai_knowledge_service.py
+app/services/ai/ai_language_prompt.py
 app/services/ai/ai_mcp_service.py
 app/services/ai/ai_memory_feedback_service.py
 app/services/ai/ai_memory_hooks.py
@@ -966,6 +967,7 @@ migrations/versions/20260709_000001_product_supply_network_catalog.py
 migrations/versions/20260710_000001_product_catalog_gallery.py
 migrations/versions/20260711_000001_business_display_timezone.py
 migrations/versions/20260711_000002_documents_timestamptz.py
+migrations/versions/20260714_000001_ai_prompts_language_policy.py
 tests/__init__.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
@@ -979,6 +981,7 @@ tests/test_ai_goal_assessment.py
 tests/test_ai_goal_assessment_session_todos.py
 tests/test_ai_json_safe.py
 tests/test_ai_knowledge_service.py
+tests/test_ai_language_prompt.py
 tests/test_ai_memory_service.py
 tests/test_ai_memory_structured.py
 tests/test_ai_model_routing.py

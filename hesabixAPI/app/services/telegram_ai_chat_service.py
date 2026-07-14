@@ -321,12 +321,18 @@ class TelegramAIChatService:
 			output_tokens = usage.get("output_tokens", 0)
 			
 			charge_result = ai_service.check_quota_and_charge(input_tokens, output_tokens)
-			
+
+			from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+
+			assistant_content = sanitize_assistant_content(
+				response["message"]["content"] or ""
+			)
+
 			# ذخیره پاسخ AI
 			assistant_message = AIChatMessage(
 				session_id=active_session.session_id,
 				role=MessageRole.ASSISTANT.value,
-				content=response["message"]["content"],
+				content=assistant_content,
 				tokens_used=input_tokens + output_tokens
 			)
 			self.db.add(assistant_message)
