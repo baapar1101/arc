@@ -1761,6 +1761,85 @@ setup_db() {
   fi
 }
 
+hesabix_db_table_exists() {
+  local table="$1"
+  PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc \
+    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='${table}');" \
+    2>/dev/null | tr -d '[:space:]'
+}
+
+hesabix_current_alembic_revision() {
+  if [[ "$(hesabix_db_table_exists alembic_version)" != "t" ]]; then
+    return 0
+  fi
+  PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc \
+    "SELECT version_num FROM alembic_version LIMIT 1;" 2>/dev/null | tr -d '[:space:]'
+}
+
+# Revision bundled with seed dump (sidecar file, env, or embedded alembic_version data).
+hesabix_read_seed_alembic_revision() {
+  local dump="$1" backup_dir="$2" rev="" f
+  if [[ -n "${HESABIX_SEED_ALEMBIC_REVISION:-}" ]]; then
+    printf '%s' "${HESABIX_SEED_ALEMBIC_REVISION}"
+    return 0
+  fi
+  for f in "${dump}.revision" "${backup_dir}/hesabix_seed.revision"; do
+    if [[ -f "${f}" ]]; then
+      rev=$(tr -d '[:space:]' < "${f}")
+      if [[ -n "${rev}" ]]; then
+        printf '%s' "${rev}"
+        return 0
+      fi
+    fi
+  done
+  if [[ -f "${dump}" ]] && command -v pg_restore >/dev/null 2>&1; then
+    rev=$(
+      pg_restore -a -t alembic_version "${dump}" 2>/dev/null | awk '
+        /^COPY / { copy=1; next }
+        copy && $0 == "\\." { exit }
+        copy && $0 !~ /^--/ && NF { gsub(/\r/, ""); print; exit }
+      '
+    )
+    if [[ -n "${rev}" ]]; then
+      printf '%s' "${rev}"
+      return 0
+    fi
+  fi
+  return 1
+}
+
+hesabix_validate_seed_schema() {
+  local t missing=()
+  for t in documents document_lines businesses users accounts; do
+    if [[ "$(hesabix_db_table_exists "${t}")" != "t" ]]; then
+      missing+=("${t}")
+    fi
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    log_error "Seed import incomplete. Missing core tables: ${missing[*]}"
+    log_error "See ${APP_ROOT}/pg_restore_seed.log — drop/recreate DB and re-run deploy, or fix the seed dump."
+    exit 1
+  fi
+}
+
+hesabix_ensure_alembic_revision_after_seed() {
+  local seed_dump="$1" backup_dir="$2" current rev
+  current=$(hesabix_current_alembic_revision)
+  if [[ -n "${current}" ]]; then
+    log_info "Alembic revision after seed: ${current}"
+    return 0
+  fi
+  if ! rev=$(hesabix_read_seed_alembic_revision "${seed_dump}" "${backup_dir}"); then
+    log_warning "alembic_version empty after seed; Alembic will run incremental migrations from base."
+    return 0
+  fi
+  log_info "Stamping database to seed Alembic revision: ${rev}"
+  if ! alembic stamp "${rev}"; then
+    log_error "alembic stamp ${rev} failed"
+    exit 1
+  fi
+}
+
 deploy_backend() {
   log_step "Deploying backend..."
   local api_dir="${APP_ROOT}/app/hesabixAPI"
@@ -1871,17 +1950,22 @@ print('Connection successful')
 
   if [[ "${table_count}" -eq 0 ]] && [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
     echo "Importing seed database from: ${seed_dump}"
-    if PGPASSWORD="${DB_PASSWORD}" pg_restore -h 127.0.0.1 -p 5432 -U hesabix -d hesabix --no-owner --no-acl "${seed_dump}" 2>/dev/null; then
+    local restore_log="${APP_ROOT}/pg_restore_seed.log"
+    : > "${restore_log}"
+    if PGPASSWORD="${DB_PASSWORD}" pg_restore -h 127.0.0.1 -p 5432 -U hesabix -d hesabix --no-owner --no-acl "${seed_dump}" >>"${restore_log}" 2>&1; then
       log_success "Seed database imported successfully."
     else
       # pg_restore may exit 1 for non-fatal warnings; verify DB is usable
       if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
+        log_warning "Seed import finished with warnings (see ${restore_log})."
         log_success "Seed database imported (some non-fatal warnings may have occurred)."
       else
-        log_error "Error importing seed database. Check pg_restore output."
+        log_error "Error importing seed database. Check ${restore_log}"
         exit 1
       fi
     fi
+    hesabix_validate_seed_schema
+    hesabix_ensure_alembic_revision_after_seed "${seed_dump}" "${backup_dir}"
   elif [[ "${table_count}" -gt "0" ]]; then
     log_info "Database already initialized (${table_count} tables). Skipping seed import."
   else
@@ -1898,6 +1982,13 @@ print('Connection successful')
   fi
 
   # Always run migrations (after optional seed import, or when DB was already initialized)
+  local alembic_current
+  alembic_current=$(hesabix_current_alembic_revision)
+  if [[ -z "${alembic_current}" ]] && [[ "${table_count}" -gt 0 ]] && [[ "$(hesabix_db_table_exists document_lines)" != "t" ]]; then
+    log_error "Database has ${table_count} tables but document_lines is missing and alembic_version is empty."
+    log_error "This usually means a partial/failed seed import. Drop and recreate the hesabix database, then re-run deploy."
+    exit 1
+  fi
   log_step "Running Alembic migrations..."
   if ! alembic upgrade head; then
     echo "$CROSS_MARK Error running migrations"
