@@ -191,6 +191,18 @@ class AgentGoalTracker:
             observation_store is not None and observation_store_has_evidence(observation_store)
         )
 
+        from app.services.ai.ai_content_sanitize import text_announces_pending_tool_use
+
+        if text_announces_pending_tool_use(text):
+            assessment = RoundAssessment(
+                goal_reached=False,
+                should_continue=True,
+                confidence="medium",
+                reason_fa="مدل ابزار را اعلام کرده ولی هنوز اجرا نشده؛ ادامه لازم است.",
+            )
+            self.last_assessment = assessment
+            return assessment
+
         if is_tool_discovery_query(user_query) and len(text) >= 48:
             assessment = RoundAssessment(
                 goal_reached=True,

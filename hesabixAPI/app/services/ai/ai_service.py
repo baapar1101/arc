@@ -46,7 +46,7 @@ from app.services.ai.ai_tool_keys import (
     tool_l10n_key,
 )
 from app.services.ai.ai_content_sanitize import (
-    extract_leaked_function_calls,
+    resolve_round_function_calls,
     sanitize_assistant_content,
 )
 from app.services.ai.ai_trace import (
@@ -2729,13 +2729,24 @@ class AIService:
                             continue
                         raise
 
-                leaked_calls = extract_leaked_function_calls(round_text)
-                if not leaked_calls and round_reasoning.strip():
-                    leaked_calls = extract_leaked_function_calls(round_reasoning)
-                if leaked_calls and not function_calls:
-                    function_calls = leaked_calls
-                if round_text:
-                    round_text = sanitize_assistant_content(round_text)
+                def _definitions_tool_names() -> List[str]:
+                    names: List[str] = []
+                    for item in tools or []:
+                        if not isinstance(item, dict):
+                            continue
+                        fn = item.get("function")
+                        if isinstance(fn, dict):
+                            name = fn.get("name")
+                            if isinstance(name, str) and name.strip():
+                                names.append(name.strip())
+                    return names
+
+                function_calls = resolve_round_function_calls(
+                    api_function_calls=function_calls,
+                    round_text=round_text,
+                    round_reasoning=round_reasoning,
+                    known_tools=_definitions_tool_names(),
+                )
 
                 if reasoning_started and round_reasoning.strip():
                     yield _emit_trace(
@@ -2743,7 +2754,9 @@ class AIService:
                         kind="reasoning",
                         state="done",
                         title_key="aiTraceReasoning",
-                        body_markdown=round_reasoning.strip(),
+                        body_markdown=sanitize_assistant_content(
+                            round_reasoning.strip()
+                        ),
                         iteration=iteration,
                         layer="reasoning",
                     )
@@ -2753,7 +2766,7 @@ class AIService:
                         step_id=narrative_step_id,
                         kind="narrative",
                         state="done",
-                        body_markdown=round_text.strip(),
+                        body_markdown=sanitize_assistant_content(round_text.strip()),
                         iteration=iteration,
                     )
                 elif not narrative_started:
@@ -2823,7 +2836,9 @@ class AIService:
                             step_id=narrative_step_id,
                             kind="narrative",
                             state="done",
-                            body_markdown=round_text.strip(),
+                            body_markdown=sanitize_assistant_content(
+                                round_text.strip()
+                            ),
                             iteration=iteration,
                         )
                     elif round_text.strip():
@@ -2831,7 +2846,9 @@ class AIService:
                             step_id=f"narrative_{iteration}",
                             kind="narrative",
                             state="done",
-                            body_markdown=round_text.strip(),
+                            body_markdown=sanitize_assistant_content(
+                                round_text.strip()
+                            ),
                             iteration=iteration,
                         )
                     else:
@@ -3263,26 +3280,25 @@ class AIService:
                         )
                         continue
 
+                    display_text = sanitize_assistant_content(round_text.strip())
                     yield _emit_trace(
                         kind="answer",
                         state="done",
                         title_key="aiTraceComposingAnswer",
-                        body_markdown=round_text.strip()
-                        if len(round_text.strip()) < 400
-                        else None,
+                        body_markdown=display_text if len(display_text) < 400 else None,
                         iteration=iteration,
                         layer="answer",
                     )
                     _answer_chunk_size = 48
-                    for offset in range(0, len(round_text), _answer_chunk_size):
-                        piece = round_text[offset : offset + _answer_chunk_size]
+                    for offset in range(0, len(display_text), _answer_chunk_size):
+                        piece = display_text[offset : offset + _answer_chunk_size]
                         yield {
                             "delta": {"content": piece},
                             "usage": None,
                             "done": False,
                         }
                         await asyncio.sleep(0)
-                    accumulated_content = round_text
+                    accumulated_content = display_text
                     break
 
                 # LLM بدون tool call و بدون متن — از یافته‌های trace پاسخ بساز

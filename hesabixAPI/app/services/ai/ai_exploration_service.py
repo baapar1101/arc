@@ -337,10 +337,14 @@ def is_substantive_text_answer(
     """آیا پاسخ متنی مدل به‌تنهایی برای کاربر کافی است؟
 
     الگوی Anthropic/Cursor: پاسخ متنی بدون tool call = سیگنال اتمام،
-    مگر اینکه خیلی کوتاه یا فاقد محتوا باشد.
+    مگر اینکه خیلی کوتاه یا فاقد محتوا باشد، یا فقط اعلام intent ابزار باشد.
     """
+    from app.services.ai.ai_content_sanitize import text_announces_pending_tool_use
+
     stripped = (text or "").strip()
     if not stripped:
+        return False
+    if text_announces_pending_tool_use(stripped):
         return False
     if len(stripped) >= min_chars:
         return True

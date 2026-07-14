@@ -2259,6 +2259,181 @@ def _validate_production_invoice_lines(
             )
 
 
+def _build_invoice_payment_account_line(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """ساخت یک خط حساب برای پرداخت فاکتور؛ مبالغ غیرمثبت نادیده گرفته می‌شوند."""
+    amount = Decimal(str(p.get("amount", 0) or 0))
+    if amount <= 0:
+        return None
+    transaction_type_value = p.get("transaction_type") or p.get("type")
+    account_line: Dict[str, Any] = {
+        "transaction_type": transaction_type_value,
+        "amount": float(amount),
+        "description": p.get("description"),
+        "transaction_date": p.get("transaction_date"),
+        "commission": p.get("commission"),
+    }
+    for key in (
+        "bank_id",
+        "bank_name",
+        "cash_register_id",
+        "cash_register_name",
+        "petty_cash_id",
+        "petty_cash_name",
+        "check_id",
+        "check_number",
+        "person_id",
+        "account_id",
+    ):
+        if p.get(key) is not None:
+            account_line[key] = p.get(key)
+    return account_line
+
+
+def _validate_invoice_payment_item_currency(
+    db: Session,
+    invoice_currency_id: int,
+    payment_item: Dict[str, Any],
+    invoice_type: str,
+) -> None:
+    """اعتبارسنجی ارز حساب پرداخت و تطابق نوع چک با نوع فاکتور."""
+    ttype = (payment_item.get("transaction_type") or payment_item.get("type") or "").strip().lower()
+    if ttype not in ("bank", "cash_register", "petty_cash", "check"):
+        return
+
+    if ttype == "bank":
+        ref_id = payment_item.get("bank_id")
+        if ref_id:
+            acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
+            if not acct:
+                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
+            if int(acct.currency_id) != invoice_currency_id:
+                raise ApiError(
+                    "PAYMENT_CURRENCY_MISMATCH",
+                    "Currency of bank account does not match invoice currency",
+                    http_status=400,
+                )
+    elif ttype == "cash_register":
+        ref_id = payment_item.get("cash_register_id")
+        if ref_id:
+            acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
+            if not acct:
+                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
+            if int(acct.currency_id) != invoice_currency_id:
+                raise ApiError(
+                    "PAYMENT_CURRENCY_MISMATCH",
+                    "Currency of cash register does not match invoice currency",
+                    http_status=400,
+                )
+    elif ttype == "petty_cash":
+        ref_id = payment_item.get("petty_cash_id")
+        if ref_id:
+            acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
+            if not acct:
+                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
+            if int(acct.currency_id) != invoice_currency_id:
+                raise ApiError(
+                    "PAYMENT_CURRENCY_MISMATCH",
+                    "Currency of petty cash does not match invoice currency",
+                    http_status=400,
+                )
+    elif ttype == "check":
+        ref_id = payment_item.get("check_id")
+        if not ref_id:
+            return
+        chk = db.query(Check).filter(Check.id == int(ref_id)).first()
+        if not chk:
+            raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
+        if int(chk.currency_id) != invoice_currency_id:
+            raise ApiError(
+                "PAYMENT_CURRENCY_MISMATCH",
+                "Currency of check does not match invoice currency",
+                http_status=400,
+            )
+
+        is_receipt_invoice = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+        expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
+        if chk.type != expected_check_type:
+            check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
+            expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
+            invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
+            raise ApiError(
+                "CHECK_TYPE_MISMATCH_WITH_INVOICE",
+                f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
+                http_status=400,
+            )
+
+
+def _create_receipt_payment_documents_for_invoice_payments(
+    db: Session,
+    *,
+    business_id: int,
+    user_id: int,
+    document: Document,
+    person_id: int,
+    payments: List[Dict[str, Any]],
+    invoice_type: str,
+) -> List[int]:
+    """ایجاد یک سند دریافت/پرداخت جداگانه برای هر آیتم پرداخت فاکتور."""
+    from app.services.receipt_payment_service import (
+        create_receipt_payment,
+        resolve_receipt_document_date_from_account_lines,
+    )
+
+    payment_docs: List[int] = []
+    invoice_currency_id = int(document.currency_id)
+    is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+    person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+
+    for p in payments:
+        amount = Decimal(str(p.get("amount", 0) or 0))
+        if amount <= 0:
+            continue
+
+        _validate_invoice_payment_item_currency(db, invoice_currency_id, p, invoice_type)
+        account_line = _build_invoice_payment_account_line(p)
+        if not account_line:
+            continue
+
+        rp_document_date = resolve_receipt_document_date_from_account_lines(
+            document.document_date,
+            [account_line],
+        )
+        rp_data = {
+            "document_type": "receipt" if is_receipt else "payment",
+            "document_date": rp_document_date.isoformat(),
+            "currency_id": document.currency_id,
+            "description": f"تسویه مرتبط با فاکتور {document.code}",
+            "person_lines": [{
+                "person_id": person_id,
+                "amount": float(amount),
+                "description": f"طرف حساب فاکتور {document.code}",
+            }],
+            "account_lines": [account_line],
+            "extra_info": {
+                "source": "invoice",
+                "invoice_id": document.id,
+                "person_is_receivable": person_is_receivable,
+            },
+        }
+        rp_doc = create_receipt_payment(
+            db=db,
+            business_id=business_id,
+            user_id=user_id,
+            data=rp_data,
+            commit=False,
+        )
+        if isinstance(rp_doc, dict) and rp_doc.get("id"):
+            payment_docs.append(int(rp_doc["id"]))
+        else:
+            raise ApiError(
+                "RECEIPT_PAYMENT_CREATE_FAILED",
+                "ایجاد سند دریافت/پرداخت مرتبط با فاکتور ناموفق بود.",
+                http_status=500,
+            )
+
+    return payment_docs
+
+
 def _sum_receipt_payment_amounts_for_invoice(
     db: Session,
     business_id: int,
