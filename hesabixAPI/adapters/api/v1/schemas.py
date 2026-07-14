@@ -1377,3 +1377,19 @@ class DocumentNumberingSettingResponse(BaseModel):
         from_attributes = True
 
 
+class DocumentCodeReservationRequest(BaseModel):
+    document_type: str = Field(..., description="نوع سند فاکتور (invoice_sales, ...)")
+    document_date: str = Field(..., description="تاریخ سند به فرمت YYYY-MM-DD")
+
+
+class DocumentCodeReservationResponse(BaseModel):
+    reservation_id: str
+    code: str
+    document_type: str
+    document_date: str
+    expires_at: Optional[str] = None
+    status: str
+
+    class Config:
+        from_attributes = True
+

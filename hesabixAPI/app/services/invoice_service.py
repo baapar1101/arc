@@ -4579,6 +4579,8 @@ def create_invoice(
             raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
 
     requested_code = str(data.get("code") or "").strip()
+    code_reservation_id = str(data.get("code_reservation_id") or "").strip() or None
+
     if requested_code:
         if not re.match(r"^[A-Za-z0-9_-]+$", requested_code):
             raise ApiError(
@@ -4614,6 +4616,50 @@ def create_invoice(
                 )
             raise
         document = candidate_manual
+
+    if not document and code_reservation_id:
+        from app.services.document_code_reservation_service import (
+            mark_reservation_used,
+            validate_reservation_for_invoice_create,
+        )
+
+        reserved_document = validate_reservation_for_invoice_create(
+            db,
+            business_id=business_id,
+            user_id=user_id,
+            reservation_id=code_reservation_id,
+            invoice_type=invoice_type,
+            document_date=document_date,
+        )
+        candidate_reserved = Document(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year.id,
+            code=reserved_document.code,
+            document_type=invoice_type,
+            document_date=document_date,
+            currency_id=int(currency_id),
+            created_by_user_id=user_id,
+            registered_at=utc_now_aware(),
+            is_proforma=bool(data.get("is_proforma", False)),
+            description=data.get("description"),
+            extra_info=new_extra_info,
+            project_id=project_id,
+        )
+        try:
+            with db.begin_nested():
+                db.add(candidate_reserved)
+                db.flush()
+                mark_reservation_used(db, reserved_document)
+        except IntegrityError as exc:
+            msg = str(getattr(exc.orig, "args", exc))
+            if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
+                raise ApiError(
+                    "DUPLICATE_DOCUMENT_CODE",
+                    "شماره رزروشده دیگر در دسترس نیست. لطفاً شماره جدید دریافت کنید.",
+                    http_status=409,
+                )
+            raise
+        document = candidate_reserved
 
     if not document:
         for attempt in range(max_code_attempts):

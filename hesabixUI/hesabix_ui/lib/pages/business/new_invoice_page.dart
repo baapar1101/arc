@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -34,6 +35,7 @@ import '../../models/invoice_line_item.dart';
 import '../../utils/invoice_line_preferences.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
 import '../../services/invoice_service.dart';
+import '../../services/document_numbering_api_service.dart';
 import '../../services/business_currency_rate_service.dart';
 import '../../services/credit_api_service.dart';
 import '../../models/credit_models.dart';
@@ -86,6 +88,10 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   bool _isSaving = false;
   String? _invoiceNumber;
   bool _autoGenerateInvoiceNumber = true;
+  String? _codeReservationId;
+  bool _loadingReservedCode = false;
+  String? _reserveCodeError;
+  int _reservationSyncGeneration = 0;
   Customer? _selectedCustomer;
   Person? _selectedSeller;
   Person? _selectedSupplier; // برای فاکتورهای خرید
@@ -327,6 +333,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         await _loadInitialPerson(widget.initialPersonId!);
       }
       await _applySavedInvoiceLineDiscountType();
+      if (mounted) {
+        await _syncReservedInvoiceCode();
+      }
     });
   }
 
@@ -1946,6 +1955,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
 
   @override
   void dispose() {
+    final reservationId = _codeReservationId;
+    if (reservationId != null) {
+      DocumentNumberingApiService.cancelReservation(
+        businessId: widget.businessId,
+        reservationId: reservationId,
+      ).catchError((_) {});
+    }
     _restoreDesktopRailAfterQuit?.call();
     disposeInvoiceAdjustmentRows(_adjustmentRows);
     _adjustmentRows = [];
@@ -2030,7 +2046,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           Tooltip(
             message: t.saveInvoice,
             child: IconButton(
-              onPressed: _isSaving ? null : _saveInvoice,
+              onPressed: (_isSaving || _isAutoInvoiceNumberBlocked) ? null : _saveInvoice,
               icon: _isSaving
                   ? const SizedBox(
                       width: 22,
@@ -2164,10 +2180,23 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
             autoGenerateInvoiceNumber: _autoGenerateInvoiceNumber,
             onAutoGenerateInvoiceNumberChanged: (auto) {
               setState(() => _autoGenerateInvoiceNumber = auto);
+              if (auto) {
+                unawaited(_syncReservedInvoiceCode());
+              } else {
+                unawaited(_cancelActiveReservation());
+                setState(() {
+                  _invoiceNumber = null;
+                  _reserveCodeError = null;
+                });
+              }
             },
+            invoiceNumberLoading: _loadingReservedCode,
+            invoiceNumberReserveError: _reserveCodeError,
+            onRetryReserveInvoiceNumber: _syncReservedInvoiceCode,
             invoiceDate: _invoiceDate,
             onInvoiceDateChanged: (date) {
               setState(() => _invoiceDate = date);
+              unawaited(_syncReservedInvoiceCode());
             },
             dueDate: _dueDate,
             onDueDateChanged: (date) {
@@ -2348,6 +2377,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         final invoiceId = (result['id'] as num?)?.toInt();
         final invoiceCode = result['code']?.toString();
 
+        _codeReservationId = null;
+
         if (!mounted) {
           return;
         }
@@ -2441,6 +2472,97 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     return 'invoice_${type.value}';
   }
 
+  bool get _isAutoInvoiceNumberBlocked =>
+      _autoGenerateInvoiceNumber &&
+      (_loadingReservedCode || _codeReservationId == null || _reserveCodeError != null);
+
+  String? _invoiceDateIso() {
+    final d = _invoiceDate;
+    if (d == null) return null;
+    return d.toIso8601String().split('T').first;
+  }
+
+  Future<void> _cancelActiveReservation({bool clearState = false}) async {
+    final reservationId = _codeReservationId;
+    if (reservationId == null) {
+      if (clearState && mounted) {
+        setState(() {
+          _codeReservationId = null;
+          _invoiceNumber = null;
+        });
+      }
+      return;
+    }
+    try {
+      await DocumentNumberingApiService.cancelReservation(
+        businessId: widget.businessId,
+        reservationId: reservationId,
+      );
+    } catch (_) {
+      // لغو رزرو هنگام خروج یا تعویض شماره؛ خطا را نادیده می‌گیریم.
+    }
+    if (!mounted) return;
+    if (clearState) {
+      setState(() {
+        _codeReservationId = null;
+        _invoiceNumber = null;
+      });
+    } else {
+      _codeReservationId = null;
+    }
+  }
+
+  Future<void> _syncReservedInvoiceCode() async {
+    if (!_autoGenerateInvoiceNumber) return;
+    final type = _selectedInvoiceType;
+    final dateIso = _invoiceDateIso();
+    if (type == null || dateIso == null) return;
+
+    final generation = ++_reservationSyncGeneration;
+    if (mounted) {
+      setState(() {
+        _loadingReservedCode = true;
+        _reserveCodeError = null;
+      });
+    }
+
+    await _cancelActiveReservation();
+
+    if (!mounted || generation != _reservationSyncGeneration) return;
+
+    try {
+      final result = await DocumentNumberingApiService.reserveDocumentCode(
+        businessId: widget.businessId,
+        documentType: _convertInvoiceTypeToApi(type),
+        documentDate: dateIso,
+      );
+      if (!mounted || generation != _reservationSyncGeneration) {
+        final staleId = result['reservation_id']?.toString();
+        if (staleId != null && staleId.isNotEmpty) {
+          await DocumentNumberingApiService.cancelReservation(
+            businessId: widget.businessId,
+            reservationId: staleId,
+          ).catchError((_) {});
+        }
+        return;
+      }
+      setState(() {
+        _codeReservationId = result['reservation_id']?.toString();
+        _invoiceNumber = result['code']?.toString();
+        _loadingReservedCode = false;
+        _reserveCodeError = null;
+      });
+    } catch (e) {
+      if (!mounted || generation != _reservationSyncGeneration) return;
+      setState(() {
+        _loadingReservedCode = false;
+        _reserveCodeError = ErrorExtractor.forContext(e, context);
+        _codeReservationId = null;
+        _invoiceNumber = null;
+      });
+    }
+  }
+
   /// نمایش هشدار برای فاکتور با مبلغ صفر
   Future<bool> _showZeroAmountWarning() async {
     final theme = Theme.of(context);
@@ -2500,6 +2622,14 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         return 'شماره فاکتور فقط می‌تواند شامل حروف انگلیسی، اعداد، خط تیره و زیرخط باشد';
       }
       manualInvoiceCode = raw;
+    } else {
+      if (_loadingReservedCode) {
+        return 'شماره فاکتور در حال آماده‌سازی است';
+      }
+      final reservationId = _codeReservationId?.trim();
+      if (reservationId == null || reservationId.isEmpty) {
+        return _reserveCodeError ?? 'شماره فاکتور هنوز آماده نیست';
+      }
     }
     if (_lineItems.isEmpty) {
       return 'حداقل یک ردیف کالا/خدمت وارد کنید';
@@ -2766,6 +2896,8 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       'is_proforma': _isDraft,
       'extra_info': extraInfo,
       if (manualInvoiceCode != null) 'code': manualInvoiceCode,
+      if (_autoGenerateInvoiceNumber && _codeReservationId != null)
+        'code_reservation_id': _codeReservationId,
       if (_invoiceTitle != null && _invoiceTitle!.isNotEmpty) 'description': _invoiceTitle,
       if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       if (_selectedTagIds.isNotEmpty) 'tag_ids': _selectedTagIds,
@@ -2983,6 +3115,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
     
     _applyPrintSettingsForCurrentType();
+    unawaited(_syncReservedInvoiceCode());
   }
 
   Widget _buildProductsTab() {

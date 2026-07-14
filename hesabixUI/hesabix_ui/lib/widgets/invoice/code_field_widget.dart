@@ -59,6 +59,18 @@ class _CodeFieldWidgetState extends State<CodeFieldWidget> {
   }
 
   @override
+  void didUpdateWidget(CodeFieldWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final newText = widget.initialValue ?? '';
+    if (oldWidget.initialValue != widget.initialValue && _controller.text != newText) {
+      _controller.text = newText;
+    }
+    if (oldWidget.autoGenerateCode != widget.autoGenerateCode) {
+      _autoGenerateCode = widget.autoGenerateCode;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     

@@ -75,5 +75,38 @@ class DocumentNumberingApiService {
       throw Exception(resp.data['message'] ?? 'خطا در حذف تنظیمات شماره‌گذاری');
     }
   }
+
+  static String _reservationsPath(int businessId) =>
+      '/api/v1/businesses/$businessId/document-code-reservations';
+
+  /// رزرو شماره قطعی سند (فاکتور) برای نمایش در فرم ایجاد.
+  static Future<Map<String, dynamic>> reserveDocumentCode({
+    required int businessId,
+    required String documentType,
+    required String documentDate,
+  }) async {
+    final resp = await _api.post(
+      _reservationsPath(businessId),
+      data: {
+        'document_type': documentType,
+        'document_date': documentDate,
+      },
+    );
+    if (resp.data['success'] == true) {
+      return Map<String, dynamic>.from(resp.data['data'] ?? {});
+    }
+    throw Exception(resp.data['message'] ?? 'خطا در رزرو شماره فاکتور');
+  }
+
+  /// لغو رزرو شماره سند.
+  static Future<void> cancelReservation({
+    required int businessId,
+    required String reservationId,
+  }) async {
+    final resp = await _api.delete('${_reservationsPath(businessId)}/$reservationId');
+    if (resp.data['success'] != true) {
+      throw Exception(resp.data['message'] ?? 'خطا در لغو رزرو شماره');
+    }
+  }
 }
 

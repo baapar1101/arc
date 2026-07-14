@@ -84,6 +84,7 @@ from adapters.api.v1.wallet_webhook import router as wallet_webhook_router
 from adapters.api.v1.credit import router as credit_router
 from adapters.api.v1.business_frequent_descriptions import router as business_frequent_descriptions_router
 from adapters.api.v1.document_numbering import router as document_numbering_router
+from adapters.api.v1.document_code_reservations import router as document_code_reservations_router
 from adapters.api.v1.marketplace import router as marketplace_router
 from adapters.api.v1.warranty import router as warranty_router
 from adapters.api.v1.customer_club import router as customer_club_router
@@ -1053,6 +1054,7 @@ def create_app() -> FastAPI:
     from adapters.api.v1.quick_sales import router as quick_sales_router
     application.include_router(quick_sales_router, prefix=settings.api_v1_prefix)
     application.include_router(document_numbering_router, prefix=settings.api_v1_prefix)
+    application.include_router(document_code_reservations_router, prefix=settings.api_v1_prefix)
     application.include_router(marketplace_router, prefix=settings.api_v1_prefix)
     application.include_router(warranty_router, prefix=settings.api_v1_prefix)
     application.include_router(customer_club_router, prefix=settings.api_v1_prefix)

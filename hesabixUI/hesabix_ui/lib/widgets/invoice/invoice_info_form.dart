@@ -43,6 +43,11 @@ class InvoiceInfoForm extends StatelessWidget {
   final ValueChanged<bool> onAutoGenerateInvoiceNumberChanged;
   final bool showAutoGenerateToggle;
 
+  /// در حالت شماره خودکار: دریافت شماره رزروشده از سرور.
+  final bool invoiceNumberLoading;
+  final String? invoiceNumberReserveError;
+  final VoidCallback? onRetryReserveInvoiceNumber;
+
   final DateTime? invoiceDate;
   final ValueChanged<DateTime?> onInvoiceDateChanged;
   final DateTime? dueDate;
@@ -106,6 +111,9 @@ class InvoiceInfoForm extends StatelessWidget {
     required this.autoGenerateInvoiceNumber,
     required this.onAutoGenerateInvoiceNumberChanged,
     this.showAutoGenerateToggle = true,
+    this.invoiceNumberLoading = false,
+    this.invoiceNumberReserveError,
+    this.onRetryReserveInvoiceNumber,
     required this.invoiceDate,
     required this.onInvoiceDateChanged,
     required this.dueDate,
@@ -210,16 +218,53 @@ class InvoiceInfoForm extends StatelessWidget {
         hintText: 'انتخاب نوع فاکتور',
         compact: true,
       ),
-      CodeFieldWidget(
-        initialValue: invoiceNumber,
-        onChanged: onInvoiceNumberChanged,
-        onAutoGenerateChanged: onAutoGenerateInvoiceNumberChanged,
-        isRequired: true,
-        label: 'شماره فاکتور',
-        hintText: 'مثال: INV-2024-001',
-        autoGenerateCode: autoGenerateInvoiceNumber,
-        invoiceDocumentCode: true,
-        showAutoManualToggle: showAutoGenerateToggle,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CodeFieldWidget(
+            initialValue: invoiceNumber,
+            onChanged: onInvoiceNumberChanged,
+            onAutoGenerateChanged: onAutoGenerateInvoiceNumberChanged,
+            isRequired: true,
+            label: 'شماره فاکتور',
+            hintText: autoGenerateInvoiceNumber && invoiceNumberLoading
+                ? 'در حال دریافت شماره...'
+                : 'مثال: INV-2024-001',
+            autoGenerateCode: autoGenerateInvoiceNumber,
+            invoiceDocumentCode: true,
+            showAutoManualToggle: showAutoGenerateToggle,
+          ),
+          if (autoGenerateInvoiceNumber && invoiceNumberLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+          if (autoGenerateInvoiceNumber &&
+              invoiceNumberReserveError != null &&
+              invoiceNumberReserveError!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      invoiceNumberReserveError!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  if (onRetryReserveInvoiceNumber != null)
+                    TextButton(
+                      onPressed: onRetryReserveInvoiceNumber,
+                      child: const Text('تلاش مجدد'),
+                    ),
+                ],
+              ),
+            ),
+        ],
       ),
       DateInputField(
         value: invoiceDate,
