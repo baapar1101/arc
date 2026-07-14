@@ -65,6 +65,15 @@ def compute_context_usage(
     }
 
 
+def is_strict_tool_pairing_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return (
+        "tool role" in msg
+        and "no previous assistant message" in msg
+        and "tool call" in msg
+    )
+
+
 def is_context_overflow_error(exc: BaseException) -> bool:
     msg = str(exc).lower()
     if "context length" in msg and ("exceed" in msg or "too long" in msg):
@@ -96,6 +105,24 @@ def _split_history_messages(
     return system_msgs, head, middle, tail
 
 
+def _align_tail_tool_boundary(
+    middle: List[Dict[str, Any]],
+    tail: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """جلوگیری از شروع tail با tool یتیم (assistant مربوطه در middle مانده)."""
+    middle = list(middle)
+    tail = list(tail)
+    while tail and tail[0].get("role") == "tool":
+        if middle and middle[-1].get("role") == "assistant" and middle[-1].get("tool_calls"):
+            group = [middle.pop()]
+            while middle and middle[-1].get("role") == "tool":
+                group.insert(0, middle.pop())
+            tail = group + tail
+            continue
+        tail.pop(0)
+    return middle, tail
+
+
 def compress_history_messages(
     messages: List[Dict[str, Any]],
     summarize_fn: Optional[SummarizeFn] = None,
@@ -117,6 +144,8 @@ def compress_history_messages(
             return messages, False
     elif not middle:
         return messages, False
+
+    middle, tail = _align_tail_tool_boundary(middle, tail)
 
     if summarize_fn:
         try:
@@ -187,6 +216,9 @@ def prepare_messages_for_context(
         usage = compute_context_usage(bundled, provider, budget_tokens)
 
     trimmed = trim_messages_for_llm(bundled)
+    from app.services.ai.chat_message_builder import repair_llm_tool_messages
+
+    trimmed = repair_llm_tool_messages(trimmed)
     usage["history_summarized"] = history_summarized
     usage["message_count"] = len(trimmed)
     usage["structured_system"] = structured

@@ -46,3 +46,13 @@ def test_prepare_messages_trims_when_large():
 def test_is_context_overflow_error_detects_phrase():
     assert is_context_overflow_error(Exception("context length exceeded"))
     assert not is_context_overflow_error(Exception("other error"))
+
+
+def test_is_strict_tool_pairing_error_detects_phrase():
+    from app.services.ai.ai_context_budget import is_strict_tool_pairing_error
+
+    err = Exception(
+        "Message has tool role, but there was no previous assistant message with a tool call!"
+    )
+    assert is_strict_tool_pairing_error(err)
+    assert not is_strict_tool_pairing_error(Exception("other error"))

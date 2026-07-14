@@ -179,10 +179,14 @@ class OpenAIProvider(AIProviderBase):
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
 
-        api_messages = [
-            {k: v for k, v in msg.items() if not str(k).startswith("_")}
-            for msg in messages
-        ]
+        from app.services.ai.chat_message_builder import repair_llm_tool_messages
+
+        api_messages = repair_llm_tool_messages(
+            [
+                {k: v for k, v in msg.items() if not str(k).startswith("_")}
+                for msg in messages
+            ]
+        )
         cache_policy = extract_prompt_cache_policy(provider_extra)
         if cache_policy:
             api_messages = split_system_messages_for_provider(api_messages, cache_policy)

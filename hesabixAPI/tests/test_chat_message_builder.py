@@ -12,6 +12,8 @@ assert _spec.loader is not None
 _spec.loader.exec_module(_mod)
 
 build_llm_messages_from_history = _mod.build_llm_messages_from_history
+expand_strict_tool_message_pairs = _mod.expand_strict_tool_message_pairs
+repair_llm_tool_messages = _mod.repair_llm_tool_messages
 serialize_function_metadata = _mod.serialize_function_metadata
 
 
@@ -34,6 +36,55 @@ def test_build_with_tool_history():
     assert "tool_calls" in built[1]
     assert built[2]["role"] == "tool"
     assert built[2]["tool_call_id"] == "tc1"
+
+
+def test_expand_strict_tool_message_pairs_splits_multi_tool_round():
+    messages = [
+        {
+            "role": "assistant",
+            "content": "plan",
+            "tool_calls": [
+                {"id": "a", "type": "function", "function": {"name": "x", "arguments": "{}"}},
+                {"id": "b", "type": "function", "function": {"name": "y", "arguments": "{}"}},
+            ],
+        },
+        {"role": "tool", "tool_call_id": "a", "content": "{}"},
+        {"role": "tool", "tool_call_id": "b", "content": "{}"},
+        {"role": "user", "content": "next"},
+    ]
+    repaired = expand_strict_tool_message_pairs(messages)
+    assert repaired[0]["role"] == "assistant"
+    assert len(repaired[0]["tool_calls"]) == 1
+    assert repaired[1]["role"] == "tool"
+    assert repaired[1]["tool_call_id"] == "a"
+    assert repaired[2]["role"] == "assistant"
+    assert len(repaired[2]["tool_calls"]) == 1
+    assert repaired[3]["role"] == "tool"
+    assert repaired[3]["tool_call_id"] == "b"
+    assert repaired[4]["role"] == "user"
+
+
+def test_repair_llm_tool_messages_drops_leading_orphan_tool():
+    messages = [
+        {"role": "tool", "tool_call_id": "orphan", "content": "{}"},
+        {"role": "user", "content": "hi"},
+    ]
+    repaired = repair_llm_tool_messages(messages)
+    assert repaired == [{"role": "user", "content": "hi"}]
+
+
+def test_build_with_empty_function_calls_dict_falls_back_to_assistant():
+    msgs = [
+        SimpleNamespace(
+            id=2,
+            role="assistant",
+            content="پاسخ",
+            function_calls=json.dumps({"calls": []}),
+            function_results=None,
+        ),
+    ]
+    built = build_llm_messages_from_history(msgs)
+    assert built == [{"role": "assistant", "content": "پاسخ"}]
 
 
 def test_build_with_tool_history_prefers_tool_call_id_result():
@@ -60,8 +111,10 @@ def test_build_with_tool_history_prefers_tool_call_id_result():
     ]
     built = build_llm_messages_from_history(msgs)
 
+    assert built[0]["role"] == "assistant"
     assert json.loads(built[1]["content"])["items"] == ["علی"]
-    assert json.loads(built[2]["content"])["items"] == ["رضا"]
+    assert built[2]["role"] == "assistant"
+    assert json.loads(built[3]["content"])["items"] == ["رضا"]
 
 
 def test_serialize_metadata():

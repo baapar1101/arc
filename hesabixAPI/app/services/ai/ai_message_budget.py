@@ -76,7 +76,11 @@ def trim_messages_for_llm(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
     rest = [m for m in messages if m.get("role") != "system"]
 
     if len(rest) > MAX_HISTORY_MESSAGES:
-        rest = rest[-MAX_HISTORY_MESSAGES:]
+        drop = len(rest) - MAX_HISTORY_MESSAGES
+        start = drop
+        while start < len(rest) and rest[start].get("role") == "tool":
+            start += 1
+        rest = rest[start:]
 
     trimmed: List[Dict[str, Any]] = []
     for msg in system_msgs + rest:
