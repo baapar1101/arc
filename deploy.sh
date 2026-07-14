@@ -1822,6 +1822,45 @@ hesabix_validate_seed_schema() {
   fi
 }
 
+# True when seed/base schema is present (not just alembic_version from a failed run).
+hesabix_db_is_fully_initialized() {
+  [[ "$(hesabix_db_table_exists businesses)" == "t" ]] \
+    && [[ "$(hesabix_db_table_exists document_lines)" == "t" ]] \
+    && [[ "$(hesabix_db_table_exists documents)" == "t" ]]
+}
+
+hesabix_reset_public_schema_for_seed() {
+  local table_count="$1"
+  log_warning "Database is not fully initialized (${table_count} table(s), core schema missing)."
+  log_warning "Resetting public schema before seed import (safe for fresh install; no Hesabix data yet)."
+  PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT ALL ON SCHEMA public TO hesabix;
+GRANT ALL ON SCHEMA public TO public;
+SQL
+}
+
+hesabix_import_seed_database() {
+  local seed_dump="$1" backup_dir="$2"
+  local restore_log="${APP_ROOT}/pg_restore_seed.log"
+  echo "Importing seed database from: ${seed_dump}"
+  : > "${restore_log}"
+  if PGPASSWORD="${DB_PASSWORD}" pg_restore -h 127.0.0.1 -p 5432 -U hesabix -d hesabix --no-owner --no-acl "${seed_dump}" >>"${restore_log}" 2>&1; then
+    log_success "Seed database imported successfully."
+  else
+    if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
+      log_warning "Seed import finished with warnings (see ${restore_log})."
+      log_success "Seed database imported (some non-fatal warnings may have occurred)."
+    else
+      log_error "Error importing seed database. Check ${restore_log}"
+      exit 1
+    fi
+  fi
+  hesabix_validate_seed_schema
+  hesabix_ensure_alembic_revision_after_seed "${seed_dump}" "${backup_dir}"
+}
+
 hesabix_ensure_alembic_revision_after_seed() {
   local seed_dump="$1" backup_dir="$2" current rev
   current=$(hesabix_current_alembic_revision)
@@ -1948,30 +1987,25 @@ print('Connection successful')
     table_count=999
   fi
 
-  if [[ "${table_count}" -eq 0 ]] && [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
-    echo "Importing seed database from: ${seed_dump}"
-    local restore_log="${APP_ROOT}/pg_restore_seed.log"
-    : > "${restore_log}"
-    if PGPASSWORD="${DB_PASSWORD}" pg_restore -h 127.0.0.1 -p 5432 -U hesabix -d hesabix --no-owner --no-acl "${seed_dump}" >>"${restore_log}" 2>&1; then
-      log_success "Seed database imported successfully."
+  if [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
+    if hesabix_db_is_fully_initialized; then
+      log_info "Database already initialized (${table_count} tables). Skipping seed import."
     else
-      # pg_restore may exit 1 for non-fatal warnings; verify DB is usable
-      if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
-        log_warning "Seed import finished with warnings (see ${restore_log})."
-        log_success "Seed database imported (some non-fatal warnings may have occurred)."
-      else
-        log_error "Error importing seed database. Check ${restore_log}"
-        exit 1
+      if [[ "${table_count}" -gt 0 ]]; then
+        hesabix_reset_public_schema_for_seed "${table_count}"
+        table_count=0
       fi
+      hesabix_import_seed_database "${seed_dump}" "${backup_dir}"
+      table_count=$(PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
     fi
-    hesabix_validate_seed_schema
-    hesabix_ensure_alembic_revision_after_seed "${seed_dump}" "${backup_dir}"
-  elif [[ "${table_count}" -gt "0" ]]; then
-    log_info "Database already initialized (${table_count} tables). Skipping seed import."
+  elif [[ "${table_count}" -eq 0 ]]; then
+    echo "$WARNING_MARK Seed dump not found in ${backup_dir}/hesabix_seed*.dump"
+  elif ! hesabix_db_is_fully_initialized; then
+    log_error "Database has ${table_count} tables but core schema is missing and no seed dump was found."
+    log_error "Add hesabix_seed*.dump under ${backup_dir} or drop/recreate the hesabix database."
+    exit 1
   else
-    if [[ -z "${seed_dump}" || ! -f "${seed_dump}" ]]; then
-      echo "$WARNING_MARK Seed dump not found in ${backup_dir}/hesabix_seed*.dump"
-    fi
+    log_info "Database already initialized (${table_count} tables). Skipping seed import."
   fi
 
   # pgvector (for servers where prereqs step was skipped earlier)
@@ -1982,11 +2016,9 @@ print('Connection successful')
   fi
 
   # Always run migrations (after optional seed import, or when DB was already initialized)
-  local alembic_current
-  alembic_current=$(hesabix_current_alembic_revision)
-  if [[ -z "${alembic_current}" ]] && [[ "${table_count}" -gt 0 ]] && [[ "$(hesabix_db_table_exists document_lines)" != "t" ]]; then
-    log_error "Database has ${table_count} tables but document_lines is missing and alembic_version is empty."
-    log_error "This usually means a partial/failed seed import. Drop and recreate the hesabix database, then re-run deploy."
+  if ! hesabix_db_is_fully_initialized && [[ "${table_count}" -gt 0 ]]; then
+    log_error "Core schema still missing after seed/migration prep (${table_count} tables)."
+    log_error "Check ${APP_ROOT}/pg_restore_seed.log or recreate the hesabix database."
     exit 1
   fi
   log_step "Running Alembic migrations..."
