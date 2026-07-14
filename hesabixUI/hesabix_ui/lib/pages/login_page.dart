@@ -53,6 +53,7 @@ class _LoginPageState extends State<LoginPage> {
 
   // Register
   final _registerKey = GlobalKey<FormState>();
+  final _signUpWizardKey = GlobalKey<SignUpWizardState>();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -386,6 +387,79 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (_) {}
     return ErrorExtractor.extractErrorMessage(e, t);
+  }
+
+  int? _registerFieldToStep(String? field) {
+    switch (field) {
+      case 'email':
+      case 'mobile':
+        return 0;
+      case 'first_name':
+      case 'last_name':
+      case 'password':
+        return 1;
+      case 'captcha':
+      case 'captcha_code':
+        return 2;
+      default:
+        return null;
+    }
+  }
+
+  int? _inferRegisterErrorStep(Object e) {
+    try {
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map) {
+          final err = data['error'] is Map ? data['error'] as Map : null;
+          final code = (err?['code'] ?? data['error_code'])?.toString();
+          switch (code) {
+            case 'EMAIL_IN_USE':
+            case 'MOBILE_IN_USE':
+            case 'INVALID_MOBILE':
+            case 'IDENTIFIER_REQUIRED':
+              return 0;
+            case 'INVALID_CAPTCHA':
+              return 2;
+          }
+
+          List<dynamic>? details;
+          if (err != null && err['details'] is List) {
+            details = err['details'] as List;
+          } else if (data['detail'] is List) {
+            details = data['detail'] as List;
+          }
+          if (details != null) {
+            for (final item in details) {
+              if (item is Map) {
+                final fieldRaw = (item['field'] ??
+                        (item['loc'] is List
+                            ? (item['loc'] as List).isNotEmpty
+                                ? (item['loc'] as List).last?.toString()
+                                : null
+                            : null))
+                    ?.toString();
+                final step = _registerFieldToStep(fieldRaw);
+                if (step != null) return step;
+              }
+            }
+          }
+
+          final message = (err?['message'] ?? data['message'])?.toString().toLowerCase() ?? '';
+          if (message.contains('email') ||
+              message.contains('mobile') ||
+              message.contains('ایمیل') ||
+              message.contains('موبایل') ||
+              message.contains('شماره')) {
+            return 0;
+          }
+          if (message.contains('captcha') || message.contains('کپچا') || message.contains('امنیتی')) {
+            return 2;
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _showSnack(String message) {
@@ -852,6 +926,10 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
       _showSnack(msg.isEmpty ? t.registerFailed : msg);
+      final errorStep = _inferRegisterErrorStep(e);
+      if (errorStep != null) {
+        _signUpWizardKey.currentState?.goToStep(errorStep);
+      }
       setState(() {
         _registerCaptchaCtrl.clear();
       });
@@ -1270,6 +1348,7 @@ class _LoginPageState extends State<LoginPage> {
         );
       case AuthFlow.signUp:
         return SignUpWizard(
+          key: _signUpWizardKey,
           formKey: _registerKey,
           firstNameController: _firstNameCtrl,
           lastNameController: _lastNameCtrl,

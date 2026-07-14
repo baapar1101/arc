@@ -35,6 +35,7 @@
   "authHaveAccount": "Already have an account?",
   "authOrDivider": "or",
   "authBackToSignIn": "Back to sign in",
+  "authBackPreviousStep": "Previous step",
   "authTrustCloud": "Cloud access from any device",
   "authTrustEncrypted": "Your data is encrypted",
   "authTrustSupport": "Support at every step",

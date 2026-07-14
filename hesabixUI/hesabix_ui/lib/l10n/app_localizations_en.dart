@@ -118,6 +118,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authBackToSignIn => 'Back to sign in';
 
   @override
+  String get authBackPreviousStep => 'Previous step';
+
+  @override
   String get authTrustCloud => 'Cloud access from any device';
 
   @override

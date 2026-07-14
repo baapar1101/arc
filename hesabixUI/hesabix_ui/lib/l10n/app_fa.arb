@@ -238,6 +238,7 @@
   "authHaveAccount": "حساب دارید؟",
   "authOrDivider": "یا",
   "authBackToSignIn": "بازگشت به ورود",
+  "authBackPreviousStep": "مرحله قبل",
   "authTrustCloud": "دسترسی ابری از هر دستگاه",
   "authTrustEncrypted": "اطلاعات شما رمزنگاری‌شده است",
   "authTrustSupport": "پشتیبانی در تمام مراحل",

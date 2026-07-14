@@ -117,6 +117,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get authBackToSignIn => 'بازگشت به ورود';
 
   @override
+  String get authBackPreviousStep => 'مرحله قبل';
+
+  @override
   String get authTrustCloud => 'دسترسی ابری از هر دستگاه';
 
   @override

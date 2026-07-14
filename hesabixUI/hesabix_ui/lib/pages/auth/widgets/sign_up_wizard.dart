@@ -56,11 +56,26 @@ class SignUpWizard extends StatefulWidget {
   });
 
   @override
-  State<SignUpWizard> createState() => _SignUpWizardState();
+  State<SignUpWizard> createState() => SignUpWizardState();
 }
 
-class _SignUpWizardState extends State<SignUpWizard> {
+class SignUpWizardState extends State<SignUpWizard> {
   int _step = 0;
+
+  /// پرش به مرحله مشخص (مثلاً پس از خطای ثبت‌نام از سرور).
+  void goToStep(int step) {
+    if (!mounted) return;
+    final target = step.clamp(0, 2);
+    if (target != _step) {
+      setState(() => _step = target);
+    }
+  }
+
+  void _goToPreviousStep(int step) {
+    if (step < _step) {
+      setState(() => _step = step);
+    }
+  }
 
   bool _validateStep0(AppLocalizations t) {
     if (widget.emailController.text.trim().isEmpty &&
@@ -132,9 +147,9 @@ class _SignUpWizardState extends State<SignUpWizard> {
           Row(
             children: [
               IconButton(
-                onPressed: widget.loading ? null : _back,
+                onPressed: _back,
                 icon: const Icon(Icons.arrow_back_rounded),
-                tooltip: t.authBackToSignIn,
+                tooltip: _step == 0 ? t.authBackToSignIn : t.authBackPreviousStep,
               ),
               Expanded(
                 child: Text(
@@ -145,7 +160,11 @@ class _SignUpWizardState extends State<SignUpWizard> {
             ],
           ),
           const SizedBox(height: 8),
-          _StepIndicator(current: _step, labels: [t.authStepContact, t.authStepProfile, t.authStepSecurity]),
+          _StepIndicator(
+            current: _step,
+            labels: [t.authStepContact, t.authStepProfile, t.authStepSecurity],
+            onStepTap: _goToPreviousStep,
+          ),
           const SizedBox(height: 24),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
@@ -308,8 +327,13 @@ class _SignUpWizardState extends State<SignUpWizard> {
 class _StepIndicator extends StatelessWidget {
   final int current;
   final List<String> labels;
+  final ValueChanged<int>? onStepTap;
 
-  const _StepIndicator({required this.current, required this.labels});
+  const _StepIndicator({
+    required this.current,
+    required this.labels,
+    this.onStepTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -319,47 +343,59 @@ class _StepIndicator extends StatelessWidget {
       children: List.generate(labels.length, (i) {
         final active = i <= current;
         final done = i < current;
+        final tappable = done && onStepTap != null;
         return Expanded(
           child: Row(
             children: [
               Expanded(
-                child: Column(
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: active ? scheme.primary : scheme.surfaceContainerHighest,
-                        border: Border.all(
-                          color: active ? scheme.primary : scheme.outlineVariant,
-                        ),
-                      ),
-                      alignment: Alignment.center,
-                      child: done
-                          ? Icon(Icons.check, size: 16, color: scheme.onPrimary)
-                          : Text(
-                              '${i + 1}',
-                              style: TextStyle(
-                                color: active ? scheme.onPrimary : scheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: tappable ? () => onStepTap!(i) : null,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: active ? scheme.primary : scheme.surfaceContainerHighest,
+                              border: Border.all(
+                                color: active ? scheme.primary : scheme.outlineVariant,
                               ),
                             ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      labels[i],
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: active ? scheme.primary : scheme.onSurfaceVariant,
-                            fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                            alignment: Alignment.center,
+                            child: done
+                                ? Icon(Icons.check, size: 16, color: scheme.onPrimary)
+                                : Text(
+                                    '${i + 1}',
+                                    style: TextStyle(
+                                      color: active ? scheme.onPrimary : scheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            labels[i],
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: active ? scheme.primary : scheme.onSurfaceVariant,
+                                  fontWeight: active ? FontWeight.w600 : FontWeight.w400,
+                                  decoration: tappable ? TextDecoration.underline : null,
+                                ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
               if (i < labels.length - 1)

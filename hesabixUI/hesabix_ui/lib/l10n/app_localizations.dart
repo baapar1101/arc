@@ -308,6 +308,12 @@ abstract class AppLocalizations {
   /// **'Back to sign in'**
   String get authBackToSignIn;
 
+  /// No description provided for @authBackPreviousStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous step'**
+  String get authBackPreviousStep;
+
   /// No description provided for @authTrustCloud.
   ///
   /// In en, this message translates to:
