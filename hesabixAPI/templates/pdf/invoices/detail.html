@@ -143,7 +143,7 @@
     .invoice-layout .header-bottom {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       gap: 12px;
       flex-wrap: wrap;
     }
@@ -153,12 +153,14 @@
     }
 
     .invoice-layout .header-meta-right {
-      flex: 0 0 auto;
-      font-size: 11px;
+      flex: 0 1 auto;
+      max-width: 42%;
+      font-size: 10px;
       display: flex;
       flex-direction: row;
-      align-items: center;
-      gap: 12px;
+      align-items: flex-start;
+      gap: 8px;
+      min-width: 0;
     }
 
     /* ترتیب DOM: QR سپس متن — در RTL ردیف عادی، در LTR معکوس تا کد/تاریخ همیشه چپِ QR باشد */
@@ -169,12 +171,28 @@
     .invoice-layout .header-meta-lines {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 4px;
       text-align: right;
+      min-width: 0;
+      flex: 1 1 auto;
     }
 
     html[dir="ltr"] .invoice-layout .header-meta-lines {
       text-align: left;
+    }
+
+    .invoice-layout .header-meta-line {
+      display: block;
+      line-height: 1.35;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .invoice-layout .header-meta-line strong {
+      display: inline-block;
+      margin-inline-end: 2px;
+      white-space: nowrap;
     }
 
     .invoice-layout .header-qr {
@@ -183,9 +201,38 @@
 
     .invoice-layout .header-qr img {
       display: block;
-      width: 56px;
-      height: 56px;
+      width: 52px;
+      height: 52px;
       object-fit: contain;
+    }
+
+    .invoice-layout .footer-info-card {
+      padding: 6px 8px;
+    }
+
+    .invoice-layout .footer-info-section {
+      line-height: 1.4;
+    }
+
+    .invoice-layout .footer-info-section + .footer-info-section {
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed #bbb;
+    }
+
+    .invoice-layout .footer-info-title {
+      margin-bottom: 3px;
+      font-weight: bold;
+      font-size: 10.5px;
+    }
+
+    .invoice-layout .footer-info-card .payments-list {
+      padding-inline-start: 14px;
+      font-size: 9.5px;
+    }
+
+    .invoice-layout .footer-info-card .payments-list li {
+      margin-bottom: 4px;
     }
 
     .invoice-layout .header .title {
@@ -429,13 +476,13 @@
               </div>
             {% endif %}
             <div class="header-meta-lines">
-              <div>
-                {{ 'کد فاکتور' if is_fa else 'Invoice code' }}:
-                {{ invoice.code or '-' }}
+              <div class="header-meta-line">
+                <strong>{{ 'کد فاکتور' if is_fa else 'Invoice code' }}:</strong>
+                <span>{{ invoice.code or '-' }}</span>
               </div>
-              <div>
-                {{ 'تاریخ فاکتور' if is_fa else 'Invoice date' }}:
-                {{ invoice.issue_date or '-' }}
+              <div class="header-meta-line">
+                <strong>{{ 'تاریخ فاکتور' if is_fa else 'Invoice date' }}:</strong>
+                <span>{{ invoice.issue_date or '-' }}</span>
               </div>
             </div>
           </div>
@@ -645,27 +692,27 @@
       </div>
     {% endif %}
 
-    {# متن پاورقی تنظیمات چاپ، پرداخت‌ها و تراز در کادرهای جدا؛ خلاصه مالی کنار آن #}
+    {# توضیحات انتهایی، پرداخت‌ها و تراز مشتری در یک باکس؛ خلاصه مالی کنار آن #}
     <div style="display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap;">
       {% set _has_notes_block = invoice_footer_note %}
       {% set _has_pay_block = payments and payments|length > 0 %}
       {% set _has_balance_block = customer_balance_info %}
 
       {% if _has_notes_block or _has_pay_block or _has_balance_block %}
-        <div style="flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 8px;">
+        <div class="section-card footer-info-card" style="flex: 1; min-width: 200px;">
           {% if invoice_footer_note %}
-            <div class="section-card">
-              <div class="meta" style="margin-bottom: 4px; font-weight: bold;">
-                {{ 'توضیحات / متن انتهای فاکتور' if is_fa else 'Footer notes' }}:
+            <div class="footer-info-section">
+              <div class="footer-info-title meta">
+                {{ 'توضیحات / متن انتهای فاکتور' if is_fa else 'Footer notes' }}
               </div>
               <div class="meta">{{ invoice_footer_note }}</div>
             </div>
           {% endif %}
 
           {% if payments and payments|length > 0 %}
-            <div class="section-card">
-              <div class="meta" style="margin-bottom: 6px; font-weight: bold;">
-                {{ 'اطلاعات پرداخت‌ها و اسناد مرتبط' if is_fa else 'Payment details & linked documents' }}:
+            <div class="footer-info-section">
+              <div class="footer-info-title meta">
+                {{ 'اطلاعات پرداخت‌ها و اسناد مرتبط' if is_fa else 'Payment details & linked documents' }}
               </div>
               <ul class="payments-list meta">
                 {% for p in payments %}
@@ -678,7 +725,7 @@
                     —
                     <span class="amount" style="font-weight: 700;">{{ (p.total_amount or 0) | format_amount(0) | ltr | safe }}</span>
                     {% if p.account_details and p.account_details|length > 0 %}
-                      <div style="margin-top: 2px; font-size: 9.5px; color: #333;">
+                      <div style="margin-top: 2px; font-size: 9px; color: #333;">
                         {% for acc in p.account_details %}
                           <span>• {{ acc.method_label or '-' }}</span>
                           {% if acc.display_name %}
@@ -693,7 +740,7 @@
                       </div>
                     {% endif %}
                     {% if p.description %}
-                      <div style="margin-top: 2px; font-size: 9.5px; color: #555;">
+                      <div style="margin-top: 2px; font-size: 9px; color: #555;">
                         {{ 'توضیح سند:' if is_fa else 'Doc. note:' }} {{ p.description }}
                       </div>
                     {% endif %}
@@ -704,13 +751,13 @@
           {% endif %}
 
           {% if customer_balance_info %}
-            <div class="section-card">
-              <div class="meta" style="margin-bottom: 6px; font-weight: bold;">
-                {{ 'وضعیت حساب مشتری' if is_fa else 'Customer account status' }}:
+            <div class="footer-info-section">
+              <div class="footer-info-title meta">
+                {{ 'وضعیت حساب مشتری' if is_fa else 'Customer account status' }}
               </div>
-              <div class="meta" style="line-height: 1.6;">
+              <div class="meta" style="line-height: 1.45;">
                 {% if invoice.is_proforma %}
-                  <div style="margin-bottom: 6px;">
+                  <div style="margin-bottom: 4px;">
                     <strong>{{ 'تراز فعلی' if is_fa else 'Current balance' }}:</strong>
                     <span class="amount" style="margin-inline-start: 4px; font-weight: 700;">{{ customer_balance_info.current_balance | format_amount(0) | ltr | safe }}</span>
                     <span style="margin-inline-start: 6px; color: #555;">({{ customer_balance_info.current_status }})</span>
