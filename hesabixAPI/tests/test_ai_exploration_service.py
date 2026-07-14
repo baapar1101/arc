@@ -66,7 +66,7 @@ def test_build_thought_and_explored_bundle():
     body, hypothesis, confidence, open_qs = build_thought_markdown_rule_based(
         bundle, "خطای fiscalId"
     )
-    assert "Important findings" in body
+    assert "یافته‌های مهم" in body
     assert hypothesis
     assert confidence in ("low", "medium", "high")
 

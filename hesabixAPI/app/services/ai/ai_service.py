@@ -931,6 +931,42 @@ class AIService:
                     return content.strip()
         return None
 
+    def _resolve_chat_language(self, business_id: Optional[int] = None) -> str:
+        from app.services.ai.ai_language_prompt import resolve_effective_chat_language
+
+        preferred: Optional[str] = None
+        bid = business_id or self.business_id
+        if bid:
+            try:
+                from app.services.ai.ai_memory_service import get_memory_structured
+
+                structured = get_memory_structured(
+                    self.db, int(bid), self.ctx.get_user_id()
+                )
+                preferred = structured.get("preferred_language")
+            except Exception as exc:
+                logger.warning("Failed to resolve AI memory language: %s", exc)
+                safe_db_rollback(self.db)
+        return resolve_effective_chat_language(
+            ctx_language=self.ctx.language,
+            preferred_language=preferred,
+        )
+
+    def _build_execution_prompt_block(
+        self,
+        execution_mode: Optional[str],
+        business_id: Optional[int] = None,
+    ) -> str:
+        from app.services.ai.ai_language_prompt import build_language_context_prompt_block
+
+        language_block = build_language_context_prompt_block(
+            self._resolve_chat_language(business_id)
+        )
+        mode_block = execution_mode_prompt_block(execution_mode)
+        if language_block and mode_block:
+            return f"{language_block}\n\n{mode_block}"
+        return language_block or mode_block
+
     def get_system_prompt(
         self,
         session_business_id: Optional[int] = None,
@@ -1079,7 +1115,9 @@ class AIService:
             return compose_structured_system_prompt(
                 static_core=base_prompt,
                 business_anchor=business_info + calendar_block,
-                execution_block=execution_mode_prompt_block(execution_mode),
+                execution_block=self._build_execution_prompt_block(
+                    execution_mode, business_id=bid
+                ),
                 plan_block=plan_block,
                 runtime_sections=runtime,
                 role=role.value,
@@ -1091,7 +1129,7 @@ class AIService:
         return compose_structured_system_prompt(
             static_core=base_prompt,
             business_anchor=build_calendar_context_prompt_block(self.ctx.get_calendar_type()),
-            execution_block=execution_mode_prompt_block(execution_mode),
+            execution_block=self._build_execution_prompt_block(execution_mode),
             role=role.value,
             business_id=None,
         )
@@ -1134,7 +1172,7 @@ class AIService:
             structured = compose_structured_system_prompt(
                 static_core=base_prompt,
                 business_anchor=build_calendar_context_prompt_block(self.ctx.get_calendar_type()),
-                execution_block=execution_mode_prompt_block(execution_mode),
+                execution_block=self._build_execution_prompt_block(execution_mode),
                 role=role_value,
                 business_id=None,
             )
@@ -1330,7 +1368,9 @@ class AIService:
         structured = compose_structured_system_prompt(
             static_core=base_prompt,
             business_anchor=business_info + calendar_block,
-            execution_block=execution_mode_prompt_block(execution_mode),
+            execution_block=self._build_execution_prompt_block(
+                execution_mode, business_id=bid
+            ),
             plan_block=plan_block,
             runtime_sections=runtime_sections_from_parts(
                 {
@@ -2198,6 +2238,9 @@ class AIService:
             self.set_request_model(request_model)
         self._validate_request_model_if_set()
         effective_user_query = user_query or self._last_user_query(messages)
+        chat_language = self._resolve_chat_language(
+            session_business_id or self.business_id
+        )
         self.set_routing_context(
             operation=AI_OPERATION_CHAT,
             user_query=effective_user_query,
@@ -3063,7 +3106,9 @@ class AIService:
 
                         thought_body, hypothesis, confidence, open_qs = (
                             build_thought_markdown_rule_based(
-                                bundle, effective_user_query
+                                bundle,
+                                effective_user_query,
+                                language=chat_language,
                             )
                         )
                         if (
@@ -3081,6 +3126,7 @@ class AIService:
                                 effective_user_query,
                                 explored_body,
                                 db=self.db,
+                                language=chat_language,
                             )
                             if llm_thought:
                                 thought_body = llm_thought

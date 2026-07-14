@@ -143,9 +143,9 @@ def structured_to_prompt_block(structured: Dict[str, Any]) -> str:
 
     lang = s.get("preferred_language")
     if lang == "en":
-        lines.append("زبان پاسخ ترجیحی: انگلیسی")
+        lines.append("زبان پاسخ و تحلیل ترجیحی: انگلیسی")
     elif lang == "fa":
-        lines.append("زبان پاسخ ترجیحی: فارسی")
+        lines.append("زبان پاسخ و تحلیل ترجیحی: فارسی")
 
     for t in s.get("internal_terms") or []:
         if isinstance(t, dict) and t.get("term"):
