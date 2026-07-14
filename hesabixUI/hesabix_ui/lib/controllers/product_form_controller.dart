@@ -108,10 +108,10 @@ class ProductFormController extends ChangeNotifier {
   String get openingBalanceQuantity => _openingBalanceQuantity;
   String get openingBalanceCostPrice => _openingBalanceCostPrice;
   bool get obEditable => _obEligibility?['editable'] == true;
+  /// نمایش بخش تعداد اولیه — حتی بدون دسترسی ویرایش (فقط‌خواندنی با هشدار).
   bool get showOpeningBalanceSection {
     if (_formData.itemType != 'کالا' || !_formData.trackInventory) return false;
-    if (_obEligibility == null) return false;
-    return _obEligibility!['show_section'] == true;
+    return _obEligibility != null || _obEligibilityLoading;
   }
 
   void setOpeningBalanceQuantity(String value) {

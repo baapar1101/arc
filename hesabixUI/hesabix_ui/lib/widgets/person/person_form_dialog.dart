@@ -114,8 +114,9 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   double? _obInitialAmount;
   String? _obInitialType;
 
+  /// نمایش تب مانده افتتاحیه — حتی بدون دسترسی ویرایش (فقط‌خواندنی با هشدار).
   bool get _showOpeningBalanceTab =>
-      !_obEligibilityLoading && (_obEligibility?['show_tab'] == true);
+      _obEligibility != null || _obEligibilityLoading;
 
   bool get _obEditable => _obEligibility?['editable'] == true;
 
@@ -1217,7 +1218,9 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   Widget _buildOpeningBalanceSection(AppLocalizations t) {
     final fyTitle = _obEligibility?['fiscal_year_title']?.toString();
     final statusMessage = _obEligibility?['message']?.toString();
-    final readonly = !_obEditable;
+    final loading = _obEligibilityLoading;
+    final readonly = !loading && _obEligibility != null && !_obEditable;
+    final readonlyWarning = _openingBalanceReadonlyWarning(t, statusMessage);
     return FutureBuilder<String?>(
       future: _getCurrencyLabel(),
       builder: (context, snapshot) {
@@ -1230,18 +1233,15 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: LinearProgressIndicator(),
+              ),
             if (fyTitle != null && fyTitle.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text('${t.personOpeningBalanceFiscalYear}: $fyTitle'),
-              ),
-            if (statusMessage != null && statusMessage.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  statusMessage,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
               ),
             if (readonly)
               Container(
@@ -1249,26 +1249,46 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  color: Colors.orange.shade50,
+                  border: Border.all(color: Colors.orange.shade200),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       Icons.lock_outline,
                       size: 18,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Colors.orange.shade800,
                     ),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(t.personOpeningBalanceReadonlyBanner)),
+                    Expanded(
+                      child: Text(
+                        readonlyWarning,
+                        style: TextStyle(
+                          color: Colors.orange.shade900,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               )
-            else
+            else ...[
+              if (statusMessage != null && statusMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    statusMessage,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
               Text(
                 t.personOpeningBalanceHint,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+            ],
             if (_obEditable && _obInitialHadLine) ...[
               const SizedBox(height: 8),
               Text(
@@ -1281,20 +1301,20 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _openingBalanceAmountController,
-              readOnly: readonly,
+              readOnly: readonly || loading,
               decoration: InputDecoration(
                 labelText: t.personOpeningBalanceAmountLabel,
                 border: const OutlineInputBorder(),
                 suffixText: currencyLabel,
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: readonly
+              inputFormatters: (readonly || loading)
                   ? null
                   : [
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                     ],
               validator: (value) {
-                if (readonly) return null;
+                if (readonly || loading) return null;
                 final raw = (value ?? '').trim();
                 if (raw.isEmpty) return null;
                 final amount = parseFormattedDouble(raw) ??
@@ -1312,20 +1332,31 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               title: Text(t.personOpeningBalanceTypeDebit),
               value: 'debit',
               groupValue: _openingBalanceType,
-              onChanged: readonly ? null : (v) => setState(() => _openingBalanceType = v ?? 'debit'),
+              onChanged: (readonly || loading)
+                  ? null
+                  : (v) => setState(() => _openingBalanceType = v ?? 'debit'),
               contentPadding: EdgeInsets.zero,
             ),
             RadioListTile<String>(
               title: Text(t.personOpeningBalanceTypeCredit),
               value: 'credit',
               groupValue: _openingBalanceType,
-              onChanged: readonly ? null : (v) => setState(() => _openingBalanceType = v ?? 'credit'),
+              onChanged: (readonly || loading)
+                  ? null
+                  : (v) => setState(() => _openingBalanceType = v ?? 'credit'),
               contentPadding: EdgeInsets.zero,
             ),
           ],
         );
       },
     );
+  }
+
+  String _openingBalanceReadonlyWarning(AppLocalizations t, String? statusMessage) {
+    if (statusMessage != null && statusMessage.trim().isNotEmpty) {
+      return statusMessage.trim();
+    }
+    return t.personOpeningBalanceReadonlyBanner;
   }
 
   Widget _buildCreditOverrideSection() {

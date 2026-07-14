@@ -396,9 +396,11 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     }
 
     final eligibility = controller.obEligibility;
+    final loading = controller.obEligibilityLoading;
     final fyTitle = eligibility?['fiscal_year_title']?.toString();
     final statusMessage = eligibility?['message']?.toString();
-    final readonly = !controller.obEditable;
+    final readonly = !loading && eligibility != null && !controller.obEditable;
+    final readonlyWarning = _openingBalanceReadonlyWarning(statusMessage);
     final isMobile = ResponsiveHelper.isMobile(context);
     final spacing = ResponsiveHelper.getGridSpacing(context);
 
@@ -426,49 +428,57 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text('سال مالی: $fyTitle'),
               ),
-            if (statusMessage != null && statusMessage.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  statusMessage,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
             if (readonly)
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  color: Colors.orange.shade50,
+                  border: Border.all(color: Colors.orange.shade200),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       Icons.lock_outline,
                       size: 18,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      color: Colors.orange.shade800,
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: Text(
-                        'تعداد اولیه قابل ویرایش نیست؛ از صفحه تراز افتتاحیه مشاهده کنید.',
+                        readonlyWarning,
+                        style: TextStyle(
+                          color: Colors.orange.shade900,
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
                       ),
                     ),
                   ],
                 ),
               )
-            else
+            else ...[
+              if (statusMessage != null && statusMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    statusMessage,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
               Text(
                 'مقدار در سند تراز افتتاحیه سال مالی جاری ثبت می‌شود. برای ثبت ارزش حسابداری، بهای تمام‌شده را وارد کنید.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
+            ],
             const SizedBox(height: 12),
             if (isMobile) ...[
               TextFormField(
                 controller: _openingQuantityController,
-                readOnly: readonly,
+                readOnly: readonly || loading,
                 decoration: const InputDecoration(
                   labelText: 'تعداد اولیه',
                   hintText: 'مثلاً ۱۰۰',
@@ -478,12 +488,12 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                   const EnglishDigitsFormatter(),
                   ThousandsSeparatorInputFormatter(),
                 ],
-                onChanged: readonly ? null : controller.setOpeningBalanceQuantity,
+                onChanged: (readonly || loading) ? null : controller.setOpeningBalanceQuantity,
               ),
               SizedBox(height: spacing),
               TextFormField(
                 controller: _openingCostPriceController,
-                readOnly: readonly,
+                readOnly: readonly || loading,
                 decoration: const InputDecoration(
                   labelText: 'بهای تمام‌شده (هر واحد)',
                   hintText: 'برای ثبت بدهکار حساب موجودی',
@@ -493,7 +503,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                   const EnglishDigitsFormatter(),
                   ThousandsSeparatorInputFormatter(),
                 ],
-                onChanged: readonly ? null : controller.setOpeningBalanceCostPrice,
+                onChanged: (readonly || loading) ? null : controller.setOpeningBalanceCostPrice,
               ),
             ] else
               Row(
@@ -501,7 +511,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                   Expanded(
                     child: TextFormField(
                       controller: _openingQuantityController,
-                      readOnly: readonly,
+                      readOnly: readonly || loading,
                       decoration: const InputDecoration(
                         labelText: 'تعداد اولیه',
                         hintText: 'مثلاً ۱۰۰',
@@ -511,14 +521,14 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                         const EnglishDigitsFormatter(),
                         ThousandsSeparatorInputFormatter(),
                       ],
-                      onChanged: readonly ? null : controller.setOpeningBalanceQuantity,
+                      onChanged: (readonly || loading) ? null : controller.setOpeningBalanceQuantity,
                     ),
                   ),
                   SizedBox(width: spacing),
                   Expanded(
                     child: TextFormField(
                       controller: _openingCostPriceController,
-                      readOnly: readonly,
+                      readOnly: readonly || loading,
                       decoration: const InputDecoration(
                         labelText: 'بهای تمام‌شده (هر واحد)',
                         hintText: 'برای ثبت بدهکار حساب موجودی',
@@ -528,7 +538,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                         const EnglishDigitsFormatter(),
                         ThousandsSeparatorInputFormatter(),
                       ],
-                      onChanged: readonly ? null : controller.setOpeningBalanceCostPrice,
+                      onChanged: (readonly || loading) ? null : controller.setOpeningBalanceCostPrice,
                     ),
                   ),
                 ],
@@ -1082,6 +1092,14 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
 
   void _updateFormData(ProductFormData newData) {
     widget.onChanged(newData);
+  }
+
+  String _openingBalanceReadonlyWarning(String? statusMessage) {
+    if (statusMessage != null && statusMessage.trim().isNotEmpty) {
+      return statusMessage.trim();
+    }
+    return 'تعداد اولیه و بهای تمام‌شده قابل ویرایش نیستند. '
+        'برای مشاهده یا تغییر از صفحه تراز افتتاحیه استفاده کنید.';
   }
 
   Widget _buildConversionWarning() {
