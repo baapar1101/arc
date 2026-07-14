@@ -2053,9 +2053,15 @@ GRANT CREATE ON SCHEMA public TO hesabix;
 SQL
 }
 
-# pg_restore --no-owner runs as postgres: tables stay owned by postgres without ACLs.
-# Grant and reassign table owners so hesabix (app user) can read/write and see schema checks.
+# pg_restore --no-owner leaves objects owned by postgres without ACLs.
+# Grant and reassign owners so hesabix (app user) can run Alembic and the API.
 hesabix_fixup_seed_object_privileges() {
+  local fixup_script="${DEPLOY_SCRIPT_DIR}/scripts/hesabix_fixup_db_privileges.sh"
+  if [[ -f "${fixup_script}" ]]; then
+    chmod +x "${fixup_script}" 2>/dev/null || true
+    bash "${fixup_script}"
+    return 0
+  fi
   sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
 ALTER SCHEMA public OWNER TO hesabix;
 GRANT ALL ON SCHEMA public TO hesabix;
@@ -2271,6 +2277,8 @@ print('Connection successful')
     log_error "Check ${APP_ROOT}/pg_restore_seed.log or recreate the hesabix database."
     exit 1
   fi
+  log_info "Ensuring hesabix owns public schema objects (Alembic/API access)..."
+  hesabix_fixup_seed_object_privileges
   hesabix_ensure_alembic_version_schema
   log_step "Running Alembic migrations..."
   if ! alembic upgrade head; then

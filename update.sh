@@ -222,6 +222,12 @@ if [[ -f "${ensure_pgvector}" ]]; then
     log_info "pgvector package not installed (non-fatal)."
   fi
 fi
+fixup_db="${APP_ROOT}/app/scripts/hesabix_fixup_db_privileges.sh"
+if [[ -f "${fixup_db}" ]]; then
+  chmod +x "${fixup_db}" 2>/dev/null || true
+  log_info "Ensuring hesabix owns public schema objects (Alembic/API access)..."
+  bash "${fixup_db}"
+fi
 # Ensure alembic_version.version_num is VARCHAR(255) for long revision IDs (fixes StringDataRightTruncation)
 log_info "Ensuring alembic_version schema compatibility..."
 PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -U hesabix -d hesabix -tAc "
