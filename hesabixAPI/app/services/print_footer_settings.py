@@ -8,7 +8,6 @@ from typing import Optional, Tuple
 from sqlalchemy.orm import Session
 
 from adapters.db.models.business_print_settings import BusinessPrintSettings
-from app.core.calendar import CalendarConverter
 
 
 def get_default_print_footer_flags(db: Session, business_id: int) -> Tuple[bool, bool]:
@@ -38,16 +37,13 @@ def build_print_meta_footer_line(
     calendar_type: str,
 ) -> str:
     """همان الگوی فاکتور تک‌صفحه: زمان چاپ | تهیه‌کننده."""
+    from app.core.datetime_utils import format_generated_at_for_pdf
+
     show_t, show_p = get_default_print_footer_flags(db, business_id)
     parts: list[str] = []
-    printed_at_str = ""
     if show_t:
-        try:
-            cal = "jalali" if calendar_type == "jalali" else "gregorian"
-            fd = CalendarConverter.format_datetime(now, cal)
-            printed_at_str = (fd.get("formatted") or fd.get("date_only") or "") or ""
-        except Exception:
-            printed_at_str = now.strftime("%Y/%m/%d %H:%M")
+        cal = "jalali" if calendar_type == "jalali" else "gregorian"
+        printed_at_str = format_generated_at_for_pdf(business_id, cal)
         if printed_at_str:
             footer_label = "زمان چاپ" if is_fa else "Printed at"
             parts.append(f"{footer_label}: {printed_at_str}")

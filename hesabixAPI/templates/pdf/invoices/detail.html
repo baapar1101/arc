@@ -81,23 +81,40 @@
       font-weight: 700;
     }
 
-    .invoice-layout .parties-inner {
-      margin-top: 2px;
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: flex-start;
+    .invoice-layout .party-line {
+      font-size: 9.5px;
+      line-height: 1.4;
+      color: #222;
     }
 
-    .invoice-layout .parties-inner .party-col {
-      flex: 1;
-      min-width: 42%;
+    .invoice-layout .party-line + .party-line {
+      margin-top: 3px;
     }
 
-    .invoice-layout .parties-desc-top {
-      padding-bottom: 8px;
-      margin-bottom: 8px;
-      border-bottom: 1px dashed #999;
+    .invoice-layout .party-line .party-label {
+      font-weight: 700;
+      margin-inline-end: 4px;
+      color: #1e3a5f;
+    }
+
+    .invoice-layout .party-sep {
+      color: #aaa;
+      margin: 0 4px;
+    }
+
+    .invoice-layout .parties-desc-bottom {
+      margin-top: 5px;
+      padding-top: 5px;
+      border-top: 1px dashed #bbb;
+      font-size: 9.5px;
+      line-height: 1.4;
+      color: #222;
+    }
+
+    .invoice-layout .parties-desc-bottom .party-label {
+      font-weight: 700;
+      margin-inline-end: 4px;
+      color: #1e3a5f;
     }
 
     .invoice-layout .payments-list {
@@ -125,85 +142,100 @@
       display: block;
     }
 
-    .invoice-layout .header-top {
-      text-align: center;
+    /* ── هدر فاکتور: تک‌ردیفه و فشرده (سازگار با WeasyPrint) ── */
+    .invoice-layout .inv-header-card {
+      padding: 5px 8px;
+      border-radius: 8px;
       margin-bottom: 6px;
     }
 
-    .invoice-layout .header-logo {
-      margin-right: 16px;
-      margin-left: 32px; /* فاصله بیشتر از سمت متن کنار لوگو */
+    .invoice-layout .inv-header-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
     }
 
-    .invoice-layout .header-logo img {
+    .invoice-layout .inv-header-table td {
+      vertical-align: middle;
+      border: none;
+      padding: 0;
+    }
+
+    .invoice-layout .inv-header-logo-cell {
+      width: 14%;
+      padding-inline-end: 8px;
+    }
+
+    .invoice-layout .inv-header-logo-cell img {
       display: block;
-      margin: 0 auto;
-    }
-
-    .invoice-layout .header-bottom {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .invoice-layout .header-main {
-      flex: 1;
-    }
-
-    .invoice-layout .header-meta-right {
-      flex: 0 1 auto;
-      max-width: 42%;
-      font-size: 10px;
-      display: flex;
-      flex-direction: row;
-      align-items: flex-start;
-      gap: 8px;
-      min-width: 0;
-    }
-
-    /* ترتیب DOM: QR سپس متن — در RTL ردیف عادی، در LTR معکوس تا کد/تاریخ همیشه چپِ QR باشد */
-    html[dir="ltr"] .invoice-layout .header-meta-right {
-      flex-direction: row-reverse;
-    }
-
-    .invoice-layout .header-meta-lines {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      text-align: right;
-      min-width: 0;
-      flex: 1 1 auto;
-    }
-
-    html[dir="ltr"] .invoice-layout .header-meta-lines {
-      text-align: left;
-    }
-
-    .invoice-layout .header-meta-line {
-      display: block;
-      line-height: 1.35;
-      white-space: normal;
-      overflow-wrap: anywhere;
-      word-break: break-word;
-    }
-
-    .invoice-layout .header-meta-line strong {
-      display: inline-block;
-      margin-inline-end: 2px;
-      white-space: nowrap;
-    }
-
-    .invoice-layout .header-qr {
-      flex: 0 0 auto;
-    }
-
-    .invoice-layout .header-qr img {
-      display: block;
-      width: 52px;
-      height: 52px;
+      max-height: 36px;
+      max-width: 80px;
       object-fit: contain;
+    }
+
+    .invoice-layout .inv-header-main-cell {
+      width: auto;
+      padding-inline-end: 6px;
+    }
+
+    .invoice-layout .inv-header-qr-cell {
+      width: 46px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .invoice-layout .inv-header-qr-box img {
+      display: block;
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 1px;
+    }
+
+    .invoice-layout .inv-header-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1e3a5f;
+      margin: 0;
+      line-height: 1.2;
+    }
+
+    .invoice-layout .inv-header-meta {
+      margin-top: 2px;
+      font-size: 9.5px;
+      color: #333;
+      line-height: 1.35;
+    }
+
+    .invoice-layout .inv-header-meta .sep {
+      color: #aaa;
+      margin: 0 5px;
+    }
+
+    .invoice-layout .inv-header-meta b {
+      font-weight: 700;
+      color: #555;
+    }
+
+    .invoice-layout .inv-header-meta .code-value {
+      font-weight: 700;
+      color: #000;
+      direction: ltr;
+      unicode-bidi: embed;
+      display: inline;
+    }
+
+    .invoice-layout .inv-header-badge {
+      display: inline;
+      font-size: 9px;
+      font-weight: 700;
+      color: #366092;
+    }
+
+    .invoice-layout .inv-header-badge.proforma {
+      color: #b45309;
     }
 
     .invoice-layout .footer-info-card {
@@ -292,45 +324,57 @@
       margin-top: 0;
     }
 
-    .invoice-layout .signatures {
-      display: flex;
-      gap: 12px;
-      justify-content: space-between;
-      align-items: flex-end;
+    .invoice-layout .signatures-wrap {
+      margin-top: 6px;
+      page-break-inside: avoid;
     }
 
-    .invoice-layout .signatures-card {
+    .invoice-layout .signatures-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .invoice-layout .signatures-table td {
       border: none;
-      background: transparent;
-      box-shadow: none;
-    }
-
-    .invoice-layout .signature-box {
-      flex: 1;
       text-align: center;
     }
 
-    .invoice-layout .signature-frame {
-      height: 56px;
-      margin: 0 12px 3px 12px;
-      border: 1px solid #000;
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      overflow: hidden;
-      text-align: center;
+    .invoice-layout .sig-images-row td {
+      width: 50%;
+      padding: 0 10px;
+      vertical-align: bottom;
+      line-height: 0;
+      font-size: 0;
     }
 
-    .invoice-layout .signature-frame img {
-      display: block;
-      margin: 0 auto;
+    .invoice-layout .sig-labels-row td {
+      width: 50%;
+      padding: 0 10px 2px;
+      vertical-align: top;
+      line-height: 1.1;
+      font-size: 10px;
+      color: #333;
     }
 
-    .invoice-layout .signature-label {
-      margin-top: 4px;
-      font-size: 11px;
+    .invoice-layout .sig-stamp {
+      display: inline-block;
+      max-width: 160px;
+      width: auto;
+      height: auto;
+      vertical-align: bottom;
+      margin: 0;
+      padding: 0;
+    }
+
+    .invoice-layout .sig-image {
+      display: inline-block;
+      max-width: 140px;
+      width: auto;
+      height: auto;
+      vertical-align: bottom;
+      margin: 0;
+      padding: 0;
     }
 
     .invoice-layout .proforma-watermark {
@@ -445,132 +489,116 @@
         {{ 'پیش‌فاکتور' if is_fa else 'PROFORMA' }}
       </div>
     {% endif %}
-    <div class="section-card">
-      <div class="header">
-        <div class="header-bottom">
+    <div class="section-card inv-header-card">
+      <table class="inv-header-table" cellpadding="0" cellspacing="0">
+        <tr>
           {% if business_logo_data_uri %}
-            <div class="header-logo" style="flex:0 0 auto;">
-              <img src="{{ business_logo_data_uri }}" alt="Logo" style="max-height: 50px; max-width: 110px; object-fit: contain;">
-            </div>
+            <td class="inv-header-logo-cell">
+              <img src="{{ business_logo_data_uri }}" alt="Logo" />
+            </td>
           {% endif %}
-          <div class="header-main">
-            <div class="title">{{ title_text or invoice.title or ('فاکتور' if is_fa else 'Invoice') }}</div>
-            <div class="meta">
-              {{ 'نوع فاکتور' if is_fa else 'Invoice type' }}:
-              {{ invoice.invoice_type_name or '-' }}
-              {% if invoice.is_proforma %}
-                • {{ 'پیش‌فاکتور' if is_fa else 'Proforma' }}
+          <td class="inv-header-main-cell">
+            <div class="inv-header-title">
+              {{ title_text or invoice.title or ('فاکتور' if is_fa else 'Invoice') }}
+            </div>
+            <div class="inv-header-meta">
+              {% if invoice.invoice_type_name %}
+                <span><b>{{ 'نوع فاکتور' if is_fa else 'Invoice type' }}:</b> {{ invoice.invoice_type_name }}</span>
               {% endif %}
+              {% if invoice.is_proforma %}
+                {% if invoice.invoice_type_name %}<span class="sep">|</span>{% endif %}
+                <span class="inv-header-badge proforma">{{ 'پیش‌فاکتور' if is_fa else 'Proforma' }}</span>
+              {% endif %}
+              {% set _currency_display = invoice.currency_title or invoice.currency_name or invoice.currency_code %}
+              {% if _currency_display %}
+                {% if invoice.invoice_type_name or invoice.is_proforma %}<span class="sep">|</span>{% endif %}
+                <span><b>{{ 'واحد پول' if is_fa else 'Currency' }}:</b> {{ _currency_display }}</span>
+              {% endif %}
+              <span class="sep">|</span>
+              <b>{{ 'کد' if is_fa else 'Code' }}:</b>
+              <span class="code-value">{{ invoice.code or '-' }}</span>
+              <span class="sep">|</span>
+              <b>{{ 'تاریخ' if is_fa else 'Date' }}:</b>
+              {{ invoice.issue_date or '-' }}
             </div>
-            {% if invoice.currency_code %}
-              <div class="meta">
-                {{ 'واحد پول' if is_fa else 'Currency' }}:
-                {{ invoice.currency_code }}
+          </td>
+          {% if show_invoice_verify_qr and invoice_verify_qr_data_uri %}
+            <td class="inv-header-qr-cell">
+              <div class="inv-header-qr-box">
+                <img src="{{ invoice_verify_qr_data_uri }}" alt="QR" />
               </div>
-            {% endif %}
-          </div>
-          <div class="header-meta-right">
-            {% if show_invoice_verify_qr and invoice_verify_qr_data_uri %}
-              <div class="header-qr">
-                <img src="{{ invoice_verify_qr_data_uri }}" alt="" />
-              </div>
-            {% endif %}
-            <div class="header-meta-lines">
-              <div class="header-meta-line">
-                <strong>{{ 'کد فاکتور' if is_fa else 'Invoice code' }}:</strong>
-                <span>{{ invoice.code or '-' }}</span>
-              </div>
-              <div class="header-meta-line">
-                <strong>{{ 'تاریخ فاکتور' if is_fa else 'Invoice date' }}:</strong>
-                <span>{{ invoice.issue_date or '-' }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+            </td>
+          {% endif %}
+        </tr>
+      </table>
     </div>
 
     <div class="section-card">
-      <h3 style="margin-top: 0;">{{ 'فروشنده، خریدار و توضیحات' if is_fa else 'Parties & notes' }}</h3>
+      <div class="party-line">
+        <span class="party-label">{{ 'فروشنده' if is_fa else 'Seller' }}:</span>
+        {% if seller.get('name_prefix') %}
+          {{ ((seller.name_prefix ~ ' ' ~ (seller.name or '')) | trim) or '-' }}
+        {% else %}
+          {{ seller.name or '-' }}
+        {% endif %}
+        {% if seller.get('legal_entity_type') %}
+          <span class="party-sep">|</span>{{ seller.legal_entity_type_label or seller.legal_entity_type }}
+        {% endif %}
+        {% if seller.national_id or seller.national_code %}
+          <span class="party-sep">|</span><b>{{ 'کد ملی' if is_fa else 'National ID' }}:</b> {{ seller.national_id or seller.national_code }}
+        {% endif %}
+        {% if seller.economic_id or seller.economic_code %}
+          <span class="party-sep">|</span><b>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</b> {{ seller.economic_id or seller.economic_code }}
+        {% endif %}
+        {% if seller.registration_number %}
+          <span class="party-sep">|</span><b>{{ 'ثبت' if is_fa else 'Reg.' }}:</b> {{ seller.registration_number }}
+        {% endif %}
+        {% if seller.address %}
+          <span class="party-sep">|</span><b>{{ 'آدرس' if is_fa else 'Address' }}:</b> {{ seller.address }}
+        {% endif %}
+        {% if seller.postal_code %}
+          <span class="party-sep">|</span><b>{{ 'کدپستی' if is_fa else 'Postal' }}:</b> {{ seller.postal_code }}
+        {% endif %}
+        {% if seller.phone or seller.mobile %}
+          <span class="party-sep">|</span><b>{{ 'تلفن' if is_fa else 'Phone' }}:</b> {{ seller.phone or seller.mobile }}
+        {% endif %}
+      </div>
+
+      <div class="party-line">
+        <span class="party-label">{{ 'خریدار' if is_fa else 'Buyer' }}:</span>
+        {% if buyer.get('name_prefix') %}
+          {{ ((buyer.name_prefix ~ ' ' ~ (buyer.name or '')) | trim) or '-' }}
+        {% else %}
+          {{ buyer.name or '-' }}
+        {% endif %}
+        {% if buyer.get('legal_entity_type') %}
+          <span class="party-sep">|</span>{{ buyer.legal_entity_type_label or buyer.legal_entity_type }}
+        {% endif %}
+        {% if buyer.economic_id or buyer.economic_code %}
+          <span class="party-sep">|</span><b>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</b> {{ buyer.economic_id or buyer.economic_code }}
+        {% elif buyer.national_id or buyer.national_code %}
+          <span class="party-sep">|</span><b>{{ 'کد ملی' if is_fa else 'National ID' }}:</b> {{ buyer.national_id or buyer.national_code }}
+        {% endif %}
+        {% if buyer.registration_number %}
+          <span class="party-sep">|</span><b>{{ 'ثبت' if is_fa else 'Reg.' }}:</b> {{ buyer.registration_number }}
+        {% endif %}
+        {% if buyer.address %}
+          <span class="party-sep">|</span><b>{{ 'آدرس' if is_fa else 'Address' }}:</b> {{ buyer.address }}
+        {% endif %}
+        {% if buyer.postal_code %}
+          <span class="party-sep">|</span><b>{{ 'کدپستی' if is_fa else 'Postal' }}:</b> {{ buyer.postal_code }}
+        {% endif %}
+        {% if buyer.mobile or buyer.phone %}
+          <span class="party-sep">|</span><b>{{ 'تلفن' if is_fa else 'Phone' }}:</b> {{ buyer.mobile or buyer.phone }}
+        {% endif %}
+      </div>
+
       {% if invoice.description %}
-        <div class="parties-desc-top">
-          <div class="meta" style="margin-bottom: 2px; font-weight: bold;">
-            {{ 'توضیحات فاکتور' if is_fa else 'Invoice notes' }}:
-          </div>
-          <div class="meta">{{ invoice.description }}</div>
+        <div class="parties-desc-bottom">
+          <span class="party-label">{{ 'توضیحات فاکتور' if is_fa else 'Invoice notes' }}:</span>
+          {{ invoice.description }}
         </div>
       {% endif %}
-      <div class="parties-inner">
-        <div class="party-col">
-          <div class="meta" style="font-weight:bold; margin-bottom:4px; font-size: 12px;">
-            {{ 'مشخصات فروشنده' if is_fa else 'Seller details' }}
-          </div>
-          <div class="meta" style="line-height: 1.4;">
-            <div><strong>{{ 'نام' if is_fa else 'Name' }}:</strong>
-              {% if seller.get('name_prefix') %}
-                {{ ((seller.name_prefix ~ ' ' ~ (seller.name or '')) | trim) or '-' }}
-              {% else %}
-                {{ seller.name or '-' }}
-              {% endif %}
-            </div>
-            {% if seller.get('legal_entity_type') %}
-              <div><strong>{{ 'نوع' if is_fa else 'Type' }}:</strong> {{ seller.legal_entity_type_label or seller.legal_entity_type }}</div>
-            {% endif %}
-            {% if seller.national_id or seller.national_code %}
-              <div><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ seller.national_id or seller.national_code }}</div>
-            {% endif %}
-            {% if seller.economic_id or seller.economic_code %}
-              <div><strong>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</strong> {{ seller.economic_id or seller.economic_code }}</div>
-            {% endif %}
-            {% if seller.registration_number %}
-              <div><strong>{{ 'شماره ثبت' if is_fa else 'Registration no.' }}:</strong> {{ seller.registration_number }}</div>
-            {% endif %}
-            {% if seller.address %}
-              <div><strong>{{ 'آدرس' if is_fa else 'Address' }}:</strong> {{ seller.address }}</div>
-            {% endif %}
-            {% if seller.postal_code %}
-              <div><strong>{{ 'کدپستی' if is_fa else 'Postal code' }}:</strong> {{ seller.postal_code }}</div>
-            {% endif %}
-            {% if seller.phone or seller.mobile %}
-              <div><strong>{{ 'تلفن' if is_fa else 'Phone' }}:</strong> {{ seller.phone or seller.mobile }}</div>
-            {% endif %}
-          </div>
-        </div>
-        <div class="party-col" style="border-inline-start: 1px dashed #ccc; padding-inline-start: 12px;">
-          <div class="meta" style="font-weight:bold; margin-bottom:4px; font-size: 12px;">
-            {{ 'مشخصات خریدار' if is_fa else 'Buyer details' }}
-          </div>
-          <div class="meta" style="line-height: 1.4;">
-            <div><strong>{{ 'نام' if is_fa else 'Name' }}:</strong>
-              {% if buyer.get('name_prefix') %}
-                {{ ((buyer.name_prefix ~ ' ' ~ (buyer.name or '')) | trim) or '-' }}
-              {% else %}
-                {{ buyer.name or '-' }}
-              {% endif %}
-            </div>
-            {% if buyer.get('legal_entity_type') %}
-              <div><strong>{{ 'نوع' if is_fa else 'Type' }}:</strong> {{ buyer.legal_entity_type_label or buyer.legal_entity_type }}</div>
-            {% endif %}
-            {% if buyer.economic_id or buyer.economic_code %}
-              <div><strong>{{ 'شناسه اقتصادی' if is_fa else 'Economic ID' }}:</strong> {{ buyer.economic_id or buyer.economic_code }}</div>
-            {% elif buyer.national_id or buyer.national_code %}
-              <div><strong>{{ 'کد/شناسه ملی' if is_fa else 'National ID' }}:</strong> {{ buyer.national_id or buyer.national_code }}</div>
-            {% endif %}
-            {% if buyer.registration_number %}
-              <div><strong>{{ 'شماره ثبت' if is_fa else 'Registration no.' }}:</strong> {{ buyer.registration_number }}</div>
-            {% endif %}
-            {% if buyer.address %}
-              <div><strong>{{ 'آدرس' if is_fa else 'Address' }}:</strong> {{ buyer.address }}</div>
-            {% endif %}
-            {% if buyer.postal_code %}
-              <div><strong>{{ 'کدپستی' if is_fa else 'Postal code' }}:</strong> {{ buyer.postal_code }}</div>
-            {% endif %}
-            {% if buyer.mobile or buyer.phone %}
-              <div><strong>{{ 'تلفن' if is_fa else 'Phone' }}:</strong> {{ buyer.mobile or buyer.phone }}</div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
     </div>
 
     <div class="section-card table-card">
@@ -846,34 +874,36 @@
     {% set _show_sig_seller = show_seller_signature_area | default(true) %}
     {% set _show_sig_buyer = show_buyer_signature_area | default(true) %}
     {% if _show_sig_seller or _show_sig_buyer %}
-      <div class="section-card signatures-card">
-        <div class="signatures">
-          {% if _show_sig_seller %}
-            <div class="signature-box">
-              <div class="signature-frame">
+      <div class="signatures-wrap">
+        <table class="signatures-table" cellpadding="0" cellspacing="0">
+          <tr class="sig-images-row">
+            {% if _show_sig_seller %}
+              <td>
                 {% if business_stamp_data_uri %}
-                  <img src="{{ business_stamp_data_uri }}" alt="Stamp" style="max-height: 60px; max-width: 140px; object-fit: contain; opacity: 0.95;">
+                  <img class="sig-stamp" src="{{ business_stamp_data_uri }}" alt="Stamp" />
                 {% endif %}
                 {% if owner_signature_data_uri %}
-                  <img src="{{ owner_signature_data_uri }}" alt="Owner signature" style="max-height: 40px; max-width: 140px; object-fit: contain; margin-top: 4px;">
+                  <img class="sig-image" src="{{ owner_signature_data_uri }}" alt="Owner signature" />
                 {% endif %}
-              </div>
-              <div class="signature-label">
+              </td>
+            {% endif %}
+            {% if _show_sig_buyer %}
+              <td>&nbsp;</td>
+            {% endif %}
+          </tr>
+          <tr class="sig-labels-row">
+            {% if _show_sig_seller %}
+              <td>
                 {{ 'امضای فروشنده / مهر شرکت' if is_fa else 'Seller signature / Company stamp' }}
-              </div>
-            </div>
-          {% endif %}
-          {% if _show_sig_buyer %}
-            <div class="signature-box">
-              <div class="signature-frame">
-                <!-- امضای خریدار -->
-              </div>
-              <div class="signature-label">
+              </td>
+            {% endif %}
+            {% if _show_sig_buyer %}
+              <td>
                 {{ 'امضای خریدار' if is_fa else 'Buyer signature' }}
-              </div>
-            </div>
-          {% endif %}
-        </div>
+              </td>
+            {% endif %}
+          </tr>
+        </table>
       </div>
     {% endif %}
 

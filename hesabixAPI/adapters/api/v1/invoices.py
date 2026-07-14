@@ -2344,7 +2344,7 @@ async def export_single_invoice_pdf(
         "installment_plan": installment_plan,
         "invoice_date_jalali": invoice_date_jalali,
         "invoice_date_gregorian": invoice_date_gregorian,
-        "generated_at": datetime.datetime.now(),
+        "generated_at": None,  # پایین‌تر با timezone کسب‌وکار پر می‌شود
         "is_fa": is_fa,
         "issuer_name": issuer_name,
         "fa_font_url_regular": fa_font_url_regular,
@@ -2402,32 +2402,36 @@ async def export_single_invoice_pdf(
     # حالت پیش‌فرض صفحه برای فاکتور: افقی (landscape)، مگر این‌که صراحتاً چیز دیگری ارسال شده باشد
     if not orientation:
         orientation = "landscape"
-    # متن فوتر با زمان چاپ (بر اساس تقویم انتخاب‌شده کاربر) و نام تهیه‌کنندهٔ سند
+    # متن فوتر با زمان چاپ (timezone کسب‌وکار + تقویم کاربر) و نام تهیه‌کنندهٔ سند
     try:
-        now = template_context["generated_at"]
+        from app.core.datetime_utils import (
+            business_wall_clock_now,
+            export_filename_timestamp,
+            format_generated_at_for_pdf,
+        )
+
+        generated_at_now = business_wall_clock_now(business_id)
+        template_context["generated_at"] = generated_at_now
+
         footer_text = ""
         show_ft = bool(print_settings.get("show_footer_print_time", True))
         show_prep = bool(print_settings.get("show_footer_preparer", True))
-        if isinstance(now, datetime.datetime):
-            footer_label = "زمان چاپ" if is_fa else "Printed at"
-            preparer_label = "تهیه‌کننده" if is_fa else "Prepared by"
-            printed_at_str = ""
-            try:
-                if calendar_type == "jalali":
-                    fd = CalendarConverter.format_datetime(now, "jalali")
-                else:
-                    fd = CalendarConverter.format_datetime(now, "gregorian")
-                printed_at_str = fd.get("formatted") or fd.get("date_only", "") or ""
-            except Exception:
-                printed_at_str = now.strftime("%Y/%m/%d %H:%M")
-            parts: List[str] = []
-            if show_ft and printed_at_str:
+        parts: List[str] = []
+        if show_ft:
+            printed_at_str = format_generated_at_for_pdf(business_id, calendar_type)
+            if printed_at_str:
+                footer_label = "زمان چاپ" if is_fa else "Printed at"
                 parts.append(f"{footer_label}: {printed_at_str}")
-            if show_prep and issuer_name:
-                parts.append(f"{preparer_label}: {issuer_name}")
-            footer_text = " | ".join(parts)
+        if show_prep and issuer_name:
+            preparer_label = "تهیه‌کننده" if is_fa else "Prepared by"
+            parts.append(f"{preparer_label}: {issuer_name}")
+        footer_text = " | ".join(parts)
+        pdf_filename_ts = export_filename_timestamp(business_id)
     except Exception:
         footer_text = ""
+        pdf_filename_ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        if template_context.get("generated_at") is None:
+            template_context["generated_at"] = datetime.datetime.now()
 
     default_ctx = {
         **template_context,
@@ -2444,7 +2448,7 @@ async def export_single_invoice_pdf(
     # نام فایل
     def _slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "invoice"
-    filename = f"invoice_{_slugify(item.get('code'))}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"invoice_{_slugify(item.get('code'))}_{pdf_filename_ts}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -4667,9 +4671,9 @@ async def export_invoices_pdf(
     except Exception:
         cal_type = "jalali" if is_fa else "gregorian"
     try:
-        _now = datetime.datetime.now()
-        _fd = CalendarConverter.format_datetime(_now, cal_type)
-        now = _fd.get("formatted") or _fd.get("date_only") or _now.strftime('%Y/%m/%d %H:%M')
+        from app.core.datetime_utils import format_generated_at_for_pdf
+
+        now = format_generated_at_for_pdf(business_id, cal_type)
     except Exception:
         now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
     title_text = "لیست فاکتورها" if is_fa else "Invoices List"

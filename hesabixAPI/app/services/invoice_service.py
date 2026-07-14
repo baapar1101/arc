@@ -6821,6 +6821,8 @@ def invoice_document_to_dict(
         "registered_at": utc_naive_to_iso_z(document.registered_at),
         "currency_id": document.currency_id,
         "currency_code": getattr(currency, "code", None),
+        "currency_title": getattr(currency, "title", None) if currency else None,
+        "currency_name": getattr(currency, "name", None) if currency else None,
         "created_by_user_id": document.created_by_user_id,
         "created_by_name": created_by_name,
         "is_proforma": document.is_proforma,
