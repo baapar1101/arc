@@ -36,6 +36,7 @@ def build_language_context_prompt_block(language: str = "fa") -> str:
 
 - Current conversation language: **English**
 - All user-visible text must be in English: final answer, pre-tool narration, reasoning, step summaries, findings, and any analysis-panel content.
+- **Reasoning text is shown directly to the user in the UI** — every reasoning token, live thinking stream, and narration must be in English for this session.
 - Even if raw tool data or API field names are non-English, explain and analyze in English.
 - Do not write analytical paragraphs in Persian or mixed languages.
 - Match the language of the user's latest message; default to English for this session.
@@ -46,6 +47,7 @@ def build_language_context_prompt_block(language: str = "fa") -> str:
 
 - زبان مکالمهٔ فعلی: **فارسی**
 - تمام متن‌های قابل‌مشاهده برای کاربر باید فارسی باشد: پاسخ نهایی، narration قبل از فراخوانی ابزار، استدلال، خلاصهٔ مراحل، یافته‌ها و هر متن داخل پنل تحلیل.
+- **متن استدلال (reasoning) مستقیماً در UI به کاربر نمایش داده می‌شود** — هر توکن استدلال، جریان تفکر زنده و narration باید فارسی باشد؛ استدلال انگلیسی ممنوع است.
 - حتی اگر دادهٔ خام ابزار یا نام فیلد API انگلیسی است، توضیح و تحلیل را فارسی بنویس.
 - از نوشتن جملات یا پاراگراف‌های تحلیلی به انگلیسی خودداری کن.
 - با زبان آخرین پیام کاربر هماهنگ بمان؛ برای این نشست پیش‌فرض فارسی است.

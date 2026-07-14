@@ -110,6 +110,7 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
                   theme: theme,
                   scheme: scheme,
                   compact: widget.compact,
+                  l10n: l10n,
                 ),
             ],
           ),
@@ -125,6 +126,7 @@ class _TraceStepTile extends StatefulWidget {
   final ThemeData theme;
   final ColorScheme scheme;
   final bool compact;
+  final AppLocalizations l10n;
 
   const _TraceStepTile({
     required this.step,
@@ -133,6 +135,7 @@ class _TraceStepTile extends StatefulWidget {
     required this.theme,
     required this.scheme,
     required this.compact,
+    required this.l10n,
   });
 
   @override
@@ -157,6 +160,8 @@ class _TraceStepTileState extends State<_TraceStepTile> {
         return Icons.route_outlined;
       case 'narrative':
         return Icons.record_voice_over_outlined;
+      case 'reasoning':
+        return Icons.psychology_alt_outlined;
       case 'tool':
         return Icons.build_circle_outlined;
       case 'observation':
@@ -176,6 +181,7 @@ class _TraceStepTileState extends State<_TraceStepTile> {
     final body = step.bodyMarkdown?.trim() ?? '';
     final hasBody = body.isNotEmpty &&
         (step.kind == 'narrative' ||
+            step.kind == 'reasoning' ||
             step.kind == 'plan' ||
             step.kind == 'observation' ||
             step.kind == 'explored' ||
@@ -185,6 +191,7 @@ class _TraceStepTileState extends State<_TraceStepTile> {
 
     final showBodyAlways = hasBody &&
         (step.kind == 'narrative' ||
+            step.kind == 'reasoning' ||
             step.kind == 'plan' ||
             step.kind == 'explored' ||
             step.kind == 'thought' ||
@@ -286,7 +293,7 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                             (step.kind == 'thought')) ...[
                           const SizedBox(width: 4),
                           _Badge(
-                            label: _confidenceLabel(step.confidence!),
+                            label: _confidenceLabel(widget.l10n, step.confidence!),
                             icon: Icons.verified_outlined,
                             color: _confidenceColor(scheme, step.confidence!),
                             scheme: scheme,
@@ -376,7 +383,7 @@ class _BodyContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kind != 'thought' && kind != 'explored' && kind != 'system') {
+    if (kind != 'thought' && kind != 'explored' && kind != 'system' && kind != 'reasoning') {
       return MarkdownBody(
         data: body,
         selectable: true,
@@ -391,7 +398,7 @@ class _BodyContent extends StatelessWidget {
         ),
       );
     }
-    final accent = kind == 'thought' || kind == 'system'
+    final accent = kind == 'thought' || kind == 'system' || kind == 'reasoning'
         ? scheme.primary
         : scheme.secondary;
     return AIThinkingScrollBox(
@@ -454,14 +461,14 @@ Color _confidenceColor(ColorScheme scheme, String confidence) {
   }
 }
 
-String _confidenceLabel(String confidence) {
+String _confidenceLabel(AppLocalizations l10n, String confidence) {
   switch (confidence) {
     case 'high':
-      return 'اطمینان بالا';
+      return l10n.aiConfidenceHigh;
     case 'low':
-      return 'داده ناکافی';
+      return l10n.aiConfidenceLow;
     default:
-      return 'نیازمند بررسی';
+      return l10n.aiConfidenceMedium;
   }
 }
 

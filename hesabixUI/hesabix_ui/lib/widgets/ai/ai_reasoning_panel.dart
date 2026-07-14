@@ -115,8 +115,8 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
         : reasoning.isNotEmpty
             ? l10n.aiReasoningPanelTitle
             : widget.agentBudget != null
-                ? 'بودجه تحلیل'
-                : 'ابزارهای استفاده‌شده';
+                ? l10n.aiReasoningBudgetTitle
+                : l10n.aiReasoningToolsUsedTitle;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -10398,6 +10398,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiReasoningPanelTitle => 'Reasoning & analysis steps';
 
   @override
+  String get aiReasoningBudgetTitle => 'Analysis budget';
+
+  @override
+  String get aiReasoningToolsUsedTitle => 'Tools used';
+
+  @override
+  String get aiTraceReasoning => 'Thinking…';
+
+  @override
+  String get aiConfidenceHigh => 'High confidence';
+
+  @override
+  String get aiConfidenceMedium => 'Needs review';
+
+  @override
+  String get aiConfidenceLow => 'Insufficient data';
+
+  @override
+  String get aiStatusAwaitingApproval =>
+      'Waiting for your approval to proceed';
+
+  @override
   String get aiAnswerPanelTitle => 'Final answer';
 
   @override

@@ -10338,6 +10338,28 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiReasoningPanelTitle => 'استدلال و مراحل تحلیل';
 
   @override
+  String get aiReasoningBudgetTitle => 'بودجه تحلیل';
+
+  @override
+  String get aiReasoningToolsUsedTitle => 'ابزارهای استفاده‌شده';
+
+  @override
+  String get aiTraceReasoning => 'در حال تفکر…';
+
+  @override
+  String get aiConfidenceHigh => 'اطمینان بالا';
+
+  @override
+  String get aiConfidenceMedium => 'نیازمند بررسی';
+
+  @override
+  String get aiConfidenceLow => 'داده ناکافی';
+
+  @override
+  String get aiStatusAwaitingApproval =>
+      'منتظر تأیید شما برای اجرای عملیات';
+
+  @override
   String get aiAnswerPanelTitle => 'پاسخ نهایی';
 
   @override

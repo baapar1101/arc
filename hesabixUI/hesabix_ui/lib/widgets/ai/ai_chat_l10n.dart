@@ -426,7 +426,7 @@ String aiStreamStatusLabel(
       );
       return l10n.aiStatusRunningTool(label);
     case 'awaiting_approval':
-      return 'منتظر تأیید شما برای اجرای عملیات';
+      return l10n.aiStatusAwaitingApproval;
     case 'preparing_context':
       switch (step) {
         case 'loading_prompt':
@@ -497,6 +497,8 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       );
     case 'aiStatusThinking':
       return l10n.aiStatusThinking;
+    case 'aiTraceReasoning':
+      return l10n.aiTraceReasoning;
     case 'aiStatusLoadingPrompt':
       return l10n.aiStatusLoadingPrompt;
     case 'aiStatusLoadingInsights':
@@ -530,7 +532,7 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
         return l10n.aiTraceThought('${step.findingsCount ?? 0}');
       }
       if (step.kind == 'approval') {
-        return 'منتظر تأیید شما';
+        return l10n.aiStatusAwaitingApproval;
       }
       if (step.tool != null) {
         return aiToolLabel(l10n, step.tool!, toolKey: step.toolKey);

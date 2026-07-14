@@ -19380,6 +19380,48 @@ abstract class AppLocalizations {
   /// **'Reasoning & analysis steps'**
   String get aiReasoningPanelTitle;
 
+  /// No description provided for @aiReasoningBudgetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis budget'**
+  String get aiReasoningBudgetTitle;
+
+  /// No description provided for @aiReasoningToolsUsedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools used'**
+  String get aiReasoningToolsUsedTitle;
+
+  /// No description provided for @aiTraceReasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get aiTraceReasoning;
+
+  /// No description provided for @aiConfidenceHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High confidence'**
+  String get aiConfidenceHigh;
+
+  /// No description provided for @aiConfidenceMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs review'**
+  String get aiConfidenceMedium;
+
+  /// No description provided for @aiConfidenceLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient data'**
+  String get aiConfidenceLow;
+
+  /// No description provided for @aiStatusAwaitingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your approval to proceed'**
+  String get aiStatusAwaitingApproval;
+
   /// No description provided for @aiAnswerPanelTitle.
   ///
   /// In en, this message translates to:
