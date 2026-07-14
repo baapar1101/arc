@@ -69,21 +69,78 @@
     }
   }
 
-  function detectLocale() {
-    var saved = storageGet('flutter.app_locale_code');
-    if (saved) {
-      var code = saved.split('-')[0].toLowerCase();
-      if (code === 'en' || code === 'fa') return code;
+  /** Flutter web SharedPreferences مقادیر را JSON-encoded ذخیره می‌کند. */
+  function parseStoredValue(raw) {
+    if (raw == null || raw === '') return null;
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return raw;
     }
-    var nav = (navigator.language || 'fa').toLowerCase();
-    return nav.indexOf('en') === 0 ? 'en' : 'fa';
+  }
+
+  function normalizeLangCode(value) {
+    if (value == null) return null;
+    var s = String(value).trim().replace(/^["']|["']$/g, '');
+    if (!s) return null;
+    var code = s.split('-')[0].toLowerCase();
+    if (code === 'en' || code === 'fa') return code;
+    return null;
+  }
+
+  function readLocaleFromStorage() {
+    var keys = [
+      'hesabix_locale',
+      'flutter.app_locale_code',
+      'flutter.String.app_locale_code',
+    ];
+    for (var i = 0; i < keys.length; i++) {
+      var raw = storageGet(keys[i]);
+      var parsed = parseStoredValue(raw);
+      var code = normalizeLangCode(parsed != null ? parsed : raw);
+      if (code) return code;
+    }
+    return null;
+  }
+
+  function detectLocale() {
+    var fromStorage = readLocaleFromStorage();
+    if (fromStorage) return fromStorage;
+    return 'fa';
+  }
+
+  function readThemeModeFromStorage() {
+    var keys = ['hesabix_theme_mode', 'flutter.theme_mode'];
+    for (var i = 0; i < keys.length; i++) {
+      var raw = storageGet(keys[i]);
+      if (raw == null || raw === '') continue;
+      var parsed = parseStoredValue(raw);
+      var n = parseInt(parsed != null ? parsed : raw, 10);
+      if (!isNaN(n) && n >= 0 && n <= 2) return n;
+    }
+    return null;
   }
 
   function detectDark() {
-    var mode = storageGet('flutter.theme_mode');
-    if (mode === '2') return true;
-    if (mode === '1') return false;
+    var mode = readThemeModeFromStorage();
+    if (mode === 2) return true;
+    if (mode === 1) return false;
+    if (mode === 0) {
+      return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  function applyDocumentLocale(loc) {
+    var isEn = loc === 'en';
+    var root = document.documentElement;
+    root.setAttribute('lang', isEn ? 'en' : 'fa');
+    root.setAttribute('dir', isEn ? 'ltr' : 'rtl');
+    if (document.body) {
+      document.body.setAttribute('dir', isEn ? 'ltr' : 'rtl');
+    }
+    var screen = document.getElementById('flutter-loading-screen');
+    if (screen) screen.setAttribute('dir', isEn ? 'ltr' : 'rtl');
   }
 
   function t() {
@@ -93,10 +150,11 @@
 
   function applyTheme() {
     var root = document.documentElement;
+    var loc = detectLocale();
     var dark = detectDark();
+    applyDocumentLocale(loc);
     root.setAttribute('data-loader-theme', dark ? 'dark' : 'light');
-    root.setAttribute('lang', detectLocale() === 'en' ? 'en' : 'fa');
-    root.setAttribute('dir', detectLocale() === 'en' ? 'ltr' : 'rtl');
+    root.setAttribute('data-loader-locale', loc);
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', dark ? '#0B1520' : BRAND);
   }
@@ -105,7 +163,16 @@
     var s = t();
     var map = {
       'loader-title': s.title,
+      'loader-brand-title': s.title,
+      'loader-subtitle': s.subtitle,
+      'loader-brand-subtitle': s.subtitle,
       'loading-status': s.statusDefault,
+      'loader-trust-cloud': s.trustCloud,
+      'loader-trust-secure': s.trustSecure,
+      'loader-trust-support': s.trustSupport,
+      'loader-trust-cloud-m': s.trustCloud,
+      'loader-trust-secure-m': s.trustSecure,
+      'loader-trust-support-m': s.trustSupport,
       'loader-step-0-label': s.stepConnect,
       'loader-step-1-label': s.stepAssets,
       'loader-step-2-label': s.stepReady,
@@ -118,9 +185,10 @@
     var quoteEl = document.getElementById('loading-quote-text');
     if (quoteEl && s.quotes.length) quoteEl.textContent = s.quotes[0];
 
-    document.querySelectorAll('.loader-logo').forEach(function (logo) {
+    var logo = document.querySelector('.loader-logo');
+    if (logo) {
       logo.src = detectDark() ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png';
-    });
+    }
   }
 
   function applyLoadingPhase(phase) {
@@ -128,8 +196,6 @@
     var p = parseInt(phase, 10);
     if (isNaN(p)) p = 0;
     p = Math.max(0, Math.min(2, p));
-    var skel = document.querySelector('.app-skeleton');
-    if (skel) skel.setAttribute('data-phase', String(p));
     for (var i = 0; i < steps.length; i++) {
       var el = steps[i];
       var idx = parseInt(el.getAttribute('data-step') || String(i), 10);
@@ -157,10 +223,7 @@
     var clamped = Math.max(0, Math.min(100, percent));
     bar.style.width = clamped + '%';
     var pctEl = document.getElementById('loading-progress-pct');
-    if (pctEl) {
-      pctEl.textContent = Math.round(clamped) + '%';
-      pctEl.setAttribute('aria-hidden', 'false');
-    }
+    if (pctEl) pctEl.textContent = Math.round(clamped) + '%';
   }
 
   function setStatus(line) {
@@ -226,16 +289,11 @@
     if (!loadingScreen) return;
     stopQuoteRotation();
     loadingScreen.setAttribute('aria-busy', 'false');
-    loadingScreen.classList.add('is-exiting');
     loadingScreen.classList.add('hidden');
-    var dark = detectDark();
-    try {
-      document.body.style.backgroundColor = dark ? '#101c2a' : '#f4f7fb';
-    } catch (_) {}
     setTimeout(function () {
       loadingScreen.remove();
       document.body.classList.add('flutter-ready');
-    }, 460);
+    }, 420);
   }
 
   window.__hesabixLoaderUI = {
@@ -267,22 +325,6 @@
 
     setTimeout(markSlowLoad, SLOW_MS);
     setTimeout(showRetry, RETRY_MS);
-
-    if (window.matchMedia) {
-      var mq = window.matchMedia('(prefers-color-scheme: dark)');
-      var onScheme = function () {
-        var mode = storageGet('flutter.theme_mode');
-        if (mode === null || mode === '0') {
-          applyTheme();
-          applyStaticCopy();
-        }
-      };
-      if (typeof mq.addEventListener === 'function') {
-        mq.addEventListener('change', onScheme);
-      } else if (typeof mq.addListener === 'function') {
-        mq.addListener(onScheme);
-      }
-    }
   }
 
   if (document.readyState === 'loading') {

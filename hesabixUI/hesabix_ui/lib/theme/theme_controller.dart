@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_client.dart';
 import '../services/admin_system_settings_service.dart';
+import '../utils/web/loader_prefs_sync.dart';
 
 class ThemeController extends ChangeNotifier {
   static const String _modeKey = 'theme_mode';
@@ -52,12 +53,14 @@ class ThemeController extends ChangeNotifier {
     
     final seed = p.getInt(_seedKey);
     if (seed != null) _seed = Color(seed);
+    syncLoaderThemeMode(_mode.index);
     notifyListeners();
   }
 
   Future<void> setMode(ThemeMode m) async {
     if (_mode == m) return;
     _mode = m;
+    syncLoaderThemeMode(m.index);
     notifyListeners();
     final p = await SharedPreferences.getInstance();
     await p.setInt(_modeKey, m.index);

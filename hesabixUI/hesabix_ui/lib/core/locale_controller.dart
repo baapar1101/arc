@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../utils/web/loader_prefs_sync.dart';
+
 class LocaleController extends ChangeNotifier {
   static const String _prefsKey = 'app_locale_code';
 
@@ -25,12 +27,14 @@ class LocaleController extends ChangeNotifier {
         initial = Locale(parts[0], parts.length > 1 ? parts[1] : null);
       }
     }
+    syncLoaderLocale(initial);
     return LocaleController._(initial);
   }
 
   Future<void> setLocale(Locale locale) async {
     if (_locale == locale) return;
     _locale = locale;
+    syncLoaderLocale(locale);
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     final String code = locale.countryCode != null && locale.countryCode!.isNotEmpty
