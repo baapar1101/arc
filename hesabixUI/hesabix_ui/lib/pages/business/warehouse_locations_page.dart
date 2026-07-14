@@ -334,6 +334,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
                           autoGenerateCode: existing == null,
                           warehouseLocationCode: true,
                           showAutoManualToggle: existing == null,
+                          showInlineAutoToggle: existing == null,
                           isRequired: true,
                           label: 'کد محل',
                           hintText: 'مثال: LOC-20260419-0001',

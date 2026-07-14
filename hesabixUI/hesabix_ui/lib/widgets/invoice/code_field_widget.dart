@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 
+import 'invoice_form_layout.dart';
+
 class CodeFieldWidget extends StatefulWidget {
   final String? initialValue;
   final ValueChanged<String?> onChanged;
@@ -17,6 +19,8 @@ class CodeFieldWidget extends StatefulWidget {
   final ValueChanged<bool>? onAutoGenerateChanged;
   /// اگر false باشد، سوئیچ خودکار/دستی نمایش داده نمی‌شود (مثلاً در ویرایش).
   final bool showAutoManualToggle;
+  /// سویچ خودکار/دستی داخل suffix فیلد؛ در فرم فاکتور بیرون فیلد نمایش داده می‌شود.
+  final bool showInlineAutoToggle;
 
   const CodeFieldWidget({
     super.key,
@@ -30,6 +34,7 @@ class CodeFieldWidget extends StatefulWidget {
     this.warehouseLocationCode = false,
     this.onAutoGenerateChanged,
     this.showAutoManualToggle = true,
+    this.showInlineAutoToggle = false,
   });
 
   @override
@@ -69,36 +74,36 @@ class _CodeFieldWidgetState extends State<CodeFieldWidget> {
       controller: _controller,
       readOnly: widget.showAutoManualToggle && _autoGenerateCode,
       inputFormatters: formatters.isEmpty ? null : formatters,
-      decoration: InputDecoration(
-        labelText: widget.label ?? t.code,
-        hintText: widget.hintText ?? t.uniqueCodeNumeric,
-        suffixIcon: widget.showAutoManualToggle
-            ? Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    child: Tooltip(
-                      message: _autoGenerateCode ? 'تولید خودکار کد فعال است' : 'تولید دستی کد فعال است',
-                      child: Switch(
-                        value: _autoGenerateCode,
-                        onChanged: (value) {
-                          setState(() {
-                            _autoGenerateCode = value;
-                            if (_autoGenerateCode) {
-                              _controller.clear();
-                              widget.onChanged(null);
-                            }
-                            widget.onAutoGenerateChanged?.call(_autoGenerateCode);
-                          });
-                        },
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                    ),
+      decoration: InvoiceFormFieldMetrics.mergeDecoration(
+        context,
+        InputDecoration(
+          labelText: widget.label ?? t.code,
+          hintText: widget.hintText ?? t.uniqueCodeNumeric,
+          suffixIcon: widget.showAutoManualToggle && widget.showInlineAutoToggle
+              ? Tooltip(
+                  message: _autoGenerateCode
+                      ? 'تولید خودکار کد فعال است'
+                      : 'تولید دستی کد فعال است',
+                  child: Switch(
+                    value: _autoGenerateCode,
+                    onChanged: (value) {
+                      setState(() {
+                        _autoGenerateCode = value;
+                        if (_autoGenerateCode) {
+                          _controller.clear();
+                          widget.onChanged(null);
+                        }
+                        widget.onAutoGenerateChanged?.call(_autoGenerateCode);
+                      });
+                    },
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                ],
-              )
-            : null,
+                )
+              : null,
+          suffixIconConstraints: widget.showInlineAutoToggle
+              ? InvoiceFormFieldMetrics.suffixIconConstraints
+              : null,
+        ),
       ),
       keyboardType: TextInputType.text,
       onChanged: (value) {

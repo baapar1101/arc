@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 
+import 'invoice_form_layout.dart';
+
 String invoiceFxFormatRowLabel(AppLocalizations t, Map<String, dynamic> e) {
   final rawRate = e['rate'];
   final rate = rawRate == null ? '—' : formatFxRateForDisplay(rawRate);
@@ -25,6 +27,7 @@ class InvoiceFxRateField extends StatefulWidget {
     required this.manualRateId,
     required this.rateRows,
     this.onChanged,
+    this.reserveLayoutSlot = false,
   });
 
   final bool show;
@@ -32,6 +35,8 @@ class InvoiceFxRateField extends StatefulWidget {
   final int? manualRateId;
   final List<Map<String, dynamic>> rateRows;
   final ValueChanged<int?>? onChanged;
+  /// اگر true باشد و [show] false، جای فیلد حفظ می‌شود تا چیدمان نپرد.
+  final bool reserveLayoutSlot;
 
   @override
   State<InvoiceFxRateField> createState() => _InvoiceFxRateFieldState();
@@ -112,7 +117,7 @@ class _InvoiceFxRateFieldState extends State<InvoiceFxRateField> {
                             ListTile(
                               title: Text(t.invoiceFxRateAuto),
                               leading: const Icon(Icons.auto_fix_high),
-                              onTap: () => Navigator.of(ctx).pop(-1), // sentin
+                              onTap: () => Navigator.of(ctx).pop(-1),
                             ),
                             const Divider(height: 1),
                             ...() {
@@ -182,34 +187,39 @@ class _InvoiceFxRateFieldState extends State<InvoiceFxRateField> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.show) {
+    if (!widget.show && !widget.reserveLayoutSlot) {
       return const SizedBox.shrink();
     }
+
     final t = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (widget.loading) const LinearProgressIndicator(),
-        SizedBox(
-          height: 56,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: t.invoiceFxRateFieldLabel,
-              border: const OutlineInputBorder(),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    final helper = t.invoiceFxRateHelper;
+
+    if (!widget.show) {
+      return InvoiceFormFieldShell(
+        reserveHelperSlot: true,
+        helperText: ' ',
+        child: const SizedBox.shrink(),
+      );
+    }
+
+    return InvoiceFormFieldShell(
+      helperText: widget.loading ? null : helper,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          InputDecorator(
+            decoration: InvoiceFormFieldMetrics.mergeDecoration(
+              context,
+              InputDecoration(
+                labelText: t.invoiceFxRateFieldLabel,
+                suffixIcon: const Icon(Icons.arrow_drop_down),
+                suffixIconConstraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+              ),
             ),
             child: InkWell(
               onTap: widget.loading ? null : _openPicker,
               child: Row(
                 children: [
-                  if (widget.loading) ...[
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
                   Expanded(
                     child: Text(
                       _summaryLabel(t),
@@ -218,23 +228,25 @@ class _InvoiceFxRateFieldState extends State<InvoiceFxRateField> {
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                   ),
-                  const Icon(Icons.arrow_drop_down),
                 ],
               ),
             ),
           ),
-        ),
-        if (!widget.loading)
-          Padding(
-            padding: const EdgeInsets.only(left: 12, right: 12, top: 4),
-            child: Text(
-              t.invoiceFxRateHelper,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
+          if (widget.loading)
+            const Positioned(
+              left: 12,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -741,9 +741,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                 border: const OutlineInputBorder(),
                 prefixIcon: const Icon(Icons.person_search),
                 suffixIconConstraints: const BoxConstraints(
-                  minHeight: 48,
-                  maxHeight: 48,
-                  minWidth: 80,
+                  minHeight: 40,
+                  maxHeight: 40,
+                  minWidth: 72,
                   maxWidth: 80,
                 ),
                 suffixIcon: Align(

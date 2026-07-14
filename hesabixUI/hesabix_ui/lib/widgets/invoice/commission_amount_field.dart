@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../utils/number_normalizer.dart';
 import '../money/amount_field_words_tooltip.dart';
+import 'invoice_form_layout.dart';
 
 class CommissionAmountField extends StatefulWidget {
   final double? initialValue;
@@ -85,20 +86,21 @@ class _CommissionAmountFieldState extends State<CommissionAmountField> {
           const EnglishDigitsFormatter(),
           const ThousandsSeparatorInputFormatter(allowDecimal: true),
         ],
-        decoration: InputDecoration(
-          labelText: widget.label,
-          hintText: widget.hintText,
-          prefixIcon: Icon(
-            Icons.attach_money,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-          errorText: _errorText,
-          errorStyle: TextStyle(
-            color: Theme.of(context).colorScheme.error,
-            fontSize: 12,
+        decoration: InvoiceFormFieldMetrics.mergeDecoration(
+          context,
+          InputDecoration(
+            labelText: widget.label,
+            hintText: widget.hintText,
+            prefixIcon: Icon(
+              Icons.attach_money,
+              size: 20,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            errorText: _errorText,
+            errorStyle: TextStyle(
+              color: Theme.of(context).colorScheme.error,
+              fontSize: 12,
+            ),
           ),
         ),
         onChanged: _validateAndUpdate,

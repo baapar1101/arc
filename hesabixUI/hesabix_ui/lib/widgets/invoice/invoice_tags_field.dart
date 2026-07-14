@@ -11,6 +11,8 @@ class InvoiceTagsField extends StatefulWidget {
   final ValueChanged<List<int>> onChanged;
   final String label;
   final bool allowCreate;
+  /// نمایش داخل بخش فرم فاکتور بدون عنوان جداگانه.
+  final bool embedded;
 
   const InvoiceTagsField({
     super.key,
@@ -20,6 +22,7 @@ class InvoiceTagsField extends StatefulWidget {
     required this.onChanged,
     this.label = 'برچسب‌ها',
     this.allowCreate = true,
+    this.embedded = false,
   });
 
   @override
@@ -131,8 +134,9 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
     if (_loading) {
       return Row(
         children: [
-          Text(widget.label, style: theme.textTheme.titleSmall),
-          const SizedBox(width: 8),
+          if (!widget.embedded)
+            Text(widget.label, style: theme.textTheme.titleSmall),
+          if (!widget.embedded) const SizedBox(width: 8),
           const SizedBox(
             width: 20,
             height: 20,
@@ -152,33 +156,68 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(widget.label, style: theme.textTheme.titleSmall),
-            if (widget.allowCreate) ...[
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _createTag,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('برچسب جدید'),
-              ),
+        if (!widget.embedded)
+          Row(
+            children: [
+              Text(widget.label, style: theme.textTheme.titleSmall),
+              if (widget.allowCreate) ...[
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _createTag,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('برچسب جدید'),
+                ),
+              ],
             ],
-          ],
-        ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final t in _all)
-              FilterChip(
-                label: Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                selected: widget.selectedTagIds.contains(t.id),
-                onSelected: (_) => _toggle(t.id),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
-          ],
+              if (widget.allowCreate)
+                TextButton.icon(
+                  onPressed: _createTag,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('برچسب جدید'),
+                ),
+            ],
+          ),
+        SizedBox(height: widget.embedded ? 6 : 4),
+        Container(
+          width: double.infinity,
+          padding: widget.embedded
+              ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+              : EdgeInsets.zero,
+          decoration: widget.embedded
+              ? BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.8),
+                  ),
+                )
+              : null,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final t in _all)
+                FilterChip(
+                  label: Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  selected: widget.selectedTagIds.contains(t.id),
+                  onSelected: (_) => _toggle(t.id),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+            ],
+          ),
         ),
       ],
     );

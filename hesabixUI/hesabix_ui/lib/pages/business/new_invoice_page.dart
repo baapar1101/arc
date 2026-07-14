@@ -8,23 +8,12 @@ import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/permission/access_denied_page.dart';
-import '../../widgets/invoice/invoice_type_combobox.dart';
-import '../../widgets/invoice/code_field_widget.dart';
-import '../../widgets/invoice/customer_combobox_widget.dart';
-import '../../widgets/invoice/seller_picker_widget.dart';
-import '../../widgets/invoice/person_combobox_widget.dart';
-import '../../widgets/invoice/commission_percentage_field.dart';
+import '../../widgets/invoice/invoice_info_form.dart';
 import '../../widgets/invoice/commission_type_selector.dart';
-import '../../widgets/invoice/commission_amount_field.dart';
 import '../../widgets/date_input_field.dart';
-import '../../widgets/banking/currency_picker_widget.dart';
-import '../../widgets/project/project_selector_widget.dart';
-import '../../widgets/invoice/invoice_tags_field.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
 import '../../models/person_model.dart';
-import '../../constants/frequent_description_scope.dart';
-import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
 import '../../widgets/invoice/bom_explosion_widget.dart';
@@ -51,7 +40,6 @@ import '../../models/credit_models.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'invoices_list_page.dart';
-import '../../widgets/invoice/invoice_fx_rate_field.dart';
 import '../../widgets/invoice/invoice_adjustments_form.dart';
 import '../../services/account_service.dart';
 import '../../utils/invoice_form_prefill.dart';
@@ -2094,6 +2082,65 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     );
   }
 
+  void _handleDraftToggle(bool isDraft) {
+    setState(() {
+      _isDraft = isDraft;
+      if (isDraft && _transactions.isNotEmpty) {
+        _transactions = [];
+      }
+      if (isDraft && _useInstallments) {
+        _useInstallments = false;
+        _hasUserCustomizedSettings = true;
+        _numInstallments = null;
+        _downPayment = null;
+        _interestRate = null;
+        _firstInstallmentDueDate = null;
+        _installmentRows = [];
+      }
+      final newTabCount = _getTabCountForType(_selectedInvoiceType);
+      final prevIdx = _tabController.index;
+      if (newTabCount != _tabController.length) {
+        _tabController.dispose();
+        _tabController = TabController(
+          length: newTabCount,
+          vsync: this,
+          initialIndex: prevIdx.clamp(0, newTabCount - 1),
+        );
+        _attachTabListener();
+      }
+    });
+    _saveLocalSettings();
+  }
+
+  void _handleSellerSelection(Person? seller) {
+    setState(() {
+      _selectedSeller = seller;
+      if (seller != null) {
+        final isSales = _selectedInvoiceType == InvoiceType.sales;
+        final isSalesReturn = _selectedInvoiceType == InvoiceType.salesReturn;
+        final percent = isSales
+            ? seller.commissionSalePercent
+            : (isSalesReturn ? seller.commissionSalesReturnPercent : null);
+        final amount = isSales
+            ? seller.commissionSalesAmount
+            : (isSalesReturn ? seller.commissionSalesReturnAmount : null);
+        if (percent != null) {
+          _commissionType = CommissionType.percentage;
+          _commissionPercentage = percent;
+          _commissionAmount = null;
+        } else if (amount != null) {
+          _commissionType = CommissionType.amount;
+          _commissionAmount = amount;
+          _commissionPercentage = null;
+        }
+      } else {
+        _commissionType = null;
+        _commissionPercentage = null;
+        _commissionAmount = null;
+      }
+    });
+  }
+
   Widget _buildInvoiceInfoTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -2102,677 +2149,98 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           constraints: BoxConstraints(
             maxWidth: ResponsiveHelper.isDesktop(context) ? 1600 : double.infinity,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // فیلدهای اصلی - responsive layout
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final t = AppLocalizations.of(context);
-                  final isMobile = ResponsiveHelper.isMobile(context);
-                  // اگر عرض صفحه کمتر از 768 پیکسل باشد، تک ستونه
-                  if (isMobile) {
-                    return Column(
-                      children: [
-                        // نوع فاکتور
-                        InvoiceTypeCombobox(
-                          selectedType: _selectedInvoiceType,
-                          onTypeChanged: (type) {
-                            _handleInvoiceTypeChange(type);
-                          },
-                          isDraft: _isDraft,
-                          onDraftChanged: (isDraft) {
-                            setState(() {
-                              _isDraft = isDraft;
-                              if (isDraft && _transactions.isNotEmpty) {
-                                _transactions = [];
-                              }
-                              if (isDraft && _useInstallments) {
-                                _useInstallments = false;
-                                _hasUserCustomizedSettings = true;
-                                _numInstallments = null;
-                                _downPayment = null;
-                                _interestRate = null;
-                                _firstInstallmentDueDate = null;
-                                _installmentRows = [];
-                              }
-                              final newTabCount = _getTabCountForType(_selectedInvoiceType);
-                              final prevIdx = _tabController.index;
-                              if (newTabCount != _tabController.length) {
-                                _tabController.dispose();
-                                _tabController = TabController(
-                                  length: newTabCount,
-                                  vsync: this,
-                                  initialIndex: prevIdx.clamp(0, newTabCount - 1),
-                                );
-                                _attachTabListener();
-                              }
-                            });
-                            _saveLocalSettings();
-                          },
-                          isRequired: true,
-                          label: 'نوع فاکتور',
-                          hintText: 'انتخاب نوع فاکتور',
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // شماره فاکتور
-                        CodeFieldWidget(
-                          initialValue: _invoiceNumber,
-                          onChanged: (number) {
-                            setState(() {
-                              _invoiceNumber = number;
-                            });
-                          },
-                          onAutoGenerateChanged: (auto) {
-                            setState(() {
-                              _autoGenerateInvoiceNumber = auto;
-                            });
-                          },
-                          isRequired: true,
-                          label: 'شماره فاکتور',
-                          hintText: 'مثال: INV-2024-001',
-                          autoGenerateCode: _autoGenerateInvoiceNumber,
-                          invoiceDocumentCode: true,
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // تاریخ فاکتور
-                        DateInputField(
-                          value: _invoiceDate,
-                          labelText: 'تاریخ فاکتور *',
-                          hintText: 'انتخاب تاریخ فاکتور',
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _invoiceDate = date;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // تاریخ سررسید
-                        DateInputField(
-                          value: _dueDate,
-                          labelText: 'تاریخ سررسید',
-                          hintText: 'انتخاب تاریخ سررسید',
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _dueDate = date;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // مشتری (فقط برای فروش و برگشت از فروش)
-                        if (_selectedInvoiceType == InvoiceType.sales || 
-                            _selectedInvoiceType == InvoiceType.salesReturn)
-                          CustomerComboboxWidget(
-                            selectedCustomer: _selectedCustomer,
-                            onCustomerChanged: (customer) {
-                              setState(() {
-                                _selectedCustomer = customer;
-                                _customerBalance = null;
-                                _customerStatus = null;
-                                _customerCreditInfo = null;
-                              });
-                              _loadCustomerBalance();
-                              _loadCustomerCreditIfNeeded();
-                            },
-                            businessId: widget.businessId,
-                            authStore: widget.authStore,
-                            isRequired: false,
-                            label: 'طرف حساب',
-                            hintText: 'انتخاب طرف حساب',
-                            showFinancialBalance: true,
-                          ),
-                        // تامین‌کننده (فقط برای خرید و برگشت از خرید)
-                        if (_selectedInvoiceType == InvoiceType.purchase || 
-                            _selectedInvoiceType == InvoiceType.purchaseReturn) ...[
-                          const SizedBox(height: 16),
-                          PersonComboboxWidget(
-                            businessId: widget.businessId,
-                            showFinancialBalance: true,
-                            selectedPerson: _selectedSupplier,
-                            onChanged: (person) {
-                              setState(() {
-                                _selectedSupplier = person;
-                              });
-                            },
-                            isRequired: false,
-                            label: 'تامین‌کننده',
-                            hintText: 'انتخاب تامین‌کننده',
-                            personTypes: ['تامین‌کننده', 'فروشنده'],
-                            searchHint: 'جست‌وجو در تامین‌کنندگان...',
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        
-                        // ارز فاکتور
-                        CurrencyPickerWidget(
-                          businessId: widget.businessId,
-                          selectedCurrencyId: _selectedCurrencyId,
-                          onChanged: (currencyId) {
-                            setState(() {
-                              _selectedCurrencyId = currencyId;
-                              _manualFxRateId = null;
-                              _applyCurrencyMetaFromCache();
-                            });
-                            _reloadFxRates();
-                          },
-                          label: 'ارز فاکتور',
-                          hintText: 'انتخاب ارز فاکتور',
-                        ),
-                        const SizedBox(height: 12),
-                        InvoiceFxRateField(
-                          show: _showInvoiceFxField,
-                          loading: _loadingFxRates,
-                          manualRateId: _manualFxRateId,
-                          rateRows: _fxRateRows,
-                          onChanged: (v) => setState(() => _manualFxRateId = v),
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // پروژه
-                        ProjectSelectorWidget(
-                          businessId: widget.businessId,
-                          apiClient: ApiClient(),
-                          selectedProjectId: _selectedProjectId,
-                          onChanged: (projectId) {
-                            setState(() {
-                              _selectedProjectId = projectId;
-                            });
-                          },
-                          allowNull: true,
-                          labelText: 'پروژه (اختیاری)',
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // فروشنده و کارمزد (فقط برای فروش و برگشت فروش)
-                        if (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn) ...[
-                          Row(
-                            children: [
-                              Expanded(
-                                child: SellerPickerWidget(
-                                  selectedSeller: _selectedSeller,
-                                  onSellerChanged: (seller) {
-                                    setState(() {
-                                      _selectedSeller = seller;
-                                      // تنظیم خودکار نوع کارمزد و مقادیر بر اساس فروشنده
-                                      if (seller != null) {
-                                        final isSales = _selectedInvoiceType == InvoiceType.sales;
-                                        final isSalesReturn = _selectedInvoiceType == InvoiceType.salesReturn;
-                                        final percent = isSales ? seller.commissionSalePercent : (isSalesReturn ? seller.commissionSalesReturnPercent : null);
-                                        final amount = isSales ? seller.commissionSalesAmount : (isSalesReturn ? seller.commissionSalesReturnAmount : null);
-                                        if (percent != null) {
-                                          _commissionType = CommissionType.percentage;
-                                          _commissionPercentage = percent;
-                                          _commissionAmount = null;
-                                        } else if (amount != null) {
-                                          _commissionType = CommissionType.amount;
-                                          _commissionAmount = amount;
-                                          _commissionPercentage = null;
-                                        }
-                                      } else {
-                                        _commissionType = null;
-                                        _commissionPercentage = null;
-                                        _commissionAmount = null;
-                                      }
-                                    });
-                                  },
-                                  businessId: widget.businessId,
-                                  authStore: widget.authStore,
-                                  isRequired: false,
-                                  label: 'فروشنده/بازاریاب',
-                                  hintText: 'جست‌وجو و انتخاب فروشنده یا بازاریاب',
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // فیلدهای کارمزد (فقط اگر فروشنده انتخاب شده باشد)
-                              if (_selectedSeller != null) ...[
-                                Expanded(
-                                  child: CommissionTypeSelector(
-                                    selectedType: _commissionType,
-                                    onTypeChanged: (type) {
-                                      setState(() {
-                                        _commissionType = type;
-                                        // پاک کردن مقادیر قبلی هنگام تغییر نوع
-                                        if (type == CommissionType.percentage) {
-                                          _commissionAmount = null;
-                                        } else if (type == CommissionType.amount) {
-                                          _commissionPercentage = null;
-                                        }
-                                      });
-                                    },
-                                    isRequired: false,
-                                    label: 'نوع کارمزد',
-                                    hintText: 'انتخاب نوع کارمزد',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                // فیلد درصد کارمزد (فقط اگر نوع درصدی انتخاب شده)
-                                if (_commissionType == CommissionType.percentage)
-                                  Expanded(
-                                    child: CommissionPercentageField(
-                                      initialValue: _commissionPercentage,
-                                      onChanged: (percentage) {
-                                        setState(() {
-                                          _commissionPercentage = percentage;
-                                        });
-                                      },
-                                      isRequired: false,
-                                      label: 'درصد کارمزد',
-                                      hintText: 'مثال: 5.5',
-                                    ),
-                                  )
-                                // فیلد مبلغ کارمزد (فقط اگر نوع مبلغی انتخاب شده)
-                                else if (_commissionType == CommissionType.amount)
-                                  Expanded(
-                                    child: CommissionAmountField(
-                                      initialValue: _commissionAmount,
-                                      onChanged: (amount) {
-                                        setState(() {
-                                          _commissionAmount = amount;
-                                        });
-                                      },
-                                      isRequired: false,
-                                      label: 'مبلغ کارمزد',
-                                      hintText: 'مثال: 100000',
-                                      currencyUnit: _invoiceCurrencyUnitLabel,
-                                    ),
-                                  ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                        
-                        // ارجاع
-                        TextFormField(
-                          initialValue: _invoiceReference,
-                          onChanged: (value) {
-                            setState(() {
-                              _invoiceReference = value.trim().isEmpty ? null : value.trim();
-                            });
-                          },
-                          decoration: const InputDecoration(
-                            labelText: 'ارجاع',
-                            hintText: 'مثال: PO-2024-001',
-                            border: OutlineInputBorder(),
-                          ),
-                          textInputAction: TextInputAction.next,
-                        ),
-                        const SizedBox(height: 16),
-                        FrequentDescriptionTextField(
-                          businessId: widget.businessId,
-                          scope: FrequentDescriptionScope.invoice,
-                          controller: _invoiceTitleController,
-                          onChanged: (value) {
-                            setState(() {
-                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
-                            });
-                          },
-                          decoration: InputDecoration(
-                            labelText: t.invoiceHeaderDescriptionLabel,
-                            hintText: t.invoiceHeaderDescriptionHint,
-                            border: const OutlineInputBorder(),
-                          ),
-                          textInputAction: TextInputAction.next,
-                          maxLines: 3,
-                        ),
-                      ],
-                    );
-                  } else {
-                    // برای دسکتاپ - چند ستونه
-                    return Column(
-                      children: [
-                        // ردیف اول: 5 فیلد اصلی
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: InvoiceTypeCombobox(
-                                selectedType: _selectedInvoiceType,
-                                onTypeChanged: (type) {
-                                  _handleInvoiceTypeChange(type);
-                                },
-                                isDraft: _isDraft,
-                                onDraftChanged: (isDraft) {
-                                  setState(() {
-                                    _isDraft = isDraft;
-                                    if (isDraft && _transactions.isNotEmpty) {
-                                      _transactions = [];
-                                    }
-                                    if (isDraft && _useInstallments) {
-                                      _useInstallments = false;
-                                      _numInstallments = null;
-                                      _downPayment = null;
-                                      _interestRate = null;
-                                      _firstInstallmentDueDate = null;
-                                      _installmentRows = [];
-                                    }
-                                    final newTabCount = _getTabCountForType(_selectedInvoiceType);
-                                    final prevIdx = _tabController.index;
-                                    if (newTabCount != _tabController.length) {
-                                      _tabController.dispose();
-                                      _tabController = TabController(
-                                        length: newTabCount,
-                                        vsync: this,
-                                        initialIndex: prevIdx.clamp(0, newTabCount - 1),
-                                      );
-                                      _attachTabListener();
-                                    }
-                                  });
-                                },
-                                isRequired: true,
-                                label: 'نوع فاکتور',
-                                hintText: 'انتخاب نوع فاکتور',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: CodeFieldWidget(
-                                initialValue: _invoiceNumber,
-                                onChanged: (number) {
-                                  setState(() {
-                                    _invoiceNumber = number;
-                                  });
-                                },
-                                onAutoGenerateChanged: (auto) {
-                                  setState(() {
-                                    _autoGenerateInvoiceNumber = auto;
-                                  });
-                                },
-                                isRequired: true,
-                                label: 'شماره فاکتور',
-                                hintText: 'مثال: INV-2024-001',
-                                autoGenerateCode: _autoGenerateInvoiceNumber,
-                                invoiceDocumentCode: true,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DateInputField(
-                                value: _invoiceDate,
-                                labelText: 'تاریخ فاکتور *',
-                                hintText: 'انتخاب تاریخ فاکتور',
-                                calendarController: widget.calendarController,
-                                onChanged: (date) {
-                                  setState(() {
-                                    _invoiceDate = date;
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DateInputField(
-                                value: _dueDate,
-                                labelText: 'تاریخ سررسید',
-                                hintText: 'انتخاب تاریخ سررسید',
-                                calendarController: widget.calendarController,
-                                onChanged: (date) {
-                                  setState(() {
-                                    _dueDate = date;
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: (_selectedInvoiceType == InvoiceType.waste ||
-                                      _selectedInvoiceType == InvoiceType.directConsumption ||
-                                      _selectedInvoiceType == InvoiceType.production)
-                                  ? const SizedBox()
-                                  : (_selectedInvoiceType == InvoiceType.sales || 
-                                      _selectedInvoiceType == InvoiceType.salesReturn)
-                                      ? CustomerComboboxWidget(
-                                          selectedCustomer: _selectedCustomer,
-                                          onCustomerChanged: (customer) {
-                                            setState(() {
-                                              _selectedCustomer = customer;
-                                              _customerBalance = null;
-                                              _customerStatus = null;
-                                            });
-                                            _loadCustomerBalance();
-                                          },
-                                          businessId: widget.businessId,
-                                          authStore: widget.authStore,
-                                          isRequired: false,
-                                          label: 'طرف حساب',
-                                          hintText: 'انتخاب طرف حساب',
-                                          showFinancialBalance: true,
-                                        )
-                                      : (_selectedInvoiceType == InvoiceType.purchase || 
-                                          _selectedInvoiceType == InvoiceType.purchaseReturn)
-                                          ? PersonComboboxWidget(
-                                              businessId: widget.businessId,
-                                              showFinancialBalance: true,
-                                              selectedPerson: _selectedSupplier,
-                                              onChanged: (person) {
-                                                setState(() {
-                                                  _selectedSupplier = person;
-                                                });
-                                              },
-                                              isRequired: false,
-                                              label: 'تامین‌کننده',
-                                              hintText: 'انتخاب تامین‌کننده',
-                                              personTypes: ['تامین‌کننده', 'فروشنده'],
-                                              searchHint: 'جست‌وجو در تامین‌کنندگان...',
-                                            )
-                                          : const SizedBox(),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ردیف دوم: ارز، ارجاع، پروژه، نرخ ارز
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: CurrencyPickerWidget(
-                                businessId: widget.businessId,
-                                selectedCurrencyId: _selectedCurrencyId,
-                                onChanged: (currencyId) {
-                                  setState(() {
-                                    _selectedCurrencyId = currencyId;
-                                    _manualFxRateId = null;
-                                    _applyCurrencyMetaFromCache();
-                                  });
-                                  _reloadFxRates();
-                                },
-                                label: 'ارز فاکتور',
-                                hintText: 'انتخاب ارز فاکتور',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                initialValue: _invoiceReference,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _invoiceReference = value.trim().isEmpty ? null : value.trim();
-                                  });
-                                },
-                                decoration: const InputDecoration(
-                                  labelText: 'ارجاع',
-                                  hintText: 'مثال: PO-2024-001',
-                                  border: OutlineInputBorder(),
-                                ),
-                                textInputAction: TextInputAction.next,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ProjectSelectorWidget(
-                                businessId: widget.businessId,
-                                apiClient: ApiClient(),
-                                selectedProjectId: _selectedProjectId,
-                                onChanged: (projectId) {
-                                  setState(() {
-                                    _selectedProjectId = projectId;
-                                  });
-                                },
-                                allowNull: true,
-                                labelText: 'پروژه (اختیاری)',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: InvoiceFxRateField(
-                                show: _showInvoiceFxField,
-                                loading: _loadingFxRates,
-                                manualRateId: _manualFxRateId,
-                                rateRows: _fxRateRows,
-                                onChanged: (v) => setState(() => _manualFxRateId = v),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        InvoiceTagsField(
-                          businessId: widget.businessId,
-                          apiClient: ApiClient(),
-                          selectedTagIds: _selectedTagIds,
-                          onChanged: (v) => setState(() => _selectedTagIds = v),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ردیف سوم: فروشنده و کارمزد (فقط برای فروش و برگشت فروش)
-                        if (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn) ...[
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: SellerPickerWidget(
-                                  selectedSeller: _selectedSeller,
-                                  onSellerChanged: (seller) {
-                                    setState(() {
-                                      _selectedSeller = seller;
-                                      // تنظیم خودکار نوع کارمزد و مقادیر بر اساس فروشنده
-                                      if (seller != null) {
-                                        final isSales = _selectedInvoiceType == InvoiceType.sales;
-                                        final isSalesReturn = _selectedInvoiceType == InvoiceType.salesReturn;
-                                        final percent = isSales ? seller.commissionSalePercent : (isSalesReturn ? seller.commissionSalesReturnPercent : null);
-                                        final amount = isSales ? seller.commissionSalesAmount : (isSalesReturn ? seller.commissionSalesReturnAmount : null);
-                                        if (percent != null) {
-                                          _commissionType = CommissionType.percentage;
-                                          _commissionPercentage = percent;
-                                          _commissionAmount = null;
-                                        } else if (amount != null) {
-                                          _commissionType = CommissionType.amount;
-                                          _commissionAmount = amount;
-                                          _commissionPercentage = null;
-                                        }
-                                      } else {
-                                        _commissionType = null;
-                                        _commissionPercentage = null;
-                                        _commissionAmount = null;
-                                      }
-                                    });
-                                  },
-                                  businessId: widget.businessId,
-                                  authStore: widget.authStore,
-                                  isRequired: false,
-                                  label: 'فروشنده/بازاریاب',
-                                  hintText: 'جست‌وجو و انتخاب فروشنده یا بازاریاب',
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // فیلدهای کارمزد (فقط اگر فروشنده انتخاب شده باشد)
-                              if (_selectedSeller != null) ...[
-                                Expanded(
-                                  child: CommissionTypeSelector(
-                                    selectedType: _commissionType,
-                                    onTypeChanged: (type) {
-                                      setState(() {
-                                        _commissionType = type;
-                                        // پاک کردن مقادیر قبلی هنگام تغییر نوع
-                                        if (type == CommissionType.percentage) {
-                                          _commissionAmount = null;
-                                        } else if (type == CommissionType.amount) {
-                                          _commissionPercentage = null;
-                                        }
-                                      });
-                                    },
-                                    isRequired: false,
-                                    label: 'نوع کارمزد',
-                                    hintText: 'انتخاب نوع کارمزد',
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                // فیلد درصد کارمزد (فقط اگر نوع درصدی انتخاب شده)
-                                if (_commissionType == CommissionType.percentage)
-                                  Expanded(
-                                    child: CommissionPercentageField(
-                                      initialValue: _commissionPercentage,
-                                      onChanged: (percentage) {
-                                        setState(() {
-                                          _commissionPercentage = percentage;
-                                        });
-                                      },
-                                      isRequired: false,
-                                      label: 'درصد کارمزد',
-                                      hintText: 'مثال: 5.5',
-                                    ),
-                                  )
-                                // فیلد مبلغ کارمزد (فقط اگر نوع مبلغی انتخاب شده)
-                                else if (_commissionType == CommissionType.amount)
-                                  Expanded(
-                                    child: CommissionAmountField(
-                                      initialValue: _commissionAmount,
-                                      onChanged: (amount) {
-                                        setState(() {
-                                          _commissionAmount = amount;
-                                        });
-                                      },
-                                      isRequired: false,
-                                      label: 'مبلغ کارمزد',
-                                      hintText: 'مثال: 100000',
-                                      currencyUnit: _invoiceCurrencyUnitLabel,
-                                    ),
-                                  )
-                                else
-                                  const Expanded(child: SizedBox()),
-                                const SizedBox(width: 12),
-                              ] else ...[
-                                const Expanded(child: SizedBox()),
-                                const SizedBox(width: 12),
-                                const Expanded(child: SizedBox()),
-                                const SizedBox(width: 12),
-                              ],
-                                const Expanded(child: SizedBox()), // جای خالی
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        FrequentDescriptionTextField(
-                          businessId: widget.businessId,
-                          scope: FrequentDescriptionScope.invoice,
-                          controller: _invoiceTitleController,
-                          onChanged: (value) {
-                            setState(() {
-                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
-                            });
-                          },
-                          decoration: InputDecoration(
-                            labelText: t.invoiceHeaderDescriptionLabel,
-                            hintText: t.invoiceHeaderDescriptionHint,
-                            border: const OutlineInputBorder(),
-                          ),
-                          textInputAction: TextInputAction.next,
-                          maxLines: 3,
-                        ),
-                      ],
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 32),
-              
-            ],
+          child: InvoiceInfoForm(
+            businessId: widget.businessId,
+            authStore: widget.authStore,
+            calendarController: widget.calendarController,
+            selectedInvoiceType: _selectedInvoiceType,
+            onInvoiceTypeChanged: _handleInvoiceTypeChange,
+            isDraft: _isDraft,
+            onDraftChanged: _handleDraftToggle,
+            invoiceNumber: _invoiceNumber,
+            onInvoiceNumberChanged: (number) {
+              setState(() => _invoiceNumber = number);
+            },
+            autoGenerateInvoiceNumber: _autoGenerateInvoiceNumber,
+            onAutoGenerateInvoiceNumberChanged: (auto) {
+              setState(() => _autoGenerateInvoiceNumber = auto);
+            },
+            invoiceDate: _invoiceDate,
+            onInvoiceDateChanged: (date) {
+              setState(() => _invoiceDate = date);
+            },
+            dueDate: _dueDate,
+            onDueDateChanged: (date) {
+              setState(() => _dueDate = date);
+            },
+            selectedCustomer: _selectedCustomer,
+            onCustomerChanged: (customer) {
+              setState(() {
+                _selectedCustomer = customer;
+                _customerBalance = null;
+                _customerStatus = null;
+                _customerCreditInfo = null;
+              });
+              _loadCustomerBalance();
+              _loadCustomerCreditIfNeeded();
+            },
+            selectedSupplier: _selectedSupplier,
+            onSupplierChanged: (person) {
+              setState(() => _selectedSupplier = person);
+            },
+            selectedCurrencyId: _selectedCurrencyId,
+            onCurrencyChanged: (currencyId) {
+              setState(() {
+                _selectedCurrencyId = currencyId;
+                _manualFxRateId = null;
+                _applyCurrencyMetaFromCache();
+              });
+              _reloadFxRates();
+            },
+            currencyUnitLabel: _invoiceCurrencyUnitLabel,
+            showFxRateField: _showInvoiceFxField,
+            loadingFxRates: _loadingFxRates,
+            manualFxRateId: _manualFxRateId,
+            fxRateRows: _fxRateRows,
+            onFxRateChanged: (v) => setState(() => _manualFxRateId = v),
+            reserveFxLayoutSlot: _canPickFxRate,
+            selectedProjectId: _selectedProjectId,
+            onProjectChanged: (projectId) {
+              setState(() => _selectedProjectId = projectId);
+            },
+            selectedTagIds: _selectedTagIds,
+            onTagsChanged: (v) => setState(() => _selectedTagIds = v),
+            selectedSeller: _selectedSeller,
+            onSellerChanged: _handleSellerSelection,
+            commissionType: _commissionType,
+            onCommissionTypeChanged: (type) {
+              setState(() {
+                _commissionType = type;
+                if (type == CommissionType.percentage) {
+                  _commissionAmount = null;
+                } else if (type == CommissionType.amount) {
+                  _commissionPercentage = null;
+                }
+              });
+            },
+            commissionPercentage: _commissionPercentage,
+            onCommissionPercentageChanged: (percentage) {
+              setState(() => _commissionPercentage = percentage);
+            },
+            commissionAmount: _commissionAmount,
+            onCommissionAmountChanged: (amount) {
+              setState(() => _commissionAmount = amount);
+            },
+            invoiceReference: _invoiceReference,
+            onInvoiceReferenceChanged: (value) {
+              setState(() => _invoiceReference = value);
+            },
+            invoiceTitleController: _invoiceTitleController,
+            onInvoiceTitleChanged: (value) {
+              setState(() {
+                _invoiceTitle = value.trim().isEmpty ? null : value.trim();
+              });
+            },
           ),
         ),
       ),
