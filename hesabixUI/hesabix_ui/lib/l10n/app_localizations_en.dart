@@ -1459,6 +1459,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get supportTickets => 'Support Tickets';
 
   @override
+  String get supportTicketCopyAll => 'Copy ticket text';
+
+  @override
+  String get supportTicketCopyMessage => 'Copy message';
+
+  @override
+  String get supportTicketCopyRequest => 'Copy initial request';
+
+  @override
   String get ticketCreatedAt => 'Created At';
 
   @override

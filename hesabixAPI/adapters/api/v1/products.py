@@ -51,6 +51,18 @@ from app.services.product_opening_balance_service import (
     create_product_with_opening_balance,
     update_product_with_opening_balance,
 )
+from app.services.product_excel_import_opening_balance import (
+    OPENING_BALANCE_COST_KEY,
+    OPENING_BALANCE_QUANTITY_KEY,
+    WAREHOUSE_CODE_KEY,
+    WAREHOUSE_NAME_KEY,
+    WarehouseImportIndex,
+    opening_balance_columns_mapped,
+    pop_excel_only_keys,
+    prepare_opening_balance_for_import_row,
+    resolve_import_default_warehouse,
+    warehouse_columns_mapped,
+)
 from app.services.product_commercial_insights_service import get_product_commercial_insights
 from app.services.bulk_price_update_service import (
     preview_bulk_price_update,
@@ -1571,6 +1583,11 @@ async def download_products_import_template(
         ("base_sales_price", {"fa": "قیمت فروش", "en": "Sales Price"}),
         ("base_purchase_price", {"fa": "قیمت خرید", "en": "Purchase Price"}),
         ("track_inventory", {"fa": "کنترل موجودی", "en": "Track Inventory"}),
+        ("default_warehouse_id", {"fa": "شناسه انبار پیش‌فرض", "en": "Default Warehouse ID"}),
+        ("warehouse_code", {"fa": "کد انبار", "en": "Warehouse Code"}),
+        ("warehouse_name", {"fa": "نام انبار", "en": "Warehouse Name"}),
+        ("opening_balance_quantity", {"fa": "تعداد اولیه", "en": "Opening Balance Qty"}),
+        ("opening_balance_cost_price", {"fa": "بهای تمام‌شده (هر واحد)", "en": "Opening Balance Cost"}),
         ("reorder_point", {"fa": "نقطه سفارش مجدد", "en": "Reorder Point"}),
         ("min_order_qty", {"fa": "حداقل مقدار سفارش", "en": "Min Order Qty"}),
         ("lead_time_days", {"fa": "زمان تامین (روز)", "en": "Lead Time (Days)"}),
@@ -1602,6 +1619,7 @@ async def download_products_import_template(
             "ردیف نمونه — قبل از ایمپورت واقعی ویرایش یا حذف کنید",
             "", "", "عدد", "", "",
             "150000", "120000", "TRUE",
+            "", "", "", "", "",
             "", "", "",
             "FALSE", "FALSE", "", "",
             "", "", "", "", "", "", "",
@@ -1613,6 +1631,7 @@ async def download_products_import_template(
             "Sample row — edit or delete before real import",
             "", "", "unit", "", "",
             "150000", "120000", "TRUE",
+            "", "", "", "", "",
             "", "", "",
             "FALSE", "FALSE", "", "",
             "", "", "", "", "", "", "",
@@ -1655,7 +1674,7 @@ async def download_products_import_template(
     - پشتیبانی از فایل Excel (.xlsx)
     - پردازش به صورت dry-run (پیش‌نمایش) یا واقعی
     - ایجاد یا به‌روزرسانی محصولات بر اساس کد
-    - پشتیبانی از دسته‌بندی، مالیات، ویژگی‌ها و سایر فیلدها
+    - پشتیبانی از دسته‌بندی، مالیات، ویژگی‌ها، انبار پیش‌فرض و تعداد اولیه (تراز افتتاحیه)
     - گزارش خطاها و هشدارها
     
     ### نکات مهم:
@@ -1733,6 +1752,7 @@ async def import_products_excel(
     from adapters.db.models.product_attribute import ProductAttribute
     from adapters.db.models.tax_type import TaxType
     from adapters.db.models.tax_unit import TaxUnit
+    from adapters.db.models.warehouse import Warehouse
 
     logger = logging.getLogger(__name__)
 
@@ -1762,6 +1782,7 @@ async def import_products_excel(
                 "tax_type": 0,
                 "tax_unit": 0,
                 "attributes": 0,
+                "warehouse": 0,
             },
             "would_create": {
                 "categories": 0,
@@ -1770,6 +1791,10 @@ async def import_products_excel(
             "created": {
                 "categories": 0,
                 "attributes": 0,
+            },
+            "opening_balance": {
+                "rows_with_opening_balance": 0,
+                "rows_cleared": 0,
             },
             "policies": {
                 "on_missing_category": on_missing_category,
@@ -1812,6 +1837,8 @@ async def import_products_excel(
             "category_path","category",
             "main_unit","secondary_unit","unit_conversion_factor",
             "base_sales_price","base_purchase_price","track_inventory",
+            "default_warehouse_id","warehouse_code","warehouse_name",
+            "opening_balance_quantity","opening_balance_cost_price",
             "reorder_point","min_order_qty","lead_time_days",
             "is_sales_taxable","is_purchase_taxable","sales_tax_rate","purchase_tax_rate",
             "tax_type_id","tax_type_code","tax_type_title","tax_code",
@@ -1839,6 +1866,14 @@ async def import_products_excel(
             _normalize_header("قیمت فروش"): "base_sales_price",
             _normalize_header("قیمت خرید"): "base_purchase_price",
             _normalize_header("کنترل موجودی"): "track_inventory",
+            _normalize_header("شناسه انبار پیش‌فرض"): "default_warehouse_id",
+            _normalize_header("شناسه انبار پیش فرض"): "default_warehouse_id",
+            _normalize_header("کد انبار"): "warehouse_code",
+            _normalize_header("نام انبار"): "warehouse_name",
+            _normalize_header("تعداد اولیه"): "opening_balance_quantity",
+            _normalize_header("بهای تمام‌شده (هر واحد)"): "opening_balance_cost_price",
+            _normalize_header("بهای تمام شده (هر واحد)"): "opening_balance_cost_price",
+            _normalize_header("قیمت تمام شده"): "opening_balance_cost_price",
             _normalize_header("نقطه سفارش مجدد"): "reorder_point",
             _normalize_header("حداقل مقدار سفارش"): "min_order_qty",
             _normalize_header("زمان تامین (روز)"): "lead_time_days",
@@ -1875,6 +1910,12 @@ async def import_products_excel(
             _normalize_header("sales price"): "base_sales_price",
             _normalize_header("purchase price"): "base_purchase_price",
             _normalize_header("track inventory"): "track_inventory",
+            _normalize_header("default warehouse id"): "default_warehouse_id",
+            _normalize_header("warehouse code"): "warehouse_code",
+            _normalize_header("warehouse name"): "warehouse_name",
+            _normalize_header("opening balance qty"): "opening_balance_quantity",
+            _normalize_header("opening balance quantity"): "opening_balance_quantity",
+            _normalize_header("opening balance cost"): "opening_balance_cost_price",
             _normalize_header("reorder point"): "reorder_point",
             _normalize_header("min order qty"): "min_order_qty",
             _normalize_header("lead time (days)"): "lead_time_days",
@@ -1896,6 +1937,11 @@ async def import_products_excel(
         headers = [header_aliases.get(_normalize_header(h), h) for h in raw_headers]
         data_rows = rows[1:]
         mapped_keys = {h for h in headers if h in internal_keys}
+        can_edit_opening_balance = has_business_permission_for_business(
+            ctx, db, business_id, "opening_balance", "edit"
+        )
+        warehouse_rows = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
+        warehouse_index = WarehouseImportIndex(warehouse_rows)
         if "name" not in mapped_keys:
             unmapped = [raw_headers[i] for i, h in enumerate(headers) if h not in internal_keys]
             raise ApiError(
@@ -2244,6 +2290,31 @@ async def import_products_excel(
                     out.append(p.split(":", 1)[1])
             return out
 
+        def _find_existing_product_row(data: dict) -> Optional[Product]:
+            if match_by == "code" and data.get("code"):
+                return (
+                    db.query(Product)
+                    .filter(
+                        _and(
+                            Product.business_id == business_id,
+                            Product.code == str(data["code"]).strip(),
+                        )
+                    )
+                    .first()
+                )
+            if match_by == "name" and data.get("name"):
+                return (
+                    db.query(Product)
+                    .filter(
+                        _and(
+                            Product.business_id == business_id,
+                            Product.name == str(data["name"]).strip(),
+                        )
+                    )
+                    .first()
+                )
+            return None
+
         errors: list[dict] = []
         valid_items: list[dict] = []
 
@@ -2267,10 +2338,12 @@ async def import_products_excel(
             # normalize & cast
             if 'item_type' in item:
                 item['item_type'] = _normalize_item_type(item.get('item_type')) or 'کالا'
-            for k in ['base_sales_price','base_purchase_price','sales_tax_rate','purchase_tax_rate','unit_conversion_factor']:
+            for k in ['base_sales_price','base_purchase_price','sales_tax_rate','purchase_tax_rate','unit_conversion_factor',
+                      'opening_balance_quantity','opening_balance_cost_price']:
                 if k in item:
                     item[k] = _parse_decimal(item.get(k))
-            for k in ['reorder_point','min_order_qty','lead_time_days','category_id','tax_type_id','tax_unit_id']:
+            for k in ['reorder_point','min_order_qty','lead_time_days','category_id','tax_type_id','tax_unit_id',
+                      'default_warehouse_id']:
                 if k in item:
                     item[k] = _parse_int(item.get(k))
             # Handle boolean fields - always set them, default to False if not provided or invalid
@@ -2354,6 +2427,55 @@ async def import_products_excel(
                     reference_summary["would_create"]["attributes"] += len(would_titles)
                     row_warnings.append("برخی ویژگی‌ها وجود ندارند و در حالت create ساخته خواهند شد")
 
+            if "_would_create_attribute_titles" in item:
+                would_titles = item.get("_would_create_attribute_titles") or []
+                if isinstance(would_titles, list) and would_titles:
+                    row_preview["would_create"]["attributes"] = would_titles
+                    reference_summary["would_create"]["attributes"] += len(would_titles)
+                    row_warnings.append("برخی ویژگی‌ها وجود ندارند و در حالت create ساخته خواهند شد")
+
+            if str(item.get("item_type") or "کالا").strip() == "خدمت":
+                if warehouse_columns_mapped(mapped_keys) and (
+                    item.get("default_warehouse_id") is not None
+                    or item.get(WAREHOUSE_CODE_KEY)
+                    or item.get(WAREHOUSE_NAME_KEY)
+                ):
+                    row_warnings.append("کالاهای خدماتی انبار پیش‌فرض ندارند؛ مقدار انبار نادیده گرفته می‌شود")
+                item.pop("default_warehouse_id", None)
+            else:
+                wh_errors, wh_preview = resolve_import_default_warehouse(
+                    item, mapped_keys, warehouse_index
+                )
+                if wh_errors:
+                    row_errors.extend(wh_errors)
+                elif wh_preview:
+                    row_preview["resolved"]["warehouse"] = wh_preview
+                    reference_summary["resolved"]["warehouse"] += 1
+
+            existing_for_ob = None
+            if opening_balance_columns_mapped(mapped_keys):
+                existing_for_ob = _find_existing_product_row(item)
+                ob_input, ob_errors, ob_warnings, ob_preview = prepare_opening_balance_for_import_row(
+                    item=item,
+                    mapped_keys=mapped_keys,
+                    business_id=business_id,
+                    db=db,
+                    can_edit_opening_balance=can_edit_opening_balance,
+                    is_update=existing_for_ob is not None,
+                    existing_product=existing_for_ob,
+                    warehouse_index=warehouse_index,
+                )
+                row_errors.extend(ob_errors)
+                row_warnings.extend(ob_warnings)
+                if ob_preview:
+                    row_preview["opening_balance"] = ob_preview
+                    if ob_preview.get("action") == "clear":
+                        reference_summary["opening_balance"]["rows_cleared"] += 1
+                    elif ob_preview.get("action") == "upsert":
+                        reference_summary["opening_balance"]["rows_with_opening_balance"] += 1
+                if ob_input is not None:
+                    item["opening_balance"] = ob_input.model_dump()
+
             # validations
             name = item.get('name')
             if not name or str(name).strip() == "":
@@ -2387,6 +2509,8 @@ async def import_products_excel(
             for k in (
                 "category_path", "category", "attribute_titles",
                 "tax_type_code", "tax_type_title", "tax_unit_code", "tax_unit_name",
+                WAREHOUSE_CODE_KEY, WAREHOUSE_NAME_KEY,
+                OPENING_BALANCE_QUANTITY_KEY, OPENING_BALANCE_COST_KEY,
             ):
                 item.pop(k, None)
             for k, v in list(item.items()):
@@ -2411,6 +2535,8 @@ async def import_products_excel(
             from adapters.db.models.product import Product
             from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
             from app.services.product_service import create_product, update_product
+
+            user_id = ctx.get_user_id()
 
             def _find_existing(session: Session, data: dict) -> Optional[Product]:
                 if match_by == 'code' and data.get('code'):
@@ -2454,7 +2580,17 @@ async def import_products_excel(
                             except Exception as log_error:
                                 logger.error(f"[IMPORT] Could not serialize validation error: {log_error}")
                             raise
-                        result = create_product(db, business_id, product_request)
+                        if product_request.opening_balance is not None:
+                            result = create_product_with_opening_balance(
+                                db,
+                                business_id,
+                                user_id,
+                                product_request,
+                                create_product_fn=create_product,
+                                delete_product_fn=delete_product,
+                            )
+                        else:
+                            result = create_product(db, business_id, product_request)
                         logger.info(f"[IMPORT] ✅ Successfully CREATED product '{item_name}' - result: {result.get('message', 'N/A')}")
                         if result.get('data', {}).get('id'):
                             logger.info(f"[IMPORT] Created product ID: {result['data']['id']}")
@@ -2475,7 +2611,22 @@ async def import_products_excel(
                         logger.info(f"[IMPORT] Will UPDATE existing product id={existing.id}")
                         try:
                             logger.debug(f"[IMPORT] Calling update_product with id={existing.id}, business_id={business_id}")
-                            result = update_product(db, existing.id, business_id, ProductUpdateRequest(**data))
+                            update_request = ProductUpdateRequest(**data)
+                            previous_warehouse_id = existing.default_warehouse_id
+                            if update_request.opening_balance is not None:
+                                result = update_product_with_opening_balance(
+                                    db,
+                                    business_id,
+                                    user_id,
+                                    existing.id,
+                                    update_request,
+                                    update_product_fn=update_product,
+                                    previous_warehouse_id=previous_warehouse_id,
+                                )
+                            else:
+                                result = update_product(
+                                    db, existing.id, business_id, update_request, user_id=user_id
+                                )
                             logger.info(f"[IMPORT] ✅ Successfully UPDATED product '{item_name}' (id={existing.id})")
                             updated += 1
                             logger.info(f"[IMPORT] Update counter: {updated}")

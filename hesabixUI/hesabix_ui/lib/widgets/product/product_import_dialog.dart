@@ -274,8 +274,12 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
               alignment: Alignment.centerRight,
               child: Text(
                 isFa
-                    ? 'نکته: برای دسته‌بندی می‌توانید «مسیر دسته‌بندی» مثل «مواد اولیه > پلاستیک» وارد کنید.'
-                    : 'Tip: You can fill Category Path like "Raw materials > Plastics".',
+                    ? 'نکته: برای دسته‌بندی می‌توانید «مسیر دسته‌بندی» مثل «مواد اولیه > پلاستیک» وارد کنید. '
+                        'تعداد اولیه و بهای تمام‌شده فقط برای کالا با کنترل موجودی فعال و در سند تراز افتتاحیه ثبت می‌شوند؛ '
+                        'انبار را با شناسه، کد یا نام مشخص کنید.'
+                    : 'Tip: Use Category Path like "Raw materials > Plastics". '
+                        'Opening balance qty/cost apply only to tracked products and are stored in the opening balance document; '
+                        'specify warehouse by ID, code, or name.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
@@ -374,9 +378,11 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
     final resolved = row['resolved'];
     final wouldCreate = row['would_create'];
     final warnings = row['warnings'];
+    final openingBalance = row['opening_balance'];
     return (resolved is Map && resolved.isNotEmpty) ||
         (wouldCreate is Map && wouldCreate.isNotEmpty) ||
-        (warnings is List && warnings.isNotEmpty);
+        (warnings is List && warnings.isNotEmpty) ||
+        (openingBalance is Map && openingBalance.isNotEmpty);
   }
 
   bool _matchFilter(Map<String, dynamic> row) {
@@ -436,11 +442,14 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
             runSpacing: 4,
             children: [
               _chip(isFa ? 'Resolve دسته‌بندی' : 'Resolved category', (refSummary['resolved'] as Map?)?['category']),
+              _chip(isFa ? 'Resolve انبار' : 'Resolved warehouse', (refSummary['resolved'] as Map?)?['warehouse']),
               _chip(isFa ? 'Resolve نوع مالیات' : 'Resolved tax type', (refSummary['resolved'] as Map?)?['tax_type']),
               _chip(isFa ? 'Resolve واحد مالیاتی' : 'Resolved tax unit', (refSummary['resolved'] as Map?)?['tax_unit']),
               _chip(isFa ? 'Resolve ویژگی‌ها' : 'Resolved attributes', (refSummary['resolved'] as Map?)?['attributes']),
               _chip(isFa ? 'ایجادشدنی دسته‌بندی' : 'Would create categories', (refSummary['would_create'] as Map?)?['categories']),
               _chip(isFa ? 'ایجادشدنی ویژگی' : 'Would create attributes', (refSummary['would_create'] as Map?)?['attributes']),
+              _chip(isFa ? 'ردیف با تعداد اولیه' : 'Rows with opening balance', (refSummary['opening_balance'] as Map?)?['rows_with_opening_balance']),
+              _chip(isFa ? 'حذف تعداد اولیه' : 'Opening balance cleared', (refSummary['opening_balance'] as Map?)?['rows_cleared']),
             ],
           ),
         ],
@@ -496,9 +505,11 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
                     final resolved = row['resolved'];
                     final wouldCreate = row['would_create'];
                     final warnings = row['warnings'];
+                    final openingBalance = row['opening_balance'];
                     final resolvedText = _fmtMap(resolved);
                     final wouldCreateText = _fmtMap(wouldCreate);
                     final warningsText = _fmtMap(warnings);
+                    final openingBalanceText = _fmtMap(openingBalance);
 
                     final lines = <String>[];
                     if (resolvedText.isNotEmpty) {
@@ -506,6 +517,9 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
                     }
                     if (wouldCreateText.isNotEmpty) {
                       lines.add((isFa ? 'ایجادشدنی: ' : 'Would create: ') + wouldCreateText);
+                    }
+                    if (openingBalanceText.isNotEmpty) {
+                      lines.add((isFa ? 'تعداد اولیه: ' : 'Opening balance: ') + openingBalanceText);
                     }
                     if (warningsText.isNotEmpty) {
                       lines.add((isFa ? 'هشدار: ' : 'Warnings: ') + warningsText);

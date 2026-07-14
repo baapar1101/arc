@@ -2798,6 +2798,24 @@ abstract class AppLocalizations {
   /// **'Support Tickets'**
   String get supportTickets;
 
+  /// No description provided for @supportTicketCopyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy ticket text'**
+  String get supportTicketCopyAll;
+
+  /// No description provided for @supportTicketCopyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy message'**
+  String get supportTicketCopyMessage;
+
+  /// No description provided for @supportTicketCopyRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy initial request'**
+  String get supportTicketCopyRequest;
+
   /// No description provided for @ticketCreatedAt.
   ///
   /// In en, this message translates to:

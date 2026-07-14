@@ -6,6 +6,7 @@ import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/support_ticket_clipboard.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/file_saver.dart';
 import 'package:hesabix_ui/widgets/support/support_semantic_colors.dart';
 
@@ -95,13 +96,25 @@ class MessageBubble extends StatelessWidget {
                     const SizedBox(height: 4),
                   ],
                   if (message.content.isNotEmpty)
-                    Text(
-                      message.content,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.4,
-                        color: _textColor(theme, colors, alignEnd, isInternal),
-                      ),
+                    GestureDetector(
+                      onLongPress: isOperator ? () => _copyMessage(context, l10n) : null,
+                      child: isOperator
+                          ? SelectableText(
+                              message.content,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: _textColor(theme, colors, alignEnd, isInternal),
+                              ),
+                            )
+                          : Text(
+                              message.content,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: _textColor(theme, colors, alignEnd, isInternal),
+                              ),
+                            ),
                     ),
                   if (message.attachments != null && message.attachments!.isNotEmpty) ...[
                     if (message.content.isNotEmpty) const SizedBox(height: 8),
@@ -122,12 +135,23 @@ class MessageBubble extends StatelessWidget {
                     ),
                   ],
                   const SizedBox(height: 4),
-                  Text(
-                    _formatTime(message.createdAt, l10n),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _textColor(theme, colors, alignEnd, isInternal).withValues(alpha: 0.65),
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatTime(message.createdAt, l10n),
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _textColor(theme, colors, alignEnd, isInternal).withValues(alpha: 0.65),
+                        ),
+                      ),
+                      if (isOperator && message.content.trim().isNotEmpty)
+                        _CopyMessageButton(
+                          tooltip: l10n.supportTicketCopyMessage,
+                          color: _textColor(theme, colors, alignEnd, isInternal).withValues(alpha: 0.75),
+                          onCopy: () => _copyMessage(context, l10n),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -159,6 +183,17 @@ class MessageBubble extends StatelessWidget {
     if (isInternal) return colors.internalNoteFg;
     if (alignEnd && !isOperator) return theme.colorScheme.onPrimary;
     return theme.colorScheme.onSurface;
+  }
+
+  Future<void> _copyMessage(BuildContext context, AppLocalizations l10n) async {
+    final text = formatSupportMessageForClipboard(
+      message: message,
+      formatDateTime: (date) {
+        final isJalali = calendarController?.isJalali ?? true;
+        return date_utils.HesabixDateUtils.formatDateTime(date, isJalali);
+      },
+    );
+    await copySupportTextToClipboard(context, text);
   }
 
   Future<void> _downloadAttachment(BuildContext context, SupportAttachment attachment) async {
@@ -196,6 +231,36 @@ class MessageBubble extends StatelessWidget {
     if (difference.inHours > 0) return l10n.hoursAgo(difference.inHours.toString());
     if (difference.inMinutes > 0) return l10n.minutesAgo(difference.inMinutes.toString());
     return l10n.justNow;
+  }
+}
+
+class _CopyMessageButton extends StatelessWidget {
+  final String tooltip;
+  final Color color;
+  final VoidCallback onCopy;
+
+  const _CopyMessageButton({
+    required this.tooltip,
+    required this.color,
+    required this.onCopy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onCopy,
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: Tooltip(
+            message: tooltip,
+            child: Icon(Icons.copy_outlined, size: 14, color: color),
+          ),
+        ),
+      ),
+    );
   }
 }
 

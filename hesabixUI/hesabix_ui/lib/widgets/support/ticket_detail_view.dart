@@ -21,6 +21,7 @@ import 'package:hesabix_ui/widgets/support/ticket_composer.dart';
 import 'package:hesabix_ui/widgets/support/ticket_pinned_request.dart';
 import 'package:hesabix_ui/widgets/support/ticket_meta_sidebar.dart';
 import 'package:hesabix_ui/widgets/support/ticket_status_chip.dart';
+import 'package:hesabix_ui/utils/support_ticket_clipboard.dart';
 
 enum TicketDetailDisplayMode { dialog, page, embedded }
 
@@ -548,6 +549,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
               ),
             ),
             if (_ticket.status != null) TicketStatusChip(status: _ticket.status!, isSmall: true),
+            _buildCopyTicketButton(l10n, compact: true),
           ],
         ),
       ),
@@ -641,7 +643,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
       cursor++;
     }
 
-    if (index == cursor) return TicketPinnedRequest(ticket: _ticket);
+    if (index == cursor) return TicketPinnedRequest(ticket: _ticket, isOperator: widget.isOperator);
     cursor++;
 
     if (_messages.isEmpty) {
@@ -726,6 +728,31 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
     final isJalali = widget.calendarController?.isJalali ?? true;
     return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
+  }
+
+  String _formatClipboardDateTime(DateTime dateTime) {
+    final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
+    final isJalali = widget.calendarController?.isJalali ?? true;
+    return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
+  }
+
+  Future<void> _copyFullTicketText(BuildContext context) async {
+    final text = formatSupportTicketForClipboard(
+      ticket: _ticket,
+      messages: _messages,
+      includeInternalNotes: widget.isOperator,
+      formatDateTime: _formatClipboardDateTime,
+    );
+    await copySupportTextToClipboard(context, text);
+  }
+
+  Widget _buildCopyTicketButton(AppLocalizations l10n, {bool compact = false}) {
+    return IconButton(
+      icon: Icon(compact ? Icons.copy_outlined : Icons.copy_all_outlined, size: compact ? 18 : 22),
+      tooltip: l10n.supportTicketCopyAll,
+      visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+      onPressed: () => _copyFullTicketText(context),
+    );
   }
 
   Widget _buildCompactUserHeader(ThemeData theme, AppLocalizations l10n, bool showBack) {
@@ -818,6 +845,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (widget.isOperator) _buildCopyTicketButton(l10n, compact: true),
             ],
           ),
           if (widget.isOperator && (_ticket.user != null || _ticket.assignedOperator != null)) ...[
@@ -955,6 +983,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                       icon: const Icon(Icons.refresh, size: 18),
                       label: const Text('بازگشایی'),
                     ),
+                  if (widget.isOperator) _buildCopyTicketButton(l10n),
                   if (widget.displayMode != TicketDetailDisplayMode.embedded)
                     IconButton(
                       onPressed: () {

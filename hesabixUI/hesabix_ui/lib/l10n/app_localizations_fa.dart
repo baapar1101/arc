@@ -1452,6 +1452,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get supportTickets => 'تیکت‌های پشتیبانی';
 
   @override
+  String get supportTicketCopyAll => 'کپی متن تیکت';
+
+  @override
+  String get supportTicketCopyMessage => 'کپی پیام';
+
+  @override
+  String get supportTicketCopyRequest => 'کپی درخواست اولیه';
+
+  @override
   String get ticketCreatedAt => 'تاریخ ایجاد';
 
   @override
