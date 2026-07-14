@@ -1746,6 +1746,12 @@ setup_db() {
   
   # Grant privileges
   sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE hesabix TO hesabix;"
+  # hesabix must own public schema so pg_restore/CREATE TABLE works (Ubuntu default owner is postgres).
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
+ALTER SCHEMA public OWNER TO hesabix;
+GRANT ALL ON SCHEMA public TO hesabix;
+GRANT CREATE ON SCHEMA public TO hesabix;
+SQL
   
   # Verify connection
   if PGPASSWORD="${DB_PASSWORD}" psql -U hesabix -h 127.0.0.1 -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
@@ -1833,11 +1839,28 @@ hesabix_reset_public_schema_for_seed() {
   local table_count="$1"
   log_warning "Database is not fully initialized (${table_count} table(s), core schema missing)."
   log_warning "Resetting public schema before seed import (safe for fresh install; no Hesabix data yet)."
-  PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
 DROP SCHEMA IF EXISTS public CASCADE;
-CREATE SCHEMA public;
+CREATE SCHEMA public AUTHORIZATION hesabix;
 GRANT ALL ON SCHEMA public TO hesabix;
 GRANT ALL ON SCHEMA public TO public;
+SQL
+}
+
+hesabix_run_pg_restore_seed() {
+  local seed_dump="$1" restore_log="$2"
+  # Restore as postgres superuser; --no-owner assigns objects to hesabix where possible.
+  if sudo -u postgres pg_restore -d hesabix --no-owner --no-acl "${seed_dump}" >>"${restore_log}" 2>&1; then
+    return 0
+  fi
+  return 1
+}
+
+hesabix_ensure_public_schema_owner() {
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL' 2>/dev/null || true
+ALTER SCHEMA public OWNER TO hesabix;
+GRANT ALL ON SCHEMA public TO hesabix;
+GRANT CREATE ON SCHEMA public TO hesabix;
 SQL
 }
 
@@ -1846,7 +1869,7 @@ hesabix_import_seed_database() {
   local restore_log="${APP_ROOT}/pg_restore_seed.log"
   echo "Importing seed database from: ${seed_dump}"
   : > "${restore_log}"
-  if PGPASSWORD="${DB_PASSWORD}" pg_restore -h 127.0.0.1 -p 5432 -U hesabix -d hesabix --no-owner --no-acl "${seed_dump}" >>"${restore_log}" 2>&1; then
+  if hesabix_run_pg_restore_seed "${seed_dump}" "${restore_log}"; then
     log_success "Seed database imported successfully."
   else
     if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
@@ -1988,6 +2011,7 @@ print('Connection successful')
   fi
 
   if [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
+    hesabix_ensure_public_schema_owner
     if hesabix_db_is_fully_initialized; then
       log_info "Database already initialized (${table_count} tables). Skipping seed import."
     else
