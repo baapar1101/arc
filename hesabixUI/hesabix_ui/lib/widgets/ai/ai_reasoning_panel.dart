@@ -15,6 +15,8 @@ class AIReasoningPanel extends StatefulWidget {
   final AISessionTodoSnapshot? todoSnapshot;
   final bool compact;
   final bool initiallyExpanded;
+  /// در حین استریم زنده پنل را باز نگه می‌دارد (بدون auto-collapse).
+  final bool keepExpanded;
 
   const AIReasoningPanel({
     super.key,
@@ -24,6 +26,7 @@ class AIReasoningPanel extends StatefulWidget {
     this.todoSnapshot,
     this.compact = false,
     this.initiallyExpanded = false,
+    this.keepExpanded = false,
   });
 
   static List<AIAgentTraceStep> reasoningOnly(List<AIAgentTraceStep> all) {
@@ -51,7 +54,7 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   @override
   void initState() {
     super.initState();
-    _expanded = widget.initiallyExpanded;
+    _expanded = widget.initiallyExpanded || widget.keepExpanded;
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -64,12 +67,14 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   @override
   void didUpdateWidget(covariant AIReasoningPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_userControlledExpansion) {
+    if (!_userControlledExpansion && !widget.keepExpanded) {
       if (_hasActiveStep) {
         _expanded = true;
       } else if (!widget.initiallyExpanded) {
         _expanded = false;
       }
+    } else if (widget.keepExpanded && !_userControlledExpansion) {
+      _expanded = true;
     }
     if (_hasActiveStep && !_pulseCtrl.isAnimating) {
       _pulseCtrl.repeat(reverse: true);

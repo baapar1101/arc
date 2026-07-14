@@ -61,6 +61,12 @@ def test_prepare_assistant_content_for_persist_uses_sanitized_trace():
     assert "۳ ماه گذشته" in content
 
 
+def test_infer_tool_from_reasoning_when_harmony_absent():
+    """مدل گاهی فقط در reasoning نام ابزار را می‌گوید (بدون Harmony)."""
+    text = "Need to call resolve_date_range for last 3 months relative to today."
+    assert extract_leaked_function_calls(text) == []
+
+
 def test_merge_trace_into_function_results_finalizes_active():
     from app.services.ai.ai_trace import merge_trace_into_function_results
 

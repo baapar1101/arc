@@ -2730,6 +2730,8 @@ class AIService:
                         raise
 
                 leaked_calls = extract_leaked_function_calls(round_text)
+                if not leaked_calls and round_reasoning.strip():
+                    leaked_calls = extract_leaked_function_calls(round_reasoning)
                 if leaked_calls and not function_calls:
                     function_calls = leaked_calls
                 if round_text:

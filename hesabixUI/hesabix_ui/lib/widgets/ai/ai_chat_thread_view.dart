@@ -566,8 +566,8 @@ class _StreamingRow extends StatelessWidget {
                     agentBudget: agentBudget,
                     todoSnapshot: todoSnapshot,
                     compact: true,
-                    initiallyExpanded: todoSnapshot?.hasActiveItem == true ||
-                        traceSteps.any((s) => s.isActive),
+                    keepExpanded: true,
+                    initiallyExpanded: true,
                   ),
                 if (hasReasoningPanel && showStatusLine)
                   const SizedBox(height: 8),

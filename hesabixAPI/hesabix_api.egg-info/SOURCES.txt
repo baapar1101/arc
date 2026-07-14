@@ -626,6 +626,7 @@ app/services/ai/ai_calendar_prompt.py
 app/services/ai/ai_citation_service.py
 app/services/ai/ai_connector_service.py
 app/services/ai/ai_constants.py
+app/services/ai/ai_content_sanitize.py
 app/services/ai/ai_context_budget.py
 app/services/ai/ai_date_resolver.py
 app/services/ai/ai_db_helpers.py
@@ -968,9 +969,11 @@ migrations/versions/20260710_000001_product_catalog_gallery.py
 migrations/versions/20260711_000001_business_display_timezone.py
 migrations/versions/20260711_000002_documents_timestamptz.py
 migrations/versions/20260714_000001_ai_prompts_language_policy.py
+migrations/versions/20260714_000002_fix_ai_chat_message_trace_content.py
 tests/__init__.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
+tests/test_ai_content_sanitize.py
 tests/test_ai_context_budget.py
 tests/test_ai_date_resolver.py
 tests/test_ai_embedding_service.py

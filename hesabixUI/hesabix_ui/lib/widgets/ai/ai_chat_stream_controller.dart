@@ -231,7 +231,7 @@ class AIChatStreamController extends ChangeNotifier {
   void mergeAgentTraceFromDone(List<AIAgentTraceStep>? agentTrace) {
     if (agentTrace == null || agentTrace.isEmpty) return;
     if (traceSteps.isEmpty) {
-      traceSteps = finalizeAgentTraceForDisplay(agentTrace);
+      traceSteps = List<AIAgentTraceStep>.from(agentTrace);
       notifyListeners();
       return;
     }
@@ -256,7 +256,7 @@ class AIChatStreamController extends ChangeNotifier {
       merged.addAll(existingById.values);
     }
 
-    traceSteps = finalizeAgentTraceForDisplay(merged);
+    traceSteps = merged;
     notifyListeners();
   }
 
