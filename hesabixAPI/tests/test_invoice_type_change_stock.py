@@ -1,15 +1,22 @@
+from decimal import Decimal
 from unittest.mock import MagicMock
 
 from app.services.invoice_service import (
     INVOICE_PRODUCTION,
     INVOICE_PURCHASE,
     INVOICE_SALES,
+    _INVENTORY_LEDGER_REFRESH_TYPES,
     _resolve_invoice_type_from_payload,
     _sanitize_extra_info_for_invoice_type_change,
     _stamp_movement_on_invoice_lines,
     _warehouse_doc_cancels_invoice_sourced_wh,
     _warehouse_document_is_invoice_sourced,
 )
+
+
+def test_inventory_ledger_refresh_types_include_purchase() -> None:
+    assert INVOICE_PURCHASE in _INVENTORY_LEDGER_REFRESH_TYPES
+    assert INVOICE_SALES not in _INVENTORY_LEDGER_REFRESH_TYPES
 
 
 def test_resolve_invoice_type_from_payload_prefers_request() -> None:

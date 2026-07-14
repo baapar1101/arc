@@ -2153,6 +2153,344 @@ def _warehouse_doc_cancels_invoice_sourced_wh(db: Session, business_id: int, wh_
     return _warehouse_document_is_invoice_sourced(db, business_id, src)
 
 
+_INVENTORY_LEDGER_REFRESH_TYPES = frozenset({INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN})
+
+
+def _validate_production_invoice_lines(
+    db: Session,
+    business_id: int,
+    lines_input: List[Dict[str, Any]],
+    header_extra: Dict[str, Any],
+) -> None:
+    """اعتبارسنجی ردیف‌ها و فرمول تولید برای فاکتور تولید."""
+    has_out = False
+    has_in = False
+
+    for i, line in enumerate(lines_input, start=1):
+        extra_info = line.get("extra_info") or {}
+        movement = extra_info.get("movement")
+
+        if movement is None or (movement != "in" and movement != "out"):
+            raise ApiError(
+                "INVALID_PRODUCTION_LINE",
+                f"ردیف {i} باید movement مشخص داشته باشد ('in' یا 'out'). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+                http_status=400,
+            )
+
+        if movement == "out":
+            has_out = True
+        elif movement == "in":
+            has_in = True
+
+    if not has_out:
+        raise ApiError(
+            "INVALID_PRODUCTION_INVOICE",
+            "فاکتور تولید باید حداقل یک ردیف با movement: 'out' داشته باشد (مواد اولیه). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+            http_status=400,
+        )
+
+    if not has_in:
+        raise ApiError(
+            "INVALID_PRODUCTION_INVOICE",
+            "فاکتور تولید باید حداقل یک ردیف با movement: 'in' داشته باشد (محصول نهایی). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+            http_status=400,
+        )
+
+    bom_ids = header_extra.get("bom_ids")
+    if not bom_ids or not isinstance(bom_ids, list) or len(bom_ids) == 0:
+        raise ApiError(
+            "BOM_REQUIRED",
+            "برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید. فاکتور تولید بدون فرمول تولید قابل ثبت نیست.",
+            http_status=400,
+        )
+
+    output_product_ids_in_invoice: set[int] = set()
+    for line in lines_input:
+        line_extra = line.get("extra_info") or {}
+        if line_extra.get("movement") == "in":
+            product_id = line.get("product_id")
+            if product_id:
+                output_product_ids_in_invoice.add(int(product_id))
+
+    for bom_id in bom_ids:
+        try:
+            bom_id_int = int(bom_id)
+        except (ValueError, TypeError):
+            continue
+
+        bom = db.get(ProductBOM, bom_id_int)
+        if not bom or bom.business_id != business_id:
+            continue
+
+        bom_outputs = db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom_id_int).all()
+
+        if not bom_outputs:
+            logger.warning(
+                "فرمول تولید %s (کالا: %s) هیچ خروجی تعریف نشده است",
+                bom_id_int,
+                bom.product_id,
+            )
+            continue
+
+        bom_product_in_outputs = any(
+            output.output_product_id == bom.product_id for output in bom_outputs
+        )
+        if not bom_product_in_outputs:
+            logger.warning(
+                "کالای فرمول تولید %s (product_id: %s) در خروجی‌های فرمول تعریف نشده است.",
+                bom_id_int,
+                bom.product_id,
+            )
+
+        missing_outputs: List[str] = []
+        for output in bom_outputs:
+            if output.output_product_id not in output_product_ids_in_invoice:
+                output_product = db.get(Product, output.output_product_id)
+                product_name = output_product.name if output_product else f"کالا #{output.output_product_id}"
+                missing_outputs.append(product_name)
+
+        if missing_outputs:
+            missing_names = "، ".join(missing_outputs)
+            raise ApiError(
+                "MISSING_BOM_OUTPUTS",
+                f"خروجی‌های فرمول تولید '{bom.name}' (نسخه: {bom.version}) که در فاکتور وجود ندارند: {missing_names}. "
+                f"لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.",
+                http_status=400,
+            )
+
+
+def _sum_receipt_payment_amounts_for_invoice(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+    receipt_payment_ids: List[int],
+) -> Decimal:
+    """جمع مبالغ تسویه‌شدهٔ فاکتور از اسناد دریافت/پرداخت پیوندی."""
+    total = Decimal(0)
+    for rp_id in receipt_payment_ids:
+        rp_doc = (
+            db.query(Document)
+            .filter(Document.id == int(rp_id), Document.business_id == int(business_id))
+            .first()
+        )
+        if not rp_doc:
+            continue
+        via_person = _sum_receipt_doc_payments_for_invoice(rp_doc, int(invoice_id), via_person_line=True)
+        if via_person > 0:
+            total += via_person
+        else:
+            total += _sum_receipt_doc_payments_for_invoice(rp_doc, int(invoice_id), via_person_line=False)
+    return total
+
+
+def _previous_sales_ar_effect_for_update(
+    db: Session,
+    business_id: int,
+    document: Document,
+    *,
+    old_document_type: str,
+    was_proforma: bool,
+    linked_receipt_payment_ids: List[int],
+) -> Decimal:
+    """
+    اثر قبلی فاکتور فروش قطعی روی ماندهٔ دریافتنی شخص (برای جلوگیری از شمارش دوبل در ویرایش).
+    """
+    if was_proforma or old_document_type != INVOICE_SALES:
+        return Decimal(0)
+    from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+
+    old_totals = dict((document.extra_info or {}).get("totals") or {})
+    try:
+        old_total_with_tax = total_with_tax_from_totals_dict(old_totals)
+    except Exception:
+        old_total_with_tax = Decimal(0)
+    old_paid = _sum_receipt_payment_amounts_for_invoice(
+        db,
+        int(business_id),
+        int(document.id),
+        linked_receipt_payment_ids,
+    )
+    effect = old_total_with_tax - old_paid
+    return effect if effect > 0 else Decimal(0)
+
+
+def _validate_and_apply_sales_credit_checks(
+    db: Session,
+    business_id: int,
+    fiscal_year: Optional[FiscalYear],
+    person_id: Optional[int],
+    totals: Dict[str, Any],
+    header_extra: Dict[str, Any],
+    data: Dict[str, Any],
+    *,
+    previous_ar_effect: Decimal = Decimal(0),
+) -> Dict[str, Any]:
+    """
+    کنترل سقف اعتبار و مسدودی اقساط معوق برای فاکتور فروش.
+    previous_ar_effect: اثر AR قبلی همین سند در ویرایش (برای کسر از ماندهٔ فعلی).
+    """
+    if not person_id:
+        return header_extra
+
+    from adapters.db.models.person import Person as _PersonModel
+    from adapters.db.models.business import Business as _BusinessModel
+    from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+    from app.services.person_service import calculate_person_balance
+
+    person_obj = db.query(_PersonModel).filter(_PersonModel.id == int(person_id)).first()
+    business_obj = db.query(_BusinessModel).filter(_BusinessModel.id == int(business_id)).first()
+
+    check_enabled = None
+    credit_limit_val = None
+    if person_obj:
+        check_enabled = getattr(person_obj, "credit_check_enabled", None)
+        credit_limit_val = getattr(person_obj, "credit_limit", None)
+    if check_enabled is None and business_obj:
+        check_enabled = bool(getattr(business_obj, "check_credit_enabled_by_default", False))
+    if credit_limit_val is None and business_obj:
+        credit_limit_val = getattr(business_obj, "default_credit_limit", None)
+
+    if not check_enabled or credit_limit_val is None:
+        return header_extra
+
+    bal, _status = calculate_person_balance(
+        db, int(person_id), fiscal_year_id=fiscal_year.id if fiscal_year else None
+    )
+    current_debt = Decimal(0)
+    try:
+        if bal is not None:
+            bdec = Decimal(str(bal))
+            current_debt = (-bdec) if bdec < 0 else Decimal(0)
+    except Exception:
+        current_debt = Decimal(0)
+
+    total_with_tax = total_with_tax_from_totals_dict(totals)
+    planned_paid = Decimal(0)
+    try:
+        for p in data.get("payments") or []:
+            amt = Decimal(str(p.get("amount", 0) or 0))
+            if amt > 0:
+                planned_paid += amt
+    except Exception:
+        planned_paid = Decimal(0)
+
+    invoice_effect = total_with_tax - planned_paid
+    if invoice_effect < 0:
+        invoice_effect = Decimal(0)
+
+    adjusted_current = current_debt - previous_ar_effect
+    if adjusted_current < 0:
+        adjusted_current = Decimal(0)
+    new_debt = adjusted_current + invoice_effect
+
+    limit_dec = Decimal(str(credit_limit_val))
+    ignore_flag = bool((data.get("extra_info") or {}).get("ignore_credit_check", False))
+    ex_out = dict(header_extra)
+
+    if new_debt > limit_dec:
+        if not ignore_flag:
+            raise ApiError(
+                "CREDIT_LIMIT_EXCEEDED",
+                f"اعتبار مشتری کافی نیست. مانده فعلی: {float(adjusted_current):.2f}، "
+                f"اثر فاکتور: {float(invoice_effect):.2f}، سقف: {float(limit_dec):.2f}",
+                http_status=400,
+            )
+        warns = list(ex_out.get("warnings") or [])
+        warns.append({
+            "code": "CREDIT_LIMIT_EXCEEDED",
+            "message": "اعتبار مشتری از سقف عبور کرده است اما نادیده گرفته شد",
+            "current_debt": float(adjusted_current),
+            "invoice_effect": float(invoice_effect),
+            "new_debt": float(new_debt),
+            "limit": float(limit_dec),
+        })
+        ex_out["warnings"] = warns
+
+    credit_cfg = get_business_credit_settings(db, business_id)
+    auto_block_days_raw = credit_cfg.get("auto_block_after_days")
+    auto_block_days = int(auto_block_days_raw) if auto_block_days_raw is not None else None
+    if auto_block_days and auto_block_days > 0:
+        inst_data = search_installments(
+            db=db,
+            business_id=business_id,
+            query={"person_id": int(person_id), "status": "overdue"},
+            disable_pagination=True,
+        )
+        max_overdue = 0
+        for it in inst_data.get("items", []):
+            od = int(it.get("overdue_days") or 0)
+            if od > max_overdue:
+                max_overdue = od
+        if max_overdue > auto_block_days:
+            if not ignore_flag:
+                raise ApiError(
+                    "CREDIT_AUTO_BLOCKED",
+                    f"به دلیل اقساط معوق بیش از {auto_block_days} روز، ثبت فاکتور جدید مجاز نیست.",
+                    http_status=400,
+                )
+            warns = list(ex_out.get("warnings") or [])
+            warns.append({
+                "code": "CREDIT_AUTO_BLOCKED_OVERRIDDEN",
+                "message": "به دلیل اقساط معوق، حساب به صورت خودکار باید مسدود می‌شد اما نادیده گرفته شد",
+                "auto_block_after_days": auto_block_days,
+                "max_overdue_days": max_overdue,
+            })
+            ex_out["warnings"] = warns
+
+    return ex_out
+
+
+def _clear_invoice_linked_receipt_payments(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+    document: Document,
+) -> None:
+    """حذف اسناد دریافت/پرداخت پیوندی و پاک‌سازی لینک‌ها."""
+    from app.services.receipt_payment_service import delete_receipt_payment
+
+    extra_info = document.extra_info or {}
+    linked_ids = _get_receipt_payment_ids_linked_to_invoice(
+        db, int(business_id), int(invoice_id), extra_info=extra_info
+    )
+    for rp_id in linked_ids:
+        delete_receipt_payment(db, int(rp_id), commit=False)
+    extra = dict(document.extra_info) if document.extra_info else {}
+    links = dict(extra.get("links") or {})
+    links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+    extra["links"] = links
+    document.extra_info = _normalize_document_extra_info_for_storage(extra)
+    flag_modified(document, "extra_info")
+
+
+def _refresh_inventory_chain_ledgers_if_needed(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int],
+    inv_type: str,
+    old_document_type: str,
+    product_ids: List[int],
+    *,
+    is_proforma: bool,
+) -> None:
+    """هم‌رسانی FIFO/COGS پس از تغییرات روی فاکتورهای خرید یا خروج از آن‌ها."""
+    if is_proforma:
+        return
+    if inv_type not in _INVENTORY_LEDGER_REFRESH_TYPES and old_document_type not in _INVENTORY_LEDGER_REFRESH_TYPES:
+        return
+    ids = sorted({int(x) for x in product_ids if x is not None})
+    if not ids:
+        return
+    from app.services.invoice_profit_ledger_service import refresh_sales_ledgers_after_inventory_invoice_change
+
+    refresh_sales_ledgers_after_inventory_invoice_change(
+        db,
+        int(business_id),
+        ids,
+        fiscal_year_id=fiscal_year_id,
+    )
+
+
 def _compute_installment_plan(
     total_with_tax: Decimal,
     header_extra: Dict[str, Any],
@@ -3863,110 +4201,8 @@ def create_invoice(
 
     # اعتبارسنجی ویژه برای فاکتور تولید
     if invoice_type == INVOICE_PRODUCTION:
-        has_out = False
-        has_in = False
-        
-        for i, line in enumerate(lines_input, start=1):
-            extra_info = line.get("extra_info") or {}
-            movement = extra_info.get("movement")
-            
-            if movement is None or (movement != "in" and movement != "out"):
-                raise ApiError(
-                    "INVALID_PRODUCTION_LINE",
-                    f"ردیف {i} باید movement مشخص داشته باشد ('in' یا 'out'). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
-                    http_status=400
-                )
-            
-            if movement == "out":
-                has_out = True
-            elif movement == "in":
-                has_in = True
-        
-        if not has_out:
-            raise ApiError(
-                "INVALID_PRODUCTION_INVOICE",
-                "فاکتور تولید باید حداقل یک ردیف با movement: 'out' داشته باشد (مواد اولیه). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
-                http_status=400
-            )
-        
-        if not has_in:
-            raise ApiError(
-                "INVALID_PRODUCTION_INVOICE",
-                "فاکتور تولید باید حداقل یک ردیف با movement: 'in' داشته باشد (محصول نهایی). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
-                http_status=400
-            )
-        
-        # بررسی وجود bom_ids در extra_info فاکتور (برای ردیابی)
         header_extra_check = data.get("extra_info") or {}
-        bom_ids = header_extra_check.get("bom_ids")
-        if not bom_ids or not isinstance(bom_ids, list) or len(bom_ids) == 0:
-            raise ApiError(
-                "BOM_REQUIRED",
-                "برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید. فاکتور تولید بدون فرمول تولید قابل ثبت نیست.",
-                http_status=400
-            )
-        
-        # اعتبارسنجی خروجی‌های فرمول تولید
-        # جمع‌آوری product_id های موجود در ردیف‌های فاکتور با movement='in'
-        output_product_ids_in_invoice = set()
-        for line in lines_input:
-            extra_info = line.get("extra_info") or {}
-            movement = extra_info.get("movement")
-            if movement == "in":
-                product_id = line.get("product_id")
-                if product_id:
-                    output_product_ids_in_invoice.add(int(product_id))
-        
-        # بررسی برای هر فرمول تولید
-        for bom_id in bom_ids:
-            try:
-                bom_id_int = int(bom_id)
-            except (ValueError, TypeError):
-                continue
-            
-            # دریافت فرمول تولید
-            bom = db.get(ProductBOM, bom_id_int)
-            if not bom or bom.business_id != business_id:
-                continue
-            
-            # دریافت خروجی‌های فرمول
-            bom_outputs = db.query(ProductBOMOutput).filter(
-                ProductBOMOutput.bom_id == bom_id_int
-            ).all()
-            
-            if not bom_outputs:
-                # اگر فرمول خروجی ندارد، هشدار می‌دهیم اما خطا نمی‌دهیم
-                logger.warning(f"فرمول تولید {bom_id_int} (کالا: {bom.product_id}) هیچ خروجی تعریف نشده است")
-                continue
-            
-            # بررسی اینکه product_id فرمول در خروجی‌ها باشد
-            bom_product_in_outputs = any(
-                output.output_product_id == bom.product_id 
-                for output in bom_outputs
-            )
-            if not bom_product_in_outputs:
-                logger.warning(
-                    f"کالای فرمول تولید {bom_id_int} (product_id: {bom.product_id}) "
-                    f"در خروجی‌های فرمول تعریف نشده است. این ممکن است باعث سردرگمی شود."
-                )
-            
-            # بررسی اینکه همه خروجی‌های فرمول در فاکتور وجود داشته باشند
-            missing_outputs = []
-            for output in bom_outputs:
-                if output.output_product_id not in output_product_ids_in_invoice:
-                    # دریافت نام کالا برای پیام خطا
-                    output_product = db.get(Product, output.output_product_id)
-                    product_name = output_product.name if output_product else f"کالا #{output.output_product_id}"
-                    missing_outputs.append(product_name)
-            
-            if missing_outputs:
-                missing_names = "، ".join(missing_outputs)
-                raise ApiError(
-                    "MISSING_BOM_OUTPUTS",
-                    f"خروجی‌های فرمول تولید '{bom.name}' (نسخه: {bom.version}) که در فاکتور وجود ندارند: {missing_names}. "
-                    f"لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.",
-                    http_status=400
-                )
+        _validate_production_invoice_lines(db, business_id, lines_input, header_extra_check)
 
     _stamp_movement_on_invoice_lines(invoice_type, lines_input)
 
@@ -4045,115 +4281,18 @@ def create_invoice(
 
     # --- اعتبارسنجی اعتبار مشتری (قبل از ایجاد سند) ---
     is_proforma_req = bool(data.get("is_proforma", False))
-    # فقط برای فروش (افزایش دریافتنی) و غیر پروفرما
     if not is_proforma_req and invoice_type == INVOICE_SALES and person_id:
-        # تنظیمات شخص و کسب‌وکار
-        from adapters.db.models.person import Person as _PersonModel
-        from adapters.db.models.business import Business as _BusinessModel
-        person_obj = db.query(_PersonModel).filter(_PersonModel.id == int(person_id)).first()
-        business_obj = db.query(_BusinessModel).filter(_BusinessModel.id == int(business_id)).first()
-        # تعیین محدودیت و فعال بودن بررسی
-        check_enabled = None
-        credit_limit_val = None
-        if person_obj:
-            check_enabled = getattr(person_obj, "credit_check_enabled", None)
-            credit_limit_val = getattr(person_obj, "credit_limit", None)
-        if (check_enabled is None) and business_obj:
-            check_enabled = bool(getattr(business_obj, "check_credit_enabled_by_default", False))
-        if (credit_limit_val is None) and business_obj:
-            credit_limit_val = getattr(business_obj, "default_credit_limit", None)
-        # اگر بررسی غیرفعال است یا سقف تعریف نشده، رد شو
-        if check_enabled and (credit_limit_val is not None):
-            # محاسبه بدهی فعلی
-            from app.services.person_service import calculate_person_balance
-            bal, _status = calculate_person_balance(db, int(person_id), fiscal_year_id=fiscal_year.id if fiscal_year else None)
-            # اگر balance منفی باشد یعنی بدهکار
-            current_debt = Decimal(str(0))
-            try:
-                if bal is not None:
-                    bdec = Decimal(str(bal))
-                    current_debt = (-bdec) if bdec < 0 else Decimal(0)
-            except Exception:
-                current_debt = Decimal(0)
-            # مبلغ کل فاکتور (با مالیات و اضافات/کسورات) که AR را افزایش می‌دهد
-            from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
-
-            total_with_tax = total_with_tax_from_totals_dict(totals)
-            # پرداخت‌های همزمان ارسالی با فاکتور
-            planned_paid = Decimal(0)
-            try:
-                for p in (data.get("payments") or []):
-                    amt = Decimal(str(p.get("amount", 0) or 0))
-                    if amt > 0:
-                        planned_paid += amt
-            except Exception:
-                planned_paid = Decimal(0)
-            invoice_effect = total_with_tax - planned_paid
-            if invoice_effect < 0:
-                invoice_effect = Decimal(0)
-            new_debt = current_debt + invoice_effect
-            limit_dec = Decimal(str(credit_limit_val))
-            ignore_flag = bool((data.get("extra_info") or {}).get("ignore_credit_check", False))
-            # --- کنترل سقف اعتبار ---
-            if new_debt > limit_dec:
-                if not ignore_flag:
-                    # توقف با خطا
-                    raise ApiError(
-                        "CREDIT_LIMIT_EXCEEDED",
-                        f"اعتبار مشتری کافی نیست. مانده فعلی: {float(current_debt):.2f}، اثر فاکتور: {float(invoice_effect):.2f}، سقف: {float(limit_dec):.2f}",
-                        http_status=400
-                    )
-                else:
-                    # اجازه ادامه؛ هشدار را در extra_info ذخیره خواهیم کرد (پس از ساخت سند)
-                    header_extra = dict(header_extra or {})
-                    warns = list((header_extra.get("warnings") or []))
-                    warns.append({
-                        "code": "CREDIT_LIMIT_EXCEEDED",
-                        "message": "اعتبار مشتری از سقف عبور کرده است اما نادیده گرفته شد",
-                        "current_debt": float(current_debt),
-                        "invoice_effect": float(invoice_effect),
-                        "new_debt": float(new_debt),
-                        "limit": float(limit_dec),
-                    })
-                    header_extra["warnings"] = warns
-                    data["extra_info"] = header_extra
-
-            # --- کنترل بلاک خودکار بر اساس اقساط معوق ---
-            auto_block_days = None
-            credit_cfg = get_business_credit_settings(db, business_id)
-            auto_block_days_raw = credit_cfg.get("auto_block_after_days")
-            if auto_block_days_raw is not None:
-                auto_block_days = int(auto_block_days_raw)
-            if auto_block_days and auto_block_days > 0:
-                inst_data = search_installments(
-                    db=db,
-                    business_id=business_id,
-                    query={"person_id": int(person_id), "status": "overdue"},
-                    disable_pagination=True,
-                )
-                max_overdue = 0
-                for it in inst_data.get("items", []):
-                    od = int(it.get("overdue_days") or 0)
-                    if od > max_overdue:
-                        max_overdue = od
-                if max_overdue > auto_block_days:
-                    if not ignore_flag:
-                        raise ApiError(
-                            "CREDIT_AUTO_BLOCKED",
-                            f"به دلیل اقساط معوق بیش از {auto_block_days} روز، ثبت فاکتور جدید مجاز نیست.",
-                            http_status=400,
-                        )
-                    else:
-                        header_extra = dict(header_extra or {})
-                        warns = list((header_extra.get("warnings") or []))
-                        warns.append({
-                            "code": "CREDIT_AUTO_BLOCKED_OVERRIDDEN",
-                            "message": "به دلیل اقساط معوق، حساب به صورت خودکار باید مسدود می‌شد اما نادیده گرفته شد",
-                            "auto_block_after_days": auto_block_days,
-                            "max_overdue_days": max_overdue,
-                        })
-                        header_extra["warnings"] = warns
-                        data["extra_info"] = header_extra
+        header_extra = _validate_and_apply_sales_credit_checks(
+            db,
+            business_id,
+            fiscal_year,
+            int(person_id),
+            totals,
+            header_extra,
+            data,
+            previous_ar_effect=Decimal(0),
+        )
+        data["extra_info"] = header_extra
 
     # Resolve inventory tracking per product and annotate lines
     all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
@@ -4950,17 +5089,15 @@ def create_invoice(
         db.flush()
 
     # پس از خرید/برگشت از خرید: هم‌رسانی ledger فاکتورهای فروش/تولید همان کالاها (FIFO به‌روز)
-    if not document.is_proforma and invoice_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
-        from app.services.invoice_profit_ledger_service import (
-            refresh_sales_ledgers_after_inventory_invoice_change,
-        )
-
-        _pids = _distinct_product_ids_for_invoice(db, int(document.id))
-        refresh_sales_ledgers_after_inventory_invoice_change(
+    if not document.is_proforma:
+        _refresh_inventory_chain_ledgers_if_needed(
             db,
             business_id,
-            _pids,
-            fiscal_year_id=int(document.fiscal_year_id),
+            int(document.fiscal_year_id) if document.fiscal_year_id else None,
+            invoice_type,
+            invoice_type,
+            _distinct_product_ids_for_invoice(db, int(document.id)),
+            is_proforma=False,
         )
         db.flush()
 
@@ -5057,8 +5194,10 @@ def update_invoice(
     _old_expense_income_ids = list(_pre_links_wh.get(INVOICE_LINK_EXPENSE_INCOME_IDS) or [])
 
     # Only editable in current fiscal year
+    fiscal_year = (
+        db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
+    )
     try:
-        fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
         if fiscal_year is not None and getattr(fiscal_year, "is_last", False) is not True:
             raise ApiError("FISCAL_YEAR_LOCKED", "سند متعلق به سال مالی جاری نیست و قابل ویرایش نمی‌باشد", http_status=409)
     except ApiError:
@@ -5191,6 +5330,16 @@ def update_invoice(
         # اگر خطایی رخ داد، فقط log می‌کنیم و ادامه می‌دهیم
         logger.warning(f"Failed to release instances for invoice {document.id}: {e}")
     
+    _old_invoice_product_ids = _distinct_product_ids_for_invoice(db, int(document.id))
+    _previous_sales_ar_effect = _previous_sales_ar_effect_for_update(
+        db,
+        int(document.business_id),
+        document,
+        old_document_type=_old_document_type,
+        was_proforma=_old_is_proforma,
+        linked_receipt_payment_ids=_old_receipt_payment_ids,
+    )
+
     # Recreate lines: حذف سطرهای حسابداری و اقلام فاکتور و بازایجاد
     db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
     db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).delete(synchronize_session=False)
@@ -5198,6 +5347,12 @@ def update_invoice(
     lines_input: List[Dict[str, Any]] = list(data.get("lines") or [])
     if not lines_input:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
+
+    if inv_type == INVOICE_PRODUCTION:
+        prod_extra = dict(data.get("extra_info") or document.extra_info or {})
+        _validate_production_invoice_lines(
+            db, int(document.business_id), lines_input, prod_extra
+        )
 
     _stamp_movement_on_invoice_lines(inv_type, lines_input)
 
@@ -5402,6 +5557,24 @@ def update_invoice(
         total_with_tax = total_with_tax_from_totals_dict(totals)
         person_id = _person_id_from_header({"extra_info": header_extra})
         person_id = _resolve_and_validate_person_id(db, document.business_id, person_id)
+
+        if inv_type == INVOICE_SALES and person_id:
+            header_extra = _validate_and_apply_sales_credit_checks(
+                db,
+                int(document.business_id),
+                fiscal_year,
+                int(person_id),
+                totals,
+                header_extra,
+                data,
+                previous_ar_effect=_previous_sales_ar_effect,
+            )
+            if header_extra.get("warnings"):
+                ex_merge_warn = dict(document.extra_info or {})
+                ex_merge_warn["warnings"] = header_extra["warnings"]
+                document.extra_info = _normalize_document_extra_info_for_storage(ex_merge_warn)
+                flag_modified(document, "extra_info")
+
         # inventory/COGS handled in warehouse posting
 
         if inv_type == INVOICE_SALES:
@@ -5828,8 +6001,19 @@ def update_invoice(
 
     # پردازش تراکنش‌های پرداخت (مشابه create_invoice)
     payment_docs: List[int] = []
+    _invoice_type_changed = inv_type != _old_document_type
     payments_provided = "payments" in data and isinstance(data.get("payments"), list)
     payments = list(data["payments"]) if payments_provided else []
+
+    # تغییر نوع فاکتور بدون ارسال payments: اسناد دریافت/پرداخت قبلی با نوع قدیم نامعتبرند
+    if _invoice_type_changed and not document.is_proforma and not payments_provided:
+        _clear_invoice_linked_receipt_payments(
+            db,
+            int(document.business_id),
+            int(document.id),
+            document,
+        )
+
     if payments_provided and not document.is_proforma:
         from app.services.receipt_payment_service import delete_receipt_payment
 
@@ -5949,18 +6133,20 @@ def update_invoice(
                 exc_info=True,
             )
 
-    if not document.is_proforma and inv_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
+    if not document.is_proforma:
         try:
-            from app.services.invoice_profit_ledger_service import (
-                refresh_sales_ledgers_after_inventory_invoice_change,
-            )
-
-            _pids_u = _distinct_product_ids_for_invoice(db, int(document.id))
-            refresh_sales_ledgers_after_inventory_invoice_change(
+            _ledger_product_ids = sorted({
+                int(x) for x in (_old_invoice_product_ids + _distinct_product_ids_for_invoice(db, int(document.id)))
+                if x is not None
+            })
+            _refresh_inventory_chain_ledgers_if_needed(
                 db,
                 int(document.business_id),
-                _pids_u,
-                fiscal_year_id=int(document.fiscal_year_id),
+                int(document.fiscal_year_id) if document.fiscal_year_id else None,
+                inv_type,
+                _old_document_type,
+                _ledger_product_ids,
+                is_proforma=False,
             )
         except Exception as inv_chain_u_ex:
             logger.warning(

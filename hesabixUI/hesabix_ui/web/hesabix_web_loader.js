@@ -161,7 +161,7 @@
 
     var logo = document.querySelector('.loader-logo');
     if (logo) {
-      logo.src = dark ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png';
+      logo.src = dark ? 'images/logo-light.png' : 'images/logo-blue.png';
     }
   }
 
