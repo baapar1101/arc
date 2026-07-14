@@ -23,6 +23,11 @@ if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/mirror_config.sh" ]]; then
   # shellcheck disable=SC1091
   source "${UPDATE_SCRIPT_DIR}/scripts/mirror_config.sh"
 fi
+# shellcheck source=scripts/hesabix_python.sh
+if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/hesabix_python.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${UPDATE_SCRIPT_DIR}/scripts/hesabix_python.sh"
+fi
 
 # If normal checkout/pull fails (local generated file, merge, diverged branch), realign the clone with remote.
 hesabix_force_sync_origin() {
@@ -169,6 +174,23 @@ if [[ ! -d "${api_dir}/.venv" ]]; then
   exit 1
 fi
 cd "${api_dir}"
+if declare -F hesabix_resolve_backend_python >/dev/null 2>&1; then
+  backend_python=""
+  if ! backend_python=$(hesabix_resolve_backend_python); then
+    log_info "Python >= 3.11 not found; installing packages..."
+    if ! hesabix_install_backend_python_packages || ! backend_python=$(hesabix_resolve_backend_python); then
+      log_err "hesabix-api requires Python >= 3.11."
+      exit 1
+    fi
+  fi
+  if ! hesabix_ensure_backend_venv "${api_dir}" "${backend_python}"; then
+    log_err "Failed to ensure backend virtualenv with ${backend_python}"
+    exit 1
+  fi
+  if [[ "${HESABIX_VENV_RECREATED:-0}" == "1" ]]; then
+    log_info "Backend virtualenv rebuilt with Python >= 3.11."
+  fi
+fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 if declare -F hesabix_apply_pip_mirror_env >/dev/null 2>&1; then

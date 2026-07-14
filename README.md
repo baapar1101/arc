@@ -24,7 +24,7 @@ Hesabix is an open-source accounting software that provides comprehensive financ
 - PostgreSQL - Robust relational database
 - SQLAlchemy - Powerful ORM
 - Alembic - Database migration management
-- Python 3.10+ (Python 3.12 on Ubuntu 24.04, Python 3.10/3.11 on Ubuntu 22.04)
+- Python 3.11+ (Python 3.12 on Ubuntu 24.04; Ubuntu 22.04: deploy installs python3.11 automatically)
 
 **Frontend:**
 - Flutter Web - Cross-platform web framework

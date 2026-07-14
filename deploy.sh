@@ -104,6 +104,105 @@ if ! declare -F hesabix_resolve_api_public_scheme >/dev/null 2>&1; then
     printf '%s' "http"
   }
 fi
+# shellcheck source=scripts/hesabix_python.sh
+for _hesabix_py_lib in \
+  "${DEPLOY_SCRIPT_DIR}/scripts/hesabix_python.sh" \
+  "${APP_ROOT}/app/scripts/hesabix_python.sh"; do
+  if [[ -r "${_hesabix_py_lib}" ]]; then
+    # shellcheck disable=SC1090
+    source "${_hesabix_py_lib}"
+    break
+  fi
+done
+unset _hesabix_py_lib
+if ! declare -F hesabix_resolve_backend_python >/dev/null 2>&1; then
+  # Standalone: curl shell.hesabix.ir/deploy.sh — no scripts/ beside installer.sh
+  # shellcheck disable=SC1091
+  source /dev/stdin <<'HESABIX_PYTHON_INLINE'
+: "${HESABIX_MIN_PYTHON_MAJOR:=3}"
+: "${HESABIX_MIN_PYTHON_MINOR:=11}"
+hesabix_python_version_ge() {
+  local ver="${1#Python }"
+  ver="${ver%% *}"
+  local req_major="$2" req_minor="$3"
+  local major minor
+  IFS=. read -r major minor _ <<< "${ver}"
+  major=${major:-0}
+  minor=${minor:-0}
+  if [[ "${major}" -gt "${req_major}" ]]; then return 0; fi
+  if [[ "${major}" -lt "${req_major}" ]]; then return 1; fi
+  [[ "${minor}" -ge "${req_minor}" ]]
+}
+hesabix_python_cmd_version() {
+  local cmd="$1"
+  "$cmd" --version 2>&1 | awk '{print $2}'
+}
+hesabix_python_cmd_meets_minimum() {
+  local cmd="$1" ver
+  command -v "${cmd}" >/dev/null 2>&1 || return 1
+  ver=$(hesabix_python_cmd_version "${cmd}")
+  hesabix_python_version_ge "${ver}" "${HESABIX_MIN_PYTHON_MAJOR}" "${HESABIX_MIN_PYTHON_MINOR}"
+}
+hesabix_resolve_backend_python() {
+  local cmd ver path
+  if [[ -n "${HESABIX_PYTHON:-}" ]]; then
+    if [[ -x "${HESABIX_PYTHON}" ]] && hesabix_python_cmd_meets_minimum "${HESABIX_PYTHON}"; then
+      printf '%s' "${HESABIX_PYTHON}"
+      return 0
+    fi
+    return 1
+  fi
+  for cmd in python3.13 python3.12 python3.11 python3; do
+    if hesabix_python_cmd_meets_minimum "${cmd}"; then
+      path=$(command -v "${cmd}")
+      HESABIX_PYTHON="${path}"
+      printf '%s' "${path}"
+      return 0
+    fi
+  done
+  return 1
+}
+hesabix_install_backend_python_packages() {
+  if hesabix_resolve_backend_python >/dev/null 2>&1; then return 0; fi
+  if ! command -v apt-get >/dev/null 2>&1; then return 1; fi
+  export DEBIAN_FRONTEND=noninteractive
+  local minor pkgs=()
+  for minor in 12 11; do
+    pkgs=("python3.${minor}" "python3.${minor}-venv" "python3.${minor}-dev")
+    if apt-get install -y "${pkgs[@]}"; then
+      if command -v "python3.${minor}" >/dev/null 2>&1; then return 0; fi
+    fi
+  done
+  return 1
+}
+hesabix_ensure_backend_python() {
+  if hesabix_resolve_backend_python >/dev/null 2>&1; then return 0; fi
+  hesabix_install_backend_python_packages || return 1
+  hesabix_resolve_backend_python >/dev/null 2>&1
+}
+hesabix_ensure_backend_venv() {
+  local api_dir="$1" python_bin="$2"
+  local venv_dir="${api_dir}/.venv"
+  local venv_py="${venv_dir}/bin/python"
+  HESABIX_VENV_RECREATED=0
+  if [[ ! -x "${python_bin}" ]]; then return 1; fi
+  if ! hesabix_python_cmd_meets_minimum "${python_bin}"; then return 1; fi
+  if [[ -d "${venv_dir}" ]] && [[ -x "${venv_py}" ]]; then
+    local venv_ver
+    venv_ver=$(hesabix_python_cmd_version "${venv_py}")
+    if ! hesabix_python_version_ge "${venv_ver}" "${HESABIX_MIN_PYTHON_MAJOR}" "${HESABIX_MIN_PYTHON_MINOR}"; then
+      rm -rf "${venv_dir}"
+      HESABIX_VENV_RECREATED=1
+    fi
+  fi
+  if [[ ! -d "${venv_dir}" ]]; then
+    "${python_bin}" -m venv "${venv_dir}" || return 1
+    HESABIX_VENV_RECREATED=1
+  fi
+  [[ -x "${venv_py}" ]]
+}
+HESABIX_PYTHON_INLINE
+fi
 # Load PyPI/Flutter mirror helpers: repo scripts/mirror_config.sh, or inline fallback for curl installer.
 hesabix_load_mirror_config() {
   if declare -F configure_pip_hesabix_mirror >/dev/null 2>&1; then
@@ -1388,19 +1487,27 @@ install_prereqs() {
   log_info "Updating package list..."
   apt-get update -y
   
-  # Detect Python 3 version and install appropriate packages
-  # Ubuntu 24.04 uses python3.12 by default, Ubuntu 22.04 uses python3.10/3.11
-  # We'll use python3 and python3-venv which work on all versions
+  # hesabix-api requires Python >= 3.11 (pyproject.toml). Ubuntu 24.04: python3=3.12;
+  # Ubuntu 22.04: python3=3.10 — install python3.11 when needed (scripts/hesabix_python.sh).
   # WeasyPrint (PDF) requires: libcairo2, libpango*, libgdk-pixbuf-2.0-0 (note: hyphen in package name on Ubuntu 24)
   log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, postgresql-client, redis-server, WeasyPrint system deps (libpango/cairo)..."
   apt-get install -y git curl unzip xz-utils ca-certificates \
     python3 python3-venv python3-pip build-essential \
     nginx postgresql postgresql-contrib postgresql-client redis-server \
     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info
-  
-  # Detect Python version for logging
-  PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-  log_info "Python version detected: ${PYTHON_VERSION}"
+
+  if ! hesabix_ensure_backend_python; then
+    log_error "hesabix-api requires Python >= 3.11. Install python3.11 (or newer) and re-run deploy."
+    exit 1
+  fi
+  local backend_python backend_py_ver
+  backend_python=$(hesabix_resolve_backend_python)
+  backend_py_ver=$("${backend_python}" --version 2>&1)
+  log_info "Backend Python: ${backend_py_ver} (${backend_python})"
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+    log_info "System default python3: ${PYTHON_VERSION}"
+  fi
   
   # Ensure PostgreSQL service is enabled and started
   if command -v systemctl >/dev/null 2>&1; then
@@ -1667,9 +1774,21 @@ deploy_backend() {
 
   configure_pip_hesabix_mirror
   set_pip_mirror_env
-  # Python venv + install
-  if [[ ! -d ".venv" ]]; then
-    python3 -m venv .venv
+
+  local backend_python
+  if ! backend_python=$(hesabix_resolve_backend_python); then
+    log_info "Python >= 3.11 not found; installing packages..."
+    if ! hesabix_install_backend_python_packages || ! backend_python=$(hesabix_resolve_backend_python); then
+      log_error "hesabix-api requires Python >= 3.11. Could not install or locate a suitable interpreter."
+      exit 1
+    fi
+  fi
+  if ! hesabix_ensure_backend_venv "${api_dir}" "${backend_python}"; then
+    log_error "Failed to create backend virtualenv with ${backend_python}"
+    exit 1
+  fi
+  if [[ "${HESABIX_VENV_RECREATED:-0}" == "1" ]]; then
+    log_info "Backend virtualenv created/rebuilt with Python >= 3.11."
   fi
   # shellcheck disable=SC1091
   source .venv/bin/activate
@@ -1726,7 +1845,7 @@ deploy_backend() {
 
   # Verify database connection before init
   echo "Verifying database connection..."
-  if ! python3 -c "
+  if ! .venv/bin/python -c "
 import sys
 sys.path.insert(0, '.')
 from app.core.settings import get_settings
