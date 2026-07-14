@@ -92,6 +92,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
 
+  // قیود مالیاتی / مودیان (از API)
+  bool _taxTypeChangeAllowed = true;
+  String? _taxTypeChangeBlockReason;
+  bool _taxHeaderLocked = false;
+  bool _isInTaxWorkspace = false;
+  String? _taxStatus;
+  String? _taxTrackingCode;
+
+  List<InvoiceType>? get _taxAllowedInvoiceTypes {
+    if (_isInTaxWorkspace && _taxTypeChangeAllowed && !_taxHeaderLocked) {
+      return const [InvoiceType.sales, InvoiceType.salesReturn];
+    }
+    return null;
+  }
+
   // طرف حساب (فروش/برگشت فروش: مشتری؛ خرید/برگشت خرید: تامین‌کننده)
   Customer? _selectedCustomer;
   Person? _selectedSupplier;
@@ -390,6 +405,16 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       final String docType = (item['document_type']?.toString() ?? '');
       final String typeValue = docType.startsWith('invoice_') ? docType.substring('invoice_'.length) : docType;
       _selectedInvoiceType = InvoiceType.fromValue(typeValue) ?? InvoiceType.sales;
+
+      _taxTypeChangeAllowed = item['tax_type_change_allowed'] != false;
+      _taxTypeChangeBlockReason = item['tax_type_change_block_reason']?.toString();
+      if (_taxTypeChangeBlockReason != null && _taxTypeChangeBlockReason!.trim().isEmpty) {
+        _taxTypeChangeBlockReason = null;
+      }
+      _taxHeaderLocked = item['tax_header_locked'] == true;
+      _isInTaxWorkspace = item['is_in_tax_workspace'] == true;
+      _taxStatus = item['tax_status']?.toString();
+      _taxTrackingCode = item['tax_tracking_code']?.toString();
 
       _invoiceNumber = item['code']?.toString();
       _isProforma = item['is_proforma'] == true;
@@ -825,6 +850,80 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     );
   }
 
+  Widget _buildTaxConstraintBanner() {
+    final reason = _taxTypeChangeBlockReason?.trim();
+    final inWorkspaceHint = _isInTaxWorkspace &&
+        !_taxHeaderLocked &&
+        _taxTypeChangeAllowed &&
+        reason == null;
+    if ((reason == null || reason.isEmpty) && !inWorkspaceHint) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isError = _taxHeaderLocked;
+    final bg = isError
+        ? colorScheme.errorContainer.withValues(alpha: 0.35)
+        : colorScheme.primaryContainer.withValues(alpha: 0.35);
+    final fg = isError ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer;
+    final icon = isError ? Icons.lock_outline : Icons.info_outline;
+
+    final lines = <String>[];
+    if (reason != null && reason.isNotEmpty) {
+      lines.add(reason);
+    } else if (inWorkspaceHint) {
+      lines.add(
+        'این فاکتور در کارپوشه مالیاتی است. فقط «فروش» و «برگشت از فروش» مجازند؛ '
+        'برای تغییر به نوع دیگر ابتدا از کارپوشه خارج کنید.',
+      );
+    }
+    if (_taxTrackingCode != null && _taxTrackingCode!.trim().isNotEmpty) {
+      lines.add('کد رهگیری مودیان: ${_taxTrackingCode!.trim()}');
+    } else if (_taxStatus != null && _taxStatus!.trim().isNotEmpty) {
+      lines.add('وضعیت مالیاتی: ${_taxStatus!.trim()}');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: fg, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  lines.join('\n'),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: fg, height: 1.45),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceTypeCombobox() {
+    return InvoiceTypeCombobox(
+      selectedType: _selectedInvoiceType,
+      onTypeChanged: _handleInvoiceTypeChanged,
+      isDraft: _isProforma,
+      onDraftChanged: _handleDraftChanged,
+      isRequired: true,
+      label: 'نوع فاکتور',
+      hintText: 'انتخاب نوع فاکتور',
+      enableTypeChange: _taxTypeChangeAllowed,
+      enableDraftToggle: !_taxHeaderLocked,
+      allowedTypes: _taxAllowedInvoiceTypes,
+    );
+  }
+
   Widget _buildInvoiceInfoTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -834,6 +933,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              _buildTaxConstraintBanner(),
               LayoutBuilder(
                 builder: (context, constraints) {
                   final t = AppLocalizations.of(context);
@@ -842,15 +942,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     // موبایل: Column layout
                     return Column(
                       children: [
-                        InvoiceTypeCombobox(
-                          selectedType: _selectedInvoiceType,
-                          onTypeChanged: _handleInvoiceTypeChanged,
-                          isDraft: _isProforma,
-                          onDraftChanged: _handleDraftChanged,
-                          isRequired: true,
-                          label: 'نوع فاکتور',
-                          hintText: 'انتخاب نوع فاکتور',
-                        ),
+                        _buildInvoiceTypeCombobox(),
                         const SizedBox(height: 12),
                         CodeFieldWidget(
                           initialValue: _invoiceNumber,
@@ -926,15 +1018,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: InvoiceTypeCombobox(
-                                selectedType: _selectedInvoiceType,
-                                onTypeChanged: _handleInvoiceTypeChanged,
-                                isDraft: _isProforma,
-                                onDraftChanged: _handleDraftChanged,
-                                isRequired: true,
-                                label: 'نوع فاکتور',
-                                hintText: 'انتخاب نوع فاکتور',
-                              ),
+                              child: _buildInvoiceTypeCombobox(),
                             ),
                             const SizedBox(width: 12),
                             Expanded(

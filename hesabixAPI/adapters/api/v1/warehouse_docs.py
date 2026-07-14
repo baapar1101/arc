@@ -1,7 +1,6 @@
 from typing import Dict, Any, List
 from datetime import datetime
 from fastapi import APIRouter, Depends, Request, Body, Response
-from sqlalchemy import and_, or_, exists
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db, SessionLocal
@@ -10,7 +9,6 @@ from app.core.permissions import require_business_access
 from app.core.responses import success_response, ApiError
 from adapters.db.models.document import Document
 from adapters.db.models.invoice_item_line import InvoiceItemLine
-from adapters.db.models.person import Person
 from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 from app.services.invoice_service import (
@@ -35,6 +33,7 @@ from app.services.warehouse_service import (
 	delete_warehouse_document,
 	export_warehouse_documents_excel,
 	post_warehouse_document,
+	search_invoices_for_warehouse_sources,
 	start_stock_count,
 	update_warehouse_document,
 	update_warehouse_document_line,
@@ -247,151 +246,16 @@ def search_invoice_sources_for_warehouse(
 	search_term = str(body.get("search") or "").strip()
 	include_completed = _to_bool(body.get("include_completed"))
 
-	q = db.query(Document).filter(
-		and_(
-			Document.business_id == business_id,
-			Document.document_type.in_(cfg["invoice_types"]),
-			Document.is_proforma == False,  # noqa: E712
-		)
+	response = search_invoices_for_warehouse_sources(
+		db,
+		business_id,
+		cfg["invoice_types"],
+		doc_type_hint=cfg.get("doc_type"),
+		search_term=search_term,
+		include_completed=include_completed,
+		skip=skip,
+		take=take,
 	)
-
-	if search_term:
-		pattern = f"%{search_term}%"
-		q = q.filter(Document.code.ilike(pattern))
-
-	wh_exists = exists().where(
-		and_(
-			WarehouseDocument.business_id == business_id,
-			WarehouseDocument.source_type == "invoice",
-			WarehouseDocument.source_document_id == Document.id,
-		)
-	)
-
-	wh_non_posted_exists = exists().where(
-		and_(
-			WarehouseDocument.business_id == business_id,
-			WarehouseDocument.source_type == "invoice",
-			WarehouseDocument.source_document_id == Document.id,
-			WarehouseDocument.status != "posted",
-		)
-	)
-
-	if not include_completed:
-		q = q.filter(or_(~wh_exists, wh_non_posted_exists))
-
-	total = q.count()
-	rows = (
-		q.order_by(Document.document_date.desc(), Document.id.desc())
-		.offset(skip)
-		.limit(take)
-		.all()
-	)
-
-	invoice_ids = [doc.id for doc in rows]
-	warehouse_map: Dict[int, List[WarehouseDocument]] = {}
-	if invoice_ids:
-		wh_rows = (
-			db.query(WarehouseDocument)
-			.filter(
-				and_(
-					WarehouseDocument.business_id == business_id,
-					WarehouseDocument.source_type == "invoice",
-					WarehouseDocument.source_document_id.in_(invoice_ids),
-				)
-			)
-			.all()
-		)
-		for wh in wh_rows:
-			warehouse_map.setdefault(int(wh.source_document_id or 0), []).append(wh)
-
-	person_ids = []
-	for doc in rows:
-		extra = doc.extra_info or {}
-		pid = extra.get("person_id")
-		if pid:
-			try:
-				person_ids.append(int(pid))
-			except Exception:
-				continue
-	person_ids = list({pid for pid in person_ids})
-	person_map: Dict[int, str] = {}
-	if person_ids:
-		person_rows = (
-			db.query(Person.id, Person.alias_name, Person.first_name, Person.last_name, Person.company_name)
-			.filter(and_(Person.id.in_(person_ids), Person.business_id == business_id))
-			.all()
-		)
-		for prow in person_rows:
-			name = prow.alias_name
-			if not name:
-				parts = filter(None, [getattr(prow, "first_name", None), getattr(prow, "last_name", None)])
-				joined = " ".join(parts).strip()
-				name = joined or getattr(prow, "company_name", None) or ""
-			person_map[int(prow.id)] = name
-
-	items: List[Dict[str, Any]] = []
-	for doc in rows:
-		extra = doc.extra_info or {}
-		person_name = extra.get("person_name")
-		person_id = extra.get("person_id")
-		if not person_name and person_id:
-			try:
-				person_name = person_map.get(int(person_id))
-			except Exception:
-				person_name = None
-
-		totals = extra.get("totals") if isinstance(extra, dict) else None
-		net_amount = None
-		if isinstance(totals, dict):
-			try:
-				net_amount = float(totals.get("net") or 0)
-			except Exception:
-				net_amount = None
-
-		wh_list = warehouse_map.get(doc.id, [])
-		statuses = [wh.status for wh in wh_list]
-		state = "missing"
-		if wh_list:
-			has_posted = any(st == "posted" for st in statuses)
-			has_draft = any(st == "draft" for st in statuses)
-			if has_posted and has_draft:
-				state = "partial"
-			elif has_posted:
-				state = "posted"
-			elif has_draft:
-				state = "draft"
-			else:
-				state = statuses[0] or "unknown"
-
-		items.append({
-			"invoice_id": doc.id,
-			"code": doc.code,
-			"document_date": doc.document_date.isoformat(),
-			"invoice_type": doc.document_type,
-			"person_name": person_name,
-			"person_id": person_id,
-			"net_amount": net_amount,
-			"warehouse_state": state,
-			"warehouse_doc_type_hint": cfg.get("doc_type"),
-			"warehouse_documents": [
-				{
-					"id": wh.id,
-					"code": wh.code,
-					"status": wh.status,
-					"doc_type": wh.doc_type,
-				}
-				for wh in wh_list
-			],
-		})
-
-	response = {
-		"items": items,
-		"total": total,
-		"take": take,
-		"skip": skip,
-		"page": (skip // take) + 1,
-		"total_pages": (total + take - 1) // take if take else 1,
-	}
 	return success_response(data=response, request=request)
 
 

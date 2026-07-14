@@ -5210,6 +5210,9 @@ def update_invoice(
     if inv_type not in SUPPORTED_INVOICE_TYPES:
         raise ApiError("INVALID_INVOICE_TYPE", "Unsupported invoice_type", http_status=400)
     if inv_type != _old_document_type:
+        from app.services.tax_reference_service import validate_invoice_type_change_for_tax
+
+        validate_invoice_type_change_for_tax(document, _old_document_type, inv_type)
         document.document_type = inv_type
     data["invoice_type"] = inv_type
 
@@ -5226,7 +5229,16 @@ def update_invoice(
     document.currency_id = int(currency_id)
     # به‌روزرسانی وضعیت پیش‌فاکتور
     if "is_proforma" in data:
-        document.is_proforma = bool(data.get("is_proforma", False))
+        _new_is_proforma = bool(data.get("is_proforma", False))
+        if _new_is_proforma != _old_is_proforma:
+            from app.services.tax_reference_service import validate_invoice_proforma_change_for_tax
+
+            validate_invoice_proforma_change_for_tax(
+                document,
+                old_is_proforma=_old_is_proforma,
+                new_is_proforma=_new_is_proforma,
+            )
+        document.is_proforma = _new_is_proforma
     # به‌روزرسانی پروژه
     if "project_id" in data:
         project_id = data.get("project_id")
@@ -6858,6 +6870,21 @@ def invoice_document_to_dict(
     else:
         result["tags"] = []
         result["tags_display"] = ""
+
+    try:
+        from app.services.tax_reference_service import build_tax_edit_constraints_for_api
+        from app.services.tax_submission_service import build_tax_status_fields_for_api
+
+        _tax_extra = dict(document.extra_info or {})
+        result.update(build_tax_status_fields_for_api(_tax_extra))
+        result.update(build_tax_edit_constraints_for_api(document))
+    except Exception as tax_meta_ex:
+        logger.warning(
+            "tax edit constraints for invoice %s failed: %s",
+            document.id,
+            tax_meta_ex,
+            exc_info=True,
+        )
 
     return result
 

@@ -445,7 +445,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           enableSorting: true,
           defaultSortBy: 'document_date',
           defaultSortDesc: true,
-          searchFields: const ['code'],
+          searchFields: const ['code', 'counterparty'],
           filterFields: const ['doc_type', 'status', 'document_date', 'source_type'],
           dateRangeField: 'document_date',
           enableDateRangeFilter: true,

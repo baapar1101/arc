@@ -64,18 +64,22 @@ def test_sanitize_extra_info_removes_sales_fields_on_purchase() -> None:
 
 
 def test_warehouse_document_is_invoice_sourced_by_source_type() -> None:
-    wh = MagicMock()
+    from adapters.db.models.warehouse_document import WarehouseDocument
+
+    wh = WarehouseDocument()
     wh.source_type = "invoice"
     wh.source_document_id = None
     assert _warehouse_document_is_invoice_sourced(MagicMock(), 1, wh) is True
 
 
 def test_warehouse_doc_cancels_invoice_sourced_wh() -> None:
+    from adapters.db.models.warehouse_document import WarehouseDocument
+
     db = MagicMock()
-    cancel_wh = MagicMock()
+    cancel_wh = WarehouseDocument()
     cancel_wh.extra_info = {"cancels_warehouse_document_id": 42}
 
-    src_wh = MagicMock()
+    src_wh = WarehouseDocument()
     src_wh.source_type = "invoice"
     src_wh.source_document_id = 100
 

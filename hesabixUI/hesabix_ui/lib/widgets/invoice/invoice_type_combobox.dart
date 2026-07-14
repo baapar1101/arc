@@ -9,6 +9,12 @@ class InvoiceTypeCombobox extends StatefulWidget {
   final bool isRequired;
   final String? label;
   final String? hintText;
+  /// اگر false باشد انتخاب نوع فاکتور غیرفعال است (مثلاً پس از ارسال به مودیان).
+  final bool enableTypeChange;
+  /// اگر false باشد سویچ پیش‌فاکتور غیرفعال است.
+  final bool enableDraftToggle;
+  /// محدودیت لیست انواع مجاز؛ null = همه انواع.
+  final List<InvoiceType>? allowedTypes;
 
   const InvoiceTypeCombobox({
     super.key,
@@ -19,6 +25,9 @@ class InvoiceTypeCombobox extends StatefulWidget {
     this.isRequired = true,
     this.label = 'نوع فاکتور',
     this.hintText = 'انتخاب نوع فاکتور',
+    this.enableTypeChange = true,
+    this.enableDraftToggle = true,
+    this.allowedTypes,
   });
 
   @override
@@ -69,16 +78,19 @@ class _InvoiceTypeComboboxState extends State<InvoiceTypeCombobox> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final typeOptions = widget.allowedTypes ?? InvoiceType.allTypes;
 
     return DropdownButtonFormField<InvoiceType>(
       initialValue: _selectedType,
-      onChanged: (InvoiceType? newValue) {
-        if (newValue != null) {
-          _selectType(newValue);
-        } else if (!widget.isRequired) {
-          _clearSelection();
-        }
-      },
+      onChanged: widget.enableTypeChange
+          ? (InvoiceType? newValue) {
+              if (newValue != null) {
+                _selectType(newValue);
+              } else if (!widget.isRequired) {
+                _clearSelection();
+              }
+            }
+          : null,
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hintText,
@@ -96,12 +108,14 @@ class _InvoiceTypeComboboxState extends State<InvoiceTypeCombobox> {
                 message: _isDraft ? 'حالت پیش‌نویس فعال است' : 'فعال کردن حالت پیش‌نویس',
                 child: Switch(
                   value: _isDraft,
-                  onChanged: (value) {
-                    setState(() {
-                      _isDraft = value;
-                    });
-                    widget.onDraftChanged(value);
-                  },
+                  onChanged: widget.enableDraftToggle
+                      ? (value) {
+                          setState(() {
+                            _isDraft = value;
+                          });
+                          widget.onDraftChanged(value);
+                        }
+                      : null,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ),
@@ -116,7 +130,7 @@ class _InvoiceTypeComboboxState extends State<InvoiceTypeCombobox> {
           ],
         ),
       ),
-      items: InvoiceType.allTypes.map((InvoiceType type) {
+      items: typeOptions.map((InvoiceType type) {
         return DropdownMenuItem<InvoiceType>(
           value: type,
           child: Row(
