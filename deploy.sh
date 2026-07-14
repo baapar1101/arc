@@ -1835,6 +1835,93 @@ hesabix_db_is_fully_initialized() {
     && [[ "$(hesabix_db_table_exists documents)" == "t" ]]
 }
 
+hesabix_dump_archive_format_version() {
+  local dump="$1"
+  python3 - "${dump}" <<'PY'
+import struct, sys
+path = sys.argv[1]
+try:
+    with open(path, "rb") as f:
+        if f.read(5) != b"PGDMP":
+            raise SystemExit(0)
+        vmaj, vmin = struct.unpack(">BB", f.read(2))
+        print(f"{vmaj}.{vmin}")
+except OSError:
+    pass
+PY
+}
+
+hesabix_pg_major_for_archive_format() {
+  local fmt="${1:-}"
+  case "${fmt}" in
+    1.16|1.15) printf '%s' "17" ;;
+    1.14) printf '%s' "16" ;;
+    1.13) printf '%s' "15" ;;
+    1.12) printf '%s' "14" ;;
+    1.11|1.10) printf '%s' "13" ;;
+    *) return 1 ;;
+  esac
+}
+
+hesabix_ensure_pgdg_apt_repo() {
+  if [[ -f /etc/apt/sources.list.d/pgdg.list ]]; then
+    return 0
+  fi
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get install -y curl ca-certificates gnupg lsb-release >/dev/null 2>&1 || true
+  install -d /usr/share/postgresql-common/pgdg
+  if ! curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    | gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg 2>/dev/null; then
+    return 1
+  fi
+  local codename
+  codename=$(. /etc/os-release 2>/dev/null && printf '%s' "${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}")
+  [[ -z "${codename}" ]] && return 1
+  printf '%s\n' \
+    "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt ${codename}-pgdg main" \
+    > /etc/apt/sources.list.d/pgdg.list
+  apt-get update -y >/dev/null 2>&1 || return 1
+}
+
+hesabix_ensure_postgresql_client_major() {
+  local major="$1"
+  local bin="/usr/lib/postgresql/${major}/bin/pg_restore"
+  [[ -x "${bin}" ]] && return 0
+  log_info "Installing postgresql-client-${major} (required to read seed dump format)..."
+  hesabix_ensure_pgdg_apt_repo || return 1
+  apt-get install -y "postgresql-client-${major}" || return 1
+  [[ -x "${bin}" ]]
+}
+
+# Pick pg_restore >= dump format (e.g. format 1.15 needs PostgreSQL 17 client).
+hesabix_resolve_pg_restore_for_dump() {
+  local dump="$1" fmt major m bin
+  fmt=$(hesabix_dump_archive_format_version "${dump}")
+  if [[ -n "${fmt}" ]]; then
+    if major=$(hesabix_pg_major_for_archive_format "${fmt}"); then
+      hesabix_ensure_postgresql_client_major "${major}" || true
+      bin="/usr/lib/postgresql/${major}/bin/pg_restore"
+      if [[ -x "${bin}" ]]; then
+        printf '%s' "${bin}"
+        return 0
+      fi
+      log_warning "Seed dump format ${fmt} needs PostgreSQL ${major} client; installing newer client..."
+      for m in 17 16 15 14; do
+        if [[ "${m}" -ge "${major}" ]] 2>/dev/null; then
+          hesabix_ensure_postgresql_client_major "${m}" || continue
+          bin="/usr/lib/postgresql/${m}/bin/pg_restore"
+          [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
+        fi
+      done
+    fi
+  fi
+  for m in 17 16 15 14; do
+    bin="/usr/lib/postgresql/${m}/bin/pg_restore"
+    [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
+  done
+  command -v pg_restore 2>/dev/null || true
+}
+
 hesabix_reset_public_schema_for_seed() {
   local table_count="$1"
   log_warning "Database is not fully initialized (${table_count} table(s), core schema missing)."
@@ -1849,11 +1936,20 @@ SQL
 
 hesabix_run_pg_restore_seed() {
   local seed_dump="$1" restore_log="$2"
-  # Restore as postgres superuser; --no-owner assigns objects to hesabix where possible.
-  if sudo -u postgres pg_restore -d hesabix --no-owner --no-acl "${seed_dump}" >>"${restore_log}" 2>&1; then
-    return 0
+  local pg_restore_bin
+  pg_restore_bin=$(hesabix_resolve_pg_restore_for_dump "${seed_dump}")
+  if [[ -z "${pg_restore_bin}" || ! -x "${pg_restore_bin}" ]]; then
+    log_error "pg_restore not found."
+    return 1
   fi
-  return 1
+  log_info "Using $(${pg_restore_bin} --version 2>&1 | head -1)"
+  sudo -u postgres "${pg_restore_bin}" -d hesabix --no-owner --no-acl "${seed_dump}" >>"${restore_log}" 2>&1
+}
+
+hesabix_seed_restore_failed_fatal() {
+  local restore_log="$1"
+  [[ -f "${restore_log}" ]] || return 1
+  grep -qE 'unsupported version|could not read from input file|input file appears to be a text format' "${restore_log}" 2>/dev/null
 }
 
 hesabix_ensure_public_schema_owner() {
@@ -1872,9 +1968,13 @@ hesabix_import_seed_database() {
   if hesabix_run_pg_restore_seed "${seed_dump}" "${restore_log}"; then
     log_success "Seed database imported successfully."
   else
+    if hesabix_seed_restore_failed_fatal "${restore_log}"; then
+      log_error "Seed dump format is newer than pg_restore on this server (see ${restore_log})."
+      log_error "Deploy will install postgresql-client-17 from PGDG when possible; or regenerate seed with older pg_dump / plain SQL."
+      exit 1
+    fi
     if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
       log_warning "Seed import finished with warnings (see ${restore_log})."
-      log_success "Seed database imported (some non-fatal warnings may have occurred)."
     else
       log_error "Error importing seed database. Check ${restore_log}"
       exit 1
