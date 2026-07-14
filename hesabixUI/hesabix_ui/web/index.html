@@ -93,16 +93,13 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#0F4C81">
 
-  <!-- Brand fonts for loader (matches Flutter app) -->
-  <link rel="preload" href="assets/fonts/YekanBakhFaNum-Regular.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="preload" href="assets/fonts/YekanBakhFaNum-Bold.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="preload" href="assets/fonts/roboto.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preconnect" href="https://hsxn.hesabix.ir" crossorigin>
-  <link rel="dns-prefetch" href="https://hsxn.hesabix.ir">
-  
-  <!-- Preload critical resources for faster page loads -->
+  <link rel="preload" href="fonts/YekanBakhFaNum-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="fonts/YekanBakhFaNum-SemiBold.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="fonts/roboto.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="hesabix_web_loader.css" as="style">
   <link rel="preload" href="hesabix_web_loader.js" as="script">
+  <link rel="preconnect" href="https://hsxn.hesabix.ir" crossorigin>
+  <link rel="dns-prefetch" href="https://hsxn.hesabix.ir">
   <link rel="preload" href="flutter_bootstrap.js" as="script">
   <link rel="preload" href="flutter_web_preload.js" as="script">
   <link rel="preload" href="assets/images/logo-light.svg" as="image" type="image/svg+xml">
@@ -131,68 +128,38 @@
 <body>
   <script src="hesabix_web_loader.js"></script>
 
-  <div id="flutter-loading-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Loading Hesabix">
-    <div class="loader-bg" aria-hidden="true"></div>
-    <div class="loader-layout">
-      <aside class="loader-brand" aria-hidden="true">
-        <img class="loader-brand__logo" src="assets/images/logo-light.svg" width="52" height="52" alt="" decoding="async" />
-        <h1 class="loader-brand__title" id="loader-brand-title">حسابیکس</h1>
-        <p class="loader-brand__subtitle" id="loader-brand-subtitle">حسابداری ابری هوشمند، امن و همیشه در دسترس برای کسب‌وکار شما.</p>
-        <div class="loader-brand__trust">
-          <div class="loader-brand__trust-item"><span class="loader-brand__trust-dot"></span><span id="loader-trust-cloud">دسترسی ابری</span></div>
-          <div class="loader-brand__trust-item"><span class="loader-brand__trust-dot"></span><span id="loader-trust-secure">رمزنگاری‌شده</span></div>
-          <div class="loader-brand__trust-item"><span class="loader-brand__trust-dot"></span><span id="loader-trust-support">پشتیبانی ۲۴/۷</span></div>
+  <div id="flutter-loading-screen" role="status" aria-live="polite" aria-busy="true">
+    <div class="loader-center">
+      <div class="loader-logo-wrap">
+        <img
+          class="loader-logo"
+          src="assets/images/logo-blue.png"
+          width="44"
+          height="44"
+          alt="Hesabix"
+          decoding="async"
+          fetchpriority="high" />
+      </div>
+      <h1 class="loader-title" id="loader-title">حسابیکس</h1>
+      <p class="loader-tagline" id="loader-tagline">حسابداری ابری هوشمند برای کسب‌وکار شما</p>
+
+      <div class="loader-progress-block">
+        <div class="loader-progress-track is-indeterminate" id="loading-progress-wrap">
+          <div class="loader-progress-bar" id="loading-progress-bar"></div>
         </div>
-      </aside>
+      </div>
 
-      <main class="loader-main">
-        <div class="loader-panel">
-          <img class="loader-logo" src="assets/images/logo-blue.png" width="64" height="64" alt="Hesabix" decoding="async" fetchpriority="high" />
-          <h2 class="loader-title" id="loader-title">حسابیکس</h2>
-          <p class="loader-subtitle" id="loader-subtitle">حسابداری ابری هوشمند برای کسب‌وکار شما</p>
+      <p class="loader-status" id="loading-status">در حال بارگذاری…</p>
 
-          <div class="loader-trust-mobile" aria-hidden="true">
-            <span class="loader-trust-chip" id="loader-trust-cloud-m">ابری</span>
-            <span class="loader-trust-chip" id="loader-trust-secure-m">امن</span>
-            <span class="loader-trust-chip" id="loader-trust-support-m">پشتیبانی</span>
-          </div>
+      <div class="loader-spinner" aria-hidden="true"></div>
 
-          <div class="loading-steps" aria-hidden="true">
-            <div class="loading-step is-active" data-step="0">
-              <div class="loading-step__icon"><span class="loading-step__num">1</span></div>
-              <span class="loading-step__label" id="loader-step-0-label">اتصال</span>
-            </div>
-            <div class="loading-step" data-step="1">
-              <div class="loading-step__icon"><span class="loading-step__num">2</span></div>
-              <span class="loading-step__label" id="loader-step-1-label">منابع</span>
-            </div>
-            <div class="loading-step" data-step="2">
-              <div class="loading-step__icon"><span class="loading-step__num">3</span></div>
-              <span class="loading-step__label" id="loader-step-2-label">آماده‌سازی</span>
-            </div>
-          </div>
+      <p class="loader-quote" id="loading-quote" aria-hidden="true">
+        <span id="loading-quote-text"></span>
+      </p>
 
-          <p class="loading-quote" id="loading-quote" aria-hidden="true">
-            <span id="loading-quote-text">…</span>
-          </p>
-
-          <div class="loader-spinner" aria-hidden="true"></div>
-
-          <div class="loader-progress-row">
-            <div class="loader-progress-wrap is-indeterminate" id="loading-progress-wrap">
-              <div class="loader-progress-bar" id="loading-progress-bar"></div>
-            </div>
-            <span class="loader-progress-pct" id="loading-progress-pct" aria-hidden="true"></span>
-          </div>
-
-          <p class="loader-status" id="loading-status">در حال بارگذاری…</p>
-          <p class="loader-version" id="loader-version" aria-hidden="true"></p>
-
-          <div id="loader-retry-wrap" hidden>
-            <button type="button" id="loader-retry-btn" onclick="window.location.reload()">تلاش مجدد</button>
-          </div>
-        </div>
-      </main>
+      <div id="loader-retry-wrap" hidden>
+        <button type="button" id="loader-retry-btn" onclick="window.location.reload()">تلاش مجدد</button>
+      </div>
     </div>
   </div>
 

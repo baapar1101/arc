@@ -15,46 +15,30 @@
   var STRINGS = {
     fa: {
       title: 'حسابیکس',
-      subtitle: 'حسابداری ابری هوشمند برای کسب‌وکار شما',
+      tagline: 'حسابداری ابری هوشمند برای کسب‌وکار شما',
       statusDefault: 'در حال بارگذاری…',
       statusApp: 'بارگذاری برنامه…',
       statusUi: 'آماده‌سازی رابط کاربری…',
       statusEngine: 'تقریباً آماده است…',
       statusDone: 'ورود به برنامه…',
-      trustCloud: 'دسترسی ابری',
-      trustSecure: 'رمزنگاری‌شده',
-      trustSupport: 'پشتیبانی ۲۴/۷',
-      stepConnect: 'اتصال',
-      stepAssets: 'منابع',
-      stepReady: 'آماده‌سازی',
       retry: 'تلاش مجدد',
-      versionPrefix: 'نسخه',
       quotes: [
         'برای امنیت بیشتر، پس از کار از حساب خود خارج شوید.',
-        'نسخهٔ وب را به‌روز نگه دارید تا از آخرین بهبودها بهره ببرید.',
         'ثبت منظم اسناد، پایهٔ گزارش‌های دقیق مالی است.',
         'از پشتیبان‌گیری منظم داده‌های کسب‌وکار غافل نشوید.',
       ],
     },
     en: {
       title: 'Hesabix',
-      subtitle: 'Smart cloud accounting for your business',
+      tagline: 'Smart cloud accounting for your business',
       statusDefault: 'Loading…',
       statusApp: 'Loading application…',
       statusUi: 'Preparing interface…',
       statusEngine: 'Almost ready…',
       statusDone: 'Starting app…',
-      trustCloud: 'Cloud access',
-      trustSecure: 'Encrypted',
-      trustSupport: '24/7 support',
-      stepConnect: 'Connect',
-      stepAssets: 'Assets',
-      stepReady: 'Prepare',
       retry: 'Try again',
-      versionPrefix: 'Version',
       quotes: [
         'Sign out when you finish for better security.',
-        'Keep your browser updated for the latest improvements.',
         'Consistent bookkeeping leads to accurate reports.',
         'Back up your business data regularly.',
       ],
@@ -161,21 +145,11 @@
 
   function applyStaticCopy() {
     var s = t();
+    var dark = detectDark();
     var map = {
       'loader-title': s.title,
-      'loader-brand-title': s.title,
-      'loader-subtitle': s.subtitle,
-      'loader-brand-subtitle': s.subtitle,
+      'loader-tagline': s.tagline,
       'loading-status': s.statusDefault,
-      'loader-trust-cloud': s.trustCloud,
-      'loader-trust-secure': s.trustSecure,
-      'loader-trust-support': s.trustSupport,
-      'loader-trust-cloud-m': s.trustCloud,
-      'loader-trust-secure-m': s.trustSecure,
-      'loader-trust-support-m': s.trustSupport,
-      'loader-step-0-label': s.stepConnect,
-      'loader-step-1-label': s.stepAssets,
-      'loader-step-2-label': s.stepReady,
       'loader-retry-btn': s.retry,
     };
     Object.keys(map).forEach(function (id) {
@@ -187,22 +161,12 @@
 
     var logo = document.querySelector('.loader-logo');
     if (logo) {
-      logo.src = detectDark() ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png';
+      logo.src = dark ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png';
     }
   }
 
-  function applyLoadingPhase(phase) {
-    var steps = document.querySelectorAll('#flutter-loading-screen .loading-step');
-    var p = parseInt(phase, 10);
-    if (isNaN(p)) p = 0;
-    p = Math.max(0, Math.min(2, p));
-    for (var i = 0; i < steps.length; i++) {
-      var el = steps[i];
-      var idx = parseInt(el.getAttribute('data-step') || String(i), 10);
-      el.classList.remove('is-active', 'is-done');
-      if (idx < p) el.classList.add('is-done');
-      else if (idx === p) el.classList.add('is-active');
-    }
+  function applyLoadingPhase(_phase) {
+    /* مراحل بصری حذف شد — سازگاری با flutter_web_preload */
   }
 
   function setDownloadProgress(percent) {
@@ -222,8 +186,6 @@
     if (screen) screen.classList.add('has-definite-progress');
     var clamped = Math.max(0, Math.min(100, percent));
     bar.style.width = clamped + '%';
-    var pctEl = document.getElementById('loading-progress-pct');
-    if (pctEl) pctEl.textContent = Math.round(clamped) + '%';
   }
 
   function setStatus(line) {
@@ -269,19 +231,6 @@
     if (btn) btn.hidden = false;
   }
 
-  function fetchVersionLabel() {
-    fetch('version.json?t=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) {
-        var build = j && typeof j.build === 'string' ? j.build : '';
-        var el = document.getElementById('loader-version');
-        if (el && build) {
-          el.textContent = t().versionPrefix + ' ' + build.slice(0, 12);
-        }
-      })
-      .catch(function () {});
-  }
-
   function hideLoadingScreen() {
     if (appReadySignaled) return;
     appReadySignaled = true;
@@ -316,13 +265,6 @@
   function onDomReady() {
     applyTheme();
     applyStaticCopy();
-    applyLoadingPhase(0);
-    fetchVersionLabel();
-
-    setTimeout(function () {
-      applyLoadingPhase(1);
-    }, 350);
-
     setTimeout(markSlowLoad, SLOW_MS);
     setTimeout(showRetry, RETRY_MS);
   }
