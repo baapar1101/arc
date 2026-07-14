@@ -1769,7 +1769,9 @@ SQL
 
 hesabix_db_table_exists() {
   local table="$1"
-  PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc \
+  # Use postgres superuser: pg_restore --no-owner leaves objects owned by postgres;
+  # hesabix cannot see them in information_schema until grants/ownership are fixed.
+  sudo -u postgres psql -d hesabix -tAc \
     "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='${table}');" \
     2>/dev/null | tr -d '[:space:]'
 }
@@ -1780,38 +1782,6 @@ hesabix_current_alembic_revision() {
   fi
   PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc \
     "SELECT version_num FROM alembic_version LIMIT 1;" 2>/dev/null | tr -d '[:space:]'
-}
-
-# Revision bundled with seed dump (sidecar file, env, or embedded alembic_version data).
-hesabix_read_seed_alembic_revision() {
-  local dump="$1" backup_dir="$2" rev="" f
-  if [[ -n "${HESABIX_SEED_ALEMBIC_REVISION:-}" ]]; then
-    printf '%s' "${HESABIX_SEED_ALEMBIC_REVISION}"
-    return 0
-  fi
-  for f in "${dump}.revision" "${backup_dir}/hesabix_seed.revision"; do
-    if [[ -f "${f}" ]]; then
-      rev=$(tr -d '[:space:]' < "${f}")
-      if [[ -n "${rev}" ]]; then
-        printf '%s' "${rev}"
-        return 0
-      fi
-    fi
-  done
-  if [[ -f "${dump}" ]] && command -v pg_restore >/dev/null 2>&1; then
-    rev=$(
-      pg_restore -a -t alembic_version "${dump}" 2>/dev/null | awk '
-        /^COPY / { copy=1; next }
-        copy && $0 == "\\." { exit }
-        copy && $0 !~ /^--/ && NF { gsub(/\r/, ""); print; exit }
-      '
-    )
-    if [[ -n "${rev}" ]]; then
-      printf '%s' "${rev}"
-      return 0
-    fi
-  fi
-  return 1
 }
 
 hesabix_validate_seed_schema() {
@@ -1851,16 +1821,35 @@ except OSError:
 PY
 }
 
+# Minimum pg_restore major required to read a custom archive format (not the dump source version).
 hesabix_pg_major_for_archive_format() {
   local fmt="${1:-}"
   case "${fmt}" in
-    1.16|1.15) printf '%s' "17" ;;
-    1.14) printf '%s' "16" ;;
+    1.16) printf '%s' "17" ;;
+    1.15|1.14) printf '%s' "16" ;;
     1.13) printf '%s' "15" ;;
     1.12) printf '%s' "14" ;;
     1.11|1.10) printf '%s' "13" ;;
     *) return 1 ;;
   esac
+}
+
+hesabix_detect_postgresql_server_major() {
+  local ver_num v
+  ver_num=$(sudo -u postgres psql -tAc "SHOW server_version_num;" 2>/dev/null | tr -d '[:space:]')
+  if [[ -n "${ver_num}" ]] && [[ "${ver_num}" =~ ^[0-9]+$ ]]; then
+    echo $((10#${ver_num} / 10000))
+    return 0
+  fi
+  detect_postgresql_major_version_for_config 2>/dev/null || return 1
+}
+
+hesabix_list_installed_pg_client_majors() {
+  local m bin
+  for m in 18 17 16 15 14 13; do
+    bin="/usr/lib/postgresql/${m}/bin/pg_restore"
+    [[ -x "${bin}" ]] && echo "${m}"
+  done
 }
 
 hesabix_ensure_pgdg_apt_repo() {
@@ -1871,7 +1860,7 @@ hesabix_ensure_pgdg_apt_repo() {
   apt-get install -y curl ca-certificates gnupg lsb-release >/dev/null 2>&1 || true
   install -d /usr/share/postgresql-common/pgdg
   if ! curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-    | gpg --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg 2>/dev/null; then
+    | gpg --batch --yes --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg 2>/dev/null; then
     return 1
   fi
   local codename
@@ -1893,33 +1882,131 @@ hesabix_ensure_postgresql_client_major() {
   [[ -x "${bin}" ]]
 }
 
-# Pick pg_restore >= dump format (e.g. format 1.15 needs PostgreSQL 17 client).
+# Pick pg_restore that can read the dump and preferably matches the target server major
+# (pg_restore newer than server may emit SET transaction_timeout on PG < 17).
 hesabix_resolve_pg_restore_for_dump() {
-  local dump="$1" fmt major m bin
+  local dump="$1" fmt min_major server_major m bin install_m
+  local -a installed=()
   fmt=$(hesabix_dump_archive_format_version "${dump}")
+  min_major=""
   if [[ -n "${fmt}" ]]; then
-    if major=$(hesabix_pg_major_for_archive_format "${fmt}"); then
-      hesabix_ensure_postgresql_client_major "${major}" || true
-      bin="/usr/lib/postgresql/${major}/bin/pg_restore"
+    min_major=$(hesabix_pg_major_for_archive_format "${fmt}" 2>/dev/null) || min_major=""
+  fi
+  server_major=$(hesabix_detect_postgresql_server_major 2>/dev/null) || server_major=""
+  while IFS= read -r m; do
+    [[ -n "${m}" ]] && installed+=("${m}")
+  done < <(hesabix_list_installed_pg_client_majors)
+
+  if [[ -n "${min_major}" ]]; then
+    if [[ -n "${server_major}" ]] && [[ "${server_major}" -ge "${min_major}" ]]; then
+      bin="/usr/lib/postgresql/${server_major}/bin/pg_restore"
       if [[ -x "${bin}" ]]; then
+        log_info "pg_restore: PostgreSQL ${server_major} client (matches server; dump format ${fmt})."
         printf '%s' "${bin}"
         return 0
       fi
-      log_warning "Seed dump format ${fmt} needs PostgreSQL ${major} client; installing newer client..."
-      for m in 17 16 15 14; do
-        if [[ "${m}" -ge "${major}" ]] 2>/dev/null; then
-          hesabix_ensure_postgresql_client_major "${m}" || continue
-          bin="/usr/lib/postgresql/${m}/bin/pg_restore"
-          [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
+    fi
+    if [[ -n "${server_major}" ]]; then
+      for m in "${installed[@]}"; do
+        if [[ "${m}" -ge "${min_major}" ]] && [[ "${m}" -le "${server_major}" ]]; then
+          log_info "pg_restore: PostgreSQL ${m} client (dump format ${fmt}; server ${server_major})."
+          printf '%s' "/usr/lib/postgresql/${m}/bin/pg_restore"
+          return 0
         fi
       done
     fi
+    for m in "${installed[@]}"; do
+      if [[ "${m}" -ge "${min_major}" ]]; then
+        if [[ -n "${server_major}" ]] && [[ "${m}" -gt "${server_major}" ]]; then
+          log_warning "pg_restore ${m} for dump format ${fmt} on PostgreSQL ${server_major} server — may cause transaction_timeout errors; prefer matching client or upgrade PostgreSQL."
+        fi
+        printf '%s' "/usr/lib/postgresql/${m}/bin/pg_restore"
+        return 0
+      fi
+    done
+    install_m="${min_major}"
+    if [[ -n "${server_major}" ]] && [[ "${server_major}" -ge "${min_major}" ]]; then
+      install_m="${server_major}"
+    fi
+    hesabix_ensure_postgresql_client_major "${install_m}" || true
+    bin="/usr/lib/postgresql/${install_m}/bin/pg_restore"
+    if [[ -x "${bin}" ]]; then
+      printf '%s' "${bin}"
+      return 0
+    fi
+    for m in 18 17 16 15 14 13; do
+      [[ "${m}" -ge "${min_major}" ]] || continue
+      hesabix_ensure_postgresql_client_major "${m}" || continue
+      bin="/usr/lib/postgresql/${m}/bin/pg_restore"
+      if [[ -x "${bin}" ]]; then
+        if [[ -n "${server_major}" ]] && [[ "${m}" -gt "${server_major}" ]]; then
+          log_warning "Installed pg_restore ${m} for format ${fmt}; target server is PostgreSQL ${server_major}."
+        fi
+        printf '%s' "${bin}"
+        return 0
+      fi
+    done
   fi
-  for m in 17 16 15 14; do
+
+  if [[ -n "${server_major}" ]]; then
+    bin="/usr/lib/postgresql/${server_major}/bin/pg_restore"
+    [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
+  fi
+  for m in 18 17 16 15 14 13; do
     bin="/usr/lib/postgresql/${m}/bin/pg_restore"
     [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
   done
   command -v pg_restore 2>/dev/null || true
+}
+
+# Revision bundled with seed dump (sidecar file, env, or embedded alembic_version data).
+hesabix_read_seed_alembic_revision() {
+  local dump="$1" backup_dir="$2" rev="" f pg_restore_bin
+  if [[ -n "${HESABIX_SEED_ALEMBIC_REVISION:-}" ]]; then
+    printf '%s' "${HESABIX_SEED_ALEMBIC_REVISION}"
+    return 0
+  fi
+  for f in "${dump}.revision" "${backup_dir}/hesabix_seed.revision"; do
+    if [[ -f "${f}" ]]; then
+      rev=$(tr -d '[:space:]' < "${f}")
+      if [[ -n "${rev}" ]]; then
+        printf '%s' "${rev}"
+        return 0
+      fi
+    fi
+  done
+  if [[ -f "${dump}" ]]; then
+    pg_restore_bin=$(hesabix_resolve_pg_restore_for_dump "${dump}")
+    if [[ -n "${pg_restore_bin}" && -x "${pg_restore_bin}" ]]; then
+      rev=$(
+        "${pg_restore_bin}" -a -t alembic_version "${dump}" 2>/dev/null | awk '
+          /^COPY / { copy=1; next }
+          copy && $0 == "\\." { exit }
+          copy && $0 !~ /^--/ && NF { gsub(/\r/, ""); print; exit }
+        '
+      )
+      if [[ -n "${rev}" ]]; then
+        printf '%s' "${rev}"
+        return 0
+      fi
+    fi
+  fi
+  return 1
+}
+
+hesabix_ensure_alembic_version_schema() {
+  log_info "Ensuring alembic_version schema compatibility..."
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=0 <<'SQL' 2>/dev/null || true
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='alembic_version') THEN
+    ALTER TABLE public.alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);
+  ELSE
+    CREATE TABLE public.alembic_version (version_num VARCHAR(255) PRIMARY KEY);
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+SQL
 }
 
 hesabix_reset_public_schema_for_seed() {
@@ -1949,7 +2036,13 @@ hesabix_run_pg_restore_seed() {
 hesabix_seed_restore_failed_fatal() {
   local restore_log="$1"
   [[ -f "${restore_log}" ]] || return 1
-  grep -qE 'unsupported version|could not read from input file|input file appears to be a text format' "${restore_log}" 2>/dev/null
+  grep -qE 'unsupported version|could not read from input file|input file appears to be a text format|unrecognized configuration parameter .transaction_timeout' "${restore_log}" 2>/dev/null
+}
+
+hesabix_seed_restore_client_server_mismatch() {
+  local restore_log="$1"
+  [[ -f "${restore_log}" ]] || return 1
+  grep -qE 'unrecognized configuration parameter .transaction_timeout' "${restore_log}" 2>/dev/null
 }
 
 hesabix_ensure_public_schema_owner() {
@@ -1957,6 +2050,32 @@ hesabix_ensure_public_schema_owner() {
 ALTER SCHEMA public OWNER TO hesabix;
 GRANT ALL ON SCHEMA public TO hesabix;
 GRANT CREATE ON SCHEMA public TO hesabix;
+SQL
+}
+
+# pg_restore --no-owner runs as postgres: tables stay owned by postgres without ACLs.
+# Grant and reassign table owners so hesabix (app user) can read/write and see schema checks.
+hesabix_fixup_seed_object_privileges() {
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
+ALTER SCHEMA public OWNER TO hesabix;
+GRANT ALL ON SCHEMA public TO hesabix;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO hesabix;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO hesabix;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO hesabix;
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p', 'v', 'm')
+      AND pg_get_userbyid(c.relowner) = 'postgres'
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I OWNER TO hesabix', r.relname);
+  END LOOP;
+END $$;
 SQL
 }
 
@@ -1969,8 +2088,14 @@ hesabix_import_seed_database() {
     log_success "Seed database imported successfully."
   else
     if hesabix_seed_restore_failed_fatal "${restore_log}"; then
-      log_error "Seed dump format is newer than pg_restore on this server (see ${restore_log})."
-      log_error "Deploy will install postgresql-client-17 from PGDG when possible; or regenerate seed with older pg_dump / plain SQL."
+      if hesabix_seed_restore_client_server_mismatch "${restore_log}"; then
+        log_error "pg_restore client is newer than the PostgreSQL server (see ${restore_log})."
+        log_error "Use a pg_restore matching the server major (e.g. postgresql-client-16 on Ubuntu 24.04), or upgrade PostgreSQL."
+        log_error "Alternatively regenerate the seed dump with pg_dump from the same major as the target server."
+      else
+        log_error "Seed dump format is newer than pg_restore on this server (see ${restore_log})."
+        log_error "Install postgresql-client-N from PGDG when possible, or regenerate seed with pg_dump / plain SQL for this server version."
+      fi
       exit 1
     fi
     if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
@@ -1980,6 +2105,7 @@ hesabix_import_seed_database() {
       exit 1
     fi
   fi
+  hesabix_fixup_seed_object_privileges
   hesabix_validate_seed_schema
   hesabix_ensure_alembic_revision_after_seed "${seed_dump}" "${backup_dir}"
 }
@@ -2105,7 +2231,7 @@ print('Connection successful')
   local seed_dump
   seed_dump=$(ls -t "${backup_dir}"/hesabix_seed*.dump 2>/dev/null | head -1)
   local table_count
-  table_count=$(PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
+  table_count=$(sudo -u postgres psql -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
   if [[ ! "${table_count}" =~ ^[0-9]+$ ]]; then
     table_count=999
   fi
@@ -2120,7 +2246,7 @@ print('Connection successful')
         table_count=0
       fi
       hesabix_import_seed_database "${seed_dump}" "${backup_dir}"
-      table_count=$(PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
+      table_count=$(sudo -u postgres psql -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
     fi
   elif [[ "${table_count}" -eq 0 ]]; then
     echo "$WARNING_MARK Seed dump not found in ${backup_dir}/hesabix_seed*.dump"
@@ -2145,6 +2271,7 @@ print('Connection successful')
     log_error "Check ${APP_ROOT}/pg_restore_seed.log or recreate the hesabix database."
     exit 1
   fi
+  hesabix_ensure_alembic_version_schema
   log_step "Running Alembic migrations..."
   if ! alembic upgrade head; then
     echo "$CROSS_MARK Error running migrations"
