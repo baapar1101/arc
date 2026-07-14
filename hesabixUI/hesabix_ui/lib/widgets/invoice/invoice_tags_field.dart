@@ -193,7 +193,7 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
         Container(
           width: double.infinity,
           padding: widget.embedded
-              ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+              ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6)
               : EdgeInsets.zero,
           decoration: widget.embedded
               ? BoxDecoration(

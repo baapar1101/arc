@@ -4,7 +4,6 @@ import '../../models/person_model.dart';
 import '../../services/person_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-import '../person/person_financial_balance_banner.dart';
 import 'invoice_form_layout.dart';
 
 class SellerPickerWidget extends StatefulWidget {
@@ -186,62 +185,41 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final inlineBalance =
-        widget.showFinancialBalance && widget.selectedSeller?.id != null;
 
     final displayText = widget.selectedSeller != null
         ? widget.selectedSeller!.displayName
         : widget.hintText;
 
-    return InvoiceFormFieldShell(
-      multiline: inlineBalance,
-      minMultilineHeight: inlineBalance ? 64 : null,
-      reserveHelperSlot: !inlineBalance,
-      child: InputDecorator(
-        decoration: InvoiceFormFieldMetrics.mergeDecoration(
-          context,
-          InputDecoration(
-            labelText: widget.label,
-            hintText: widget.hintText,
-            prefixIcon: const Icon(Icons.person_search_outlined, size: 20),
-            suffixIcon: widget.selectedSeller != null
-                ? IconButton(
-                    tooltip: 'پاک کردن',
-                    icon: Icon(Icons.clear, color: colorScheme.error, size: 18),
-                    onPressed: () => widget.onSellerChanged(null),
-                    padding: EdgeInsets.zero,
-                    constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
-                  )
-                : const Icon(Icons.arrow_drop_down),
-            suffixIconConstraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
-          ),
+    return InputDecorator(
+      decoration: InvoiceFormFieldMetrics.mergeDecoration(
+        context,
+        InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          suffixIcon: widget.selectedSeller != null
+              ? IconButton(
+                  tooltip: 'پاک کردن',
+                  icon: Icon(Icons.clear, color: colorScheme.error, size: 18),
+                  onPressed: () => widget.onSellerChanged(null),
+                  padding: EdgeInsets.zero,
+                  constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                )
+              : const Icon(Icons.arrow_drop_down, size: 22),
+          suffixIconConstraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
         ),
-        child: InkWell(
-          onTap: _showSellerPicker,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                displayText,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: widget.selectedSeller != null
-                      ? colorScheme.onSurface
-                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
-                  fontWeight:
-                      widget.selectedSeller != null ? FontWeight.w500 : FontWeight.normal,
-                ),
-              ),
-              if (inlineBalance)
-                Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: PersonFinancialBalanceBanner(
-                    selectedPerson: widget.selectedSeller,
-                  ),
-                ),
-            ],
+      ),
+      child: InkWell(
+        onTap: _showSellerPicker,
+        child: Text(
+          displayText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: widget.selectedSeller != null
+                ? colorScheme.onSurface
+                : colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+            fontWeight:
+                widget.selectedSeller != null ? FontWeight.w500 : FontWeight.normal,
           ),
         ),
       ),

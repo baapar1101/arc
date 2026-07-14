@@ -901,7 +901,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
   Widget _buildInvoiceInfoTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1600),
@@ -952,7 +952,6 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             manualFxRateId: _manualFxRateId,
             fxRateRows: _fxRateRows,
             onFxRateChanged: (v) => setState(() => _manualFxRateId = v),
-            reserveFxLayoutSlot: _canPickFxRate,
             selectedProjectId: _selectedProjectId,
             onProjectChanged: (projectId) {
               setState(() => _selectedProjectId = projectId);

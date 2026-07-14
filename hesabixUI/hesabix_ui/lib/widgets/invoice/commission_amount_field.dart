@@ -91,11 +91,6 @@ class _CommissionAmountFieldState extends State<CommissionAmountField> {
           InputDecoration(
             labelText: widget.label,
             hintText: widget.hintText,
-            prefixIcon: Icon(
-              Icons.attach_money,
-              size: 20,
-              color: Theme.of(context).colorScheme.primary,
-            ),
             errorText: _errorText,
             errorStyle: TextStyle(
               color: Theme.of(context).colorScheme.error,

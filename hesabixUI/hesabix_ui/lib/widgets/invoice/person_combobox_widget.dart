@@ -8,6 +8,7 @@ import '../../widgets/person/person_financial_balance_banner.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
+import 'invoice_form_layout.dart';
 
 class _PersonPickerState {
   final List<Person> persons;
@@ -56,6 +57,7 @@ class PersonComboboxWidget extends StatefulWidget {
   final String? searchHint;
   /// نمایش مانده حساب و بدهکار/بستانکار زیر فیلد (برای فرم‌های مالی)
   final bool showFinancialBalance;
+  final bool dense;
 
   const PersonComboboxWidget({
     super.key,
@@ -68,6 +70,7 @@ class PersonComboboxWidget extends StatefulWidget {
     this.personTypes,
     this.searchHint,
     this.showFinancialBalance = false,
+    this.dense = false,
   });
 
   @override
@@ -735,51 +738,98 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
             child: TextField(
               controller: _searchController,
               focusNode: _fieldFocus,
-              decoration: InputDecoration(
-                labelText: widget.label,
-                hintText: widget.hintText,
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.person_search),
-                suffixIconConstraints: const BoxConstraints(
-                  minHeight: 40,
-                  maxHeight: 40,
-                  minWidth: 72,
-                  maxWidth: 104,
-                ),
-                suffixIcon: Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'افزودن شخص جدید',
-                        icon: Icon(Icons.add, color: colorScheme.primary),
-                        onPressed: _addNewPersonFromField,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                      ),
-                      if (_isSearching)
-                        const Padding(
-                          padding: EdgeInsetsDirectional.only(end: 4),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+              decoration: widget.dense
+                  ? InvoiceFormFieldMetrics.mergeDecoration(
+                      context,
+                      InputDecoration(
+                        labelText: widget.label,
+                        hintText: widget.hintText,
+                        suffixIconConstraints: const BoxConstraints(
+                          minHeight: 36,
+                          maxHeight: 36,
+                          minWidth: 72,
+                          maxWidth: 104,
+                        ),
+                        suffixIcon: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'افزودن شخص جدید',
+                                icon: Icon(Icons.add, color: colorScheme.primary, size: 20),
+                                onPressed: _addNewPersonFromField,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                              ),
+                              if (_isSearching)
+                                const Padding(
+                                  padding: EdgeInsetsDirectional.only(end: 4),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                              IconButton(
+                                tooltip: 'انتخاب پیشرفته',
+                                icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary, size: 20),
+                                onPressed: _showPersonPicker,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                              ),
+                            ],
                           ),
                         ),
-                      IconButton(
-                        tooltip: 'انتخاب پیشرفته',
-                        icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
-                        onPressed: _showPersonPicker,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    )
+                  : InputDecoration(
+                      labelText: widget.label,
+                      hintText: widget.hintText,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.person_search),
+                      suffixIconConstraints: const BoxConstraints(
+                        minHeight: 40,
+                        maxHeight: 40,
+                        minWidth: 72,
+                        maxWidth: 104,
+                      ),
+                      suffixIcon: Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'افزودن شخص جدید',
+                              icon: Icon(Icons.add, color: colorScheme.primary),
+                              onPressed: _addNewPersonFromField,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            ),
+                            if (_isSearching)
+                              const Padding(
+                                padding: EdgeInsetsDirectional.only(end: 4),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            IconButton(
+                              tooltip: 'انتخاب پیشرفته',
+                              icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                              onPressed: _showPersonPicker,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
               onTap: () {
                 _showDesktopOverlay();
                 if (_searchController.text.trim().isEmpty) {

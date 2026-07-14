@@ -92,11 +92,6 @@ class _CommissionPercentageFieldState extends State<CommissionPercentageField> {
                 color: Theme.of(context).colorScheme.primary,
                 fontWeight: FontWeight.w500,
               ),
-          prefixIcon: Icon(
-            Icons.percent,
-            size: 20,
-            color: Theme.of(context).colorScheme.primary,
-          ),
           errorText: _errorText,
           errorStyle: TextStyle(
             color: Theme.of(context).colorScheme.error,

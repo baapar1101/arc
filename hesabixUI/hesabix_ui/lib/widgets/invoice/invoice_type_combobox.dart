@@ -18,6 +18,8 @@ class InvoiceTypeCombobox extends StatefulWidget {
   final List<InvoiceType>? allowedTypes;
   /// سویچ پیش‌نویس داخل suffix فیلد؛ در فرم فاکتور جدید بیرون فیلد نمایش داده می‌شود.
   final bool showInlineDraftToggle;
+  /// بدون آیکون prefix برای چیدمان فشرده.
+  final bool compact;
 
   const InvoiceTypeCombobox({
     super.key,
@@ -32,6 +34,7 @@ class InvoiceTypeCombobox extends StatefulWidget {
     this.enableDraftToggle = true,
     this.allowedTypes,
     this.showInlineDraftToggle = false,
+    this.compact = false,
   });
 
   @override
@@ -86,6 +89,7 @@ class _InvoiceTypeComboboxState extends State<InvoiceTypeCombobox> {
 
     return DropdownButtonFormField<InvoiceType>(
       initialValue: _selectedType,
+      isDense: widget.compact,
       onChanged: widget.enableTypeChange
           ? (InvoiceType? newValue) {
               if (newValue != null) {
@@ -100,9 +104,11 @@ class _InvoiceTypeComboboxState extends State<InvoiceTypeCombobox> {
         InputDecoration(
           labelText: widget.label,
           hintText: widget.hintText,
-          prefixIcon: _selectedType != null
-              ? Icon(_getTypeIcon(_selectedType!), size: 20)
-              : const Icon(Icons.category_outlined, size: 20),
+          prefixIcon: widget.compact
+              ? null
+              : (_selectedType != null
+                  ? Icon(_getTypeIcon(_selectedType!), size: 20)
+                  : const Icon(Icons.category_outlined, size: 20)),
           suffixIcon: widget.showInlineDraftToggle
               ? Row(
                   mainAxisSize: MainAxisSize.min,

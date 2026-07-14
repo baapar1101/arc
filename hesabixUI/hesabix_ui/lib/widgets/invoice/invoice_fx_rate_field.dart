@@ -27,7 +27,6 @@ class InvoiceFxRateField extends StatefulWidget {
     required this.manualRateId,
     required this.rateRows,
     this.onChanged,
-    this.reserveLayoutSlot = false,
   });
 
   final bool show;
@@ -35,8 +34,6 @@ class InvoiceFxRateField extends StatefulWidget {
   final int? manualRateId;
   final List<Map<String, dynamic>> rateRows;
   final ValueChanged<int?>? onChanged;
-  /// اگر true باشد و [show] false، جای فیلد حفظ می‌شود تا چیدمان نپرد.
-  final bool reserveLayoutSlot;
 
   @override
   State<InvoiceFxRateField> createState() => _InvoiceFxRateFieldState();
@@ -187,65 +184,38 @@ class _InvoiceFxRateFieldState extends State<InvoiceFxRateField> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.show && !widget.reserveLayoutSlot) {
+    if (!widget.show) {
       return const SizedBox.shrink();
     }
 
     final t = AppLocalizations.of(context);
-    final helper = t.invoiceFxRateHelper;
 
-    if (!widget.show) {
-      return InvoiceFormFieldShell(
-        reserveHelperSlot: true,
-        helperText: ' ',
-        child: const SizedBox.shrink(),
-      );
-    }
-
-    return InvoiceFormFieldShell(
-      helperText: widget.loading ? null : helper,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          InputDecorator(
-            decoration: InvoiceFormFieldMetrics.mergeDecoration(
-              context,
-              InputDecoration(
-                labelText: t.invoiceFxRateFieldLabel,
-                suffixIcon: const Icon(Icons.arrow_drop_down),
-                suffixIconConstraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
-              ),
-            ),
-            child: InkWell(
-              onTap: widget.loading ? null : _openPicker,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _summaryLabel(t),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
+    return InputDecorator(
+      decoration: InvoiceFormFieldMetrics.mergeDecoration(
+        context,
+        InputDecoration(
+          labelText: t.invoiceFxRateFieldLabel,
+          suffixIcon: widget.loading
+              ? const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                ],
-              ),
-            ),
-          ),
-          if (widget.loading)
-            const Positioned(
-              left: 12,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            ),
-        ],
+                )
+              : const Icon(Icons.arrow_drop_down, size: 22),
+          suffixIconConstraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+        ),
+      ),
+      child: InkWell(
+        onTap: widget.loading ? null : _openPicker,
+        child: Text(
+          _summaryLabel(t),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
       ),
     );
   }

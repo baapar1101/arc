@@ -6,6 +6,7 @@ import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/project/project_form_dialog.dart';
+import 'package:hesabix_ui/widgets/invoice/invoice_form_layout.dart';
 
 /// ویجت انتخاب پروژه (کمبوباکس)
 class ProjectSelectorWidget extends StatefulWidget {
@@ -89,22 +90,28 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
     return DropdownButtonFormField<int?>(
       value: _loading ? null : widget.selectedProjectId,
       isDense: widget.isDense,
-      decoration: InputDecoration(
-        labelText: widget.labelText ?? 'پروژه',
-        border: const OutlineInputBorder(),
-        errorText: _error != null ? 'خطا در بارگذاری پروژه‌ها' : null,
-        suffixIcon: _buildSuffixIcon(),
-        suffixIconConstraints: BoxConstraints(
-          minWidth: widget.isDense ? 36 : 40,
-          maxWidth: 120,
-          minHeight: widget.isDense ? 36 : 40,
-          maxHeight: widget.isDense ? 44 : 48,
-        ),
-        isDense: widget.isDense,
-        contentPadding: widget.isDense
-            ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
-            : null,
-      ),
+      decoration: widget.isDense
+          ? InvoiceFormFieldMetrics.mergeDecoration(
+              context,
+              InputDecoration(
+                labelText: widget.labelText ?? 'پروژه',
+                errorText: _error != null ? 'خطا در بارگذاری پروژه‌ها' : null,
+                suffixIcon: _buildSuffixIcon(),
+                suffixIconConstraints: InvoiceFormFieldMetrics.suffixIconConstraints,
+              ),
+            )
+          : InputDecoration(
+              labelText: widget.labelText ?? 'پروژه',
+              border: const OutlineInputBorder(),
+              errorText: _error != null ? 'خطا در بارگذاری پروژه‌ها' : null,
+              suffixIcon: _buildSuffixIcon(),
+              suffixIconConstraints: BoxConstraints(
+                minWidth: 40,
+                maxWidth: 120,
+                minHeight: 40,
+                maxHeight: 48,
+              ),
+            ),
       isExpanded: true,
       items: [
         if (widget.allowNull)

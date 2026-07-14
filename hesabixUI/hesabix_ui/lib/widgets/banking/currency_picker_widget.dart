@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
 import '../../utils/error_extractor.dart';
+import '../invoice/invoice_form_layout.dart';
 
 class CurrencyPickerWidget extends StatefulWidget {
   final int? selectedCurrencyId;
@@ -90,17 +91,23 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
     bool enabled = true,
     String? errorText,
   }) {
-    final base = InputDecoration(
-      labelText: widget.label ?? 'ارز',
-      hintText: widget.hintText ?? 'انتخاب ارز',
-      border: border ?? const OutlineInputBorder(),
-      enabled: enabled,
-      errorText: errorText,
-      isDense: widget.isDense,
-      contentPadding: widget.isDense
-          ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
-          : null,
-    );
+    final base = widget.isDense
+        ? InvoiceFormFieldMetrics.mergeDecoration(
+            context,
+            InputDecoration(
+              labelText: widget.label ?? 'ارز',
+              hintText: widget.hintText ?? 'انتخاب ارز',
+              enabled: enabled,
+              errorText: errorText,
+            ),
+          )
+        : InputDecoration(
+            labelText: widget.label ?? 'ارز',
+            hintText: widget.hintText ?? 'انتخاب ارز',
+            border: border ?? const OutlineInputBorder(),
+            enabled: enabled,
+            errorText: errorText,
+          );
     return base;
   }
 

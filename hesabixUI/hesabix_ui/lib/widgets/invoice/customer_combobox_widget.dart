@@ -7,6 +7,7 @@ import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/person/person_financial_balance_banner.dart';
+import 'invoice_form_layout.dart';
 import '../../models/person_model.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -52,6 +53,7 @@ class CustomerComboboxWidget extends StatefulWidget {
   final String? hintText;
   /// مانده طرف حساب زیر نام داخل همان فیلد (شناسه مشتری همان شخص است)
   final bool showFinancialBalance;
+  final bool dense;
 
   const CustomerComboboxWidget({
     super.key,
@@ -63,6 +65,7 @@ class CustomerComboboxWidget extends StatefulWidget {
     this.label = 'طرف حساب',
     this.hintText = 'انتخاب طرف حساب',
     this.showFinancialBalance = false,
+    this.dense = false,
   });
 
   @override
@@ -735,42 +738,80 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
             child: TextField(
               controller: _searchController,
               focusNode: _fieldFocus,
-              decoration: InputDecoration(
-                labelText: widget.label,
-                hintText: widget.hintText,
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.person_search),
-                suffixIconConstraints: const BoxConstraints(
-                  minHeight: 40,
-                  maxHeight: 40,
-                  minWidth: 72,
-                  maxWidth: 80,
-                ),
-                suffixIcon: Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'افزودن طرف حساب جدید',
-                        icon: Icon(Icons.add, color: colorScheme.primary),
-                        onPressed: _addNewCustomerFromField,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              decoration: widget.dense
+                  ? InvoiceFormFieldMetrics.mergeDecoration(
+                      context,
+                      InputDecoration(
+                        labelText: widget.label,
+                        hintText: widget.hintText,
+                        suffixIconConstraints: const BoxConstraints(
+                          minHeight: 36,
+                          maxHeight: 36,
+                          minWidth: 72,
+                          maxWidth: 80,
+                        ),
+                        suffixIcon: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'افزودن طرف حساب جدید',
+                                icon: Icon(Icons.add, color: colorScheme.primary, size: 20),
+                                onPressed: _addNewCustomerFromField,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                              ),
+                              IconButton(
+                                tooltip: 'انتخاب پیشرفته',
+                                icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary, size: 20),
+                                onPressed: _showCustomerPicker,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                      IconButton(
-                        tooltip: 'انتخاب پیشرفته',
-                        icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
-                        onPressed: _showCustomerPicker,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                    )
+                  : InputDecoration(
+                      labelText: widget.label,
+                      hintText: widget.hintText,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.person_search),
+                      suffixIconConstraints: const BoxConstraints(
+                        minHeight: 40,
+                        maxHeight: 40,
+                        minWidth: 72,
+                        maxWidth: 80,
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                      suffixIcon: Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'افزودن طرف حساب جدید',
+                              icon: Icon(Icons.add, color: colorScheme.primary),
+                              onPressed: _addNewCustomerFromField,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            ),
+                            IconButton(
+                              tooltip: 'انتخاب پیشرفته',
+                              icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                              onPressed: _showCustomerPicker,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
               onTap: () {
                 _showDesktopOverlay();
                 if (_searchController.text.trim().isEmpty) {
