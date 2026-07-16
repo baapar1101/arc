@@ -46,6 +46,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
   DashboardLayoutProfile? _layout;
   Map<String, dynamic> _data = <String, dynamic>{};
   bool _loading = true;
+  bool _widgetsLoading = false;
   String? _error;
   bool _editMode = false;
   final Set<int> _annBusyIds = <int>{};
@@ -86,18 +87,8 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       if (!mounted) return;
       Map<String, dynamic> nextData = _data;
       if (layout != null) {
-        final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-        var data = await _service.getWidgetsBatchData(
-          widgetKeys: keys,
-          filters: _dashboardFilters(keys),
-        );
-        data = await _service.hydrateSpecialWidgets(
-          data,
-          keys,
-          onlyUnread: _annOnlyUnread,
-        );
+        nextData = await _fetchWidgetData(layout);
         if (!mounted) return;
-        nextData = data;
       }
       setState(() {
         _supportPublic = supportCfg;
@@ -244,9 +235,17 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       setState(() {
         _loading = true;
         _error = null;
+        _data = <String, dynamic>{};
+        _widgetsLoading = false;
       });
-      final supportCfg = await SupportTicketsPublicConfig.fetch(ApiClient());
-      final defs = await _service.getWidgetDefinitions();
+
+      // فاز A: ساختار شل به‌صورت موازی (config + definitions)
+      final boot = await Future.wait<Object>([
+        SupportTicketsPublicConfig.fetch(ApiClient()),
+        _service.getWidgetDefinitions(),
+      ]);
+      final supportCfg = boot[0] as SupportTicketsPublicConfig;
+      final defs = boot[1] as DashboardDefinitionsResponse;
       if (!context.mounted) return;
       final ctx = context;
       final bp = ResponsiveHelper.breakpointFromWidth(MediaQuery.of(ctx).size.width);
@@ -264,46 +263,52 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
         }
         layout = await _service.putLayoutProfile(breakpoint: bp, items: items);
       }
-      final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-      var data = await _service.getWidgetsBatchData(
-        widgetKeys: keys,
-        filters: _dashboardFilters(keys),
-      );
-      data = await _service.hydrateSpecialWidgets(
-        data,
-        keys,
-        onlyUnread: _annOnlyUnread,
-      );
+
+      // Progressive paint: چیدمان را فوری نشان بده؛ ویجت‌ها تا رسیدن داده spinner دارند
       if (!mounted) return;
       setState(() {
         _layout = layout;
-        _data = data;
-        _loading = false;
         _supportPublic = supportCfg;
+        _loading = false;
+        _widgetsLoading = true;
+      });
+
+      // فاز B: دادهٔ ویجت‌ها (hydrate فقط در صورت نبود دادهٔ قابل‌استفاده از batch)
+      final data = await _fetchWidgetData(layout);
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _widgetsLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = ErrorExtractor.forContext(e, context);
         _loading = false;
+        _widgetsLoading = false;
       });
     }
+  }
+
+  Future<Map<String, dynamic>> _fetchWidgetData(DashboardLayoutProfile layout) async {
+    final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
+    var data = await _service.getWidgetsBatchData(
+      widgetKeys: keys,
+      filters: _dashboardFilters(keys),
+    );
+    data = await _service.hydrateSpecialWidgets(
+      data,
+      keys,
+      onlyUnread: _annOnlyUnread,
+    );
+    return data;
   }
 
   Future<void> _reloadDataOnly() async {
     try {
       final layout = _layout;
       if (layout == null) return;
-      final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-      var data = await _service.getWidgetsBatchData(
-        widgetKeys: keys,
-        filters: _dashboardFilters(keys),
-      );
-      data = await _service.hydrateSpecialWidgets(
-        data,
-        keys,
-        onlyUnread: _annOnlyUnread,
-      );
+      final data = await _fetchWidgetData(layout);
       if (!mounted) return;
       setState(() {
         _data = data;
@@ -420,65 +425,69 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 
     return Container(
       color: dashBg,
-      child: Padding(
-        padding: EdgeInsets.all(padding),
-        child: Column(
-          children: [
-            _buildHeaderRow(t),
-            SizedBox(height: _isMobile(context) ? 12 : 16),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final totalWidth = constraints.maxWidth;
-                  final spacing = _getGridSpacing(context);
-                  final unit = _computeColumnUnit(totalWidth, crossAxisCount, context);
-                  final children = _buildGridChildren(
-                    visible: visible,
-                    crossAxisCount: crossAxisCount,
-                    totalWidth: totalWidth,
-                    unit: unit,
-                    spacing: spacing,
-                  );
-                  if (!_editMode) {
-                    return SingleChildScrollView(
-                      child: Wrap(
-                        spacing: spacing,
-                        runSpacing: spacing,
-                        children: children,
-                      ),
-                    );
-                  }
-                  return SingleChildScrollView(
-                    child: ReorderableWrap(
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      needsLongPressDraggable: true,
-                      onReorder: (oldIndex, newIndex) {
-                        final list = List<DashboardLayoutItem>.from(visible);
-                        final moved = list.removeAt(oldIndex);
-                        list.insert(newIndex, moved);
-                        final profile = _layout!;
-                        final newItems = <DashboardLayoutItem>[];
-                        final visibleKeys = list.map((e) => e.key).toSet();
-                        newItems.addAll(list);
-                        for (final it in profile.items) {
-                          if (!visibleKeys.contains(it.key) && !it.hidden) continue;
-                          if (it.hidden) newItems.add(it);
+      child: Column(
+        children: [
+          if (_widgetsLoading)
+            LinearProgressIndicator(
+              minHeight: 2,
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                children: [
+                  _buildHeaderRow(t),
+                  SizedBox(height: _isMobile(context) ? 12 : 16),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final totalWidth = constraints.maxWidth;
+                        final spacing = _getGridSpacing(context);
+                        final unit = _computeColumnUnit(totalWidth, crossAxisCount, context);
+                        final children = _buildGridChildren(
+                          visible: visible,
+                          crossAxisCount: crossAxisCount,
+                          totalWidth: totalWidth,
+                          unit: unit,
+                          spacing: spacing,
+                        );
+                        if (!_editMode) {
+                          return SingleChildScrollView(
+                            child: Wrap(
+                              spacing: spacing,
+                              runSpacing: spacing,
+                              children: children,
+                            ),
+                          );
                         }
-                        _reindexAndSave(newItems);
+                        return SingleChildScrollView(
+                          child: ReorderableWrap(
+                            spacing: spacing,
+                            runSpacing: spacing,
+                            needsLongPressDraggable: true,
+                            onReorder: (oldIndex, newIndex) {
+                              final list = List<DashboardLayoutItem>.from(visible);
+                              final moved = list.removeAt(oldIndex);
+                              list.insert(newIndex, moved);
+                              final hidden = items.where((e) => e.hidden).toList();
+                              _reindexAndSave([...list, ...hidden]);
+                            },
+                            children: children,
+                          ),
+                        );
                       },
-                      children: children,
                     ),
-                  );
-                },
+                  ),
+                  if (_editMode) ...[
+                    const SizedBox(height: 12),
+                    _buildHiddenSection(t),
+                  ],
+                ],
               ),
             ),
-            if (_editMode) ...[
-              const SizedBox(height: 12),
-              _buildHiddenSection(t),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

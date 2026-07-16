@@ -423,11 +423,13 @@ class BusinessDashboardService {
     return Map<String, dynamic>.from(data);
   }
 
-  /// Polling برای دریافت نتیجه job
+  /// Polling برای دریافت نتیجه job — backoff کوتاه برای TTFB بهتر
   Future<Map<String, dynamic>> _pollJobResult(String jobId, {int maxAttempts = 60}) async {
+    const delaysMs = <int>[150, 250, 400, 600, 800, 1000];
     int attempts = 0;
     while (attempts < maxAttempts) {
-      await Future.delayed(const Duration(seconds: 1));
+      final delayMs = attempts < delaysMs.length ? delaysMs[attempts] : 1000;
+      await Future.delayed(Duration(milliseconds: delayMs));
       
       try {
         final res = await _apiClient.get<Map<String, dynamic>>('/api/v1/jobs/$jobId');
