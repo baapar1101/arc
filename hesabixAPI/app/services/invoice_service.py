@@ -2926,6 +2926,8 @@ def _empty_profit_response() -> Dict[str, Any]:
         "total_profit": 0.0,
         "total_profit_percent": 0.0,
         "total_overhead": 0.0,
+        "total_cost": 0.0,
+        "total_sales": 0.0,
         "line_profits": []
     }
 
@@ -4307,6 +4309,11 @@ def _calculate_invoice_profit(
 
         total_net_profit = total_gross_profit - total_overhead
 
+    if document.document_type == INVOICE_PRODUCTION:
+        total_cost = sum(
+            Decimal(str(lp.get("total_cost", 0) or 0)) for lp in line_profits
+        )
+
     # محاسبه درصد سود
     revenue_basis = total_sales + adjustments_net_total
     denom_total = abs(revenue_basis) if revenue_basis != Decimal(0) else Decimal(0)
@@ -4320,7 +4327,9 @@ def _calculate_invoice_profit(
     # ساخت response
     result = {
         "total_overhead": float(total_overhead),
-        "line_profits": line_profits
+        "total_cost": float(total_cost),
+        "total_sales": float(total_sales),
+        "line_profits": line_profits,
     }
     
     if normalized_type in ["gross", "both"]:

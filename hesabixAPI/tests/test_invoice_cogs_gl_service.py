@@ -12,6 +12,8 @@ from app.services.invoice_cogs_gl_service import (
     _evaluate_should_have_cogs_gl,
     _existing_cogs_gl_amount,
     _is_cogs_gl_line,
+    _total_cost_from_profit_data,
+    _recognized_ledger_cogs_total_from_document,
     resync_invoice_cogs_gl_lines,
 )
 from app.services.invoice_profit_ledger_service import (
@@ -203,3 +205,46 @@ class TestResyncInvoiceCogsGlLines:
         assert resync_invoice_cogs_gl_lines(db, 99) is True
         mock_remove.assert_not_called()
         mock_post.assert_not_called()
+
+
+class TestTotalCostFromProfitData:
+    def test_reads_top_level_total_cost(self):
+        data = {"total_cost": 1500000.0, "line_profits": [{"total_cost": 500000.0}]}
+        assert _total_cost_from_profit_data(data) == Decimal("1500000")
+
+    def test_falls_back_to_line_profits_sum(self):
+        data = {
+            "line_profits": [
+                {"total_cost": 1000000.0},
+                {"total_cost": 250000.5},
+            ]
+        }
+        assert _total_cost_from_profit_data(data) == Decimal("1250000.5")
+
+    def test_negative_total_cost_becomes_absolute(self):
+        data = {"total_cost": -800000.0, "line_profits": []}
+        assert _total_cost_from_profit_data(data) == Decimal("800000")
+
+    def test_empty_profit_data_returns_zero(self):
+        assert _total_cost_from_profit_data({}) == Decimal(0)
+
+
+class TestRecognizedLedgerCogsTotal:
+    def test_sums_recognized_lines_only(self):
+        db = MagicMock()
+        rows = [
+            SimpleNamespace(
+                ledger_recognized_at="2026-01-01",
+                ledger_line_cogs=Decimal("1000"),
+            ),
+            SimpleNamespace(
+                ledger_recognized_at=None,
+                ledger_line_cogs=Decimal("500"),
+            ),
+            SimpleNamespace(
+                ledger_recognized_at="2026-01-01",
+                ledger_line_cogs=Decimal("-250"),
+            ),
+        ]
+        db.query.return_value.filter.return_value.all.return_value = rows
+        assert _recognized_ledger_cogs_total_from_document(db, 99) == Decimal("1250")

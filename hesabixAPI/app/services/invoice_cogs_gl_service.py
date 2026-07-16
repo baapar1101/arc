@@ -96,6 +96,44 @@ def _evaluate_should_have_cogs_gl(db: Session, document: Document) -> bool:
     return False
 
 
+def _total_cost_from_profit_data(profit_data: Dict[str, Any]) -> Decimal:
+    """استخراج بهای تمام‌شده کل از خروجی محاسبه سود (با fallback به جمع خطوط)."""
+    raw_total = profit_data.get("total_cost")
+    if raw_total is not None:
+        total_cost = Decimal(str(raw_total or 0))
+    else:
+        total_cost = Decimal(0)
+        for line in profit_data.get("line_profits") or []:
+            total_cost += Decimal(str(line.get("total_cost", 0) or 0))
+    if total_cost < 0:
+        total_cost = abs(total_cost)
+    return total_cost
+
+
+def _recognized_ledger_cogs_total_from_document(db: Session, document_id: int) -> Decimal:
+    """
+    جمع بهای تمام‌شده شناسایی‌شده روی خطوط فاکتور (ستون ledger_line_cogs).
+
+    وقتی محاسبهٔ زندهٔ سود (مثلاً fifo_jbfn) مقدار صفر برمی‌گرداند ولی شناسایی قطعی
+    قبلاً روی خطوط ذخیره شده، مبنای ثبت COGS در دفتر کل همان مقادیر شناسایی‌شده است.
+    """
+    from adapters.db.models.invoice_item_line import InvoiceItemLine
+
+    rows = (
+        db.query(InvoiceItemLine)
+        .filter(InvoiceItemLine.document_id == int(document_id))
+        .all()
+    )
+    total = Decimal(0)
+    for row in rows:
+        if getattr(row, "ledger_recognized_at", None) is None:
+            continue
+        if row.ledger_line_cogs is None:
+            continue
+        total += abs(Decimal(str(row.ledger_line_cogs)))
+    return total
+
+
 def _calculate_invoice_cogs_amount_for_gl(
     db: Session,
     business_id: int,
@@ -130,10 +168,10 @@ def _calculate_invoice_cogs_amount_for_gl(
         fifo_shortage_mode=getattr(biz, "invoice_profit_fifo_shortage_mode", None),
     )
 
-    total_cost = Decimal(str(profit_data.get("total_cost", 0) or 0))
-    if total_cost < 0:
-        total_cost = abs(total_cost)
-    return total_cost
+    calculated = _total_cost_from_profit_data(profit_data)
+    if calculated > 0:
+        return calculated
+    return _recognized_ledger_cogs_total_from_document(db, int(document_id))
 
 
 def _resolve_cogs_gl_accounts(db: Session, document: Document) -> Tuple[Account, Account]:
