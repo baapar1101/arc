@@ -140,6 +140,10 @@ REASONING_EFFORT_BY_COMPLEXITY: dict[str, str] = {
 # حداکثر انتظار برای هر loader زمینهٔ prompt (ثانیه)
 PROMPT_LOADER_TIMEOUT_SEC = 4.0
 
+# حداکثر انتظار برای نوبت اضطراری «سنتز اجباری» (بدون ابزار) وقتی حلقه با
+# شواهد explored/thought اما بدون پاسخ متنی تمام شده است (Phase 1).
+FORCED_SYNTHESIS_TIMEOUT_SEC = 25.0
+
 # حداقل طول پاسخ متنی برای «کافی بودن» بدون فراخوانی ابزار (agent loop)
 SUBSTANTIVE_TEXT_MIN_CHARS = 160
 # پاسخ کوتاه‌تر از این — ممکن است یک نوبت دیگر مجاز باشد

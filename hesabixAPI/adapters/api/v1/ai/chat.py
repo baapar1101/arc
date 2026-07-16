@@ -125,6 +125,45 @@ def _prepare_assistant_persist_fields(
     return content, calls, merged_results
 
 
+def _warn_if_premature_status_answer(
+    *,
+    content: str,
+    message_content: str,
+    messages: List[Dict[str, Any]],
+    function_calls: Optional[List[Dict[str, Any]]],
+    function_results: Optional[Dict[str, Any]],
+    session_id: int,
+) -> None:
+    """هشدار نرم (فقط log) اگر محتوای در حال ذخیره شبیه narrative وضعیت باشد
+    درحالی‌که سوال نیاز به ابزار داشته و هیچ evidence ابزاری در دسترس نیست.
+
+    Plan C: صرفاً برای مانیتورینگ/متریک — هیچ رفتاری را block نمی‌کند و در
+    تصمیم‌گیری continue/stop اثری ندارد (آن قبلاً در ai_service.py گرفته شده).
+    """
+    try:
+        from app.services.ai.ai_premature_answer import looks_like_status_narrative
+        from app.services.ai.ai_tool_intent import query_expects_tool_use
+
+        if not looks_like_status_narrative(content):
+            return
+        if not query_expects_tool_use(message_content, messages):
+            return
+        has_tool_evidence = bool(function_calls) or any(
+            not str(key).startswith("_") for key in (function_results or {})
+        )
+        if has_tool_evidence:
+            return
+        logger.warning(
+            "[AI Premature Answer][session=%s] content looks like a status "
+            "narrative while needs_tools=True and no tool evidence exists: %r",
+            session_id,
+            (content or "")[:160],
+        )
+    except Exception:
+        # هشدار نرم — هرگز نباید persist را مختل کند
+        logger.debug("premature-answer check failed", exc_info=True)
+
+
 def _session_needs_title(session: AIChatSession) -> bool:
     title = (session.title or "").strip()
     return not title or title == DEFAULT_CHAT_TITLE
@@ -1311,6 +1350,26 @@ def _estimate_stream_usage_if_missing(
     }
 
 
+def _merge_agent_run_checkpoint(
+    function_results: Optional[Dict[str, Any]],
+    agent_run: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """checkpoint سبک {run_id, phase, iteration, needs_tools} را ذخیره می‌کند.
+
+    فقط داده — بدون UI/منطق resume (Phase 2، مینیمال).
+    """
+    if not agent_run:
+        return function_results
+    merged = dict(function_results or {})
+    merged["_agent_run"] = {
+        "run_id": agent_run.get("run_id"),
+        "phase": agent_run.get("phase"),
+        "iteration": agent_run.get("iteration"),
+        "needs_tools": agent_run.get("needs_tools"),
+    }
+    return merged
+
+
 async def _persist_stream_assistant_message(
     *,
     session_id: int,
@@ -1326,6 +1385,7 @@ async def _persist_stream_assistant_message(
     final_function_results: Optional[Dict[str, Any]],
     final_agent_trace: Optional[List[Dict[str, Any]]],
     stream_ai_config: Any = None,
+    final_agent_run: Optional[Dict[str, Any]] = None,
 ) -> tuple[Optional[int], Optional[Dict[str, Any]]]:
     """ذخیره پاسخ assistant و ثبت usage. برمی‌گرداند (message_id, usage)."""
     from adapters.db.session import get_db_session
@@ -1346,6 +1406,17 @@ async def _persist_stream_assistant_message(
             function_calls = leaked
     merged_function_results = merge_trace_into_function_results(
         final_function_results, finalized_trace
+    )
+    merged_function_results = _merge_agent_run_checkpoint(
+        merged_function_results, final_agent_run
+    )
+    _warn_if_premature_status_answer(
+        content=content,
+        message_content=message_content,
+        messages=messages,
+        function_calls=function_calls,
+        function_results=merged_function_results,
+        session_id=session_id,
     )
     usage = _estimate_stream_usage_if_missing(
         final_usage, stream_ai_config, messages, content
@@ -1479,6 +1550,7 @@ def _schedule_stream_persist_after_disconnect(
     final_function_results: Optional[Dict[str, Any]],
     final_agent_trace: Optional[List[Dict[str, Any]]],
     stream_ai_config: Any = None,
+    final_agent_run: Optional[Dict[str, Any]] = None,
 ) -> None:
     """ذخیره پاسخ در پس‌زمینه وقتی کلاینت قبل از done قطع می‌کند."""
     import asyncio
@@ -1507,6 +1579,7 @@ def _schedule_stream_persist_after_disconnect(
                 final_function_results=final_function_results,
                 final_agent_trace=final_agent_trace,
                 stream_ai_config=stream_ai_config,
+                final_agent_run=final_agent_run,
             )
         except Exception as exc:
             logger.warning(
@@ -1551,6 +1624,7 @@ async def _stream_message_response(
     final_function_calls: Optional[List[Dict[str, Any]]] = None
     final_function_results: Optional[Dict[str, Any]] = None
     final_agent_trace: Optional[List[Dict[str, Any]]] = None
+    final_agent_run: Optional[Dict[str, Any]] = None
     stream_ai_config = None
     prebuilt_prompt: Optional[str] = None
     prebuilt_structured: Optional[Any] = None
@@ -1558,7 +1632,7 @@ async def _stream_message_response(
 
     def _capture_chunk(chunk: Dict[str, Any]) -> None:
         nonlocal accumulated_content, final_usage, final_function_calls
-        nonlocal final_function_results, final_agent_trace
+        nonlocal final_function_results, final_agent_trace, final_agent_run
         delta = chunk.get("delta", {})
         content_chunk = delta.get("content", "")
         if content_chunk:
@@ -1571,6 +1645,8 @@ async def _stream_message_response(
             final_function_results = chunk["function_results"]
         if chunk.get("agent_trace"):
             final_agent_trace = chunk["agent_trace"]
+        if chunk.get("agent_run"):
+            final_agent_run = chunk["agent_run"]
 
     def _schedule_persist_on_disconnect() -> None:
         _schedule_stream_persist_after_disconnect(
@@ -1587,6 +1663,7 @@ async def _stream_message_response(
             final_function_results=final_function_results,
             final_agent_trace=final_agent_trace,
             stream_ai_config=stream_ai_config,
+            final_agent_run=final_agent_run,
         )
 
     try:
@@ -1663,12 +1740,17 @@ async def _stream_message_response(
 
                 _capture_chunk(chunk)
 
+                # نکته مهم: chunk نهایی (done=True) اینجا به‌عنوان SSE ارسال
+                # نمی‌شود — هنوز message_id ندارد. state آن capture شده و بعد
+                # از persist، یک done یکتا با message_id ارسال می‌شود
+                # (جلوگیری از double-done که در Flutter باعث از دست رفتن
+                # message_id می‌شد).
+                if chunk.get("done", False):
+                    break
+
                 for payload in _emit_chunk_as_sse(chunk):
                     yield payload
                     await asyncio.sleep(0)
-
-                if chunk.get("done", False):
-                    break
 
         logger.info(
             "[AI Stream][session=%s] final_response_length=%s preview=%s",
@@ -1694,6 +1776,7 @@ async def _stream_message_response(
             final_function_results=final_function_results,
             final_agent_trace=final_agent_trace,
             stream_ai_config=stream_ai_config,
+            final_agent_run=final_agent_run,
         )
 
         yield _sse_payload({
@@ -1704,6 +1787,7 @@ async def _stream_message_response(
             "function_calls": final_function_calls,
             "function_results": final_function_results,
             "agent_trace": final_agent_trace,
+            **({"agent_run": final_agent_run} if final_agent_run else {}),
             **({"warning": "Usage information not available"} if not final_usage else {}),
         })
 

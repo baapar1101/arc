@@ -127,9 +127,15 @@ def resolve_exploration_enabled(
         return False
     if mode == EXPLORATION_MODE_EXPLORE:
         return True
-    # auto
+    # auto: علاوه بر پیچیدگی، وقتی سوال قطعاً نیاز به ابزار دارد (Phase 3) هم
+    # exploration باید فعال باشد — یک سوال ساده اما داده‌محور نباید کاوش را
+    # از دست بدهد.
     complexity = estimate_query_complexity(user_query, history_messages)
-    return complexity in ("medium", "complex")
+    if complexity in ("medium", "complex"):
+        return True
+    from app.services.ai.ai_tool_intent import query_expects_tool_use
+
+    return query_expects_tool_use(user_query, history_messages)
 
 
 def new_bundle_id(iteration: int) -> str:

@@ -52,12 +52,14 @@ from app.services.ai.ai_content_sanitize import (
 from app.services.ai.ai_trace import (
     context_trace,
     extract_citations_from_result,
+    extract_explored_context_for_synthesis,
     extract_final_content_from_trace,
     extract_result_count,
     finalize_trace_steps_for_persist,
     format_planned_tools,
     summarize_tool_result,
     summarize_tool_result_for_llm,
+    trace_has_unanswered_evidence,
     trace_record_from_event,
     trace_step,
 )
@@ -73,6 +75,7 @@ from app.services.ai.ai_constants import (
     AI_OPERATION_THOUGHT,
     EXPLORATION_COMPLEXITY_ITERATIONS,
     EXPLORATION_LLM_THOUGHT_MIN_TOOLS,
+    FORCED_SYNTHESIS_TIMEOUT_SEC,
     KNOWLEDGE_LOAD_TIMEOUT_SEC,
     MAX_AGENT_ITERATIONS,
     PLANNING_STEP_MIN_CHARS,
@@ -99,6 +102,13 @@ from app.services.ai.ai_goal_assessment import (
     resolve_budget_gate,
     should_agent_continue_after_text_round,
     try_extend_budget_for_goal,
+)
+from app.services.ai.ai_agent_run import (
+    AGENT_RUN_PHASE_AGENT_LOOP,
+    AGENT_RUN_PHASE_DONE,
+    AGENT_RUN_PHASE_ERROR,
+    AGENT_RUN_PHASE_SYNTHESIZE,
+    AgentRunState,
 )
 from app.services.ai.ai_retry_policy import is_retryable_error
 from app.services.ai.ai_constants import MAX_LLM_RETRIES
@@ -134,6 +144,7 @@ from app.services.ai.ai_tool_intent import (
     estimate_query_complexity,
     filter_function_definitions,
     iterations_for_query,
+    query_expects_tool_use,
     query_needs_knowledge,
     select_tool_names,
 )
@@ -556,10 +567,17 @@ class AIService:
         user_query: Optional[str],
         history_messages: Optional[List[Dict[str, Any]]],
     ) -> bool:
+        """آیا این سوال به ابزار/داده نیاز دارد؟
+
+        قبلاً فقط بر اساس پیچیدگی (medium/complex) تصمیم می‌گرفت؛ سوال‌های ساده
+        اما داده‌محور (مثل «یه گزارش از هزینه‌ها بهم بگو») هرگز tools=None
+        نمی‌گرفتند و narrative میانی به‌جای پاسخ نهایی می‌ماند. حالا از
+        query_expects_tool_use (که هم پیچیدگی و هم دامنهٔ ابزار/تاریخچه را
+        می‌بیند) استفاده می‌شود.
+        """
         if not use_function_calling:
             return False
-        complexity = estimate_query_complexity(user_query, history_messages)
-        return complexity in ("medium", "complex")
+        return query_expects_tool_use(user_query, history_messages)
 
     def _use_tools_for_request(self, use_function_calling: bool) -> bool:
         """
@@ -1963,8 +1981,14 @@ class AIService:
             elif not eff_tools:
                 tools = None
 
+            # حتی اگر ابزار به هر دلیلی بار نشود (eff_tools/tools خالی)، وقتی خود
+            # سوال داده‌محور است باید goal_tracker وجود داشته باشد تا Plan C
+            # بتواند narrative بدون evidence را به‌عنوان پاسخ نهایی قفل نکند.
+            needs_tools_intent = query_expects_tool_use(effective_user_query, messages)
             goal_tracker: Optional[AgentGoalTracker] = (
-                AgentGoalTracker() if eff_tools and tools else None
+                AgentGoalTracker()
+                if (eff_tools and tools) or needs_tools_intent
+                else None
             )
 
             skills_extra = self._anthropic_skills_extra(session_business_id, effective_user_query)
@@ -2246,14 +2270,18 @@ class AIService:
         chat_language = self._resolve_chat_language(
             session_business_id or self.business_id
         )
+        _needs_tools_routing = self._routing_needs_tools(
+            use_function_calling, effective_user_query, messages
+        )
         self.set_routing_context(
             operation=AI_OPERATION_CHAT,
             user_query=effective_user_query,
             history_messages=messages,
-            needs_tools=self._routing_needs_tools(
-                use_function_calling, effective_user_query, messages
-            ),
+            needs_tools=_needs_tools_routing,
         )
+        # وضعیت سبک اجرا (run_id/phase) — برای ردیابی در trace/agent_budget و
+        # checkpoint در function_results (Phase 2).
+        agent_run = AgentRunState(needs_tools=_needs_tools_routing)
         exploration_enabled = resolve_exploration_enabled(
             exploration_mode, effective_user_query, messages
         )
@@ -2375,6 +2403,60 @@ class AIService:
                     }
                     await asyncio.sleep(0)
 
+            async def _run_forced_synthesis_round() -> Optional[str]:
+                """نوبت اضطراری LLM بدون ابزار برای سنتز پاسخ از explored/thought.
+
+                فقط وقتی حلقه بدون هیچ متن/answer پایان یافته اما شواهد کافی
+                (explored/thought) در trace موجود است صدا زده می‌شود — به‌جای
+                نمایش مستقیم markdown خام ابزارها به کاربر (Phase 1).
+                """
+                explored_ctx = extract_explored_context_for_synthesis(trace_steps)
+                if not explored_ctx:
+                    return None
+                synthesis_messages = list(full_messages) + [
+                    {
+                        "role": "user",
+                        "content": (
+                            "[force_synthesis]\n"
+                            "بر اساس داده‌های زیر که از ابزارها جمع‌آوری شده، یک "
+                            "پاسخ نهایی مستقیم، خوانا و فارسی برای کاربر بنویس. "
+                            "دیگر از فراخوانی ابزار استفاده نکن:\n\n" + explored_ctx
+                        ),
+                    }
+                ]
+                collected = ""
+
+                async def _consume() -> None:
+                    nonlocal collected
+                    async for syn_chunk in provider.chat_completion_stream(
+                        messages=synthesis_messages,
+                        model=self.get_effective_model_api_id(),
+                        max_tokens=max_tokens_override or self.config.max_tokens,
+                        temperature=float(self.config.temperature),
+                        tools=None,
+                        reasoning_effort=reasoning_effort,
+                        **stream_provider_extras,
+                    ):
+                        syn_delta = syn_chunk.get("delta", {}) or {}
+                        piece = syn_delta.get("content", "")
+                        if piece:
+                            collected += piece
+                        if syn_chunk.get("done"):
+                            break
+
+                try:
+                    await asyncio.wait_for(
+                        _consume(), timeout=FORCED_SYNTHESIS_TIMEOUT_SEC
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "[AI Agent][session=%s] Forced synthesis round failed: %s",
+                        session_id,
+                        exc,
+                    )
+                    return None
+                return collected.strip() or None
+
             yield status_event("thinking")
             yield _emit_trace(
                 step_id="ctx_thinking",
@@ -2481,9 +2563,16 @@ class AIService:
                     {"role": "system", "content": catalog_section},
                 )
 
+            # حتی اگر ابزار به هر دلیلی بار نشود (eff_tools/tools خالی)، وقتی خود
+            # سوال داده‌محور است باید goal_tracker وجود داشته باشد تا Plan C
+            # بتواند narrative بدون evidence را به‌عنوان پاسخ نهایی قفل نکند.
+            needs_tools_intent = query_expects_tool_use(effective_user_query, messages)
             goal_tracker: Optional[AgentGoalTracker] = (
-                AgentGoalTracker() if eff_tools and tools else None
+                AgentGoalTracker()
+                if (eff_tools and tools) or needs_tools_intent
+                else None
             )
+            agent_run.needs_tools = bool((eff_tools and tools) or needs_tools_intent)
 
             skills_extra = self._anthropic_skills_extra(session_business_id, effective_user_query)
             stream_provider_extras = self._provider_call_extras(
@@ -2521,6 +2610,7 @@ class AIService:
             budget.reset_clock()
             budget_stop_reason: Optional[str] = None
             budget_stop_message: Optional[str] = None
+            agent_run.set_phase(AGENT_RUN_PHASE_AGENT_LOOP)
             while True:
                 budget_status = resolve_budget_gate(budget, iteration, goal_tracker)
                 if budget_status.stop:
@@ -2528,6 +2618,7 @@ class AIService:
                     budget_stop_message = budget_status.message_fa
                     break
                 iteration += 1
+                agent_run.iteration = iteration
                 max_iterations = budget.max_iterations
                 function_calls = None
                 tool_call_id_map: Dict[str, str] = {}
@@ -2570,6 +2661,20 @@ class AIService:
                 last_reasoning_emit = 0.0
                 llm_stream_retry_count = 0
 
+                # نوبت اول وقتی سوال قطعاً به ابزار نیاز دارد: مدل را مجبور به
+                # tool_call می‌کنیم تا متن وضعیت («در حال...») به‌جای فراخوانی
+                # ابزار برنگردد (Phase 2). فقط OpenAI (کم‌ریسک‌تر از Anthropic).
+                round_tool_choice = (
+                    "required"
+                    if (
+                        use_tools
+                        and iteration == 1
+                        and needs_tools_intent
+                        and self.get_effective_provider_type() == "openai"
+                    )
+                    else None
+                )
+
                 llm_round_complete = False
                 while not llm_round_complete:
                     try:
@@ -2580,6 +2685,7 @@ class AIService:
                             temperature=float(self.config.temperature),
                             tools=tools if use_tools else None,
                             reasoning_effort=reasoning_effort,
+                            tool_choice=round_tool_choice,
                             **stream_provider_extras,
                         )
                         async for chunk in iter_stream_with_wall_clock(
@@ -2734,6 +2840,13 @@ class AIService:
                     round_text=round_text,
                     round_reasoning=round_reasoning,
                 )
+                # Phase 3: حذف tool_callهای بدون نام (stream ناقص / delta خالی)
+                if function_calls:
+                    function_calls = [
+                        c
+                        for c in function_calls
+                        if isinstance(c, dict) and str(c.get("name") or "").strip()
+                    ] or None
 
                 if reasoning_started and round_reasoning.strip():
                     yield _emit_trace(
@@ -2784,12 +2897,17 @@ class AIService:
                         stop_reason=budget_stop_reason,
                         stop_message_fa=budget_stop_message,
                     )
-                    if round_text.strip():
+                    # Phase 1: هرگز narrative نیمه‌کاره (round_text) را به‌عنوان
+                    # پاسخ نهایی emit نکن. اگر گام answer واقعی در trace باشد
+                    # از آن استفاده کن؛ در غیر این صورت به fallback بعد از حلقه
+                    # (سنتز اجباری یا پیام بودجهٔ فارسی) سپرده می‌شود.
+                    synthesized = extract_final_content_from_trace(trace_steps)
+                    if synthesized:
                         async for answer_chunk in _emit_answer_text(
-                            round_text.strip(), iter_num=iteration
+                            synthesized, iter_num=iteration
                         ):
                             yield answer_chunk
-                        accumulated_content = round_text.strip()
+                        accumulated_content = synthesized
                     break
 
                 if function_calls and use_tools:
@@ -3233,7 +3351,7 @@ class AIService:
                         messages,
                         tools_enabled=bool(use_tools),
                     )
-                    if should_agent_continue_after_text_round(
+                    _continue_decision = should_agent_continue_after_text_round(
                         goal_tracker=goal_tracker,
                         exploration_enabled=exploration_enabled,
                         observation_store=observation_store,
@@ -3244,7 +3362,54 @@ class AIService:
                         history_messages=messages,
                         needs_tools=_needs_tools,
                         tools_enabled=bool(use_tools),
+                    )
+                    logger.info(
+                        "[AI Agent][session=%s] text-round decision: "
+                        "complexity=%s needs_tools=%s eff_tools=%s "
+                        "goal_tracker=%s continue=%s iteration=%s/%s",
+                        session_id,
+                        complexity,
+                        _needs_tools,
+                        bool(use_tools),
+                        goal_tracker is not None,
+                        _continue_decision,
+                        iteration,
+                        budget.max_iterations,
+                    )
+                    # لایهٔ ایمنی: اگر Plan C به‌اشتباه stop داده ولی متن شبیه
+                    # narrative وضعیت است و هنوز evidence ابزار نداریم، ادامه بده.
+                    # تصمیم اصلی همچنان evidence-based است؛ این فقط last-line defense است.
+                    if (
+                        not _continue_decision
+                        and _needs_tools
+                        and use_tools
+                        and iteration < budget.max_iterations
                     ):
+                        from app.services.ai.ai_premature_answer import (
+                            looks_like_status_narrative,
+                        )
+                        from app.services.ai.ai_exploration_service import (
+                            observation_store_has_evidence,
+                        )
+
+                        _has_evidence = (
+                            observation_store is not None
+                            and observation_store_has_evidence(observation_store)
+                        )
+                        if (
+                            not _has_evidence
+                            and looks_like_status_narrative(round_text)
+                        ):
+                            logger.warning(
+                                "[AI Agent][session=%s] safety-gate: status "
+                                "narrative blocked from becoming final answer "
+                                "(iteration=%s)",
+                                session_id,
+                                iteration,
+                            )
+                            _continue_decision = True
+
+                    if _continue_decision:
                         max_iterations = budget.max_iterations
                         yield _emit_trace(
                             step_id=f"continue_explore_{iteration}",
@@ -3264,7 +3429,8 @@ class AIService:
                             "[agent_continue]\n"
                             "بر اساس یافته‌های تا اینجا، هنوز نیاز به بررسی "
                             "یا ابزار بیشتر است. قبل از پاسخ نهایی، "
-                            "دادهٔ لازم را با ابزار مناسب جمع‌آوری کن."
+                            "دادهٔ لازم را با tool_call API (نه فقط توضیح متنی) "
+                            "جمع‌آوری کن."
                         )
                         full_messages.append(
                             {"role": "user", "content": continue_msg}
@@ -3307,7 +3473,13 @@ class AIService:
                 continue
 
             if not accumulated_content.strip():
+                agent_run.set_phase(AGENT_RUN_PHASE_SYNTHESIZE)
                 synthesized = extract_final_content_from_trace(trace_steps)
+                if not synthesized and trace_has_unanswered_evidence(trace_steps):
+                    # حلقه بدون پاسخ متنی/answer تمام شده اما شواهد ابزار وجود
+                    # دارد — به‌جای raw explored markdown، یک نوبت سنتز اجباری
+                    # (بدون ابزار) اجرا کن.
+                    synthesized = await _run_forced_synthesis_round()
                 if synthesized:
                     accumulated_content = synthesized
                     async for answer_chunk in _emit_answer_text(
@@ -3343,6 +3515,7 @@ class AIService:
                         stop_message_fa=budget_stop_message,
                     )
 
+            agent_run.set_phase(AGENT_RUN_PHASE_DONE)
             final_agent_budget = budget_snapshot(
                 budget,
                 iteration=iteration,
@@ -3350,6 +3523,8 @@ class AIService:
                 stop_reason=budget_stop_reason,
                 stop_message_fa=budget_stop_message,
             )
+            final_agent_budget["run_id"] = agent_run.run_id
+            final_agent_budget["phase"] = agent_run.phase
 
             if exploration_enabled:
                 yield _emit_trace(
@@ -3412,6 +3587,7 @@ class AIService:
                 ),
                 "agent_trace": finalize_trace_steps_for_persist(trace_steps) or None,
                 "agent_budget": final_agent_budget,
+                "agent_run": agent_run.snapshot(),
                 "citations_context": citations_context or None,
                 "requested_model": requested_model_code,
                 "resolved_model": resolved_model_code,
@@ -3419,8 +3595,10 @@ class AIService:
             }
 
         except ApiError:
+            agent_run.set_phase(AGENT_RUN_PHASE_ERROR)
             raise
         except Exception as e:
+            agent_run.set_phase(AGENT_RUN_PHASE_ERROR)
             logger.error(f"Unexpected error in AI streaming service: {e}", exc_info=True)
             raise ApiError(
                 "AI_SERVICE_ERROR",

@@ -48,6 +48,15 @@
     "note": "پیام budget unproductive — نباید پاسخ نهایی باشد"
   },
   {
+    "id": "db_1367_expense_report_status",
+    "message_id": 1367,
+    "user_query": "یه گزارش از هزینه ها بهم بگو",
+    "round_text": "در حال دریافت لیست گزارش‌های موجود برای شناسایی گزارش هزینه‌ها هستم.",
+    "expect_continue": true,
+    "expect_goal_reached": false,
+    "note": "status narrative without tools — must continue"
+  },
+  {
     "id": "db_1348_complete_answer",
     "message_id": 1348,
     "user_query": "لیست بدهکاران را بهم بگو و نمودار بده",

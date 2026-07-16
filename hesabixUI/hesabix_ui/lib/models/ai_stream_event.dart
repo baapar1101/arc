@@ -17,9 +17,10 @@ List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
   return finalizeAgentTraceForDisplay(steps);
 }
 
+// Phase 1 (backend answer-channel gate): فقط answer پاسخ نهایی می‌شود؛
+// explored/thought شواهد خام هستند و نباید مستقیم به کاربر نمایش داده شوند.
 const _traceContentFallbackKinds = [
   'answer',
-  'explored',
 ];
 
 /// متن پاسخ از trace وقتی content پیام خالی است (هم‌تراز بک‌اند).

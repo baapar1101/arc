@@ -218,7 +218,7 @@ _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"قالب\s*گزارش|قالب\s*فاکتور|قالب\s*چاپ|report\s*template", "report_templates"),
     (r"بازار\s*افزونه|افزونه\s*فعال|plugin\s*marketplace|marketplace", "marketplace"),
     (r"dead\s*letter|صف\s*خطا|خلاصه\s*باسلام", "integration"),
-    (r"هزینه|درآمد|expense|income", "financial"),
+    (r"هزینه|درآمد|expense|income|مالی", "financial"),
     (r"اتوماسیون|automation|workflow|گردش\s*کار|اجرای\s*workflow|تریگر\s*workflow", "workflow"),
 ]
 
@@ -267,11 +267,24 @@ _GREETING_ONLY = re.compile(
     r"^(سلام|درود|hello|hi|hey|صبح بخیر|عصر بخیر|وقت بخیر)\b",
     re.IGNORECASE,
 )
+# سلام/درود ابتدای جمله — باید قبل از تشخیص دامنه حذف شود تا «سلام یه گزارش
+# هزینه‌ها بده» به‌اشتباه به‌عنوان صرفاً خوش‌وبش تشخیص داده نشود.
+_LEADING_GREETING = re.compile(
+    r"^(سلام|درود|صبح\s*بخیر|عصر\s*بخیر|وقت\s*بخیر|hello|hi|hey)[\s,،!؛:.]*",
+    re.IGNORECASE,
+)
 _KNOWLEDGE_HINTS = re.compile(
     r"دانشنامه|قوانین|سیاست|رویه|دستورالعمل|راهنما|مقررات|فرآیند|فرایند|"
     r"documentation|policy|procedure|how\s+to",
     re.IGNORECASE,
 )
+
+
+def _strip_leading_greeting(user_query: Optional[str]) -> str:
+    """حذف سلام/درود ابتدای جمله قبل از تشخیص دامنه ابزار."""
+    text = (user_query or "").strip()
+    stripped = _LEADING_GREETING.sub("", text, count=1).strip()
+    return stripped or text
 
 
 def query_needs_knowledge(user_query: Optional[str]) -> bool:
@@ -383,7 +396,7 @@ def estimate_query_complexity(
 
 def query_targets_tool_domain(user_query: Optional[str]) -> bool:
     """آیا سوال کاربر به دامنهٔ داده/ابزار کسب‌وکار اشاره دارد (routing، نه پاسخ مدل)."""
-    text = _normalize_query(user_query)
+    text = _normalize_query(_strip_leading_greeting(user_query))
     if not text or len(text) < 8:
         return False
     if _SIMPLE_PATTERNS.match(text):
@@ -399,15 +412,18 @@ def query_expects_tool_use(
     history_messages: Optional[List[dict]] = None,
 ) -> bool:
     """آیا سوال برای پاسخ به ابزار/data وابسته است (بدون regex روی پاسخ مدل)."""
-    if estimate_query_complexity(user_query, history_messages) in (
+    effective_query = _strip_leading_greeting(user_query)
+    if estimate_query_complexity(effective_query, history_messages) in (
         "medium",
         "complex",
     ):
         return True
-    if query_targets_tool_domain(user_query):
+    if query_targets_tool_domain(effective_query):
         return True
-    q = (user_query or "").strip()
-    if len(q) < 24 and history_messages:
+    q = effective_query.strip()
+    # پیام‌های پیگیری کوتاه («انجامش بده») هم باید به context قبلی مراجعه کنند —
+    # سقف بزرگ‌تر از تشخیص greeting/غیر-داده صرف تا follow-upهای کمی طولانی‌تر را هم بگیرد.
+    if len(q) < 40 and history_messages:
         for msg in reversed(history_messages[-8:]):
             if msg.get("role") != "user":
                 continue

@@ -156,6 +156,8 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             done_payload["agent_trace"] = chunk.get("agent_trace")
         if chunk.get("agent_budget"):
             done_payload["agent_budget"] = chunk.get("agent_budget")
+        if chunk.get("agent_run"):
+            done_payload["agent_run"] = chunk.get("agent_run")
         if chunk.get("requested_model"):
             done_payload["requested_model"] = chunk.get("requested_model")
         if chunk.get("resolved_model"):

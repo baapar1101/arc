@@ -423,18 +423,20 @@ def extract_trace_from_function_results(
     return []
 
 
-# اولویت استخراج متن نهایی از trace — فقط answer و explored (Plan C).
+# اولویت استخراج متن نهایی از trace — فقط answer (Phase 1: answer-channel gate).
+#
+# قبلاً "explored" هم fallback بود و خلاصهٔ خام ابزارها (Markdown با ####)
+# می‌توانست به‌جای پاسخ نهایی نمایش داده شود. explored/thought شواهد خام هستند،
+# نه پاسخ نهایی؛ برای تولید پاسخ باید یک synthesis واقعی (LLM یا answer step)
+# روی آن‌ها انجام شود — به extract_explored_context_for_synthesis نگاه کنید.
 TRACE_CONTENT_FALLBACK_KINDS: tuple[str, ...] = (
     "answer",
-    "explored",
 )
 
 
 def _is_valid_trace_answer_fallback(body: str, kind: str, *, min_body_len: int) -> bool:
     if not body:
         return False
-    if kind == "explored":
-        return len(body) >= min_body_len
     return len(body) >= min_body_len
 
 
@@ -443,7 +445,11 @@ def extract_final_content_from_trace(
     *,
     min_body_len: int = 20,
 ) -> str:
-    """متن قابل‌نمایش از trace agent (برای persist و fallback پاسخ)."""
+    """متن قابل‌نمایش از trace agent (برای persist و fallback پاسخ).
+
+    فقط از گام‌های kind="answer" استفاده می‌کند؛ narrative/explored/thought
+    هرگز مستقیماً پاسخ نهایی نمی‌شوند (Phase 1 — answer channel gate).
+    """
     if not trace_steps:
         return ""
     from app.services.ai.ai_content_sanitize import sanitize_assistant_content
@@ -458,6 +464,48 @@ def extract_final_content_from_trace(
             if _is_valid_trace_answer_fallback(body, kind, min_body_len=min_body_len):
                 return body
     return ""
+
+
+def extract_explored_context_for_synthesis(
+    trace_steps: Optional[List[Dict[str, Any]]],
+    *,
+    max_chars: int = 6000,
+) -> str:
+    """خلاصهٔ explored/thought برای ساخت prompt سنتز نهایی (نه پاسخ مستقیم کاربر).
+
+    برخلاف extract_final_content_from_trace، این تابع صرفاً برای تغذیهٔ یک
+    نوبت اضافی LLM (force-synthesis) استفاده می‌شود، نه نمایش مستقیم به کاربر.
+    """
+    if not trace_steps:
+        return ""
+    from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+
+    parts: List[str] = []
+    total = 0
+    for step in trace_steps:
+        if step.get("kind") not in ("explored", "thought"):
+            continue
+        body = sanitize_assistant_content((step.get("body_markdown") or "").strip())
+        if not body:
+            continue
+        parts.append(body)
+        total += len(body)
+        if total >= max_chars:
+            break
+    joined = "\n\n".join(parts)
+    return joined[:max_chars]
+
+
+def trace_has_unanswered_evidence(
+    trace_steps: Optional[List[Dict[str, Any]]],
+) -> bool:
+    """آیا trace شواهد ابزار (explored/thought) دارد اما هنوز answer نهایی ندارد؟"""
+    if not trace_steps:
+        return False
+    has_answer = any(step.get("kind") == "answer" for step in trace_steps)
+    if has_answer:
+        return False
+    return any(step.get("kind") in ("explored", "thought") for step in trace_steps)
 
 
 def merge_accumulated_and_trace_content(

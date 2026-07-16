@@ -2,7 +2,9 @@
 from app.services.ai.ai_tool_intent import (
     detect_categories,
     estimate_query_complexity,
+    query_expects_tool_use,
     query_needs_knowledge,
+    query_targets_tool_domain,
     select_tool_names,
 )
 
@@ -66,3 +68,31 @@ def test_estimate_query_complexity_write_operation():
 
 def test_estimate_query_complexity_greeting():
     assert estimate_query_complexity("سلام") == "simple"
+
+
+# ---- Phase 0: routing باید حتی سوال‌های «ساده» اما داده‌محور را tools بدهد ----
+
+def test_query_expects_tool_use_simple_complexity_but_data_domain():
+    query = "یه گزارش از هزینه ها بهم بگو"
+    # علت اصلی باگ: این سوال complexity=simple است اما باید tools بگیرد.
+    assert estimate_query_complexity(query) == "simple"
+    assert query_expects_tool_use(query) is True
+
+
+def test_query_targets_tool_domain_strips_leading_greeting():
+    assert query_targets_tool_domain("سلام یه گزارش از هزینه ها بهم بگو") is True
+
+
+def test_query_expects_tool_use_greeting_prefixed_data_query():
+    assert query_expects_tool_use("سلام یه گزارش از هزینه ها بهم بگو") is True
+
+
+def test_query_expects_tool_use_pure_greeting_stays_false():
+    assert query_expects_tool_use("سلام") is False
+
+
+def test_query_expects_tool_use_short_followup_with_history():
+    history = [
+        {"role": "user", "content": "بررسی مالی از ۳ ماه گذشته انجام بده"},
+    ]
+    assert query_expects_tool_use("انجامش بده", history) is True

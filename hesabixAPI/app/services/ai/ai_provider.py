@@ -68,6 +68,7 @@ class AIProviderBase(ABC):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
+        tool_choice: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         ارسال درخواست chat completion به صورت streaming
@@ -169,12 +170,17 @@ class OpenAIProvider(AIProviderBase):
         provider_extra: Optional[Dict[str, Any]] = None,
         *,
         stream: bool = False,
+        tool_choice: Optional[str] = None,
     ) -> Dict[str, Any]:
         """ساخت پارامترهای درخواست با پشتیبانی از مدل‌های reasoning.
 
         مدل‌های reasoning (o-series/gpt-5) به‌جای `max_tokens` از
         `max_completion_tokens` استفاده می‌کنند، `temperature` را نمی‌پذیرند و
         پارامتر `reasoning_effort` را قبول دارند.
+
+        tool_choice: برای نوبت اول وقتی سوال قطعاً به ابزار نیاز دارد
+        ("required") تا مدل بدون tool_call متن ننویسد (Phase 2). فقط وقتی
+        tools موجود باشد اعمال می‌شود.
         """
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
@@ -198,6 +204,8 @@ class OpenAIProvider(AIProviderBase):
         }
         if stream:
             kwargs["stream"] = True
+        if tool_choice and tools:
+            kwargs["tool_choice"] = tool_choice
 
         if (
             cache_policy
@@ -249,6 +257,9 @@ class OpenAIProvider(AIProviderBase):
             message = response.choices[0].message
             usage = normalize_openai_usage(response.usage)
             
+            valid_tool_calls = [
+                fc for fc in (message.tool_calls or []) if (fc.function.name or "").strip()
+            ]
             result = {
                 "message": {
                     "role": message.role,
@@ -259,8 +270,8 @@ class OpenAIProvider(AIProviderBase):
                             "name": fc.function.name,
                             "arguments": json.loads(fc.function.arguments)
                         }
-                        for fc in (message.tool_calls or [])
-                    ] if message.tool_calls else None
+                        for fc in valid_tool_calls
+                    ] if valid_tool_calls else None
                 },
                 "usage": usage.to_usage_dict(),
             }
@@ -283,6 +294,7 @@ class OpenAIProvider(AIProviderBase):
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
         provider_extra: Optional[Dict[str, Any]] = None,
+        tool_choice: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به OpenAI به صورت streaming با async client"""
         try:
@@ -297,6 +309,7 @@ class OpenAIProvider(AIProviderBase):
                 reasoning_effort,
                 provider_extra,
                 stream=True,
+                tool_choice=tool_choice,
             )
 
             async def _open_stream():
@@ -390,20 +403,26 @@ class OpenAIProvider(AIProviderBase):
                 function_calls = []
                 for index in sorted(tool_calls_accumulator.keys()):
                     tc = tool_calls_accumulator[index]
+                    function_name = (tc["function"]["name"] or "").strip()
+                    if not function_name:
+                        # tool_call بدون نام معتبر — احتمالاً stream ناقص/خراب؛
+                        # اضافه کردنش باعث خطای provider در نوبت بعد می‌شود.
+                        continue
                     try:
                         arguments = json.loads(tc["function"]["arguments"]) if tc["function"]["arguments"] else {}
                     except json.JSONDecodeError:
                         arguments = {}
-                    
-                    function_name = tc["function"]["name"]
+
                     tool_call_id = tc.get("id", f"call_{index}")
                     tool_call_id_map[function_name] = tool_call_id
-                    
+
                     function_calls.append({
                         "id": tool_call_id,
                         "name": function_name,
                         "arguments": arguments
                     })
+                if not function_calls:
+                    function_calls = None
             
             # ارسال chunk نهایی با usage و function_calls
             yield {
@@ -516,7 +535,12 @@ def _anthropic_blocks_to_openai_result(content_blocks: Any) -> tuple[str, Option
             text_parts.append(getattr(block, "text", None) or (block.get("text") if isinstance(block, dict) else ""))
         elif btype == "tool_use":
             bid = getattr(block, "id", None) or (block.get("id") if isinstance(block, dict) else None)
-            name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else "unknown")
+            name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else None)
+            name = (name or "").strip()
+            if not name:
+                # tool_use بدون نام معتبر — نادیده گرفته می‌شود تا در نوبت
+                # بعدی به‌عنوان فراخوانی ناقص به provider ارسال نشود.
+                continue
             inp = getattr(block, "input", None) if hasattr(block, "input") else block.get("input")
             function_calls.append(
                 {
@@ -678,7 +702,11 @@ class AnthropicProvider(AIProviderBase):
         tools: Optional[List[Dict[str, Any]]] = None,
         provider_extra: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
+        tool_choice: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
+        # یادداشت Phase 2: tool_choice="required" فعلاً فقط برای OpenAI اعمال
+        # می‌شود (ریسک کمتر)؛ Anthropic فرمت متفاوتی دارد
+        # (tool_choice={"type": "any"}) و عمداً اینجا نادیده گرفته می‌شود.
         kwargs = self._build_request_kwargs(
             messages,
             model,
@@ -836,8 +864,9 @@ class LocalProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
+        tool_choice: Optional[str] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """ارسال درخواست به مدل محلی به صورت streaming"""
+        """ارسال درخواست به مدل محلی به صورت streaming (tool_choice پشتیبانی نمی‌شود)"""
         import httpx
         import asyncio
         
