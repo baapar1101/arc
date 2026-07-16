@@ -625,6 +625,7 @@ app/services/ai/__init__.py
 app/services/ai/ai_accounting_domain_prompt.py
 app/services/ai/ai_agent_continuation.py
 app/services/ai/ai_agent_run.py
+app/services/ai/ai_answer_from_evidence.py
 app/services/ai/ai_attachment_service.py
 app/services/ai/ai_budget.py
 app/services/ai/ai_calendar_prompt.py
@@ -983,6 +984,7 @@ tests/test_ai_agent_continuation.py
 tests/test_ai_agent_regression_db.py
 tests/test_ai_agent_regression_v2.py
 tests/test_ai_agent_run.py
+tests/test_ai_answer_from_evidence.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
 tests/test_ai_content_sanitize.py

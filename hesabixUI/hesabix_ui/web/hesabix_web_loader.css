@@ -1,26 +1,27 @@
-/* فونت‌های محلی — همان خانوادهٔ Flutter (YekanBakhFaNum / Roboto) */
+/* فونت‌های محلی — همان خانوادهٔ Flutter (YekanBakhFaNum / Roboto)
+   WOFF2 برای مسیر بحرانی؛ font-display:swap تا متن با فونت سیستم دیده شود. */
 @font-face {
   font-family: 'YekanBakhFaNum';
-  src: url('fonts/YekanBakhFaNum-Regular.ttf') format('truetype');
+  src: url('fonts/YekanBakhFaNum-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
-  font-display: block;
+  font-display: swap;
 }
 
 @font-face {
   font-family: 'YekanBakhFaNum';
-  src: url('fonts/YekanBakhFaNum-SemiBold.ttf') format('truetype');
+  src: url('fonts/YekanBakhFaNum-SemiBold.woff2') format('woff2');
   font-weight: 600;
   font-style: normal;
-  font-display: block;
+  font-display: swap;
 }
 
 @font-face {
   font-family: 'YekanBakhFaNum';
-  src: url('fonts/YekanBakhFaNum-Bold.ttf') format('truetype');
+  src: url('fonts/YekanBakhFaNum-Bold.woff2') format('woff2');
   font-weight: 700;
   font-style: normal;
-  font-display: block;
+  font-display: swap;
 }
 
 @font-face {
@@ -28,7 +29,7 @@
   src: url('fonts/roboto.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
-  font-display: block;
+  font-display: swap;
 }
 
 :root {

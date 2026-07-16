@@ -302,11 +302,12 @@ echo "System Memory Status:"
 free -h | head -2
 echo ""
 
-# آینهٔ کامل fallback موتور وب (fontFallbackBaseUrl) — بدون fonts.gstatic.com در runtime
+# آینهٔ fallback موتور وب (fontFallbackBaseUrl) — بدون fonts.gstatic.com در runtime
+# خانواده‌های تاریخی/نادر به‌صورت پیش‌فرض حذف می‌شوند؛ SYNC_FONT_INCLUDE_RARE=1 برای کامل
 SYNC_FONT_MIRROR="$APP_DIR/scripts/sync_font_fallback_mirror.sh"
 if [ -f "$SYNC_FONT_MIRROR" ]; then
   chmod +x "$SYNC_FONT_MIRROR" 2>/dev/null || true
-  echo "Syncing local font fallback mirror (full gstatic bundle) into web/ ..."
+  echo "Syncing local font fallback mirror into web/ ..."
   SYNC_FONT_STRICT="${SYNC_FONT_STRICT:-0}" "$SYNC_FONT_MIRROR" "$APP_DIR/web" || warn "Font mirror incomplete — run: bash scripts/extract_flutter_gstatic_font_paths.sh && bash scripts/populate_gstatic_font_bundle.sh (see assets/gstatic_font_bundle/README.txt)"
 else
   warn "sync_font_fallback_mirror.sh not found; skipping local gstatic font mirror for web engine"
@@ -328,10 +329,9 @@ if [ ! -f "$BUILD_DIR/index.html" ]; then
   die "flutter build web did not produce index.html. Flutter SDK may be broken (e.g. Dart SDK download failed). Try: rm -rf /opt/flutter && re-run deploy with mirror set."
 fi
 
-# همان آینهٔ gstatic (فهرست کامل موتور Flutter) را روی خروجی نهایی هم بنویس —
-# مخصوصاً اگر build-dir سفارشی باشد یا فایل‌های دانلودی فقط در web/ مانده باشند.
+# همان آینهٔ gstatic را روی خروجی نهایی هم بنویس (با هرس خانواده‌های نادر مگر SYNC_FONT_INCLUDE_RARE=1)
 if [ -f "$SYNC_FONT_MIRROR" ]; then
-  echo "Ensuring local font fallback mirror (full engine fallback list) in $BUILD_DIR ..."
+  echo "Ensuring local font fallback mirror in $BUILD_DIR ..."
   "$SYNC_FONT_MIRROR" "$BUILD_DIR" || warn "Font fallback mirror sync to build output failed; see assets/gstatic_font_bundle/README.txt"
 fi
 
