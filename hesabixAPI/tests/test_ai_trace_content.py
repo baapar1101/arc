@@ -4,9 +4,9 @@ from app.services.ai.ai_trace import (
 )
 
 
-def test_extract_prefers_answer_over_thought():
+def test_extract_prefers_answer_over_explored():
     trace = [
-        {"kind": "thought", "body_markdown": "### Important findings\n1. ten debtors"},
+        {"kind": "explored", "body_markdown": "#### draft"},
         {"kind": "answer", "body_markdown": "**خلاصه**\n- 10 بدهکار"},
     ]
     assert extract_final_content_from_trace(trace) == "**خلاصه**\n- 10 بدهکار"
@@ -23,20 +23,14 @@ def test_extract_falls_back_to_explored():
     assert "10" in extract_final_content_from_trace(trace)
 
 
-def test_extract_skips_narrative_pending_tool():
+def test_extract_skips_narrative_only():
     trace = [
         {
             "kind": "narrative",
             "body_markdown": "در حال جستجوی فاکتورهای فروش برای بازهٔ مشخص.",
         },
-        {"kind": "answer", "body_markdown": ""},
     ]
     assert extract_final_content_from_trace(trace) == ""
-
-
-def test_extract_short_observation():
-    trace = [{"kind": "observation", "body_markdown": "**10** مورد"}]
-    assert extract_final_content_from_trace(trace) == "**10** مورد"
 
 
 def test_merge_keeps_stream_content():

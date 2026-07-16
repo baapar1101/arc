@@ -48,7 +48,6 @@ from app.services.ai.ai_tool_keys import (
 from app.services.ai.ai_content_sanitize import (
     resolve_round_function_calls,
     sanitize_assistant_content,
-    text_announces_pending_tool_use,
 )
 from app.services.ai.ai_trace import (
     context_trace,
@@ -2730,23 +2729,10 @@ class AIService:
                             continue
                         raise
 
-                def _definitions_tool_names() -> List[str]:
-                    names: List[str] = []
-                    for item in tools or []:
-                        if not isinstance(item, dict):
-                            continue
-                        fn = item.get("function")
-                        if isinstance(fn, dict):
-                            name = fn.get("name")
-                            if isinstance(name, str) and name.strip():
-                                names.append(name.strip())
-                    return names
-
                 function_calls = resolve_round_function_calls(
                     api_function_calls=function_calls,
                     round_text=round_text,
                     round_reasoning=round_reasoning,
-                    known_tools=_definitions_tool_names(),
                 )
 
                 if reasoning_started and round_reasoning.strip():
@@ -3240,18 +3226,24 @@ class AIService:
                     continue
 
                 if round_text.strip():
-                    if await should_agent_continue_after_text_round(
+                    from app.services.ai.ai_agent_continuation import resolve_needs_tools
+
+                    _needs_tools = resolve_needs_tools(
+                        effective_user_query,
+                        messages,
+                        tools_enabled=bool(use_tools),
+                    )
+                    if should_agent_continue_after_text_round(
                         goal_tracker=goal_tracker,
                         exploration_enabled=exploration_enabled,
                         observation_store=observation_store,
                         iteration=iteration,
                         budget=budget,
                         round_text=round_text,
-                        round_reasoning=round_reasoning,
                         user_query=effective_user_query,
-                        provider=provider,
-                        model=resolved_model_code,
-                        db=self.db,
+                        history_messages=messages,
+                        needs_tools=_needs_tools,
+                        tools_enabled=bool(use_tools),
                     ):
                         max_iterations = budget.max_iterations
                         yield _emit_trace(
@@ -3272,25 +3264,7 @@ class AIService:
                             "[agent_continue]\n"
                             "بر اساس یافته‌های تا اینجا، هنوز نیاز به بررسی "
                             "یا ابزار بیشتر است. قبل از پاسخ نهایی، "
-                            "دادهٔ لازم را جمع‌آوری کن."
-                        )
-                        full_messages.append(
-                            {"role": "user", "content": continue_msg}
-                        )
-                        continue
-
-                    if text_announces_pending_tool_use(round_text):
-                        full_messages.append(
-                            {"role": "assistant", "content": round_text.strip()}
-                        )
-                        continue_msg = (
-                            goal_tracker.continue_context_for_llm()
-                            if goal_tracker
-                            else None
-                        ) or (
-                            "[agent_continue]\n"
-                            "ابزار اعلام شده ولی اجرا نشده؛ "
-                            "قبل از پاسخ نهایی، ابزار مناسب را فراخوانی کن."
+                            "دادهٔ لازم را با ابزار مناسب جمع‌آوری کن."
                         )
                         full_messages.append(
                             {"role": "user", "content": continue_msg}

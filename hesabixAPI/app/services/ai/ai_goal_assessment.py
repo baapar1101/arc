@@ -1,9 +1,8 @@
 """
-ارزیابی میانی هدف agent — ادامهٔ هوشمند + ضد loop.
+ارزیابی میانی هدف agent — ادامهٔ evidence-based + ضد loop.
 
-پس از هر نوبت tool، سیستم بررسی می‌کند آیا به هدف رسیده‌ایم یا نه.
-اگر نه و بودجه تمام شده باشد، تا سقف مطلق تمدید می‌شود؛
-تکرار همان tool+args مانع تمدید و ادامه می‌شود.
+Plan C: تصمیم continue/stop فقط از tool evidence، نوع سوال، و session todos —
+بدون regex یا heuristic طول متن.
 """
 from __future__ import annotations
 
@@ -12,6 +11,10 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
+from app.services.ai.ai_agent_continuation import (
+    assess_text_round_evidence,
+    resolve_needs_tools,
+)
 from app.services.ai.ai_constants import AGENT_MAX_IDENTICAL_TOOL_REPEATS
 from app.services.ai.ai_budget import AgentBudget, BudgetStatus, STOP_REASON_ITERATIONS, STOP_REASON_UNPRODUCTIVE
 from app.services.ai.ai_exploration_service import (
@@ -20,7 +23,6 @@ from app.services.ai.ai_exploration_service import (
     ToolObservation,
     assess_tool_round_productivity,
     build_thought_markdown_rule_based,
-    is_substantive_text_answer,
     observation_store_has_evidence,
     should_continue_exploring,
 )
@@ -58,7 +60,6 @@ class ToolCallTracker:
         return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
     def record(self, function_calls: List[Dict[str, Any]]) -> int:
-        """تعداد فراخوانی‌هایی که از آستانهٔ تکرار عبور کرده‌اند."""
         over_limit = 0
         for call in function_calls:
             fp = self.fingerprint(
@@ -182,70 +183,43 @@ class AgentGoalTracker:
         *,
         user_query: Optional[str] = None,
         observation_store: Optional[ObservationStore] = None,
+        needs_tools: bool = True,
+        history_messages: Optional[List[dict]] = None,
+        tools_enabled: bool = True,
     ) -> RoundAssessment:
-        """ارزیابی پس از پاسخ متنی بدون tool call (سیگنال اتمام یا ادامه)."""
+        """ارزیابی پس از پاسخ متنی بدون tool call — evidence-based (Plan C)."""
         from app.services.ai.ai_tool_catalog import is_tool_discovery_query
 
-        text = (round_text or "").strip()
-        had_evidence = (
-            observation_store is not None and observation_store_has_evidence(observation_store)
+        if not tools_enabled:
+            needs_tools = False
+        elif needs_tools:
+            needs_tools = resolve_needs_tools(
+                user_query,
+                history_messages,
+                tools_enabled=True,
+            )
+
+        prior = self.last_assessment
+        evidence = assess_text_round_evidence(
+            round_text=round_text,
+            user_query=user_query,
+            observation_store=observation_store,
+            needs_tools=needs_tools,
+            tool_discovery=is_tool_discovery_query(user_query),
+            session_has_open_todos=bool(
+                self.last_session_todo_state
+                and self.last_session_todo_state.has_open
+            ),
+            prior_goal_reached=bool(prior and prior.goal_reached),
+            prior_should_continue=bool(prior and prior.should_continue),
+            prior_loop_detected=bool(prior and prior.loop_detected),
         )
 
-        from app.services.ai.ai_content_sanitize import text_announces_pending_tool_use
-
-        if text_announces_pending_tool_use(text):
-            assessment = RoundAssessment(
-                goal_reached=False,
-                should_continue=True,
-                confidence="medium",
-                reason_fa="مدل ابزار را اعلام کرده ولی هنوز اجرا نشده؛ ادامه لازم است.",
-            )
-            self.last_assessment = assessment
-            return assessment
-
-        if is_tool_discovery_query(user_query) and len(text) >= 48:
-            assessment = RoundAssessment(
-                goal_reached=True,
-                should_continue=False,
-                confidence="high",
-                reason_fa="فهرست ابزارهای واقعی ارائه شد.",
-            )
-            self.last_assessment = assessment
-            return assessment
-
-        if not had_evidence and is_substantive_text_answer(text):
-            assessment = RoundAssessment(
-                goal_reached=True,
-                should_continue=False,
-                confidence="high",
-                reason_fa="مدل بدون ابزار پاسخ کامل داد؛ نیازی به نوبت اضافه نیست.",
-            )
-            self.last_assessment = assessment
-            return assessment
-
-        if (
-            self.last_assessment
-            and self.last_assessment.should_continue
-            and not self.last_assessment.loop_detected
-            and had_evidence
-        ):
-            return self.last_assessment
-
-        if self.last_session_todo_state and self.last_session_todo_state.has_open:
-            assessment = RoundAssessment(
-                goal_reached=False,
-                should_continue=True,
-                confidence="medium",
-                reason_fa="مراحل باز در برنامهٔ کاری جلسه باقی مانده.",
-            )
-            self.last_assessment = assessment
-            return assessment
-
         assessment = RoundAssessment(
-            goal_reached=bool(text),
-            should_continue=False,
-            confidence="medium" if text else "low",
-            reason_fa="پاسخ متنی بدون نیاز به کاوش بیشتر.",
+            goal_reached=evidence.goal_reached,
+            should_continue=evidence.should_continue,
+            confidence="high" if evidence.goal_reached else "medium",
+            reason_fa=evidence.reason_fa,
         )
         self.last_assessment = assessment
         return assessment
@@ -336,7 +310,6 @@ class AgentGoalTracker:
 def try_extend_budget_for_goal(
     budget: AgentBudget, assessment: Optional[RoundAssessment]
 ) -> bool:
-    """تمدید بودجه وقتی هدف محقق نشده و به سقف نوبت رسیده‌ایم."""
     if assessment is None or assessment.loop_detected:
         return False
     if assessment.goal_reached or not assessment.should_continue:
@@ -349,7 +322,6 @@ def resolve_budget_gate(
     iteration: int,
     goal_tracker: Optional[AgentGoalTracker],
 ) -> BudgetStatus:
-    """بررسی بودجه با امکان تمدید پویا پیش از توقف."""
     status = budget.check(iteration)
     if status.stop and status.reason in (
         STOP_REASON_ITERATIONS,
@@ -363,7 +335,7 @@ def resolve_budget_gate(
     return status
 
 
-async def should_agent_continue_after_text_round(
+def should_agent_continue_after_text_round(
     *,
     goal_tracker: Optional[AgentGoalTracker],
     observation_store: Optional[ObservationStore],
@@ -371,28 +343,25 @@ async def should_agent_continue_after_text_round(
     iteration: int,
     budget: AgentBudget,
     round_text: str = "",
-    round_reasoning: str = "",
     user_query: Optional[str] = None,
-    provider: Any = None,
-    model: Optional[str] = None,
-    db: Any = None,
-    use_llm: bool = True,
+    history_messages: Optional[List[dict]] = None,
+    needs_tools: bool = True,
+    tools_enabled: bool = True,
 ) -> bool:
-    """ادامه پس از پاسخ متنی مدل (بدون tool call) — قواعد + LLM."""
-    from app.services.ai.ai_agent_continuation import resolve_agent_continuation
+    """ادامه پس از پاسخ متنی — evidence-based، بدون regex/LLM."""
+    if goal_tracker is None:
+        return False
+
+    assessment = goal_tracker.assess_after_text_round(
+        round_text,
+        user_query=user_query,
+        observation_store=observation_store,
+        needs_tools=needs_tools,
+        history_messages=history_messages,
+        tools_enabled=tools_enabled,
+    )
 
     if budget.remaining_iterations(iteration) <= 0:
-        if goal_tracker is not None and not (round_text or "").strip():
-            prior = goal_tracker.last_assessment
-            if prior and prior.should_continue and not prior.loop_detected:
-                return try_extend_budget_for_goal(budget, prior)
-        if goal_tracker is not None:
-            goal_tracker.assess_after_text_round(
-                round_text,
-                user_query=user_query,
-                observation_store=observation_store,
-            )
-        assessment = goal_tracker.last_assessment if goal_tracker else None
         if (
             exploration_enabled
             and observation_store is not None
@@ -400,37 +369,15 @@ async def should_agent_continue_after_text_round(
                 observation_store,
                 iteration,
                 budget.max_iterations,
-                round_text=round_text,
             )
         ):
             return budget.try_extend()
         return try_extend_budget_for_goal(budget, assessment)
 
-    if not (round_text or "").strip() and goal_tracker is not None:
-        prior = goal_tracker.last_assessment
-        if prior and prior.should_continue and not prior.loop_detected:
-            return iteration < budget.max_iterations
+    if assessment.loop_detected:
+        return False
 
-    continuation = await resolve_agent_continuation(
-        provider=provider,
-        model=model,
-        user_query=user_query,
-        round_text=round_text,
-        round_reasoning=round_reasoning,
-        observation_store=observation_store,
-        goal_tracker=goal_tracker,
-        iteration=iteration,
-        max_iterations=budget.max_iterations,
-        db=db,
-        use_llm=use_llm,
-    )
-
-    if continuation.should_continue and not continuation.goal_reached:
+    if assessment.should_continue and not assessment.goal_reached:
         return iteration < budget.max_iterations
-
-    if goal_tracker and goal_tracker.last_session_todo_state:
-        state = goal_tracker.last_session_todo_state
-        if state.has_open and iteration < budget.max_iterations:
-            return True
 
     return False

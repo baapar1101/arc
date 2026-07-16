@@ -423,26 +423,18 @@ def extract_trace_from_function_results(
     return []
 
 
-# اولویت استخراج متن نهایی از trace وقتی delta/stream خالی است.
-# narrative/thought/reasoning عمداً حذف شده‌اند — فقط پاسخ یا یافتهٔ ابزار.
+# اولویت استخراج متن نهایی از trace — فقط answer و explored (Plan C).
 TRACE_CONTENT_FALLBACK_KINDS: tuple[str, ...] = (
     "answer",
     "explored",
-    "observation",
 )
 
 
 def _is_valid_trace_answer_fallback(body: str, kind: str, *, min_body_len: int) -> bool:
-    from app.services.ai.ai_content_sanitize import text_announces_pending_tool_use
-
-    if not body or text_announces_pending_tool_use(body):
+    if not body:
         return False
-    if kind == "observation":
-        if len(body) >= min_body_len:
-            return True
-        return len(body) >= 8 and bool(
-            re.search(r"\d|مورد|یافت شد|✓|✗", body)
-        )
+    if kind == "explored":
+        return len(body) >= min_body_len
     return len(body) >= min_body_len
 
 

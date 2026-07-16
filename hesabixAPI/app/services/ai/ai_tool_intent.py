@@ -381,6 +381,46 @@ def estimate_query_complexity(
     return "simple"
 
 
+def query_targets_tool_domain(user_query: Optional[str]) -> bool:
+    """آیا سوال کاربر به دامنهٔ داده/ابزار کسب‌وکار اشاره دارد (routing، نه پاسخ مدل)."""
+    text = _normalize_query(user_query)
+    if not text or len(text) < 8:
+        return False
+    if _SIMPLE_PATTERNS.match(text):
+        return False
+    for pattern, _category in _KEYWORD_CATEGORIES:
+        if re.search(pattern, text, re.IGNORECASE):
+            return True
+    return False
+
+
+def query_expects_tool_use(
+    user_query: Optional[str],
+    history_messages: Optional[List[dict]] = None,
+) -> bool:
+    """آیا سوال برای پاسخ به ابزار/data وابسته است (بدون regex روی پاسخ مدل)."""
+    if estimate_query_complexity(user_query, history_messages) in (
+        "medium",
+        "complex",
+    ):
+        return True
+    if query_targets_tool_domain(user_query):
+        return True
+    q = (user_query or "").strip()
+    if len(q) < 24 and history_messages:
+        for msg in reversed(history_messages[-8:]):
+            if msg.get("role") != "user":
+                continue
+            prior = (msg.get("content") or "").strip()
+            if len(prior) < 8:
+                continue
+            if query_targets_tool_domain(prior):
+                return True
+            if estimate_query_complexity(prior) in ("medium", "complex"):
+                return True
+    return False
+
+
 def iterations_for_query(
     user_query: Optional[str],
     history_messages: Optional[List[dict]] = None,

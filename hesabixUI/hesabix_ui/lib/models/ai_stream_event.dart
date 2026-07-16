@@ -20,13 +20,12 @@ List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
 const _traceContentFallbackKinds = [
   'answer',
   'explored',
-  'observation',
 ];
 
 /// متن پاسخ از trace وقتی content پیام خالی است (هم‌تراز بک‌اند).
 String extractContentFromTraceSteps(List<AIAgentTraceStep> steps) {
   for (final kind in _traceContentFallbackKinds) {
-    final minLen = kind == 'observation' ? 8 : 20;
+    const minLen = 20;
     for (final step in steps.reversed) {
       if (step.kind != kind) continue;
       final body = sanitizeAssistantContent(step.bodyMarkdown?.trim() ?? '');

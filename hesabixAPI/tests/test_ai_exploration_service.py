@@ -1,8 +1,6 @@
 """تست سرویس Exploration (Exploring / Explored / Thought)."""
 from __future__ import annotations
 
-import pytest
-
 from app.services.ai.ai_budget import build_agent_budget
 from app.services.ai.ai_exploration_service import (
     EXPLORATION_MODE_AUTO,
@@ -10,6 +8,7 @@ from app.services.ai.ai_exploration_service import (
     EXPLORATION_MODE_OFF,
     ExplorationBundle,
     ObservationStore,
+    ThoughtRecord,
     ToolObservation,
     build_explored_body_markdown,
     build_thought_markdown_rule_based,
@@ -105,8 +104,6 @@ def test_observation_store_context():
     )
     store.add_bundle(bundle)
     body, hyp, conf, oq = build_thought_markdown_rule_based(bundle, "q")
-    from app.services.ai.ai_exploration_service import ThoughtRecord
-
     store.add_thought(
         ThoughtRecord(
             thought_id="th1",
@@ -123,10 +120,8 @@ def test_observation_store_context():
     assert "[agent_thought]" in ctx
 
 
-def test_should_continue_exploring():
+def test_should_continue_exploring_stops_on_high_confidence():
     store = ObservationStore()
-    from app.services.ai.ai_exploration_service import ThoughtRecord
-
     store.add_thought(
         ThoughtRecord(
             thought_id="t",
@@ -140,21 +135,14 @@ def test_should_continue_exploring():
     assert should_continue_exploring(store, 2, 8) is False
 
 
-def test_should_not_continue_on_substantive_text_without_evidence():
+def test_should_continue_exploring_without_evidence():
     store = ObservationStore()
-    long_answer = "سلام! " + ("این یک پاسخ بلند است. " * 30)
-    assert should_continue_exploring(store, 1, 4, round_text=long_answer) is False
+    assert should_continue_exploring(store, 1, 4) is True
 
 
-def test_should_continue_on_pending_tool_medium_text():
+def test_should_stop_exploring_at_max_iteration():
     store = ObservationStore()
-    text = "در حال تبدیل بازهٔ «امروز تا ۳ ماه پیش» به بازهٔ دقیق شمسی برای استخراج هزینه‌ها."
-    assert should_continue_exploring(store, 1, 6, round_text=text) is True
-
-
-def test_should_continue_on_empty_evidence_and_short_text():
-    store = ObservationStore()
-    assert should_continue_exploring(store, 1, 4, round_text="سلام") is True
+    assert should_continue_exploring(store, 4, 4) is False
 
 
 def test_assess_tool_round_productivity():
@@ -174,33 +162,31 @@ def test_assess_tool_round_productivity():
     ) is False
 
 
-@pytest.mark.asyncio
-async def test_should_agent_continue_after_text_respects_budget():
+def test_should_agent_continue_stops_when_goal_reached_at_budget():
     budget = build_agent_budget("medium", max_iterations=2)
-    store = ObservationStore()
-    result = await should_agent_continue_after_text_round(
+    result = should_agent_continue_after_text_round(
         goal_tracker=AgentGoalTracker(),
-        observation_store=store,
-        exploration_enabled=True,
+        observation_store=ObservationStore(),
+        exploration_enabled=False,
         iteration=2,
         budget=budget,
-        use_llm=False,
+        round_text="سلام! چطور می‌توانم کمک کنم؟",
+        user_query="سلام",
     )
     assert result is False
 
 
-@pytest.mark.asyncio
-async def test_should_agent_continue_on_pending_tool_text():
+def test_should_agent_continue_on_narrative_without_evidence():
     budget = build_agent_budget("medium", max_iterations=6)
     store = ObservationStore()
     text = "We will call resolve_date_range then get_financial_summary."
-    result = await should_agent_continue_after_text_round(
+    result = should_agent_continue_after_text_round(
         goal_tracker=AgentGoalTracker(),
         observation_store=store,
         exploration_enabled=True,
         iteration=2,
         budget=budget,
         round_text=text,
-        use_llm=False,
+        user_query="بررسی مالی انجام بده",
     )
     assert result is True
