@@ -32,9 +32,12 @@ class AIReasoningPanel extends StatefulWidget {
   static List<AIAgentTraceStep> reasoningOnly(List<AIAgentTraceStep> all) {
     return all
         .where((s) {
+          // پاسخ نهایی و گام‌های داخلی نباید در پنل تحلیل دیده شوند.
+          if (s.visibility == 'internal') return false;
           final layer = s.layer;
           if (layer == 'answer') return false;
           if (layer == null && s.kind == 'answer') return false;
+          if (s.kind == 'answer') return false;
           return true;
         })
         .toList();

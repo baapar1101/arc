@@ -45,6 +45,10 @@ from app.services.ai.ai_tool_keys import (
     tool_label_fa,
     tool_l10n_key,
 )
+from app.services.ai.ai_answer_from_evidence import (
+    build_deterministic_answer_from_trace,
+    redact_final_answer_from_reasoning_trace,
+)
 from app.services.ai.ai_content_sanitize import (
     resolve_round_function_calls,
     sanitize_assistant_content,
@@ -2386,11 +2390,14 @@ class AIService:
                 stripped = sanitize_assistant_content((text or "").strip())
                 if not stripped:
                     return
+                # پاسخ نهایی فقط در کانال content می‌رود؛ بدنهٔ کامل را در
+                # trace لایهٔ answer تکرار نکن تا در پنل تحلیل دیده نشود.
+                redact_final_answer_from_reasoning_trace(trace_steps, stripped)
                 yield _emit_trace(
                     kind="answer",
                     state="done",
                     title_key="aiTraceComposingAnswer",
-                    body_markdown=stripped if len(stripped) < 400 else None,
+                    body_markdown=None,
                     iteration=iter_num,
                     layer="answer",
                 )
@@ -2404,6 +2411,36 @@ class AIService:
                     }
                     await asyncio.sleep(0)
 
+            async def _resolve_answer_after_budget_stop(
+                *,
+                prefer_llm_synthesis: bool,
+            ) -> Optional[str]:
+                """بازیابی پاسخ وقتی بودجه/زمان تمام شده.
+
+                اولویت: answer موجود → narrative قابل‌قبول → (اختیاری) سنتز LLM
+                → پاسخ قطعی از explored/observation. هرگز پیام خالی بودجه را
+                وقتی داده داریم برنگردان.
+                """
+                synthesized = extract_final_content_from_trace(trace_steps)
+                if synthesized:
+                    return synthesized
+                synthesized = extract_usable_narrative_for_answer(trace_steps)
+                if synthesized:
+                    return synthesized
+                if prefer_llm_synthesis and trace_has_unanswered_evidence(
+                    trace_steps
+                ):
+                    agent_run.set_phase(AGENT_RUN_PHASE_SYNTHESIZE)
+                    llm_answer = await _run_forced_synthesis_round()
+                    if llm_answer:
+                        return llm_answer
+                deterministic = build_deterministic_answer_from_trace(
+                    trace_steps,
+                    user_query=effective_user_query,
+                    budget_note=True,
+                )
+                return deterministic or None
+
             async def _run_forced_synthesis_round() -> Optional[str]:
                 """نوبت اضطراری LLM بدون ابزار برای سنتز پاسخ از explored/thought.
 
@@ -2413,6 +2450,17 @@ class AIService:
                 """
                 explored_ctx = extract_explored_context_for_synthesis(trace_steps)
                 if not explored_ctx:
+                    return None
+                # اگر زمان دیوار از قبل تمام شده، LLM را صدا نزن — معمولاً
+                # timeout می‌شود و فقط تأخیر اضافه می‌کند (session 751).
+                remaining = budget.remaining_wall_clock_sec()
+                if remaining is not None and remaining <= 5.0:
+                    logger.info(
+                        "[AI Agent][session=%s] skip LLM synthesis "
+                        "(wall-clock remaining=%.1fs); use deterministic",
+                        session_id,
+                        remaining if remaining is not None else -1,
+                    )
                     return None
                 synthesis_messages = list(full_messages) + [
                     {
@@ -2432,10 +2480,13 @@ class AIService:
                     async for syn_chunk in provider.chat_completion_stream(
                         messages=synthesis_messages,
                         model=self.get_effective_model_api_id(),
-                        max_tokens=max_tokens_override or self.config.max_tokens,
+                        max_tokens=min(
+                            1200,
+                            max_tokens_override or self.config.max_tokens or 1200,
+                        ),
                         temperature=float(self.config.temperature),
                         tools=None,
-                        reasoning_effort=reasoning_effort,
+                        reasoning_effort="low",
                         **stream_provider_extras,
                     ):
                         syn_delta = syn_chunk.get("delta", {}) or {}
@@ -2451,9 +2502,11 @@ class AIService:
                     )
                 except Exception as exc:
                     logger.warning(
-                        "[AI Agent][session=%s] Forced synthesis round failed: %s",
+                        "[AI Agent][session=%s] Forced synthesis round failed: "
+                        "%s: %s",
                         session_id,
-                        exc,
+                        type(exc).__name__,
+                        exc or repr(exc),
                     )
                     return None
                 return collected.strip() or None
@@ -2898,18 +2951,11 @@ class AIService:
                         stop_reason=budget_stop_reason,
                         stop_message_fa=budget_stop_message,
                     )
-                    # هرگز narrative وضعیت یا پیام بودجه را جای پاسخ آماده نگذار.
-                    # اولویت: answer → narrative قابل‌قبول قبلی → سنتز اجباری.
-                    synthesized = extract_final_content_from_trace(trace_steps)
-                    if not synthesized:
-                        synthesized = extract_usable_narrative_for_answer(
-                            trace_steps
-                        )
-                    if not synthesized and trace_has_unanswered_evidence(
-                        trace_steps
-                    ):
-                        agent_run.set_phase(AGENT_RUN_PHASE_SYNTHESIZE)
-                        synthesized = await _run_forced_synthesis_round()
+                    # زمان تمام شده → LLM synthesis را رد کن؛ از دادهٔ جمع‌شده
+                    # پاسخ قطعی بساز (session 751: سنتز LLM دو بار timeout شد).
+                    synthesized = await _resolve_answer_after_budget_stop(
+                        prefer_llm_synthesis=False,
+                    )
                     if synthesized:
                         async for answer_chunk in _emit_answer_text(
                             synthesized, iter_num=iteration
@@ -3486,11 +3532,14 @@ class AIService:
                         continue
 
                     display_text = sanitize_assistant_content(round_text.strip())
+                    redact_final_answer_from_reasoning_trace(
+                        trace_steps, display_text
+                    )
                     yield _emit_trace(
                         kind="answer",
                         state="done",
                         title_key="aiTraceComposingAnswer",
-                        body_markdown=display_text if len(display_text) < 400 else None,
+                        body_markdown=None,
                         iteration=iteration,
                         layer="answer",
                     )
@@ -3520,15 +3569,11 @@ class AIService:
                 continue
 
             if not accumulated_content.strip():
-                agent_run.set_phase(AGENT_RUN_PHASE_SYNTHESIZE)
-                synthesized = extract_final_content_from_trace(trace_steps)
-                if not synthesized:
-                    synthesized = extract_usable_narrative_for_answer(trace_steps)
-                if not synthesized and trace_has_unanswered_evidence(trace_steps):
-                    # حلقه بدون پاسخ متنی/answer تمام شده اما شواهد ابزار وجود
-                    # دارد — به‌جای raw explored markdown، یک نوبت سنتز اجباری
-                    # (بدون ابزار) اجرا کن.
-                    synthesized = await _run_forced_synthesis_round()
+                # اگر به‌خاطر wall-clock ایستاده‌ایم LLM را دوباره امتحان نکن.
+                prefer_llm = budget_stop_reason != STOP_REASON_WALL_CLOCK
+                synthesized = await _resolve_answer_after_budget_stop(
+                    prefer_llm_synthesis=prefer_llm,
+                )
                 if synthesized:
                     accumulated_content = synthesized
                     async for answer_chunk in _emit_answer_text(
