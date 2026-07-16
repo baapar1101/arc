@@ -624,6 +624,7 @@ app/services/zohal_service.py
 app/services/ai/__init__.py
 app/services/ai/ai_accounting_domain_prompt.py
 app/services/ai/ai_agent_continuation.py
+app/services/ai/ai_agent_run.py
 app/services/ai/ai_attachment_service.py
 app/services/ai/ai_budget.py
 app/services/ai/ai_calendar_prompt.py
@@ -635,6 +636,7 @@ app/services/ai/ai_context_budget.py
 app/services/ai/ai_date_resolver.py
 app/services/ai/ai_db_helpers.py
 app/services/ai/ai_embedding_service.py
+app/services/ai/ai_eval_premature.py
 app/services/ai/ai_eval_schedule_service.py
 app/services/ai/ai_eval_service.py
 app/services/ai/ai_execution_policy.py
@@ -674,6 +676,7 @@ app/services/ai/ai_model_seed_service.py
 app/services/ai/ai_model_service.py
 app/services/ai/ai_ops_metrics.py
 app/services/ai/ai_permission_map.py
+app/services/ai/ai_premature_answer.py
 app/services/ai/ai_prompt_cache.py
 app/services/ai/ai_provider.py
 app/services/ai/ai_provider_service.py
@@ -979,12 +982,14 @@ tests/__init__.py
 tests/test_ai_agent_continuation.py
 tests/test_ai_agent_regression_db.py
 tests/test_ai_agent_regression_v2.py
+tests/test_ai_agent_run.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
 tests/test_ai_content_sanitize.py
 tests/test_ai_context_budget.py
 tests/test_ai_date_resolver.py
 tests/test_ai_embedding_service.py
+tests/test_ai_eval_premature.py
 tests/test_ai_eval_service.py
 tests/test_ai_exploration_service.py
 tests/test_ai_feedback_analytics.py
@@ -999,10 +1004,13 @@ tests/test_ai_model_routing.py
 tests/test_ai_model_seed_service.py
 tests/test_ai_model_service.py
 tests/test_ai_permission_map.py
+tests/test_ai_premature_answer.py
 tests/test_ai_prompt_cache.py
+tests/test_ai_provider.py
 tests/test_ai_quota_helpers.py
 tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
+tests/test_ai_routing_alignment.py
 tests/test_ai_session_todo_service.py
 tests/test_ai_skill_parser.py
 tests/test_ai_stream_budget.py

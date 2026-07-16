@@ -471,22 +471,27 @@ def extract_explored_context_for_synthesis(
     *,
     max_chars: int = 6000,
 ) -> str:
-    """خلاصهٔ explored/thought برای ساخت prompt سنتز نهایی (نه پاسخ مستقیم کاربر).
+    """خلاصهٔ explored/thought/narrative مفید برای ساخت prompt سنتز نهایی.
 
     برخلاف extract_final_content_from_trace، این تابع صرفاً برای تغذیهٔ یک
     نوبت اضافی LLM (force-synthesis) استفاده می‌شود، نه نمایش مستقیم به کاربر.
+    narrativeهای وضعیت («در حال…») عمداً حذف می‌شوند.
     """
     if not trace_steps:
         return ""
     from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+    from app.services.ai.ai_premature_answer import looks_like_status_narrative
 
     parts: List[str] = []
     total = 0
     for step in trace_steps:
-        if step.get("kind") not in ("explored", "thought"):
+        kind = step.get("kind")
+        if kind not in ("explored", "thought", "narrative"):
             continue
         body = sanitize_assistant_content((step.get("body_markdown") or "").strip())
         if not body:
+            continue
+        if kind == "narrative" and looks_like_status_narrative(body):
             continue
         parts.append(body)
         total += len(body)
@@ -494,6 +499,35 @@ def extract_explored_context_for_synthesis(
             break
     joined = "\n\n".join(parts)
     return joined[:max_chars]
+
+
+def extract_usable_narrative_for_answer(
+    trace_steps: Optional[List[Dict[str, Any]]],
+    *,
+    min_body_len: int = 40,
+) -> str:
+    """آخرین narrative قابل‌قبول به‌عنوان پاسخ (نه status مثل «در حال…»).
+
+    برای بازیابی وقتی wall-clock/budget قطع می‌شود ولی مدل قبلاً خلاصهٔ
+    واقعی نوشته و فقط kind=answer ثبت نشده (مثل session 750).
+    """
+    if not trace_steps:
+        return ""
+    from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+    from app.services.ai.ai_premature_answer import looks_like_status_narrative
+
+    for step in reversed(trace_steps):
+        if step.get("kind") != "narrative":
+            continue
+        body = sanitize_assistant_content(
+            (step.get("body_markdown") or "").strip()
+        )
+        if len(body) < min_body_len:
+            continue
+        if looks_like_status_narrative(body):
+            continue
+        return body
+    return ""
 
 
 def trace_has_unanswered_evidence(

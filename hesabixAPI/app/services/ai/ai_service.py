@@ -55,6 +55,7 @@ from app.services.ai.ai_trace import (
     extract_explored_context_for_synthesis,
     extract_final_content_from_trace,
     extract_result_count,
+    extract_usable_narrative_for_answer,
     finalize_trace_steps_for_persist,
     format_planned_tools,
     summarize_tool_result,
@@ -2897,11 +2898,18 @@ class AIService:
                         stop_reason=budget_stop_reason,
                         stop_message_fa=budget_stop_message,
                     )
-                    # Phase 1: هرگز narrative نیمه‌کاره (round_text) را به‌عنوان
-                    # پاسخ نهایی emit نکن. اگر گام answer واقعی در trace باشد
-                    # از آن استفاده کن؛ در غیر این صورت به fallback بعد از حلقه
-                    # (سنتز اجباری یا پیام بودجهٔ فارسی) سپرده می‌شود.
+                    # هرگز narrative وضعیت یا پیام بودجه را جای پاسخ آماده نگذار.
+                    # اولویت: answer → narrative قابل‌قبول قبلی → سنتز اجباری.
                     synthesized = extract_final_content_from_trace(trace_steps)
+                    if not synthesized:
+                        synthesized = extract_usable_narrative_for_answer(
+                            trace_steps
+                        )
+                    if not synthesized and trace_has_unanswered_evidence(
+                        trace_steps
+                    ):
+                        agent_run.set_phase(AGENT_RUN_PHASE_SYNTHESIZE)
+                        synthesized = await _run_forced_synthesis_round()
                     if synthesized:
                         async for answer_chunk in _emit_answer_text(
                             synthesized, iter_num=iteration
@@ -3410,6 +3418,45 @@ class AIService:
                             _continue_decision = True
 
                     if _continue_decision:
+                        # اگر زمان دیوار تقریباً تمام است و قبلاً پاسخ ترکیبی/شواهد
+                        # داریم، به‌جای شروع نوبت جدید همان را نهایی کن.
+                        from app.services.ai.ai_premature_answer import (
+                            looks_like_status_narrative as _is_status_text,
+                        )
+
+                        _remaining_wc = budget.remaining_wall_clock_sec()
+                        if (
+                            _remaining_wc is not None
+                            and _remaining_wc < 35.0
+                            and use_tools
+                        ):
+                            _early = extract_usable_narrative_for_answer(
+                                trace_steps
+                            )
+                            if not _early:
+                                _candidate = sanitize_assistant_content(
+                                    round_text.strip()
+                                )
+                                if (
+                                    len(_candidate) >= 40
+                                    and not _is_status_text(_candidate)
+                                ):
+                                    _early = _candidate
+                            if _early:
+                                logger.info(
+                                    "[AI Agent][session=%s] early-finalize before "
+                                    "wall-clock (remaining=%.1fs iteration=%s)",
+                                    session_id,
+                                    _remaining_wc,
+                                    iteration,
+                                )
+                                async for answer_chunk in _emit_answer_text(
+                                    _early, iter_num=iteration
+                                ):
+                                    yield answer_chunk
+                                accumulated_content = _early
+                                break
+
                         max_iterations = budget.max_iterations
                         yield _emit_trace(
                             step_id=f"continue_explore_{iteration}",
@@ -3475,6 +3522,8 @@ class AIService:
             if not accumulated_content.strip():
                 agent_run.set_phase(AGENT_RUN_PHASE_SYNTHESIZE)
                 synthesized = extract_final_content_from_trace(trace_steps)
+                if not synthesized:
+                    synthesized = extract_usable_narrative_for_answer(trace_steps)
                 if not synthesized and trace_has_unanswered_evidence(trace_steps):
                     # حلقه بدون پاسخ متنی/answer تمام شده اما شواهد ابزار وجود
                     # دارد — به‌جای raw explored markdown، یک نوبت سنتز اجباری

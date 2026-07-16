@@ -76,11 +76,35 @@ def assess_text_round_evidence(
                 goal_reached=True,
                 reason_fa="شواهد کافی از ابزارها جمع شد.",
             )
+        # پس از جمع شواهد، اگر مدل متن ترکیبی قابل‌قبول نوشته (نه narrative
+        # وضعیت مثل «در حال…»)، این همان نوبت سنتز پاسخ است — ادامه نده.
+        # در غیر این صورت با thought medium/open_questions بی‌نهایت ادامه
+        # می‌دادیم تا wall-clock برسد و پاسخ خوب دور ریخته شود (session 750).
+        if text and len(text) >= 40:
+            from app.services.ai.ai_premature_answer import looks_like_status_narrative
+
+            if not looks_like_status_narrative(text):
+                return EvidenceContinuation(
+                    should_continue=False,
+                    goal_reached=True,
+                    reason_fa="پس از شواهد ابزار، پاسخ ترکیبی آماده شد.",
+                )
         return EvidenceContinuation(
             should_continue=True,
             goal_reached=False,
             reason_fa="هنوز سوالات باز یا شواهد ناکافی است.",
         )
+
+    # شواهد ابزار هست ولی هنوز thought ساخته نشده؛ متن ترکیبی مدل = پاسخ نهایی
+    if had_evidence and text and len(text) >= 40:
+        from app.services.ai.ai_premature_answer import looks_like_status_narrative
+
+        if not looks_like_status_narrative(text):
+            return EvidenceContinuation(
+                should_continue=False,
+                goal_reached=True,
+                reason_fa="پس از شواهد ابزار، پاسخ ترکیبی آماده شد.",
+            )
 
     if had_evidence and prior_goal_reached and not prior_should_continue:
         return EvidenceContinuation(

@@ -63,6 +63,34 @@ def test_extract_explored_context_for_synthesis():
     assert "در حال جستجو" not in ctx
 
 
+def test_extract_usable_narrative_for_answer_skips_status():
+    from app.services.ai.ai_trace import extract_usable_narrative_for_answer
+
+    trace = [
+        {"kind": "narrative", "body_markdown": "در حال دریافت گزارش فروش هستم."},
+        {
+            "kind": "narrative",
+            "body_markdown": (
+                "**خلاصهٔ فروش ۳ ماه اخیر**\n\n"
+                "- تعداد فاکتور: ۱۱\n"
+                "- مجموع: ۴۱۴ میلیون"
+            ),
+        },
+    ]
+    body = extract_usable_narrative_for_answer(trace)
+    assert "خلاصهٔ فروش" in body
+    assert "در حال" not in body
+
+
+def test_extract_usable_narrative_ignores_short_status_only():
+    from app.services.ai.ai_trace import extract_usable_narrative_for_answer
+
+    trace = [
+        {"kind": "narrative", "body_markdown": "در حال جستجو..."},
+    ]
+    assert extract_usable_narrative_for_answer(trace) == ""
+
+
 def test_trace_has_unanswered_evidence_true_without_answer():
     trace = [
         {"kind": "explored", "body_markdown": "#### ✓ گزارش بدهکاران\n**10** مورد"},

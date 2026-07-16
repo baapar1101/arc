@@ -77,3 +77,53 @@ def test_narrative_text_does_not_auto_stop_without_evidence():
     )
     assert result.should_continue is True
     assert result.goal_reached is False
+
+
+def test_stop_when_evidence_and_composed_answer_text():
+    """session 750: بعد از tool، خلاصهٔ واقعی مدل باید نهایی شود نه continue."""
+    store = ObservationStore()
+    store.add_thought(
+        ThoughtRecord(
+            thought_id="t1",
+            bundle_id="b1",
+            iteration=1,
+            body_markdown="### یافته‌ها\n1. گزارش فروش: **11** مورد",
+            confidence="medium",
+            open_questions=[],
+        )
+    )
+    result = assess_text_round_evidence(
+        round_text=(
+            "**خلاصهٔ فروش ۳ ماه اخیر**\n\n"
+            "- تعداد فاکتور: ۱۱\n"
+            "- مجموع مبلغ: ۴۱۴ میلیون ریال"
+        ),
+        user_query="یه گزارش از فروش سه ماه گذشته بهم بگو",
+        observation_store=store,
+        needs_tools=True,
+    )
+    assert result.should_continue is False
+    assert result.goal_reached is True
+
+
+def test_continue_when_evidence_but_status_narrative():
+    """با evidence اگر هنوز «در حال…» می‌گوید → continue."""
+    store = ObservationStore()
+    store.add_thought(
+        ThoughtRecord(
+            thought_id="t1",
+            bundle_id="b1",
+            iteration=1,
+            body_markdown="### یافته‌ها",
+            confidence="medium",
+            open_questions=["نیاز به جزئیات بیشتر"],
+        )
+    )
+    result = assess_text_round_evidence(
+        round_text="در حال دریافت جزئیات فاکتورها هستم.",
+        user_query="فاکتورهای فروش را بررسی کن",
+        observation_store=store,
+        needs_tools=True,
+    )
+    assert result.should_continue is True
+    assert result.goal_reached is False
