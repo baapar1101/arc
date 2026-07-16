@@ -977,6 +977,8 @@ migrations/versions/20260714_000002_fix_ai_chat_message_trace_content.py
 migrations/versions/20260714_000003_document_code_reservations.py
 tests/__init__.py
 tests/test_ai_agent_continuation.py
+tests/test_ai_agent_regression_db.py
+tests/test_ai_agent_regression_v2.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
 tests/test_ai_content_sanitize.py
