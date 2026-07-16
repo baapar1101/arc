@@ -12,15 +12,26 @@ def test_extract_prefers_answer_over_thought():
     assert extract_final_content_from_trace(trace) == "**خلاصه**\n- 10 بدهکار"
 
 
-def test_extract_falls_back_to_thought():
+def test_extract_falls_back_to_explored():
     trace = [
-        {"kind": "tool", "body_markdown": ""},
+        {"kind": "narrative", "body_markdown": "در حال جستجو..."},
         {
-            "kind": "thought",
-            "body_markdown": "### Important findings\n1. گزارش بدهکاران: **10** مورد",
+            "kind": "explored",
+            "body_markdown": "#### ✓ گزارش بدهکاران\n**10** مورد",
         },
     ]
     assert "10" in extract_final_content_from_trace(trace)
+
+
+def test_extract_skips_narrative_pending_tool():
+    trace = [
+        {
+            "kind": "narrative",
+            "body_markdown": "در حال جستجوی فاکتورهای فروش برای بازهٔ مشخص.",
+        },
+        {"kind": "answer", "body_markdown": ""},
+    ]
+    assert extract_final_content_from_trace(trace) == ""
 
 
 def test_extract_short_observation():

@@ -77,6 +77,12 @@ def test_infer_tool_from_reasoning_when_harmony_absent():
     assert calls[0]["name"] == "resolve_date_range"
 
 
+def test_pending_tool_search_fa():
+    text = "در حال جستجوی فاکتورهای فروش برای بازهٔ «از 1405/01/23 تا 1405/04/23»."
+    assert text_announces_pending_tool_use(text) is True
+    assert is_substantive_text_answer(text) is False
+
+
 def test_message_1313_style_plan_is_not_substantive():
     text = (
         "برای پاسخ به درخواست شما ابتدا باید تعداد افراد را استخراج کنیم.\n"

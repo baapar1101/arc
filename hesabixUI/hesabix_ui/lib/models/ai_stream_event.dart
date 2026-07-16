@@ -19,8 +19,6 @@ List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
 
 const _traceContentFallbackKinds = [
   'answer',
-  'narrative',
-  'thought',
   'explored',
   'observation',
 ];

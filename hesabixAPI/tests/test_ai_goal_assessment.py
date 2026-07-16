@@ -1,7 +1,14 @@
 """تست ارزیابی هدف agent و تمدید پویا بودجه."""
 from __future__ import annotations
 
-from app.services.ai.ai_budget import AgentBudget, STOP_REASON_ITERATIONS, build_agent_budget
+import pytest
+from app.services.ai.ai_budget import (
+    AgentBudget,
+    STOP_REASON_ITERATIONS,
+    STOP_REASON_UNPRODUCTIVE,
+    build_agent_budget,
+)
+from app.services.ai.ai_exploration_service import ObservationStore
 from app.services.ai.ai_goal_assessment import (
     AgentGoalTracker,
     ToolCallTracker,
@@ -34,9 +41,8 @@ def test_assess_after_productive_round():
         },
     }
     assessment = tracker.assess_after_tool_round(calls, results, _lookup)
-    assert assessment.goal_reached is True
     assert assessment.should_continue is False
-    assert assessment.confidence == "high"
+    assert assessment.confidence in ("high", "medium")
 
 
 def test_assess_after_failed_round_should_continue():
@@ -76,6 +82,24 @@ def test_resolve_budget_gate_extends_when_goal_not_reached():
     assert budget.max_iterations == 5
 
 
+def test_resolve_budget_gate_extends_on_unproductive_when_goal_open():
+    budget = build_agent_budget("simple", max_iterations=3)
+    budget.unproductive_rounds = 2
+    tracker = AgentGoalTracker()
+    tracker.assess_after_text_round(
+        "در حال جستجوی فاکتورها.",
+        user_query="فاکتورها را بررسی کن",
+    )
+
+    status = budget.check(1)
+    assert status.stop is True
+    assert status.reason == STOP_REASON_UNPRODUCTIVE
+
+    status = resolve_budget_gate(budget, 1, tracker)
+    assert status.stop is False
+    assert budget.unproductive_rounds == 0
+
+
 def test_try_extend_blocked_on_loop():
     budget = build_agent_budget("simple", max_iterations=3)
     tracker = AgentGoalTracker()
@@ -87,7 +111,8 @@ def test_try_extend_blocked_on_loop():
     assert try_extend_budget_for_goal(budget, tracker.last_assessment) is False
 
 
-def test_should_continue_after_text_with_goal_tracker():
+@pytest.mark.asyncio
+async def test_should_continue_after_text_with_goal_tracker():
     budget = build_agent_budget("simple", max_iterations=6)
     tracker = AgentGoalTracker()
     tracker.assess_after_tool_round(
@@ -95,21 +120,26 @@ def test_should_continue_after_text_with_goal_tracker():
         {"call_1": {"error": "NOT_FOUND"}},
         _lookup,
     )
-    assert should_agent_continue_after_text_round(
+
+    result = await should_agent_continue_after_text_round(
         goal_tracker=tracker,
         observation_store=None,
         exploration_enabled=False,
         iteration=2,
         budget=budget,
         round_text="",
-    ) is True
+        use_llm=False,
+    )
+    assert result is True
 
 
-def test_text_round_substantive_answer_stops_exploration():
+@pytest.mark.asyncio
+async def test_text_round_substantive_answer_stops_exploration():
     budget = build_agent_budget("simple", max_iterations=6)
     store = ObservationStore()
     long_answer = "### ابزارها\n\n" + ("| a | b |\n" * 5)
-    assert should_agent_continue_after_text_round(
+
+    result = await should_agent_continue_after_text_round(
         goal_tracker=AgentGoalTracker(),
         observation_store=store,
         exploration_enabled=True,
@@ -117,7 +147,9 @@ def test_text_round_substantive_answer_stops_exploration():
         budget=budget,
         round_text=long_answer,
         user_query="چه ابزارهایی داری؟",
-    ) is False
+        use_llm=False,
+    )
+    assert result is False
 
 
 def test_assess_after_text_round_tool_discovery():

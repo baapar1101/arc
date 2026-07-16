@@ -81,6 +81,17 @@ AUX_EXPLORATION = (
     "داده اختراع نکن. secretها را ماسک کن (فقط ۴ کاراکتر آخر). حداکثر ۴۰۰ کلمه."
 )
 
+AUX_AGENT_CONTINUATION = (
+    "تو ارزیاب ادامهٔ agent در ERP حسابداری هستی. "
+    "مدل گاهی بدون فراخوانی ابزار، فقط برنامه یا narration می‌دهد — این پاسخ نهایی نیست.\n"
+    "ادامه بده (should_continue=true) اگر: سوال کاربر هنوز پاسخ داده نشده، "
+    "مدل فقط intent ابزار اعلام کرده، یا فقط planning/reasoning بدون داده واقعی است.\n"
+    "توقف (should_continue=false, goal_reached=true) اگر: پاسخ کامل با داده/جدول/نتیجه "
+    "یا فهرست ابزارها برای سوال discovery.\n"
+    "فقط JSON معتبر برگردان، بدون markdown:\n"
+    '{"should_continue": true|false, "goal_reached": true|false, "reason": "دلیل کوتاه فارسی"}'
+)
+
 CHAT_LANGUAGE_POLICY = """
 ## زبان کاربر و متن تحلیل (الزامی)
 
@@ -396,6 +407,7 @@ AI_PROMPT_FALLBACKS: dict[str, str] = {
     "chat.admin": CHAT_ADMIN,
     "aux.history_summary": AUX_HISTORY_SUMMARY,
     "aux.exploration": AUX_EXPLORATION,
+    "aux.agent_continuation": AUX_AGENT_CONTINUATION,
     "aux.chat_title": AUX_CHAT_TITLE,
     "aux.chat_title_user": AUX_CHAT_TITLE_USER,
     "support.ticket_suggest.system": SUPPORT_TICKET_SYSTEM,
@@ -527,6 +539,14 @@ AI_DEFAULT_PROMPT_ROWS: list[dict[str, str]] = [
         "category": "auxiliary",
         "title": "تحلیل نتایج ابزارها",
         "content": AUX_EXPLORATION,
+    },
+    {
+        "prompt_key": "aux.agent_continuation",
+        "role": "user",
+        "prompt_type": "system",
+        "category": "auxiliary",
+        "title": "ارزیابی ادامه agent",
+        "content": AUX_AGENT_CONTINUATION,
     },
     {
         "prompt_key": "aux.chat_title",

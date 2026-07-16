@@ -4,6 +4,7 @@ Agent trace — زنجیرهٔ مراحل قابل نمایش برای کارب�
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -422,14 +423,27 @@ def extract_trace_from_function_results(
     return []
 
 
-# اولویت استخراج متن نهایی از trace وقتی delta/stream خالی است
+# اولویت استخراج متن نهایی از trace وقتی delta/stream خالی است.
+# narrative/thought/reasoning عمداً حذف شده‌اند — فقط پاسخ یا یافتهٔ ابزار.
 TRACE_CONTENT_FALLBACK_KINDS: tuple[str, ...] = (
     "answer",
-    "narrative",
-    "thought",
     "explored",
     "observation",
 )
+
+
+def _is_valid_trace_answer_fallback(body: str, kind: str, *, min_body_len: int) -> bool:
+    from app.services.ai.ai_content_sanitize import text_announces_pending_tool_use
+
+    if not body or text_announces_pending_tool_use(body):
+        return False
+    if kind == "observation":
+        if len(body) >= min_body_len:
+            return True
+        return len(body) >= 8 and bool(
+            re.search(r"\d|مورد|یافت شد|✓|✗", body)
+        )
+    return len(body) >= min_body_len
 
 
 def extract_final_content_from_trace(
@@ -443,14 +457,13 @@ def extract_final_content_from_trace(
     from app.services.ai.ai_content_sanitize import sanitize_assistant_content
 
     for kind in TRACE_CONTENT_FALLBACK_KINDS:
-        min_len = 8 if kind == "observation" else min_body_len
         for step in reversed(trace_steps):
             if step.get("kind") != kind:
                 continue
             body = sanitize_assistant_content(
                 (step.get("body_markdown") or "").strip()
             )
-            if len(body) >= min_len:
+            if _is_valid_trace_answer_fallback(body, kind, min_body_len=min_body_len):
                 return body
     return ""
 

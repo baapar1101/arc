@@ -623,6 +623,7 @@ app/services/year_end_closing_service.py
 app/services/zohal_service.py
 app/services/ai/__init__.py
 app/services/ai/ai_accounting_domain_prompt.py
+app/services/ai/ai_agent_continuation.py
 app/services/ai/ai_attachment_service.py
 app/services/ai/ai_budget.py
 app/services/ai/ai_calendar_prompt.py
@@ -975,6 +976,7 @@ migrations/versions/20260714_000001_ai_prompts_language_policy.py
 migrations/versions/20260714_000002_fix_ai_chat_message_trace_content.py
 migrations/versions/20260714_000003_document_code_reservations.py
 tests/__init__.py
+tests/test_ai_agent_continuation.py
 tests/test_ai_budget.py
 tests/test_ai_connector_security.py
 tests/test_ai_content_sanitize.py

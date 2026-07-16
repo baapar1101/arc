@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 
 from app.services.ai.ai_constants import (
     SUBSTANTIVE_TEXT_MIN_CHARS,
-    TEXT_ANSWER_SHORT_THRESHOLD_CHARS,
 )
 
 from app.services.ai.ai_tool_intent import estimate_query_complexity
@@ -372,13 +371,16 @@ def should_continue_exploring(
     if iteration >= max_iterations:
         return False
 
+    stripped = (round_text or "").strip()
+    from app.services.ai.ai_content_sanitize import text_announces_pending_tool_use
+
+    if text_announces_pending_tool_use(stripped):
+        return iteration < max_iterations
+
     if not observation_store_has_evidence(store):
-        stripped = (round_text or "").strip()
         if is_substantive_text_answer(stripped):
             return False
-        if len(stripped) < TEXT_ANSWER_SHORT_THRESHOLD_CHARS:
-            return iteration < max_iterations - 1
-        return False
+        return iteration < max_iterations
 
     if not store.thoughts:
         return True
@@ -386,7 +388,7 @@ def should_continue_exploring(
     last = store.thoughts[-1]
     if last.confidence == "high" and not last.open_questions:
         return False
-    if last.confidence == "low" and iteration < max_iterations - 1:
+    if last.confidence == "low" and iteration < max_iterations:
         return True
     return bool(last.open_questions) and iteration < max_iterations
 

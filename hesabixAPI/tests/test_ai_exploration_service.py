@@ -1,6 +1,8 @@
 """تست سرویس Exploration (Exploring / Explored / Thought)."""
 from __future__ import annotations
 
+import pytest
+
 from app.services.ai.ai_budget import build_agent_budget
 from app.services.ai.ai_exploration_service import (
     EXPLORATION_MODE_AUTO,
@@ -144,6 +146,12 @@ def test_should_not_continue_on_substantive_text_without_evidence():
     assert should_continue_exploring(store, 1, 4, round_text=long_answer) is False
 
 
+def test_should_continue_on_pending_tool_medium_text():
+    store = ObservationStore()
+    text = "در حال تبدیل بازهٔ «امروز تا ۳ ماه پیش» به بازهٔ دقیق شمسی برای استخراج هزینه‌ها."
+    assert should_continue_exploring(store, 1, 6, round_text=text) is True
+
+
 def test_should_continue_on_empty_evidence_and_short_text():
     store = ObservationStore()
     assert should_continue_exploring(store, 1, 4, round_text="سلام") is True
@@ -166,13 +174,33 @@ def test_assess_tool_round_productivity():
     ) is False
 
 
-def test_should_agent_continue_after_text_respects_budget():
+@pytest.mark.asyncio
+async def test_should_agent_continue_after_text_respects_budget():
     budget = build_agent_budget("medium", max_iterations=2)
     store = ObservationStore()
-    assert should_agent_continue_after_text_round(
+    result = await should_agent_continue_after_text_round(
         goal_tracker=AgentGoalTracker(),
         observation_store=store,
         exploration_enabled=True,
         iteration=2,
         budget=budget,
-    ) is False
+        use_llm=False,
+    )
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_should_agent_continue_on_pending_tool_text():
+    budget = build_agent_budget("medium", max_iterations=6)
+    store = ObservationStore()
+    text = "We will call resolve_date_range then get_financial_summary."
+    result = await should_agent_continue_after_text_round(
+        goal_tracker=AgentGoalTracker(),
+        observation_store=store,
+        exploration_enabled=True,
+        iteration=2,
+        budget=budget,
+        round_text=text,
+        use_llm=False,
+    )
+    assert result is True

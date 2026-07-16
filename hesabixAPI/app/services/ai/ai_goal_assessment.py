@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from app.services.ai.ai_constants import AGENT_MAX_IDENTICAL_TOOL_REPEATS
-from app.services.ai.ai_budget import AgentBudget, BudgetStatus, STOP_REASON_ITERATIONS
+from app.services.ai.ai_budget import AgentBudget, BudgetStatus, STOP_REASON_ITERATIONS, STOP_REASON_UNPRODUCTIVE
 from app.services.ai.ai_exploration_service import (
     ExplorationBundle,
     ObservationStore,
@@ -351,14 +351,19 @@ def resolve_budget_gate(
 ) -> BudgetStatus:
     """بررسی بودجه با امکان تمدید پویا پیش از توقف."""
     status = budget.check(iteration)
-    if status.stop and status.reason == STOP_REASON_ITERATIONS:
+    if status.stop and status.reason in (
+        STOP_REASON_ITERATIONS,
+        STOP_REASON_UNPRODUCTIVE,
+    ):
         assessment = goal_tracker.last_assessment if goal_tracker else None
         if try_extend_budget_for_goal(budget, assessment):
+            if status.reason == STOP_REASON_UNPRODUCTIVE:
+                budget.unproductive_rounds = 0
             return BudgetStatus(stop=False)
     return status
 
 
-def should_agent_continue_after_text_round(
+async def should_agent_continue_after_text_round(
     *,
     goal_tracker: Optional[AgentGoalTracker],
     observation_store: Optional[ObservationStore],
@@ -366,10 +371,27 @@ def should_agent_continue_after_text_round(
     iteration: int,
     budget: AgentBudget,
     round_text: str = "",
+    round_reasoning: str = "",
     user_query: Optional[str] = None,
+    provider: Any = None,
+    model: Optional[str] = None,
+    db: Any = None,
+    use_llm: bool = True,
 ) -> bool:
-    """ادامه پس از پاسخ متنی مدل (بدون tool call)."""
+    """ادامه پس از پاسخ متنی مدل (بدون tool call) — قواعد + LLM."""
+    from app.services.ai.ai_agent_continuation import resolve_agent_continuation
+
     if budget.remaining_iterations(iteration) <= 0:
+        if goal_tracker is not None and not (round_text or "").strip():
+            prior = goal_tracker.last_assessment
+            if prior and prior.should_continue and not prior.loop_detected:
+                return try_extend_budget_for_goal(budget, prior)
+        if goal_tracker is not None:
+            goal_tracker.assess_after_text_round(
+                round_text,
+                user_query=user_query,
+                observation_store=observation_store,
+            )
         assessment = goal_tracker.last_assessment if goal_tracker else None
         if (
             exploration_enabled
@@ -382,35 +404,33 @@ def should_agent_continue_after_text_round(
             )
         ):
             return budget.try_extend()
-        if goal_tracker is not None:
-            assessment = goal_tracker.assess_after_text_round(
-                round_text,
-                user_query=user_query,
-                observation_store=observation_store,
-            )
-            return try_extend_budget_for_goal(budget, assessment)
         return try_extend_budget_for_goal(budget, assessment)
 
-    if exploration_enabled and observation_store is not None:
-        return should_continue_exploring(
-            observation_store,
-            iteration,
-            budget.max_iterations,
-            round_text=round_text,
-        )
+    if not (round_text or "").strip() and goal_tracker is not None:
+        prior = goal_tracker.last_assessment
+        if prior and prior.should_continue and not prior.loop_detected:
+            return iteration < budget.max_iterations
 
-    if goal_tracker is not None:
-        assessment = goal_tracker.assess_after_text_round(
-            round_text,
-            user_query=user_query,
-            observation_store=observation_store,
-        )
-        if assessment.should_continue and not assessment.loop_detected:
-            return True
+    continuation = await resolve_agent_continuation(
+        provider=provider,
+        model=model,
+        user_query=user_query,
+        round_text=round_text,
+        round_reasoning=round_reasoning,
+        observation_store=observation_store,
+        goal_tracker=goal_tracker,
+        iteration=iteration,
+        max_iterations=budget.max_iterations,
+        db=db,
+        use_llm=use_llm,
+    )
+
+    if continuation.should_continue and not continuation.goal_reached:
+        return iteration < budget.max_iterations
 
     if goal_tracker and goal_tracker.last_session_todo_state:
         state = goal_tracker.last_session_todo_state
-        if state.has_open:
-            return budget.try_extend() if budget.remaining_iterations(iteration) <= 0 else True
+        if state.has_open and iteration < budget.max_iterations:
+            return True
 
     return False

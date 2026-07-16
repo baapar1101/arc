@@ -48,6 +48,7 @@ from app.services.ai.ai_tool_keys import (
 from app.services.ai.ai_content_sanitize import (
     resolve_round_function_calls,
     sanitize_assistant_content,
+    text_announces_pending_tool_use,
 )
 from app.services.ai.ai_trace import (
     context_trace,
@@ -3239,20 +3240,18 @@ class AIService:
                     continue
 
                 if round_text.strip():
-                    if goal_tracker is not None:
-                        goal_tracker.assess_after_text_round(
-                            round_text,
-                            user_query=effective_user_query,
-                            observation_store=observation_store,
-                        )
-                    if should_agent_continue_after_text_round(
+                    if await should_agent_continue_after_text_round(
                         goal_tracker=goal_tracker,
                         exploration_enabled=exploration_enabled,
                         observation_store=observation_store,
                         iteration=iteration,
                         budget=budget,
                         round_text=round_text,
+                        round_reasoning=round_reasoning,
                         user_query=effective_user_query,
+                        provider=provider,
+                        model=resolved_model_code,
+                        db=self.db,
                     ):
                         max_iterations = budget.max_iterations
                         yield _emit_trace(
@@ -3278,6 +3277,25 @@ class AIService:
                         full_messages.append(
                             {"role": "user", "content": continue_msg}
                         )
+                        continue
+
+                    if text_announces_pending_tool_use(round_text):
+                        full_messages.append(
+                            {"role": "assistant", "content": round_text.strip()}
+                        )
+                        continue_msg = (
+                            goal_tracker.continue_context_for_llm()
+                            if goal_tracker
+                            else None
+                        ) or (
+                            "[agent_continue]\n"
+                            "ابزار اعلام شده ولی اجرا نشده؛ "
+                            "قبل از پاسخ نهایی، ابزار مناسب را فراخوانی کن."
+                        )
+                        full_messages.append(
+                            {"role": "user", "content": continue_msg}
+                        )
+                        budget.note_round(productive=False)
                         continue
 
                     display_text = sanitize_assistant_content(round_text.strip())
@@ -3323,11 +3341,18 @@ class AIService:
                     ):
                         yield answer_chunk
                 elif budget_stop_reason:
+                    from app.services.ai.ai_budget import STOP_REASON_UNPRODUCTIVE
+
                     if budget_stop_reason == STOP_REASON_ITERATIONS:
                         accumulated_content = (
                             f"به حداکثر تعداد مراحل تحلیل ({max_iterations}) رسیدم. "
                             "با داده‌های جمع‌آوری‌شده می‌توانید سوال را دقیق‌تر تکرار کنید "
                             "یا موضوع را در چند پیام جدا بپرسید."
+                        )
+                    elif budget_stop_reason == STOP_REASON_UNPRODUCTIVE:
+                        accumulated_content = (
+                            "نتوانستم با دادهٔ کافی به سوال پاسخ دهم. "
+                            "لطفاً سوال را دقیق‌تر تکرار کنید یا آن را به چند بخش کوچک‌تر تقسیم کنید."
                         )
                     else:
                         accumulated_content = (
