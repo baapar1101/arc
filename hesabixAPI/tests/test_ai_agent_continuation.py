@@ -63,8 +63,36 @@ def test_stop_when_high_confidence_thought():
         observation_store=store,
         needs_tools=True,
     )
-    assert result.goal_reached is True
-    assert result.should_continue is False
+    assert result.goal_reached is False
+    assert result.should_continue is True
+
+
+def test_continue_when_evidence_but_planning_narrative_session_756():
+    """session 756: planning + JSON با evidence نباید goal_reached شود."""
+    store = ObservationStore()
+    store.add_thought(
+        ThoughtRecord(
+            thought_id="t1",
+            bundle_id="b1",
+            iteration=1,
+            body_markdown="### یافته‌ها",
+            confidence="medium",
+            open_questions=[],
+        )
+    )
+    planning = (
+        "برای تهیهٔ گزارش مالی سه ماه گذشته ابتدا بازهٔ تاریخی را تبدیل می‌کنم. "
+        "سپس داده‌های فروش و خرید را دریافت می‌کنم.\n\n"
+        '```json\n{"relative": "last_3_months"}\n```'
+    )
+    result = assess_text_round_evidence(
+        round_text=planning,
+        user_query="یه گزارش مالی از سه ماه گذشته بهم بده",
+        observation_store=store,
+        needs_tools=True,
+    )
+    assert result.should_continue is True
+    assert result.goal_reached is False
 
 
 def test_narrative_text_does_not_auto_stop_without_evidence():

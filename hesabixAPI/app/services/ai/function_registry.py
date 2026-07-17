@@ -1237,7 +1237,7 @@ class AIFunctionRegistry:
                 "from_date": kwargs.get("from_date"),
                 "to_date": kwargs.get("to_date"),
                 "fiscal_year_id": kwargs.get("fiscal_year_id"),
-                "take": 1000,
+                "take": 100,
                 "skip": 0
             }
             
@@ -1246,7 +1246,7 @@ class AIFunctionRegistry:
                 "from_date": kwargs.get("from_date"),
                 "to_date": kwargs.get("to_date"),
                 "fiscal_year_id": kwargs.get("fiscal_year_id"),
-                "take": 1000,
+                "take": 100,
                 "skip": 0
             }
             

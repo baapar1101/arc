@@ -29,7 +29,7 @@
     "round_text": "",
     "needs_tools": true,
     "has_high_confidence_thought": true,
-    "expect_continue": false,
-    "expect_goal_reached": true
+    "expect_continue": true,
+    "expect_goal_reached": false
   }
 ]

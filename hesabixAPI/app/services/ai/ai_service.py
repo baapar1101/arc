@@ -3430,17 +3430,16 @@ class AIService:
                         iteration,
                         budget.max_iterations,
                     )
-                    # لایهٔ ایمنی: اگر Plan C به‌اشتباه stop داده ولی متن شبیه
-                    # narrative وضعیت است و هنوز evidence ابزار نداریم، ادامه بده.
-                    # تصمیم اصلی همچنان evidence-based است؛ این فقط last-line defense است.
+                    # لایهٔ ایمنی: اگر Plan C به‌اشتباه stop داده ولی متن تحویلی
+                    # نیست، ادامه بده (با یا بدون evidence ابزار).
                     if (
                         not _continue_decision
                         and _needs_tools
                         and use_tools
                         and iteration < budget.max_iterations
                     ):
-                        from app.services.ai.ai_premature_answer import (
-                            looks_like_status_narrative,
+                        from app.services.ai.ai_deliverable_answer import (
+                            is_deliverable_answer,
                         )
                         from app.services.ai.ai_exploration_service import (
                             observation_store_has_evidence,
@@ -3450,24 +3449,26 @@ class AIService:
                             observation_store is not None
                             and observation_store_has_evidence(observation_store)
                         )
-                        if (
-                            not _has_evidence
-                            and looks_like_status_narrative(round_text)
+                        if not is_deliverable_answer(
+                            round_text,
+                            needs_tools=True,
+                            has_tool_evidence=_has_evidence,
                         ):
                             logger.warning(
-                                "[AI Agent][session=%s] safety-gate: status "
-                                "narrative blocked from becoming final answer "
-                                "(iteration=%s)",
+                                "[AI Agent][session=%s] deliverable-gate: "
+                                "non-deliverable text blocked from final answer "
+                                "(iteration=%s has_evidence=%s)",
                                 session_id,
                                 iteration,
+                                _has_evidence,
                             )
                             _continue_decision = True
 
                     if _continue_decision:
                         # اگر زمان دیوار تقریباً تمام است و قبلاً پاسخ ترکیبی/شواهد
                         # داریم، به‌جای شروع نوبت جدید همان را نهایی کن.
-                        from app.services.ai.ai_premature_answer import (
-                            looks_like_status_narrative as _is_status_text,
+                        from app.services.ai.ai_deliverable_answer import (
+                            is_deliverable_answer as _is_deliverable_text,
                         )
 
                         _remaining_wc = budget.remaining_wall_clock_sec()
@@ -3483,9 +3484,10 @@ class AIService:
                                 _candidate = sanitize_assistant_content(
                                     round_text.strip()
                                 )
-                                if (
-                                    len(_candidate) >= 40
-                                    and not _is_status_text(_candidate)
+                                if _is_deliverable_text(
+                                    _candidate,
+                                    needs_tools=_needs_tools,
+                                    has_tool_evidence=True,
                                 ):
                                     _early = _candidate
                             if _early:
@@ -3532,6 +3534,61 @@ class AIService:
                         continue
 
                     display_text = sanitize_assistant_content(round_text.strip())
+                    from app.services.ai.ai_deliverable_answer import (
+                        is_deliverable_answer,
+                    )
+                    from app.services.ai.ai_exploration_service import (
+                        observation_store_has_evidence,
+                    )
+
+                    _has_evidence = (
+                        (
+                            observation_store is not None
+                            and observation_store_has_evidence(observation_store)
+                        )
+                        or trace_has_unanswered_evidence(trace_steps)
+                    )
+                    if not is_deliverable_answer(
+                        display_text,
+                        needs_tools=_needs_tools,
+                        has_tool_evidence=bool(_has_evidence),
+                    ):
+                        if _has_evidence:
+                            prefer_llm = budget_stop_reason != STOP_REASON_WALL_CLOCK
+                            synthesized = await _resolve_answer_after_budget_stop(
+                                prefer_llm_synthesis=prefer_llm,
+                            )
+                            if synthesized:
+                                async for answer_chunk in _emit_answer_text(
+                                    synthesized, iter_num=iteration
+                                ):
+                                    yield answer_chunk
+                                accumulated_content = synthesized
+                                break
+                        if iteration < budget.max_iterations:
+                            full_messages.append(
+                                {"role": "assistant", "content": round_text.strip()}
+                            )
+                            full_messages.append(
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        "[agent_synthesize]\n"
+                                        "بر اساس داده‌هایی که از ابزارها جمع شد، "
+                                        "یک پاسخ نهایی مستقیم و خوانا برای کاربر "
+                                        "بنویس. دیگر برنامه‌ریزی یا توضیح قصد "
+                                        "فراخوانی ابزار نده."
+                                    ),
+                                }
+                            )
+                            budget.note_round(productive=False)
+                            continue
+                        display_text = ""
+
+                    if not display_text:
+                        budget.note_round(productive=False)
+                        continue
+
                     redact_final_answer_from_reasoning_trace(
                         trace_steps, display_text
                     )
@@ -3568,8 +3625,34 @@ class AIService:
                 budget.note_round(productive=False)
                 continue
 
-            if not accumulated_content.strip():
-                # اگر به‌خاطر wall-clock ایستاده‌ایم LLM را دوباره امتحان نکن.
+            from app.services.ai.ai_agent_continuation import resolve_needs_tools
+            from app.services.ai.ai_deliverable_answer import is_deliverable_answer
+            from app.services.ai.ai_exploration_service import (
+                observation_store_has_evidence,
+            )
+
+            _has_evidence = (
+                (
+                    observation_store is not None
+                    and observation_store_has_evidence(observation_store)
+                )
+                or trace_has_unanswered_evidence(trace_steps)
+                or bool(accumulated_function_results)
+            )
+            _needs_tools_final = resolve_needs_tools(
+                effective_user_query,
+                messages,
+                tools_enabled=bool(use_tools),
+            )
+            _content = (accumulated_content or "").strip()
+            _deliverable = bool(_content) and is_deliverable_answer(
+                _content,
+                needs_tools=_needs_tools_final,
+                has_tool_evidence=bool(_has_evidence),
+            )
+
+            if not _deliverable and (_has_evidence or not _content):
+                # پاسخ خالی یا planning-only با شواهد ابزار → سنتز اجباری
                 prefer_llm = budget_stop_reason != STOP_REASON_WALL_CLOCK
                 synthesized = await _resolve_answer_after_budget_stop(
                     prefer_llm_synthesis=prefer_llm,
@@ -3608,6 +3691,8 @@ class AIService:
                         stop_reason=budget_stop_reason,
                         stop_message_fa=budget_stop_message,
                     )
+                elif _content and not _deliverable:
+                    accumulated_content = ""
 
             agent_run.set_phase(AGENT_RUN_PHASE_DONE)
             final_agent_budget = budget_snapshot(

@@ -1235,6 +1235,13 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         _columnDateFromValues.isNotEmpty;
   }
 
+  bool _columnHasActiveFilter(String columnKey) {
+    return _columnSearchValues.containsKey(columnKey) ||
+        (_columnMultiSelectValues[columnKey]?.isNotEmpty ?? false) ||
+        (_columnDateFromValues[columnKey] != null &&
+            _columnDateToValues[columnKey] != null);
+  }
+
   void _clearAllFilters() {
     _persistTableFiltersDebounce?.cancel();
     if (_tableFiltersPersistenceEnabled) {
@@ -3580,7 +3587,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             onSearch: widget.config.showColumnSearch && column.searchable
                 ? () => _openColumnSearchDialog(column.key, column.label)
                 : () {},
-            hasActiveFilter: _columnSearchValues.containsKey(column.key),
+            hasActiveFilter: _columnHasActiveFilter(column.key),
             enabled: widget.config.enableSorting && column.sortable,
             onResizeDrag: widget.config.enableColumnSettings
                 ? (dx) {

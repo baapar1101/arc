@@ -1,12 +1,8 @@
 """
 تشخیص «narrative وضعیت» در متن پاسخ — فقط برای eval/logging/متریک.
 
-⚠️ Plan C: این ماژول هرگز نباید در مسیر تصمیم continue/stop تولید (runtime)
-استفاده شود. تصمیم agent باید صرفاً بر اساس evidence ساختاری (tool calls و
-نتایج آن‌ها) باشد، نه regex روی متن مدل. این تابع فقط برای:
-  - تست‌های regression (شناسایی نمونه‌های شناخته‌شده باگ)
-  - هشدار نرم (log warning) هنگام persist، بدون تغییر رفتار
-استفاده می‌شود.
+Plan C+: تصمیم continue/stop و persist از `ai_deliverable_answer.is_deliverable_answer`
+استفاده می‌کند. این ماژول فقط الگوهای narrative شناخته‌شده را برای eval/logging نگه می‌دارد.
 """
 from __future__ import annotations
 

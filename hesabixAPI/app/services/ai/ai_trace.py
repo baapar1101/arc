@@ -547,8 +547,21 @@ def merge_accumulated_and_trace_content(
     trace_steps: Optional[List[Dict[str, Any]]],
 ) -> str:
     """ترکیب متن stream شده با fallback از trace."""
+    from app.services.ai.ai_deliverable_answer import is_deliverable_answer
+
     text = (accumulated_content or "").strip()
-    if text:
+    has_tool_evidence = bool(trace_steps) and any(
+        step.get("kind") in ("explored", "thought", "tool", "narrative")
+        for step in trace_steps
+    )
+    if text and is_deliverable_answer(
+        text,
+        needs_tools=has_tool_evidence,
+        has_tool_evidence=has_tool_evidence,
+    ):
         return accumulated_content
     synthesized = extract_final_content_from_trace(trace_steps)
-    return synthesized or (accumulated_content or "")
+    if synthesized:
+        return synthesized
+    usable = extract_usable_narrative_for_answer(trace_steps)
+    return usable or (accumulated_content or "")

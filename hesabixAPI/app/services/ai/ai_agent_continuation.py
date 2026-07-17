@@ -12,7 +12,24 @@ from app.services.ai.ai_exploration_service import (
     ObservationStore,
     observation_store_has_evidence,
 )
+from app.services.ai.ai_deliverable_answer import is_deliverable_answer
 from app.services.ai.ai_tool_intent import query_expects_tool_use
+
+
+def _round_text_is_deliverable(
+    text: str,
+    *,
+    needs_tools: bool,
+    had_evidence: bool,
+) -> bool:
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    return is_deliverable_answer(
+        stripped,
+        needs_tools=needs_tools,
+        has_tool_evidence=had_evidence,
+    )
 
 
 @dataclass
@@ -71,40 +88,48 @@ def assess_text_round_evidence(
     if had_evidence and observation_store and observation_store.thoughts:
         last = observation_store.thoughts[-1]
         if last.confidence == "high" and not last.open_questions:
-            return EvidenceContinuation(
-                should_continue=False,
-                goal_reached=True,
-                reason_fa="شواهد کافی از ابزارها جمع شد.",
-            )
-        # پس از جمع شواهد، اگر مدل متن ترکیبی قابل‌قبول نوشته (نه narrative
-        # وضعیت مثل «در حال…»)، این همان نوبت سنتز پاسخ است — ادامه نده.
-        # در غیر این صورت با thought medium/open_questions بی‌نهایت ادامه
-        # می‌دادیم تا wall-clock برسد و پاسخ خوب دور ریخته شود (session 750).
-        if text and len(text) >= 40:
-            from app.services.ai.ai_premature_answer import looks_like_status_narrative
-
-            if not looks_like_status_narrative(text):
+            if _round_text_is_deliverable(
+                text, needs_tools=needs_tools, had_evidence=True
+            ):
                 return EvidenceContinuation(
                     should_continue=False,
                     goal_reached=True,
-                    reason_fa="پس از شواهد ابزار، پاسخ ترکیبی آماده شد.",
+                    reason_fa="شواهد کافی و پاسخ تحویلی آماده است.",
                 )
-        return EvidenceContinuation(
-            should_continue=True,
-            goal_reached=False,
-            reason_fa="هنوز سوالات باز یا شواهد ناکافی است.",
-        )
-
-    # شواهد ابزار هست ولی هنوز thought ساخته نشده؛ متن ترکیبی مدل = پاسخ نهایی
-    if had_evidence and text and len(text) >= 40:
-        from app.services.ai.ai_premature_answer import looks_like_status_narrative
-
-        if not looks_like_status_narrative(text):
+            return EvidenceContinuation(
+                should_continue=True,
+                goal_reached=False,
+                reason_fa="شواهد کافی جمع شد؛ پاسخ نهایی هنوز سنتز نشده.",
+            )
+        if _round_text_is_deliverable(
+            text, needs_tools=needs_tools, had_evidence=True
+        ):
             return EvidenceContinuation(
                 should_continue=False,
                 goal_reached=True,
-                reason_fa="پس از شواهد ابزار، پاسخ ترکیبی آماده شد.",
+                reason_fa="پس از شواهد ابزار، پاسخ تحویلی آماده شد.",
             )
+        return EvidenceContinuation(
+            should_continue=True,
+            goal_reached=False,
+            reason_fa="هنوز سوالات باز یا پاسخ تحویلی آماده نیست.",
+        )
+
+    if had_evidence and _round_text_is_deliverable(
+        text, needs_tools=needs_tools, had_evidence=True
+    ):
+        return EvidenceContinuation(
+            should_continue=False,
+            goal_reached=True,
+            reason_fa="پس از شواهد ابزار، پاسخ تحویلی آماده شد.",
+        )
+
+    if had_evidence:
+        return EvidenceContinuation(
+            should_continue=True,
+            goal_reached=False,
+            reason_fa="شواهد ابزار موجود است؛ پاسخ نهایی هنوز سنتز نشده.",
+        )
 
     if had_evidence and prior_goal_reached and not prior_should_continue:
         return EvidenceContinuation(

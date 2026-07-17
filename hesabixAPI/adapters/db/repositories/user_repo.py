@@ -186,8 +186,13 @@ class UserRepository(BaseRepository[User]):
 			parts = [p for p in [user.first_name, user.last_name] if p]
 			full_name = " ".join(parts) if parts else None
 		
-		# تعیین status از is_active
-		status = "active" if user.is_active else "inactive"
+		# تعیین status از is_active و وضعیت تأیید
+		if not user.is_active:
+			status = "inactive"
+		elif not user.email_verified and not user.mobile_verified:
+			status = "pending"
+		else:
+			status = "active"
 		
 		# تعیین role از app_permissions
 		role = "user"
@@ -265,5 +270,11 @@ class UserRepository(BaseRepository[User]):
 			})
 		
 		return result
+
+	def query_admin_list(self, query_info: QueryInfo) -> tuple[list[User], int]:
+		"""لیست کاربران برای پنل مدیریت با فیلدهای مجازی UI."""
+		from app.services.user_list_query_service import query_users_admin
+
+		return query_users_admin(self.db, query_info)
 
 

@@ -36,9 +36,18 @@ def test_extract_skips_narrative_only():
     assert extract_final_content_from_trace(trace) == ""
 
 
-def test_merge_keeps_stream_content():
+def test_merge_keeps_deliverable_stream_content():
     trace = [{"kind": "thought", "body_markdown": "from trace"}]
-    assert merge_accumulated_and_trace_content("stream text", trace) == "stream text"
+    stream = "**خلاصه**\n- ۱۰ مورد"
+    assert merge_accumulated_and_trace_content(stream, trace) == stream
+
+
+def test_merge_replaces_planning_stream_with_trace_answer():
+    planning = (
+        "ابتدا بازه را مشخص می‌کنم سپس داده‌های فروش را دریافت می‌کنم."
+    )
+    trace = [{"kind": "answer", "body_markdown": "**خلاصه**\n- 10 بدهکار"}]
+    assert merge_accumulated_and_trace_content(planning, trace) == "**خلاصه**\n- 10 بدهکار"
 
 
 def test_merge_does_not_use_explored_when_stream_empty():

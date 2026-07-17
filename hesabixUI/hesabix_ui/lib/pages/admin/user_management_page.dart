@@ -150,7 +150,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
       defaultPageSize: 20,
       expandBodyHeightToFitRows: true,
       pageSizeOptions: const [10, 20, 50, 100],
-      searchFields: const ['full_name', 'email', 'mobile'],
+      searchFields: const ['first_name', 'last_name', 'email', 'mobile'],
       filterFields: const ['status', 'role'],
       emptyStateMessage: 'کاربری یافت نشد',
       onRowTap: (item) => _openUserDetailsDialog(item as Map<String, dynamic>),
@@ -313,7 +313,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
           'last_login_at',
           'آخرین ورود',
           width: ColumnWidth.medium,
+          sortable: true,
           showTime: false,
+          filterType: ColumnFilterType.dateRange,
           formatter: (item) =>
               _formatDate((item as Map<String, dynamic>)['last_login_at'],
                   showTime: false),
@@ -322,7 +324,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
           'created_at',
           'تاریخ ثبت‌نام',
           width: ColumnWidth.medium,
+          sortable: true,
           showTime: false,
+          filterType: ColumnFilterType.dateRange,
           formatter: (item) =>
               _formatDate((item as Map<String, dynamic>)['created_at']),
         ),

@@ -134,28 +134,29 @@ def _warn_if_premature_status_answer(
     function_results: Optional[Dict[str, Any]],
     session_id: int,
 ) -> None:
-    """هشدار نرم (فقط log) اگر محتوای در حال ذخیره شبیه narrative وضعیت باشد
-    درحالی‌که سوال نیاز به ابزار داشته و هیچ evidence ابزاری در دسترس نیست.
-
-    Plan C: صرفاً برای مانیتورینگ/متریک — هیچ رفتاری را block نمی‌کند و در
-    تصمیم‌گیری continue/stop اثری ندارد (آن قبلاً در ai_service.py گرفته شده).
+    """هشدار نرم (فقط log) اگر محتوای در حال ذخیره تحویلی نباشد
+    درحالی‌که سوال نیاز به ابزار داشته و evidence ابزاری موجود است.
     """
     try:
-        from app.services.ai.ai_premature_answer import looks_like_status_narrative
+        from app.services.ai.ai_deliverable_answer import is_deliverable_answer
         from app.services.ai.ai_tool_intent import query_expects_tool_use
 
-        if not looks_like_status_narrative(content):
-            return
         if not query_expects_tool_use(message_content, messages):
             return
         has_tool_evidence = bool(function_calls) or any(
             not str(key).startswith("_") for key in (function_results or {})
         )
-        if has_tool_evidence:
+        if not has_tool_evidence:
+            return
+        if is_deliverable_answer(
+            content,
+            needs_tools=True,
+            has_tool_evidence=True,
+        ):
             return
         logger.warning(
-            "[AI Premature Answer][session=%s] content looks like a status "
-            "narrative while needs_tools=True and no tool evidence exists: %r",
+            "[AI Premature Answer][session=%s] content is not deliverable "
+            "while needs_tools=True and tool evidence exists: %r",
             session_id,
             (content or "")[:160],
         )
@@ -1370,6 +1371,20 @@ def _merge_agent_run_checkpoint(
     return merged
 
 
+def _merge_agent_budget_checkpoint(
+    function_results: Optional[Dict[str, Any]],
+    agent_budget: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """بودجهٔ نهایی agent را برای دیباگ در function_results ذخیره می‌کند."""
+    if not agent_budget:
+        return function_results
+    from app.services.ai.ai_budget import AGENT_BUDGET_STORAGE_KEY
+
+    merged = dict(function_results or {})
+    merged[AGENT_BUDGET_STORAGE_KEY] = agent_budget
+    return merged
+
+
 async def _persist_stream_assistant_message(
     *,
     session_id: int,
@@ -1386,6 +1401,7 @@ async def _persist_stream_assistant_message(
     final_agent_trace: Optional[List[Dict[str, Any]]],
     stream_ai_config: Any = None,
     final_agent_run: Optional[Dict[str, Any]] = None,
+    final_agent_budget: Optional[Dict[str, Any]] = None,
 ) -> tuple[Optional[int], Optional[Dict[str, Any]]]:
     """ذخیره پاسخ assistant و ثبت usage. برمی‌گرداند (message_id, usage)."""
     from adapters.db.session import get_db_session
@@ -1409,6 +1425,9 @@ async def _persist_stream_assistant_message(
     )
     merged_function_results = _merge_agent_run_checkpoint(
         merged_function_results, final_agent_run
+    )
+    merged_function_results = _merge_agent_budget_checkpoint(
+        merged_function_results, final_agent_budget
     )
     _warn_if_premature_status_answer(
         content=content,
@@ -1551,6 +1570,7 @@ def _schedule_stream_persist_after_disconnect(
     final_agent_trace: Optional[List[Dict[str, Any]]],
     stream_ai_config: Any = None,
     final_agent_run: Optional[Dict[str, Any]] = None,
+    final_agent_budget: Optional[Dict[str, Any]] = None,
 ) -> None:
     """ذخیره پاسخ در پس‌زمینه وقتی کلاینت قبل از done قطع می‌کند."""
     import asyncio
@@ -1580,6 +1600,7 @@ def _schedule_stream_persist_after_disconnect(
                 final_agent_trace=final_agent_trace,
                 stream_ai_config=stream_ai_config,
                 final_agent_run=final_agent_run,
+                final_agent_budget=final_agent_budget,
             )
         except Exception as exc:
             logger.warning(
@@ -1625,6 +1646,7 @@ async def _stream_message_response(
     final_function_results: Optional[Dict[str, Any]] = None
     final_agent_trace: Optional[List[Dict[str, Any]]] = None
     final_agent_run: Optional[Dict[str, Any]] = None
+    final_agent_budget: Optional[Dict[str, Any]] = None
     stream_ai_config = None
     prebuilt_prompt: Optional[str] = None
     prebuilt_structured: Optional[Any] = None
@@ -1633,6 +1655,7 @@ async def _stream_message_response(
     def _capture_chunk(chunk: Dict[str, Any]) -> None:
         nonlocal accumulated_content, final_usage, final_function_calls
         nonlocal final_function_results, final_agent_trace, final_agent_run
+        nonlocal final_agent_budget
         delta = chunk.get("delta", {})
         content_chunk = delta.get("content", "")
         if content_chunk:
@@ -1647,6 +1670,8 @@ async def _stream_message_response(
             final_agent_trace = chunk["agent_trace"]
         if chunk.get("agent_run"):
             final_agent_run = chunk["agent_run"]
+        if chunk.get("agent_budget"):
+            final_agent_budget = chunk["agent_budget"]
 
     def _schedule_persist_on_disconnect() -> None:
         _schedule_stream_persist_after_disconnect(
@@ -1664,6 +1689,7 @@ async def _stream_message_response(
             final_agent_trace=final_agent_trace,
             stream_ai_config=stream_ai_config,
             final_agent_run=final_agent_run,
+            final_agent_budget=final_agent_budget,
         )
 
     try:
@@ -1777,6 +1803,7 @@ async def _stream_message_response(
             final_agent_trace=final_agent_trace,
             stream_ai_config=stream_ai_config,
             final_agent_run=final_agent_run,
+            final_agent_budget=final_agent_budget,
         )
 
         yield _sse_payload({
