@@ -5,13 +5,11 @@ import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
-import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
-import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
-import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/widgets/reports/pnl_report_shared.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
@@ -35,13 +33,22 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
   int? _selectedFiscalYearId;
   int? _selectedCurrencyId;
   int? _selectedProjectId;
+  bool _includeZeroBalance = false;
+  String? _compareMode;
 
   List<Map<String, dynamic>> _fiscalYears = [];
   List<Map<String, dynamic>> _currencies = [];
 
-  List<Map<String, dynamic>> _revenueItems = [];
-  List<Map<String, dynamic>> _expenseItems = [];
+  List<Map<String, dynamic>> _salesItems = [];
+  List<Map<String, dynamic>> _otherIncomeItems = [];
+  List<Map<String, dynamic>> _cogsItems = [];
+  List<Map<String, dynamic>> _operatingItems = [];
+  List<Map<String, dynamic>> _nonOperatingIncomeItems = [];
+  List<Map<String, dynamic>> _nonOperatingExpenseItems = [];
+  List<Map<String, dynamic>> _taxItems = [];
+  List<Map<String, dynamic>> _statementLines = [];
   Map<String, dynamic>? _summary;
+  Map<String, dynamic>? _comparison;
   bool _loading = false;
   bool _exporting = false;
   String? _error;
@@ -72,13 +79,9 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
           orElse: () => const <String, dynamic>{},
         );
         final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        if (id is int) _selectedFiscalYearId = id;
       });
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadCurrencies() async {
@@ -96,19 +99,31 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
           _selectedCurrencyId = defaultCurrency['id'] as int?;
         }
       });
-    } catch (_) {
-      // ignore
-    }
+    } catch (_) {}
   }
 
-  Map<String, dynamic> _requestBody() {
-    return <String, dynamic>{
-      if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
-      if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
-      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-      if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
-      if (_selectedProjectId != null) 'project_id': _selectedProjectId,
-    };
+  Map<String, dynamic> _requestBody() => {
+        if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
+        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        'include_zero_balance': _includeZeroBalance,
+        if (_compareMode != null) 'compare_mode': _compareMode,
+        'compare_prior_period': _compareMode != null,
+      };
+
+  void _applyData(Map<String, dynamic> data) {
+    _salesItems = List<Map<String, dynamic>>.from(data['sales_items'] ?? []);
+    _otherIncomeItems = List<Map<String, dynamic>>.from(data['other_income_items'] ?? []);
+    _cogsItems = List<Map<String, dynamic>>.from(data['cogs_items'] ?? []);
+    _operatingItems = List<Map<String, dynamic>>.from(data['operating_expense_items'] ?? []);
+    _nonOperatingIncomeItems = List<Map<String, dynamic>>.from(data['non_operating_income_items'] ?? []);
+    _nonOperatingExpenseItems = List<Map<String, dynamic>>.from(data['non_operating_expense_items'] ?? []);
+    _taxItems = List<Map<String, dynamic>>.from(data['tax_expense_items'] ?? []);
+    _statementLines = List<Map<String, dynamic>>.from(data['statement_lines'] ?? []);
+    _summary = data['summary'] is Map ? Map<String, dynamic>.from(data['summary'] as Map) : null;
+    _comparison = data['comparison'] is Map ? Map<String, dynamic>.from(data['comparison'] as Map) : null;
   }
 
   Future<void> _fetchData() async {
@@ -118,22 +133,15 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
     });
 
     try {
-      final api = ApiClient();
-      final res = await api.post<Map<String, dynamic>>(
+      final res = await ApiClient().post<Map<String, dynamic>>(
         '/api/v1/businesses/${widget.businessId}/reports/pnl-period',
         data: _requestBody(),
       );
-
       final body = res.data;
       if (body is Map<String, dynamic> && body['data'] is Map<String, dynamic>) {
-        final data = body['data'] as Map<String, dynamic>;
         if (!mounted) return;
         setState(() {
-          _revenueItems = List<Map<String, dynamic>>.from(data['revenue_items'] ?? []);
-          _expenseItems = List<Map<String, dynamic>>.from(data['expense_items'] ?? []);
-          _summary = data['summary'] is Map
-              ? Map<String, dynamic>.from(data['summary'] as Map)
-              : null;
+          _applyData(body['data'] as Map<String, dynamic>);
           _loading = false;
         });
       } else if (mounted) {
@@ -148,75 +156,29 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
     }
   }
 
-  String _formatNumber(dynamic value) {
-    if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
-    return DataTableUtils.formatNumber(n);
-  }
-
-  double _asDouble(dynamic value) {
-    if (value == null) return 0;
-    if (value is num) return value.toDouble();
-    return double.tryParse(value.toString()) ?? 0;
-  }
-
-  Future<void> _exportExcel() async {
+  Future<void> _export(String type) async {
     setState(() => _exporting = true);
     try {
-      final api = ApiClient();
-      final bytes = await api.post<List<int>>(
-        '/api/v1/businesses/${widget.businessId}/reports/pnl-period/export/excel',
+      final isPdf = type == 'pdf';
+      final bytes = await ApiClient().post<List<int>>(
+        '/api/v1/businesses/${widget.businessId}/reports/pnl-period/export/$type',
         data: _requestBody(),
         responseType: ResponseType.bytes,
-        options: Options(headers: {'Accept': 'application/octet-stream'}),
+        options: Options(headers: {'Accept': isPdf ? 'application/pdf' : 'application/octet-stream'}),
       );
       final data = bytes.data ?? <int>[];
       if (kIsWeb) {
         await web_utils.saveBytesAsFileWeb(
           data,
-          'pnl_period_${widget.businessId}.xlsx',
-          mimeType: 'application/octet-stream',
+          'pnl_period_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
+          mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
         );
       } else if (mounted) {
         SnackBarHelper.show(context, message: 'Export only available on web');
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message: 'Export error: ${ErrorExtractor.forContext(e, context)}',
-      );
-    } finally {
-      if (mounted) setState(() => _exporting = false);
-    }
-  }
-
-  Future<void> _exportPdf() async {
-    setState(() => _exporting = true);
-    try {
-      final api = ApiClient();
-      final bytes = await api.post<List<int>>(
-        '/api/v1/businesses/${widget.businessId}/reports/pnl-period/export/pdf',
-        data: _requestBody(),
-        responseType: ResponseType.bytes,
-        options: Options(headers: {'Accept': 'application/pdf'}),
-      );
-      final data = bytes.data ?? <int>[];
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          'pnl_period_${widget.businessId}.pdf',
-          mimeType: 'application/pdf',
-        );
-      } else if (mounted) {
-        SnackBarHelper.show(context, message: 'Export only available on web');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message: 'Export error: ${ErrorExtractor.forContext(e, context)}',
-      );
+      SnackBarHelper.showError(context, message: 'Export error: ${ErrorExtractor.forContext(e, context)}');
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -228,15 +190,11 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
     final cs = Theme.of(context).colorScheme;
     final isMobile = ResponsiveHelper.isMobile(context);
     final pagePadding = ResponsiveHelper.getPadding(context);
-    final net = _asDouble(_summary?['net_profit_loss']);
 
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -257,21 +215,12 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                 ? SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: cs.onSurface,
-                    ),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.onSurface),
                   )
                 : const Icon(Icons.download_outlined),
             tooltip: t.export,
             enabled: !_exporting && !_loading,
-            onSelected: (value) {
-              if (value == 'excel') {
-                _exportExcel();
-              } else if (value == 'pdf') {
-                _exportPdf();
-              }
-            },
+            onSelected: _export,
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'excel',
@@ -316,10 +265,52 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildFilters(context, isMobile),
+                        PnlReportFilters(
+                          isCumulative: false,
+                          isMobile: isMobile,
+                          fiscalYears: _fiscalYears,
+                          currencies: _currencies,
+                          selectedFiscalYearId: _selectedFiscalYearId,
+                          fromDate: _fromDate,
+                          toDate: _toDate,
+                          selectedCurrencyId: _selectedCurrencyId,
+                          selectedProjectId: _selectedProjectId,
+                          businessId: widget.businessId,
+                          calendarController: widget.calendarController,
+                          includeZeroBalance: _includeZeroBalance,
+                          compareMode: _compareMode,
+                          onFiscalYearChanged: (v) {
+                            setState(() => _selectedFiscalYearId = v);
+                            _fetchData();
+                          },
+                          onFromDateChanged: (v) {
+                            setState(() => _fromDate = v);
+                            _fetchData();
+                          },
+                          onToDateChanged: (v) {
+                            setState(() => _toDate = v);
+                            _fetchData();
+                          },
+                          onCurrencyChanged: (v) {
+                            setState(() => _selectedCurrencyId = v);
+                            _fetchData();
+                          },
+                          onProjectChanged: (v) {
+                            setState(() => _selectedProjectId = v);
+                            _fetchData();
+                          },
+                          onIncludeZeroBalanceChanged: (v) {
+                            setState(() => _includeZeroBalance = v);
+                            _fetchData();
+                          },
+                          onCompareModeChanged: (v) {
+                            setState(() => _compareMode = v);
+                            _fetchData();
+                          },
+                        ),
                         const SizedBox(height: 16),
                         if (_summary != null) ...[
-                          _buildSummary(context, isMobile, net),
+                          PnlSummaryPanel(summary: _summary, comparison: _comparison, isMobile: isMobile),
                           const SizedBox(height: 16),
                         ],
                         if (_loading)
@@ -330,53 +321,104 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                         else if (_error != null)
                           _buildErrorState(cs)
                         else ...[
-                          _buildStatementSection(
-                            context: context,
-                            title: 'درآمدها',
-                            count: _revenueItems.length,
-                            icon: Icons.trending_up_rounded,
-                            accent: const Color(0xFF15803D),
-                            emptyText: 'هیچ درآمدی در این بازه یافت نشد',
-                            headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
-                            rows: _revenueItems
-                                .map(
-                                  (item) => [
-                                    item['account_code']?.toString() ?? '',
-                                    item['account_name']?.toString() ?? '',
-                                    _formatNumber(item['credit']),
-                                    _formatNumber(item['debit']),
-                                    _formatNumber(item['revenue']),
-                                  ],
-                                )
-                                .toList(),
-                            totalLabel: 'جمع درآمد',
-                            totalValue: _formatNumber(_summary?['total_revenue']),
-                          ),
+                          PnlStatementView(statementLines: _statementLines),
                           const SizedBox(height: 16),
-                          _buildStatementSection(
-                            context: context,
-                            title: 'هزینه‌ها',
-                            count: _expenseItems.length,
-                            icon: Icons.trending_down_rounded,
-                            accent: const Color(0xFFB91C1C),
-                            emptyText: 'هیچ هزینه‌ای در این بازه یافت نشد',
-                            headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
-                            rows: _expenseItems
-                                .map(
-                                  (item) => [
-                                    item['account_code']?.toString() ?? '',
-                                    item['account_name']?.toString() ?? '',
-                                    _formatNumber(item['debit']),
-                                    _formatNumber(item['credit']),
-                                    _formatNumber(item['expense']),
-                                  ],
-                                )
-                                .toList(),
-                            totalLabel: 'جمع هزینه',
-                            totalValue: _formatNumber(_summary?['total_expense']),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildNetResult(context, net),
+                          if (_salesItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'فروش و درآمد عملیاتی',
+                              count: _salesItems.length,
+                              icon: Icons.storefront_outlined,
+                              accent: const Color(0xFF15803D),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
+                              rows: PnlTableRows.revenueRows(_salesItems),
+                              totalLabel: 'جمع فروش',
+                              totalValue: PnlTableRows.fmt(_summary?['total_sales']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_otherIncomeItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'درآمدهای عملیاتی (۶۰۱)',
+                              count: _otherIncomeItems.length,
+                              icon: Icons.trending_up_rounded,
+                              accent: const Color(0xFF059669),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
+                              rows: PnlTableRows.revenueRows(_otherIncomeItems),
+                              totalLabel: 'جمع درآمد عملیاتی',
+                              totalValue: PnlTableRows.fmt(_summary?['total_other_income']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_cogsItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'بهای تمام‌شده کالای فروش‌رفته',
+                              count: _cogsItems.length,
+                              icon: Icons.inventory_2_outlined,
+                              accent: const Color(0xFFB45309),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
+                              rows: PnlTableRows.expenseRows(_cogsItems),
+                              totalLabel: 'جمع بهای تمام‌شده',
+                              totalValue: PnlTableRows.fmt(_summary?['total_cogs']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_operatingItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'هزینه‌های عملیاتی',
+                              count: _operatingItems.length,
+                              icon: Icons.trending_down_rounded,
+                              accent: const Color(0xFFB91C1C),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
+                              rows: PnlTableRows.expenseRows(_operatingItems),
+                              totalLabel: 'جمع هزینه عملیاتی',
+                              totalValue: PnlTableRows.fmt(_summary?['total_operating_expense']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_nonOperatingIncomeItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'درآمدهای غیرعملیاتی',
+                              count: _nonOperatingIncomeItems.length,
+                              icon: Icons.savings_outlined,
+                              accent: const Color(0xFF047857),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
+                              rows: PnlTableRows.revenueRows(_nonOperatingIncomeItems),
+                              totalLabel: 'جمع درآمد غیرعملیاتی',
+                              totalValue: PnlTableRows.fmt(_summary?['total_non_operating_income']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_nonOperatingExpenseItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'هزینه‌های غیرعملیاتی',
+                              count: _nonOperatingExpenseItems.length,
+                              icon: Icons.money_off_csred_outlined,
+                              accent: const Color(0xFF9F1239),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
+                              rows: PnlTableRows.expenseRows(_nonOperatingExpenseItems),
+                              totalLabel: 'جمع هزینه غیرعملیاتی',
+                              totalValue: PnlTableRows.fmt(_summary?['total_non_operating_expense']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_taxItems.isNotEmpty)
+                            PnlDetailSection(
+                              title: 'مالیات بر درآمد',
+                              count: _taxItems.length,
+                              icon: Icons.receipt_long_outlined,
+                              accent: const Color(0xFF9A3412),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
+                              rows: PnlTableRows.expenseRows(_taxItems),
+                              totalLabel: 'جمع مالیات',
+                              totalValue: PnlTableRows.fmt(_summary?['total_tax_expense']),
+                            ),
                         ],
                       ],
                     ),
@@ -384,191 +426,6 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                 ),
               ),
             ),
-    );
-  }
-
-  Widget _buildFilters(BuildContext context, bool isMobile) {
-    final cs = Theme.of(context).colorScheme;
-    final fieldWidth = isMobile ? double.infinity : 220.0;
-
-    InputDecoration decoration(String label) => InputDecoration(
-          labelText: label,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-        );
-
-    return Material(
-      color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: EdgeInsets.all(isMobile ? 12 : 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.tune_rounded, size: 18, color: cs.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'فیلترها',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                SizedBox(
-                  width: fieldWidth,
-                  child: DropdownButtonFormField<int>(
-                    value: _selectedFiscalYearId,
-                    isExpanded: true,
-                    decoration: decoration('سال مالی'),
-                    items: _fiscalYears.map((fy) {
-                      return DropdownMenuItem<int>(
-                        value: fy['id'] as int?,
-                        child: Text(
-                          fy['title']?.toString() ?? '',
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedFiscalYearId = value);
-                      _fetchData();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: fieldWidth,
-                  child: DateInputField(
-                    value: _fromDate,
-                    calendarController: widget.calendarController,
-                    labelText: 'از تاریخ',
-                    onChanged: (date) {
-                      setState(() => _fromDate = date);
-                      _fetchData();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: fieldWidth,
-                  child: DateInputField(
-                    value: _toDate,
-                    calendarController: widget.calendarController,
-                    labelText: 'تا تاریخ',
-                    onChanged: (date) {
-                      setState(() => _toDate = date);
-                      _fetchData();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: fieldWidth,
-                  child: DropdownButtonFormField<int>(
-                    value: _selectedCurrencyId,
-                    isExpanded: true,
-                    decoration: decoration('ارز'),
-                    items: [
-                      const DropdownMenuItem<int>(
-                        value: null,
-                        child: Text('همه ارزها'),
-                      ),
-                      ..._currencies.map((c) {
-                        final id = c['id'] as int?;
-                        final code = (c['code'] ?? '').toString();
-                        final name = (c['name'] ?? '').toString();
-                        final displayName = code.isNotEmpty ? '$code - $name' : name;
-                        return DropdownMenuItem<int>(
-                          key: ValueKey('currency_$id'),
-                          value: id,
-                          child: Text(
-                            displayName,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        );
-                      }),
-                    ],
-                    onChanged: (val) {
-                      setState(() => _selectedCurrencyId = val);
-                      _fetchData();
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: isMobile ? double.infinity : 260,
-                  child: ProjectSelectorWidget(
-                    businessId: widget.businessId,
-                    apiClient: ApiClient(),
-                    selectedProjectId: _selectedProjectId,
-                    onChanged: (projectId) {
-                      setState(() => _selectedProjectId = projectId);
-                      _fetchData();
-                    },
-                    allowNull: true,
-                    labelText: 'پروژه (همه)',
-                    calendarController: widget.calendarController,
-                    isDense: true,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummary(BuildContext context, bool isMobile, double net) {
-    final cards = [
-      _SummaryMetric(
-        label: 'جمع درآمد',
-        value: _formatNumber(_summary?['total_revenue']),
-        icon: Icons.south_west_rounded,
-        color: const Color(0xFF15803D),
-        background: const Color(0xFFECFDF5),
-      ),
-      _SummaryMetric(
-        label: 'جمع هزینه',
-        value: _formatNumber(_summary?['total_expense']),
-        icon: Icons.north_east_rounded,
-        color: const Color(0xFFB91C1C),
-        background: const Color(0xFFFEF2F2),
-      ),
-      _SummaryMetric(
-        label: 'سود/زیان خالص',
-        value: _formatNumber(_summary?['net_profit_loss']),
-        icon: net >= 0 ? Icons.insights_rounded : Icons.warning_amber_rounded,
-        color: net >= 0 ? const Color(0xFF1D4ED8) : const Color(0xFFC2410C),
-        background: net >= 0 ? const Color(0xFFEFF6FF) : const Color(0xFFFFF7ED),
-      ),
-    ];
-
-    if (isMobile) {
-      return Column(
-        children: [
-          for (var i = 0; i < cards.length; i++) ...[
-            if (i > 0) const SizedBox(height: 10),
-            cards[i],
-          ],
-        ],
-      );
-    }
-
-    return Row(
-      children: [
-        for (var i = 0; i < cards.length; i++) ...[
-          if (i > 0) const SizedBox(width: 12),
-          Expanded(child: cards[i]),
-        ],
-      ],
     );
   }
 
@@ -585,291 +442,11 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         children: [
           Icon(Icons.error_outline, color: cs.error, size: 36),
           const SizedBox(height: 12),
-          Text(
-            'خطا در دریافت گزارش',
-            style: TextStyle(fontWeight: FontWeight.w700, color: cs.error),
-          ),
+          Text('خطا در دریافت گزارش', style: TextStyle(fontWeight: FontWeight.w700, color: cs.error)),
           const SizedBox(height: 8),
           Text(_error ?? '', textAlign: TextAlign.center),
           const SizedBox(height: 16),
-          FilledButton.tonal(
-            onPressed: _fetchData,
-            child: const Text('تلاش مجدد'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatementSection({
-    required BuildContext context,
-    required String title,
-    required int count,
-    required IconData icon,
-    required Color accent,
-    required String emptyText,
-    required List<String> headers,
-    required List<List<String>> rows,
-    required String totalLabel,
-    required String totalValue,
-  }) {
-    final cs = Theme.of(context).colorScheme;
-    final isMobile = ResponsiveHelper.isMobile(context);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.7)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Container(
-            padding: EdgeInsets.symmetric(
-              horizontal: isMobile ? 12 : 16,
-              vertical: 12,
-            ),
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.08),
-              border: Border(
-                bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6)),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(icon, size: 18, color: accent),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: cs.surface,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: cs.outlineVariant),
-                  ),
-                  child: Text(
-                    '$count مورد',
-                    style: Theme.of(context).textTheme.labelMedium,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (rows.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
-              child: Center(
-                child: Text(
-                  emptyText,
-                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
-                ),
-              ),
-            )
-          else
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final table = DataTable(
-                  headingRowHeight: 44,
-                  dataRowMinHeight: 40,
-                  dataRowMaxHeight: 52,
-                  columnSpacing: isMobile ? 16 : 28,
-                  horizontalMargin: isMobile ? 12 : 16,
-                  headingRowColor: WidgetStatePropertyAll(
-                    cs.surfaceContainerHighest.withValues(alpha: 0.45),
-                  ),
-                  columns: [
-                    for (final h in headers)
-                      DataColumn(
-                        label: Text(
-                          h,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                  ],
-                  rows: [
-                    for (final row in rows)
-                      DataRow(
-                        cells: [
-                          for (var i = 0; i < row.length; i++)
-                            DataCell(
-                              Text(
-                                row[i],
-                                textAlign: i >= 2 ? TextAlign.center : TextAlign.start,
-                                style: i == row.length - 1
-                                    ? const TextStyle(fontWeight: FontWeight.w600)
-                                    : null,
-                              ),
-                            ),
-                        ],
-                      ),
-                    DataRow(
-                      color: WidgetStatePropertyAll(
-                        cs.surfaceContainerHighest.withValues(alpha: 0.55),
-                      ),
-                      cells: [
-                        const DataCell(SizedBox.shrink()),
-                        DataCell(
-                          Text(
-                            totalLabel,
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                        ),
-                        const DataCell(SizedBox.shrink()),
-                        const DataCell(SizedBox.shrink()),
-                        DataCell(
-                          Text(
-                            totalValue,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: accent,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                );
-
-                if (constraints.maxWidth < 720) {
-                  return SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 720),
-                      child: table,
-                    ),
-                  );
-                }
-                return table;
-              },
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNetResult(BuildContext context, double net) {
-    final isProfit = net >= 0;
-    final color = isProfit ? const Color(0xFF065F46) : const Color(0xFF9A3412);
-    final bg = isProfit ? const Color(0xFFECFDF5) : const Color(0xFFFFF7ED);
-    final border = isProfit ? const Color(0xFFA7F3D0) : const Color(0xFFFED7AA);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            isProfit ? Icons.check_circle_outline : Icons.info_outline,
-            color: color,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'سود/زیان خالص',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: color,
-                fontSize: 15,
-              ),
-            ),
-          ),
-          Text(
-            _formatNumber(_summary?['net_profit_loss']),
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: color,
-              fontSize: 18,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryMetric extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final Color background;
-
-  const _SummaryMetric({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.background,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: color.withValues(alpha: 0.85),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          FilledButton.tonal(onPressed: _fetchData, child: const Text('تلاش مجدد')),
         ],
       ),
     );

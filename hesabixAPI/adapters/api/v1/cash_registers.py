@@ -954,3 +954,46 @@ async def export_cash_petty_turnover_excel(
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/cash-petty-turnover/export/pdf",
+    summary="خروجی PDF گزارش گردش صندوق و تنخواه",
+)
+@require_business_access("business_id")
+async def export_cash_petty_turnover_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    from app.services.turnover_report_export_service import (
+        CASH_PETTY_TURNOVER_COLUMNS,
+        turnover_pdf_response,
+    )
+
+    cash_register_ids = body.get("cash_register_ids")
+    if cash_register_ids is not None and not isinstance(cash_register_ids, list):
+        cash_register_ids = None
+    petty_cash_ids = body.get("petty_cash_ids")
+    if petty_cash_ids is not None and not isinstance(petty_cash_ids, list):
+        petty_cash_ids = None
+
+    return turnover_pdf_response(
+        request,
+        business_id,
+        body,
+        ctx,
+        db,
+        fetch_fn=get_cash_petty_turnover_report,
+        columns=CASH_PETTY_TURNOVER_COLUMNS,
+        filename_prefix="cash_petty_turnover",
+        title_fa="گزارش گردش صندوق و تنخواه",
+        title_en="Cash & Petty Cash Turnover Report",
+        fetch_kwargs={
+            "cash_register_ids": cash_register_ids,
+            "petty_cash_ids": petty_cash_ids,
+        },
+    )

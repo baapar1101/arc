@@ -73,6 +73,9 @@ String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
   return null;
 }
 
+/// نوع عملیات ثبت در حال اجرا (برای لودینگ دقیق روی دکمه‌ها).
+enum _QuickSalesSaveAction { none, save, saveAndPrint }
+
 class QuickSalesPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
@@ -105,7 +108,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   final CategoryService _categoryService = CategoryService(ApiClient());
   
   bool _loading = true;
-  bool _saving = false;
+  _QuickSalesSaveAction _saveAction = _QuickSalesSaveAction.none;
+  bool get _isSaving => _saveAction != _QuickSalesSaveAction.none;
   Map<String, dynamic>? _settings;
   Customer? _anonymousCustomer;
   
@@ -114,7 +118,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   
   // موجودی محصولات (productId -> stock)
   Map<int, num> _productStocks = {};
-  bool _loadingStocks = false;
+  final Set<int> _loadingStockProductIds = <int>{};
+  final Set<int> _pendingStockProductIds = <int>{};
+  bool _loadingStocksBulk = false;
+  Timer? _stockBatchTimer;
+
+  // کش قیمت لیست قیمت (per session)
+  final Map<int, num> _priceListCache = <int, num>{};
+
+  // جستجو / افزودن به سبد
+  bool _barcodeSearching = false;
+  int? _addingProductId;
+  int? _recentProductLoadingId;
   
   // تاریخچه محصولات اخیر
   List<Map<String, dynamic>> _recentProducts = [];
@@ -181,7 +196,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
   late final TabController _mobileTabController;
   int _mobileTabIndex = 0;
+  final Set<int> _mobileTabsBuilt = <int>{0};
   Timer? _searchDebounce;
+  Timer? _globalDiscountDebounce;
   String? _lastFailedSearchQuery; // آخرین جستجوی ناموفق برای نمایش دکمه افزودن کالا
 
   /// هم‌سو با API (`products.add`)؛ بدون این مجوز نباید دیالوگ افزودن کالا باز شود.
@@ -198,16 +215,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   void initState() {
     super.initState();
     _mobileTabController = TabController(length: 3, vsync: this, initialIndex: _mobileTabIndex);
-    _mobileTabController.addListener(() {
-      _mobileTabIndex = _mobileTabController.index;
-    });
+    _mobileTabController.addListener(_onMobileTabChanged);
     _globalDiscountValueController = TextEditingController();
     _globalDiscountValueController.addListener(() {
-      if (mounted) setState(() {});
+      _globalDiscountDebounce?.cancel();
+      _globalDiscountDebounce = Timer(const Duration(milliseconds: 120), () {
+        if (mounted) setState(() {});
+      });
     });
     _loadSettings();
     _loadRecentProducts();
-    _loadCategories();
     _barcodeFocus.addListener(_onBarcodeFocusChanged);
     _barcodeOverlayScrollController.addListener(_onBarcodeOverlayScroll);
     // فوکوس خودکار روی فیلد بارکد
@@ -317,10 +334,25 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
   }
 
+  void _onMobileTabChanged() {
+    if (_mobileTabController.indexIsChanging) return;
+    final index = _mobileTabController.index;
+    if (_mobileTabIndex == index && _mobileTabsBuilt.contains(index)) return;
+    setState(() {
+      _mobileTabIndex = index;
+      _mobileTabsBuilt.add(index);
+    });
+  }
+
+  bool _isProductStockLoading(int? productId) =>
+      productId != null && _loadingStockProductIds.contains(productId);
+
   @override
   void dispose() {
     _restoreDesktopRailAfterQuit?.call();
     _searchDebounce?.cancel();
+    _globalDiscountDebounce?.cancel();
+    _stockBatchTimer?.cancel();
     _removeBarcodeOverlay();
     _mobileTabController.dispose();
     _barcodeController.dispose();
@@ -358,11 +390,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       _loading = true;
     });
     try {
-      final settings = await _quickSalesService.getSettings(businessId: widget.businessId);
-      final customer = await _quickSalesService.getAnonymousCustomer(businessId: widget.businessId);
-      
+      final results = await Future.wait<dynamic>([
+        _quickSalesService.getSettings(businessId: widget.businessId),
+        _quickSalesService.getAnonymousCustomer(businessId: widget.businessId),
+      ]);
+      final settings = Map<String, dynamic>.from(results[0] as Map);
+      final customer = Map<String, dynamic>.from(results[1] as Map);
+
       final previousShowInventory = _showInventory;
-      
+
+      if (!mounted) return;
       setState(() {
         _settings = settings;
         _anonymousCustomer = Customer(
@@ -371,7 +408,6 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         );
         _selectedCustomer = _anonymousCustomer;
         _defaultWarehouseId = settings['default_warehouse_id'];
-        // اگر ارز پیش‌فرض در تنظیمات فروش سریع تنظیم نشده باشد، از ارز پیش‌فرض کسب‌وکار استفاده می‌کنیم
         _defaultCurrencyId = settings['default_currency_id'] ?? widget.authStore.currentBusiness?.defaultCurrency?.id;
         _defaultPriceListId = settings['default_price_list_id'];
         _selectedCashRegisterId = settings['default_cash_register_id']?.toString();
@@ -384,34 +420,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         _printTemplateId = settings['print_template_id'];
         _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
         _applyShareDefaultsFromSettings(settings);
+        _priceListCache.clear();
+        _loading = false;
       });
-      
+
       unawaited(_loadShareGatewaysAndDefaults());
-      
-      // اگر نمایش موجودی فعال شد و قبلاً غیرفعال بود، موجودی‌ها را بارگذاری کن
+      unawaited(_loadBusinessMetadata());
+
       if (_showInventory && !previousShowInventory && _cartItems.isNotEmpty) {
         _refreshAllStocks();
       }
-
-      try {
-        final b = await BusinessApiService.getBusiness(widget.businessId);
-        if (mounted) {
-          setState(() {
-            _globalDiscountPolicy = InvoiceGlobalDiscountPolicy.fromBusiness(b);
-          });
-        }
-      } catch (_) {}
-
-      try {
-        final cs = CurrencyService(ApiClient());
-        final curList = await cs.listBusinessCurrencies(businessId: widget.businessId);
-        if (mounted) {
-          setState(() {
-            _businessCurrenciesCache = curList;
-            _applyCurrencyMetaFromCache();
-          });
-        }
-      } catch (_) {}
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -420,12 +438,26 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               'خطا در بارگذاری تنظیمات: ${ErrorExtractor.forContext(e, context)}',
           isError: true,
         );
+        setState(() {
+          _loading = false;
+        });
       }
-    } finally {
-      setState(() {
-        _loading = false;
-      });
     }
+  }
+
+  Future<void> _loadBusinessMetadata() async {
+    try {
+      final results = await Future.wait<dynamic>([
+        BusinessApiService.getBusiness(widget.businessId),
+        CurrencyService(ApiClient()).listBusinessCurrencies(businessId: widget.businessId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _globalDiscountPolicy = InvoiceGlobalDiscountPolicy.fromBusiness(results[0]);
+        _businessCurrenciesCache = List<Map<String, dynamic>>.from(results[1] as List);
+        _applyCurrencyMetaFromCache();
+      });
+    } catch (_) {}
   }
 
   String? get _selectedCustomerPhone {
@@ -705,6 +737,39 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   bool get _supportsCameraScanButton =>
       kIsWeb || _supportsMobileNativeCameraScan;
 
+  Future<void> _onRecentProductTap(Map<String, dynamic> product) async {
+    final productId = _productIntId(product);
+    if (productId == null || _recentProductLoadingId != null) return;
+
+    setState(() => _recentProductLoadingId = productId);
+    try {
+      final fullProduct = await _productService.getProduct(
+        businessId: widget.businessId,
+        productId: productId,
+      );
+      await _addToCart(fullProduct, skipHydrate: true);
+      await _saveRecentProduct(fullProduct);
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: 'خطا در افزودن محصول: ${ErrorExtractor.forContext(e, context)}',
+          isError: true,
+        );
+      }
+    } finally {
+      if (mounted && _recentProductLoadingId == productId) {
+        setState(() => _recentProductLoadingId = null);
+      }
+    }
+  }
+
   Future<void> _scanBarcodeWithCamera() async {
     final String? code;
     if (kIsWeb) {
@@ -731,9 +796,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   Future<void> _searchByBarcode(String code) async {
-    if (code.trim().isEmpty) return;
-    
+    if (code.trim().isEmpty || _barcodeSearching) return;
+
+    setState(() => _barcodeSearching = true);
     try {
+      try {
       // جستجو در کالاهای یونیک
       final instanceData = await _warehouseService.searchInstanceByCode(
         businessId: widget.businessId,
@@ -766,7 +833,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             final instanceWarehouseId = (selected['warehouse_id'] as num?)?.toInt() ??
                 (selected['warehouseId'] as num?)?.toInt() ??
                 int.tryParse('${selected['warehouse_id'] ?? selected['warehouseId'] ?? ''}');
-            await _addToCart(product, instanceId: instanceId, instanceWarehouseId: instanceWarehouseId);
+            await _addToCart(product, instanceId: instanceId, instanceWarehouseId: instanceWarehouseId, skipHydrate: true);
             await _saveRecentProduct(product);
             _barcodeController.clear();
             _barcodeFocus.requestFocus();
@@ -808,7 +875,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         final instanceWarehouseId = (instanceData['warehouse_id'] as num?)?.toInt() ??
             (instanceData['warehouseId'] as num?)?.toInt() ??
             int.tryParse('${instanceData['warehouse_id'] ?? instanceData['warehouseId'] ?? ''}');
-        await _addToCart(product, instanceId: instanceId, instanceWarehouseId: instanceWarehouseId);
+        await _addToCart(product, instanceId: instanceId, instanceWarehouseId: instanceWarehouseId, skipHydrate: true);
         await _saveRecentProduct(product);
         _barcodeController.clear();
         _barcodeFocus.requestFocus();
@@ -827,12 +894,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         }
         return;
       }
-    } catch (e) {
-      // اگر کالای یونیک پیدا نشد، در محصولات عادی جستجو می‌کنیم
-    }
+      } catch (e) {
+        // اگر کالای یونیک پیدا نشد، در محصولات عادی جستجو می‌کنیم
+      }
     
       // جستجو در محصولات عادی (از طریق کد، بارکد یا نام)
-    try {
       final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
       final products = await _productService.searchProducts(
         businessId: widget.businessId,
@@ -865,7 +931,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         );
         
         if (selected != null) {
-          await _addToCart(selected);
+          await _addToCart(selected, skipHydrate: true);
           await _saveRecentProduct(selected);
           _barcodeController.clear();
           _barcodeFocus.requestFocus();
@@ -895,7 +961,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       
       // اگر فقط یک نتیجه پیدا شد، مستقیماً اضافه کن
       final product = products.first;
-      await _addToCart(product);
+      await _addToCart(product, skipHydrate: true);
       await _saveRecentProduct(product);
       _barcodeController.clear();
       _barcodeFocus.requestFocus();
@@ -920,6 +986,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           isError: true,
         );
       }
+    } finally {
+      if (mounted) setState(() => _barcodeSearching = false);
     }
   }
 
@@ -969,7 +1037,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               productId: newProductId,
             );
             
-            await _addToCart(product);
+            await _addToCart(product, skipHydrate: true);
             await _saveRecentProduct(product);
             
             // پاک کردن جستجوی ناموفق و فیلد جستجو
@@ -1030,6 +1098,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   Future<num> _getPriceFromPriceList(int productId) async {
+    if (_priceListCache.containsKey(productId)) {
+      return _priceListCache[productId]!;
+    }
     // اگر لیست قیمت پیش‌فرض وجود ندارد یا ارز مشخص نشده، null برگردان
     if (_defaultPriceListId == null || _defaultCurrencyId == null) {
       return 0;
@@ -1062,6 +1133,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         
         // اگر unit_id null باشد، یعنی قیمت برای واحد اصلی است
         if (unitId == null && price != null && price > 0) {
+          _priceListCache[productId] = price;
           return price;
         }
       }
@@ -1069,7 +1141,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       // در صورت خطا، 0 برگردان تا از قیمت پایه استفاده شود
       debugPrint('خطا در دریافت قیمت از لیست قیمت: $e');
     }
-    
+
+    _priceListCache[productId] = 0;
     return 0;
   }
 
@@ -1107,6 +1180,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
       // کش موجودی وابسته به انبار است
       _productStocks.clear();
+      _pendingStockProductIds.clear();
+      _loadingStockProductIds.clear();
     });
 
     // در صورت فعال بودن نمایش موجودی، موجودی‌ها را مجدداً بارگذاری کن
@@ -1186,10 +1261,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     Map<String, dynamic> product, {
     int? instanceId,
     int? instanceWarehouseId,
+    bool skipHydrate = false,
   }) async {
-    await _hydrateProductCodeIfNeeded(product);
+    if (!skipHydrate) {
+      await _hydrateProductCodeIfNeeded(product);
+    }
     final productId = _productIntId(product);
     if (productId == null) return;
+
+    setState(() => _addingProductId = productId);
+    try {
     
     final trackInventory = product['track_inventory'] == true;
     
@@ -1209,7 +1290,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         });
         // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
         if (trackInventory && _showInventory) {
-          _loadProductStock(productId);
+          _scheduleStockLoads([productId]);
         }
         return;
       }
@@ -1262,66 +1343,77 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     
     // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
     if (trackInventory && instanceId == null && _showInventory) {
-      _loadProductStock(productId);
+      _scheduleStockLoads([productId]);
+    }
+    } finally {
+      if (mounted && _addingProductId == productId) {
+        setState(() => _addingProductId = null);
+      }
     }
   }
   
-  Future<void> _loadProductStock(int productId) async {
-    // اگر نمایش موجودی غیرفعال باشد، موجودی را بارگذاری نکن
-    if (!_showInventory) {
-      return;
+  void _scheduleStockLoads(Iterable<int> productIds) {
+    if (!_showInventory || _defaultWarehouseId == null) return;
+    var scheduled = false;
+    for (final productId in productIds) {
+      if (_productStocks.containsKey(productId) || _loadingStockProductIds.contains(productId)) {
+        continue;
+      }
+      _pendingStockProductIds.add(productId);
+      scheduled = true;
     }
-    
-    // جلوگیری از درخواست‌های تکراری
-    if (_productStocks.containsKey(productId) || _loadingStocks) {
-      return;
-    }
-    
-    if (_defaultWarehouseId == null) {
-      return; // بدون انبار، موجودی قابل محاسبه نیست
-    }
-    
-    setState(() {
-      _loadingStocks = true;
+    if (!scheduled) return;
+    _stockBatchTimer?.cancel();
+    _stockBatchTimer = Timer(const Duration(milliseconds: 80), () {
+      unawaited(_flushPendingStockLoads());
     });
-    
+  }
+
+  Future<void> _flushPendingStockLoads() async {
+    if (!_showInventory || _defaultWarehouseId == null || _pendingStockProductIds.isEmpty) {
+      return;
+    }
+    final productIds = _pendingStockProductIds.toList();
+    _pendingStockProductIds.clear();
+    if (!mounted) return;
+    setState(() {
+      _loadingStockProductIds.addAll(productIds);
+    });
     try {
       final stockReport = await _warehouseService.getStockReport(
         businessId: widget.businessId,
         query: {
-          'product_ids': [productId],
+          'product_ids': productIds,
           'warehouse_ids': [_defaultWarehouseId],
           'as_of_date': DateTime.now().toIso8601String().split('T')[0],
           'include_zero': true,
         },
       );
-      
       final items = List<dynamic>.from(stockReport['items'] ?? []);
-      if (items.isNotEmpty) {
-        final stock = (items.first['quantity'] as num?) ?? 0;
-        if (mounted) {
-          setState(() {
-            _productStocks[productId] = stock;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _productStocks[productId] = 0;
-          });
+      final stocksMap = <int, num>{};
+      for (final item in items) {
+        final pid = (item['product_id'] as num?)?.toInt();
+        if (pid != null) {
+          stocksMap[pid] = (item['quantity'] as num?) ?? 0;
         }
       }
-    } catch (e) {
-      // در صورت خطا، موجودی را null نگه دار (نمایش داده نمی‌شود)
+      if (!mounted) return;
+      setState(() {
+        for (final productId in productIds) {
+          _productStocks[productId] = stocksMap[productId] ?? 0;
+        }
+      });
+    } catch (_) {
+      // در صورت خطا، موجودی نمایش داده نمی‌شود
     } finally {
       if (mounted) {
         setState(() {
-          _loadingStocks = false;
+          _loadingStockProductIds.removeAll(productIds);
         });
       }
     }
   }
-  
+
   Future<void> _refreshAllStocks() async {
     // اگر نمایش موجودی غیرفعال باشد، موجودی را به‌روزرسانی نکن
     if (!_showInventory) {
@@ -1339,7 +1431,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
     
     setState(() {
-      _loadingStocks = true;
+      _loadingStocksBulk = true;
+      _loadingStockProductIds.addAll(trackInventoryProductIds);
     });
     
     try {
@@ -1373,12 +1466,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     } finally {
       if (mounted) {
         setState(() {
-          _loadingStocks = false;
+          _loadingStocksBulk = false;
+          _loadingStockProductIds.removeAll(trackInventoryProductIds);
         });
       }
     }
   }
-  
+
   num? _getProductStock(int? productId) {
     if (productId == null) return null;
     return _productStocks[productId];
@@ -1454,7 +1548,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     
     // به‌روزرسانی موجودی در صورت تغییر تعداد (اگر نمایش موجودی فعال باشد)
     if (item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null && _showInventory) {
-      _loadProductStock(item.productId!);
+      _scheduleStockLoads([item.productId!]);
     }
   }
 
@@ -1567,8 +1661,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
     
     setState(() {
-      _saving = true;
+      _saveAction = print ? _QuickSalesSaveAction.saveAndPrint : _QuickSalesSaveAction.save;
     });
+
+    final shouldPrint = print || _autoPrint;
+    final shouldShare = !_autoCreatePaymentDocument;
+    final savedTotalAmount = _totalAmount;
     
     try {
       // ساخت payload
@@ -1633,7 +1731,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           isError: true,
         );
         setState(() {
-          _saving = false;
+          _saveAction = _QuickSalesSaveAction.none;
         });
         return;
       }
@@ -1687,55 +1785,41 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       
       if (!mounted) return;
       
-      // استخراج invoice_id و invoice_code
       final invoiceId = (result['id'] as num?)?.toInt();
       final invoiceCode = result['code']?.toString();
-      
-      // چاپ در صورت نیاز
-      if (print || _autoPrint) {
-        if (invoiceId != null) {
-          await _printInvoice(invoiceId: invoiceId, invoiceCode: invoiceCode);
-        } else {
-          SnackBarHelper.show(
-            context, 
-            message: 'فاکتور ثبت شد اما شناسه فاکتور برای چاپ در دسترس نیست',
-            isError: true,
-          );
-        }
-      }
 
-      List<String> shareNotes = const [];
-      if (!_autoCreatePaymentDocument && invoiceId != null) {
-        shareNotes = await _createAndShareAfterSave(
-          invoiceId: invoiceId,
-          invoiceCode: invoiceCode,
-          personId: personId,
-          totalAmount: _totalAmount,
-        );
-      }
-      
-      // پاک کردن سبد و موجودی‌ها
       setState(() {
         _cartItems.clear();
         _payment = null;
         _productStocks.clear();
+        _pendingStockProductIds.clear();
         _documentDate = DateTime.now();
         _documentDescriptionController.clear();
         _globalDiscountValueController.clear();
+        _saveAction = _QuickSalesSaveAction.none;
       });
-      
+
       _barcodeFocus.requestFocus();
-      
+
       final successMsg = StringBuffer('فاکتور با موفقیت ثبت شد');
       if (invoiceCode != null) successMsg.write(' ($invoiceCode)');
-      if (shareNotes.isNotEmpty) {
-        successMsg.write('\n${shareNotes.join('\n')}');
-      }
       SnackBarHelper.show(context, message: successMsg.toString());
-      
-      // به‌روزرسانی موجودی بعد از ثبت موفق (برای دفعه بعد)
-      if (_defaultWarehouseId != null) {
-        _refreshAllStocks();
+
+      if (invoiceId != null && (shouldPrint || shouldShare)) {
+        unawaited(_runPostSaveTasks(
+          invoiceId: invoiceId,
+          invoiceCode: invoiceCode,
+          personId: personId,
+          totalAmount: savedTotalAmount,
+          shouldPrint: shouldPrint,
+          shouldShare: shouldShare,
+        ));
+      } else if (shouldPrint && invoiceId == null) {
+        SnackBarHelper.show(
+          context,
+          message: 'فاکتور ثبت شد اما شناسه فاکتور برای چاپ در دسترس نیست',
+          isError: true,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -1751,12 +1835,48 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         SnackBarHelper.show(context, message: errorMessage, isError: true);
       }
     } finally {
-      if (mounted) {
+      if (mounted && _isSaving) {
         setState(() {
-          _saving = false;
+          _saveAction = _QuickSalesSaveAction.none;
         });
       }
     }
+  }
+
+  Future<void> _runPostSaveTasks({
+    required int invoiceId,
+    required String? invoiceCode,
+    required int personId,
+    required num totalAmount,
+    required bool shouldPrint,
+    required bool shouldShare,
+  }) async {
+    final followUpNotes = <String>[];
+
+    if (shouldPrint) {
+      try {
+        await _printInvoice(invoiceId: invoiceId, invoiceCode: invoiceCode);
+      } catch (e) {
+        followUpNotes.add('خطا در چاپ: ${ErrorExtractor.forContext(e, context)}');
+      }
+    }
+
+    if (shouldShare) {
+      try {
+        final shareNotes = await _createAndShareAfterSave(
+          invoiceId: invoiceId,
+          invoiceCode: invoiceCode,
+          personId: personId,
+          totalAmount: totalAmount,
+        );
+        followUpNotes.addAll(shareNotes);
+      } catch (e) {
+        followUpNotes.add(ErrorExtractor.forContext(e, context));
+      }
+    }
+
+    if (!mounted || followUpNotes.isEmpty) return;
+    SnackBarHelper.show(context, message: followUpNotes.join('\n'));
   }
   
   Future<void> _printInvoice({required int invoiceId, String? invoiceCode}) async {
@@ -2227,7 +2347,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   Future<void> _selectBarcodeSuggestion(Map<String, dynamic> product) async {
-    await _addToCart(product);
+    await _addToCart(product, skipHydrate: true);
     await _saveRecentProduct(product);
     if (!mounted) return;
     _barcodeController.clear();
@@ -2278,7 +2398,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         if (_isAnyTextInputFocused()) {
           return false;
         }
-        if (!_saving && _cartItems.isNotEmpty) {
+        if (!_isSaving && _cartItems.isNotEmpty) {
           _saveInvoice(print: false);
           return true;
         }
@@ -2287,7 +2407,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       // Ctrl/Cmd + P: ثبت و چاپ
       if ((isControlPressed || isMetaPressed) &&
           event.logicalKey == LogicalKeyboardKey.keyP) {
-        if (!_saving && _cartItems.isNotEmpty) {
+        if (!_isSaving && _cartItems.isNotEmpty) {
           _saveInvoice(print: true);
           return true;
         }
@@ -2553,7 +2673,19 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: const Text('فروش سریع')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: Column(
+          children: [
+            const LinearProgressIndicator(),
+            Expanded(
+              child: Center(
+                child: Text(
+                  'در حال بارگذاری تنظیمات فروش سریع...',
+                  style: TextStyle(color: cs.onSurface.withOpacity(0.7)),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
     }
     if (!widget.authStore.canAccessInvoiceType('invoice_sales', action: 'add')) {
@@ -2686,14 +2818,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                               // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
                               if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
                                 IconButton(
-                                  icon: _loadingStocks
+                                  icon: _loadingStocksBulk
                                       ? const SizedBox(
                                           width: 20,
                                           height: 20,
                                           child: CircularProgressIndicator(strokeWidth: 2),
                                         )
                                       : const Icon(Icons.refresh),
-                                  onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
+                                  onPressed: _loadingStocksBulk ? null : () => _refreshAllStocks(),
                                   tooltip: 'به‌روزرسانی موجودی',
                                 ),
                               Expanded(child: _buildBarcodeSearchField(compact: isCompact)),
@@ -2728,14 +2860,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                             children: [
                               if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
                                 IconButton(
-                                  icon: _loadingStocks
+                                  icon: _loadingStocksBulk
                                       ? const SizedBox(
                                           width: 20,
                                           height: 20,
                                           child: CircularProgressIndicator(strokeWidth: 2),
                                         )
                                       : const Icon(Icons.refresh),
-                                  onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
+                                  onPressed: _loadingStocksBulk ? null : () => _refreshAllStocks(),
                                   tooltip: 'به‌روزرسانی موجودی',
                                 ),
                               Expanded(child: _buildBarcodeSearchField(compact: false)),
@@ -2777,43 +2909,34 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                               return Padding(
                                 padding: const EdgeInsets.only(right: 8),
                                 child: InkWell(
-                                  onTap: () async {
-                                    try {
-                                      final productId = _productIntId(product);
-                                      if (productId != null) {
-                                        final fullProduct = await _productService.getProduct(
-                                          businessId: widget.businessId,
-                                          productId: productId,
-                                        );
-                                        await _addToCart(fullProduct);
-                                        await _saveRecentProduct(fullProduct);
-                                        if (mounted) {
-                                          SnackBarHelper.show(
-                                            context,
-                                            message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-                                          );
-                                        }
-                                      }
-                                    } catch (e) {
-                                      if (mounted) {
-                                        SnackBarHelper.show(
-                                          context,
-                                          message:
-                                              'خطا در افزودن محصول: ${ErrorExtractor.forContext(e, context)}',
-                                          isError: true,
-                                        );
-                                      }
-                                    }
-                                  },
+                                  onTap: () => _onRecentProductTap(product),
                                   child: AnimatedContainer(
                                     duration: const Duration(milliseconds: 200),
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
                                       color: cs.surface,
                                       borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: cs.outline.withOpacity(0.3)),
+                                      border: Border.all(
+                                        color: _recentProductLoadingId == _productIntId(product)
+                                            ? cs.primary
+                                            : cs.outline.withOpacity(0.3),
+                                      ),
                                     ),
-                                    child: Column(
+                                    child: _recentProductLoadingId == _productIntId(product)
+                                        ? SizedBox(
+                                            width: 80,
+                                            child: Center(
+                                              child: SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: cs.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                        : Column(
                                       mainAxisSize: MainAxisSize.min,
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
@@ -2948,13 +3071,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                                     builder: (context) {
                                                       final stock = _getProductStock(item.productId);
                                                       // اگر موجودی null است و در حال بارگذاری نیست، سعی کن بارگذاری کن
-                                                      if (stock == null && !_loadingStocks && _defaultWarehouseId != null) {
+                                                      if (stock == null &&
+                                                          !_isProductStockLoading(item.productId) &&
+                                                          _defaultWarehouseId != null) {
                                                         WidgetsBinding.instance.addPostFrameCallback((_) {
                                                           if (mounted && _showInventory) {
-                                                            _loadProductStock(item.productId!);
+                                                            _scheduleStockLoads([item.productId!]);
                                                           }
                                                         });
                                                       }
+                                                      final isStockPending = stock == null && _isProductStockLoading(item.productId);
                                                       final hasInsufficientStock = stock != null && stock < item.quantity;
                                                       return Padding(
                                                         padding: const EdgeInsets.only(top: 4),
@@ -2967,9 +3093,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                                             ),
                                                             const SizedBox(width: 4),
                                                             Text(
-                                                              stock != null 
-                                                                ? 'موجودی: ${_formatNumber(stock)}'
-                                                                : 'در حال بررسی موجودی...',
+                                                              stock != null
+                                                                  ? 'موجودی: ${_formatNumber(stock)}'
+                                                                  : (isStockPending
+                                                                      ? 'در حال بررسی موجودی...'
+                                                                      : 'موجودی نامشخص'),
                                                               style: TextStyle(
                                                                 fontSize: 11,
                                                                 color: hasInsufficientStock ? cs.error : cs.onSurface.withOpacity(0.6),
@@ -3066,8 +3194,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             controller: _mobileTabController,
             children: [
               _buildMobileItemsTab(cs, isCompact: isCompact),
-              _buildMobileDocumentInfoTab(cs, isCompact: isCompact),
-              _buildMobileCheckoutTab(cs),
+              _mobileTabsBuilt.contains(1)
+                  ? _buildMobileDocumentInfoTab(cs, isCompact: isCompact)
+                  : const Center(child: CircularProgressIndicator()),
+              _mobileTabsBuilt.contains(2)
+                  ? _buildMobileCheckoutTab(cs)
+                  : const Center(child: CircularProgressIndicator()),
             ],
           ),
         ),
@@ -3088,14 +3220,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                   if (_showInventory &&
                       _cartItems.any((item) => item.trackInventory && item.productId != null))
                     IconButton(
-                      icon: _loadingStocks
+                      icon: _loadingStocksBulk
                           ? const SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.refresh),
-                      onPressed: _loadingStocks ? null : () => _refreshAllStocks(),
+                      onPressed: _loadingStocksBulk ? null : () => _refreshAllStocks(),
                       tooltip: 'به‌روزرسانی موجودی',
                     ),
                   Expanded(child: _buildBarcodeSearchField(compact: isCompact)),
@@ -3136,43 +3268,34 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                       return Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: InkWell(
-                          onTap: () async {
-                            try {
-                              final productId = _productIntId(product);
-                              if (productId != null) {
-                                final fullProduct = await _productService.getProduct(
-                                  businessId: widget.businessId,
-                                  productId: productId,
-                                );
-                                await _addToCart(fullProduct);
-                                await _saveRecentProduct(fullProduct);
-                                if (mounted) {
-                                  SnackBarHelper.show(
-                                    context,
-                                    message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-                                  );
-                                }
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                SnackBarHelper.show(
-                                  context,
-                                  message:
-                                      'خطا در افزودن محصول: ${ErrorExtractor.forContext(e, context)}',
-                                  isError: true,
-                                );
-                              }
-                            }
-                          },
+                          onTap: () => _onRecentProductTap(product),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: cs.surface,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: cs.outline.withOpacity(0.3)),
+                              border: Border.all(
+                                color: _recentProductLoadingId == _productIntId(product)
+                                    ? cs.primary
+                                    : cs.outline.withOpacity(0.3),
+                              ),
                             ),
-                            child: Column(
+                            child: _recentProductLoadingId == _productIntId(product)
+                                ? SizedBox(
+                                    width: 80,
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: cs.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Column(
                               mainAxisSize: MainAxisSize.min,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -3312,14 +3435,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                               builder: (context) {
                                                 final stock = _getProductStock(item.productId);
                                                 if (stock == null &&
-                                                    !_loadingStocks &&
+                                                    !_isProductStockLoading(item.productId) &&
                                                     _defaultWarehouseId != null) {
                                                   WidgetsBinding.instance.addPostFrameCallback((_) {
                                                     if (mounted && _showInventory) {
-                                                      _loadProductStock(item.productId!);
+                                                      _scheduleStockLoads([item.productId!]);
                                                     }
                                                   });
                                                 }
+                                                final isStockPending =
+                                                    stock == null && _isProductStockLoading(item.productId);
                                                 final insufficient =
                                                     stock != null && stock < item.quantity;
                                                 return Padding(
@@ -3339,7 +3464,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                                       Text(
                                                         stock != null
                                                             ? 'موجودی: ${_formatNumber(stock)}'
-                                                            : 'در حال بررسی موجودی...',
+                                                            : (isStockPending
+                                                                ? 'در حال بررسی موجودی...'
+                                                                : 'موجودی نامشخص'),
                                                         style: TextStyle(
                                                           fontSize: 11,
                                                           color: insufficient
@@ -3453,6 +3580,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       child: TextField(
         controller: _barcodeController,
         focusNode: _barcodeFocus,
+        enabled: !_barcodeSearching,
         decoration: InputDecoration(
           labelText: compact ? 'جستجوی کالا' : 'بارکد / کد / نام محصول',
           hintText: compact ? 'کد، نام یا بارکد' : 'اسکن یا وارد کردن بارکد، کد یا نام',
@@ -3466,6 +3594,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           suffixIcon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (_barcodeSearching)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 4),
+                  child: SizedBox(
+                    width: compact ? 18 : 20,
+                    height: compact ? 18 : 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.primary,
+                    ),
+                  ),
+                ),
               if (_canCreateProducts)
                 IconButton(
                   icon: const Icon(Icons.add),
@@ -3585,6 +3725,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
   
   void _showCategoryFilter(BuildContext context) {
+    if (_categoryTree.isEmpty && !_loadingCategories) {
+      unawaited(_loadCategories());
+    }
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < ResponsiveHelper.shellPersistentNavMinWidth;
     
@@ -3888,7 +4031,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             title: Text(t.quickSalesAutoCreateReceiptSwitch),
             subtitle: Text(t.quickSalesAutoCreateReceiptSwitchHint),
             value: _autoCreatePaymentDocument,
-            onChanged: _saving ? null : _onAutoCreatePaymentDocumentChanged,
+            onChanged: _isSaving ? null : _onAutoCreatePaymentDocumentChanged,
           ),
           if (_autoCreatePaymentDocument) ...[
             const SizedBox(height: 8),
@@ -3969,7 +4112,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               title: Text(t.quickSalesShareOnlinePayment),
               subtitle: Text(t.quickSalesShareOnlinePaymentHint),
               value: _shareOnlinePaymentEnabled,
-              onChanged: _saving || _loadingShareGateways
+              onChanged: _isSaving || _loadingShareGateways
                   ? null
                   : (v) {
                       setState(() {
@@ -4004,7 +4147,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                       ),
                     ),
                 ],
-                onChanged: _saving || !_shareOnlinePaymentEnabled
+                onChanged: _isSaving || !_shareOnlinePaymentEnabled
                     ? null
                     : (v) => setState(() => _shareGatewayId = v),
               ),
@@ -4014,7 +4157,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               contentPadding: EdgeInsets.zero,
               title: Text(t.quickSalesShareChannelSms),
               value: _shareSendSms,
-              onChanged: _saving || !hasPhone
+              onChanged: _isSaving || !hasPhone
                   ? null
                   : (v) => setState(() => _shareSendSms = v ?? false),
             ),
@@ -4030,7 +4173,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               contentPadding: EdgeInsets.zero,
               title: Text(t.quickSalesShareChannelEmail),
               value: _shareSendEmail,
-              onChanged: _saving || !hasEmail
+              onChanged: _isSaving || !hasEmail
                   ? null
                   : (v) => setState(() => _shareSendEmail = v ?? false),
             ),
@@ -4046,7 +4189,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               contentPadding: EdgeInsets.zero,
               title: Text(t.quickSalesShareChannelNative),
               value: _shareViaNativeShare,
-              onChanged: _saving ? null : (v) => setState(() => _shareViaNativeShare = v ?? false),
+              onChanged: _isSaving ? null : (v) => setState(() => _shareViaNativeShare = v ?? false),
             ),
           ],
         ),
@@ -4055,6 +4198,15 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   Widget _buildCheckoutButtons(ColorScheme cs) {
+    Widget saveSpinner({double size = 20}) => SizedBox(
+          width: size,
+          height: size,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: cs.onPrimary,
+          ),
+        );
+
     return Container(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -4063,13 +4215,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             width: double.infinity,
             height: 50,
             child: ElevatedButton.icon(
-              onPressed: _saving ? null : () => _saveInvoice(print: true),
-              icon: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+              onPressed: _isSaving ? null : () => _saveInvoice(print: true),
+              icon: _saveAction == _QuickSalesSaveAction.saveAndPrint
+                  ? saveSpinner()
                   : const Icon(Icons.print),
               label: const Text('ثبت و چاپ'),
               style: ElevatedButton.styleFrom(
@@ -4083,8 +4231,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             width: double.infinity,
             height: 50,
             child: OutlinedButton.icon(
-              onPressed: _saving ? null : () => _saveInvoice(print: false),
-              icon: const Icon(Icons.save),
+              onPressed: _isSaving ? null : () => _saveInvoice(print: false),
+              icon: _saveAction == _QuickSalesSaveAction.save
+                  ? SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                    )
+                  : const Icon(Icons.save),
               label: const Text('ثبت'),
             ),
           ),
@@ -4094,7 +4248,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   Widget _buildMobileBottomBar(ColorScheme cs) {
-    final canCheckout = _cartItems.isNotEmpty && !_saving;
+    final canCheckout = _cartItems.isNotEmpty && !_isSaving;
     final narrow = MediaQuery.sizeOf(context).width < _compactBreakpoint;
     return SafeArea(
       top: false,
@@ -4138,11 +4292,20 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               style: narrow
                   ? FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))
                   : null,
-              child: Text(
-                _cartItems.isEmpty
-                    ? 'سبد خالی'
-                    : (narrow ? 'تسویه' : 'پرداخت / ثبت'),
-              ),
+              child: _isSaving
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.onPrimary,
+                      ),
+                    )
+                  : Text(
+                      _cartItems.isEmpty
+                          ? 'سبد خالی'
+                          : (narrow ? 'تسویه' : 'پرداخت / ثبت'),
+                    ),
             ),
             const SizedBox(width: 8),
             PopupMenuButton<String>(
@@ -4184,7 +4347,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                 width: 44,
                 height: 44,
                 child: Center(
-                  child: _saving
+                  child: _isSaving
                       ? const SizedBox(
                           width: 18,
                           height: 18,

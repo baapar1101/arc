@@ -6352,3 +6352,50 @@ async def export_sales_by_product_report_excel(
     )
 
 
+@router.post(
+    "/businesses/{business_id}/reports/sales-by-product/export/pdf",
+    summary="خروجی PDF گزارش فروش به تفکیک کالا",
+)
+@require_business_access("business_id")
+async def export_sales_by_product_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    from app.services.turnover_report_export_service import (
+        SALES_BY_PRODUCT_COLUMNS,
+        turnover_pdf_response,
+    )
+
+    product_ids = body.get("product_ids")
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    category_ids = body.get("category_ids")
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    warehouse_ids = body.get("warehouse_ids")
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+
+    return turnover_pdf_response(
+        request,
+        business_id,
+        body,
+        ctx,
+        db,
+        fetch_fn=get_sales_by_product_report,
+        columns=SALES_BY_PRODUCT_COLUMNS,
+        filename_prefix="sales_by_product",
+        title_fa="گزارش فروش به تفکیک کالا",
+        title_en="Sales by Product Report",
+        fetch_kwargs={
+            "product_ids": product_ids,
+            "category_ids": category_ids,
+            "warehouse_ids": warehouse_ids,
+            "include_zero_sales": bool(body.get("include_zero_sales", False)),
+        },
+    )
+

@@ -73,6 +73,30 @@ def test_legacy_response_indicates_accpro_required():
     assert not legacy_response_indicates_accpro_required("")
 
 
+def test_legacy_api_unauthorized_does_not_return_http_401():
+    """401 از سرور قدیم نباید باعث logout کاربر در پنل جدید شود."""
+    from unittest.mock import MagicMock
+
+    import httpx
+    import pytest
+
+    from app.core.responses import ApiError
+    from app.services.legacy_import.client import LegacyApiClient
+
+    client = LegacyApiClient("https://app.hesabix.ir", "test-api-key-12345")
+    response = MagicMock(spec=httpx.Response)
+    response.status_code = 401
+    response.text = "Unauthorized"
+    response.request = MagicMock()
+    response.request.url = "https://app.hesabix.ir/api/business/list"
+
+    with pytest.raises(ApiError) as exc_info:
+        client._raise_for_status(response, context="business/list")
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"]["code"] == "LEGACY_API_UNAUTHORIZED"
+    assert "کلید API نسخه قدیم" in exc_info.value.detail["error"]["message"]
+
+
 def test_map_legacy_person_types_defaults():
     assert map_legacy_person_types([]) == ["مشتری"]
     assert "مشتری" in map_legacy_person_types([1])

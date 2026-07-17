@@ -5,19 +5,18 @@ import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
-import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
-import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/widgets/reports/pnl_report_shared.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 
 class PnlCumulativeReportPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
-  
+
   const PnlCumulativeReportPage({
     super.key,
     required this.businessId,
@@ -29,28 +28,42 @@ class PnlCumulativeReportPage extends StatefulWidget {
 }
 
 class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
-  // Filters
   DateTime? _toDate;
   int? _selectedFiscalYearId;
   int? _selectedCurrencyId;
-  
-  // Data
+  int? _selectedProjectId;
+  bool _includeZeroBalance = false;
+  String? _compareMode;
+
   List<Map<String, dynamic>> _fiscalYears = [];
   List<Map<String, dynamic>> _currencies = [];
-  
-  // Report data
-  List<Map<String, dynamic>> _revenueItems = [];
-  List<Map<String, dynamic>> _expenseItems = [];
+
+  List<Map<String, dynamic>> _salesItems = [];
+  List<Map<String, dynamic>> _otherIncomeItems = [];
+  List<Map<String, dynamic>> _cogsItems = [];
+  List<Map<String, dynamic>> _operatingItems = [];
+  List<Map<String, dynamic>> _nonOperatingIncomeItems = [];
+  List<Map<String, dynamic>> _nonOperatingExpenseItems = [];
+  List<Map<String, dynamic>> _taxItems = [];
+  List<Map<String, dynamic>> _statementLines = [];
   Map<String, dynamic>? _summary;
+  Map<String, dynamic>? _comparison;
   bool _loading = false;
+  bool _exporting = false;
   String? _error;
+  bool _filtersReady = false;
 
   @override
   void initState() {
     super.initState();
-    _loadFiscalYears();
-    _loadCurrencies();
-    _fetchData();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await Future.wait([_loadFiscalYears(), _loadCurrencies()]);
+    if (!mounted) return;
+    setState(() => _filtersReady = true);
+    await _fetchData();
   }
 
   Future<void> _loadFiscalYears() async {
@@ -65,13 +78,9 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
           orElse: () => const <String, dynamic>{},
         );
         final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        if (id is int) _selectedFiscalYearId = id;
       });
-    } catch (_) {
-      // ignore errors
-    }
+    } catch (_) {}
   }
 
   Future<void> _loadCurrencies() async {
@@ -81,7 +90,6 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
         if (items.isNotEmpty) {
           final defaultCurrency = items.firstWhere(
             (c) => c['is_default'] == true,
@@ -90,9 +98,30 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
           _selectedCurrencyId = defaultCurrency['id'] as int?;
         }
       });
-    } catch (_) {
-      // ignore errors
-    }
+    } catch (_) {}
+  }
+
+  Map<String, dynamic> _requestBody() => {
+        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+        'include_zero_balance': _includeZeroBalance,
+        if (_compareMode != null) 'compare_mode': _compareMode,
+        'compare_prior_period': _compareMode != null,
+      };
+
+  void _applyData(Map<String, dynamic> data) {
+    _salesItems = List<Map<String, dynamic>>.from(data['sales_items'] ?? []);
+    _otherIncomeItems = List<Map<String, dynamic>>.from(data['other_income_items'] ?? []);
+    _cogsItems = List<Map<String, dynamic>>.from(data['cogs_items'] ?? []);
+    _operatingItems = List<Map<String, dynamic>>.from(data['operating_expense_items'] ?? []);
+    _nonOperatingIncomeItems = List<Map<String, dynamic>>.from(data['non_operating_income_items'] ?? []);
+    _nonOperatingExpenseItems = List<Map<String, dynamic>>.from(data['non_operating_expense_items'] ?? []);
+    _taxItems = List<Map<String, dynamic>>.from(data['tax_expense_items'] ?? []);
+    _statementLines = List<Map<String, dynamic>>.from(data['statement_lines'] ?? []);
+    _summary = data['summary'] is Map ? Map<String, dynamic>.from(data['summary'] as Map) : null;
+    _comparison = data['comparison'] is Map ? Map<String, dynamic>.from(data['comparison'] as Map) : null;
   }
 
   Future<void> _fetchData() async {
@@ -102,130 +131,54 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
     });
 
     try {
-      final api = ApiClient();
-      final requestData = <String, dynamic>{
-        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
-        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
-      };
-      
-      final res = await api.post<Map<String, dynamic>>(
+      final res = await ApiClient().post<Map<String, dynamic>>(
         '/api/v1/businesses/${widget.businessId}/reports/pnl-cumulative',
-        data: requestData,
+        data: _requestBody(),
       );
-      
       final body = res.data;
       if (body is Map<String, dynamic> && body['data'] is Map<String, dynamic>) {
-        final data = body['data'] as Map<String, dynamic>;
-        
-        if (mounted) {
-          setState(() {
-            _revenueItems = List<Map<String, dynamic>>.from(data['revenue_items'] ?? []);
-            _expenseItems = List<Map<String, dynamic>>.from(data['expense_items'] ?? []);
-            _summary = data['summary'] as Map<String, dynamic>?;
-            _loading = false;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+        if (!mounted) return;
         setState(() {
-          _error = ErrorExtractor.forContext(e, context);
+          _applyData(body['data'] as Map<String, dynamic>);
           _loading = false;
         });
+      } else if (mounted) {
+        setState(() => _loading = false);
       }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = ErrorExtractor.forContext(e, context);
+        _loading = false;
+      });
     }
   }
 
-  String _formatNumber(dynamic value) {
-    if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
-    return DataTableUtils.formatNumber(n);
-  }
-
-  void _refreshData() {
-    _fetchData();
-  }
-
-  Future<void> _exportExcel() async {
-    setState(() => _loading = true);
+  Future<void> _export(String type) async {
+    setState(() => _exporting = true);
     try {
-      final api = ApiClient();
-      final requestData = <String, dynamic>{
-        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
-        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
-      };
-
-      final bytes = await api.post<List<int>>(
-        '/api/v1/businesses/${widget.businessId}/reports/pnl-cumulative/export/excel',
-        data: requestData,
+      final isPdf = type == 'pdf';
+      final bytes = await ApiClient().post<List<int>>(
+        '/api/v1/businesses/${widget.businessId}/reports/pnl-cumulative/export/$type',
+        data: _requestBody(),
         responseType: ResponseType.bytes,
-        options: Options(
-          headers: {'Accept': 'application/octet-stream'},
-        ),
+        options: Options(headers: {'Accept': isPdf ? 'application/pdf' : 'application/octet-stream'}),
       );
       final data = bytes.data ?? <int>[];
       if (kIsWeb) {
         await web_utils.saveBytesAsFileWeb(
           data,
-          'pnl_cumulative_${widget.businessId}.xlsx',
-          mimeType: 'application/octet-stream',
+          'pnl_cumulative_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
+          mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
         );
-      } else {
-        if (mounted) {
-          SnackBarHelper.show(context, message: 'Export only available on web');
-        }
+      } else if (mounted) {
+        SnackBarHelper.show(context, message: 'Export only available on web');
       }
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message: 'Export error: ${ErrorExtractor.forContext(e, context)}',
-      );
+      SnackBarHelper.showError(context, message: 'Export error: ${ErrorExtractor.forContext(e, context)}');
     } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _exportPdf() async {
-    setState(() => _loading = true);
-    try {
-      final api = ApiClient();
-      final requestData = <String, dynamic>{
-        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
-        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
-      };
-
-      final bytes = await api.post<List<int>>(
-        '/api/v1/businesses/${widget.businessId}/reports/pnl-cumulative/export/pdf',
-        data: requestData,
-        responseType: ResponseType.bytes,
-        options: Options(
-          headers: {'Accept': 'application/pdf'},
-        ),
-      );
-      final data = bytes.data ?? <int>[];
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          'pnl_cumulative_${widget.businessId}.pdf',
-          mimeType: 'application/pdf',
-        );
-      } else {
-        if (mounted) {
-          SnackBarHelper.show(context, message: 'Export only available on web');
-        }
-      }
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message: 'Export error: ${ErrorExtractor.forContext(e, context)}',
-      );
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
@@ -233,32 +186,45 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
-    
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final pagePadding = ResponsiveHelper.getPadding(context);
+
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(t.reportsPnlCumulativeTitle, style: const TextStyle(fontSize: 18)),
+            Text(
+              'از ابتدای سال مالی تا تاریخ انتخابی',
+              style: TextStyle(
+                fontSize: 12,
+                color: cs.onSurface.withValues(alpha: 0.65),
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
         ),
-        title: Text(t.reportsPnlCumulativeTitle),
         actions: [
           PopupMenuButton<String>(
-            icon: const Icon(Icons.download),
+            icon: _exporting
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.onSurface),
+                  )
+                : const Icon(Icons.download_outlined),
             tooltip: t.export,
-            onSelected: (value) {
-              if (value == 'excel') {
-                _exportExcel();
-              } else if (value == 'pdf') {
-                _exportPdf();
-              }
-            },
+            enabled: !_exporting && !_loading,
+            onSelected: _export,
             itemBuilder: (context) => [
               PopupMenuItem(
                 value: 'excel',
                 child: Row(
                   children: [
-                    Icon(Icons.table_chart, color: Colors.green[600]),
+                    Icon(Icons.table_chart_outlined, color: Colors.green[700]),
                     const SizedBox(width: 8),
                     Text(t.exportToExcel),
                   ],
@@ -268,7 +234,7 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
                 value: 'pdf',
                 child: Row(
                   children: [
-                    Icon(Icons.picture_as_pdf, color: Colors.red[600]),
+                    Icon(Icons.picture_as_pdf_outlined, color: Colors.red[700]),
                     const SizedBox(width: 8),
                     Text(t.exportToPdf),
                   ],
@@ -279,375 +245,210 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: t.refresh,
-            onPressed: _refreshData,
+            onPressed: (_loading || !_filtersReady) ? null : _fetchData,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Filters
-          Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  // Fiscal Year
-                  SizedBox(
-                    width: 280,
-                    child: DropdownButtonFormField<int>(
-                      value: _selectedFiscalYearId,
-                      decoration: InputDecoration(
-                        labelText: 'سال مالی',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                      ),
-                      items: _fiscalYears.map((fy) {
-                        return DropdownMenuItem<int>(
-                          value: fy['id'] as int?,
-                          child: Text(
-                            fy['title']?.toString() ?? '',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+      body: !_filtersReady
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _fetchData,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(pagePadding, pagePadding, pagePadding, pagePadding + 24),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        PnlReportFilters(
+                          isCumulative: true,
+                          isMobile: isMobile,
+                          fiscalYears: _fiscalYears,
+                          currencies: _currencies,
+                          selectedFiscalYearId: _selectedFiscalYearId,
+                          fromDate: null,
+                          toDate: _toDate,
+                          selectedCurrencyId: _selectedCurrencyId,
+                          selectedProjectId: _selectedProjectId,
+                          businessId: widget.businessId,
+                          calendarController: widget.calendarController,
+                          includeZeroBalance: _includeZeroBalance,
+                          compareMode: _compareMode,
+                          onFiscalYearChanged: (v) {
+                            setState(() => _selectedFiscalYearId = v);
+                            _fetchData();
+                          },
+                          onFromDateChanged: (_) {},
+                          onToDateChanged: (v) {
+                            setState(() => _toDate = v);
+                            _fetchData();
+                          },
+                          onCurrencyChanged: (v) {
+                            setState(() => _selectedCurrencyId = v);
+                            _fetchData();
+                          },
+                          onProjectChanged: (v) {
+                            setState(() => _selectedProjectId = v);
+                            _fetchData();
+                          },
+                          onIncludeZeroBalanceChanged: (v) {
+                            setState(() => _includeZeroBalance = v);
+                            _fetchData();
+                          },
+                          onCompareModeChanged: (v) {
+                            setState(() => _compareMode = v);
+                            _fetchData();
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        if (_summary != null) ...[
+                          PnlSummaryPanel(
+                            summary: _summary,
+                            comparison: _comparison,
+                            isMobile: isMobile,
+                            isCumulative: true,
                           ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedFiscalYearId = value;
-                        });
-                        _refreshData();
-                      },
-                    ),
-                  ),
-                  
-                  // Date To (شروع همیشه ابتدای سال مالی است)
-                  SizedBox(
-                    width: 180,
-                    child: DateInputField(
-                      value: _toDate,
-                      calendarController: widget.calendarController,
-                      onChanged: (date) {
-                        setState(() {
-                          _toDate = date;
-                        });
-                        _refreshData();
-                      },
-                    ),
-                  ),
-                  
-                  // Info about date from
-                  SizedBox(
-                    width: 300,
-                    child: Card(
-                      color: Colors.blue.shade50,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline, size: 20, color: Colors.blue.shade700),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'شروع: ابتدای سال مالی',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.blue.shade700,
-                                ),
-                              ),
+                          const SizedBox(height: 16),
+                        ],
+                        if (_loading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 64),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (_error != null)
+                          _buildErrorState(cs)
+                        else ...[
+                          PnlStatementView(statementLines: _statementLines),
+                          const SizedBox(height: 16),
+                          if (_salesItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'فروش و درآمد عملیاتی (تجمعی)',
+                              count: _salesItems.length,
+                              icon: Icons.storefront_outlined,
+                              accent: const Color(0xFF15803D),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
+                              rows: PnlTableRows.revenueRows(_salesItems),
+                              totalLabel: 'جمع فروش',
+                              totalValue: PnlTableRows.fmt(_summary?['total_sales']),
                             ),
+                            const SizedBox(height: 16),
                           ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  // Currency
-                  SizedBox(
-                    width: 200,
-                    child: DropdownButtonFormField<int>(
-                      value: _selectedCurrencyId,
-                      decoration: InputDecoration(
-                        labelText: 'ارز',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                      ),
-                      items: [
-                        const DropdownMenuItem<int>(
-                          value: null,
-                          child: Text('همه ارزها'),
-                        ),
-                        ..._currencies.map<DropdownMenuItem<int>>((c) {
-                          final id = c['id'] as int?;
-                          final code = (c['code'] ?? '').toString();
-                          final name = (c['name'] ?? '').toString();
-                          final displayName = code.isNotEmpty ? '$code - $name' : name;
-                          return DropdownMenuItem<int>(
-                            key: ValueKey('currency_$id'),
-                            value: id,
-                            child: Text(
-                              displayName,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
+                          if (_otherIncomeItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'درآمدهای عملیاتی (۶۰۱) — تجمعی',
+                              count: _otherIncomeItems.length,
+                              icon: Icons.trending_up_rounded,
+                              accent: const Color(0xFF059669),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
+                              rows: PnlTableRows.revenueRows(_otherIncomeItems),
+                              totalLabel: 'جمع درآمد عملیاتی',
+                              totalValue: PnlTableRows.fmt(_summary?['total_other_income']),
                             ),
-                          );
-                        }).toList(),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_cogsItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'بهای تمام‌شده (تجمعی)',
+                              count: _cogsItems.length,
+                              icon: Icons.inventory_2_outlined,
+                              accent: const Color(0xFFB45309),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
+                              rows: PnlTableRows.expenseRows(_cogsItems),
+                              totalLabel: 'جمع بهای تمام‌شده',
+                              totalValue: PnlTableRows.fmt(_summary?['total_cogs']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_operatingItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'هزینه‌های عملیاتی (تجمعی)',
+                              count: _operatingItems.length,
+                              icon: Icons.trending_down_rounded,
+                              accent: const Color(0xFFB91C1C),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
+                              rows: PnlTableRows.expenseRows(_operatingItems),
+                              totalLabel: 'جمع هزینه عملیاتی',
+                              totalValue: PnlTableRows.fmt(_summary?['total_operating_expense']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_nonOperatingIncomeItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'درآمدهای غیرعملیاتی (تجمعی)',
+                              count: _nonOperatingIncomeItems.length,
+                              icon: Icons.savings_outlined,
+                              accent: const Color(0xFF047857),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
+                              rows: PnlTableRows.revenueRows(_nonOperatingIncomeItems),
+                              totalLabel: 'جمع درآمد غیرعملیاتی',
+                              totalValue: PnlTableRows.fmt(_summary?['total_non_operating_income']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_nonOperatingExpenseItems.isNotEmpty) ...[
+                            PnlDetailSection(
+                              title: 'هزینه‌های غیرعملیاتی (تجمعی)',
+                              count: _nonOperatingExpenseItems.length,
+                              icon: Icons.money_off_csred_outlined,
+                              accent: const Color(0xFF9F1239),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
+                              rows: PnlTableRows.expenseRows(_nonOperatingExpenseItems),
+                              totalLabel: 'جمع هزینه غیرعملیاتی',
+                              totalValue: PnlTableRows.fmt(_summary?['total_non_operating_expense']),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+                          if (_taxItems.isNotEmpty)
+                            PnlDetailSection(
+                              title: 'مالیات بر درآمد (تجمعی)',
+                              count: _taxItems.length,
+                              icon: Icons.receipt_long_outlined,
+                              accent: const Color(0xFF9A3412),
+                              emptyText: 'موردی یافت نشد',
+                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
+                              rows: PnlTableRows.expenseRows(_taxItems),
+                              totalLabel: 'جمع مالیات',
+                              totalValue: PnlTableRows.fmt(_summary?['total_tax_expense']),
+                            ),
+                        ],
                       ],
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedCurrencyId = val;
-                        });
-                        _refreshData();
-                      },
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-          
-          // Summary Cards
-          if (_summary != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Card(
-                      color: Colors.green.shade50,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'جمع درآمد تجمعی',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatNumber(_summary!['total_revenue']),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      color: Colors.red.shade50,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'جمع هزینه تجمعی',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatNumber(_summary!['total_expense']),
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Card(
-                      color: ((_summary!['net_profit_loss'] as num?)?.toDouble() ?? 0) >= 0
-                          ? Colors.blue.shade50
-                          : Colors.orange.shade50,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'سود/زیان خالص تجمعی',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              _formatNumber(_summary!['net_profit_loss']),
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: ((_summary!['net_profit_loss'] as num?)?.toDouble() ?? 0) >= 0
-                                    ? Colors.blue
-                                    : Colors.orange,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          // Data Tables
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? Center(child: Text('خطا: $_error', style: TextStyle(color: cs.error)))
-                    : DefaultTabController(
-                        length: 2,
-                        child: Column(
-                          children: [
-                            TabBar(
-                              tabs: [
-                                Tab(text: 'درآمدها (${_revenueItems.length})'),
-                                Tab(text: 'هزینه‌ها (${_expenseItems.length})'),
-                              ],
-                            ),
-                            Expanded(
-                              child: TabBarView(
-                                children: [
-                                  _buildRevenueTable(),
-                                  _buildExpenseTable(),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-          ),
+    );
+  }
+
+  Widget _buildErrorState(ColorScheme cs) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 48),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: cs.errorContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.error.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.error_outline, color: cs.error, size: 36),
+          const SizedBox(height: 12),
+          Text('خطا در دریافت گزارش', style: TextStyle(fontWeight: FontWeight.w700, color: cs.error)),
+          const SizedBox(height: 8),
+          Text(_error ?? '', textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          FilledButton.tonal(onPressed: _fetchData, child: const Text('تلاش مجدد')),
         ],
-      ),
-    );
-  }
-
-  Widget _buildRevenueTable() {
-    if (_revenueItems.isEmpty) {
-      return const Center(child: Text('هیچ درآمدی یافت نشد'));
-    }
-    
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: DataTable(
-          columnSpacing: 24,
-          columns: const [
-            DataColumn(label: Text('کد حساب')),
-            DataColumn(label: Text('نام حساب')),
-            DataColumn(label: Text('گردش بستانکار', textAlign: TextAlign.center)),
-            DataColumn(label: Text('گردش بدهکار', textAlign: TextAlign.center)),
-            DataColumn(label: Text('درآمد خالص', textAlign: TextAlign.center)),
-          ],
-          rows: [
-            ..._revenueItems.map((item) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(item['account_code']?.toString() ?? '')),
-                  DataCell(Text(item['account_name']?.toString() ?? '')),
-                  DataCell(Text(_formatNumber(item['credit']), textAlign: TextAlign.center)),
-                  DataCell(Text(_formatNumber(item['debit']), textAlign: TextAlign.center)),
-                  DataCell(Text(_formatNumber(item['revenue']), textAlign: TextAlign.center)),
-                ],
-              );
-            }),
-            DataRow(
-              color: WidgetStateProperty.all(Colors.grey.shade100),
-              cells: [
-                const DataCell(Text('', style: TextStyle(fontWeight: FontWeight.bold))),
-                const DataCell(Text('جمع', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataCell(Text(
-                  _formatNumber(_summary?['total_revenue']),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                )),
-                const DataCell(Text('', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataCell(Text(
-                  _formatNumber(_summary?['total_revenue']),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                )),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExpenseTable() {
-    if (_expenseItems.isEmpty) {
-      return const Center(child: Text('هیچ هزینه‌ای یافت نشد'));
-    }
-    
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        child: DataTable(
-          columnSpacing: 24,
-          columns: const [
-            DataColumn(label: Text('کد حساب')),
-            DataColumn(label: Text('نام حساب')),
-            DataColumn(label: Text('گردش بدهکار', textAlign: TextAlign.center)),
-            DataColumn(label: Text('گردش بستانکار', textAlign: TextAlign.center)),
-            DataColumn(label: Text('هزینه خالص', textAlign: TextAlign.center)),
-          ],
-          rows: [
-            ..._expenseItems.map((item) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(item['account_code']?.toString() ?? '')),
-                  DataCell(Text(item['account_name']?.toString() ?? '')),
-                  DataCell(Text(_formatNumber(item['debit']), textAlign: TextAlign.center)),
-                  DataCell(Text(_formatNumber(item['credit']), textAlign: TextAlign.center)),
-                  DataCell(Text(_formatNumber(item['expense']), textAlign: TextAlign.center)),
-                ],
-              );
-            }),
-            DataRow(
-              color: WidgetStateProperty.all(Colors.grey.shade100),
-              cells: [
-                const DataCell(Text('', style: TextStyle(fontWeight: FontWeight.bold))),
-                const DataCell(Text('جمع', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataCell(Text(
-                  _formatNumber(_summary?['total_expense']),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                )),
-                const DataCell(Text('', style: TextStyle(fontWeight: FontWeight.bold))),
-                DataCell(Text(
-                  _formatNumber(_summary?['total_expense']),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                )),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
 }
-

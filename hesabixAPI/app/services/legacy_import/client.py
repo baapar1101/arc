@@ -105,10 +105,12 @@ class LegacyApiClient:
         if response.status_code < 400:
             return
         if response.status_code in (401, 403):
+            # هرگز 401 به کلاینت پنل برنگردان: interceptor فرانت‌اند آن را
+            # به‌معنای انقضای نشست کاربر فعلی می‌گیرد و به صفحه ورود می‌فرستد.
             raise ApiError(
                 "LEGACY_API_UNAUTHORIZED",
-                "کلید API نسخه قدیم نامعتبر است یا دسترسی ندارد",
-                http_status=401,
+                "کلید API نسخه قدیم نامعتبر است یا دسترسی ندارد. لطفاً کلید را در حسابیکس قبلی بررسی کنید.",
+                http_status=400,
                 details={"context": context, "status": response.status_code},
             )
         if response.status_code == 404:

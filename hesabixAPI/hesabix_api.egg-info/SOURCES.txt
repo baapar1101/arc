@@ -609,6 +609,7 @@ app/services/template_builder_compiler.py
 app/services/template_design_v2_compiler.py
 app/services/transfer_service.py
 app/services/trial_balance_service.py
+app/services/user_list_query_service.py
 app/services/user_ui_preferences_service.py
 app/services/wallet_service.py
 app/services/warehouse_location_service.py
@@ -636,6 +637,7 @@ app/services/ai/ai_content_sanitize.py
 app/services/ai/ai_context_budget.py
 app/services/ai/ai_date_resolver.py
 app/services/ai/ai_db_helpers.py
+app/services/ai/ai_deliverable_answer.py
 app/services/ai/ai_embedding_service.py
 app/services/ai/ai_eval_premature.py
 app/services/ai/ai_eval_schedule_service.py
@@ -737,6 +739,7 @@ app/services/legacy_import/constants.py
 app/services/legacy_import/context.py
 app/services/legacy_import/document_importer.py
 app/services/legacy_import/document_rows.py
+app/services/legacy_import/errors.py
 app/services/legacy_import/expense_income_rows.py
 app/services/legacy_import/id_map.py
 app/services/legacy_import/importer.py
@@ -986,10 +989,12 @@ tests/test_ai_agent_regression_v2.py
 tests/test_ai_agent_run.py
 tests/test_ai_answer_from_evidence.py
 tests/test_ai_budget.py
+tests/test_ai_calendar_prompt.py
 tests/test_ai_connector_security.py
 tests/test_ai_content_sanitize.py
 tests/test_ai_context_budget.py
 tests/test_ai_date_resolver.py
+tests/test_ai_deliverable_answer.py
 tests/test_ai_embedding_service.py
 tests/test_ai_eval_premature.py
 tests/test_ai_eval_service.py
@@ -1075,6 +1080,7 @@ tests/test_stock_count.py
 tests/test_sunway_sms_provider.py
 tests/test_tax_key_material_service.py
 tests/test_template_design_v2_compiler.py
+tests/test_user_list_query_service.py
 tests/test_voice_ws_helpers.py
 tests/test_warehouse_document_search.py
 tests/test_webm_decode.py

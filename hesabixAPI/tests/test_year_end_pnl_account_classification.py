@@ -7,8 +7,11 @@ from types import SimpleNamespace
 from app.services.pnl_account_classification import (
     is_pnl_expense_account,
     is_pnl_expense_gl_account,
+    is_pnl_operating_expense_account,
     is_pnl_revenue_account,
     is_pnl_revenue_gl_account,
+    is_pnl_tax_expense_account,
+    pnl_account_section,
 )
 
 
@@ -26,17 +29,19 @@ class TestPnlAccountClassification:
         assert is_pnl_revenue_account("60101")
         assert is_pnl_revenue_account("60204")
         assert is_pnl_revenue_gl_account(_account("60101"))
+        assert pnl_account_section("60204") == "non_operating_income"
 
-    def test_income_tax_expense_is_not_revenue(self):
-        assert not is_pnl_revenue_account("50101")
-        assert is_pnl_expense_account("50101")
-        assert is_pnl_expense_gl_account(_account("50101"))
-        assert not is_pnl_revenue_gl_account(_account("50101"))
+    def test_income_tax_50101_is_tax_expense(self):
+        assert is_pnl_tax_expense_account("50101")
+        assert not is_pnl_operating_expense_account("50101")
+        assert pnl_account_section("50101") == "tax_expense"
 
     def test_cogs_and_expense_accounts(self):
         assert is_pnl_expense_account("40001")
         assert is_pnl_expense_account("70801")
+        assert is_pnl_operating_expense_account("70201")
         assert is_pnl_expense_gl_account(_account("70201"))
+        assert pnl_account_section("70901") == "non_operating_expense"
 
     def test_subledger_accounts_excluded_from_pnl_close(self):
         person_as_revenue_code = _account("603", "person")
