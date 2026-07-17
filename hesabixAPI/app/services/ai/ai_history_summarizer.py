@@ -9,6 +9,10 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from app.services.ai.ai_language_prompt import (
+    build_history_summary_system_prompt,
+    detect_message_language,
+)
 from app.services.ai.prompt_service import get_prompt_by_key
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,22 @@ def _message_plain_text(msg: Dict[str, Any]) -> str:
     if msg.get("tool_calls"):
         return "[فراخوانی ابزار]"
     return ""
+
+
+def _resolve_summary_language(
+    messages: List[Dict[str, Any]],
+    *,
+    language: Optional[str] = None,
+) -> str:
+    if language in ("fa", "en"):
+        return language
+    for msg in reversed(messages):
+        if msg.get("role") != "user":
+            continue
+        detected = detect_message_language(_message_plain_text(msg))
+        if detected:
+            return detected
+    return "fa"
 
 
 def build_rule_based_history_summary(messages: List[Dict[str, Any]]) -> str:
@@ -53,20 +73,34 @@ def summarize_history_with_llm(
     *,
     db: Optional[Session] = None,
     max_output_tokens: int = 500,
+    language: Optional[str] = None,
 ) -> Optional[str]:
     """خلاصهٔ فشرده با یک فراخوانی LLM."""
     draft = build_rule_based_history_summary(messages)
     if not draft:
         return None
 
+    lang = _resolve_summary_language(messages, language=language)
+    system_content = build_history_summary_system_prompt(lang)
+    if db is not None:
+        try:
+            seeded = get_prompt_by_key(db, "aux.history_summary")
+            if seeded and lang == "fa":
+                system_content = seeded
+        except Exception:
+            pass
+
+    user_prefix = (
+        "Conversation text:\n\n"
+        if lang == "en"
+        else "متن مکالمه:\n\n"
+    )
+
     prompt_messages = [
-        {
-            "role": "system",
-            "content": get_prompt_by_key(db, "aux.history_summary"),
-        },
+        {"role": "system", "content": system_content},
         {
             "role": "user",
-            "content": f"متن مکالمه:\n\n{draft[:12000]}",
+            "content": f"{user_prefix}{draft[:12000]}",
         },
     ]
 

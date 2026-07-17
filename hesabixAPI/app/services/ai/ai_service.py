@@ -536,6 +536,19 @@ class AIService:
                 bid = self.business_id
                 uid = self.ctx.get_user_id()
                 if bid and uid and can_use_llm_summarize(uid, int(bid)):
+                    from app.services.ai.ai_language_prompt import (
+                        detect_message_language,
+                    )
+
+                    last_user = next(
+                        (
+                            m.get("content")
+                            for m in reversed(middle_msgs)
+                            if m.get("role") == "user"
+                            and isinstance(m.get("content"), str)
+                        ),
+                        None,
+                    )
                     text = summarize_history_with_llm(
                         provider,
                         self.get_effective_model_api_id(
@@ -543,6 +556,7 @@ class AIService:
                         ),
                         middle_msgs,
                         db=self.db,
+                        language=detect_message_language(last_user),
                     )
                     if text:
                         record_llm_summarize(uid, int(bid))
@@ -959,7 +973,11 @@ class AIService:
                     return content.strip()
         return None
 
-    def _resolve_chat_language(self, business_id: Optional[int] = None) -> str:
+    def _resolve_chat_language(
+        self,
+        business_id: Optional[int] = None,
+        user_query: Optional[str] = None,
+    ) -> str:
         from app.services.ai.ai_language_prompt import resolve_effective_chat_language
 
         preferred: Optional[str] = None
@@ -978,17 +996,19 @@ class AIService:
         return resolve_effective_chat_language(
             ctx_language=self.ctx.language,
             preferred_language=preferred,
+            user_message=user_query,
         )
 
     def _build_execution_prompt_block(
         self,
         execution_mode: Optional[str],
         business_id: Optional[int] = None,
+        user_query: Optional[str] = None,
     ) -> str:
         from app.services.ai.ai_language_prompt import build_language_context_prompt_block
 
         language_block = build_language_context_prompt_block(
-            self._resolve_chat_language(business_id)
+            self._resolve_chat_language(business_id, user_query=user_query)
         )
         mode_block = execution_mode_prompt_block(execution_mode)
         if language_block and mode_block:
@@ -1113,9 +1133,16 @@ class AIService:
 
             todos_text, plan_block = self._session_todo_prompt_extras(session_id, user_query)
 
-            from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+            from app.services.ai.ai_calendar_prompt import (
+                build_calendar_context_prompt_block,
+                build_datetime_now_prompt_block,
+            )
 
             calendar_block = build_calendar_context_prompt_block(
+                self.ctx.get_calendar_type(),
+                business_id=int(bid),
+            )
+            datetime_block = build_datetime_now_prompt_block(
                 self.ctx.get_calendar_type(),
                 business_id=int(bid),
             )
@@ -1131,6 +1158,7 @@ class AIService:
 
             runtime = runtime_sections_from_parts(
                 {
+                    "datetime": datetime_block,
                     "memory": parts.get("memory", ""),
                     "insights": parts.get("insights", ""),
                     "knowledge": parts.get("knowledge", ""),
@@ -1144,7 +1172,7 @@ class AIService:
                 static_core=base_prompt,
                 business_anchor=business_info + calendar_block,
                 execution_block=self._build_execution_prompt_block(
-                    execution_mode, business_id=bid
+                    execution_mode, business_id=bid, user_query=user_query
                 ),
                 plan_block=plan_block,
                 runtime_sections=runtime,
@@ -1152,12 +1180,21 @@ class AIService:
                 business_id=bid,
             )
 
-        from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+        from app.services.ai.ai_calendar_prompt import (
+            build_calendar_context_prompt_block,
+            build_datetime_now_prompt_block,
+        )
+
+        cal_type = self.ctx.get_calendar_type()
+        datetime_block = build_datetime_now_prompt_block(cal_type)
 
         return compose_structured_system_prompt(
             static_core=base_prompt,
-            business_anchor=build_calendar_context_prompt_block(self.ctx.get_calendar_type()),
-            execution_block=self._build_execution_prompt_block(execution_mode),
+            business_anchor=build_calendar_context_prompt_block(cal_type),
+            execution_block=self._build_execution_prompt_block(
+                execution_mode, user_query=user_query
+            ),
+            runtime_sections=(datetime_block,) if datetime_block else (),
             role=role.value,
             business_id=None,
         )
@@ -1195,12 +1232,21 @@ class AIService:
 
         business_id = session_business_id or self.business_id
         if not business_id:
-            from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+            from app.services.ai.ai_calendar_prompt import (
+                build_calendar_context_prompt_block,
+                build_datetime_now_prompt_block,
+            )
 
+            cal_type = self.ctx.get_calendar_type()
             structured = compose_structured_system_prompt(
                 static_core=base_prompt,
-                business_anchor=build_calendar_context_prompt_block(self.ctx.get_calendar_type()),
-                execution_block=self._build_execution_prompt_block(execution_mode),
+                business_anchor=build_calendar_context_prompt_block(cal_type),
+                execution_block=self._build_execution_prompt_block(
+                    execution_mode, user_query=user_query
+                ),
+                runtime_sections=(
+                    build_datetime_now_prompt_block(cal_type),
+                ),
                 role=role_value,
                 business_id=None,
             )
@@ -1386,9 +1432,16 @@ class AIService:
 
         todos_text, plan_block = self._session_todo_prompt_extras(session_id, user_query)
 
-        from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+        from app.services.ai.ai_calendar_prompt import (
+            build_calendar_context_prompt_block,
+            build_datetime_now_prompt_block,
+        )
 
         calendar_block = build_calendar_context_prompt_block(
+            self.ctx.get_calendar_type(),
+            business_id=int(bid),
+        )
+        datetime_block = build_datetime_now_prompt_block(
             self.ctx.get_calendar_type(),
             business_id=int(bid),
         )
@@ -1397,11 +1450,12 @@ class AIService:
             static_core=base_prompt,
             business_anchor=business_info + calendar_block,
             execution_block=self._build_execution_prompt_block(
-                execution_mode, business_id=bid
+                execution_mode, business_id=bid, user_query=user_query
             ),
             plan_block=plan_block,
             runtime_sections=runtime_sections_from_parts(
                 {
+                    "datetime": datetime_block,
                     "memory": parts.get("loading_memory", ""),
                     "insights": parts.get("loading_insights", ""),
                     "knowledge": parts.get("loading_knowledge", ""),
@@ -2273,7 +2327,8 @@ class AIService:
         self._validate_request_model_if_set()
         effective_user_query = user_query or self._last_user_query(messages)
         chat_language = self._resolve_chat_language(
-            session_business_id or self.business_id
+            session_business_id or self.business_id,
+            user_query=effective_user_query,
         )
         _needs_tools_routing = self._routing_needs_tools(
             use_function_calling, effective_user_query, messages
@@ -2448,6 +2503,10 @@ class AIService:
                 (explored/thought) در trace موجود است صدا زده می‌شود — به‌جای
                 نمایش مستقیم markdown خام ابزارها به کاربر (Phase 1).
                 """
+                from app.services.ai.ai_language_prompt import (
+                    build_force_synthesis_user_content,
+                )
+
                 explored_ctx = extract_explored_context_for_synthesis(trace_steps)
                 if not explored_ctx:
                     return None
@@ -2465,11 +2524,9 @@ class AIService:
                 synthesis_messages = list(full_messages) + [
                     {
                         "role": "user",
-                        "content": (
-                            "[force_synthesis]\n"
-                            "بر اساس داده‌های زیر که از ابزارها جمع‌آوری شده، یک "
-                            "پاسخ نهایی مستقیم، خوانا و فارسی برای کاربر بنویس. "
-                            "دیگر از فراخوانی ابزار استفاده نکن:\n\n" + explored_ctx
+                        "content": build_force_synthesis_user_content(
+                            chat_language,
+                            explored_ctx,
                         ),
                     }
                 ]
@@ -2903,6 +2960,21 @@ class AIService:
                     ] or None
 
                 if reasoning_started and round_reasoning.strip():
+                    from app.services.ai.ai_language_prompt import (
+                        reasoning_language_mismatch,
+                    )
+
+                    if reasoning_language_mismatch(
+                        round_reasoning, chat_language
+                    ):
+                        logger.warning(
+                            "[AI Agent][session=%s] reasoning language mismatch "
+                            "(expected=%s iteration=%s preview=%r)",
+                            session_id,
+                            chat_language,
+                            iteration,
+                            round_reasoning.strip()[:120],
+                        )
                     yield _emit_trace(
                         step_id=reasoning_step_id,
                         kind="reasoning",
@@ -3566,18 +3638,18 @@ class AIService:
                                 accumulated_content = synthesized
                                 break
                         if iteration < budget.max_iterations:
+                            from app.services.ai.ai_language_prompt import (
+                                build_agent_synthesize_continue_message,
+                            )
+
                             full_messages.append(
                                 {"role": "assistant", "content": round_text.strip()}
                             )
                             full_messages.append(
                                 {
                                     "role": "user",
-                                    "content": (
-                                        "[agent_synthesize]\n"
-                                        "بر اساس داده‌هایی که از ابزارها جمع شد، "
-                                        "یک پاسخ نهایی مستقیم و خوانا برای کاربر "
-                                        "بنویس. دیگر برنامه‌ریزی یا توضیح قصد "
-                                        "فراخوانی ابزار نده."
+                                    "content": build_agent_synthesize_continue_message(
+                                        chat_language
                                     ),
                                 }
                             )

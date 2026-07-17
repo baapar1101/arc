@@ -125,6 +125,7 @@ def coerce_structured_system_prompt(
 def runtime_sections_from_parts(parts: dict[str, str]) -> List[str]:
     """ترتیب اولویت runtime مطابق trim_system_prompt_sections."""
     return [
+        parts.get("datetime", ""),
         parts.get("memory", ""),
         parts.get("insights", ""),
         parts.get("knowledge", ""),
