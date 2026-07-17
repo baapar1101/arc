@@ -3827,6 +3827,10 @@
     }
   },
   "categoryTreeNoProductsInCategory": "No products in this category",
+  "categoryTreeIncludeSubcategoriesLabel": "Include subcategories",
+  "categoryTreeDirectMembersOnlyLabel": "Direct members only",
+  "categoryTreeIncludesSubcategoriesHint": "Includes products from subcategories",
+  "categoryTreeDirectMembersOnlyHint": "Only products in this category",
   "categoryDescriptionHint": "Optional category description",
   "categorySortOrderLabel": "Display order",
   "categorySortOrderHint": "Sort number (lower appears first)",

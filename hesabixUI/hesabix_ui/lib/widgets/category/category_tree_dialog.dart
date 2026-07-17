@@ -30,6 +30,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   bool _showProducts = false;
   int? _selectedCategoryForProducts;
   bool _loadingProducts = false;
+  bool _includeSubcategories = true;
   List<Map<String, dynamic>> _categoryProducts = const <Map<String, dynamic>>[];
 
   @override
@@ -680,7 +681,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     try {
       final node = findNode(_tree, categoryId);
       final categoryIds = <int>[categoryId];
-      if (node != null) {
+      if (_includeSubcategories && node != null) {
         final allDescendantIds = _collectAllDescendantIds(node);
         categoryIds.addAll(allDescendantIds);
       }
@@ -719,6 +720,12 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     }
   }
 
+  bool _categoryNodeHasChildren(Map<String, dynamic>? node) {
+    if (node == null) return false;
+    final children = node['children'] as List?;
+    return children != null && children.isNotEmpty;
+  }
+
   Widget _buildProductsList(AppLocalizations t) {
     final theme = Theme.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
@@ -727,6 +734,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     if (node != null) {
       categoryName = (node['label'] ?? node['title'] ?? node['name'] ?? t.category).toString();
     }
+    final hasChildCategories = _categoryNodeHasChildren(node);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -735,41 +743,91 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
           elevation: 0,
           color: theme.colorScheme.surfaceContainerHigh.withValues(alpha: 0.65),
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 4),
-            child: Row(
+            padding: EdgeInsets.fromLTRB(isMobile ? 4 : 8, 4, isMobile ? 4 : 8, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                IconButton(
-                  style: IconButton.styleFrom(
-                    foregroundColor: theme.colorScheme.primary,
-                  ),
-                  icon: const Icon(Icons.arrow_forward_rounded),
-                  onPressed: () {
-                    setState(() {
-                      _selectedCategoryForProducts = null;
-                      _categoryProducts = const [];
-                    });
-                  },
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        categoryName,
-                        style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    IconButton(
+                      style: IconButton.styleFrom(
+                        foregroundColor: theme.colorScheme.primary,
                       ),
-                      Text(
-                        '${_categoryProducts.length} ${t.products}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                      icon: const Icon(Icons.arrow_forward_rounded),
+                      onPressed: () {
+                        setState(() {
+                          _selectedCategoryForProducts = null;
+                          _categoryProducts = const [];
+                        });
+                      },
+                      tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            categoryName,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            hasChildCategories
+                                ? (_includeSubcategories
+                                    ? t.categoryTreeIncludesSubcategoriesHint
+                                    : t.categoryTreeDirectMembersOnlyHint)
+                                : t.categoryTreeDirectMembersOnlyHint,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            '${_categoryProducts.length} ${t.products}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (hasChildCategories) ...[
+                  const SizedBox(height: 6),
+                  SegmentedButton<bool>(
+                    showSelectedIcon: false,
+                    style: ButtonStyle(
+                      visualDensity: isMobile ? VisualDensity.compact : VisualDensity.standard,
+                      padding: WidgetStateProperty.all(
+                        EdgeInsets.symmetric(horizontal: isMobile ? 6 : 10, vertical: isMobile ? 6 : 8),
+                      ),
+                    ),
+                    segments: <ButtonSegment<bool>>[
+                      ButtonSegment<bool>(
+                        value: true,
+                        label: Text(
+                          t.categoryTreeIncludeSubcategoriesLabel,
+                          style: theme.textTheme.labelMedium,
+                        ),
+                      ),
+                      ButtonSegment<bool>(
+                        value: false,
+                        label: Text(
+                          t.categoryTreeDirectMembersOnlyLabel,
+                          style: theme.textTheme.labelMedium,
                         ),
                       ),
                     ],
+                    selected: <bool>{_includeSubcategories},
+                    onSelectionChanged: (Set<bool> next) {
+                      final includeSubcategories = next.first;
+                      if (includeSubcategories == _includeSubcategories) return;
+                      setState(() => _includeSubcategories = includeSubcategories);
+                      _loadCategoryProducts(_selectedCategoryForProducts);
+                    },
                   ),
-                ),
+                ],
               ],
             ),
           ),

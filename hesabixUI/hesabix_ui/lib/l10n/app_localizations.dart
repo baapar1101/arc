@@ -18522,6 +18522,30 @@ abstract class AppLocalizations {
   /// **'No products in this category'**
   String get categoryTreeNoProductsInCategory;
 
+  /// No description provided for @categoryTreeIncludeSubcategoriesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Include subcategories'**
+  String get categoryTreeIncludeSubcategoriesLabel;
+
+  /// No description provided for @categoryTreeDirectMembersOnlyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct members only'**
+  String get categoryTreeDirectMembersOnlyLabel;
+
+  /// No description provided for @categoryTreeIncludesSubcategoriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes products from subcategories'**
+  String get categoryTreeIncludesSubcategoriesHint;
+
+  /// No description provided for @categoryTreeDirectMembersOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only products in this category'**
+  String get categoryTreeDirectMembersOnlyHint;
+
   /// No description provided for @categoryDescriptionHint.
   ///
   /// In en, this message translates to:

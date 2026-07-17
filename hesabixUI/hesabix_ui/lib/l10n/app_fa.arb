@@ -3869,6 +3869,10 @@
     }
   },
   "categoryTreeNoProductsInCategory": "کالایی در این دسته‌بندی یافت نشد",
+  "categoryTreeIncludeSubcategoriesLabel": "شامل زیردسته‌ها",
+  "categoryTreeDirectMembersOnlyLabel": "فقط اعضای مستقیم",
+  "categoryTreeIncludesSubcategoriesHint": "شامل کالاهای زیردسته‌ها",
+  "categoryTreeDirectMembersOnlyHint": "فقط کالاهای این دسته",
   "categoryDescriptionHint": "توضیحات اختیاری دسته‌بندی",
   "categorySortOrderLabel": "ترتیب نمایش",
   "categorySortOrderHint": "عدد ترتیب نمایش (کمتر = بالاتر)",

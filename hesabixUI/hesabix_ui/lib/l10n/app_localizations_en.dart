@@ -9946,6 +9946,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryTreeNoProductsInCategory => 'No products in this category';
 
   @override
+  String get categoryTreeIncludeSubcategoriesLabel => 'Include subcategories';
+
+  @override
+  String get categoryTreeDirectMembersOnlyLabel => 'Direct members only';
+
+  @override
+  String get categoryTreeIncludesSubcategoriesHint => 'Includes products from subcategories';
+
+  @override
+  String get categoryTreeDirectMembersOnlyHint => 'Only products in this category';
+
+  @override
   String get categoryDescriptionHint => 'Optional category description';
 
   @override

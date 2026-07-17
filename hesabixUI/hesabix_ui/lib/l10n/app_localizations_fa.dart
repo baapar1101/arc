@@ -9886,6 +9886,18 @@ class AppLocalizationsFa extends AppLocalizations {
       'کالایی در این دسته‌بندی یافت نشد';
 
   @override
+  String get categoryTreeIncludeSubcategoriesLabel => 'شامل زیردسته‌ها';
+
+  @override
+  String get categoryTreeDirectMembersOnlyLabel => 'فقط اعضای مستقیم';
+
+  @override
+  String get categoryTreeIncludesSubcategoriesHint => 'شامل کالاهای زیردسته‌ها';
+
+  @override
+  String get categoryTreeDirectMembersOnlyHint => 'فقط کالاهای این دسته';
+
+  @override
   String get categoryDescriptionHint => 'توضیحات اختیاری دسته‌بندی';
 
   @override
