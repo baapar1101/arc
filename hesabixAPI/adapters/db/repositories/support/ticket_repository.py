@@ -314,23 +314,8 @@ class TicketRepository(BaseRepository[Ticket]):
                     elif str(filter_item.value).lower() in ("false", "0"):
                         query = query.filter(Ticket.sla_breached.is_(False))
         
-        # اعمال جستجو
-        if query_info.search and query_info.search_fields:
-            search_conditions = []
-            for field in query_info.search_fields:
-                if hasattr(Ticket, field):
-                    search_conditions.append(getattr(Ticket, field).ilike(f"%{query_info.search}%"))
-                elif field == "user_email" and hasattr(Ticket.user, "email"):
-                    search_conditions.append(Ticket.user.email.ilike(f"%{query_info.search}%"))
-                elif field == "user_name":
-                    search_conditions.append(
-                        or_(
-                            Ticket.user.first_name.ilike(f"%{query_info.search}%"),
-                            Ticket.user.last_name.ilike(f"%{query_info.search}%")
-                        )
-                    )
-            if search_conditions:
-                query = query.filter(or_(*search_conditions))
+        # اعمال جستجو (عنوان، توضیحات، کاربر، شماره تیکت)
+        query = self._apply_operator_search(query, query_info)
         
         # شمارش کل
         total = query.count()
@@ -349,6 +334,54 @@ class TicketRepository(BaseRepository[Ticket]):
         query = query.offset(query_info.skip).limit(query_info.take)
         
         return query.all(), total
+
+    def _apply_operator_search(self, query, query_info: QueryInfo):
+        """جستجوی اپراتور: title/description/user + شماره تیکت (بدون join تکراری)."""
+        raw = (query_info.search or "").strip()
+        if not raw:
+            return query
+
+        fields = list(query_info.search_fields or [])
+        search_conditions = []
+        term = raw
+        id_candidate = term[1:] if term.startswith("#") else term
+        if id_candidate.isdigit():
+            search_conditions.append(Ticket.id == int(id_candidate))
+
+        pattern = f"%{term}%"
+        effective_fields = fields or [
+            "title",
+            "description",
+            "user.email",
+            "user.first_name",
+            "user.last_name",
+        ]
+        for field in effective_fields:
+            if field == "title" and hasattr(Ticket, "title"):
+                search_conditions.append(Ticket.title.ilike(pattern))
+            elif field == "description" and hasattr(Ticket, "description"):
+                search_conditions.append(Ticket.description.ilike(pattern))
+            elif field in ("user_email", "user.email"):
+                search_conditions.append(Ticket.user.has(User.email.ilike(pattern)))
+            elif field == "user.first_name":
+                search_conditions.append(Ticket.user.has(User.first_name.ilike(pattern)))
+            elif field == "user.last_name":
+                search_conditions.append(Ticket.user.has(User.last_name.ilike(pattern)))
+            elif field == "user_name":
+                search_conditions.append(
+                    or_(
+                        Ticket.user.has(User.first_name.ilike(pattern)),
+                        Ticket.user.has(User.last_name.ilike(pattern)),
+                    )
+                )
+            elif hasattr(Ticket, field):
+                col = getattr(Ticket, field)
+                if hasattr(col, "ilike"):
+                    search_conditions.append(col.ilike(pattern))
+
+        if search_conditions:
+            query = query.filter(or_(*search_conditions))
+        return query
     
     def update_ticket_status(self, ticket_id: int, status_id: int, operator_id: Optional[int] = None) -> Optional[Ticket]:
         """تغییر وضعیت تیکت"""

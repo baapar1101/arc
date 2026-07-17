@@ -1314,6 +1314,24 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: '/user/profile/operator/tickets/:ticketId',
+              name: 'profile_operator_ticket_detail',
+              builder: (context, state) {
+                if (_authStore == null || !_authStore!.canAccessSupportOperator) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                final ticketId = int.tryParse(state.pathParameters['ticketId'] ?? '') ?? 0;
+                if (ticketId <= 0) {
+                  return PermissionGuard.buildAccessDeniedPage();
+                }
+                return SupportTicketDetailPage(
+                  ticketId: ticketId,
+                  calendarController: _calendarController,
+                  isOperator: true,
+                );
+              },
+            ),
+            GoRoute(
               path: '/user/profile/operator/dashboard',
               name: 'profile_operator_dashboard',
               builder: (context, state) {

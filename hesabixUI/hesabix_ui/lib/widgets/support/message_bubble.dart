@@ -49,8 +49,9 @@ class MessageBubble extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Container(
-              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.72),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: _bubbleColor(theme, colors, alignEnd, isInternal),
@@ -155,6 +156,7 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
             ),
           ),
           if (alignEnd) ...[

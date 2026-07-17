@@ -82,7 +82,7 @@ class TicketMetaSidebar extends StatelessWidget {
                   trailing: const Icon(Icons.chevron_left, size: 18),
                   onTap: () {
                     final id = t['id'];
-                    if (id is int) context.push('/user/profile/operator?ticket=$id');
+                    if (id is int) context.push('/user/profile/operator/tickets/$id');
                   },
                 ),
               ),

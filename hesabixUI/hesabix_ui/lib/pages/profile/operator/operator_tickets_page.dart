@@ -10,15 +10,18 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
-import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 import 'package:hesabix_ui/services/support_realtime_service.dart';
 import 'package:hesabix_ui/widgets/support/sla_indicator.dart';
 import 'package:hesabix_ui/widgets/support/operator_command_palette.dart';
 import 'package:hesabix_ui/widgets/support/operator_inbox_list.dart';
+import 'package:hesabix_ui/widgets/support/operator_inbox_splitter.dart';
 
 enum OperatorInboxDisplayMode { list, table }
+
+/// Breakpoint for split inbox + detail workspace.
+const kOperatorSplitBreakpoint = 960.0;
 
 class OperatorTicketsPage extends StatefulWidget {
   final CalendarController? calendarController;
@@ -49,6 +52,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   bool _isSuperAdmin = false;
   int? _currentUserId;
   bool? _lastMessageFromUser;
+  bool _selectionMode = false;
 
   SupportTicket? _selectedTicket;
   bool _selectedTicketLoading = false;
@@ -56,6 +60,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
 
   SupportRealtimeService? _realtime;
   Timer? _pollTimer;
+  DateTime? _lastRealtimeAt;
+  DateTime? _lastRefreshBump;
+  Timer? _refreshThrottle;
 
   OperatorInboxView _inboxView = OperatorInboxView.all;
   OperatorInboxDisplayMode _displayMode = OperatorInboxDisplayMode.list;
@@ -72,22 +79,58 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     _connectRealtime();
     final ticketId = widget.initialTicketId;
     if (ticketId != null && ticketId > 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _openTicketInSplitView(ticketId));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final wide = MediaQuery.sizeOf(context).width >= kOperatorSplitBreakpoint;
+        if (wide) {
+          _openTicketInSplitView(ticketId);
+        } else {
+          context.push('/user/profile/operator/tickets/$ticketId');
+        }
+      });
     }
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _refreshThrottle?.cancel();
     _realtime?.disconnect();
     super.dispose();
   }
 
   void _startPolling() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) _safeSetState(() => _refreshCounter++);
+    // Soft backup refresh. Skip when realtime events arrived recently.
+    _pollTimer = Timer.periodic(const Duration(seconds: 90), (_) {
+      if (!mounted) return;
+      final last = _lastRealtimeAt;
+      if (last != null && DateTime.now().difference(last) < const Duration(seconds: 45)) {
+        return;
+      }
+      _bumpRefresh(immediate: true);
     });
+  }
+
+  void _bumpRefresh({bool immediate = false}) {
+    if (!mounted) return;
+    if (immediate) {
+      setState(() => _refreshCounter++);
+      _lastRefreshBump = DateTime.now();
+      return;
+    }
+    final last = _lastRefreshBump;
+    if (last != null && DateTime.now().difference(last) < const Duration(seconds: 2)) {
+      _refreshThrottle?.cancel();
+      _refreshThrottle = Timer(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        setState(() => _refreshCounter++);
+        _lastRefreshBump = DateTime.now();
+      });
+      return;
+    }
+    setState(() => _refreshCounter++);
+    _lastRefreshBump = DateTime.now();
   }
 
   void _connectRealtime() {
@@ -99,8 +142,13 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       onEvent: (event) {
         if ('${event['type']}' != 'support') return;
         if (!mounted) return;
-        _safeSetState(() => _refreshCounter++);
-        if (event['ticket_id'] == _selectedTicketId) _reloadSelectedTicket();
+        _lastRealtimeAt = DateTime.now();
+        // Silent list refresh (OperatorInboxList keeps items visible).
+        _bumpRefresh();
+        final eventTicketId = event['ticket_id'];
+        if (eventTicketId is int && eventTicketId == _selectedTicketId) {
+          _reloadSelectedTicket();
+        }
       },
     );
   }
@@ -157,6 +205,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       final result = await _supportService.bulkAssignTickets(_selectedRows.toList(), _currentUserId!);
       _safeSetState(() {
         _selectedRows.clear();
+        _selectionMode = false;
         _refreshCounter++;
       });
       if (mounted) {
@@ -178,7 +227,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     if (ticketId is! int || _currentUserId == null) return;
     try {
       await _supportService.assignTicket(ticketId, AssignTicketRequest(operatorId: _currentUserId!));
-      _safeSetState(() => _refreshCounter++);
+      _bumpRefresh();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('تیکت #$ticketId به شما تخصیص داده شد'), backgroundColor: Colors.green),
@@ -198,6 +247,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لطفاً حداقل یک تیکت انتخاب کنید')));
       return;
     }
+    if (_statuses.isEmpty) return;
     final resolvedStatus = _statuses.firstWhere(
       (s) => s.name.toLowerCase().contains('حل') || s.name.toLowerCase().contains('resolved'),
       orElse: () => _statuses.firstWhere((s) => s.isFinal, orElse: () => _statuses.last),
@@ -210,6 +260,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       );
       _safeSetState(() {
         _selectedRows.clear();
+        _selectionMode = false;
         _refreshCounter++;
       });
       if (mounted) {
@@ -226,30 +277,29 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     }
   }
 
+  bool get _isWide => MediaQuery.sizeOf(context).width >= kOperatorSplitBreakpoint;
+
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
     final ticketId = ticketData['id'];
     if (ticketId is! int) return;
-    if (MediaQuery.of(context).size.width >= 900) {
+    if (_isWide) {
       _openTicketInSplitView(ticketId);
       return;
     }
-    showDialog(
-      context: context,
-      builder: (context) => TicketDetailsDialog(
-        ticket: SupportTicket.fromJson(ticketData),
-        isOperator: true,
-        calendarController: widget.calendarController,
-        onTicketUpdated: () => _safeSetState(() => _refreshCounter++),
-      ),
-    );
+    context.push('/user/profile/operator/tickets/$ticketId');
   }
 
   Future<void> _openTicketInSplitView(int ticketId) async {
+    if (_selectedTicketId == ticketId && _selectedTicket != null) return;
+    final previousId = _selectedTicketId;
     _safeSetState(() {
       _selectedTicketId = ticketId;
       _selectedTicket = null;
       _selectedTicketLoading = true;
     });
+    if (previousId != null && previousId != ticketId) {
+      _realtime?.unsubscribeTicket(previousId);
+    }
     _realtime?.subscribeTicket(ticketId);
     try {
       final ticket = await _supportService.getOperatorTicket(ticketId);
@@ -314,7 +364,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       context,
       OperatorCommandPalette(
         onSelectView: (view) => _safeSetState(() => _inboxView = view),
-        onRefresh: () => _safeSetState(() => _refreshCounter++),
+        onRefresh: _bumpRefresh,
         onAssignToMe: () {
           if (_selectedTicketId != null) {
             _safeSetState(() => _selectedRows = {_selectedTicketId!});
@@ -327,7 +377,13 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
           }
           _markResolved();
         },
-        onOpenTicket: _openTicketInSplitView,
+        onOpenTicket: (id) {
+          if (_isWide) {
+            _openTicketInSplitView(id);
+          } else {
+            context.push('/user/profile/operator/tickets/$id');
+          }
+        },
         onGoDashboard: () => context.push('/user/profile/operator/dashboard'),
       ),
     );
@@ -351,6 +407,25 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         ),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن'))],
       ),
+    );
+  }
+
+  Widget _buildInboxList() {
+    final selectionOn = _selectionMode || _selectedRows.isNotEmpty;
+    return OperatorInboxList(
+      view: _inboxView,
+      currentUserId: _currentUserId,
+      selectedTicketId: _selectedTicketId,
+      refreshToken: _refreshCounter,
+      calendarController: widget.calendarController,
+      extraFilters: _extraFilters(),
+      onTicketTap: _navigateToTicketDetail,
+      selectionEnabled: selectionOn,
+      selectedIds: _selectedRows,
+      onSelectionChanged: (ids) => _safeSetState(() {
+        _selectedRows = ids;
+        if (ids.isEmpty) _selectionMode = false;
+      }),
     );
   }
 
@@ -382,29 +457,18 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final useSplit = constraints.maxWidth >= 960;
-                    final inbox = _displayMode == OperatorInboxDisplayMode.list
-                        ? OperatorInboxList(
-                            view: _inboxView,
-                            currentUserId: _currentUserId,
-                            selectedTicketId: _selectedTicketId,
-                            refreshToken: _refreshCounter,
-                            calendarController: widget.calendarController,
-                            extraFilters: _extraFilters(),
-                            onTicketTap: _navigateToTicketDetail,
-                          )
-                        : _buildTicketsTable();
-
-                    if (!useSplit) return inbox;
-
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(width: 300, child: inbox),
-                        VerticalDivider(width: 1, color: theme.dividerColor),
-                        Expanded(child: _buildSplitDetailPanel()),
-                      ],
-                    );
+                    final useSplit = constraints.maxWidth >= kOperatorSplitBreakpoint;
+                    // Split workspace always uses dense list; table is full-width only.
+                    if (useSplit) {
+                      return OperatorInboxSplitter(
+                        left: _buildInboxList(),
+                        right: _buildSplitDetailPanel(),
+                      );
+                    }
+                    if (_displayMode == OperatorInboxDisplayMode.table) {
+                      return _buildTicketsTable();
+                    }
+                    return _buildInboxList();
                   },
                 ),
               ),
@@ -419,17 +483,31 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
+                Icon(Icons.support_agent, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 6),
                 Text(
                   t.operatorPanel,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
+                IconButton(
+                  tooltip: _selectionMode ? 'لغو انتخاب' : 'انتخاب چندتایی',
+                  icon: Icon(
+                    _selectionMode ? Icons.checklist_rtl : Icons.checklist,
+                    size: 20,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _safeSetState(() {
+                    _selectionMode = !_selectionMode;
+                    if (!_selectionMode) _selectedRows.clear();
+                  }),
+                ),
                 IconButton(
                   tooltip: 'پالت دستورات (Ctrl+K)',
                   icon: const Icon(Icons.search, size: 20),
@@ -446,7 +524,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                   tooltip: 'بروزرسانی',
                   icon: const Icon(Icons.refresh, size: 20),
                   visualDensity: VisualDensity.compact,
-                  onPressed: () => _safeSetState(() => _refreshCounter++),
+                  onPressed: _bumpRefresh,
                 ),
                 IconButton(
                   tooltip: 'داشبورد',
@@ -456,7 +534,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Row(
               children: [
                 Expanded(
@@ -467,12 +545,14 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                         final selected = _inboxView == view;
                         return Padding(
                           padding: const EdgeInsets.only(left: 4),
-                          child: FilterChip(
+                          child: ChoiceChip(
                             avatar: Icon(view.icon, size: 14),
-                            label: Text(view.label, style: const TextStyle(fontSize: 12)),
+                            label: Text(view.label, style: const TextStyle(fontSize: 11)),
                             selected: selected,
-                            visualDensity: VisualDensity.compact,
+                            visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
                             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            labelPadding: const EdgeInsets.only(left: 2, right: 4),
                             onSelected: (_) => _safeSetState(() => _inboxView = view),
                           ),
                         );
@@ -480,16 +560,19 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
+                // Hide table toggle in narrow split contexts — still available on mobile full-width.
                 SegmentedButton<OperatorInboxDisplayMode>(
                   segments: const [
                     ButtonSegment(
                       value: OperatorInboxDisplayMode.list,
                       icon: Icon(Icons.view_list, size: 16),
+                      tooltip: 'لیست',
                     ),
                     ButtonSegment(
                       value: OperatorInboxDisplayMode.table,
                       icon: Icon(Icons.table_rows, size: 16),
+                      tooltip: 'جدول',
                     ),
                   ],
                   selected: {_displayMode},
@@ -507,10 +590,18 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
+                    Text(
+                      '${_selectedRows.length} انتخاب‌شده',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     FilledButton.tonalIcon(
                       onPressed: _assignToMe,
                       icon: const Icon(Icons.person_add_outlined, size: 16),
-                      label: Text('تخصیص (${_selectedRows.length})'),
+                      label: const Text('تخصیص به من'),
                       style: FilledButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -520,7 +611,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                     FilledButton.tonalIcon(
                       onPressed: _markResolved,
                       icon: const Icon(Icons.check_circle_outline, size: 16),
-                      label: Text('حل‌شده (${_selectedRows.length})'),
+                      label: const Text('حل‌شده'),
                       style: FilledButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -531,13 +622,21 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                       FilledButton.tonalIcon(
                         onPressed: () => _deleteTicket(_selectedRows.first),
                         icon: const Icon(Icons.delete_outline, size: 16),
-                        label: Text('حذف (${_selectedRows.length})'),
+                        label: const Text('حذف'),
                         style: FilledButton.styleFrom(
                           visualDensity: VisualDensity.compact,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                     ],
+                    const SizedBox(width: 6),
+                    TextButton(
+                      onPressed: () => _safeSetState(() {
+                        _selectedRows.clear();
+                        _selectionMode = false;
+                      }),
+                      child: const Text('لغو'),
+                    ),
                   ],
                 ),
               ),
@@ -555,7 +654,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.inbox_outlined, size: 48, color: theme.colorScheme.outline),
+            Icon(Icons.inbox_outlined, size: 44, color: theme.colorScheme.outlineVariant),
             const SizedBox(height: 10),
             Text('تیکتی انتخاب نشده', style: theme.textTheme.titleSmall),
             const SizedBox(height: 4),
@@ -568,7 +667,13 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       );
     }
     if (_selectedTicketLoading || _selectedTicket == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      );
     }
     return TicketDetailsDialog(
       key: ValueKey(_selectedTicket!.id),
@@ -577,36 +682,58 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       calendarController: widget.calendarController,
       displayMode: TicketDetailDisplayMode.embedded,
       onTicketUpdated: () {
-        _safeSetState(() => _refreshCounter++);
+        _bumpRefresh();
         _reloadSelectedTicket();
       },
     );
   }
 
   Widget _buildTicketsTable() {
+    // Soft refresh: do NOT remount via ValueKey on every counter tick.
     return DataTableWidget<Map<String, dynamic>>(
-      key: ValueKey('data_table_$_refreshCounter'),
+      key: const ValueKey('operator_tickets_table'),
       config: DataTableConfig<Map<String, dynamic>>(
         title: null,
         endpoint: '/api/v1/support/operator/tickets/search',
         columns: [
           TextColumn('title', 'عنوان', sortable: true, searchable: true, width: ColumnWidth.large),
           TextColumn('user.first_name', 'کاربر', sortable: true, searchable: true, width: ColumnWidth.medium),
-          TextColumn('category.name', 'دسته', sortable: true, width: ColumnWidth.medium,
-              filterType: ColumnFilterType.multiSelect,
-              filterOptions: _categories.map((c) => FilterOption(value: c.name, label: c.name)).toList()),
-          TextColumn('priority.name', 'اولویت', sortable: true, width: ColumnWidth.small,
-              filterType: ColumnFilterType.multiSelect,
-              filterOptions: _priorities.map((p) => FilterOption(value: p.name, label: p.name)).toList()),
-          TextColumn('status.name', 'وضعیت', sortable: true, width: ColumnWidth.small,
-              filterType: ColumnFilterType.multiSelect,
-              filterOptions: _statuses.map((s) => FilterOption(value: s.name, label: s.name)).toList()),
+          TextColumn(
+            'category.name',
+            'دسته',
+            sortable: true,
+            width: ColumnWidth.medium,
+            filterType: ColumnFilterType.multiSelect,
+            filterOptions: _categories.map((c) => FilterOption(value: c.name, label: c.name)).toList(),
+          ),
+          TextColumn(
+            'priority.name',
+            'اولویت',
+            sortable: true,
+            width: ColumnWidth.small,
+            filterType: ColumnFilterType.multiSelect,
+            filterOptions: _priorities.map((p) => FilterOption(value: p.name, label: p.name)).toList(),
+          ),
+          TextColumn(
+            'status.name',
+            'وضعیت',
+            sortable: true,
+            width: ColumnWidth.small,
+            filterType: ColumnFilterType.multiSelect,
+            filterOptions: _statuses.map((s) => FilterOption(value: s.name, label: s.name)).toList(),
+          ),
           TextColumn('assigned_operator.first_name', 'اپراتور', sortable: true, width: ColumnWidth.medium),
           DateColumn('updated_at', 'بروزرسانی', sortable: true, width: ColumnWidth.medium, showTime: false),
-          TextColumn('sla', 'SLA', sortable: false, searchable: false, width: ColumnWidth.small,
-              formatter: (item) => item is Map<String, dynamic> ? slaStatusLabel(slaStatusFromRow(item)) : ''),
+          TextColumn(
+            'sla',
+            'SLA',
+            sortable: false,
+            searchable: false,
+            width: ColumnWidth.small,
+            formatter: (item) => item is Map<String, dynamic> ? slaStatusLabel(slaStatusFromRow(item)) : '',
+          ),
         ],
-        searchFields: ['title', 'description', 'user.first_name', 'user.email'],
+        searchFields: operatorInboxSearchFields,
         filterFields: ['title', 'category.name', 'priority.name', 'status.name', 'assigned_operator.first_name', 'created_at'],
         dateRangeField: 'created_at',
         showSearch: true,

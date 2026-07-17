@@ -63,15 +63,28 @@ class _SupportTicketDetailPageState extends State<SupportTicketDetailPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        appBar: AppBar(title: Text('تیکت #${widget.ticketId}')),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        body: Center(
+          child: SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+        ),
       );
     }
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: Text('تیکت #${widget.ticketId}')),
+        appBar: AppBar(
+          title: Text('تیکت #${widget.ticketId}'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.go(
+              widget.isOperator ? '/user/profile/operator' : '/user/profile/support',
+            ),
+          ),
+        ),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -79,8 +92,10 @@ class _SupportTicketDetailPageState extends State<SupportTicketDetailPage> {
               Text(_error!),
               const SizedBox(height: 16),
               FilledButton(
-                onPressed: () => context.go('/user/profile/support'),
-                child: const Text('بازگشت به پشتیبانی'),
+                onPressed: () => context.go(
+                  widget.isOperator ? '/user/profile/operator' : '/user/profile/support',
+                ),
+                child: Text(widget.isOperator ? 'بازگشت به صندوق ورودی' : 'بازگشت به پشتیبانی'),
               ),
             ],
           ),
@@ -95,7 +110,14 @@ class _SupportTicketDetailPageState extends State<SupportTicketDetailPage> {
         isOperator: widget.isOperator,
         calendarController: widget.calendarController,
         displayMode: TicketDetailDisplayMode.page,
-        onTicketUpdated: _loadTicket,
+        onTicketUpdated: () async {
+          try {
+            final ticket = widget.isOperator
+                ? await _supportService.getOperatorTicket(widget.ticketId)
+                : await _supportService.getTicket(widget.ticketId);
+            if (mounted) setState(() => _ticket = ticket);
+          } catch (_) {}
+        },
         onRequestCsat: widget.isOperator ? null : () => _maybeShowCsat(),
       ),
     );

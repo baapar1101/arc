@@ -117,7 +117,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
         if (event['ticket_id'] != _ticket.id) return;
         if (!mounted) return;
         if (event['event'] == 'message.created') {
-          _loadMessages();
+          _loadMessages(silent: true);
         } else {
           _reloadTicket();
         }
@@ -385,11 +385,14 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     });
   }
 
-  Future<void> _loadMessages() async {
+  Future<void> _loadMessages({bool silent = false}) async {
     if (_isLoading) return;
 
     setState(() {
       _isLoading = true;
+      if (!silent) {
+        // Keep existing messages visible during silent refresh.
+      }
     });
 
     try {
@@ -399,29 +402,33 @@ class _TicketDetailViewState extends State<TicketDetailView> {
         isOperator: widget.isOperator,
       );
       
+      if (!mounted) return;
       setState(() {
         _messages = messages;
         _isLoading = false;
       });
 
-      // Scroll to bottom
+      // Scroll to bottom only on first load or when near bottom
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients) {
+        if (!_scrollController.hasClients) return;
+        final pos = _scrollController.position;
+        final nearBottom = pos.maxScrollExtent - pos.pixels < 120;
+        if (!silent || nearBottom || _messages.length <= 3) {
           _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
+            pos.maxScrollExtent,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
           );
         }
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
       
-      if (mounted) {
+      if (mounted && !silent) {
         final l10n = AppLocalizations.of(context);
-        // Show error message using Overlay to appear above dialog
         _showOverlayMessage(
           l10n.ticketLoadingError,
           Colors.red,
@@ -514,15 +521,29 @@ class _TicketDetailViewState extends State<TicketDetailView> {
 
 
   Widget _buildCompactOperatorHeader(ThemeData theme, AppLocalizations l10n) {
+    final showBack = widget.displayMode == TicketDetailDisplayMode.page;
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.6))),
         ),
         child: Row(
           children: [
+            if (showBack)
+              IconButton(
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/user/profile/operator');
+                  }
+                },
+                icon: const Icon(Icons.arrow_back_rounded, size: 20),
+                tooltip: 'بازگشت به صندوق',
+                visualDensity: VisualDensity.compact,
+              ),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -542,7 +563,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                         style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                       ),
                       const SizedBox(width: 8),
-                      SlaIndicator(slaStatus: _ticket.slaStatus),
+                      SlaIndicator(slaStatus: _ticket.slaStatus, compact: true),
                     ],
                   ),
                 ],
@@ -691,7 +712,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
             _messageController.text = suggestedReply;
           },
           onAutoReply: (replyText) {
-            _loadMessages();
+            _loadMessages(silent: true);
             widget.onTicketUpdated?.call();
           },
         ),
@@ -880,7 +901,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                   subtitle: Text('${t['status'] ?? ''}'),
                   onTap: () {
                     final id = t['id'];
-                    if (id is int) context.push('/user/profile/operator?ticket=$id');
+                    if (id is int) context.push('/user/profile/operator/tickets/$id');
                   },
                 ),
               ),
@@ -900,7 +921,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     final isDialog = widget.displayMode == TicketDetailDisplayMode.dialog;
     final isPage = widget.displayMode == TicketDetailDisplayMode.page;
     final compactUser = !widget.isOperator && (isEmbedded || isPage);
-    final compactOperator = widget.isOperator && isEmbedded;
+    final compactOperator = widget.isOperator && (isEmbedded || isPage);
     final useCompactChrome = compactUser || compactOperator;
 
     final body = Container(
@@ -1083,39 +1104,55 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                 padding: EdgeInsets.symmetric(horizontal: useCompactChrome ? 6 : 16),
                 child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final showSidePanel = widget.isOperator && !isEmbedded && constraints.maxWidth > 900;
-                  final showMetaInThread = compactOperator;
+                  // Side meta panel for operator when detail pane is wide enough
+                  // (including embedded split view on large screens).
+                  final showSidePanel = widget.isOperator && constraints.maxWidth > 720;
+                  final showMetaInThread = compactOperator && !showSidePanel;
                   final showAiInThread = widget.isOperator && !showSidePanel;
 
                   Widget buildThread() {
-                    if (_isLoading) {
-                      return const Center(child: CircularProgressIndicator());
+                    if (_isLoading && _messages.isEmpty) {
+                      return const Center(
+                        child: SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 2.5),
+                        ),
+                      );
                     }
-                    return Scrollbar(
-                      controller: _scrollController,
-                      thumbVisibility: true,
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        primary: false,
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-                        itemCount: _listItemCount(
-                          showSidePanel: showSidePanel,
-                          compactUser: compactUser,
-                          showMetaInThread: showMetaInThread,
-                          showAiInThread: showAiInThread,
+                    return Column(
+                      children: [
+                        if (_isLoading && _messages.isNotEmpty)
+                          const LinearProgressIndicator(minHeight: 2),
+                        Expanded(
+                          child: Scrollbar(
+                            controller: _scrollController,
+                            thumbVisibility: true,
+                            child: ListView.builder(
+                              controller: _scrollController,
+                              primary: false,
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                              itemCount: _listItemCount(
+                                showSidePanel: showSidePanel,
+                                compactUser: compactUser,
+                                showMetaInThread: showMetaInThread,
+                                showAiInThread: showAiInThread,
+                              ),
+                              itemBuilder: (context, index) => _buildListItem(
+                                context,
+                                index,
+                                showSidePanel,
+                                l10n,
+                                theme,
+                                compactUser: compactUser,
+                                showMetaInThread: showMetaInThread,
+                                showAiInThread: showAiInThread,
+                              ),
+                            ),
+                          ),
                         ),
-                        itemBuilder: (context, index) => _buildListItem(
-                          context,
-                          index,
-                          showSidePanel,
-                          l10n,
-                          theme,
-                          compactUser: compactUser,
-                          showMetaInThread: showMetaInThread,
-                          showAiInThread: showAiInThread,
-                        ),
-                      ),
+                      ],
                     );
                   }
 
