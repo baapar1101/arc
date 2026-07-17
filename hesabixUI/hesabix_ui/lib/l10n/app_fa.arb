@@ -1487,6 +1487,7 @@
   "apiErrorBusinessUsersOwnerCannotLeave": "مالک کسب و کار نمی‌تواند از کسب و کار خارج شود. برای حذف کسب و کار از بخش تنظیمات استفاده کنید.",
   "apiErrorBusinessUsersNotAMemberLeave": "شما عضو این کسب و کار نیستید.",
   "apiErrorBusinessUsersLeaveFailed": "خطا در خروج از کسب و کار.",
+  "apiErrorLegacyAccproRequired": "برای انجام این کار، افزونه «حسابداری پیشرفته» را در نسخه قدیم حسابیکس فعال یا تمدید کنید.",
   "apiErrorNoFiscalYearForDate": "سال مالی‌ای برای این تاریخ تعریف نشده است.",
   "apiErrorFiscalYearRangeOverlap": "بازهٔ انتخاب‌شده با سال مالی دیگری همپوشانی دارد.",
   "apiErrorFiscalYearLockedForPosting": "سال مالی بسته است و امکان ثبت سند وجود ندارد.",

@@ -11,9 +11,14 @@ export 'support_realtime_service_stub.dart';
 class WebSupportRealtimeService implements SupportRealtimeService {
   web.WebSocket? _ws;
   void Function(Map<String, dynamic>)? _onEvent;
+  void Function(bool connected)? _onStatus;
   String? _apiKey;
   Timer? _reconnectTimer;
   bool _manualDisconnect = false;
+
+  void _setConnected(bool value) {
+    _onStatus?.call(value);
+  }
 
   void _scheduleReconnect() {
     if (_manualDisconnect) return;
@@ -21,20 +26,26 @@ class WebSupportRealtimeService implements SupportRealtimeService {
     _reconnectTimer = Timer(const Duration(seconds: 5), () {
       final key = _apiKey;
       if (key == null || key.isEmpty || _manualDisconnect) return;
-      connect(apiKey: key, onEvent: _onEvent);
+      connect(apiKey: key, onEvent: _onEvent, onStatus: _onStatus);
     });
   }
 
   @override
-  void connect({required String apiKey, void Function(Map<String, dynamic>)? onEvent}) {
+  void connect({
+    required String apiKey,
+    void Function(Map<String, dynamic>)? onEvent,
+    void Function(bool connected)? onStatus,
+  }) {
     _apiKey = apiKey;
     _onEvent = onEvent;
+    _onStatus = onStatus;
     _manualDisconnect = false;
     _reconnectTimer?.cancel();
     try {
       _ws?.close();
     } catch (_) {}
     _ws = null;
+    _setConnected(false);
 
     try {
       final apiBase = AppConfig.apiBaseUrl;
@@ -45,6 +56,7 @@ class WebSupportRealtimeService implements SupportRealtimeService {
       _ws = web.WebSocket(url);
       _ws!.onOpen.listen((_) {
         _ws!.send(jsonEncode(<String, String>{'type': 'auth', 'api_key': apiKey}).toJS);
+        _setConnected(true);
       });
       _ws!.onMessage.listen((web.MessageEvent e) {
         try {
@@ -57,14 +69,17 @@ class WebSupportRealtimeService implements SupportRealtimeService {
       });
       _ws!.onClose.listen((_) {
         _ws = null;
+        _setConnected(false);
         _scheduleReconnect();
       });
       _ws!.onError.listen((_) {
         _ws = null;
+        _setConnected(false);
         _scheduleReconnect();
       });
     } catch (_) {
       _ws = null;
+      _setConnected(false);
       _scheduleReconnect();
     }
   }
@@ -93,6 +108,7 @@ class WebSupportRealtimeService implements SupportRealtimeService {
       _ws?.close();
     } catch (_) {}
     _ws = null;
+    _setConnected(false);
   }
 }
 

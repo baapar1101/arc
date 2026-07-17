@@ -22,6 +22,30 @@ from app.services.legacy_import.mappers import normalize_server_url
 
 logger = logging.getLogger(__name__)
 
+LEGACY_ACCPRO_REQUIRED_MESSAGE = (
+    "برای انجام این کار، افزونه «حسابداری پیشرفته» را در نسخه قدیم حسابیکس فعال یا تمدید کنید."
+)
+
+
+def legacy_response_indicates_accpro_required(body: str) -> bool:
+    """True when legacy Hesabix v1 rejected the call due to inactive accpro plugin."""
+    text = (body or "").strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    if "accpro" in lowered:
+        return True
+    return "حسابداری پیشرفته" in text
+
+
+def _raise_accpro_required(*, context: str, legacy_message: str | None = None) -> None:
+    raise ApiError(
+        "LEGACY_ACCPRO_REQUIRED",
+        LEGACY_ACCPRO_REQUIRED_MESSAGE,
+        http_status=400,
+        details={"context": context, "legacy_message": legacy_message},
+    )
+
 
 class LegacyApiClient:
     """HTTP client for Hesabix v1 (legacy) REST API."""
@@ -75,9 +99,11 @@ class LegacyApiClient:
         )
 
     def _raise_for_status(self, response: httpx.Response, *, context: str) -> None:
+        body_preview = (response.text or "")[:500]
+        if legacy_response_indicates_accpro_required(body_preview):
+            _raise_accpro_required(context=context, legacy_message=body_preview[:500] or None)
         if response.status_code < 400:
             return
-        body_preview = (response.text or "")[:500]
         if response.status_code in (401, 403):
             raise ApiError(
                 "LEGACY_API_UNAUTHORIZED",
@@ -214,6 +240,13 @@ class LegacyApiClient:
             resp = client.post(LEGACY_ARCHIVE_CREATE_PATH, json={})
             self._raise_for_status(resp, context="backup/archive/create")
             content = resp.content
+            if content[:1] in (b"{", b"[") and legacy_response_indicates_accpro_required(
+                content.decode("utf-8", errors="replace")
+            ):
+                _raise_accpro_required(
+                    context="backup/archive/create",
+                    legacy_message=content.decode("utf-8", errors="replace")[:500] or None,
+                )
             if len(content) > self.max_archive_bytes:
                 raise ApiError(
                     "LEGACY_ARCHIVE_TOO_LARGE",

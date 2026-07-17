@@ -9,19 +9,28 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
-import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 import 'package:hesabix_ui/services/support_realtime_service.dart';
-import 'package:hesabix_ui/widgets/support/sla_indicator.dart';
 import 'package:hesabix_ui/widgets/support/operator_command_palette.dart';
 import 'package:hesabix_ui/widgets/support/operator_inbox_list.dart';
 import 'package:hesabix_ui/widgets/support/operator_inbox_splitter.dart';
 
-enum OperatorInboxDisplayMode { list, table }
-
 /// Breakpoint for split inbox + detail workspace.
 const kOperatorSplitBreakpoint = 960.0;
+
+/// Primary chips shown in the toolbar; the rest live under «بیشتر».
+const _kPrimaryInboxViews = <OperatorInboxView>[
+  OperatorInboxView.all,
+  OperatorInboxView.mine,
+  OperatorInboxView.unread,
+  OperatorInboxView.unassigned,
+];
+
+const _kSecondaryInboxViews = <OperatorInboxView>[
+  OperatorInboxView.waitingOnCustomer,
+  OperatorInboxView.overdue,
+];
 
 class OperatorTicketsPage extends StatefulWidget {
   final CalendarController? calendarController;
@@ -46,12 +55,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   final SupportService _supportService = SupportService(ApiClient());
 
   List<SupportStatus> _statuses = [];
-  List<SupportPriority> _priorities = [];
-  List<SupportCategory> _categories = [];
   int _refreshCounter = 0;
   bool _isSuperAdmin = false;
   int? _currentUserId;
-  bool? _lastMessageFromUser;
   bool _selectionMode = false;
 
   SupportTicket? _selectedTicket;
@@ -60,12 +66,11 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
 
   SupportRealtimeService? _realtime;
   Timer? _pollTimer;
-  DateTime? _lastRealtimeAt;
   DateTime? _lastRefreshBump;
   Timer? _refreshThrottle;
+  bool _wsConnected = false;
 
-  OperatorInboxView _inboxView = OperatorInboxView.all;
-  OperatorInboxDisplayMode _displayMode = OperatorInboxDisplayMode.list;
+  OperatorInboxView _inboxView = OperatorInboxView.unread;
 
   @override
   void initState() {
@@ -101,13 +106,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
 
   void _startPolling() {
     _pollTimer?.cancel();
-    // Soft backup refresh. Skip when realtime events arrived recently.
-    _pollTimer = Timer.periodic(const Duration(seconds: 90), (_) {
-      if (!mounted) return;
-      final last = _lastRealtimeAt;
-      if (last != null && DateTime.now().difference(last) < const Duration(seconds: 45)) {
-        return;
-      }
+    // Fallback only while WebSocket is down.
+    _pollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!mounted || _wsConnected) return;
       _bumpRefresh(immediate: true);
     });
   }
@@ -139,11 +140,14 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     _realtime = createSupportRealtimeService();
     _realtime!.connect(
       apiKey: apiKey,
+      onStatus: (connected) {
+        if (!mounted) return;
+        _wsConnected = connected;
+      },
       onEvent: (event) {
         if ('${event['type']}' != 'support') return;
         if (!mounted) return;
-        _lastRealtimeAt = DateTime.now();
-        // Silent list refresh (OperatorInboxList keeps items visible).
+        _wsConnected = true;
         _bumpRefresh();
         final eventTicketId = event['ticket_id'];
         if (eventTicketId is int && eventTicketId == _selectedTicketId) {
@@ -159,16 +163,8 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
 
   Future<void> _loadMetadata() async {
     try {
-      final results = await Future.wait([
-        _supportService.getStatuses(),
-        _supportService.getPriorities(),
-        _supportService.getCategories(),
-      ]);
-      _safeSetState(() {
-        _statuses = results[0] as List<SupportStatus>;
-        _priorities = results[1] as List<SupportPriority>;
-        _categories = results[2] as List<SupportCategory>;
-      });
+      final statuses = await _supportService.getStatuses();
+      _safeSetState(() => _statuses = statuses);
     } catch (_) {}
   }
 
@@ -182,18 +178,6 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         _currentUserId = data?['id'] as int?;
       });
     } catch (_) {}
-  }
-
-  List<FilterItem> _extraFilters() {
-    final filters = <FilterItem>[];
-    if (_lastMessageFromUser != null) {
-      filters.add(FilterItem(
-        property: 'last_message_from_user',
-        operator: '==',
-        value: _lastMessageFromUser == true ? 'true' : 'false',
-      ));
-    }
-    return filters;
   }
 
   Future<void> _assignToMe() async {
@@ -211,26 +195,6 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${result['updated_count']} تیکت به شما تخصیص داده شد'), backgroundColor: Colors.green),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ErrorExtractor.forContext(e, context)), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _assignActiveRowToMe(Map<String, dynamic> row) async {
-    final ticketId = row['id'];
-    if (ticketId is! int || _currentUserId == null) return;
-    try {
-      await _supportService.assignTicket(ticketId, AssignTicketRequest(operatorId: _currentUserId!));
-      _bumpRefresh();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تیکت #$ticketId به شما تخصیص داده شد'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
@@ -364,7 +328,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       context,
       OperatorCommandPalette(
         onSelectView: (view) => _safeSetState(() => _inboxView = view),
-        onRefresh: _bumpRefresh,
+        onRefresh: () => _bumpRefresh(immediate: true),
         onAssignToMe: () {
           if (_selectedTicketId != null) {
             _safeSetState(() => _selectedRows = {_selectedTicketId!});
@@ -384,28 +348,6 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
             context.push('/user/profile/operator/tickets/$id');
           }
         },
-        onGoDashboard: () => context.push('/user/profile/operator/dashboard'),
-      ),
-    );
-  }
-
-  void _showShortcutsHelp() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('میانبرهای صفحه‌کلید'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Ctrl+K — پالت دستورات'),
-            Text('j / k — حرکت بین ردیف‌ها'),
-            Text('Enter / Space — باز کردن تیکت'),
-            Text('r — پاسخ / باز کردن'),
-            Text('a — تخصیص به من'),
-          ],
-        ),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('بستن'))],
       ),
     );
   }
@@ -418,7 +360,6 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       selectedTicketId: _selectedTicketId,
       refreshToken: _refreshCounter,
       calendarController: widget.calendarController,
-      extraFilters: _extraFilters(),
       onTicketTap: _navigateToTicketDetail,
       selectionEnabled: selectionOn,
       selectedIds: _selectedRows,
@@ -458,15 +399,11 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final useSplit = constraints.maxWidth >= kOperatorSplitBreakpoint;
-                    // Split workspace always uses dense list; table is full-width only.
                     if (useSplit) {
                       return OperatorInboxSplitter(
                         left: _buildInboxList(),
                         right: _buildSplitDetailPanel(),
                       );
-                    }
-                    if (_displayMode == OperatorInboxDisplayMode.table) {
-                      return _buildTicketsTable();
                     }
                     return _buildInboxList();
                   },
@@ -480,6 +417,8 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   }
 
   Widget _buildCompactToolbar(AppLocalizations t, ThemeData theme) {
+    final secondarySelected = _kSecondaryInboxViews.contains(_inboxView);
+
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       child: Padding(
@@ -509,80 +448,83 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
                   }),
                 ),
                 IconButton(
-                  tooltip: 'پالت دستورات (Ctrl+K)',
-                  icon: const Icon(Icons.search, size: 20),
+                  tooltip: 'دستورات سریع (Ctrl+K)',
+                  icon: const Icon(Icons.bolt_outlined, size: 20),
                   visualDensity: VisualDensity.compact,
                   onPressed: _showCommandPalette,
-                ),
-                IconButton(
-                  tooltip: 'میانبرها',
-                  icon: const Icon(Icons.keyboard_outlined, size: 20),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: _showShortcutsHelp,
                 ),
                 IconButton(
                   tooltip: 'بروزرسانی',
                   icon: const Icon(Icons.refresh, size: 20),
                   visualDensity: VisualDensity.compact,
-                  onPressed: _bumpRefresh,
-                ),
-                IconButton(
-                  tooltip: 'داشبورد',
-                  icon: const Icon(Icons.dashboard_outlined, size: 20),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => context.push('/user/profile/operator/dashboard'),
+                  onPressed: () => _bumpRefresh(immediate: true),
                 ),
               ],
             ),
             const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: OperatorInboxView.values.map((view) {
-                        final selected = _inboxView == view;
-                        return Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: ChoiceChip(
-                            avatar: Icon(view.icon, size: 14),
-                            label: Text(view.label, style: const TextStyle(fontSize: 11)),
-                            selected: selected,
-                            visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            padding: const EdgeInsets.symmetric(horizontal: 4),
-                            labelPadding: const EdgeInsets.only(left: 2, right: 4),
-                            onSelected: (_) => _safeSetState(() => _inboxView = view),
-                          ),
-                        );
-                      }).toList(),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ..._kPrimaryInboxViews.map((view) {
+                    final selected = _inboxView == view;
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: ChoiceChip(
+                        avatar: Icon(view.icon, size: 14),
+                        label: Text(view.label, style: const TextStyle(fontSize: 11)),
+                        selected: selected,
+                        visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        labelPadding: const EdgeInsets.only(left: 2, right: 4),
+                        onSelected: (_) => _safeSetState(() => _inboxView = view),
+                      ),
+                    );
+                  }),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: PopupMenuButton<OperatorInboxView>(
+                      tooltip: 'فیلترهای بیشتر',
+                      initialValue: secondarySelected ? _inboxView : null,
+                      onSelected: (view) => _safeSetState(() => _inboxView = view),
+                      itemBuilder: (context) => _kSecondaryInboxViews
+                          .map(
+                            (v) => PopupMenuItem(
+                              value: v,
+                              child: Row(
+                                children: [
+                                  Icon(v.icon, size: 16),
+                                  const SizedBox(width: 8),
+                                  Text(v.label),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      child: Chip(
+                        avatar: Icon(
+                          secondarySelected ? _inboxView.icon : Icons.more_horiz,
+                          size: 14,
+                        ),
+                        label: Text(
+                          secondarySelected ? _inboxView.label : 'بیشتر',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        labelPadding: const EdgeInsets.only(left: 2, right: 4),
+                        side: BorderSide(
+                          color: secondarySelected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outlineVariant,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                // Hide table toggle in narrow split contexts — still available on mobile full-width.
-                SegmentedButton<OperatorInboxDisplayMode>(
-                  segments: const [
-                    ButtonSegment(
-                      value: OperatorInboxDisplayMode.list,
-                      icon: Icon(Icons.view_list, size: 16),
-                      tooltip: 'لیست',
-                    ),
-                    ButtonSegment(
-                      value: OperatorInboxDisplayMode.table,
-                      icon: Icon(Icons.table_rows, size: 16),
-                      tooltip: 'جدول',
-                    ),
-                  ],
-                  selected: {_displayMode},
-                  onSelectionChanged: (s) => _safeSetState(() => _displayMode = s.first),
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
             if (_selectedRows.isNotEmpty) ...[
               const SizedBox(height: 6),
@@ -685,85 +627,6 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         _bumpRefresh();
         _reloadSelectedTicket();
       },
-    );
-  }
-
-  Widget _buildTicketsTable() {
-    // Soft refresh: do NOT remount via ValueKey on every counter tick.
-    return DataTableWidget<Map<String, dynamic>>(
-      key: const ValueKey('operator_tickets_table'),
-      config: DataTableConfig<Map<String, dynamic>>(
-        title: null,
-        endpoint: '/api/v1/support/operator/tickets/search',
-        columns: [
-          TextColumn('title', 'عنوان', sortable: true, searchable: true, width: ColumnWidth.large),
-          TextColumn('user.first_name', 'کاربر', sortable: true, searchable: true, width: ColumnWidth.medium),
-          TextColumn(
-            'category.name',
-            'دسته',
-            sortable: true,
-            width: ColumnWidth.medium,
-            filterType: ColumnFilterType.multiSelect,
-            filterOptions: _categories.map((c) => FilterOption(value: c.name, label: c.name)).toList(),
-          ),
-          TextColumn(
-            'priority.name',
-            'اولویت',
-            sortable: true,
-            width: ColumnWidth.small,
-            filterType: ColumnFilterType.multiSelect,
-            filterOptions: _priorities.map((p) => FilterOption(value: p.name, label: p.name)).toList(),
-          ),
-          TextColumn(
-            'status.name',
-            'وضعیت',
-            sortable: true,
-            width: ColumnWidth.small,
-            filterType: ColumnFilterType.multiSelect,
-            filterOptions: _statuses.map((s) => FilterOption(value: s.name, label: s.name)).toList(),
-          ),
-          TextColumn('assigned_operator.first_name', 'اپراتور', sortable: true, width: ColumnWidth.medium),
-          DateColumn('updated_at', 'بروزرسانی', sortable: true, width: ColumnWidth.medium, showTime: false),
-          TextColumn(
-            'sla',
-            'SLA',
-            sortable: false,
-            searchable: false,
-            width: ColumnWidth.small,
-            formatter: (item) => item is Map<String, dynamic> ? slaStatusLabel(slaStatusFromRow(item)) : '',
-          ),
-        ],
-        searchFields: operatorInboxSearchFields,
-        filterFields: ['title', 'category.name', 'priority.name', 'status.name', 'assigned_operator.first_name', 'created_at'],
-        dateRangeField: 'created_at',
-        showSearch: true,
-        showFilters: true,
-        showPagination: true,
-        enableSorting: true,
-        enableGlobalSearch: true,
-        enableDateRangeFilter: true,
-        enableRowSelection: true,
-        enableMultiRowSelection: true,
-        selectedRows: _selectedRows,
-        onRowSelectionChanged: (rows) => _safeSetState(() => _selectedRows = rows),
-        getCustomFilters: _extraFilters,
-        defaultPageSize: 20,
-        showRefreshButton: true,
-        showClearFiltersButton: true,
-        emptyStateMessage: 'هیچ تیکتی یافت نشد',
-        onRowTap: (ticketData) => _navigateToTicketDetail(ticketData as Map<String, dynamic>),
-        onRowShortcutReply: (row) => _navigateToTicketDetail(row as Map<String, dynamic>),
-        onRowShortcutAssign: (row) {
-          if (row is Map<String, dynamic>) _assignActiveRowToMe(row);
-        },
-        rowColorBuilder: (item, index) => item is Map<String, dynamic> ? slaRowBackgroundColor(item) : null,
-        expandBodyHeightToFitRows: true,
-        showBorder: true,
-        borderRadius: BorderRadius.circular(8),
-        padding: const EdgeInsets.all(8),
-      ),
-      fromJson: (json) => json,
-      calendarController: widget.calendarController,
     );
   }
 }

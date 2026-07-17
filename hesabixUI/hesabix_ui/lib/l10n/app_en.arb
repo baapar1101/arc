@@ -1389,6 +1389,7 @@
   "apiErrorBusinessUsersOwnerCannotLeave": "The business owner cannot leave the business here. Delete the business from settings if needed.",
   "apiErrorBusinessUsersNotAMemberLeave": "You are not a member of this business.",
   "apiErrorBusinessUsersLeaveFailed": "Could not leave the business. Please try again.",
+  "apiErrorLegacyAccproRequired": "To complete this action, enable or renew the Advanced Accounting add-on in your legacy Hesabix account.",
   "apiErrorNoFiscalYearForDate": "No fiscal year covers this date.",
   "apiErrorFiscalYearRangeOverlap": "The selected date range overlaps another fiscal year.",
   "apiErrorFiscalYearLockedForPosting": "This fiscal year is closed; posting is not allowed.",

@@ -142,6 +142,9 @@ class ErrorExtractor {
       case 'FILE_SIZE_EXCEEDED':
         return t.apiErrorFileSizeExceeded;
 
+      case 'LEGACY_ACCPRO_REQUIRED':
+        return t.apiErrorLegacyAccproRequired;
+
       default:
         return null;
     }

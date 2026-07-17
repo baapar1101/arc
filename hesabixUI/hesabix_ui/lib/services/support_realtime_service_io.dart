@@ -9,9 +9,14 @@ export 'support_realtime_service_stub.dart';
 class IoSupportRealtimeService implements SupportRealtimeService {
   WebSocket? _socket;
   void Function(Map<String, dynamic>)? _onEvent;
+  void Function(bool connected)? _onStatus;
   String? _apiKey;
   Timer? _reconnectTimer;
   bool _manualDisconnect = false;
+
+  void _setConnected(bool value) {
+    _onStatus?.call(value);
+  }
 
   void _scheduleReconnect() {
     if (_manualDisconnect) return;
@@ -19,20 +24,26 @@ class IoSupportRealtimeService implements SupportRealtimeService {
     _reconnectTimer = Timer(const Duration(seconds: 5), () {
       final key = _apiKey;
       if (key == null || key.isEmpty || _manualDisconnect) return;
-      connect(apiKey: key, onEvent: _onEvent);
+      connect(apiKey: key, onEvent: _onEvent, onStatus: _onStatus);
     });
   }
 
   @override
-  void connect({required String apiKey, void Function(Map<String, dynamic>)? onEvent}) async {
+  void connect({
+    required String apiKey,
+    void Function(Map<String, dynamic>)? onEvent,
+    void Function(bool connected)? onStatus,
+  }) async {
     _apiKey = apiKey;
     _onEvent = onEvent;
+    _onStatus = onStatus;
     _manualDisconnect = false;
     _reconnectTimer?.cancel();
     try {
       await _socket?.close();
     } catch (_) {}
     _socket = null;
+    _setConnected(false);
     final apiBase = AppConfig.apiBaseUrl;
     final wsBase = apiBase.startsWith('https://')
         ? apiBase.replaceFirst('https://', 'wss://')
@@ -41,6 +52,7 @@ class IoSupportRealtimeService implements SupportRealtimeService {
     try {
       _socket = await WebSocket.connect(url);
       _socket!.add(jsonEncode(<String, String>{'type': 'auth', 'api_key': apiKey}));
+      _setConnected(true);
       _socket!.listen((dynamic data) {
         try {
           final msg = data is String ? jsonDecode(data) as Map<String, dynamic> : <String, dynamic>{};
@@ -48,13 +60,16 @@ class IoSupportRealtimeService implements SupportRealtimeService {
         } catch (_) {}
       }, onDone: () {
         _socket = null;
+        _setConnected(false);
         _scheduleReconnect();
       }, onError: (_) {
         _socket = null;
+        _setConnected(false);
         _scheduleReconnect();
       });
     } catch (_) {
       _socket = null;
+      _setConnected(false);
       _scheduleReconnect();
     }
   }
@@ -83,6 +98,7 @@ class IoSupportRealtimeService implements SupportRealtimeService {
       _socket?.close();
     } catch (_) {}
     _socket = null;
+    _setConnected(false);
   }
 }
 

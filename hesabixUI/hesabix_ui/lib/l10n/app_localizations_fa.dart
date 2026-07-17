@@ -3629,6 +3629,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get apiErrorBusinessUsersLeaveFailed => 'خطا در خروج از کسب و کار.';
 
   @override
+  String get apiErrorLegacyAccproRequired =>
+      'برای انجام این کار، افزونه «حسابداری پیشرفته» را در نسخه قدیم حسابیکس فعال یا تمدید کنید.';
+
+  @override
   String get apiErrorNoFiscalYearForDate =>
       'سال مالی‌ای برای این تاریخ تعریف نشده است.';
 

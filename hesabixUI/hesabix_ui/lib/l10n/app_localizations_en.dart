@@ -3653,6 +3653,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Could not leave the business. Please try again.';
 
   @override
+  String get apiErrorLegacyAccproRequired =>
+      'To complete this action, enable or renew the Advanced Accounting add-on in your legacy Hesabix account.';
+
+  @override
   String get apiErrorNoFiscalYearForDate => 'No fiscal year covers this date.';
 
   @override

@@ -2,6 +2,7 @@ abstract class SupportRealtimeService {
   void connect({
     required String apiKey,
     void Function(Map<String, dynamic>)? onEvent,
+    void Function(bool connected)? onStatus,
   });
   void subscribeTicket(int ticketId);
   void unsubscribeTicket(int ticketId);
@@ -12,7 +13,11 @@ SupportRealtimeService createSupportRealtimeService() => _NoopSupportRealtime();
 
 class _NoopSupportRealtime implements SupportRealtimeService {
   @override
-  void connect({required String apiKey, void Function(Map<String, dynamic>)? onEvent}) {}
+  void connect({
+    required String apiKey,
+    void Function(Map<String, dynamic>)? onEvent,
+    void Function(bool connected)? onStatus,
+  }) {}
 
   @override
   void disconnect() {}

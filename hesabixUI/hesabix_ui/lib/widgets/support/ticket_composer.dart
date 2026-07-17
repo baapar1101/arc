@@ -22,6 +22,7 @@ class TicketComposer extends StatelessWidget {
   final VoidCallback onPickAttachment;
   final ValueChanged<int> onRemoveAttachment;
   final VoidCallback? onShowTemplates;
+  final VoidCallback? onShowAiAssistant;
   final void Function(ResponseTemplate template)? onApplyTemplate;
   final bool compact;
 
@@ -40,6 +41,7 @@ class TicketComposer extends StatelessWidget {
     required this.onPickAttachment,
     required this.onRemoveAttachment,
     this.onShowTemplates,
+    this.onShowAiAssistant,
     this.onApplyTemplate,
     this.compact = false,
   });
@@ -127,10 +129,18 @@ class TicketComposer extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              if (isOperator && onShowAiAssistant != null)
+                IconButton(
+                  icon: const Icon(Icons.auto_awesome_outlined, size: 20),
+                  tooltip: 'پیشنهاد هوش مصنوعی',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onShowAiAssistant,
+                ),
               if (isOperator && onShowTemplates != null)
                 IconButton(
-                  icon: const Icon(Icons.description_outlined),
+                  icon: const Icon(Icons.description_outlined, size: 20),
                   tooltip: 'قالب‌های پاسخ',
+                  visualDensity: VisualDensity.compact,
                   onPressed: onShowTemplates,
                 ),
               Expanded(

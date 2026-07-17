@@ -45,8 +45,6 @@ const operatorInboxSearchFields = [
   'user.first_name',
   'user.last_name',
   'user.email',
-  'user_name',
-  'user_email',
 ];
 
 /// Scrollable operator ticket inbox (list view) backed by search API.

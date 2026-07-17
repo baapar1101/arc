@@ -27,6 +27,17 @@ def test_normalize_server_url():
     assert normalize_server_url("https://app.hesabix.ir/") == "https://app.hesabix.ir"
 
 
+def test_legacy_response_indicates_accpro_required():
+    from app.services.legacy_import.client import legacy_response_indicates_accpro_required
+
+    assert legacy_response_indicates_accpro_required(
+        '{"result":0,"message":"این قابلیت فقط برای کاربران افزونه accpro در دسترس است."}'
+    )
+    assert legacy_response_indicates_accpro_required("افزونه حسابداری پیشرفته فعال نیست")
+    assert not legacy_response_indicates_accpro_required('{"result":0,"message":"خطای دیگر"}')
+    assert not legacy_response_indicates_accpro_required("")
+
+
 def test_map_legacy_person_types_defaults():
     assert map_legacy_person_types([]) == ["مشتری"]
     assert "مشتری" in map_legacy_person_types([1])

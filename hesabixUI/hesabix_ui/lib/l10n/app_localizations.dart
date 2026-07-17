@@ -6900,6 +6900,12 @@ abstract class AppLocalizations {
   /// **'Could not leave the business. Please try again.'**
   String get apiErrorBusinessUsersLeaveFailed;
 
+  /// No description provided for @apiErrorLegacyAccproRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'To complete this action, enable or renew the Advanced Accounting add-on in your legacy Hesabix account.'**
+  String get apiErrorLegacyAccproRequired;
+
   /// No description provided for @apiErrorNoFiscalYearForDate.
   ///
   /// In en, this message translates to:

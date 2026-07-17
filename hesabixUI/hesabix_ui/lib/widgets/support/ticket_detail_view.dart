@@ -617,6 +617,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
         () => _pendingAttachments = _pendingAttachments.where((a) => a.id != id).toList(),
       ),
       onShowTemplates: widget.isOperator && _templates.isNotEmpty ? _showTemplatesDialog : null,
+      onShowAiAssistant: widget.isOperator ? _showAiAssistantSheet : null,
       onApplyTemplate: (template) {
         final variables = {
           'user_name': _ticket.user?.displayName ?? 'کاربر',
@@ -628,17 +629,47 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     );
   }
 
+  Future<void> _showAiAssistantSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final bottom = MediaQuery.viewInsetsOf(ctx).bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: bottom),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: AITicketAssistant(
+                ticketId: _ticket.id,
+                ticketContext: _ticket.description,
+                onReplySuggested: (suggestedReply) {
+                  _messageController.text = suggestedReply;
+                  Navigator.pop(ctx);
+                },
+                onAutoReply: (replyText) {
+                  _loadMessages(silent: true);
+                  widget.onTicketUpdated?.call();
+                  Navigator.pop(ctx);
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   int _listItemCount({
     required bool showSidePanel,
     required bool compactUser,
     required bool showMetaInThread,
-    required bool showAiInThread,
   }) {
     var count = 1 + _messages.length;
     if (!showSidePanel && !compactUser) count += 1;
     if (showMetaInThread) count += 1;
     if (_messages.isEmpty) count += 1;
-    if (showAiInThread) count += 1;
     return count;
   }
 
@@ -650,7 +681,6 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     ThemeData theme, {
     bool compactUser = false,
     bool showMetaInThread = false,
-    bool showAiInThread = false,
   }) {
     var cursor = 0;
 
@@ -664,7 +694,13 @@ class _TicketDetailViewState extends State<TicketDetailView> {
       cursor++;
     }
 
-    if (index == cursor) return TicketPinnedRequest(ticket: _ticket, isOperator: widget.isOperator);
+    if (index == cursor) {
+      return TicketPinnedRequest(
+        ticket: _ticket,
+        isOperator: widget.isOperator,
+        initiallyExpanded: !widget.isOperator,
+      );
+    }
     cursor++;
 
     if (_messages.isEmpty) {
@@ -697,24 +733,6 @@ class _TicketDetailViewState extends State<TicketDetailView> {
           message: message,
           calendarController: widget.calendarController,
           isOperator: widget.isOperator,
-        ),
-      );
-    }
-    cursor += _messages.length;
-
-    if (showAiInThread && index == cursor) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 4, bottom: 8),
-        child: AITicketAssistant(
-          ticketId: _ticket.id,
-          ticketContext: _ticket.description,
-          onReplySuggested: (suggestedReply) {
-            _messageController.text = suggestedReply;
-          },
-          onAutoReply: (replyText) {
-            _loadMessages(silent: true);
-            widget.onTicketUpdated?.call();
-          },
         ),
       );
     }
@@ -1108,7 +1126,6 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                   // (including embedded split view on large screens).
                   final showSidePanel = widget.isOperator && constraints.maxWidth > 720;
                   final showMetaInThread = compactOperator && !showSidePanel;
-                  final showAiInThread = widget.isOperator && !showSidePanel;
 
                   Widget buildThread() {
                     if (_isLoading && _messages.isEmpty) {
@@ -1137,7 +1154,6 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                                 showSidePanel: showSidePanel,
                                 compactUser: compactUser,
                                 showMetaInThread: showMetaInThread,
-                                showAiInThread: showAiInThread,
                               ),
                               itemBuilder: (context, index) => _buildListItem(
                                 context,
@@ -1147,7 +1163,6 @@ class _TicketDetailViewState extends State<TicketDetailView> {
                                 theme,
                                 compactUser: compactUser,
                                 showMetaInThread: showMetaInThread,
-                                showAiInThread: showAiInThread,
                               ),
                             ),
                           ),

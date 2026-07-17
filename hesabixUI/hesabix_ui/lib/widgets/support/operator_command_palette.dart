@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/widgets/support/operator_inbox_list.dart';
 
+/// Slim command palette focused on power actions (open by ID, bulk ops, views).
 class OperatorCommandPalette extends StatefulWidget {
   final void Function(OperatorInboxView view)? onSelectView;
   final VoidCallback? onRefresh;
   final VoidCallback? onAssignToMe;
   final VoidCallback? onMarkResolved;
   final void Function(int ticketId)? onOpenTicket;
-  final VoidCallback? onGoDashboard;
 
   const OperatorCommandPalette({
     super.key,
@@ -17,7 +17,6 @@ class OperatorCommandPalette extends StatefulWidget {
     this.onAssignToMe,
     this.onMarkResolved,
     this.onOpenTicket,
-    this.onGoDashboard,
   });
 
   static Future<void> show(BuildContext context, OperatorCommandPalette palette) {
@@ -42,11 +41,7 @@ class _OperatorCommandPaletteState extends State<OperatorCommandPalette> {
   }
 
   List<_Cmd> get _all => [
-        for (final v in OperatorInboxView.values)
-          _Cmd(v.label, v.icon, () {
-            Navigator.pop(context);
-            widget.onSelectView?.call(v);
-          }),
+        _Cmd('باز کردن تیکت با شماره…', Icons.tag, _promptTicketId),
         _Cmd('بروزرسانی لیست', Icons.refresh, () {
           Navigator.pop(context);
           widget.onRefresh?.call();
@@ -59,11 +54,11 @@ class _OperatorCommandPaletteState extends State<OperatorCommandPalette> {
           Navigator.pop(context);
           widget.onMarkResolved?.call();
         }),
-        _Cmd('داشبورد', Icons.dashboard_outlined, () {
-          Navigator.pop(context);
-          widget.onGoDashboard?.call();
-        }),
-        _Cmd('باز کردن تیکت با شماره…', Icons.tag, _promptTicketId),
+        for (final v in OperatorInboxView.values)
+          _Cmd('نمای: ${v.label}', v.icon, () {
+            Navigator.pop(context);
+            widget.onSelectView?.call(v);
+          }),
       ];
 
   List<_Cmd> get _filtered {
@@ -82,6 +77,7 @@ class _OperatorCommandPaletteState extends State<OperatorCommandPalette> {
           keyboardType: TextInputType.number,
           decoration: const InputDecoration(labelText: 'شماره تیکت'),
           autofocus: true,
+          onSubmitted: (v) => Navigator.pop(ctx, int.tryParse(v.trim())),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('لغو')),
@@ -123,8 +119,8 @@ class _OperatorCommandPaletteState extends State<OperatorCommandPalette> {
                     controller: _search,
                     autofocus: true,
                     decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search),
-                      hintText: 'جست‌وجو دستور… (Ctrl+K)',
+                      prefixIcon: const Icon(Icons.bolt_outlined),
+                      hintText: 'دستور سریع… (Ctrl+K)',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     onChanged: (v) => setState(() => _query = v.trim()),
@@ -162,8 +158,4 @@ class _Cmd {
   final VoidCallback run;
 
   _Cmd(this.label, this.icon, this.run);
-}
-
-class OperatorCommandPaletteIntent extends Intent {
-  const OperatorCommandPaletteIntent();
 }
