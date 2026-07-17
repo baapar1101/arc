@@ -337,31 +337,43 @@ class AIService {
   Future<Map<String, dynamic>> updateAIMemory({
     required String content,
     int? businessId,
-    Map<String, dynamic>? structured,
   }) async {
     final res = await _api.put<Map<String, dynamic>>(
       '/api/v1/ai/chat/memory',
       data: {
         'content': content,
+        'instructions': content,
         if (businessId != null) 'business_id': businessId,
-        if (structured != null && structured.isNotEmpty)
-          'structured': structured,
       },
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getAIMemoryDigest({int? businessId}) async {
-    final query = <String, dynamic>{
-      if (businessId != null) 'business_id': businessId.toString(),
-    };
-    final res = await _api.get<Map<String, dynamic>>(
-      '/api/v1/ai/chat/memory/digest',
-      query: query,
+  Future<Map<String, dynamic>> updateAIMemoryItem({
+    required int itemId,
+    required String content,
+    int? businessId,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory/items/$itemId',
+      data: {
+        'content': content,
+        if (businessId != null) 'business_id': businessId,
+      },
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<void> deleteAIMemoryItem({
+    required int itemId,
+    int? businessId,
+  }) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory/items/$itemId',
+      query: {if (businessId != null) 'business_id': businessId.toString()},
+    );
   }
 
   Future<void> deleteAIMemory({int? businessId}) async {

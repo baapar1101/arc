@@ -1,4 +1,4 @@
-"""حافظهٔ دستیار AI per user + business."""
+"""حافظهٔ دو لایهٔ دستیار AI: دستورات کاربر + یادگیری بی‌صدا."""
 from __future__ import annotations
 
 import logging
@@ -9,21 +9,16 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from adapters.db.models.ai_business_memory import AIBusinessMemory
-from app.services.ai.ai_memory_structured import (
-    extract_structured_from_text,
-    merge_structured_patch,
-    parse_structured,
-    serialize_structured,
-    structured_to_digest_sections,
-    structured_to_prompt_block,
-)
 from app.services.ai.ai_ops_metrics import log_ai_event
 
 logger = logging.getLogger(__name__)
+
 MAX_MEMORY_CHARS = 4000
 AUTO_SUMMARIZE_MIN_MESSAGES = 4
 AUTO_SUMMARIZE_MAX_MESSAGES = 20
 AUTO_SECTION_MARKER = "# به‌روزرسانی اخیر:"
+LEGACY_AUTO_MARKER = "# ترجیحات کاربر (خودکار):"
+_AUTO_MARKERS = (AUTO_SECTION_MARKER, LEGACY_AUTO_MARKER)
 
 
 def get_memory(db: Session, business_id: int, user_id: int) -> Optional[AIBusinessMemory]:
@@ -38,15 +33,28 @@ def get_memory(db: Session, business_id: int, user_id: int) -> Optional[AIBusine
 
 
 def get_memory_content(db: Session, business_id: int, user_id: int) -> str:
+    """دستورات همیشگی کاربر (بدون بخش‌های یادگیری خودکار قدیمی)."""
     row = get_memory(db, business_id, user_id)
     if not row or not row.content:
         return ""
-    return row.content.strip()[:MAX_MEMORY_CHARS]
+    return strip_auto_sections(row.content).strip()[:MAX_MEMORY_CHARS]
 
 
-def get_memory_structured(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
-    row = get_memory(db, business_id, user_id)
-    return parse_structured(row.structured if row else None)
+def strip_auto_sections(content: str) -> str:
+    """حذف بلوک‌های یادگیری خودکار قدیمی از متن دستورات."""
+    text = content or ""
+    for marker in _AUTO_MARKERS:
+        idx = text.find(marker)
+        if idx >= 0:
+            text = text[:idx]
+    # بخش‌های با عنوان قدیمی دستیار که از فیدبک آمده‌اند هم در دستورات نمانند
+    text = re.sub(
+        r"\n\n# (ترجیحات تأییدشده|بازخورد منفی|یادداشت دستیار):.*",
+        "",
+        text,
+        flags=re.DOTALL,
+    )
+    return text.strip()
 
 
 def upsert_memory(
@@ -54,57 +62,21 @@ def upsert_memory(
     business_id: int,
     user_id: int,
     content: str,
-    structured: Optional[Dict[str, Any]] = None,
+    structured: Optional[Dict[str, Any]] = None,  # noqa: ARG001 — سازگاری عقب‌رو
 ) -> AIBusinessMemory:
-    text = (content or "").strip()[:MAX_MEMORY_CHARS]
+    """ذخیرهٔ فقط دستورات همیشگی کاربر. structured نادیده گرفته می‌شود."""
+    text = strip_auto_sections(content or "").strip()[:MAX_MEMORY_CHARS]
     row = get_memory(db, business_id, user_id)
-    parsed_structured = merge_structured_patch(
-        parse_structured(row.structured if row else None),
-        structured,
-    )
-    if not structured and text:
-        parsed_structured = merge_structured_patch(
-            parsed_structured,
-            extract_structured_from_text(text),
-        )
-
     if row:
         row.content = text
-        row.structured = serialize_structured(parsed_structured)
+        row.structured = None
         row.updated_at = datetime.utcnow()
     else:
         row = AIBusinessMemory(
             business_id=business_id,
             user_id=user_id,
             content=text,
-            structured=serialize_structured(parsed_structured),
-        )
-        db.add(row)
-    db.commit()
-    db.refresh(row)
-    return row
-
-
-def upsert_structured_only(
-    db: Session,
-    business_id: int,
-    user_id: int,
-    structured_patch: Dict[str, Any],
-) -> AIBusinessMemory:
-    row = get_memory(db, business_id, user_id)
-    merged = merge_structured_patch(
-        parse_structured(row.structured if row else None),
-        structured_patch,
-    )
-    if row:
-        row.structured = serialize_structured(merged)
-        row.updated_at = datetime.utcnow()
-    else:
-        row = AIBusinessMemory(
-            business_id=business_id,
-            user_id=user_id,
-            content="",
-            structured=serialize_structured(merged),
+            structured=None,
         )
         db.add(row)
     db.commit()
@@ -113,84 +85,77 @@ def upsert_structured_only(
 
 
 def clear_memory(db: Session, business_id: int, user_id: int) -> None:
+    """پاک کردن دستورات + همهٔ آیتم‌های یادگرفته‌شده."""
     row = get_memory(db, business_id, user_id)
     if row:
         db.delete(row)
         db.commit()
+    try:
+        from app.services.ai.ai_memory_item_service import clear_all_memory_items
+
+        clear_all_memory_items(db, business_id, user_id)
+    except Exception as exc:
+        logger.warning("clear memory items failed: %s", exc)
     log_ai_event("memory_cleared", business_id=business_id, user_id=user_id)
 
 
-def memory_to_dict(row: Optional[AIBusinessMemory]) -> Dict[str, Any]:
-    if not row:
-        return {
-            "content": "",
-            "structured": parse_structured(None),
-            "updated_at": None,
-            "char_count": 0,
-            "max_chars": MAX_MEMORY_CHARS,
-            "has_auto_sections": False,
-        }
-    content = row.content or ""
+def memory_to_dict(
+    row: Optional[AIBusinessMemory],
+    *,
+    items: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    instructions = strip_auto_sections(row.content) if row else ""
     return {
-        "content": content,
-        "structured": parse_structured(row.structured),
-        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-        "char_count": len(content),
+        "instructions": instructions,
+        "content": instructions,  # سازگاری با کلاینت‌های قدیمی
+        "items": items or [],
+        "structured": {},  # فیلد ساخت‌یافته حذف شد
+        "updated_at": row.updated_at.isoformat() if row and row.updated_at else None,
+        "char_count": len(instructions),
         "max_chars": MAX_MEMORY_CHARS,
-        "has_auto_sections": AUTO_SECTION_MARKER in content
-        or "# ترجیحات کاربر (خودکار):" in content,
+        "has_auto_sections": False,
+        "learned_count": len(items or []),
     }
 
 
-def get_memory_digest(
-    db: Session,
-    business_id: int,
-    user_id: int,
-) -> Dict[str, Any]:
+def get_memory_payload(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
+    from app.services.ai.ai_memory_item_service import list_memory_items, memory_item_to_dict
+
     row = get_memory(db, business_id, user_id)
-    content = row.content if row else ""
-    structured = parse_structured(row.structured if row else None)
-    digest = structured_to_digest_sections(structured, content)
-    digest["updated_at"] = row.updated_at.isoformat() if row and row.updated_at else None
-    return digest
+    items = [
+        memory_item_to_dict(r)
+        for r in list_memory_items(db, business_id, user_id, limit=100)
+    ]
+    return memory_to_dict(row, items=items)
 
 
-def format_memory_goal_hint_for_insights(
-    db: Session,
-    business_id: int,
-    user_id: int,
-    insights: Dict[str, Any],
-) -> str:
-    """یک خط راهنما برای مقایسه هدف حافظه با KPI واقعی."""
-    structured = get_memory_structured(db, business_id, user_id)
-    goal = structured.get("sales_goal_monthly")
-    if not goal or goal <= 0:
-        return ""
-
-    kpis = insights.get("kpis") or {}
-    sales_week = kpis.get("sales_last_7_days") or {}
-    estimate_month = float(sales_week.get("total_net") or 0) * 4.33
-    if estimate_month <= 0:
-        return ""
-
-    pct = round((estimate_month / float(goal)) * 100, 1)
-    return (
-        f"\nهدف فروش ماهانه (از حافظه): {float(goal):,.0f} — "
-        f"برآورد فعلی از فروش ۷ روز: ~{estimate_month:,.0f} ({pct}٪ از هدف)."
-    )
+def get_memory_digest(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
+    """خلاصهٔ خواندنی — سازگاری با API قدیمی."""
+    payload = get_memory_payload(db, business_id, user_id)
+    sections: List[Dict[str, str]] = []
+    if payload["instructions"]:
+        preview = payload["instructions"]
+        if len(preview) > 800:
+            preview = preview[:800] + "…"
+        sections.append({"title": "دستورات همیشگی", "body": preview})
+    if payload["items"]:
+        lines = [f"• {it.get('content', '')}" for it in payload["items"][:12]]
+        sections.append({"title": "آنچه یاد گرفته‌ام", "body": "\n".join(lines)})
+    return {
+        "sections": sections,
+        "is_empty": not sections,
+        "updated_at": payload.get("updated_at"),
+        "items": payload["items"],
+        "instructions": payload["instructions"],
+    }
 
 
 def format_memory_for_prompt(db: Session, business_id: int, user_id: int) -> str:
-    row = get_memory(db, business_id, user_id)
     parts: List[str] = []
 
-    if row:
-        structured_block = structured_to_prompt_block(parse_structured(row.structured))
-        if structured_block:
-            parts.append(structured_block)
-        content = (row.content or "").strip()[:MAX_MEMORY_CHARS]
-        if content:
-            parts.append(content)
+    instructions = get_memory_content(db, business_id, user_id)
+    if instructions:
+        parts.append("### دستورات همیشگی کاربر (الزامی مگر خلاف صریح بگوید)\n" + instructions)
 
     try:
         from app.services.ai.ai_memory_item_service import format_memory_items_for_prompt
@@ -204,28 +169,95 @@ def format_memory_for_prompt(db: Session, business_id: int, user_id: int) -> str
     if not parts:
         return ""
 
-    body = "\n".join(parts)
+    body = "\n\n".join(parts)
     return (
-        "\n\n--- حافظهٔ ترجیحات کاربر (رعایت کن مگر خلاف دستور صریح باشد) ---\n"
-        "حقایق پایدار از این بخش؛ اسناد طولانی در knowledge؛ دادهٔ لحظه‌ای با ابزار.\n"
-        "برای ویرایش دقیق از ابزارهای list_memory_items / upsert_memory_item / delete_memory_item.\n"
+        "\n\n--- حافظهٔ بلندمدت کاربر ---\n"
+        "دستورات همیشگی را رعایت کن. حقایق یادگرفته‌شده زمینهٔ پایدارند؛ "
+        "اسناد بلند در knowledge و دادهٔ لحظه‌ای با ابزار.\n"
+        "برای افزودن/ویرایش حقایق یادگرفته‌شده از upsert_memory_item / "
+        "list_memory_items / delete_memory_item استفاده کن "
+        "(بدون پرسیدن از کاربر — یادگیری بی‌صدا).\n"
         f"{body}"
     )
 
 
-def extract_facts_from_messages(messages: List[Dict[str, Any]]) -> List[str]:
-    """استخراج واقعیت‌های کلیدی از مکالمه برای ذخیره در حافظه."""
-    facts: List[str] = []
+def format_memory_goal_hint_for_insights(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    insights: Dict[str, Any],
+) -> str:
+    """سازگاری عقب‌رو — هدف ساخت‌یافته حذف شد."""
+    return ""
+
+
+# ---- استخراج و یادگیری بی‌صدا -------------------------------------------------
+
+_PREFERENCE_RE = re.compile(
+    r"ترجیح\s*می‌?دم|prefer|دوست\s*دارم|همیشه|معمولاً|اکثراً|"
+    r"به\s*خاطر\s*بسپار|یادت\s*باشه|فراموش\s*نکن|remember|"
+    r"اسم\s*(?:کسب\s*و\s*کار|شرکت|فروشگاه|پروژه)|"
+    r"روی\s*پروژه|کار\s*می‌?کنم\s*روی|"
+    r"هدف\s*فروش|هدف\s*ماه|اصطلاح|معنی\s*می‌?دهد",
+    re.IGNORECASE,
+)
+
+_EXPLICIT_REMEMBER = re.compile(
+    r"(?:به\s*خاطر\s*بسپار|یادت\s*باشه|فراموش\s*نکن|remember(?:\s+that)?)\s*[:：]?\s*(.+)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+_NAMED_ENTITY = re.compile(
+    r"(?:اسم\s*(?:کسب\s*و\s*کار|شرکت|فروشگاه|برند)|نام\s*پروژه|پروژه(?:‌ام|م)?)\s*"
+    r"[:：]?\s*[«\"']?([^«\"'\n،.]{2,80})[»\"']?",
+    re.IGNORECASE,
+)
+
+_GOAL_RE = re.compile(
+    r"هدف\s*(?:فروش)?\s*(?:ماه(?:انه)?)?\s*[:：]?\s*([\d،,\.]+)\s*(میلیون|میلیارد|هزار)?",
+    re.IGNORECASE,
+)
+
+_TERM_RE = re.compile(
+    r"(?:اصطلاح|منظور(?:م)?\s*از)\s*[«\"']?([^«\"'\n]{2,40})[»\"']?\s*"
+    r"(?:یعنی|معنی(?:‌اش|ش)?|:=?\s*)\s*[«\"']?([^«\"'\n]{2,120})",
+    re.IGNORECASE,
+)
+
+
+def _normalize_fact_text(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").strip())[:220]
+
+
+def _fact_key(category: str, content: str) -> str:
+    from app.services.ai.ai_memory_item_service import slugify_key
+
+    base = content[:48] if content else category
+    return slugify_key(f"{category}_{base}")
+
+
+def extract_learned_candidates(messages: List[Dict[str, Any]]) -> List[Dict[str, str]]:
+    """استخراج کاندیدهای حافظهٔ یادگرفته‌شده از پیام‌های کاربر."""
+    candidates: List[Dict[str, str]] = []
     seen: set[str] = set()
 
-    preference_patterns = [
-        r"ترجیح\s*می‌?دم|prefer|دوست\s*دارم|همیشه|معمولاً|اکثراً",
-        r"نشان\s*بده|نمایش\s*بده|بگو|بنویس|خلاصه\s*کن",
-        r"زبان\s*(فارسی|انگلیسی)|به\s*صورت\s*(جدولی|لیستی|خلاصه)",
-        r"هدف\s*فروش|هدف\s*ماه|میلیون|میلیارد|تومان|ریال",
-        r"به\s*خاطر\s*بسپار|یادت\s*باشه|فراموش\s*نکن|remember",
-        r"اصطلاح|معنی\s*می‌?دهد|منظورم",
-    ]
+    def _add(category: str, content: str, confidence: str = "medium") -> None:
+        text = _normalize_fact_text(content)
+        if len(text) < 8:
+            return
+        key = _fact_key(category, text)
+        dedupe = text[:60].lower()
+        if dedupe in seen:
+            return
+        seen.add(dedupe)
+        candidates.append(
+            {
+                "item_key": key,
+                "category": category,
+                "content": text,
+                "confidence": confidence,
+            }
+        )
 
     for msg in messages:
         if msg.get("role") != "user":
@@ -234,27 +266,61 @@ def extract_facts_from_messages(messages: List[Dict[str, Any]]) -> List[str]:
         if len(content) < 10:
             continue
 
-        matched = False
-        for pattern in preference_patterns:
-            if re.search(pattern, content, re.IGNORECASE):
-                matched = True
-                break
-        if not matched:
+        m = _EXPLICIT_REMEMBER.search(content)
+        if m:
+            _add("fact", m.group(1).strip(), "high")
             continue
 
-        snippet = content.replace("\n", " ").strip()[:220]
-        key = snippet[:60].lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        facts.append(snippet)
-        if len(facts) >= 5:
+        for em in _NAMED_ENTITY.finditer(content):
+            name = em.group(1).strip()
+            label = "نام کسب‌وکار/پروژه"
+            _add("fact", f"{label}: {name}", "high")
+
+        gm = _GOAL_RE.search(content)
+        if gm:
+            num_raw = gm.group(1).replace("،", "").replace(",", "")
+            try:
+                val = float(num_raw)
+                mult = gm.group(2) or ""
+                if "میلیارد" in mult:
+                    val *= 1_000_000_000
+                elif "میلیون" in mult:
+                    val *= 1_000_000
+                elif "هزار" in mult:
+                    val *= 1_000
+                _add("goal", f"هدف فروش ماهانه حدود {val:,.0f}", "medium")
+            except ValueError:
+                pass
+
+        tm = _TERM_RE.search(content)
+        if tm:
+            term = tm.group(1).strip()
+            meaning = tm.group(2).strip()
+            _add("term", f"اصطلاح «{term}»: {meaning}", "high")
+
+        if _PREFERENCE_RE.search(content) and not any(
+            c["content"][:40] in content for c in candidates[-3:]
+        ):
+            snippet = _normalize_fact_text(content)
+            if len(snippet) <= 180:
+                cat = "preference" if re.search(
+                    r"ترجیح|prefer|دوست\s*دارم|همیشه|معمولاً", content, re.I
+                ) else "fact"
+                _add(cat, snippet, "low")
+
+        if len(candidates) >= 8:
             break
 
-    return facts
+    return candidates[:8]
+
+
+def extract_facts_from_messages(messages: List[Dict[str, Any]]) -> List[str]:
+    """سازگاری با تست‌های قدیمی — متن حقایق استخراج‌شده."""
+    return [c["content"] for c in extract_learned_candidates(messages)]
 
 
 def merge_memory_content(current_memory: str, facts: List[str]) -> str:
+    """سازگاری عقب‌رو — دیگر برای یادگیری استفاده نمی‌شود."""
     new_facts = facts
     if current_memory:
         new_facts = [f for f in facts if f[:50] not in current_memory]
@@ -264,11 +330,85 @@ def merge_memory_content(current_memory: str, facts: List[str]) -> str:
         updated = f"{current_memory}\n\n{AUTO_SECTION_MARKER}\n{new_facts_text}"
     else:
         new_facts_text = "\n".join(f"- {f}" for f in facts)
-        updated = f"# ترجیحات کاربر (خودکار):\n{new_facts_text}"
+        updated = f"{LEGACY_AUTO_MARKER}\n{new_facts_text}"
 
     if len(updated) > MAX_MEMORY_CHARS:
         updated = updated[-MAX_MEMORY_CHARS:]
     return updated
+
+
+def _content_similar(a: str, b: str) -> bool:
+    aa = _normalize_fact_text(a).lower()
+    bb = _normalize_fact_text(b).lower()
+    if not aa or not bb:
+        return False
+    if aa == bb or aa in bb or bb in aa:
+        return True
+    return aa[:40] == bb[:40]
+
+
+def silent_learn_from_messages(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    session_messages: List[Dict[str, Any]],
+) -> int:
+    """
+    یادگیری بی‌صدا: حقایق پایدار را به‌صورت آیتم در ai_memory_items ذخیره می‌کند.
+    دستورات همیشگی کاربر را تغییر نمی‌دهد.
+    """
+    from app.services.ai.ai_memory_item_service import (
+        list_memory_items,
+        upsert_memory_item,
+    )
+
+    candidates = extract_learned_candidates(
+        session_messages[-AUTO_SUMMARIZE_MAX_MESSAGES:]
+    )
+    if not candidates:
+        return 0
+
+    existing = list_memory_items(db, business_id, user_id, limit=100)
+    existing_contents = [e.content for e in existing]
+    created = 0
+
+    for cand in candidates:
+        if any(_content_similar(cand["content"], ec) for ec in existing_contents):
+            continue
+        try:
+            row = upsert_memory_item(
+                db,
+                business_id,
+                user_id,
+                item_key=cand["item_key"],
+                category=cand["category"],
+                content=cand["content"],
+                source="auto",
+                confidence=cand.get("confidence") or "medium",
+            )
+            existing_contents.append(row.content)
+            created += 1
+        except Exception as exc:
+            logger.debug("silent learn upsert skipped: %s", exc)
+
+    # پاک‌سازی بخش‌های خودکار قدیمی از فیلد دستورات
+    row = get_memory(db, business_id, user_id)
+    if row and row.content and any(m in row.content for m in _AUTO_MARKERS):
+        cleaned = strip_auto_sections(row.content)
+        if cleaned != (row.content or "").strip():
+            row.content = cleaned
+            row.structured = None
+            row.updated_at = datetime.utcnow()
+            db.commit()
+
+    if created:
+        log_ai_event(
+            "memory_silent_learned",
+            business_id=business_id,
+            user_id=user_id,
+            extra={"items": created},
+        )
+    return created
 
 
 async def auto_summarize_session(
@@ -276,44 +416,12 @@ async def auto_summarize_session(
     business_id: int,
     user_id: int,
     session_messages: List[Dict[str, Any]],
-    ai_service=None,
+    ai_service=None,  # noqa: ARG001
 ) -> bool:
-    """
-    خلاصه‌سازی خودکار مکالمه و ادغام با حافظه کاربر.
-    ai_service نادیده گرفته می‌شود (سازگاری با امضای قبلی).
-    """
     if len(session_messages) < AUTO_SUMMARIZE_MIN_MESSAGES:
         return False
-
-    user_msgs = [m for m in session_messages if m.get("role") == "user"]
-    facts = extract_facts_from_messages(user_msgs[-AUTO_SUMMARIZE_MAX_MESSAGES:])
-    if not facts:
-        return False
-
-    row = get_memory(db, business_id, user_id)
-    current_memory = row.content if row else ""
-    updated = merge_memory_content(current_memory or "", facts)
-    if updated == current_memory:
-        return False
-
-    try:
-        upsert_memory(
-            db,
-            business_id,
-            user_id,
-            updated,
-            structured=extract_structured_from_text("\n".join(facts)),
-        )
-        log_ai_event(
-            "memory_auto_summarized",
-            business_id=business_id,
-            user_id=user_id,
-            extra={"facts": len(facts)},
-        )
-        return True
-    except Exception as exc:
-        logger.warning("AI memory auto-summarize failed: %s", exc)
-        return False
+    created = silent_learn_from_messages(db, business_id, user_id, session_messages)
+    return created > 0
 
 
 async def maybe_auto_summarize_session(
@@ -333,12 +441,26 @@ def append_to_memory(
     *,
     section_title: str = "یادداشت دستیار",
 ) -> AIBusinessMemory:
-    """افزودن متن به حافظه (برای ابزار update_user_memory)."""
+    """
+    سازگاری با ابزار قدیمی: به‌جای آلوده کردن دستورات،
+    یک آیتم یادگرفته‌شده می‌سازد و دستورات را دست‌نخورده برمی‌گرداند.
+    """
     note = (note or "").strip()
     if not note:
         raise ValueError("متن حافظه خالی است")
+    from app.services.ai.ai_memory_item_service import upsert_memory_item
+
+    upsert_memory_item(
+        db,
+        business_id,
+        user_id,
+        item_key=None,
+        category="fact",
+        content=f"{section_title}: {note[:500]}",
+        source="assistant",
+        confidence="medium",
+    )
     row = get_memory(db, business_id, user_id)
-    current = row.content if row else ""
-    block = f"\n\n# {section_title}:\n- {note[:500]}"
-    merged = (current + block).strip()[:MAX_MEMORY_CHARS]
-    return upsert_memory(db, business_id, user_id, merged)
+    if row:
+        return row
+    return upsert_memory(db, business_id, user_id, "")

@@ -5,6 +5,7 @@ from datetime import datetime
 from datetime import date
 from typing import Any, Callable, Dict, Optional
 
+from pydantic import ValidationError
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
@@ -32,6 +33,7 @@ from app.services.legacy_import.client import LegacyApiClient
 from app.services.legacy_import.constants import IMPORT_MODE_LEGACY_API
 from app.services.legacy_import.context import reset_legacy_import_active, set_legacy_import_active
 from app.services.legacy_import.document_importer import LegacyDocumentImporter
+from app.services.legacy_import.errors import format_legacy_validation_error
 from app.services.legacy_import.opening_balance_importer import LegacyApiOpeningBalanceImporter
 from app.services.legacy_import.warehouse_document_importer import LegacyApiWarehouseDocumentImporter
 from app.services.legacy_import.table_enrichment import enrich_hesabdari_tables
@@ -224,25 +226,33 @@ class LegacyBusinessImporter:
         currency_id = self._resolve_currency_id(archive)
         fiscal_years = self._build_fiscal_years(archive)
 
-        req = BusinessCreateRequest(
-            name=name,
-            business_type=map_business_type(legacy_biz.get("type") or api_biz.get("type")),
-            business_field=map_business_field(legacy_biz.get("field") or api_biz.get("field")),
-            address=legacy_biz.get("address") or api_biz.get("address"),
-            phone=legacy_biz.get("tel") or api_biz.get("tel"),
-            mobile=legacy_biz.get("mobile") or api_biz.get("mobile"),
-            national_id=legacy_biz.get("shenasemeli") or None,
-            registration_number=legacy_biz.get("shomaresabt") or None,
-            economic_id=legacy_biz.get("codeeghtesadi") or None,
-            country=legacy_biz.get("country") or api_biz.get("country"),
-            province=legacy_biz.get("ostan") or api_biz.get("ostan"),
-            city=legacy_biz.get("shahrestan") or api_biz.get("shahrestan"),
-            postal_code=legacy_biz.get("postalcode") or api_biz.get("postalcode"),
-            default_currency_id=currency_id,
-            currency_ids=[currency_id],
-            fiscal_years=fiscal_years,
-            include_sample_data=False,
-        )
+        try:
+            req = BusinessCreateRequest(
+                name=name,
+                business_type=map_business_type(legacy_biz.get("type") or api_biz.get("type")),
+                business_field=map_business_field(legacy_biz.get("field") or api_biz.get("field")),
+                address=legacy_biz.get("address") or api_biz.get("address"),
+                phone=legacy_biz.get("tel") or api_biz.get("tel"),
+                mobile=legacy_biz.get("mobile") or api_biz.get("mobile"),
+                national_id=legacy_biz.get("shenasemeli") or None,
+                registration_number=legacy_biz.get("shomaresabt") or None,
+                economic_id=legacy_biz.get("codeeghtesadi") or None,
+                country=legacy_biz.get("country") or api_biz.get("country"),
+                province=legacy_biz.get("ostan") or api_biz.get("ostan"),
+                city=legacy_biz.get("shahrestan") or api_biz.get("shahrestan"),
+                postal_code=legacy_biz.get("postalcode") or api_biz.get("postalcode"),
+                default_currency_id=currency_id,
+                currency_ids=[currency_id],
+                fiscal_years=fiscal_years,
+                include_sample_data=False,
+            )
+        except ValidationError as exc:
+            raise ApiError(
+                "LEGACY_BUSINESS_DATA_INVALID",
+                format_legacy_validation_error(exc, stage="ایجاد کسب‌وکار"),
+                http_status=400,
+                details={"validation_errors": exc.errors()},
+            ) from exc
 
         created = create_business(
             self.db,

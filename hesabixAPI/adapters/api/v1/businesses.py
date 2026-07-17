@@ -571,18 +571,20 @@ async def import_business_from_legacy_api(
                     progress_callback=on_progress,
                 )
                 result = importer.run()
-                jm.succeed(job_id, result, "Legacy import completed")
+                jm.succeed(job_id, result, "انتقال از نسخه قدیم با موفقیت انجام شد")
             except Exception as e:
-                error_msg = str(e)
-                error_code = None
-                if isinstance(e, ApiError) and isinstance(e.detail, dict):
-                    err = e.detail.get("error", e.detail)
-                    if isinstance(err, dict):
-                        error_code = err.get("code")
-                        error_msg = err.get("message", error_msg)
-                final_error = f"{error_code}: {error_msg}" if error_code else error_msg
-                jm.fail(job_id, final_error, "Legacy import failed")
-                raise
+                from app.services.legacy_import.errors import format_legacy_import_exception
+
+                error_msg = format_legacy_import_exception(e)
+                # پیام واضح برای کاربر؛ از متن عمومی انگلیسی استفاده نمی‌شود
+                jm.fail(job_id, error_msg, error_msg)
+                # خطا قبلاً در وضعیت job ثبت شده؛ از پرتاب مجدد برای جلوگیری از
+                # لاگ «Unhandled exception» گمراه‌کننده خودداری می‌کنیم.
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "Legacy API import job %s failed: %s", job_id, error_msg
+                )
 
     background.add_task(task)
     return success_response(

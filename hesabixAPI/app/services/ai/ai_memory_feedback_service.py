@@ -1,4 +1,4 @@
-"""یادگیری از بازخورد thumbs."""
+"""یادگیری از بازخورد thumbs — به‌صورت آیتم حافظه (بی‌صدا)."""
 from __future__ import annotations
 
 import logging
@@ -10,8 +10,6 @@ from sqlalchemy.orm import Session
 from adapters.db.models.ai_chat_message import AIChatMessage
 from adapters.db.models.ai_chat_session import AIChatSession
 from app.services.ai.ai_constants import MAX_MEMORY_FEEDBACK_UPDATES_PER_DAY
-from app.services.ai.ai_memory_service import append_to_memory, get_memory
-from app.services.ai.ai_memory_structured import merge_structured_patch, parse_structured, serialize_structured
 from app.services.ai.ai_ops_metrics import log_ai_event
 
 logger = logging.getLogger(__name__)
@@ -61,38 +59,25 @@ def apply_feedback_to_memory(
     if not _can_apply_feedback(user_id, business_id):
         return False
 
-    snippet = (msg.content or "").strip().replace("\n", " ")[:180]
-    if not snippet and not (comment or "").strip():
+    # فقط بازخورد منفی با نظر متنی ارزش حافظه دارد
+    if rating >= 0 or not (comment or "").strip():
         return False
 
-    if rating > 0:
-        section = "ترجیحات تأییدشده"
-        note = "کاربر این پاسخ را مفید دانست"
-    else:
-        section = "بازخورد منفی"
-        note = "کاربر این پاسخ را مفید ندانست"
+    from app.services.ai.ai_memory_item_service import upsert_memory_item
 
-    parts = [note]
-    if snippet:
-        parts.append(f"خلاصه پاسخ: {snippet}")
-    if comment and comment.strip():
-        parts.append(f"نظر: {comment.strip()[:200]}")
-
+    note = f"اجتناب از این الگو: {comment.strip()[:160]}"
     try:
-        append_to_memory(db, business_id, user_id, " — ".join(parts), section_title=section)
+        upsert_memory_item(
+            db,
+            business_id,
+            user_id,
+            item_key=None,
+            category="hint",
+            content=note,
+            source="feedback",
+            confidence="medium",
+        )
         _record_feedback_apply(user_id, business_id)
-
-        if rating < 0 and comment and comment.strip():
-            row = get_memory(db, business_id, user_id)
-            if row:
-                structured = merge_structured_patch(
-                    parse_structured(row.structured),
-                    {"knowledge_hints": [f"اجتناب: {comment.strip()[:100]}"]},
-                )
-                row.structured = serialize_structured(structured)
-                row.updated_at = datetime.utcnow()
-                db.commit()
-
         log_ai_event(
             "memory_feedback_applied",
             business_id=business_id,

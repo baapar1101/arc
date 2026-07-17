@@ -27,6 +27,41 @@ def test_normalize_server_url():
     assert normalize_server_url("https://app.hesabix.ir/") == "https://app.hesabix.ir"
 
 
+def test_format_legacy_validation_error_economic_id_too_long():
+    from pydantic import ValidationError
+
+    from adapters.api.v1.schemas import BusinessCreateRequest, BusinessField, BusinessType
+    from app.services.legacy_import.errors import format_legacy_validation_error
+
+    long_text = "یک زراعت کار، " + ("توضیح " * 20) + "معاف از پرداخت مالیات است."
+    with pytest.raises(ValidationError) as exc_info:
+        BusinessCreateRequest(
+            name="تست",
+            business_type=BusinessType.INDIVIDUAL,
+            business_field=BusinessField.OTHER,
+            default_currency_id=1,
+            economic_id=long_text,
+        )
+    msg = format_legacy_validation_error(exc_info.value, stage="ایجاد کسب‌وکار")
+    assert "شناسه اقتصادی" in msg
+    assert "50" in msg
+    assert "حسابیکس قبلی" in msg
+    assert "errors.pydantic.dev" not in msg
+    assert "string_too_long" not in msg
+
+
+def test_format_legacy_import_exception_uses_api_error_message():
+    from app.core.responses import ApiError
+    from app.services.legacy_import.errors import format_legacy_import_exception
+
+    exc = ApiError(
+        "LEGACY_BUSINESS_DATA_INVALID",
+        "پیام واضح برای کاربر",
+        http_status=400,
+    )
+    assert format_legacy_import_exception(exc) == "پیام واضح برای کاربر"
+
+
 def test_legacy_response_indicates_accpro_required():
     from app.services.legacy_import.client import legacy_response_indicates_accpro_required
 

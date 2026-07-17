@@ -297,6 +297,9 @@ String _toolNameToKey(String name) {
     'update_customer_club_settings': 'aiToolUpdateCustomerClubSettings',
     'get_user_memory': 'aiToolGeneric',
     'update_user_memory': 'aiToolGeneric',
+    'list_memory_items': 'aiToolGeneric',
+    'upsert_memory_item': 'aiToolGeneric',
+    'delete_memory_item': 'aiToolGeneric',
   };
   return map[name] ?? 'aiToolGeneric';
 }
@@ -346,7 +349,10 @@ const _toolLabelFallbackFa = <String, String>{
   'recalculate_customer_club_rfm': 'محاسبه مجدد RFM',
   'update_customer_club_settings': 'تنظیمات باشگاه مشتری',
   'get_user_memory': 'خواندن حافظه دستیار',
-  'update_user_memory': 'به‌روزرسانی حافظه دستیار',
+  'update_user_memory': 'به‌روزرسانی دستورات همیشگی',
+  'list_memory_items': 'فهرست حافظه یادگرفته‌شده',
+  'upsert_memory_item': 'ذخیره حقیقت در حافظه',
+  'delete_memory_item': 'حذف حقیقت از حافظه',
 };
 
 /// خلاصهٔ بودجه agent برای نمایش در استریم.

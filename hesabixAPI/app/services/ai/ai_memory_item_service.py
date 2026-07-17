@@ -124,6 +124,47 @@ def upsert_memory_item(
     return row
 
 
+def clear_all_memory_items(db: Session, business_id: int, user_id: int) -> int:
+    """حذف نرم همهٔ آیتم‌های فعال."""
+    rows = list_memory_items(db, business_id, user_id, limit=MAX_MEMORY_ITEMS_PER_USER)
+    now = datetime.utcnow()
+    for row in rows:
+        row.deleted_at = now
+    if rows:
+        db.commit()
+    return len(rows)
+
+
+def update_memory_item_content(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    item_id: int,
+    content: str,
+) -> Optional[AIMemoryItem]:
+    text = (content or "").strip()[:MAX_MEMORY_ITEM_CONTENT_CHARS]
+    if not text:
+        raise ValueError("متن حافظه خالی است")
+    row = (
+        db.query(AIMemoryItem)
+        .filter(
+            AIMemoryItem.id == item_id,
+            AIMemoryItem.business_id == business_id,
+            AIMemoryItem.user_id == user_id,
+            AIMemoryItem.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not row:
+        return None
+    row.content = text
+    row.source = "user"
+    row.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(row)
+    return row
+
+
 def soft_delete_memory_item(
     db: Session,
     business_id: int,
@@ -178,11 +219,12 @@ def format_memory_items_for_prompt(
     *,
     limit: int = 24,
 ) -> str:
-    """خلاصهٔ آیتم‌های فعال برای system prompt."""
+    """خلاصهٔ آیتم‌های یادگرفته‌شده برای system prompt."""
     items = list_memory_items(db, business_id, user_id, limit=limit)
     if not items:
         return ""
-    lines = ["### حافظهٔ ترجیحات و حقایق (آیتم‌ها)"]
+    lines = ["### آنچه از رفتار/گفتگو دربارهٔ کاربر یاد گرفته‌ای"]
     for item in items:
-        lines.append(f"- [{item.category}] **{item.item_key}**: {item.content[:300]}")
+        src = f" ({item.source})" if item.source and item.source != "assistant" else ""
+        lines.append(f"- {item.content[:300]}{src}")
     return "\n".join(lines)

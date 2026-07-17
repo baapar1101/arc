@@ -330,21 +330,15 @@ class CheckAvailabilityRequest(BaseModel):
     user_query: Optional[str] = None
 
 
-class AIMemoryStructuredPatch(BaseModel):
-    sales_goal_monthly: Optional[float] = None
-    sales_goal_unit: Optional[str] = None
-    currency_display: Optional[str] = None
-    report_style: Optional[str] = None
-    preferred_language: Optional[str] = None
-    business_role: Optional[str] = None
-    internal_terms: Optional[List[Dict[str, str]]] = None
-    knowledge_hints: Optional[List[str]] = None
-
-
 class AIMemoryUpdateRequest(BaseModel):
     business_id: Optional[int] = None
     content: str = ""
-    structured: Optional[AIMemoryStructuredPatch] = None
+    instructions: Optional[str] = None
+
+
+class AIMemoryItemUpdateRequest(BaseModel):
+    business_id: Optional[int] = None
+    content: str
 
 
 class AIKnowledgeCreateRequest(BaseModel):
@@ -513,10 +507,12 @@ async def get_ai_memory(
     if not ctx.can_access_business(int(effective_business_id)):
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
 
-    from app.services.ai.ai_memory_service import get_memory, memory_to_dict
+    from app.services.ai.ai_memory_service import get_memory_payload
 
-    row = get_memory(db, int(effective_business_id), ctx.get_user_id())
-    return success_response(memory_to_dict(row), request)
+    return success_response(
+        get_memory_payload(db, int(effective_business_id), ctx.get_user_id()),
+        request,
+    )
 
 
 @router.delete("/memory", summary="پاک کردن حافظه دستیار")
@@ -532,13 +528,17 @@ async def delete_ai_memory(
     if not ctx.can_access_business(int(effective_business_id)):
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
 
-    from app.services.ai.ai_memory_service import clear_memory, memory_to_dict
+    from app.services.ai.ai_memory_service import clear_memory, get_memory_payload
 
     clear_memory(db, int(effective_business_id), ctx.get_user_id())
-    return success_response(memory_to_dict(None), request, "حافظه پاک شد")
+    return success_response(
+        get_memory_payload(db, int(effective_business_id), ctx.get_user_id()),
+        request,
+        "حافظه پاک شد",
+    )
 
 
-@router.put("/memory", summary="ذخیره حافظه دستیار")
+@router.put("/memory", summary="ذخیره دستورات همیشگی دستیار")
 async def update_ai_memory(
     request: Request,
     params: AIMemoryUpdateRequest = Body(...),
@@ -551,19 +551,20 @@ async def update_ai_memory(
     if not ctx.can_access_business(int(effective_business_id)):
         raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
 
-    from app.services.ai.ai_memory_service import upsert_memory, memory_to_dict
+    from app.services.ai.ai_memory_service import get_memory_payload, upsert_memory
 
-    structured_patch = (
-        params.structured.model_dump(exclude_none=True) if params.structured else None
-    )
-    row = upsert_memory(
+    text = params.instructions if params.instructions is not None else params.content
+    upsert_memory(
         db,
         int(effective_business_id),
         ctx.get_user_id(),
-        params.content,
-        structured=structured_patch,
+        text or "",
     )
-    return success_response(memory_to_dict(row), request, "حافظه ذخیره شد")
+    return success_response(
+        get_memory_payload(db, int(effective_business_id), ctx.get_user_id()),
+        request,
+        "حافظه ذخیره شد",
+    )
 
 
 @router.get("/memory/digest", summary="خلاصهٔ خواندنی حافظه دستیار")
@@ -583,6 +584,64 @@ async def get_ai_memory_digest(
 
     digest = get_memory_digest(db, int(effective_business_id), ctx.get_user_id())
     return success_response(digest, request)
+
+
+@router.put("/memory/items/{item_id}", summary="ویرایش یک حقیقت یادگرفته‌شده")
+async def update_ai_memory_item(
+    request: Request,
+    item_id: int,
+    params: AIMemoryItemUpdateRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    effective_business_id = params.business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+
+    from app.services.ai.ai_memory_item_service import (
+        memory_item_to_dict,
+        update_memory_item_content,
+    )
+
+    row = update_memory_item_content(
+        db,
+        int(effective_business_id),
+        ctx.get_user_id(),
+        item_id,
+        params.content,
+    )
+    if not row:
+        raise ApiError("NOT_FOUND", "آیتم حافظه یافت نشد", http_status=404)
+    return success_response(memory_item_to_dict(row), request, "آیتم به‌روز شد")
+
+
+@router.delete("/memory/items/{item_id}", summary="حذف یک حقیقت یادگرفته‌شده")
+async def delete_ai_memory_item(
+    request: Request,
+    item_id: int,
+    business_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    effective_business_id = business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+
+    from app.services.ai.ai_memory_item_service import soft_delete_memory_item
+
+    ok = soft_delete_memory_item(
+        db,
+        int(effective_business_id),
+        ctx.get_user_id(),
+        item_id=item_id,
+    )
+    if not ok:
+        raise ApiError("NOT_FOUND", "آیتم حافظه یافت نشد", http_status=404)
+    return success_response({"deleted": True, "id": item_id}, request, "آیتم حذف شد")
 
 
 @router.get("/knowledge", summary="لیست اسناد دانشنامه کسب‌وکار")

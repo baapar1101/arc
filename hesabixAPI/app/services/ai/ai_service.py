@@ -980,22 +980,9 @@ class AIService:
     ) -> str:
         from app.services.ai.ai_language_prompt import resolve_effective_chat_language
 
-        preferred: Optional[str] = None
-        bid = business_id or self.business_id
-        if bid:
-            try:
-                from app.services.ai.ai_memory_service import get_memory_structured
-
-                structured = get_memory_structured(
-                    self.db, int(bid), self.ctx.get_user_id()
-                )
-                preferred = structured.get("preferred_language")
-            except Exception as exc:
-                logger.warning("Failed to resolve AI memory language: %s", exc)
-                safe_db_rollback(self.db)
         return resolve_effective_chat_language(
             ctx_language=self.ctx.language,
-            preferred_language=preferred,
+            preferred_language=None,
             user_message=user_query,
         )
 
