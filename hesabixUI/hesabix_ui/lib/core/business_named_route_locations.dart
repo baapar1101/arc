@@ -113,6 +113,7 @@ abstract final class BusinessNamedRoutes {
     'business_settings_business': 'settings/business',
     'business_settings_currencies': 'settings/currencies',
     'business_settings_fx_revaluation': 'settings/fx-revaluation',
+    'business_settings_fx_auto_sync': 'settings/fx-auto-sync',
     'business_settings_quick_sales': 'settings/quick-sales',
     'business_quick_sales': 'quick-sales',
     'business_settings_credit': 'settings/credit',

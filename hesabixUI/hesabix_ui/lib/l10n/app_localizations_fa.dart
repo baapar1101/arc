@@ -15220,6 +15220,167 @@ class AppLocalizationsFa extends AppLocalizations {
       'لحظه مرجع نرخ و رفتار در نبود نرخ (ارز اصلی/فرعی)';
 
   @override
+  String get settingsFxAutoSyncTitle => 'به‌روزرسانی خودکار نرخ تسعیر';
+
+  @override
+  String get settingsFxAutoSyncSubtitle =>
+      'زمان‌بندی ثبت نرخ از اسنپ‌شات مرکزی با آفست درصد یا مبلغ برای هر ارز';
+
+  @override
+  String get fxAutoSyncTitle => 'به‌روزرسانی خودکار نرخ تسعیر';
+
+  @override
+  String get fxAutoSyncHeroTitle => 'نرخ‌هایی که با بازار همراه می‌مانند';
+
+  @override
+  String get fxAutoSyncIntro =>
+      'اسنپ‌شات مرکزی بازار را طبق زمان‌بندی بخوانید، حاشیهٔ خود (درصد یا مبلغ) را اعمال کنید و نرخ تسعیر را خودکار ثبت کنید. کسب‌وکار تک‌ارزی این صفحه را نمی‌بیند.';
+
+  @override
+  String get fxAutoSyncSingleCurrencyHint =>
+      'این قابلیت فقط برای کسب‌وکارهای چندارزی است. ابتدا ارز فرعی اضافه کنید.';
+
+  @override
+  String get fxAutoSyncEnableLabel => 'فعال‌سازی همگام‌سازی خودکار';
+
+  @override
+  String get fxAutoSyncSourceHint =>
+      'منبع: اسنپ‌شات مرکزی سیستم (بدون فراخوانی مستقیم API برای هر کسب‌وکار)';
+
+  @override
+  String get fxAutoSyncScheduleMode => 'زمان‌بندی';
+
+  @override
+  String get fxAutoSyncModeInterval => 'هر N ساعت';
+
+  @override
+  String get fxAutoSyncModeDaily => 'ساعات ثابت روزانه';
+
+  @override
+  String get fxAutoSyncIntervalLabel => 'بازه';
+
+  @override
+  String fxAutoSyncEveryNHours(int hours) {
+    return 'هر $hours ساعت';
+  }
+
+  @override
+  String get fxAutoSyncAddTimeLabel => 'افزودن ساعت (HH:MM)';
+
+  @override
+  String get fxAutoSyncAddTime => 'افزودن';
+
+  @override
+  String get fxAutoSyncInvalidTime =>
+      'ساعت نامعتبر است. فرمت HH:MM (مثلاً ۰۹:۰۰).';
+
+  @override
+  String fxAutoSyncTimezoneHint(String tz) {
+    return 'ساعات بر اساس منطقه زمانی: $tz';
+  }
+
+  @override
+  String get fxAutoSyncOptionsTitle => 'گزینه‌های ایمنی';
+
+  @override
+  String get fxAutoSyncSkipUnchanged => 'رد کردن اگر تغییر نرخ ناچیز باشد';
+
+  @override
+  String get fxAutoSyncMinChangePercent => 'حداقل درصد تغییر برای ثبت';
+
+  @override
+  String get fxAutoSyncBlockStale => 'مسدود کردن وقتی اسنپ‌شات کهنه است';
+
+  @override
+  String get fxAutoSyncStaleHours => 'کهنگی پس از (ساعت)';
+
+  @override
+  String get fxAutoSyncOffsetsTitle => 'آفست هر ارز';
+
+  @override
+  String get fxAutoSyncOffsetsHint =>
+      'پیش‌نمایش با مقادیر فعلی فرم (پیش‌نویس) محاسبه می‌شود. برای ماندگاری، ذخیره کنید.';
+
+  @override
+  String get fxAutoSyncRefreshPreview => 'Refresh preview';
+
+  @override
+  String get fxAutoSyncNoSecondaryCurrencies =>
+      'No secondary currencies found.';
+
+  @override
+  String get fxAutoSyncOffsetType => 'Offset type';
+
+  @override
+  String get fxAutoSyncOffsetNone => 'None';
+
+  @override
+  String get fxAutoSyncOffsetPercent => 'Percent';
+
+  @override
+  String get fxAutoSyncOffsetAmount => 'Fixed amount';
+
+  @override
+  String get fxAutoSyncOffsetDirection => 'Direction';
+
+  @override
+  String get fxAutoSyncOffsetUp => 'Above market (+)';
+
+  @override
+  String get fxAutoSyncOffsetDown => 'Below market (−)';
+
+  @override
+  String get fxAutoSyncOffsetValue => 'Value';
+
+  @override
+  String get fxAutoSyncRefRate => 'Reference rate';
+
+  @override
+  String get fxAutoSyncFinalRate => 'Final rate after offset';
+
+  @override
+  String get fxAutoSyncPreviewSavedHint =>
+      'پیش‌نمایش زنده از اسنپ‌شات مرکزی با پیش‌نویس فعلی.';
+
+  @override
+  String get fxAutoSyncRunNow => 'اجرای فوری';
+
+  @override
+  String get fxAutoSyncRunDone => 'همگام‌سازی انجام شد';
+
+  @override
+  String get fxAutoSyncStatusActive => 'زمان‌بندی فعال';
+
+  @override
+  String get fxAutoSyncStatusInactive => 'زمان‌بندی خاموش';
+
+  @override
+  String get fxAutoSyncLastRun => 'آخرین اجرا';
+
+  @override
+  String get fxAutoSyncNextRun => 'اجرای بعدی';
+
+  @override
+  String fxAutoSyncLoadError(String error) {
+    return 'بارگذاری تنظیمات خودکار ناموفق: $error';
+  }
+
+  @override
+  String fxAutoSyncSaveError(String error) {
+    return 'ذخیره تنظیمات خودکار ناموفق: $error';
+  }
+
+  @override
+  String fxAutoSyncPreviewError(String error) {
+    return 'بارگذاری پیش‌نمایش ناموفق: $error';
+  }
+
+  @override
+  String fxAutoSyncRunError(String error) {
+    return 'اجرای همگام‌سازی ناموفق: $error';
+  }
+
+  @override
   String get fxRevaluationSettingsTitle => 'تسعیر فاکتور (سیاست)';
 
   @override

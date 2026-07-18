@@ -5734,6 +5734,83 @@
   "settingsSideCurrenciesSubtitle": "Add and remove currencies available for this business",
   "settingsInvoiceFxPolicyTitle": "Invoice FX revaluation policy",
   "settingsInvoiceFxPolicySubtitle": "Reference time for the rate and behavior when no rate exists (base vs. foreign currency)",
+  "settingsFxAutoSyncTitle": "Automatic FX rate sync",
+  "settingsFxAutoSyncSubtitle": "Schedule revaluation rates from the central snapshot with per-currency offsets",
+  "fxAutoSyncTitle": "Automatic FX rate sync",
+  "fxAutoSyncHeroTitle": "Rates that keep up with the market",
+  "fxAutoSyncIntro": "Pull the central market snapshot on a schedule, apply your margin (percent or amount), and write revaluation rates automatically. Single-currency businesses never see this.",
+  "fxAutoSyncSingleCurrencyHint": "This feature is only available for multi-currency businesses. Add a secondary currency first.",
+  "fxAutoSyncEnableLabel": "Enable automatic sync",
+  "fxAutoSyncSourceHint": "Source: central system snapshot (not a direct API call per business)",
+  "fxAutoSyncScheduleMode": "Schedule",
+  "fxAutoSyncModeInterval": "Every N hours",
+  "fxAutoSyncModeDaily": "Daily times",
+  "fxAutoSyncIntervalLabel": "Interval",
+  "fxAutoSyncEveryNHours": "Every {hours} hours",
+  "@fxAutoSyncEveryNHours": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+  "fxAutoSyncAddTimeLabel": "Add time (HH:MM)",
+  "fxAutoSyncAddTime": "Add",
+  "fxAutoSyncInvalidTime": "Invalid time. Use HH:MM (e.g. 09:00).",
+  "fxAutoSyncTimezoneHint": "Times are evaluated in timezone: {tz}",
+  "@fxAutoSyncTimezoneHint": {
+    "placeholders": {
+      "tz": { "type": "String" }
+    }
+  },
+  "fxAutoSyncOptionsTitle": "Safety options",
+  "fxAutoSyncSkipUnchanged": "Skip if rate barely changed",
+  "fxAutoSyncMinChangePercent": "Minimum change to write (%)",
+  "fxAutoSyncBlockStale": "Block when snapshot is stale",
+  "fxAutoSyncStaleHours": "Stale after (hours)",
+  "fxAutoSyncOffsetsTitle": "Per-currency offsets",
+  "fxAutoSyncOffsetsHint": "Preview uses your current form values (draft). Save to persist schedule and offsets.",
+  "fxAutoSyncRefreshPreview": "Refresh preview",
+  "fxAutoSyncNoSecondaryCurrencies": "No secondary currencies found.",
+  "fxAutoSyncOffsetType": "Offset type",
+  "fxAutoSyncOffsetNone": "None",
+  "fxAutoSyncOffsetPercent": "Percent",
+  "fxAutoSyncOffsetAmount": "Fixed amount",
+  "fxAutoSyncOffsetDirection": "Direction",
+  "fxAutoSyncOffsetUp": "Above market (+)",
+  "fxAutoSyncOffsetDown": "Below market (−)",
+  "fxAutoSyncOffsetValue": "Value",
+  "fxAutoSyncRefRate": "Reference rate",
+  "fxAutoSyncFinalRate": "Final rate after offset",
+  "fxAutoSyncPreviewSavedHint": "Live draft preview from the central snapshot.",
+  "fxAutoSyncRunNow": "Run now",
+  "fxAutoSyncRunDone": "Sync finished",
+  "fxAutoSyncStatusActive": "Schedule active",
+  "fxAutoSyncStatusInactive": "Schedule off",
+  "fxAutoSyncLastRun": "Last run",
+  "fxAutoSyncNextRun": "Next run",
+  "fxAutoSyncLoadError": "Failed to load auto-sync settings: {error}",
+  "@fxAutoSyncLoadError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "fxAutoSyncSaveError": "Failed to save auto-sync settings: {error}",
+  "@fxAutoSyncSaveError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "fxAutoSyncPreviewError": "Failed to load preview: {error}",
+  "@fxAutoSyncPreviewError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "fxAutoSyncRunError": "Failed to run sync: {error}",
+  "@fxAutoSyncRunError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "fxRevaluationSettingsTitle": "Invoice revaluation (policy)",
   "fxRevaluationSettingsIntro": "These options define the reference time for the revaluation rate (against the base currency) for invoices in foreign currency, and what happens if no rate exists.",
   "fxRevaluationAsOfSourceLabel": "Reference time for the rate (as_of)",

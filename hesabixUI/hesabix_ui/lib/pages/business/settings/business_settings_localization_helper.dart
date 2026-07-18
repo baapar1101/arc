@@ -13,6 +13,8 @@ class BusinessSettingsLocalizationHelper {
         return t.settingsSideCurrenciesTitle;
       case 'settingsInvoiceFxPolicyTitle':
         return t.settingsInvoiceFxPolicyTitle;
+      case 'settingsFxAutoSyncTitle':
+        return t.settingsFxAutoSyncTitle;
       case 'businessSettingsFiscalYearEdit':
         return t.businessSettingsFiscalYearEdit;
       case 'creditSettingsTitle':
@@ -82,6 +84,8 @@ class BusinessSettingsLocalizationHelper {
         return t.settingsSideCurrenciesSubtitle;
       case 'settingsInvoiceFxPolicySubtitle':
         return t.settingsInvoiceFxPolicySubtitle;
+      case 'settingsFxAutoSyncSubtitle':
+        return t.settingsFxAutoSyncSubtitle;
       case 'businessSettingsFiscalYearEditDescription':
         return t.businessSettingsFiscalYearEditDescription;
       case 'creditSettingsSubtitle':

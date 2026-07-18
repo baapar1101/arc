@@ -16,6 +16,7 @@ adapters/api/v1/business_dashboard.py
 adapters/api/v1/business_data_table_settings.py
 adapters/api/v1/business_frequent_descriptions.py
 adapters/api/v1/business_ftp_backup.py
+adapters/api/v1/business_fx_global_rates.py
 adapters/api/v1/business_notifications.py
 adapters/api/v1/business_users.py
 adapters/api/v1/businesses.py
@@ -102,6 +103,7 @@ adapters/api/v1/admin/document_monetization.py
 adapters/api/v1/admin/email_config.py
 adapters/api/v1/admin/file_storage.py
 adapters/api/v1/admin/firewall.py
+adapters/api/v1/admin/fx_providers.py
 adapters/api/v1/admin/legacy_import.py
 adapters/api/v1/admin/marketplace.py
 adapters/api/v1/admin/monitoring.py
@@ -248,6 +250,7 @@ adapters/db/models/file_storage.py
 adapters/db/models/firewall_rate_policy.py
 adapters/db/models/firewall_rule.py
 adapters/db/models/fiscal_year.py
+adapters/db/models/fx_rate_provider.py
 adapters/db/models/invoice_item_line.py
 adapters/db/models/marketplace.py
 adapters/db/models/messenger_operator_session.py
@@ -502,6 +505,8 @@ app/services/file_storage_service.py
 app/services/file_storage_share_service.py
 app/services/firewall_service.py
 app/services/fiscal_year_rollback_service.py
+app/services/fx_rate_background_jobs.py
+app/services/fx_rate_provider_service.py
 app/services/general_ledger_service.py
 app/services/invoice_adjustments_service.py
 app/services/invoice_bulk_upsert_service.py
@@ -986,6 +991,7 @@ migrations/versions/20260711_000002_documents_timestamptz.py
 migrations/versions/20260714_000001_ai_prompts_language_policy.py
 migrations/versions/20260714_000002_fix_ai_chat_message_trace_content.py
 migrations/versions/20260714_000003_document_code_reservations.py
+migrations/versions/20260718_000001_fx_rate_providers_global_rates.py
 tests/__init__.py
 tests/test_ai_agent_continuation.py
 tests/test_ai_agent_regression_db.py

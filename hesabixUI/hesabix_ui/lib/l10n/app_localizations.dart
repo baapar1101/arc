@@ -28306,6 +28306,288 @@ abstract class AppLocalizations {
   /// **'Reference time for the rate and behavior when no rate exists (base vs. foreign currency)'**
   String get settingsInvoiceFxPolicySubtitle;
 
+  /// No description provided for @settingsFxAutoSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic FX rate sync'**
+  String get settingsFxAutoSyncTitle;
+
+  /// No description provided for @settingsFxAutoSyncSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule revaluation rates from the central snapshot with per-currency offsets'**
+  String get settingsFxAutoSyncSubtitle;
+
+  /// No description provided for @fxAutoSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic FX rate sync'**
+  String get fxAutoSyncTitle;
+
+  /// No description provided for @fxAutoSyncHeroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rates that keep up with the market'**
+  String get fxAutoSyncHeroTitle;
+
+  /// No description provided for @fxAutoSyncIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull the central market snapshot on a schedule, apply your margin (percent or amount), and write revaluation rates automatically. Single-currency businesses never see this.'**
+  String get fxAutoSyncIntro;
+
+  /// No description provided for @fxAutoSyncSingleCurrencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This feature is only available for multi-currency businesses. Add a secondary currency first.'**
+  String get fxAutoSyncSingleCurrencyHint;
+
+  /// No description provided for @fxAutoSyncEnableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable automatic sync'**
+  String get fxAutoSyncEnableLabel;
+
+  /// No description provided for @fxAutoSyncSourceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Source: central system snapshot (not a direct API call per business)'**
+  String get fxAutoSyncSourceHint;
+
+  /// No description provided for @fxAutoSyncScheduleMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get fxAutoSyncScheduleMode;
+
+  /// No description provided for @fxAutoSyncModeInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Every N hours'**
+  String get fxAutoSyncModeInterval;
+
+  /// No description provided for @fxAutoSyncModeDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily times'**
+  String get fxAutoSyncModeDaily;
+
+  /// No description provided for @fxAutoSyncIntervalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Interval'**
+  String get fxAutoSyncIntervalLabel;
+
+  /// No description provided for @fxAutoSyncEveryNHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Every {hours} hours'**
+  String fxAutoSyncEveryNHours(int hours);
+
+  /// No description provided for @fxAutoSyncAddTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add time (HH:MM)'**
+  String get fxAutoSyncAddTimeLabel;
+
+  /// No description provided for @fxAutoSyncAddTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get fxAutoSyncAddTime;
+
+  /// No description provided for @fxAutoSyncInvalidTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid time. Use HH:MM (e.g. 09:00).'**
+  String get fxAutoSyncInvalidTime;
+
+  /// No description provided for @fxAutoSyncTimezoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Times are evaluated in timezone: {tz}'**
+  String fxAutoSyncTimezoneHint(String tz);
+
+  /// No description provided for @fxAutoSyncOptionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Safety options'**
+  String get fxAutoSyncOptionsTitle;
+
+  /// No description provided for @fxAutoSyncSkipUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip if rate barely changed'**
+  String get fxAutoSyncSkipUnchanged;
+
+  /// No description provided for @fxAutoSyncMinChangePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum change to write (%)'**
+  String get fxAutoSyncMinChangePercent;
+
+  /// No description provided for @fxAutoSyncBlockStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Block when snapshot is stale'**
+  String get fxAutoSyncBlockStale;
+
+  /// No description provided for @fxAutoSyncStaleHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Stale after (hours)'**
+  String get fxAutoSyncStaleHours;
+
+  /// No description provided for @fxAutoSyncOffsetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-currency offsets'**
+  String get fxAutoSyncOffsetsTitle;
+
+  /// No description provided for @fxAutoSyncOffsetsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview uses your current form values (draft). Save to persist schedule and offsets.'**
+  String get fxAutoSyncOffsetsHint;
+
+  /// No description provided for @fxAutoSyncRefreshPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh preview'**
+  String get fxAutoSyncRefreshPreview;
+
+  /// No description provided for @fxAutoSyncNoSecondaryCurrencies.
+  ///
+  /// In en, this message translates to:
+  /// **'No secondary currencies found.'**
+  String get fxAutoSyncNoSecondaryCurrencies;
+
+  /// No description provided for @fxAutoSyncOffsetType.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset type'**
+  String get fxAutoSyncOffsetType;
+
+  /// No description provided for @fxAutoSyncOffsetNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get fxAutoSyncOffsetNone;
+
+  /// No description provided for @fxAutoSyncOffsetPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get fxAutoSyncOffsetPercent;
+
+  /// No description provided for @fxAutoSyncOffsetAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed amount'**
+  String get fxAutoSyncOffsetAmount;
+
+  /// No description provided for @fxAutoSyncOffsetDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get fxAutoSyncOffsetDirection;
+
+  /// No description provided for @fxAutoSyncOffsetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Above market (+)'**
+  String get fxAutoSyncOffsetUp;
+
+  /// No description provided for @fxAutoSyncOffsetDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Below market (−)'**
+  String get fxAutoSyncOffsetDown;
+
+  /// No description provided for @fxAutoSyncOffsetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get fxAutoSyncOffsetValue;
+
+  /// No description provided for @fxAutoSyncRefRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference rate'**
+  String get fxAutoSyncRefRate;
+
+  /// No description provided for @fxAutoSyncFinalRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Final rate after offset'**
+  String get fxAutoSyncFinalRate;
+
+  /// No description provided for @fxAutoSyncPreviewSavedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Live draft preview from the central snapshot.'**
+  String get fxAutoSyncPreviewSavedHint;
+
+  /// No description provided for @fxAutoSyncRunNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run now'**
+  String get fxAutoSyncRunNow;
+
+  /// No description provided for @fxAutoSyncRunDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync finished'**
+  String get fxAutoSyncRunDone;
+
+  /// No description provided for @fxAutoSyncStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule active'**
+  String get fxAutoSyncStatusActive;
+
+  /// No description provided for @fxAutoSyncStatusInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule off'**
+  String get fxAutoSyncStatusInactive;
+
+  /// No description provided for @fxAutoSyncLastRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Last run'**
+  String get fxAutoSyncLastRun;
+
+  /// No description provided for @fxAutoSyncNextRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Next run'**
+  String get fxAutoSyncNextRun;
+
+  /// No description provided for @fxAutoSyncLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load auto-sync settings: {error}'**
+  String fxAutoSyncLoadError(String error);
+
+  /// No description provided for @fxAutoSyncSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save auto-sync settings: {error}'**
+  String fxAutoSyncSaveError(String error);
+
+  /// No description provided for @fxAutoSyncPreviewError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load preview: {error}'**
+  String fxAutoSyncPreviewError(String error);
+
+  /// No description provided for @fxAutoSyncRunError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to run sync: {error}'**
+  String fxAutoSyncRunError(String error);
+
   /// No description provided for @fxRevaluationSettingsTitle.
   ///
   /// In en, this message translates to:

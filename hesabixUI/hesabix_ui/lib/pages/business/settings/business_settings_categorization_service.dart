@@ -133,6 +133,17 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 3,
         ),
+      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+        _item(
+          id: 'fx_auto_sync',
+          title: 'settingsFxAutoSyncTitle',
+          description: 'settingsFxAutoSyncSubtitle',
+          icon: Icons.autorenew_rounded,
+          color: const Color(0xFF00695C),
+          route: ctx.panelRoute('settings/fx-auto-sync'),
+          categoryId: 'business_finance',
+          order: 4,
+        ),
       if (ctx.canEditFiscalYear)
         _item(
           id: 'fiscal_year',
@@ -142,7 +153,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFF00897B),
           route: ctx.panelRoute('settings/fiscal-year'),
           categoryId: 'business_finance',
-          order: 4,
+          order: 5,
         ),
       if (ctx.canJoinSettings)
         _item(
@@ -153,7 +164,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFFEF6C00),
           route: ctx.panelRoute('settings/credit'),
           categoryId: 'business_finance',
-          order: 5,
+          order: 6,
         ),
     ];
 

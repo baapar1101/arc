@@ -5776,6 +5776,83 @@
   "settingsSideCurrenciesSubtitle": "اضافه و حذف ارزهای قابل استفاده در کسب‌وکار",
   "settingsInvoiceFxPolicyTitle": "سیاست تسعیر فاکتور",
   "settingsInvoiceFxPolicySubtitle": "لحظه مرجع نرخ و رفتار در نبود نرخ (ارز اصلی/فرعی)",
+  "settingsFxAutoSyncTitle": "به‌روزرسانی خودکار نرخ تسعیر",
+  "settingsFxAutoSyncSubtitle": "زمان‌بندی ثبت نرخ از اسنپ‌شات مرکزی با آفست درصد یا مبلغ برای هر ارز",
+  "fxAutoSyncTitle": "به‌روزرسانی خودکار نرخ تسعیر",
+  "fxAutoSyncHeroTitle": "نرخ‌هایی که با بازار همراه می‌مانند",
+  "fxAutoSyncIntro": "اسنپ‌شات مرکزی بازار را طبق زمان‌بندی بخوانید، حاشیهٔ خود (درصد یا مبلغ) را اعمال کنید و نرخ تسعیر را خودکار ثبت کنید. کسب‌وکار تک‌ارزی این صفحه را نمی‌بیند.",
+  "fxAutoSyncSingleCurrencyHint": "این قابلیت فقط برای کسب‌وکارهای چندارزی است. ابتدا ارز فرعی اضافه کنید.",
+  "fxAutoSyncEnableLabel": "فعال‌سازی همگام‌سازی خودکار",
+  "fxAutoSyncSourceHint": "منبع: اسنپ‌شات مرکزی سیستم (بدون فراخوانی مستقیم API برای هر کسب‌وکار)",
+  "fxAutoSyncScheduleMode": "زمان‌بندی",
+  "fxAutoSyncModeInterval": "هر N ساعت",
+  "fxAutoSyncModeDaily": "ساعات ثابت روزانه",
+  "fxAutoSyncIntervalLabel": "بازه",
+  "fxAutoSyncEveryNHours": "هر {hours} ساعت",
+  "@fxAutoSyncEveryNHours": {
+    "placeholders": {
+      "hours": { "type": "int" }
+    }
+  },
+  "fxAutoSyncAddTimeLabel": "افزودن ساعت (HH:MM)",
+  "fxAutoSyncAddTime": "افزودن",
+  "fxAutoSyncInvalidTime": "ساعت نامعتبر است. فرمت HH:MM (مثلاً ۰۹:۰۰).",
+  "fxAutoSyncTimezoneHint": "ساعات بر اساس منطقه زمانی: {tz}",
+  "@fxAutoSyncTimezoneHint": {
+    "placeholders": {
+      "tz": { "type": "String" }
+    }
+  },
+  "fxAutoSyncOptionsTitle": "گزینه‌های ایمنی",
+  "fxAutoSyncSkipUnchanged": "رد کردن اگر تغییر نرخ ناچیز باشد",
+  "fxAutoSyncMinChangePercent": "حداقل درصد تغییر برای ثبت",
+  "fxAutoSyncBlockStale": "مسدود کردن وقتی اسنپ‌شات کهنه است",
+  "fxAutoSyncStaleHours": "کهنگی پس از (ساعت)",
+  "fxAutoSyncOffsetsTitle": "آفست هر ارز",
+  "fxAutoSyncOffsetsHint": "پیش‌نمایش با مقادیر فعلی فرم (پیش‌نویس) محاسبه می‌شود. برای ماندگاری، ذخیره کنید.",
+  "fxAutoSyncRefreshPreview": "تازه‌سازی پیش‌نمایش",
+  "fxAutoSyncNoSecondaryCurrencies": "ارز فرعی‌ای یافت نشد.",
+  "fxAutoSyncOffsetType": "نوع آفست",
+  "fxAutoSyncOffsetNone": "بدون آفست",
+  "fxAutoSyncOffsetPercent": "درصد",
+  "fxAutoSyncOffsetAmount": "مبلغ ثابت",
+  "fxAutoSyncOffsetDirection": "جهت",
+  "fxAutoSyncOffsetUp": "بالاتر از بازار (+)",
+  "fxAutoSyncOffsetDown": "پایین‌تر از بازار (−)",
+  "fxAutoSyncOffsetValue": "مقدار",
+  "fxAutoSyncRefRate": "نرخ مرجع",
+  "fxAutoSyncFinalRate": "نرخ نهایی پس از آفست",
+  "fxAutoSyncPreviewSavedHint": "پیش‌نمایش زنده از اسنپ‌شات مرکزی با پیش‌نویس فعلی.",
+  "fxAutoSyncRunNow": "اجرای فوری",
+  "fxAutoSyncRunDone": "همگام‌سازی انجام شد",
+  "fxAutoSyncStatusActive": "زمان‌بندی فعال",
+  "fxAutoSyncStatusInactive": "زمان‌بندی خاموش",
+  "fxAutoSyncLastRun": "آخرین اجرا",
+  "fxAutoSyncNextRun": "اجرای بعدی",
+  "fxAutoSyncLoadError": "بارگذاری تنظیمات خودکار ناموفق: {error}",
+  "@fxAutoSyncLoadError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "fxAutoSyncSaveError": "ذخیره تنظیمات خودکار ناموفق: {error}",
+  "@fxAutoSyncSaveError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "fxAutoSyncPreviewError": "بارگذاری پیش‌نمایش ناموفق: {error}",
+  "@fxAutoSyncPreviewError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "fxAutoSyncRunError": "اجرای همگام‌سازی ناموفق: {error}",
+  "@fxAutoSyncRunError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "fxRevaluationSettingsTitle": "تسعیر فاکتور (سیاست)",
   "fxRevaluationSettingsIntro": "این گزینه‌ها تعیین می‌کنند «لحظه مرجع» نرخ تسعیر (نسبت به ارز اصلی) برای فاکتورهای ارزی چگونه محاسبه شود و اگر نرخی نبود چه رفتاری انجام شود.",
   "fxRevaluationAsOfSourceLabel": "لحظه مرجع نرخ (as_of)",

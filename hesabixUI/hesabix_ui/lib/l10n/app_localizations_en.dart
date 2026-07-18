@@ -15308,6 +15308,166 @@ class AppLocalizationsEn extends AppLocalizations {
       'Reference time for the rate and behavior when no rate exists (base vs. foreign currency)';
 
   @override
+  String get settingsFxAutoSyncTitle => 'Automatic FX rate sync';
+
+  @override
+  String get settingsFxAutoSyncSubtitle =>
+      'Schedule revaluation rates from the central snapshot with per-currency offsets';
+
+  @override
+  String get fxAutoSyncTitle => 'Automatic FX rate sync';
+
+  @override
+  String get fxAutoSyncHeroTitle => 'Rates that keep up with the market';
+
+  @override
+  String get fxAutoSyncIntro =>
+      'Pull the central market snapshot on a schedule, apply your margin (percent or amount), and write revaluation rates automatically. Single-currency businesses never see this.';
+
+  @override
+  String get fxAutoSyncSingleCurrencyHint =>
+      'This feature is only available for multi-currency businesses. Add a secondary currency first.';
+
+  @override
+  String get fxAutoSyncEnableLabel => 'Enable automatic sync';
+
+  @override
+  String get fxAutoSyncSourceHint =>
+      'Source: central system snapshot (not a direct API call per business)';
+
+  @override
+  String get fxAutoSyncScheduleMode => 'Schedule';
+
+  @override
+  String get fxAutoSyncModeInterval => 'Every N hours';
+
+  @override
+  String get fxAutoSyncModeDaily => 'Daily times';
+
+  @override
+  String get fxAutoSyncIntervalLabel => 'Interval';
+
+  @override
+  String fxAutoSyncEveryNHours(int hours) {
+    return 'Every $hours hours';
+  }
+
+  @override
+  String get fxAutoSyncAddTimeLabel => 'Add time (HH:MM)';
+
+  @override
+  String get fxAutoSyncAddTime => 'Add';
+
+  @override
+  String get fxAutoSyncInvalidTime => 'Invalid time. Use HH:MM (e.g. 09:00).';
+
+  @override
+  String fxAutoSyncTimezoneHint(String tz) {
+    return 'Times are evaluated in timezone: $tz';
+  }
+
+  @override
+  String get fxAutoSyncOptionsTitle => 'Safety options';
+
+  @override
+  String get fxAutoSyncSkipUnchanged => 'Skip if rate barely changed';
+
+  @override
+  String get fxAutoSyncMinChangePercent => 'Minimum change to write (%)';
+
+  @override
+  String get fxAutoSyncBlockStale => 'Block when snapshot is stale';
+
+  @override
+  String get fxAutoSyncStaleHours => 'Stale after (hours)';
+
+  @override
+  String get fxAutoSyncOffsetsTitle => 'Per-currency offsets';
+
+  @override
+  String get fxAutoSyncOffsetsHint =>
+      'Preview uses your current form values (draft). Save to persist schedule and offsets.';
+
+  @override
+  String get fxAutoSyncRefreshPreview => 'Refresh preview';
+
+  @override
+  String get fxAutoSyncNoSecondaryCurrencies =>
+      'No secondary currencies found.';
+
+  @override
+  String get fxAutoSyncOffsetType => 'Offset type';
+
+  @override
+  String get fxAutoSyncOffsetNone => 'None';
+
+  @override
+  String get fxAutoSyncOffsetPercent => 'Percent';
+
+  @override
+  String get fxAutoSyncOffsetAmount => 'Fixed amount';
+
+  @override
+  String get fxAutoSyncOffsetDirection => 'Direction';
+
+  @override
+  String get fxAutoSyncOffsetUp => 'Above market (+)';
+
+  @override
+  String get fxAutoSyncOffsetDown => 'Below market (−)';
+
+  @override
+  String get fxAutoSyncOffsetValue => 'Value';
+
+  @override
+  String get fxAutoSyncRefRate => 'Reference rate';
+
+  @override
+  String get fxAutoSyncFinalRate => 'Final rate after offset';
+
+  @override
+  String get fxAutoSyncPreviewSavedHint =>
+      'Live draft preview from the central snapshot.';
+
+  @override
+  String get fxAutoSyncRunNow => 'Run now';
+
+  @override
+  String get fxAutoSyncRunDone => 'Sync finished';
+
+  @override
+  String get fxAutoSyncStatusActive => 'Schedule active';
+
+  @override
+  String get fxAutoSyncStatusInactive => 'Schedule off';
+
+  @override
+  String get fxAutoSyncLastRun => 'Last run';
+
+  @override
+  String get fxAutoSyncNextRun => 'Next run';
+
+  @override
+  String fxAutoSyncLoadError(String error) {
+    return 'Failed to load auto-sync settings: $error';
+  }
+
+  @override
+  String fxAutoSyncSaveError(String error) {
+    return 'Failed to save auto-sync settings: $error';
+  }
+
+  @override
+  String fxAutoSyncPreviewError(String error) {
+    return 'Failed to load preview: $error';
+  }
+
+  @override
+  String fxAutoSyncRunError(String error) {
+    return 'Failed to run sync: $error';
+  }
+
+  @override
   String get fxRevaluationSettingsTitle => 'Invoice revaluation (policy)';
 
   @override

@@ -78,6 +78,7 @@ import 'pages/business/settings_page.dart';
 import 'pages/business/business_info_settings_page.dart';
 import 'pages/business/business_currencies_settings_page.dart';
 import 'pages/business/fx_revaluation_settings_page.dart';
+import 'pages/business/fx_auto_sync_settings_page.dart';
 import 'pages/business/reports_page.dart';
 import 'pages/business/kardex_page.dart';
 import 'pages/business/debtors_report_page.dart';
@@ -3372,6 +3373,24 @@ class _MyAppState extends State<MyApp> {
                   );
                 }
                 return hesabixNoTransitionPage(state, FxRevaluationSettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'settings/fx-auto-sync',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'business') &&
+                    !_authStore!.hasBusinessPermission('currency_revaluation', 'view')) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  FxAutoSyncSettingsPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),
