@@ -96,6 +96,9 @@ class AccountLine {
     this.extraInfo,
   });
 
+  /// خط کارمزد داخلی سند (کسر از بانک/صندوق و هزینه ۷۰۹۰۲) — جزء پرداخت مشتری نیست.
+  bool get isCommissionLine => extraInfo?['is_commission_line'] == true;
+
   factory AccountLine.fromJson(dynamic json) {
     final m = json is Map ? Map<String, dynamic>.from(json) : <String, dynamic>{};
     // API فیلدهای توصیفی را گاهی در ریشهٔ خط و نه فقط داخل extra_info برمی‌گرداند.

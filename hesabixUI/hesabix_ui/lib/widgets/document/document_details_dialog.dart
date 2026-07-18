@@ -3890,11 +3890,13 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   List<_InvoicePaymentDisplayEntry> _paymentDisplayEntries() {
     final entries = <_InvoicePaymentDisplayEntry>[];
     for (final doc in _paymentDocuments) {
-      if (doc.accountLines.isEmpty) {
+      // فقط خطوط پرداخت مشتری؛ خطوط کارمزد داخلی (کسر بانک + ۷۰۹۰۲) نمایش داده نمی‌شوند.
+      final paymentLines = doc.accountLines.where((l) => !l.isCommissionLine).toList();
+      if (paymentLines.isEmpty) {
         entries.add(_InvoicePaymentDisplayEntry(document: doc));
         continue;
       }
-      for (final line in doc.accountLines) {
+      for (final line in paymentLines) {
         entries.add(_InvoicePaymentDisplayEntry(document: doc, accountLine: line));
       }
     }
@@ -4049,7 +4051,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     if (line != null) {
       addMethodFromLine(line);
     } else {
-      for (final accountLine in doc.accountLines) {
+      for (final accountLine in doc.accountLines.where((l) => !l.isCommissionLine)) {
         addMethodFromLine(accountLine);
       }
     }
@@ -4139,6 +4141,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 ),
               ],
             ),
+            if (line != null && line.commission != null && line.commission! > 0) ...[
+              const SizedBox(height: 8),
+              _buildPaymentInfoRow(
+                'کارمزد بانکی:',
+                formatWithThousands(line.commission!.toInt()),
+                isAmount: true,
+              ),
+            ],
             if (transactionMethods.isNotEmpty) ...[
               const SizedBox(height: 8),
               _buildPaymentInfoRow(
@@ -4989,10 +4999,17 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
       _amountController.text = formatWithThousands(doc.totalAmount, decimalPlaces: 0);
       _descriptionController.text = doc.description ?? '';
       
-      // تعیین روش پرداخت از account_lines
-      if (doc.accountLines.isNotEmpty) {
-        final firstLine = doc.accountLines.first;
+      // تعیین روش پرداخت از خطوط حساب (بدون خطوط کارمزد داخلی)
+      final paymentLines = doc.accountLines.where((l) => !l.isCommissionLine).toList();
+      if (paymentLines.isNotEmpty) {
+        final firstLine = paymentLines.first;
         _selectedTransactionMethod = firstLine.transactionType;
+        if (firstLine.commission != null && firstLine.commission! > 0) {
+          _commissionController.text = formatWithThousands(
+            firstLine.commission!,
+            decimalPlaces: 0,
+          );
+        }
         if (_selectedTransactionMethod == 'bank') {
           _selectedBankId = firstLine.extraInfo?['bank_id']?.toString();
         } else if (_selectedTransactionMethod == 'cash_register') {

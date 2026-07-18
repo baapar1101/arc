@@ -1155,10 +1155,9 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 final doc = await receiptPaymentService.getById(docId);
                 if (doc == null) continue;
                 
-                // مجموع account_lines (بدون کارمزد)
+                // مجموع account_lines (بدون کارمزد داخلی پذیرنده)
                 for (final accountLine in doc.accountLines) {
-                  final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
-                  if (!isCommission) {
+                  if (!accountLine.isCommissionLine) {
                     totalPaid += accountLine.amount;
                   }
                 }
@@ -1229,10 +1228,9 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             
             processedDocIds.add(docId);
             
-            // مجموع account_lines (بدون کارمزد)
+            // مجموع account_lines (بدون کارمزد داخلی پذیرنده)
             for (final accountLine in doc.accountLines) {
-              final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
-              if (!isCommission) {
+              if (!accountLine.isCommissionLine) {
                 totalPaid += accountLine.amount;
               }
             }

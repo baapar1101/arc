@@ -1518,11 +1518,10 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
           }
         }
       }
-      // تبدیل خطوط حساب‌ها (حذف خطوط کارمزد)
+      // تبدیل خطوط حساب‌ها (حذف خطوط کارمزد داخلی — هزینه پذیرنده، نه پرداخت مشتری)
       _centerTransactions.clear();
       for (final al in initial.accountLines) {
-        final isCommission = (al.extraInfo != null && (al.extraInfo!['is_commission_line'] == true));
-        if (isCommission) continue;
+        if (al.isCommissionLine) continue;
         final t = TransactionType.fromValue(al.transactionType ?? '') ?? TransactionType.person;
         _centerTransactions.add(
           InvoiceTransaction(
@@ -3140,10 +3139,9 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 final doc = await receiptPaymentService.getById(docId);
                 if (doc == null) continue;
                 
-                // مجموع account_lines (بدون کارمزد)
+                // مجموع account_lines (بدون کارمزد داخلی پذیرنده)
                 for (final accountLine in doc.accountLines) {
-                  final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
-                  if (!isCommission) {
+                  if (!accountLine.isCommissionLine) {
                     totalPaid += accountLine.amount;
                   }
                 }
@@ -3225,10 +3223,9 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             
             processedDocIds.add(docId);
             
-            // مجموع account_lines (بدون کارمزد)
+            // مجموع account_lines (بدون کارمزد داخلی پذیرنده)
             for (final accountLine in doc.accountLines) {
-              final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
-              if (!isCommission) {
+              if (!accountLine.isCommissionLine) {
                 totalPaid += accountLine.amount;
               }
             }
@@ -4434,7 +4431,7 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
   }
 
   Widget _buildAccountLineItem(AccountLine line, ReceiptPaymentDocument doc) {
-    final isCommission = line.extraInfo?['is_commission_line'] == true;
+    final isCommission = line.isCommissionLine;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),

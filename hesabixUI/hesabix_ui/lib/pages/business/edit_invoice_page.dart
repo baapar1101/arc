@@ -630,6 +630,8 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       final List<InvoiceTransaction> transactions = [];
       for (final doc in paymentDocs) {
         for (final accountLine in doc.accountLines) {
+          // کارمزد تسویه درگاه هزینه پذیرنده است؛ نباید به‌عنوان تراکنش پرداخت مشتری نمایش/ذخیره شود.
+          if (accountLine.isCommissionLine) continue;
           if (accountLine.transactionType == null) continue;
 
           final transactionType = TransactionType.fromValue(accountLine.transactionType ?? '');

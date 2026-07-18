@@ -1052,10 +1052,10 @@ def create_receipt_payment(
                     credit=commission_credit,
                     description=f"کارمزد تراکنش {transaction_type}",
                     extra_info={
-                        "transaction_type": transaction_type,
-                        "commission": float(commission_amount),
+                        # بدون transaction_type تا به‌عنوان تراکنش پرداخت مشتری بازخوانی نشود
                         "is_commission_line": True,
                         "original_transaction_index": i,
+                        "commission_type": "settlement_contra",
                     }
                 )
                 logger.info(f"خط کارمزد حساب ایجاد شد: {commission_line}")
@@ -1080,7 +1080,6 @@ def create_receipt_payment(
                     credit=commission_service_credit,
                     description=f"کارمزد خدمات بانکی",
                     extra_info={
-                        "commission": float(commission_amount),
                         "is_commission_line": True,
                         "original_transaction_index": i,
                         "commission_type": "banking_service",
@@ -2090,10 +2089,10 @@ def update_receipt_payment(
                     credit=commission_credit,
                     description=f"کارمزد تراکنش {transaction_type}",
                     extra_info={
-                        "transaction_type": transaction_type,
-                        "commission": float(commission_amount),
+                        # بدون transaction_type تا به‌عنوان تراکنش پرداخت مشتری بازخوانی نشود
                         "is_commission_line": True,
                         "original_transaction_index": i,
+                        "commission_type": "settlement_contra",
                     },
                 ))
                 commission_service_account = _get_fixed_account_by_code(db, "70902")
@@ -2106,7 +2105,6 @@ def update_receipt_payment(
                     credit=commission_service_credit,
                     description="کارمزد خدمات بانکی",
                     extra_info={
-                        "commission": float(commission_amount),
                         "is_commission_line": True,
                         "original_transaction_index": i,
                         "commission_type": "banking_service",

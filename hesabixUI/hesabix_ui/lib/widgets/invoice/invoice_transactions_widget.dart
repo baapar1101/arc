@@ -107,7 +107,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     }
   }
   
-  // محاسبه مجموع تراکنش‌ها (بدون کارمزد)
+  // مجموع مبالغ پرداخت مشتری (فیلد کارمزد درگاه جداست و به مبلغ پرداخت اضافه نمی‌شود)
   num get _totalPaid {
     return widget.transactions.fold<num>(0, (sum, t) => sum + t.amount);
   }
@@ -589,7 +589,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             if (transaction.commission != null)
               Expanded(
                 child: _buildDetailRow(
-                  'کارمزد:',
+                  'کارمزد بانکی:',
                   formatWithThousands(transaction.commission!, decimalPlaces: 0),
                 ),
               ),
