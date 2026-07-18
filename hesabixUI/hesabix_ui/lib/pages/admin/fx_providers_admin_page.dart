@@ -247,8 +247,9 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                                 const SizedBox(height: 4),
                                 Text(
                                   'بازه: ${p['fetch_interval_seconds'] ?? 900} ثانیه · '
-                                  'کلید: ${p['has_api_key'] == true ? 'دارد' : 'ندارد'} · '
-                                  'وضعیت: ${status ?? '—'}',
+                                  'کلید: ${p['has_db_api_key'] == true ? 'دیتابیس' : (p['api_key_source'] == 'env' ? 'env' : 'ندارد')} · '
+                                  'وضعیت: ${status ?? '—'}'
+                                  '${p['last_fetch_at'] != null ? ' · ${p['last_fetch_at']}' : ''}',
                                   style: theme.textTheme.bodySmall,
                                 ),
                                 if (p['last_fetch_error'] != null)

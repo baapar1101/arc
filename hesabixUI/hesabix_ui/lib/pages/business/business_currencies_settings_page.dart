@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
@@ -9,8 +10,13 @@ import 'dart:ui' as ui;
 
 class BusinessCurrenciesSettingsPage extends StatefulWidget {
   final int businessId;
+  final AuthStore? authStore;
 
-  const BusinessCurrenciesSettingsPage({super.key, required this.businessId});
+  const BusinessCurrenciesSettingsPage({
+    super.key,
+    required this.businessId,
+    this.authStore,
+  });
 
   @override
   State<BusinessCurrenciesSettingsPage> createState() => _BusinessCurrenciesSettingsPageState();
@@ -85,6 +91,27 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
     }
   }
 
+  Future<void> _syncAuthStoreCurrencies() async {
+    final store = widget.authStore;
+    if (store == null || store.currentBusiness?.id != widget.businessId) return;
+    try {
+      final businessCurrencies = await _currencyService.listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
+      Map<String, dynamic>? defaultCurrency;
+      for (final c in businessCurrencies) {
+        if (c['is_default'] == true) {
+          defaultCurrency = c;
+          break;
+        }
+      }
+      await store.refreshCurrentBusinessCurrencies(
+        currencies: businessCurrencies,
+        defaultCurrency: defaultCurrency,
+      );
+    } catch (_) {}
+  }
+
   Future<void> _addCurrency(int currencyId) async {
     try {
       await _currencyService.addBusinessCurrency(
@@ -94,6 +121,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       
       // بارگذاری مجدد لیست ارزها
       await _loadCurrencies();
+      await _syncAuthStoreCurrencies();
       
       if (mounted) {
         SnackBarHelper.show(context, message: 'ارز با موفقیت اضافه شد');
@@ -167,6 +195,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       
       // بارگذاری مجدد لیست ارزها
       await _loadCurrencies();
+      await _syncAuthStoreCurrencies();
       
       if (mounted) {
         SnackBarHelper.show(context, message: 'ارز با موفقیت حذف شد');

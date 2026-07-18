@@ -109,6 +109,23 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
         );
         return;
       }
+      if (payload['stale'] == true) {
+        final age = payload['max_age_hours'];
+        final cont = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('اسنپ‌شات قدیمی'),
+            content: Text(
+              'آخرین واکشی مرکزی حدود ${age ?? '—'} ساعت پیش بوده است. ادامه می‌دهید؟',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ادامه')),
+            ],
+          ),
+        );
+        if (cont != true || !mounted) return;
+      }
       final selected = <int>{
         for (final it in items)
           if (it['business_currency_id'] != null) (it['business_currency_id'] as num).toInt(),

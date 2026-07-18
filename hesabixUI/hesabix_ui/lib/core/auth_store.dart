@@ -45,6 +45,61 @@ class AuthStore with ChangeNotifier {
 
   /// کسب‌وکار فعلی چندارزی است (حداقل یک ارز فرعی).
   bool get isMultiCurrency => _currentBusiness?.isMultiCurrency ?? false;
+
+  /// به‌روزرسانی ارزهای کسب‌وکار فعلی پس از افزودن/حذف ارز فرعی (بدون رفرش کامل جلسه).
+  Future<void> refreshCurrentBusinessCurrencies({
+    required List<Map<String, dynamic>> currencies,
+    Map<String, dynamic>? defaultCurrency,
+  }) async {
+    final current = _currentBusiness;
+    if (current == null) return;
+
+    CurrencyLite? defLite = current.defaultCurrency;
+    if (defaultCurrency != null) {
+      try {
+        defLite = CurrencyLite.fromJson(Map<String, dynamic>.from(defaultCurrency));
+      } catch (_) {}
+    }
+
+    final list = <CurrencyLite>[];
+    for (final c in currencies) {
+      try {
+        list.add(CurrencyLite.fromJson(Map<String, dynamic>.from(c)));
+      } catch (_) {}
+    }
+    // اگر ارز پیش‌فرض در لیست نبود اضافه کن
+    if (defLite != null && !list.any((e) => e.id == defLite!.id)) {
+      list.insert(0, defLite);
+    }
+
+    final isMc = defLite == null
+        ? list.length > 1
+        : list.any((c) => c.id != defLite!.id);
+
+    _currentBusiness = BusinessWithPermission(
+      id: current.id,
+      name: current.name,
+      businessType: current.businessType,
+      businessField: current.businessField,
+      ownerId: current.ownerId,
+      address: current.address,
+      phone: current.phone,
+      mobile: current.mobile,
+      createdAt: current.createdAt,
+      isOwner: current.isOwner,
+      role: current.role,
+      permissions: current.permissions,
+      defaultCurrency: defLite,
+      currencies: list,
+      isMultiCurrency: isMc,
+      deletedAt: current.deletedAt,
+      autoDeleteAt: current.autoDeleteAt,
+      isDeleted: current.isDeleted,
+      isDeletionPending: current.isDeletionPending,
+    );
+    notifyListeners();
+    await _saveCurrentBusiness();
+  }
   Map<String, dynamic>? get businessPermissions => _businessPermissions;
   String? get selectedCurrencyCode => _selectedCurrencyCode;
   int? get selectedCurrencyId => _selectedCurrencyId;

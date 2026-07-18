@@ -98,7 +98,7 @@
 - `PUT /api/v1/admin/fx-providers/{code}` — ایجاد/ویرایش (api_key خالی = حفظ قبلی)
 - `POST /api/v1/admin/fx-providers/{code}/test` — یک درخواست تست (با احتیاط rate-limit)
 - `POST /api/v1/admin/fx-providers/{code}/fetch-now` — واکشی فوری و ذخیره اسنپ‌شات
-- `GET /api/v1/admin/fx-global-rates` — مشاهده اسنپ‌شات مرکزی
+- ادمین: `GET /api/v1/admin/fx-providers/global-rates` — مشاهده اسنپ‌شات مرکزی
 
 ### کسب‌وکار (فقط اگر `is_multi_currency`)
 - فیلد `is_multi_currency` روی پاسخ کسب‌وکار

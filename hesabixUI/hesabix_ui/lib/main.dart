@@ -2063,6 +2063,24 @@ class _MyAppState extends State<MyApp> {
               path: 'currency-revaluation',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
+                if (_authStore == null || !_authStore!.isMultiCurrency) {
+                  return hesabixNoTransitionPage(
+                    state,
+                    Scaffold(
+                      appBar: AppBar(title: const Text('تسعیر ارز')),
+                      body: const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.\n'
+                            'از تنظیمات کسب‌وکار، یک ارز فرعی اضافه کنید.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
                 return hesabixNoTransitionPage(state, CurrencyRevaluationPage(
                     businessId: businessId,
                     authStore: _authStore!,
@@ -3338,7 +3356,10 @@ class _MyAppState extends State<MyApp> {
                   return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage(),
                   );
                 }
-                return hesabixNoTransitionPage(state, BusinessCurrenciesSettingsPage(businessId: businessId),
+                return hesabixNoTransitionPage(state, BusinessCurrenciesSettingsPage(
+                  businessId: businessId,
+                  authStore: _authStore,
+                ),
                 );
               },
             ),

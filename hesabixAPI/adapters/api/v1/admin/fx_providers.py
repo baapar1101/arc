@@ -84,8 +84,13 @@ def admin_test_fx_provider(
 ) -> dict:
 	_require_admin(ctx)
 	provider = get_provider_by_code(db, code)
-	result = test_provider_connection(db, provider)
-	db.commit()
+	try:
+		result = test_provider_connection(db, provider)
+		db.commit()
+	except ApiError:
+		# وضعیت last_fetch_* قبل از raise flush شده؛ commit تا در UI دیده شود
+		db.commit()
+		raise
 	return success_response(
 		data=format_datetime_fields(result, request),
 		request=request,
@@ -102,8 +107,12 @@ def admin_fetch_fx_provider_now(
 ) -> dict:
 	_require_admin(ctx)
 	provider = get_provider_by_code(db, code)
-	result = fetch_and_store_provider(db, provider)
-	db.commit()
+	try:
+		result = fetch_and_store_provider(db, provider)
+		db.commit()
+	except ApiError:
+		db.commit()
+		raise
 	return success_response(
 		data=format_datetime_fields(result, request),
 		request=request,

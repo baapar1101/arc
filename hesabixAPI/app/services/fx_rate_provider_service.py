@@ -83,7 +83,8 @@ def resolve_provider_api_key(provider: FxRateProvider) -> str:
 
 
 def serialize_provider(provider: FxRateProvider, *, include_sensitive: bool = False) -> Dict[str, Any]:
-	has_key = bool(resolve_provider_api_key(provider))
+	has_db_key = bool(_decrypt_key(provider.api_key_encrypted).strip())
+	has_resolved = bool(resolve_provider_api_key(provider))
 	out: Dict[str, Any] = {
 		"id": provider.id,
 		"code": provider.code,
@@ -92,8 +93,10 @@ def serialize_provider(provider: FxRateProvider, *, include_sensitive: bool = Fa
 		"is_active": bool(provider.is_active),
 		"fetch_interval_seconds": int(provider.fetch_interval_seconds or 900),
 		"config": _parse_config(provider.config_json),
-		"has_api_key": has_key,
-		"api_key": "***" if has_key else None,
+		"has_api_key": has_resolved,
+		"has_db_api_key": has_db_key,
+		"api_key_source": ("db" if has_db_key else ("env" if has_resolved else None)),
+		"api_key": "***" if has_resolved else None,
 		"last_fetch_at": provider.last_fetch_at,
 		"last_fetch_status": provider.last_fetch_status,
 		"last_fetch_error": provider.last_fetch_error,
@@ -104,6 +107,7 @@ def serialize_provider(provider: FxRateProvider, *, include_sensitive: bool = Fa
 	if include_sensitive:
 		out["api_key_resolved_len"] = len(resolve_provider_api_key(provider))
 	return out
+
 
 
 def list_providers(db: Session) -> List[Dict[str, Any]]:
@@ -492,32 +496,62 @@ def list_business_relevant_global_rates(db: Session, business_id: int) -> Dict[s
 		)
 	).scalars().all()
 	codes = {str(c.code).upper() for c in secondary}
-	all_rates = list_global_rates(db)
-	matched = [r for r in all_rates if str(r["currency_code"]).upper() in codes]
+	# اولویت: ارائه‌دهنده فعال، سپس تازه‌ترین fetched_at؛ یک ردیف per currency_code
+	q = (
+		select(FxGlobalRate, FxRateProvider)
+		.join(FxRateProvider, FxGlobalRate.provider_id == FxRateProvider.id)
+		.where(FxGlobalRate.currency_code.in_(list(codes)))
+		.order_by(
+			FxRateProvider.is_active.desc(),
+			FxGlobalRate.fetched_at.desc(),
+			FxGlobalRate.id.desc(),
+		)
+	)
+	rows = db.execute(q).all()
 	base = b.default_currency
 	base_code = base.code if base else "IRR"
+	seen: set[str] = set()
 	enriched = []
-	for r in matched:
+	stalest_age_hours: float | None = None
+	now = datetime.now(timezone.utc)
+	for g_row, provider in rows:
+		code = str(g_row.currency_code).upper()
+		if code in seen:
+			continue
+		seen.add(code)
 		try:
 			rate_base = rate_to_business_base(
-				price_irr=_to_decimal(r["price_irr"]),
+				price_irr=Decimal(str(g_row.price_irr)),
 				base_currency_code=base_code,
 			)
 		except ApiError:
 			rate_base = None
-		cur = next((c for c in secondary if str(c.code).upper() == str(r["currency_code"]).upper()), None)
-		enriched.append(
+		cur = next((c for c in secondary if str(c.code).upper() == code), None)
+		fetched = g_row.fetched_at
+		if fetched is not None:
+			if fetched.tzinfo is None:
+				fetched = fetched.replace(tzinfo=timezone.utc)
+			age_h = (now - fetched).total_seconds() / 3600.0
+			if stalest_age_hours is None or age_h > stalest_age_hours:
+				stalest_age_hours = age_h
+		item = serialize_global_rate(g_row, provider_code=provider.code)
+		item.update(
 			{
-				**r,
 				"rate_to_base": str(rate_base) if rate_base is not None else None,
 				"base_currency_code": base_code,
 				"business_currency_id": cur.id if cur else None,
+				"provider_active": bool(provider.is_active),
 			}
 		)
+		enriched.append(item)
+
+	stale = bool(stalest_age_hours is not None and stalest_age_hours > 24)
 	return {
 		"is_multi_currency": True,
 		"base_currency_code": base_code,
 		"items": enriched,
+		"stale": stale,
+		"max_age_hours": round(stalest_age_hours, 2) if stalest_age_hours is not None else None,
 		"secondary_currencies": [
 			{"id": c.id, "code": c.code, "title": c.title, "symbol": c.symbol} for c in secondary
 		],
@@ -547,6 +581,7 @@ def apply_global_rates_to_business(
 	note_prefix = (str(payload.get("note")).strip() if payload.get("note") else "") or "از نرخ روز (اسنپ‌شات مرکزی)"
 	now = datetime.now(timezone.utc)
 	created: List[Dict[str, Any]] = []
+	seen_currency_ids: set[int] = set()
 
 	for raw in items:
 		if not isinstance(raw, dict):
@@ -557,14 +592,18 @@ def apply_global_rates_to_business(
 
 		cur: Currency | None = None
 		if currency_id is not None:
-			cur = db.get(Currency, int(currency_id))
+			try:
+				cur = db.get(Currency, int(currency_id))
+			except (TypeError, ValueError) as exc:
+				raise ApiError("CURRENCY_ID_INVALID", "شناسه ارز نامعتبر است", http_status=400) from exc
 		elif currency_code:
 			cur = db.execute(select(Currency).where(Currency.code == currency_code)).scalar_one_or_none()
 		if not cur:
 			raise ApiError("CURRENCY_NOT_FOUND", "ارز کسب‌وکار یافت نشد", http_status=404)
+		if int(cur.id) in seen_currency_ids:
+			continue
 		if int(cur.id) == int(b.default_currency_id):
 			raise ApiError("CURRENCY_IS_BASE", "برای ارز اصلی نرخ ثبت نمی‌شود", http_status=400)
-		# باید در business_currencies باشد
 		bc = db.execute(
 			select(BusinessCurrency.id).where(
 				BusinessCurrency.business_id == int(business_id),
@@ -574,10 +613,14 @@ def apply_global_rates_to_business(
 		if bc is None:
 			raise ApiError("CURRENCY_NOT_ALLOWED", "این ارز برای کسب‌وکار فعال نیست", http_status=400)
 
-		gq = select(FxGlobalRate).where(FxGlobalRate.currency_code == cur.code.upper())
+		gq = (
+			select(FxGlobalRate)
+			.join(FxRateProvider, FxGlobalRate.provider_id == FxRateProvider.id)
+			.where(FxGlobalRate.currency_code == cur.code.upper())
+		)
 		if symbol:
 			gq = gq.where(FxGlobalRate.symbol == symbol)
-		gq = gq.order_by(FxGlobalRate.fetched_at.desc())
+		gq = gq.order_by(FxRateProvider.is_active.desc(), FxGlobalRate.fetched_at.desc(), FxGlobalRate.id.desc())
 		g_row = db.execute(gq).scalars().first()
 		if not g_row:
 			raise ApiError(
@@ -603,6 +646,7 @@ def apply_global_rates_to_business(
 		)
 		db.add(row)
 		db.flush()
+		seen_currency_ids.add(int(cur.id))
 		created.append(
 			{
 				"id": row.id,

@@ -10,6 +10,7 @@ import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
 import '../../theme/theme_controller.dart';
 import '../../widgets/combined_user_menu_button.dart';
+import '../../widgets/fx/daily_fx_rates_toolbar_chip.dart';
 import '../../models/person_model.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/banking/bank_account_form_dialog.dart';
@@ -2254,6 +2255,11 @@ class _BusinessShellState extends State<BusinessShell> {
               ),
       ),
       actions: [
+        DailyFxRatesToolbarChip(
+          businessId: widget.businessId,
+          authStore: widget.authStore,
+          iconColor: appBarFg,
+        ),
         NotificationBellButton(authStore: widget.authStore, iconColor: appBarFg),
         IconButton(
           tooltip: 'چت سریع با AI',

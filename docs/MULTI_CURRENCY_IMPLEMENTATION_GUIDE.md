@@ -209,23 +209,18 @@ Transaction Rate  = نرخ قفل‌شده روی همان تراکنش/قسط (
 - ثبت در همان `business_currency_rates` (effective_at = now)
 
 #### Backend
-- [ ] endpoint خلاصه نرخ‌های جاری:  
-  `GET /businesses/{id}/currency-rates/latest`  
-  → لیست ارزهای فرعی + آخرین rate + effective_at
-- [ ] (اختیاری) `POST .../currency-rates/bulk` برای ثبت چند ارز یکجا از دیالوگ toolbar
+- [x] endpoint خلاصه نرخ‌های جاری:  
+  `GET /businesses/{id}/currency-rates/latest`
+- [x] `POST .../currency-rates/bulk` برای ثبت چند ارز یکجا از دیالوگ toolbar
 
 #### Frontend
-- [ ] ویجت `DailyFxRatesToolbarChip` در shell کسب‌وکار
-- [ ] دیالوگ ثبت سریع نرخ
-- [ ] کش کوتاه‌مدت + refresh دستی
-
-#### خارج از دامنه این فاز
-- API مثقال / کرون خودکار (فاز ۱ب)
-- تغییر قیمت کالا
+- [x] ویجت `DailyFxRatesToolbarChip` در shell کسب‌وکار
+- [x] دیالوگ/شیت ثبت سریع نرخ + «از نرخ روز» (اسنپ‌شات مرکزی فاز ۰)
+- [x] کش کوتاه‌مدت + refresh دستی
 
 #### معیار پذیرش
-- تک‌ارزی: toolbar بدون تغییر.
-- چندارزی: نرخ‌ها دیده می‌شوند؛ ثبت دستی در تاریخچه ظاهر می‌شود؛ فاکتور می‌تواند از همان نرخ‌ها resolve کند (رفتار فعلی).
+- تک‌ارزی: toolbar بدون تغییر. ✅
+- چندارزی: نرخ‌ها دیده می‌شوند؛ ثبت دستی در تاریخچه ظاهر می‌شود. ✅
 
 ---
 
