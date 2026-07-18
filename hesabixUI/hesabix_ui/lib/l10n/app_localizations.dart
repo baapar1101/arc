@@ -20388,6 +20388,18 @@ abstract class AppLocalizations {
   /// **'Decimal places, rounding, add or remove currencies'**
   String get settingsCurrenciesAdminDescription;
 
+  /// No description provided for @settingsFxProvidersAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'FX rate providers'**
+  String get settingsFxProvidersAdmin;
+
+  /// No description provided for @settingsFxProvidersAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'API keys and centralized rate fetch (BRS, Mesghal, …)'**
+  String get settingsFxProvidersAdminDescription;
+
   /// No description provided for @settingsPaymentGateways.
   ///
   /// In en, this message translates to:

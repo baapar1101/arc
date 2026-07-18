@@ -122,7 +122,7 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 2,
         ),
-      if (ctx.canManageBusiness)
+      if (ctx.canManageBusiness && ctx.isMultiCurrency)
         _item(
           id: 'fx_revaluation',
           title: 'settingsInvoiceFxPolicyTitle',

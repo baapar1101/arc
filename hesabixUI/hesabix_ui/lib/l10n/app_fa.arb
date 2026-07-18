@@ -4248,6 +4248,8 @@
   "settingsWalletSettingsDescription": "تعیین ارز پایه و سیاست‌ها",
   "settingsCurrenciesAdmin": "مدیریت ارزها",
   "settingsCurrenciesAdminDescription": "اعشار، گرد کردن مبالغ و افزودن یا حذف ارز",
+  "settingsFxProvidersAdmin": "ارائه‌دهندگان نرخ ارز",
+  "settingsFxProvidersAdminDescription": "کلید API و واکشی متمرکز نرخ (BRS، مثقال و …)",
   "settingsPaymentGateways": "درگاه‌های پرداخت",
   "settingsPaymentGatewaysDescription": "مدیریت و پیکربندی درگاه‌ها",
   "settingsBusinessesManagement": "مدیریت کسب و کارها",

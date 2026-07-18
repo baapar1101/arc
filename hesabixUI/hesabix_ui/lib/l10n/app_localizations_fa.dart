@@ -10896,6 +10896,13 @@ class AppLocalizationsFa extends AppLocalizations {
       'اعشار، گرد کردن مبالغ و افزودن یا حذف ارز';
 
   @override
+  String get settingsFxProvidersAdmin => 'ارائه‌دهندگان نرخ ارز';
+
+  @override
+  String get settingsFxProvidersAdminDescription =>
+      'کلید API و واکشی متمرکز نرخ (BRS، مثقال و …)';
+
+  @override
   String get settingsPaymentGateways => 'درگاه‌های پرداخت';
 
   @override

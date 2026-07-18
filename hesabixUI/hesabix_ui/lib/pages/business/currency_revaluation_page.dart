@@ -7,6 +7,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/permission_guard.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_currency_rate_service.dart';
+import 'package:hesabix_ui/services/business_fx_global_rate_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -35,6 +36,7 @@ class CurrencyRevaluationPage extends StatefulWidget {
 class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
   late final BusinessCurrencyRateService _service;
   late final CurrencyService _currencyService;
+  late final BusinessFxGlobalRateService _globalFxService;
   static final _dtFmt = DateFormat('yyyy-MM-dd HH:mm');
   int _listVersion = 0;
 
@@ -50,6 +52,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
     super.initState();
     _service = BusinessCurrencyRateService(ApiClient());
     _currencyService = CurrencyService(ApiClient());
+    _globalFxService = BusinessFxGlobalRateService(ApiClient());
     _loadCurrencies();
   }
 
@@ -78,6 +81,125 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
   void _bumpListVersion() {
     if (mounted) {
       setState(() => _listVersion++);
+    }
+  }
+
+  Future<void> _openApplyFromGlobal() async {
+    if (!_canAdd) return;
+    if (_secondaryCurrencies.isEmpty) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: 'ابتدا از تنظیمات کسب‌وکار، ارزهای جانبی به کسب‌وکار اضافه کنید.',
+        );
+      }
+      return;
+    }
+    try {
+      final payload = await _globalFxService.latest(businessId: widget.businessId);
+      final items = (payload['items'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (!mounted) return;
+      if (items.isEmpty) {
+        SnackBarHelper.showError(
+          context,
+          message:
+              'نرخ اسنپ‌شات برای ارزهای این کسب‌وکار یافت نشد. از مدیریت کل، واکشی نرخ را انجام دهید.',
+        );
+        return;
+      }
+      final selected = <int>{
+        for (final it in items)
+          if (it['business_currency_id'] != null) (it['business_currency_id'] as num).toInt(),
+      };
+      final apply = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          return StatefulBuilder(
+            builder: (context, setLocal) {
+              return AlertDialog(
+                title: const Text('ثبت سریع از نرخ روز'),
+                content: SizedBox(
+                  width: 480,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'نرخ‌ها از اسنپ‌شات مرکزی سیستم خوانده می‌شوند (بدون درخواست به API خارجی).',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.sizeOf(context).height * 0.45,
+                        ),
+                        child: ListView(
+                          shrinkWrap: true,
+                          children: [
+                            for (final it in items)
+                              CheckboxListTile(
+                                value: selected.contains(
+                                  (it['business_currency_id'] as num?)?.toInt(),
+                                ),
+                                onChanged: (v) {
+                                  final id = (it['business_currency_id'] as num?)?.toInt();
+                                  if (id == null) return;
+                                  setLocal(() {
+                                    if (v == true) {
+                                      selected.add(id);
+                                    } else {
+                                      selected.remove(id);
+                                    }
+                                  });
+                                },
+                                title: Text(
+                                  '${it['currency_code']} — نرخ به پایه: '
+                                  '${it['rate_to_base'] != null ? formatFxRateForDisplay(it['rate_to_base']) : '—'}',
+                                ),
+                                subtitle: Text(
+                                  'اسنپ‌شات: ${it['fetched_at'] ?? '—'} · ${it['name_fa'] ?? ''}',
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+                  FilledButton(
+                    onPressed: selected.isEmpty ? null : () => Navigator.pop(ctx, true),
+                    child: const Text('ثبت نرخ‌ها'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      if (apply != true || !mounted) return;
+      final bodyItems = <Map<String, dynamic>>[
+        for (final it in items)
+          if (selected.contains((it['business_currency_id'] as num?)?.toInt()))
+            {
+              'currency_id': it['business_currency_id'],
+              'symbol': it['symbol'],
+            },
+      ];
+      final result = await _globalFxService.applyFromGlobal(
+        businessId: widget.businessId,
+        items: bodyItems,
+      );
+      if (!mounted) return;
+      final n = result['count'] ?? bodyItems.length;
+      SnackBarHelper.show(context, message: '$n نرخ تسعیر ثبت شد');
+      _bumpListVersion();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
   }
 
@@ -427,6 +549,12 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
                   if (_filterCurrencyId != null) 'currency_id': _filterCurrencyId,
                 },
                 customHeaderActions: [
+                  if (_canAdd)
+                    IconButton(
+                      onPressed: _openApplyFromGlobal,
+                      icon: const Icon(Icons.bolt),
+                      tooltip: 'ثبت سریع از نرخ روز',
+                    ),
                   if (_canAdd)
                     IconButton(
                       onPressed: () {

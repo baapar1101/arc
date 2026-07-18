@@ -4206,6 +4206,8 @@
   "settingsWalletSettingsDescription": "Set base currency and policies",
   "settingsCurrenciesAdmin": "Currency management",
   "settingsCurrenciesAdminDescription": "Decimal places, rounding, add or remove currencies",
+  "settingsFxProvidersAdmin": "FX rate providers",
+  "settingsFxProvidersAdminDescription": "API keys and centralized rate fetch (BRS, Mesghal, …)",
   "settingsPaymentGateways": "Payment Gateways",
   "settingsPaymentGatewaysDescription": "Manage and configure payment gateways",
   "settingsBusinessesManagement": "Businesses Management",

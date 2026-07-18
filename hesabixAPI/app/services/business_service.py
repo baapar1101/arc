@@ -1542,6 +1542,16 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
     else:
         data["currencies"] = []
 
+    # چندارزی: حداقل یک ارز فرعی غیر از ارز اصلی
+    default_id = getattr(business, "default_currency_id", None)
+    currencies_list = data.get("currencies") or []
+    if default_id is None:
+        data["is_multi_currency"] = False
+    else:
+        data["is_multi_currency"] = any(
+            int(c.get("id")) != int(default_id) for c in currencies_list if c.get("id") is not None
+        )
+
     return data
 
 

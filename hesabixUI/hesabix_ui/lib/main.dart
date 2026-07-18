@@ -63,6 +63,7 @@ import 'pages/business/wallet_page.dart';
 import 'pages/business/wallet_payment_result_page.dart';
 import 'pages/admin/wallet_settings_page.dart';
 import 'pages/admin/currencies_admin_page.dart';
+import 'pages/admin/fx_providers_admin_page.dart';
 import 'pages/admin/payment_gateways_page.dart';
 import 'pages/admin/storage_plans_admin_page.dart';
 import 'pages/admin/document_monetization_page.dart';
@@ -1382,6 +1383,20 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const CurrenciesAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'fx-providers',
+                  name: 'system_settings_fx_providers',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const FxProvidersAdminPage();
                   },
                 ),
                 GoRoute(

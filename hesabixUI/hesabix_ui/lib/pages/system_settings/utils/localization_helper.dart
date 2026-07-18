@@ -34,6 +34,8 @@ class LocalizationHelper {
         return t.settingsWalletSettings;
       case 'settingsCurrenciesAdmin':
         return t.settingsCurrenciesAdmin;
+      case 'settingsFxProvidersAdmin':
+        return t.settingsFxProvidersAdmin;
       case 'settingsWalletPayoutsAdmin':
         return t.settingsWalletPayoutsAdmin;
       case 'settingsSupportOperators':
@@ -110,6 +112,8 @@ class LocalizationHelper {
         return t.settingsWalletSettingsDescription;
       case 'settingsCurrenciesAdminDescription':
         return t.settingsCurrenciesAdminDescription;
+      case 'settingsFxProvidersAdminDescription':
+        return t.settingsFxProvidersAdminDescription;
       case 'settingsWalletPayoutsAdminDescription':
         return t.settingsWalletPayoutsAdminDescription;
       case 'settingsSupportOperatorsDescription':

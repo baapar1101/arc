@@ -9952,10 +9952,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get categoryTreeDirectMembersOnlyLabel => 'Direct members only';
 
   @override
-  String get categoryTreeIncludesSubcategoriesHint => 'Includes products from subcategories';
+  String get categoryTreeIncludesSubcategoriesHint =>
+      'Includes products from subcategories';
 
   @override
-  String get categoryTreeDirectMembersOnlyHint => 'Only products in this category';
+  String get categoryTreeDirectMembersOnlyHint =>
+      'Only products in this category';
 
   @override
   String get categoryDescriptionHint => 'Optional category description';
@@ -10956,6 +10958,13 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsCurrenciesAdminDescription =>
       'Decimal places, rounding, add or remove currencies';
+
+  @override
+  String get settingsFxProvidersAdmin => 'FX rate providers';
+
+  @override
+  String get settingsFxProvidersAdminDescription =>
+      'API keys and centralized rate fetch (BRS, Mesghal, …)';
 
   @override
   String get settingsPaymentGateways => 'Payment Gateways';

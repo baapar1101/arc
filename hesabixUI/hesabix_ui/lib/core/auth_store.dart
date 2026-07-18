@@ -42,6 +42,9 @@ class AuthStore with ChangeNotifier {
   String? get currentUserName => _currentUserName;
   String? get currentUserMobile => _currentUserMobile;
   BusinessWithPermission? get currentBusiness => _currentBusiness;
+
+  /// کسب‌وکار فعلی چندارزی است (حداقل یک ارز فرعی).
+  bool get isMultiCurrency => _currentBusiness?.isMultiCurrency ?? false;
   Map<String, dynamic>? get businessPermissions => _businessPermissions;
   String? get selectedCurrencyCode => _selectedCurrencyCode;
   int? get selectedCurrencyId => _selectedCurrencyId;
@@ -414,6 +417,7 @@ class AuthStore with ChangeNotifier {
                 'symbol': _currentBusiness!.defaultCurrency!.symbol,
               }
             : null,
+        'is_multi_currency': _currentBusiness!.isMultiCurrency,
         'currencies': _currentBusiness!.currencies
             .map((c) => {
                   'id': c.id,

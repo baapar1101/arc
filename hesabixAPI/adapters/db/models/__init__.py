@@ -47,6 +47,7 @@ from .fiscal_year import FiscalYear  # noqa: F401
 # Currency models
 from .currency import Currency, BusinessCurrency  # noqa: F401
 from .business_currency_rate import BusinessCurrencyRate  # noqa: F401
+from .fx_rate_provider import FxRateProvider, FxGlobalRate  # noqa: F401
 
 # Documents
 from .document import Document  # noqa: F401

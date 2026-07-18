@@ -1487,6 +1487,7 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
+          if (widget.authStore.isMultiCurrency)
           _MenuItem(
             key: 'currency-revaluation',
             label: t.currencyRevaluation,

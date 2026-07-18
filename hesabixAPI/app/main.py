@@ -57,6 +57,7 @@ from adapters.api.v1.admin.system_settings import router as admin_system_setting
 from adapters.api.v1.admin.legacy_import import router as admin_legacy_import_router
 from adapters.api.v1.admin.firewall import router as admin_firewall_router
 from adapters.api.v1.admin.currencies import router as admin_currencies_router
+from adapters.api.v1.admin.fx_providers import router as admin_fx_providers_router
 from adapters.api.v1.admin.monitoring import router as admin_monitoring_router
 from adapters.api.v1.admin.system_services import router as admin_system_services_router
 from adapters.api.v1.admin.wallet_admin import router as admin_wallet_router
@@ -77,6 +78,7 @@ from adapters.api.v1.documents import router as documents_router
 from adapters.api.v1.kardex import router as kardex_router
 from adapters.api.v1.opening_balance import router as opening_balance_router
 from adapters.api.v1.business_currency_rates import router as business_currency_rates_router
+from adapters.api.v1.business_fx_global_rates import router as business_fx_global_rates_router
 from adapters.api.v1.report_templates import router as report_templates_router
 from adapters.api.v1.wallet import router as wallet_router
 from adapters.api.v1.zohal import router as zohal_router
@@ -1045,6 +1047,8 @@ def create_app() -> FastAPI:
     application.include_router(query_schema_router, prefix=settings.api_v1_prefix)
     application.include_router(opening_balance_router, prefix=settings.api_v1_prefix)
     application.include_router(business_currency_rates_router, prefix=settings.api_v1_prefix)
+    application.include_router(business_fx_global_rates_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_fx_providers_router, prefix=settings.api_v1_prefix)
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_router, prefix=settings.api_v1_prefix)
     application.include_router(zohal_router, prefix=settings.api_v1_prefix)
@@ -1258,6 +1262,11 @@ def create_app() -> FastAPI:
         from app.services.support.support_background_jobs import support_sla_breach_check_loop
 
         asyncio.create_task(support_sla_breach_check_loop(300))
+
+        # نرخ ارز متمرکز: بررسی هر ۶۰ثانیه؛ واکشی واقعی طبق fetch_interval هر provider (پیش‌فرض ۱۵دقیقه)
+        from app.services.fx_rate_background_jobs import fx_global_rates_fetch_loop
+
+        asyncio.create_task(fx_global_rates_fetch_loop(60))
 
     @application.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):
