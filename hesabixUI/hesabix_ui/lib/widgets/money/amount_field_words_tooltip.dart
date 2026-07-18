@@ -24,6 +24,7 @@ class AmountFieldWordsTooltip extends StatefulWidget {
 
 class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
   final LayerLink _layerLink = LayerLink();
+  final GlobalKey _targetKey = GlobalKey();
   OverlayEntry? _overlayEntry;
   bool _hovering = false;
   bool _longPressVisible = false;
@@ -73,6 +74,62 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
     _overlayEntry = null;
   }
 
+  Widget _buildOverlay(BuildContext overlayContext) {
+    final text = _currentMessage();
+    if (text == null || text.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(overlayContext);
+    final box = _targetKey.currentContext?.findRenderObject() as RenderBox?;
+    final fieldWidth = (box != null && box.hasSize) ? box.size.width : 200.0;
+    final screenHeight = MediaQuery.sizeOf(overlayContext).height;
+    final maxWidth = fieldWidth.clamp(120.0, 260.0);
+    final maxHeight = (screenHeight * 0.22).clamp(72.0, 140.0);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        CompositedTransformFollower(
+          link: _layerLink,
+          showWhenUnlinked: false,
+          targetAnchor: Alignment.bottomCenter,
+          followerAnchor: Alignment.topCenter,
+          offset: const Offset(0, 6),
+          child: Material(
+            color: Colors.transparent,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.inverseSurface,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colorScheme.shadow.withValues(alpha: 0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(
+                    text,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onInverseSurface,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _showOverlay() {
     final msg = _currentMessage();
     if (msg == null || msg.isEmpty) {
@@ -86,47 +143,9 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
     }
 
     final overlay = Overlay.of(context, rootOverlay: true);
-    final theme = Theme.of(context);
 
     _overlayEntry = OverlayEntry(
-      builder: (overlayContext) {
-        final text = _currentMessage();
-        if (text == null || text.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        return CompositedTransformFollower(
-          link: _layerLink,
-          targetAnchor: Alignment.bottomCenter,
-          followerAnchor: Alignment.topCenter,
-          offset: const Offset(0, 10),
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 320),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.inverseSurface,
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: theme.colorScheme.shadow.withValues(alpha: 0.18),
-                    blurRadius: 10,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Text(
-                text,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onInverseSurface,
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+      builder: _buildOverlay,
     );
     overlay.insert(_overlayEntry!);
   }
@@ -162,14 +181,17 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
   Widget build(BuildContext context) {
     return CompositedTransformTarget(
       link: _layerLink,
-      child: MouseRegion(
-        onEnter: _handleHoverEnter,
-        onExit: _handleHoverExit,
-        child: GestureDetector(
-          behavior: HitTestBehavior.deferToChild,
-          onLongPressStart: _handleLongPressStart,
-          onLongPressEnd: _handleLongPressEnd,
-          child: widget.child,
+      child: KeyedSubtree(
+        key: _targetKey,
+        child: MouseRegion(
+          onEnter: _handleHoverEnter,
+          onExit: _handleHoverExit,
+          child: GestureDetector(
+            behavior: HitTestBehavior.deferToChild,
+            onLongPressStart: _handleLongPressStart,
+            onLongPressEnd: _handleLongPressEnd,
+            child: widget.child,
+          ),
         ),
       ),
     );

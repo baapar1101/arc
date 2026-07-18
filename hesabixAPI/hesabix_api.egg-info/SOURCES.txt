@@ -16,6 +16,7 @@ adapters/api/v1/business_dashboard.py
 adapters/api/v1/business_data_table_settings.py
 adapters/api/v1/business_frequent_descriptions.py
 adapters/api/v1/business_ftp_backup.py
+adapters/api/v1/business_fx_auto_sync.py
 adapters/api/v1/business_fx_global_rates.py
 adapters/api/v1/business_notifications.py
 adapters/api/v1/business_users.py
@@ -222,6 +223,7 @@ adapters/db/models/business_currency_rate.py
 adapters/db/models/business_dashboard_layout.py
 adapters/db/models/business_frequent_description.py
 adapters/db/models/business_ftp_backup_setting.py
+adapters/db/models/business_fx_auto_sync.py
 adapters/db/models/business_notification.py
 adapters/db/models/business_permission.py
 adapters/db/models/business_print_settings.py
@@ -459,6 +461,7 @@ app/services/business_frequent_description_service.py
 app/services/business_ftp_access.py
 app/services/business_ftp_queue_jobs.py
 app/services/business_ftp_service.py
+app/services/business_fx_auto_sync_service.py
 app/services/business_membership_background_jobs.py
 app/services/business_menu_preferences_service.py
 app/services/business_notification_service.py
@@ -505,6 +508,7 @@ app/services/file_storage_service.py
 app/services/file_storage_share_service.py
 app/services/firewall_service.py
 app/services/fiscal_year_rollback_service.py
+app/services/fx_auto_sync_background_jobs.py
 app/services/fx_rate_background_jobs.py
 app/services/fx_rate_provider_service.py
 app/services/general_ledger_service.py
@@ -992,6 +996,7 @@ migrations/versions/20260714_000001_ai_prompts_language_policy.py
 migrations/versions/20260714_000002_fix_ai_chat_message_trace_content.py
 migrations/versions/20260714_000003_document_code_reservations.py
 migrations/versions/20260718_000001_fx_rate_providers_global_rates.py
+migrations/versions/20260718_000002_business_fx_auto_sync.py
 tests/__init__.py
 tests/test_ai_agent_continuation.py
 tests/test_ai_agent_regression_db.py

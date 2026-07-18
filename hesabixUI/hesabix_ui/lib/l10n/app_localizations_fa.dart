@@ -15302,41 +15302,40 @@ class AppLocalizationsFa extends AppLocalizations {
       'پیش‌نمایش با مقادیر فعلی فرم (پیش‌نویس) محاسبه می‌شود. برای ماندگاری، ذخیره کنید.';
 
   @override
-  String get fxAutoSyncRefreshPreview => 'Refresh preview';
+  String get fxAutoSyncRefreshPreview => 'تازه‌سازی پیش‌نمایش';
 
   @override
-  String get fxAutoSyncNoSecondaryCurrencies =>
-      'No secondary currencies found.';
+  String get fxAutoSyncNoSecondaryCurrencies => 'ارز فرعی‌ای یافت نشد.';
 
   @override
-  String get fxAutoSyncOffsetType => 'Offset type';
+  String get fxAutoSyncOffsetType => 'نوع آفست';
 
   @override
-  String get fxAutoSyncOffsetNone => 'None';
+  String get fxAutoSyncOffsetNone => 'بدون آفست';
 
   @override
-  String get fxAutoSyncOffsetPercent => 'Percent';
+  String get fxAutoSyncOffsetPercent => 'درصد';
 
   @override
-  String get fxAutoSyncOffsetAmount => 'Fixed amount';
+  String get fxAutoSyncOffsetAmount => 'مبلغ ثابت';
 
   @override
-  String get fxAutoSyncOffsetDirection => 'Direction';
+  String get fxAutoSyncOffsetDirection => 'جهت';
 
   @override
-  String get fxAutoSyncOffsetUp => 'Above market (+)';
+  String get fxAutoSyncOffsetUp => 'بالاتر از بازار (+)';
 
   @override
-  String get fxAutoSyncOffsetDown => 'Below market (−)';
+  String get fxAutoSyncOffsetDown => 'پایین‌تر از بازار (−)';
 
   @override
-  String get fxAutoSyncOffsetValue => 'Value';
+  String get fxAutoSyncOffsetValue => 'مقدار';
 
   @override
-  String get fxAutoSyncRefRate => 'Reference rate';
+  String get fxAutoSyncRefRate => 'نرخ مرجع';
 
   @override
-  String get fxAutoSyncFinalRate => 'Final rate after offset';
+  String get fxAutoSyncFinalRate => 'نرخ نهایی پس از آفست';
 
   @override
   String get fxAutoSyncPreviewSavedHint =>
