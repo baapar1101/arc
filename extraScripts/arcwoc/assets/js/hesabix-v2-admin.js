@@ -448,6 +448,21 @@
 			$(document).on('change', 'input[name="invoice_doc_mode"]', hesabixV2ToggleProformaFinalize);
 			hesabixV2ToggleProformaFinalize();
 		}
+
+		var $productSyncPreset = $('#hesabix_v2_product_sync_preset');
+		if ($productSyncPreset.length) {
+			function hesabixV2ToggleProductSyncFields() {
+				var preset = $productSyncPreset.val() || 'accounting';
+				var $advanced = $('.hesabix-v2-product-sync-advanced-only');
+				var $fieldRows = $('.hesabix-v2-product-sync-field-rows .hesabix-v2-product-sync-field-row');
+
+				$advanced.toggle(preset === 'advanced');
+				$fieldRows.toggle(preset !== 'import_only');
+			}
+
+			$productSyncPreset.on('change', hesabixV2ToggleProductSyncFields);
+			hesabixV2ToggleProductSyncFields();
+		}
 	});
 
 	window.HesabixV2Admin = HesabixV2Admin;

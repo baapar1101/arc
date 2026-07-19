@@ -42,6 +42,7 @@ from adapters.db.models.business_print_settings import BusinessPrintSettings
 from adapters.db.models.user import User
 from app.core.responses import ApiError
 from app.services.invoice_adjustments_service import payable_total_from_extra_info
+from app.services.invoice_bulk_upsert_service import bulk_upsert_invoices_integration
 from app.services.invoice_service import (
     create_invoice,
     update_invoice,

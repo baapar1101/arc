@@ -752,6 +752,12 @@ class Hesabix_V2_Admin
 			'auto_sync_customers' => isset($_POST['auto_sync_customers']),
 			'auto_sync_orders' => isset($_POST['auto_sync_orders']),
 			'sync_on_product_update' => isset($_POST['sync_on_product_update']),
+			'product_sync_preset' => isset($_POST['product_sync_preset'])
+				? sanitize_key(wp_unslash($_POST['product_sync_preset']))
+				: Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING,
+			'sync_product_name' => isset($_POST['sync_product_name']),
+			'sync_product_description' => isset($_POST['sync_product_description']),
+			'sync_product_barcode' => isset($_POST['sync_product_barcode']),
 			'sync_product_categories' => isset($_POST['sync_product_categories']),
 			'sync_category_link_by_name_in_hesabix' => isset($_POST['sync_category_link_by_name_in_hesabix']),
 			'sync_product_price' => isset($_POST['sync_product_price']),
@@ -828,6 +834,10 @@ class Hesabix_V2_Admin
 
 		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {
 			$sync_settings = Hesabix_V2_Gateway_Fee_Service::normalize_sync_settings($sync_settings);
+		}
+
+		if (class_exists('Hesabix_V2_Product_Sync_Payload')) {
+			$sync_settings = Hesabix_V2_Product_Sync_Payload::normalize_sync_settings($sync_settings);
 		}
 
 		update_option('hesabix_v2_sync_settings', $sync_settings);

@@ -852,6 +852,16 @@ def update_product(
         catalog_specifications=effective_specs,
     )
 
+    price_update_kwargs: Dict[str, Any] = {}
+    if "base_sales_price" in fields_set:
+        price_update_kwargs["base_sales_price"] = payload.base_sales_price
+    if "base_sales_note" in fields_set:
+        price_update_kwargs["base_sales_note"] = payload.base_sales_note
+    if "base_purchase_price" in fields_set:
+        price_update_kwargs["base_purchase_price"] = payload.base_purchase_price
+    if "base_purchase_note" in fields_set:
+        price_update_kwargs["base_purchase_note"] = payload.base_purchase_note
+
     updated = repo.update(
         product_id,
         commit=False,
@@ -863,10 +873,6 @@ def update_product(
         main_unit=main_unit_val if 'main_unit' in fields_set else None,
         secondary_unit=secondary_unit_val if 'secondary_unit' in fields_set else None,
         unit_conversion_factor=payload.unit_conversion_factor,
-        base_sales_price=payload.base_sales_price,
-        base_sales_note=payload.base_sales_note,
-        base_purchase_price=payload.base_purchase_price,
-        base_purchase_note=payload.base_purchase_note,
         track_inventory=payload.track_inventory if payload.track_inventory is not None else None,
         reorder_point=payload.reorder_point,
         min_order_qty=payload.min_order_qty,
@@ -906,6 +912,7 @@ def update_product(
         **catalog_uuid_kw,
         **catalog_profile_kw,
         **gb_kw,
+        **price_update_kwargs,
     )
     if not updated:
         return None

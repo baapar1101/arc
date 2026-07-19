@@ -180,20 +180,32 @@ class Hesabix_V2_Sync_Service
 
 			$wc_payload_for_log = $product_data;
 
-			// اعمال تنظیمات همگام‌سازی قیمت و موجودی (API حسابیکس: base_sales_price، track_inventory)
 			$sync_settings = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
-			if (empty($sync_settings['sync_product_price'])) {
-				unset($product_data['base_sales_price']);
-			}
-			if (empty($sync_settings['sync_product_stock'])) {
-				$product_data['track_inventory'] = false;
-			} else {
-				$policy = isset($sync_settings['track_inventory_policy']) ? (string) $sync_settings['track_inventory_policy'] : 'wc';
-				$product_data['track_inventory'] = Hesabix_V2_Mapper::resolve_track_inventory_by_policy($product, $policy);
-			}
 
 			// Check if already synced
 			$existing_mapping = $this->db->get_mapping('product', $wc_id, $wc_parent_id);
+			$is_update = !empty($existing_mapping);
+
+			$product_data = Hesabix_V2_Product_Sync_Payload::prepare(
+				$product_data,
+				$is_update,
+				$sync_settings,
+				$product,
+				(int) $wc_id,
+				$wc_parent_id !== null ? (int) $wc_parent_id : null
+			);
+
+			if ($is_update && Hesabix_V2_Product_Sync_Payload::is_noop_update($product_data)) {
+				$execution_time = microtime(true) - $start_time;
+
+				return array(
+					'success' => true,
+					'message' => __('به‌روزرسانی لازم نبود؛ داده‌های حسابیکس حفظ شد.', 'hesabix-v2'),
+					'hesabix_id' => (int) $existing_mapping['hesabix_id'],
+					'skipped_noop' => true,
+					'execution_time' => $execution_time,
+				);
+			}
 
 			if ($existing_mapping) {
 				// Update existing product
@@ -1436,18 +1448,27 @@ class Hesabix_V2_Sync_Service
 		}
 
 		$sync_settings = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
-		if (empty($sync_settings['sync_product_price'])) {
-			unset($product_data['base_sales_price']);
-		}
-
-		if (empty($sync_settings['sync_product_stock'])) {
-			$product_data['track_inventory'] = false;
-		} else {
-			$policy = isset($sync_settings['track_inventory_policy']) ? (string) $sync_settings['track_inventory_policy'] : 'wc';
-			$product_data['track_inventory'] = Hesabix_V2_Mapper::resolve_track_inventory_by_policy($product, $policy);
-		}
-
 		$existing_mapping = $this->db->get_mapping('product', $wc_id, $wc_parent_id);
+		$is_update = !empty($existing_mapping);
+
+		$product_data = Hesabix_V2_Product_Sync_Payload::prepare(
+			$product_data,
+			$is_update,
+			$sync_settings,
+			$product,
+			(int) $wc_id,
+			$wc_parent_id !== null ? (int) $wc_parent_id : null
+		);
+
+		if ($is_update && Hesabix_V2_Product_Sync_Payload::is_noop_update($product_data)) {
+			return array(
+				'ok' => true,
+				'skipped_noop' => true,
+				'wc_id' => $wc_id,
+				'wc_parent_id' => $wc_parent_id,
+				'hesabix_id' => !empty($existing_mapping['hesabix_id']) ? (int) $existing_mapping['hesabix_id'] : null,
+			);
+		}
 
 		$hx_pid = null;
 		if (!empty($existing_mapping['hesabix_id'])) {
@@ -1608,7 +1629,14 @@ class Hesabix_V2_Sync_Service
 					continue;
 				}
 
-				$cref = isset($collected['item']['client_ref']) ? (string) $collected['item']['client_ref'] : '';
+				if (!empty($collected['skipped_noop'])) {
+					$results['success']++;
+					continue;
+				}
+
+				if (empty($collected['item']) || !is_array($collected['item'])) {
+					continue;
+				}
 				if ($cref === '') {
 					continue;
 				}

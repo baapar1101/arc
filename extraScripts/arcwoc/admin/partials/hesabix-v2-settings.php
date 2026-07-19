@@ -344,10 +344,69 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="checkbox" name="sync_on_product_update" value="1" <?php checked($sync_settings['sync_on_product_update'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
+					<p class="description"><?php _e('با فعال بودن، تغییرات ووکامرس طبق «سیاست به‌روزرسانی» زیر به حسابیکس اعمال می‌شود.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
 			<tr>
+				<th scope="row"><?php _e('سیاست به‌روزرسانی محصول از ووکامرس', 'hesabix-v2'); ?></th>
+				<td>
+					<?php
+					$product_sync_preset = isset($sync_settings['product_sync_preset'])
+						? (string) $sync_settings['product_sync_preset']
+						: Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING;
+					?>
+					<select name="product_sync_preset" id="hesabix_v2_product_sync_preset" class="regular-text">
+						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_IMPORT_ONLY); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_IMPORT_ONLY); ?>>
+							<?php esc_html_e('فقط ایمپورت اولیه (به‌روزرسانی خودکار هیچ فیلدی)', 'hesabix-v2'); ?>
+						</option>
+						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING); ?>>
+							<?php esc_html_e('حسابداری‌محور (پیشنهادی — حفظ قیمت خرید و داده‌های مالی)', 'hesabix-v2'); ?>
+						</option>
+						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_LIVE_STORE); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_LIVE_STORE); ?>>
+							<?php esc_html_e('فروشگاه زنده (نام، قیمت، دسته و … از ووکامرس)', 'hesabix-v2'); ?>
+						</option>
+						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_ADVANCED); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_ADVANCED); ?>>
+							<?php esc_html_e('پیشرفته (انتخاب فیلد به فیلد)', 'hesabix-v2'); ?>
+						</option>
+					</select>
+					<p class="description"><?php esc_html_e('در ایجاد اولیهٔ محصول، اطلاعات پایه از ووکامرس ساخته می‌شود. در به‌روزرسانی‌های بعدی فقط فیلدهای مجاز این سیاست ارسال می‌شوند؛ قیمت خرید و داده‌های حسابداری هرگز از ووکامرس بازنویسی نمی‌شوند.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tbody id="hesabix-v2-product-sync-field-rows">
+			<tr class="hesabix-v2-product-sync-advanced-only">
+				<th scope="row"><?php _e('همگام‌سازی نام محصول', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="sync_product_name" value="1" <?php checked(!empty($sync_settings['sync_product_name'])); ?>>
+						<?php _e('فعال', 'hesabix-v2'); ?>
+					</label>
+				</td>
+			</tr>
+
+			<tr class="hesabix-v2-product-sync-advanced-only">
+				<th scope="row"><?php _e('همگام‌سازی توضیحات محصول', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="sync_product_description" value="1" <?php checked(!empty($sync_settings['sync_product_description'])); ?>>
+						<?php _e('فعال', 'hesabix-v2'); ?>
+					</label>
+					<p class="description"><?php esc_html_e('فقط وقتی در ووکامرس توضیح داشته باشد ارسال می‌شود.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr class="hesabix-v2-product-sync-advanced-only">
+				<th scope="row"><?php _e('همگام‌سازی بارکد/SKU', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="sync_product_barcode" value="1" <?php checked(!empty($sync_settings['sync_product_barcode'])); ?>>
+						<?php _e('فعال', 'hesabix-v2'); ?>
+					</label>
+				</td>
+			</tr>
+
+			<tr class="hesabix-v2-product-sync-field-row">
 				<th scope="row"><?php _e('همگام‌سازی دستهٔ محصول با حسابیکس', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
@@ -369,17 +428,18 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				</td>
 			</tr>
 
-			<tr>
-				<th scope="row"><?php _e('همگام‌سازی قیمت محصول', 'hesabix-v2'); ?></th>
+			<tr class="hesabix-v2-product-sync-field-row">
+				<th scope="row"><?php _e('همگام‌سازی قیمت فروش محصول', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
 						<input type="checkbox" name="sync_product_price" value="1" <?php checked($sync_settings['sync_product_price'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
+					<p class="description"><?php esc_html_e('فقط قیمت فروش از ووکامرس؛ قیمت خرید حسابیکس هرگز از ووکامرس تغییر نمی‌کند.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
-			<tr>
+			<tr class="hesabix-v2-product-sync-field-row">
 				<th scope="row"><?php _e('همگام‌سازی موجودی محصول', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
@@ -389,7 +449,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				</td>
 			</tr>
 
-			<tr>
+			<tr class="hesabix-v2-product-sync-field-row">
 				<th scope="row"><?php _e('کنترل موجودی حسابیکس نسبت به ووکامرس', 'hesabix-v2'); ?></th>
 				<td>
 					<select name="track_inventory_policy" id="hesabix_v2_track_inventory_policy" class="regular-text">
@@ -409,6 +469,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					<p class="description"><?php _e('فقط هنگامی که «همگام‌سازی موجودی محصول» فعال است اعمال می‌شود؛ در صورت غیرفعال بودن آن، کنترل موجودی در حسابیکس در همگام‌سازی خاموش می‌ماند.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
+			</tbody>
 
 			<tr>
 				<th scope="row"><?php _e('همگام‌سازی خودکار مشتریان', 'hesabix-v2'); ?></th>

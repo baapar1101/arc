@@ -89,6 +89,8 @@ class Hesabix_V2
 		 */
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-mapper.php';
 
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-product-sync-payload.php';
+
 		/**
 		 * Invoice / tag helpers for sync.
 		 */
