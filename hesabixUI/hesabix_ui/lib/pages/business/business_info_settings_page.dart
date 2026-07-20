@@ -90,6 +90,15 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _allowNegativeInventoryForUnique = false;
   bool _warehouseTransferRequirePositiveStock = true;
 
+  // کالای هزینه‌شده / کالای درآمدشده
+  String _geiWorkflowMode = 'simple';
+  bool _geiAutoPostInSimpleMode = true;
+  final _geiDefaultExpenseAccountCtrl = TextEditingController(text: '70407');
+  final _geiDefaultIncomeAccountCtrl = TextEditingController(text: '60103');
+  String _geiStockCountMode = 'goods_docs';
+  bool _geiAllowManualUnitCost = false;
+  bool _geiRequirePerson = false;
+
   /// reject | use_default_warehouse — وقتی ردیف انبارداری بدون انبار و ثبت انبار فعال است
   String _invoiceMissingLineWarehousePolicy = 'reject';
   int? _invoiceDefaultWarehouseId;
@@ -135,6 +144,8 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     _invoiceProfitOverheadPercentController.dispose();
     _invoiceGlobalDiscountMaxPercentController.dispose();
     _invoiceGlobalDiscountMaxAmountController.dispose();
+    _geiDefaultExpenseAccountCtrl.dispose();
+    _geiDefaultIncomeAccountCtrl.dispose();
     super.dispose();
   }
 
@@ -193,6 +204,13 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _allowNegativeInventoryForBulk = resp.allowNegativeInventoryForBulk;
       _allowNegativeInventoryForUnique = resp.allowNegativeInventoryForUnique;
       _warehouseTransferRequirePositiveStock = resp.warehouseTransferRequirePositiveStock;
+      _geiWorkflowMode = resp.goodsExpenseIncomeWorkflowMode;
+      _geiAutoPostInSimpleMode = resp.goodsExpenseIncomeAutoPostInSimpleMode;
+      _geiDefaultExpenseAccountCtrl.text = resp.goodsExpenseIncomeDefaultExpenseAccountCode;
+      _geiDefaultIncomeAccountCtrl.text = resp.goodsExpenseIncomeDefaultIncomeAccountCode;
+      _geiStockCountMode = resp.goodsExpenseIncomeStockCountMode;
+      _geiAllowManualUnitCost = resp.goodsExpenseIncomeAllowManualUnitCost;
+      _geiRequirePerson = resp.goodsExpenseIncomeRequirePerson;
       _invoiceMissingLineWarehousePolicy = resp.invoiceMissingLineWarehousePolicy;
       _invoiceDefaultWarehouseId = resp.invoiceDefaultWarehouseId;
       _invoiceDefaultWarehouseFillDocumentHeader = resp.invoiceDefaultWarehouseFillDocumentHeader;
@@ -377,6 +395,29 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_warehouseTransferRequirePositiveStock != orig.warehouseTransferRequirePositiveStock) {
       payload['warehouse_transfer_require_positive_stock'] = _warehouseTransferRequirePositiveStock;
+    }
+    if (_geiWorkflowMode != orig.goodsExpenseIncomeWorkflowMode) {
+      payload['goods_expense_income_workflow_mode'] = _geiWorkflowMode;
+    }
+    if (_geiAutoPostInSimpleMode != orig.goodsExpenseIncomeAutoPostInSimpleMode) {
+      payload['goods_expense_income_auto_post_in_simple_mode'] = _geiAutoPostInSimpleMode;
+    }
+    final geiExp = _geiDefaultExpenseAccountCtrl.text.trim();
+    if (geiExp != orig.goodsExpenseIncomeDefaultExpenseAccountCode) {
+      payload['goods_expense_income_default_expense_account_code'] = geiExp;
+    }
+    final geiInc = _geiDefaultIncomeAccountCtrl.text.trim();
+    if (geiInc != orig.goodsExpenseIncomeDefaultIncomeAccountCode) {
+      payload['goods_expense_income_default_income_account_code'] = geiInc;
+    }
+    if (_geiStockCountMode != orig.goodsExpenseIncomeStockCountMode) {
+      payload['goods_expense_income_stock_count_mode'] = _geiStockCountMode;
+    }
+    if (_geiAllowManualUnitCost != orig.goodsExpenseIncomeAllowManualUnitCost) {
+      payload['goods_expense_income_allow_manual_unit_cost'] = _geiAllowManualUnitCost;
+    }
+    if (_geiRequirePerson != orig.goodsExpenseIncomeRequirePerson) {
+      payload['goods_expense_income_require_person'] = _geiRequirePerson;
     }
     if (_invoiceMissingLineWarehousePolicy != orig.invoiceMissingLineWarehousePolicy) {
       payload['invoice_missing_line_warehouse_policy'] = _invoiceMissingLineWarehousePolicy;
@@ -1193,6 +1234,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               const SizedBox(height: 8),
               _buildInventoryNegativePolicySettings(cs),
 
+              const SizedBox(height: 24),
+              _buildSectionTitle('کالای هزینه‌شده / کالای درآمدشده', cs),
+              const SizedBox(height: 8),
+              _buildGoodsExpenseIncomeSettings(cs),
+
             ],
           ),
         ),
@@ -1590,6 +1636,100 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               subtitle: Text(t.inventoryNegativePolicyTransferSubtitle),
               value: _warehouseTransferRequirePositiveStock,
               onChanged: (v) => setState(() => _warehouseTransferRequirePositiveStock = v),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoodsExpenseIncomeSettings(ColorScheme cs) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'برای سازمان‌های کوچک حالت «ساده» و برای تفکیک انباردار/حسابدار حالت «دو مرحله‌ای» را انتخاب کنید.',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            Text('گردش‌کار', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'simple', label: Text('ساده')),
+                ButtonSegment(value: 'two_step', label: Text('دو مرحله‌ای')),
+              ],
+              selected: {_geiWorkflowMode},
+              onSelectionChanged: (s) => setState(() => _geiWorkflowMode = s.first),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('قطعی خودکار در حالت ساده'),
+              subtitle: const Text('اگر کاربر مجوز قطعی‌سازی داشته باشد، سند هنگام ثبت قطعی می‌شود'),
+              value: _geiAutoPostInSimpleMode,
+              onChanged: _geiWorkflowMode == 'simple'
+                  ? (v) => setState(() => _geiAutoPostInSimpleMode = v)
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            TextFormField(
+              controller: _geiDefaultExpenseAccountCtrl,
+              decoration: const InputDecoration(
+                labelText: 'کد حساب پیش‌فرض کالای هزینه‌شده',
+                hintText: '70407',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _geiDefaultIncomeAccountCtrl,
+              decoration: const InputDecoration(
+                labelText: 'کد حساب پیش‌فرض کالای درآمدشده',
+                hintText: '60103',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _geiStockCountMode,
+              decoration: const InputDecoration(
+                labelText: 'خروجی انبارگردانی',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'goods_docs',
+                  child: Text('اسناد کالای هزینه/درآمد (با اثر مالی)'),
+                ),
+                DropdownMenuItem(
+                  value: 'physical_adjustment',
+                  child: Text('فقط حواله تعدیل فیزیکی'),
+                ),
+                DropdownMenuItem(
+                  value: 'ask',
+                  child: Text('پرسش از کاربر هنگام ثبت'),
+                ),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _geiStockCountMode = v);
+              },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('اجازه تغییر دستی بهای واحد'),
+              subtitle: const Text('نیاز به مجوز جداگانه change_unit_cost دارد'),
+              value: _geiAllowManualUnitCost,
+              onChanged: (v) => setState(() => _geiAllowManualUnitCost = v),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('الزام انتخاب شخص'),
+              value: _geiRequirePerson,
+              onChanged: (v) => setState(() => _geiRequirePerson = v),
             ),
           ],
         ),

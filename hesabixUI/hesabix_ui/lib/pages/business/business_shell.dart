@@ -1579,6 +1579,15 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
+          _MenuItem(
+            key: 'goods-expense-income',
+            label: 'کالای هزینه/درآمد شده',
+            icon: Icons.inventory_2_outlined,
+            selectedIcon: Icons.inventory_2,
+            path: _bu('goods-expense-income'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
         ],
       ),
       _MenuItem(
@@ -2615,6 +2624,8 @@ class _BusinessShellState extends State<BusinessShell> {
                                             showAddWarehouseDialog();
                                           } else if (child.label == 'حواله‌های انبار') {
                                             showAddWarehouseDocumentDialog();
+                                          } else if (child.label == 'کالای هزینه/درآمد شده') {
+                                            context.go(_bu('goods-expense-income'));
                                           } else if (child.label == 'فرایندها و زون ارجاعات') {
                                             context.go('${_bu('crm/process-definitions')}?openAdd=1');
                                           } else if (child.label == 'سرنخ‌ها') {
@@ -3470,6 +3481,11 @@ class _BusinessShellState extends State<BusinessShell> {
     // انبارگردانی (Stock Count) در نهایت به ایجاد/مدیریت حواله‌های تعدیل منجر می‌شود؛
     // بنابراین در مدل دسترسی فعلی زیر مجموعه‌ی warehouse_transfers در نظر گرفته می‌شود.
     if (label == 'انبار گردانی' || label == 'انبارگردانی' || label == 'Stock Count') return 'warehouse_transfers';
+    if (label == 'کالای هزینه/درآمد شده' ||
+        label == 'کالای هزینه‌شده / کالای درآمدشده' ||
+        label == 'Goods Expense/Income') {
+      return 'goods_expense_income';
+    }
     if (label == t.storageSpace) return 'storage';
     if (label == t.taxpayers) return 'moadian';
     if (label == t.settings) return 'settings';

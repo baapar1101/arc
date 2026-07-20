@@ -1168,6 +1168,17 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'delete': '${t.delete} ${t.expensesIncome}',
         'draft': '${t.draft} ${t.expensesIncome}',
       },
+      'goods_expense_income': {
+        'view': 'مشاهده کالای هزینه/درآمد شده',
+        'add': 'ایجاد کالای هزینه/درآمد شده',
+        'edit': 'ویرایش کالای هزینه/درآمد شده',
+        'delete': 'حذف کالای هزینه/درآمد شده',
+        'submit': 'ارسال به حسابداری',
+        'allocate': 'تخصیص حساب معین',
+        'post': 'قطعی‌سازی (انبار + دفتر)',
+        'cancel': 'ابطال سند قطعی',
+        'change_unit_cost': 'تغییر دستی بهای واحد',
+      },
       'accounting_documents': {
         'add': '${t.add} ${t.accountingDocuments}',
         'view': '${t.view} ${t.accountingDocuments}',
@@ -1807,7 +1818,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': t.warehouseManagement,
         'icon': Icons.warehouse,
-        'sections': ['warehouses', 'warehouse_transfers'],
+        'sections': ['warehouses', 'warehouse_transfers', 'goods_expense_income'],
         'permissionHintKey': 'warehouse_inventory_bridge',
       },
       {
@@ -1981,6 +1992,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.warehouses;
       case 'warehouse_transfers':
         return t.warehouseTransfers;
+      case 'goods_expense_income':
+        return 'کالای هزینه/درآمد شده';
       case 'settings':
         return t.settings;
       case 'storage':
@@ -2046,6 +2059,16 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.delete;
       case 'draft':
         return t.draft;
+      case 'submit':
+        return 'ارسال به حسابداری';
+      case 'allocate':
+        return 'تخصیص حساب';
+      case 'post':
+        return 'قطعی‌سازی';
+      case 'cancel':
+        return 'ابطال';
+      case 'change_unit_cost':
+        return 'تغییر بهای واحد';
       case 'read':
         return t.view;
       case 'write':

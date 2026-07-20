@@ -74,6 +74,7 @@ from adapters.api.v1.receipts_payments import router as receipts_payments_router
 from adapters.api.v1.transfers import router as transfers_router
 from adapters.api.v1.fiscal_years import router as fiscal_years_router
 from adapters.api.v1.expense_income import router as expense_income_router
+from adapters.api.v1.goods_expense_income import router as goods_expense_income_router
 from adapters.api.v1.documents import router as documents_router
 from adapters.api.v1.kardex import router as kardex_router
 from adapters.api.v1.opening_balance import router as opening_balance_router
@@ -1039,6 +1040,7 @@ def create_app() -> FastAPI:
     application.include_router(receipts_payments_router, prefix=settings.api_v1_prefix)
     application.include_router(transfers_router, prefix=settings.api_v1_prefix)
     application.include_router(expense_income_router, prefix=settings.api_v1_prefix)
+    application.include_router(goods_expense_income_router, prefix=settings.api_v1_prefix)
     application.include_router(documents_router, prefix=settings.api_v1_prefix)
     application.include_router(fiscal_years_router, prefix=settings.api_v1_prefix)
     application.include_router(activity_logs_router, prefix=settings.api_v1_prefix)

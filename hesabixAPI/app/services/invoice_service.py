@@ -1281,8 +1281,9 @@ def _compute_available_stock(
 
     wh_movements = wh_movements_query.with_entities(WarehouseDocumentLine, WarehouseDocument).all()
     for wh_mv, wh_doc in wh_movements:
-        # حوالهٔ معکوس لغوِ حوالهٔ فاکتور در invoice_item_lines منعکس شده؛ شمارش مجدد دوبرابر می‌کند.
-        if _warehouse_doc_cancels_invoice_sourced_wh(db, business_id, wh_doc):
+        # حوالهٔ معکوس لغو: موجودی با cancelled شدن اصل اصلاح شده؛ شمارش مجدد دوبرابر می‌کند.
+        # (شامل معکوس فاکتور و معکوس دستی/کالای هزینه-درآمد)
+        if _warehouse_doc_is_cancel_reversal_of_cancelled(db, business_id, wh_doc):
             continue
         if wh_mv.movement == "in":
             bal += Decimal(str(wh_mv.quantity))
@@ -2151,6 +2152,32 @@ def _warehouse_doc_cancels_invoice_sourced_wh(db: Session, business_id: int, wh_
     if not src:
         return False
     return _warehouse_document_is_invoice_sourced(db, business_id, src)
+
+
+def _warehouse_doc_is_cancel_reversal_of_cancelled(db: Session, business_id: int, wh_doc: Any) -> bool:
+    """حوالهٔ معکوسِ لغو وقتی اصل cancelled است؛ موجودی با حذف اصل اصلاح شده و شمارش معکوس دوبرابر می‌کند."""
+    from adapters.db.models.warehouse_document import WarehouseDocument
+
+    ex = getattr(wh_doc, "extra_info", None) or {}
+    if not isinstance(ex, dict):
+        return False
+    if ex.get("audit_only_reversal") or ex.get("stock_already_corrected_by_cancel"):
+        return True
+    cancel_id = ex.get("cancels_warehouse_document_id")
+    if cancel_id is None:
+        return False
+    try:
+        cid = int(cancel_id)
+    except (TypeError, ValueError):
+        return False
+    src = (
+        db.query(WarehouseDocument)
+        .filter(WarehouseDocument.id == cid, WarehouseDocument.business_id == int(business_id))
+        .first()
+    )
+    if not src:
+        return False
+    return (src.status or "").strip().lower() == "cancelled"
 
 
 _INVENTORY_LEDGER_REFRESH_TYPES = frozenset({INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN})

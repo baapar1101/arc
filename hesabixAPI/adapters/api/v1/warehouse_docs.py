@@ -1042,12 +1042,21 @@ def create_stock_count_adjustment_endpoint(
 	ctx: AuthContext = Depends(get_current_user),
 	db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-	"""ایجاد حواله تعدیل از تفاوت‌های انبار گردانی."""
+	"""ایجاد حواله تعدیل یا اسناد کالای هزینه/درآمد از تفاوت‌های انبار گردانی."""
 	if not ctx.has_business_permission("inventory", "write"):
 		raise ApiError("FORBIDDEN", "Missing business permission: inventory.write", http_status=403)
 	
 	from app.services.transfer_service import _parse_iso_date as _parse_date
 	from datetime import date as date_type
+	from adapters.db.models.business import Business
+	from app.services.goods_expense_income_service import (
+		STOCK_COUNT_ASK,
+		STOCK_COUNT_GOODS_DOCS,
+		STOCK_COUNT_PHYSICAL,
+		create_from_stock_count,
+		get_workflow_settings,
+	)
+	from app.core.permissions import has_business_permission_for_business
 	
 	stock_count_code = payload.get("stock_count_code", "").strip()
 	if not stock_count_code:
@@ -1067,7 +1076,56 @@ def create_stock_count_adjustment_endpoint(
 		raise ApiError("INVALID_PAYLOAD", "items list is required", http_status=400)
 	
 	notes = payload.get("notes")
-	
+
+	biz = db.query(Business).filter(Business.id == int(business_id)).first()
+	settings = get_workflow_settings(biz) if biz else {"stock_count_mode": STOCK_COUNT_GOODS_DOCS}
+	mode = str(payload.get("result_mode") or settings.get("stock_count_mode") or STOCK_COUNT_GOODS_DOCS).strip().lower()
+	if mode == STOCK_COUNT_ASK:
+		# کلاینت باید صریحاً result_mode بفرستد
+		explicit = str(payload.get("result_mode") or "").strip().lower()
+		if explicit not in (STOCK_COUNT_GOODS_DOCS, STOCK_COUNT_PHYSICAL):
+			return success_response(
+				data={
+					"needs_choice": True,
+					"options": [STOCK_COUNT_GOODS_DOCS, STOCK_COUNT_PHYSICAL],
+					"settings": settings,
+				},
+				request=request,
+				message="STOCK_COUNT_RESULT_MODE_REQUIRED",
+			)
+		mode = explicit
+
+	if mode == STOCK_COUNT_GOODS_DOCS:
+		if not has_business_permission_for_business(
+			ctx, db, business_id, "goods_expense_income", "add"
+		):
+			raise ApiError(
+				"FORBIDDEN",
+				"برای ثبت کالای هزینه/درآمد از انبارگردانی، مجوز goods_expense_income.add لازم است",
+				http_status=403,
+			)
+		created = create_from_stock_count(
+			db,
+			business_id,
+			ctx.get_user_id(),
+			stock_count_code=stock_count_code,
+			stock_count_date=stock_count_date,
+			items=items,
+			notes=notes,
+			user_can_allocate=has_business_permission_for_business(
+				ctx, db, business_id, "goods_expense_income", "allocate"
+			),
+			user_can_post=False,
+			commit=False,
+		)
+		db.commit()
+		return success_response(
+			data={"mode": STOCK_COUNT_GOODS_DOCS, **created},
+			request=request,
+			message="STOCK_COUNT_GOODS_DOCS_CREATED",
+		)
+
+	# physical_adjustment (سازگاری با رفتار قبلی)
 	wh = create_stock_count_adjustment(
 		db,
 		business_id,

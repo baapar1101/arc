@@ -169,6 +169,8 @@ class PermissionInfoWidget extends StatelessWidget {
         return Icons.warehouse;
       case 'warehouse_transfers':
         return Icons.local_shipping;
+      case 'goods_expense_income':
+        return Icons.inventory_2_outlined;
       case 'storage':
         return Icons.storage;
       case 'settings':
@@ -220,6 +222,8 @@ class PermissionInfoWidget extends StatelessWidget {
         return 'انبارها';
       case 'warehouse_transfers':
         return 'حواله‌ها';
+      case 'goods_expense_income':
+        return 'کالای هزینه/درآمد شده';
       case 'storage':
         return 'فضای ذخیره‌سازی';
       case 'settings':
@@ -251,6 +255,16 @@ class PermissionInfoWidget extends StatelessWidget {
         return 'برگشت';
       case 'charge':
         return 'شارژ';
+      case 'submit':
+        return 'ارسال به حسابداری';
+      case 'allocate':
+        return 'تخصیص حساب';
+      case 'post':
+        return 'قطعی‌سازی';
+      case 'cancel':
+        return 'ابطال';
+      case 'change_unit_cost':
+        return 'تغییر بهای واحد';
       default:
         return action;
     }

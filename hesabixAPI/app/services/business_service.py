@@ -1491,6 +1491,27 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "warehouse_transfer_require_positive_stock": bool(
             getattr(business, "warehouse_transfer_require_positive_stock", True),
         ),
+        "goods_expense_income_workflow_mode": str(
+            getattr(business, "goods_expense_income_workflow_mode", None) or "simple",
+        ),
+        "goods_expense_income_auto_post_in_simple_mode": bool(
+            getattr(business, "goods_expense_income_auto_post_in_simple_mode", True),
+        ),
+        "goods_expense_income_default_expense_account_code": str(
+            getattr(business, "goods_expense_income_default_expense_account_code", None) or "70407",
+        ),
+        "goods_expense_income_default_income_account_code": str(
+            getattr(business, "goods_expense_income_default_income_account_code", None) or "60103",
+        ),
+        "goods_expense_income_stock_count_mode": str(
+            getattr(business, "goods_expense_income_stock_count_mode", None) or "goods_docs",
+        ),
+        "goods_expense_income_allow_manual_unit_cost": bool(
+            getattr(business, "goods_expense_income_allow_manual_unit_cost", False),
+        ),
+        "goods_expense_income_require_person": bool(
+            getattr(business, "goods_expense_income_require_person", False),
+        ),
         "invoice_global_discount_percent_basis": str(
             getattr(business, "invoice_global_discount_percent_basis", None)
             or "subtotal_after_line_discount",

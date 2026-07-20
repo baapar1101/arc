@@ -146,6 +146,7 @@ abstract final class BusinessNamedRoutes {
     'business_warehouse_docs': 'warehouse-docs',
     'business_warehouse_doc_details': 'warehouse-docs/:doc_id',
     'business_stock_count': 'stock-count',
+    'business_goods_expense_income': 'goods-expense-income',
     'business_documents': 'documents',
     'business_storage_files': 'storage-files',
     'business_storage_file_manager': 'storage-files/file-manager',

@@ -472,9 +472,9 @@ class _StockCountPageState extends State<StockCountPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تایید ایجاد حواله تعدیل'),
+        title: const Text('تایید ثبت اختلاف انبارگردانی'),
         content: Text(
-          'آیا از ایجاد حواله تعدیل برای ${itemsWithDifference.length} محصول با تفاوت اطمینان دارید؟',
+          'برای ${itemsWithDifference.length} قلم دارای اختلاف، سند/حواله اصلاحی ایجاد شود؟',
         ),
         actions: [
           TextButton(
@@ -493,22 +493,58 @@ class _StockCountPageState extends State<StockCountPage> {
 
     setState(() => _loading = true);
     try {
-      await _svc.createStockCountAdjustment(
+      final data = await _svc.createStockCountAdjustment(
         businessId: widget.businessId,
         stockCountCode: _stockCountCodeController.text.trim(),
         stockCountDate: _asOfDate!.toIso8601String().split('T')[0],
-        items: calculatedItems,
+        items: itemsWithDifference,
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       );
 
       if (!mounted) return;
-      
-      _showSuccess('حواله تعدیل با موفقیت ایجاد شد');
 
-      await _clearDraft();
-      
-      // هدایت به صفحه لیست حواله‌های انبار
-      context.go('/business/${widget.businessId}/warehouse-docs');
+      if (data['needs_choice'] == true) {
+        setState(() => _loading = false);
+        final choice = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('نوع ثبت اختلاف انبارگردانی'),
+            content: const Text(
+              'می‌خواهید اختلاف‌ها به‌صورت کالای هزینه/درآمد (با سند حسابداری) ثبت شود یا فقط حواله تعدیل فیزیکی؟',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('انصراف'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'physical_adjustment'),
+                child: const Text('فقط تعدیل فیزیکی'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, 'goods_docs'),
+                child: const Text('کالای هزینه/درآمد'),
+              ),
+            ],
+          ),
+        );
+        if (choice == null) return;
+        setState(() => _loading = true);
+        final data2 = await _svc.createStockCountAdjustment(
+          businessId: widget.businessId,
+          stockCountCode: _stockCountCodeController.text.trim(),
+          stockCountDate: _asOfDate!.toIso8601String().split('T')[0],
+          items: itemsWithDifference,
+          notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+          resultMode: choice,
+        );
+        if (!mounted) return;
+        await _finishStockCountCreate(data2, choice);
+        return;
+      }
+
+      final mode = data['mode']?.toString();
+      await _finishStockCountCreate(data, mode);
     } catch (e) {
       if (!mounted) return;
       _showError(
@@ -519,6 +555,18 @@ class _StockCountPageState extends State<StockCountPage> {
         setState(() => _loading = false);
       }
     }
+  }
+
+  Future<void> _finishStockCountCreate(Map<String, dynamic> data, String? mode) async {
+    await _clearDraft();
+    if (!mounted) return;
+    if (mode == 'goods_docs' || data['expense'] != null || data['income'] != null) {
+      _showSuccess('اسناد کالای هزینه/درآمد از انبارگردانی ایجاد شد');
+      context.go('/business/${widget.businessId}/goods-expense-income');
+      return;
+    }
+    _showSuccess('حواله تعدیل با موفقیت ایجاد شد');
+    context.go('/business/${widget.businessId}/warehouse-docs');
   }
 
   void _showError(String message) {

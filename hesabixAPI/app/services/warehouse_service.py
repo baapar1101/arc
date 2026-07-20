@@ -47,7 +47,77 @@ _SOURCE_TYPE_LABELS_FA = {
 	"manual": "دستی",
 	"invoice": "فاکتور",
 	"api": "API",
+	"goods_expense_income": "کالای هزینه/درآمد شده",
 }
+
+
+def _warehouse_document_source_is_invoice(db: Session, business_id: int, wh: WarehouseDocument) -> bool:
+	"""آیا موجودی این حواله از مسیر فاکتور (نه خطوط حواله) شمرده می‌شود؟"""
+	st = (getattr(wh, "source_type", None) or "").strip().lower()
+	if st == "invoice":
+		return True
+	src_doc_id = getattr(wh, "source_document_id", None)
+	if src_doc_id is None:
+		return False
+	from app.services.invoice_service import SUPPORTED_INVOICE_TYPES
+
+	row = (
+		db.query(Document.document_type)
+		.filter(Document.id == int(src_doc_id), Document.business_id == int(business_id))
+		.first()
+	)
+	if row is None:
+		return False
+	return str(row[0] or "") in SUPPORTED_INVOICE_TYPES
+
+
+def should_seal_warehouse_cancel_reversal(db: Session, business_id: int, wh: WarehouseDocument) -> bool:
+	"""
+	اگر True باشد، لغو حوالهٔ اصلی خودش موجودی فیزیکی را اصلاح می‌کند
+	(اصل به cancelled می‌رود و از مجموع posted حذف می‌شود)؛ بنابراین حوالهٔ معکوس
+	فقط بایگانی است و نباید draft/قابل‌پست بماند.
+	برای حواله‌های فاکتور، جریان فعلی draft→post برای بایگانی حفظ می‌شود.
+	"""
+	return not _warehouse_document_source_is_invoice(db, business_id, wh)
+
+
+def assert_cancel_reversal_postable(db: Session, wh: WarehouseDocument) -> None:
+	"""جلوگیری از پست حوالهٔ معکوس وقتی موجودی قبلاً با لغو اصل اصلاح شده است."""
+	ex = wh.extra_info or {}
+	if not isinstance(ex, dict):
+		return
+	cancel_id = ex.get("cancels_warehouse_document_id")
+	if cancel_id is None:
+		return
+	if ex.get("audit_only_reversal") or ex.get("stock_already_corrected_by_cancel"):
+		raise ApiError(
+			"CANCEL_REVERSAL_NOT_POSTABLE",
+			"این حوالهٔ معکوس فقط برای بایگانی است؛ موجودی با لغو حوالهٔ اصلی اصلاح شده و قابل قطعی‌سازی نیست",
+			http_status=400,
+		)
+	try:
+		cid = int(cancel_id)
+	except (TypeError, ValueError):
+		return
+	original = (
+		db.query(WarehouseDocument)
+		.filter(
+			WarehouseDocument.id == cid,
+			WarehouseDocument.business_id == int(wh.business_id),
+		)
+		.first()
+	)
+	if not original:
+		return
+	if (original.status or "").strip().lower() != "cancelled":
+		return
+	# اصل لغو شده و موجودی از خطوط حواله شمرده می‌شود → پست معکوس دوبرابر می‌کند
+	if should_seal_warehouse_cancel_reversal(db, int(wh.business_id), original):
+		raise ApiError(
+			"CANCEL_REVERSAL_NOT_POSTABLE",
+			"این حوالهٔ معکوس قابل قطعی‌سازی نیست؛ موجودی با لغو حوالهٔ اصلی اصلاح شده است",
+			http_status=400,
+		)
 
 _WH_DOC_TYPE_EXPORT_FA = {
 	"receipt": "ورود",
@@ -2596,6 +2666,14 @@ def post_warehouse_document(
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
 	if wh.status == "posted":
 		return {"id": wh.id, "status": wh.status}
+	if (wh.status or "").strip().lower() == "cancelled":
+		raise ApiError(
+			"NOT_POSTABLE",
+			"حوالهٔ لغوشده قابل قطعی‌سازی نیست",
+			http_status=400,
+		)
+
+	assert_cancel_reversal_postable(db, wh)
 
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
@@ -3475,8 +3553,20 @@ def bulk_delete_warehouse_documents(db: Session, business_id: int, doc_ids: List
 	}
 
 
-def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id: int) -> WarehouseDocument:
-	"""لغو حواله posted با ایجاد حواله معکوس."""
+def cancel_warehouse_document(
+	db: Session,
+	business_id: int,
+	wh_id: int,
+	user_id: int,
+	*,
+	seal_reversal: Optional[bool] = None,
+) -> WarehouseDocument:
+	"""لغو حواله posted با ایجاد حواله معکوس.
+
+	برای حواله‌هایی که موجودی از خطوط حواله شمرده می‌شود (دستی، کالای هزینه/درآمد، …)
+	حوالهٔ معکوس به‌صورت cancelled/بایگانی پلمپ می‌شود تا با پست مجدد موجودی دوبار اصلاح نشود.
+	برای حوالهٔ فاکتور، پیش‌فرض draft می‌ماند تا جریان لغو فاکتور بتواند آن را پست کند.
+	"""
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
@@ -3503,6 +3593,21 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 		reverse_doc_type = "receipt"
 	# برای transfer و adjustment همان نوع باقی می‌ماند
 
+	do_seal = (
+		should_seal_warehouse_cancel_reversal(db, business_id, wh)
+		if seal_reversal is None
+		else bool(seal_reversal)
+	)
+	reverse_status = "cancelled" if do_seal else "draft"
+	reverse_extra: Dict[str, Any] = {
+		"cancels_warehouse_document_id": wh.id,
+		"cancellation_reason": "لغو حواله",
+		"cancelled_source_type": (wh.source_type or None),
+	}
+	if do_seal:
+		reverse_extra["audit_only_reversal"] = True
+		reverse_extra["stock_already_corrected_by_cancel"] = True
+
 	cancel_wh: Optional[WarehouseDocument] = None
 	for attempt in range(10):
 		code = _generate_warehouse_document_code(db, business_id, wh.document_date)
@@ -3513,17 +3618,14 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 					fiscal_year_id=fy.id,
 					code=code,
 					document_date=wh.document_date,
-					status="draft",  # حواله معکوس به صورت draft ایجاد می‌شود
+					status=reverse_status,
 					doc_type=reverse_doc_type,
 					warehouse_id_from=wh.warehouse_id_to,  # معکوس
 					warehouse_id_to=wh.warehouse_id_from,  # معکوس
 					source_type="manual",
 					source_document_id=wh.id,  # لینک به حواله اصلی
 					created_by_user_id=user_id,
-					extra_info={
-						"cancels_warehouse_document_id": wh.id,
-						"cancellation_reason": "لغو حواله",
-					},
+					extra_info=reverse_extra,
 				)
 				db.add(cancel_wh)
 				db.flush()

@@ -863,6 +863,36 @@ class BusinessUpdateRequest(BaseModel):
 		default=None,
 		description="اگر true باشد، حواله انتقال همیشه کنترل کسری کامل دارد",
 	)
+	goods_expense_income_workflow_mode: Optional[str] = Field(
+		default=None,
+		description="simple | two_step — گردش‌کار کالای هزینه/درآمد",
+	)
+	goods_expense_income_auto_post_in_simple_mode: Optional[bool] = Field(
+		default=None,
+		description="در حالت simple، قطعی خودکار در صورت داشتن مجوز post",
+	)
+	goods_expense_income_default_expense_account_code: Optional[str] = Field(
+		default=None,
+		max_length=50,
+		description="کد حساب پیش‌فرض کالای هزینه‌شده (مثلاً 70407)",
+	)
+	goods_expense_income_default_income_account_code: Optional[str] = Field(
+		default=None,
+		max_length=50,
+		description="کد حساب پیش‌فرض کالای درآمدشده (مثلاً 60103)",
+	)
+	goods_expense_income_stock_count_mode: Optional[str] = Field(
+		default=None,
+		description="goods_docs | physical_adjustment | ask",
+	)
+	goods_expense_income_allow_manual_unit_cost: Optional[bool] = Field(
+		default=None,
+		description="اجازه تغییر دستی بهای واحد",
+	)
+	goods_expense_income_require_person: Optional[bool] = Field(
+		default=None,
+		description="الزام انتخاب شخص روی سند",
+	)
 	invoice_global_discount_percent_basis: Optional[str] = Field(
 		default=None,
 		description=(
@@ -948,6 +978,38 @@ class BusinessUpdateRequest(BaseModel):
 		if s in ("draft",):
 			return "draft"
 		raise ValueError("invoice_warehouse_release_mode نامعتبر است (none، draft یا posted)")
+
+	@validator("goods_expense_income_workflow_mode")
+	def _validate_gei_workflow_mode(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip().lower()
+		if s not in ("simple", "two_step"):
+			raise ValueError("goods_expense_income_workflow_mode باید simple یا two_step باشد")
+		return s
+
+	@validator("goods_expense_income_stock_count_mode")
+	def _validate_gei_stock_count_mode(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip().lower()
+		if s not in ("goods_docs", "physical_adjustment", "ask"):
+			raise ValueError(
+				"goods_expense_income_stock_count_mode باید goods_docs، physical_adjustment یا ask باشد"
+			)
+		return s
+
+	@validator(
+		"goods_expense_income_default_expense_account_code",
+		"goods_expense_income_default_income_account_code",
+	)
+	def _validate_gei_account_code(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip()
+		if not s:
+			raise ValueError("کد حساب نمی‌تواند خالی باشد")
+		return s
 
 	@validator("invoice_purchase_accounting_mode")
 	def _validate_invoice_purchase_accounting_mode(cls, v):  # noqa: N805
