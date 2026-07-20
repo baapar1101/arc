@@ -318,6 +318,29 @@ class _TableBlock extends StatelessWidget {
         : <Map<String, dynamic>>[];
     final title = block['title']?.toString();
 
+    if (cols.isEmpty) {
+      return Card(
+        margin: const EdgeInsets.only(bottom: 14),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (title != null && title.isNotEmpty)
+                Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Text(
+                rows.isEmpty ? 'داده‌ای برای نمایش وجود ندارد.' : 'ستون‌های جدول مشخص نشده است.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       clipBehavior: Clip.antiAlias,
@@ -345,6 +368,16 @@ class _TableBlock extends StatelessWidget {
               ],
             ),
           ),
+          if (rows.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'ردیفی یافت نشد.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
           if (rows.length > 200)
             Padding(
               padding: const EdgeInsets.all(8),

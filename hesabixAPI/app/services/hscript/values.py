@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Any, Callable, Iterable, Iterator, Optional
+from uuid import UUID
 
 from app.services.hscript.errors import SecurityErrorHS, TypeErrorHS, ResourceLimitErrorHS
 
@@ -21,6 +24,22 @@ def sanitize_jsonish(value: Any, *, max_depth: int = 12, _depth: int = 0) -> Any
 		raise ResourceLimitErrorHS("عمق داده بیش از حد مجاز است")
 	if is_primitive(value):
 		return value
+	if isinstance(value, datetime):
+		return value.isoformat()
+	if isinstance(value, date):
+		return value.isoformat()
+	if isinstance(value, time):
+		return value.isoformat()
+	if isinstance(value, Decimal):
+		# حفظ دقت معقول برای مبالغ
+		as_int = value.to_integral_value()
+		if as_int == value:
+			return int(as_int)
+		return float(value)
+	if isinstance(value, UUID):
+		return str(value)
+	if isinstance(value, bytes):
+		return value.decode("utf-8", errors="replace")[:5000]
 	if isinstance(value, HTable):
 		return value.to_plain()
 	if isinstance(value, HModule):

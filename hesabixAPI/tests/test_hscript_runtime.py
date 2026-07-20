@@ -132,3 +132,36 @@ report.text(msg)
 	result = _run(src)
 	assert result.ok, result.error
 	assert any(b.get("text") == "two" for b in result.spec["blocks"])
+
+
+def test_sanitize_datetime_and_decimal_from_gateway(monkeypatch):
+	"""فیلدهای date/datetime/Decimal اسناد نباید اجرای اسکریپت را بشکنند."""
+	from datetime import date, datetime
+	from decimal import Decimal
+	from unittest.mock import patch
+
+	src = """
+rows = invoices.all(limit=10)
+report.kpi("n", rows.count())
+report.table(rows, columns=["code", "document_date", "total_debit"])
+"""
+	fake = {
+		"items": [
+			{
+				"id": 1,
+				"code": "INV-1",
+				"document_date": date(2026, 1, 2),
+				"registered_at": datetime(2026, 1, 2, 10, 30, 0),
+				"total_debit": Decimal("1500.50"),
+				"total_credit": Decimal("0"),
+			}
+		]
+	}
+	with patch("app.services.document_service.list_documents", return_value=fake):
+		result = _run(src)
+	assert result.ok, result.error
+	table = next(b for b in result.spec["blocks"] if b["type"] == "table")
+	row = table["rows"][0]
+	assert row["code"] == "INV-1"
+	assert row["document_date"] == "2026-01-02"
+	assert row["total_debit"] == 1500.5

@@ -215,11 +215,16 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairShopSettings;
       case 'payroll':
         return t.payrollMenu;
+      case 'hscript':
+        return 'گزارش‌ساز اسکریپتی';
       default:
         break;
     }
     if (pathTailBase.startsWith('payroll/')) {
       return t.payrollMenu;
+    }
+    if (pathTailBase.startsWith('hscript')) {
+      return 'گزارش‌ساز اسکریپتی';
     }
     if (RegExp(r'^price-lists/\d+/items$').hasMatch(pathTailBase)) {
       return t.businessPanelTabRoutePriceListItems;
@@ -1541,6 +1546,15 @@ class _BusinessShellState extends State<BusinessShell> {
         icon: Icons.store,
         selectedIcon: Icons.store,
         path: _bu('plugin-marketplace'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
+        key: 'hscript',
+        label: 'گزارش‌ساز اسکریپتی',
+        icon: Icons.code_outlined,
+        selectedIcon: Icons.code,
+        path: _bu('hscript'),
         type: _MenuItemType.simple,
         hasAddButton: false,
       ),
@@ -3414,6 +3428,8 @@ class _BusinessShellState extends State<BusinessShell> {
   // تبدیل کلید/برچسب منو به کلید سکشن دسترسی
   String? _sectionForMenuItem(_MenuItem item, AppLocalizations t) {
     switch (item.key) {
+      case 'hscript':
+        return 'reports';
       case 'payroll':
         return 'payroll';
       case 'customer-club':
@@ -3431,6 +3447,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     final path = item.path;
     if (path != null) {
+      if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
       if (path.contains('/customer-club')) return 'customer_club';
       if (path.contains('/repair-shop')) return 'repair_shop';
@@ -3443,6 +3460,8 @@ class _BusinessShellState extends State<BusinessShell> {
 
   // تبدیل برچسب محلی‌شده منو به کلید سکشن دسترسی
   String? _sectionForLabel(String label, AppLocalizations t) {
+    if (label == t.reports) return 'reports';
+    if (label == 'گزارش‌ساز اسکریپتی' || label == 'HScript Reports') return 'reports';
     if (label == t.people) return 'people';
     if (label == 'CRM' ||
         label == 'داشبورد' ||
@@ -3475,7 +3494,6 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.chartOfAccounts) return 'chart_of_accounts';
     if (label == t.openingBalance) return 'opening_balance';
     if (label == t.currencyRevaluation) return 'currency_revaluation';
-    if (label == t.reports) return 'reports';
     if (label == t.warehouses) return 'warehouses';
     if (label == 'حواله‌های انبار') return 'warehouse_transfers';
     // انبارگردانی (Stock Count) در نهایت به ایجاد/مدیریت حواله‌های تعدیل منجر می‌شود؛

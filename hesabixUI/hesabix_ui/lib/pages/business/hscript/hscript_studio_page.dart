@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/auth_store.dart';
@@ -15,19 +14,21 @@ import '../../../utils/web/web_utils.dart' as web_utils;
 import '../../../widgets/ai/ai_chat_dialog.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../widgets/data_table/helpers/file_saver.dart';
+import '../../../widgets/hscript/hscript_code_editor.dart';
 import '../../../widgets/hscript/hscript_plan_banner.dart';
 import '../../../widgets/hscript/hscript_spec_renderer.dart';
 import '../../../widgets/permission/access_denied_page.dart';
 
 const _kDefaultScript = '''report.dashboard(columns=12)
-report.title("داشبورد فروش ماه")
-rows = invoices.this_month(limit=100)
+report.title("داشبورد فروش")
+rows = invoices.all(limit=50)
 report.kpi("تعداد فاکتور", rows.count(), span=4)
-report.kpi("نمونه جمع id", rows.sum("id"), format="currency", span=4)
+report.kpi("جمع بدهکار", rows.sum("total_debit"), format="currency", span=4)
 report.card("وضعیت", "آماده", subtitle="پیش‌نمایش", span=4)
 report.row_break()
-report.bar_chart(rows.limit(10), x="code", y="id", title="نمونه", span=6)
-report.table(rows.limit(15), title="آخرین فاکتورها", span=6)
+top_rows = rows.top(10, by="total_debit")
+report.bar_chart(top_rows, x="code", y="total_debit", title="بیشترین بدهکار", span=6)
+report.table(rows.limit(15), columns=["code", "document_date", "total_debit", "total_credit"], title="آخرین فاکتورها", span=6)
 ''';
 
 /// استودیوی طراحی و اجرای گزارش HScript.
@@ -56,7 +57,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
 
   bool _loading = false;
   bool _running = false;
-  bool _useAsync = true;
+  bool _useAsync = false;
   String? _jobStatusMsg;
   int? _reportId;
   String _status = 'draft';
@@ -620,38 +621,35 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
         children: [
           Expanded(
             flex: 7,
-            child: TextField(
+            child: HScriptCodeEditor(
               controller: _codeCtrl,
-              maxLines: null,
-              expands: true,
-              textAlignVertical: TextAlignVertical.top,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.45),
-              decoration: InputDecoration(
-                labelText: 'اسکریپت HScript',
-                alignLabelWithHint: true,
-                border: const OutlineInputBorder(),
-                filled: true,
-                fillColor: cs.surfaceContainerLowest,
-              ),
-              inputFormatters: [
-                // جلوگیری از paste کاراکتر null
-                FilteringTextInputFormatter.deny(RegExp(r'\u0000')),
-              ],
+              label: 'اسکریپت HScript',
             ),
           ),
           const SizedBox(height: 10),
           Expanded(
             flex: 3,
-            child: TextField(
-              controller: _paramsCtrl,
-              maxLines: null,
-              expands: true,
-              textAlignVertical: TextAlignVertical.top,
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-              decoration: const InputDecoration(
-                labelText: 'پارامترها (JSON)',
-                alignLabelWithHint: true,
-                border: OutlineInputBorder(),
+            child: Directionality(
+              textDirection: TextDirection.ltr,
+              child: TextField(
+                controller: _paramsCtrl,
+                maxLines: null,
+                expands: true,
+                textAlign: TextAlign.left,
+                textAlignVertical: TextAlignVertical.top,
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 12.5,
+                  height: 1.45,
+                ),
+                decoration: InputDecoration(
+                  labelText: 'params (JSON)',
+                  alignLabelWithHint: true,
+                  border: const OutlineInputBorder(),
+                  filled: true,
+                  fillColor: cs.surfaceContainerLowest,
+                ),
               ),
             ),
           ),
