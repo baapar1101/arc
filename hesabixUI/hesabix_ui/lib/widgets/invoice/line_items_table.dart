@@ -1479,25 +1479,24 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             const SizedBox(height: 4),
             SizedBox(
               height: fieldHeight,
-              child: Tooltip(
-                message: _allowManualInvoiceUnitPrice ? t.unitPricePickHint : t.unitPriceReadOnlyFieldHint,
-                child: _UnitPriceCell(
-                  businessId: widget.businessId,
-                  invoiceType: widget.invoiceType,
-                  currencyId: widget.selectedCurrencyId,
-                  currencyDecimalPlaces: widget.currencyDecimalPlaces,
-                  currencyUnitLabel: widget.currencyUnitLabel,
-                  item: item,
-                  allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
-                  onChanged: (src, price) {
-                    final validatedPrice = price < 0 ? 0 : price;
-                    _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
-                  },
-                  resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
-                  unitTitleResolver: (u) => _unitTitle(item, u),
-                  focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
-                  onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
-                ),
+              // راهنمای فیلد روی آیکون لیست / Semantics است؛ Tooltip بیرونی با
+              // AmountFieldWordsTooltip داخل سلول تداخل می‌کرد.
+              child: _UnitPriceCell(
+                businessId: widget.businessId,
+                invoiceType: widget.invoiceType,
+                currencyId: widget.selectedCurrencyId,
+                currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                currencyUnitLabel: widget.currencyUnitLabel,
+                item: item,
+                allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
+                onChanged: (src, price) {
+                  final validatedPrice = price < 0 ? 0 : price;
+                  _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
+                },
+                resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
+                unitTitleResolver: (u) => _unitTitle(item, u),
+                focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
+                onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
               ),
             ),
             const SizedBox(height: 12),
@@ -1750,25 +1749,24 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 flex: 3,
                 child: SizedBox(
                   height: fieldHeight,
-                  child: Tooltip(
-                    message: _allowManualInvoiceUnitPrice ? t.unitPricePickHint : t.unitPriceReadOnlyFieldHint,
-                    child: _UnitPriceCell(
-                      businessId: widget.businessId,
-                      invoiceType: widget.invoiceType,
-                      currencyId: widget.selectedCurrencyId,
-                      currencyDecimalPlaces: widget.currencyDecimalPlaces,
-                      currencyUnitLabel: widget.currencyUnitLabel,
-                      item: item,
-                      allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
-                      onChanged: (src, price) {
-                        final validatedPrice = price < 0 ? 0 : price;
-                        _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
-                      },
-                      resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
-                      unitTitleResolver: (u) => _unitTitle(item, u),
-                      focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
-                      onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
-                    ),
+                  // راهنمای فیلد روی آیکون لیست / Semantics است؛ Tooltip بیرونی با
+                  // AmountFieldWordsTooltip داخل سلول تداخل می‌کرد.
+                  child: _UnitPriceCell(
+                    businessId: widget.businessId,
+                    invoiceType: widget.invoiceType,
+                    currencyId: widget.selectedCurrencyId,
+                    currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                    currencyUnitLabel: widget.currencyUnitLabel,
+                    item: item,
+                    allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
+                    onChanged: (src, price) {
+                      final validatedPrice = price < 0 ? 0 : price;
+                      _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
+                    },
+                    resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
+                    unitTitleResolver: (u) => _unitTitle(item, u),
+                    focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
+                    onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
                   ),
                 ),
               ),
@@ -2266,7 +2264,9 @@ class _DiscountCellState extends State<_DiscountCell> {
         ),
       ),
     );
-    final fieldOrTooltip = _type == 'amount'
+    // فقط وقتی معادل حروف فعال نیست Tooltip متریال بگذار؛ وگرنه دو حباب روی هم می‌افتند.
+    final useWordsTooltip = _type == 'amount';
+    final fieldOrWords = useWordsTooltip
         ? AmountFieldWordsTooltip(
             controller: _ctrl,
             currencyUnit: widget.currencyUnitLabel,
@@ -2275,12 +2275,12 @@ class _DiscountCellState extends State<_DiscountCell> {
         : field;
     return SizedBox(
       height: fieldHeight,
-      child: isMobile
-          ? fieldOrTooltip
+      child: isMobile || useWordsTooltip
+          ? fieldOrWords
           : Tooltip(
               message: t.discountTypeAndValue,
               waitDuration: const Duration(milliseconds: 400),
-              child: fieldOrTooltip,
+              child: fieldOrWords,
             ),
     );
   }
@@ -2565,53 +2565,65 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
     
     // استفاده از focusNode خارجی اگر موجود باشد، در غیر این صورت از داخلی
     final effectiveFocusNode = widget.focusNode ?? _focusNode;
+    final fieldHint = locked ? t.unitPriceReadOnlyFieldHint : t.unitPricePickHint;
     
     return SizedBox(
       height: fieldHeight,
       child: AmountFieldWordsTooltip(
         controller: _ctrl,
         currencyUnit: widget.currencyUnitLabel,
-        child: TextFormField(
-          controller: _ctrl,
-          focusNode: effectiveFocusNode,
-          readOnly: locked,
-          showCursor: !locked,
-          enableInteractiveSelection: !locked,
-          style: locked
-              ? theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant)
-              : theme.textTheme.bodyLarge,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: const [
-            EnglishDigitsFormatter(),
-            ThousandsSeparatorInputFormatter(allowDecimal: true),
-          ],
-          onChanged: widget.allowManualUnitPriceEdit
-              ? (v) {
-                  _isUserTyping = true;
-                  final price = parseFormattedDouble(v) ?? 0;
-                  widget.onChanged('manual', price < 0 ? 0 : price);
-                  // بعد از یک فریم، فلگ را ریست کن
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      _isUserTyping = false;
-                    }
-                  });
-                }
-              : null,
-          onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            border: const OutlineInputBorder(),
-            contentPadding: fieldPadding,
-            filled: locked,
-            fillColor: locked ? colorScheme.surfaceContainerHighest : null,
-            suffixIcon: _loading
-                ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
-                : IconButton(
-                    tooltip: t.pricePickFromList,
-                    icon: const Icon(Icons.list_alt_outlined),
-                    onPressed: () => _openPricePicker(context),
-                  ),
+        child: Semantics(
+          hint: fieldHint,
+          child: TextFormField(
+            controller: _ctrl,
+            focusNode: effectiveFocusNode,
+            readOnly: locked,
+            showCursor: !locked,
+            enableInteractiveSelection: !locked,
+            style: locked
+                ? theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant)
+                : theme.textTheme.bodyLarge,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: const [
+              EnglishDigitsFormatter(),
+              ThousandsSeparatorInputFormatter(allowDecimal: true),
+            ],
+            onChanged: widget.allowManualUnitPriceEdit
+                ? (v) {
+                    _isUserTyping = true;
+                    final price = parseFormattedDouble(v) ?? 0;
+                    widget.onChanged('manual', price < 0 ? 0 : price);
+                    // بعد از یک فریم، فلگ را ریست کن
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        _isUserTyping = false;
+                      }
+                    });
+                  }
+                : null,
+            onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              contentPadding: fieldPadding,
+              filled: locked,
+              fillColor: locked ? colorScheme.surfaceContainerHighest : null,
+              suffixIcon: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      // راهنمای رفتار فیلد اینجا می‌ماند تا با AmountFieldWordsTooltip تداخل نکند.
+                      tooltip: locked ? t.unitPriceReadOnlyFieldHint : t.pricePickFromList,
+                      icon: const Icon(Icons.list_alt_outlined),
+                      onPressed: () => _openPricePicker(context),
+                    ),
+            ),
           ),
         ),
       ),

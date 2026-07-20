@@ -6,6 +6,9 @@ import 'package:hesabix_ui/utils/amount_to_words.dart';
 ///
 /// متن tooltip از طریق [OverlayEntry] به‌روز می‌شود تا [child] (معمولاً TextField)
 /// با تغییر مقدار دوباره ساخته نشود و فوکوس از دست نرود.
+///
+/// مهم: این ویجت را داخل [Tooltip] متریال قرار ندهید؛ هر دو روی hover فعال می‌شوند
+/// و روی هم می‌افتند. راهنمای فیلد را روی آیکون/Semantics یا hint فیلد بگذارید.
 class AmountFieldWordsTooltip extends StatefulWidget {
   final Widget child;
   final TextEditingController controller;
@@ -28,6 +31,7 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
   OverlayEntry? _overlayEntry;
   bool _hovering = false;
   bool _longPressVisible = false;
+  bool _wordsVisible = false;
 
   @override
   void initState() {
@@ -50,7 +54,7 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
   @override
   void dispose() {
     widget.controller.removeListener(_onControllerChanged);
-    _removeOverlay();
+    _removeOverlay(updateState: false);
     super.dispose();
   }
 
@@ -69,9 +73,16 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
     );
   }
 
-  void _removeOverlay() {
+  void _removeOverlay({bool updateState = true}) {
+    if (_overlayEntry == null && !_wordsVisible) return;
     _overlayEntry?.remove();
     _overlayEntry = null;
+    if (_wordsVisible) {
+      _wordsVisible = false;
+      if (updateState && mounted) {
+        setState(() {});
+      }
+    }
   }
 
   Widget _buildOverlay(BuildContext overlayContext) {
@@ -87,46 +98,50 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
     final maxWidth = fieldWidth.clamp(120.0, 260.0);
     final maxHeight = (screenHeight * 0.22).clamp(72.0, 140.0);
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          targetAnchor: Alignment.bottomCenter,
-          followerAnchor: Alignment.topCenter,
-          offset: const Offset(0, 6),
-          child: Material(
-            color: Colors.transparent,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.inverseSurface,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colorScheme.shadow.withValues(alpha: 0.18),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Text(
-                    text,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onInverseSurface,
-                      height: 1.35,
+    // IgnorePointer: موس روی باکس حروف، hover فیلدهای مجاور را خراب نکند
+    // و با Tooltip متریال روی هم نیفتد.
+    return IgnorePointer(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.bottomCenter,
+            followerAnchor: Alignment.topCenter,
+            offset: const Offset(0, 6),
+            child: Material(
+              color: Colors.transparent,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.inverseSurface,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.shadow.withValues(alpha: 0.18),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Text(
+                      text,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onInverseSurface,
+                        height: 1.35,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -148,6 +163,10 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
       builder: _buildOverlay,
     );
     overlay.insert(_overlayEntry!);
+    if (!_wordsVisible) {
+      _wordsVisible = true;
+      if (mounted) setState(() {});
+    }
   }
 
   void _handleHoverEnter(_) {
@@ -183,14 +202,19 @@ class _AmountFieldWordsTooltipState extends State<AmountFieldWordsTooltip> {
       link: _layerLink,
       child: KeyedSubtree(
         key: _targetKey,
-        child: MouseRegion(
-          onEnter: _handleHoverEnter,
-          onExit: _handleHoverExit,
-          child: GestureDetector(
-            behavior: HitTestBehavior.deferToChild,
-            onLongPressStart: _handleLongPressStart,
-            onLongPressEnd: _handleLongPressEnd,
-            child: widget.child,
+        // هنگام نمایش معادل حروف، Tooltipهای متریالِ فرزند (مثل suffix IconButton)
+        // را مخفی می‌کند تا دو حباب روی هم نیفتند.
+        child: TooltipVisibility(
+          visible: !_wordsVisible,
+          child: MouseRegion(
+            onEnter: _handleHoverEnter,
+            onExit: _handleHoverExit,
+            child: GestureDetector(
+              behavior: HitTestBehavior.deferToChild,
+              onLongPressStart: _handleLongPressStart,
+              onLongPressEnd: _handleLongPressEnd,
+              child: widget.child,
+            ),
           ),
         ),
       ),
