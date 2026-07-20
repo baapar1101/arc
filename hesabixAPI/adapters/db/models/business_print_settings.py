@@ -63,6 +63,15 @@ class BusinessPrintSettings(Base):
     show_seller_signature_area: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     show_buyer_signature_area: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
 
+    # مقیاس نمایش مهر و امضا در PDF نسبت به اندازهٔ پایه قالب (۱۰۰ = رفتار پیش‌فرض)
+    # بازهٔ مجاز در لایه سرویس: ۵۰ تا ۲۰۰
+    stamp_scale_percent: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
+    signature_scale_percent: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
+
     # متن ثابت انتهای فاکتور (پاورقی قابل تنظیم برای این نوع سند)
     footer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 

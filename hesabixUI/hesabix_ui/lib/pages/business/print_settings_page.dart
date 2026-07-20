@@ -303,6 +303,79 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
             });
           },
         ),
+          if (cfg.showStamp) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
+            child: Text(
+              'اندازه مهر در PDF',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+            child: _ScalePresetRow(
+              value: cfg.stampScalePercent,
+              onChanged: (v) {
+                setState(() {
+                  final current = _currentConfig();
+                  _updateCurrentConfig(current.copyWith(stampScalePercent: v));
+                });
+              },
+            ),
+          ),
+          if (_isCustomScale(cfg.stampScalePercent))
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+              child: _ScaleSlider(
+                label: 'مقیاس مهر',
+                value: cfg.stampScalePercent,
+                onChanged: (v) {
+                  setState(() {
+                    final current = _currentConfig();
+                    _updateCurrentConfig(current.copyWith(stampScalePercent: v));
+                  });
+                },
+              ),
+            ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
+            child: Text(
+              'اندازه امضا در PDF',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+            child: _ScalePresetRow(
+              value: cfg.signatureScalePercent,
+              onChanged: (v) {
+                setState(() {
+                  final current = _currentConfig();
+                  _updateCurrentConfig(current.copyWith(signatureScalePercent: v));
+                });
+              },
+            ),
+          ),
+          if (_isCustomScale(cfg.signatureScalePercent))
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+              child: _ScaleSlider(
+                label: 'مقیاس امضا',
+                value: cfg.signatureScalePercent,
+                onChanged: (v) {
+                  setState(() {
+                    final current = _currentConfig();
+                    _updateCurrentConfig(current.copyWith(signatureScalePercent: v));
+                  });
+                },
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
         SwitchListTile(
           title: const Text('نمایش بلوک امضا / مهر فروشنده'),
           subtitle: const Text('کل بخش امضای فروشنده در انتهای صفحهٔ PDF؛ می‌توانید بدون خاموش کردن بقیهٔ فاکتور مخفی کنید'),
@@ -412,6 +485,10 @@ class _PrintConfig {
   final bool showFooterPrintTime;
   final bool showFooterPreparer;
   final String? footerNote;
+  /// مقیاس مهر نسبت به اندازه پایه قالب (۵۰ تا ۲۰۰؛ ۱۰۰ = پیش‌فرض)
+  final int stampScalePercent;
+  /// مقیاس امضا نسبت به اندازه پایه قالب (۵۰ تا ۲۰۰؛ ۱۰۰ = پیش‌فرض)
+  final int signatureScalePercent;
 
   const _PrintConfig({
     required this.showLogo,
@@ -425,6 +502,8 @@ class _PrintConfig {
     required this.showFooterPrintTime,
     required this.showFooterPreparer,
     required this.footerNote,
+    required this.stampScalePercent,
+    required this.signatureScalePercent,
   });
 
   factory _PrintConfig.initial() {
@@ -440,6 +519,8 @@ class _PrintConfig {
       showFooterPrintTime: true,
       showFooterPreparer: true,
       footerNote: null,
+      stampScalePercent: 100,
+      signatureScalePercent: 100,
     );
   }
 
@@ -470,6 +551,8 @@ class _PrintConfig {
       footerNote: (json['footer_note'] as String?)?.trim().isEmpty == true
           ? null
           : json['footer_note'] as String?,
+      stampScalePercent: _clampScale(json['stamp_scale_percent'], 100),
+      signatureScalePercent: _clampScale(json['signature_scale_percent'], 100),
     );
   }
 
@@ -486,6 +569,8 @@ class _PrintConfig {
       'show_footer_print_time': showFooterPrintTime,
       'show_footer_preparer': showFooterPreparer,
       'footer_note': footerNote,
+      'stamp_scale_percent': stampScalePercent,
+      'signature_scale_percent': signatureScalePercent,
     };
   }
 
@@ -501,6 +586,8 @@ class _PrintConfig {
     bool? showFooterPrintTime,
     bool? showFooterPreparer,
     String? footerNote,
+    int? stampScalePercent,
+    int? signatureScalePercent,
   }) {
     return _PrintConfig(
       showLogo: showLogo ?? this.showLogo,
@@ -514,6 +601,108 @@ class _PrintConfig {
       showFooterPrintTime: showFooterPrintTime ?? this.showFooterPrintTime,
       showFooterPreparer: showFooterPreparer ?? this.showFooterPreparer,
       footerNote: footerNote ?? this.footerNote,
+      stampScalePercent: stampScalePercent ?? this.stampScalePercent,
+      signatureScalePercent: signatureScalePercent ?? this.signatureScalePercent,
+    );
+  }
+}
+
+bool _isCustomScale(int value) => value != 70 && value != 100 && value != 140;
+
+int _clampScale(dynamic raw, int fallback) {
+  int n = fallback;
+  if (raw is int) {
+    n = raw;
+  } else if (raw is num) {
+    n = raw.round();
+  } else if (raw is String) {
+    n = int.tryParse(raw.trim()) ?? fallback;
+  }
+  if (n < 50) return 50;
+  if (n > 200) return 200;
+  return n;
+}
+
+class _ScalePresetRow extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _ScalePresetRow({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _isCustomScale(value)
+        ? 'custom'
+        : (value == 70
+            ? 'small'
+            : (value == 140 ? 'large' : 'medium'));
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ChoiceChip(
+          label: const Text('کوچک'),
+          selected: selected == 'small',
+          onSelected: (_) => onChanged(70),
+        ),
+        ChoiceChip(
+          label: const Text('متوسط'),
+          selected: selected == 'medium',
+          onSelected: (_) => onChanged(100),
+        ),
+        ChoiceChip(
+          label: const Text('بزرگ'),
+          selected: selected == 'large',
+          onSelected: (_) => onChanged(140),
+        ),
+        ChoiceChip(
+          label: Text(_isCustomScale(value) ? 'سفارشی ($value٪)' : 'سفارشی'),
+          selected: selected == 'custom',
+          onSelected: (_) {
+            if (!_isCustomScale(value)) {
+              onChanged(120);
+            }
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _ScaleSlider extends StatelessWidget {
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _ScaleSlider({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('$label: $value٪')),
+          ],
+        ),
+        Slider(
+          value: value.toDouble().clamp(50, 200),
+          min: 50,
+          max: 200,
+          divisions: 30,
+          label: '$value٪',
+          onChanged: (v) => onChanged(v.round()),
+        ),
+      ],
     );
   }
 }

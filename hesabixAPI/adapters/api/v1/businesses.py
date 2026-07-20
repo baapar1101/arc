@@ -684,7 +684,7 @@ def list_user_businesses(
 @router.get(
     "/{business_id}/print-settings",
     summary="تنظیمات چاپ فاکتورهای کسب‌وکار",
-    description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، مقیاس مهر/امضا، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
     response_model=SuccessResponse,
 )
 async def get_business_print_settings_endpoint(
@@ -707,7 +707,7 @@ async def get_business_print_settings_endpoint(
 @router.put(
     "/{business_id}/print-settings",
     summary="ویرایش تنظیمات چاپ فاکتورهای کسب‌وکار",
-    description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، مقیاس مهر/امضا، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
     response_model=SuccessResponse,
 )
 async def update_business_print_settings_endpoint(

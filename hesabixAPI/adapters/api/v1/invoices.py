@@ -1406,6 +1406,8 @@ async def export_single_invoice_pdf(
         "show_customer_balance": True,
         "show_seller_signature_area": True,
         "show_buyer_signature_area": True,
+        "stamp_scale_percent": 100,
+        "signature_scale_percent": 100,
     }
     invoice_footer_note: Optional[str] = None
 
@@ -1440,62 +1442,53 @@ async def export_single_invoice_pdf(
                 print_rows = []
 
             def _pick_print_settings() -> dict:
+                from app.services.print_stamp_scale import (
+                    STAMP_SCALE_DEFAULT,
+                    clamp_scale_percent,
+                )
+
                 # از print_settings فعلی به‌عنوان مقدار اولیه استفاده می‌کنیم
                 default_cfg = dict(print_settings)
                 per_type_cfg = None
+
+                def _row_cfg(r) -> dict:
+                    return {
+                        "show_logo": bool(getattr(r, "show_logo", True)),
+                        "show_stamp": bool(getattr(r, "show_stamp", True)),
+                        "show_payments": bool(getattr(r, "show_payments", True)),
+                        "show_installment_plan": bool(
+                            getattr(r, "show_installment_plan", True)
+                        ),
+                        "show_share_qr": bool(getattr(r, "show_share_qr", False)),
+                        "show_footer_print_time": bool(
+                            getattr(r, "show_footer_print_time", True)
+                        ),
+                        "show_footer_preparer": bool(
+                            getattr(r, "show_footer_preparer", True)
+                        ),
+                        "footer_note": getattr(r, "footer_note", None),
+                        "show_customer_balance": bool(
+                            getattr(r, "show_customer_balance", True)
+                        ),
+                        "show_seller_signature_area": bool(
+                            getattr(r, "show_seller_signature_area", True)
+                        ),
+                        "show_buyer_signature_area": bool(
+                            getattr(r, "show_buyer_signature_area", True)
+                        ),
+                        "stamp_scale_percent": clamp_scale_percent(
+                            getattr(r, "stamp_scale_percent", STAMP_SCALE_DEFAULT)
+                        ),
+                        "signature_scale_percent": clamp_scale_percent(
+                            getattr(r, "signature_scale_percent", STAMP_SCALE_DEFAULT)
+                        ),
+                    }
+
                 for r in print_rows:
                     if r.document_type == "all":
-                        default_cfg = {
-                            "show_logo": bool(getattr(r, "show_logo", True)),
-                            "show_stamp": bool(getattr(r, "show_stamp", True)),
-                            "show_payments": bool(getattr(r, "show_payments", True)),
-                            "show_installment_plan": bool(
-                                getattr(r, "show_installment_plan", True)
-                            ),
-                            "show_share_qr": bool(getattr(r, "show_share_qr", False)),
-                            "show_footer_print_time": bool(
-                                getattr(r, "show_footer_print_time", True)
-                            ),
-                            "show_footer_preparer": bool(
-                                getattr(r, "show_footer_preparer", True)
-                            ),
-                            "footer_note": getattr(r, "footer_note", None),
-                            "show_customer_balance": bool(
-                                getattr(r, "show_customer_balance", True)
-                            ),
-                            "show_seller_signature_area": bool(
-                                getattr(r, "show_seller_signature_area", True)
-                            ),
-                            "show_buyer_signature_area": bool(
-                                getattr(r, "show_buyer_signature_area", True)
-                            ),
-                        }
+                        default_cfg = _row_cfg(r)
                     elif r.document_type == doc.document_type:
-                        per_type_cfg = {
-                            "show_logo": bool(getattr(r, "show_logo", True)),
-                            "show_stamp": bool(getattr(r, "show_stamp", True)),
-                            "show_payments": bool(getattr(r, "show_payments", True)),
-                            "show_installment_plan": bool(
-                                getattr(r, "show_installment_plan", True)
-                            ),
-                            "show_share_qr": bool(getattr(r, "show_share_qr", False)),
-                            "show_footer_print_time": bool(
-                                getattr(r, "show_footer_print_time", True)
-                            ),
-                            "show_footer_preparer": bool(
-                                getattr(r, "show_footer_preparer", True)
-                            ),
-                            "footer_note": getattr(r, "footer_note", None),
-                            "show_customer_balance": bool(
-                                getattr(r, "show_customer_balance", True)
-                            ),
-                            "show_seller_signature_area": bool(
-                                getattr(r, "show_seller_signature_area", True)
-                            ),
-                            "show_buyer_signature_area": bool(
-                                getattr(r, "show_buyer_signature_area", True)
-                            ),
-                        }
+                        per_type_cfg = _row_cfg(r)
                 if per_type_cfg is None:
                     return default_cfg
                 # per_type روی default override می‌شود
@@ -1520,7 +1513,7 @@ async def export_single_invoice_pdf(
                         return False
                 return None
 
-            # پارامترهای query: مهر و QR
+            # پارامترهای query: مهر، QR و مقیاس مهر/امضا
             try:
                 _qp_print = request.query_params
                 _st_q = _normalize_bool(_qp_print.get("show_stamp"))
@@ -1535,6 +1528,18 @@ async def export_single_invoice_pdf(
                 _sfp = _normalize_bool(_qp_print.get("show_footer_preparer"))
                 if _sfp is not None:
                     print_settings["show_footer_preparer"] = _sfp
+                from app.services.print_stamp_scale import clamp_scale_percent
+
+                if _qp_print.get("stamp_scale_percent") is not None:
+                    print_settings["stamp_scale_percent"] = clamp_scale_percent(
+                        _qp_print.get("stamp_scale_percent"),
+                        print_settings.get("stamp_scale_percent", 100),
+                    )
+                if _qp_print.get("signature_scale_percent") is not None:
+                    print_settings["signature_scale_percent"] = clamp_scale_percent(
+                        _qp_print.get("signature_scale_percent"),
+                        print_settings.get("signature_scale_percent", 100),
+                    )
             except Exception:
                 pass
 
@@ -1603,6 +1608,18 @@ async def export_single_invoice_pdf(
         _qfp = _norm_bool_pdf(_qp_fb.get("show_footer_preparer"))
         if _qfp is not None:
             print_settings["show_footer_preparer"] = _qfp
+        from app.services.print_stamp_scale import clamp_scale_percent
+
+        if _qp_fb.get("stamp_scale_percent") is not None:
+            print_settings["stamp_scale_percent"] = clamp_scale_percent(
+                _qp_fb.get("stamp_scale_percent"),
+                print_settings.get("stamp_scale_percent", 100),
+            )
+        if _qp_fb.get("signature_scale_percent") is not None:
+            print_settings["signature_scale_percent"] = clamp_scale_percent(
+                _qp_fb.get("signature_scale_percent"),
+                print_settings.get("signature_scale_percent", 100),
+            )
     except Exception:
         pass
 
@@ -2328,6 +2345,12 @@ async def export_single_invoice_pdf(
             invoice_verify_qr_data_uri = None
 
     # کانتکست قالب
+    from app.services.print_stamp_scale import invoice_stamp_signature_sizes
+
+    _stamp_sig_sizes = invoice_stamp_signature_sizes(
+        print_settings.get("stamp_scale_percent", 100),
+        print_settings.get("signature_scale_percent", 100),
+    )
     template_context = {
         "business_id": business_id,
         "business_name": business_name,
@@ -2362,6 +2385,10 @@ async def export_single_invoice_pdf(
         "show_buyer_signature_area": bool(
             print_settings.get("show_buyer_signature_area", True)
         ),
+        "stamp_scale_percent": _stamp_sig_sizes["stamp_scale_percent"],
+        "signature_scale_percent": _stamp_sig_sizes["signature_scale_percent"],
+        "stamp_max_width_px": _stamp_sig_sizes["stamp_max_width_px"],
+        "signature_max_width_px": _stamp_sig_sizes["signature_max_width_px"],
     }
 
     # تلاش برای رندر با قالب سفارشی

@@ -1120,6 +1120,11 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
     - در صورت وجود رکورد برای نوع سند خاص، همان برای آن نوع استفاده می‌شود.
     - اگر هیچ رکوردی وجود نداشته باشد، مقادیر پیش‌فرض (همه روشن، بدون متن پاورقی) برگردانده می‌شود.
     """
+    from app.services.print_stamp_scale import (
+        STAMP_SCALE_DEFAULT,
+        clamp_scale_percent,
+    )
+
     rows = (
         db.query(BusinessPrintSettings)
         .filter(BusinessPrintSettings.business_id == business_id)
@@ -1140,6 +1145,12 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
             "show_customer_balance": bool(getattr(row, "show_customer_balance", True)),
             "show_seller_signature_area": bool(getattr(row, "show_seller_signature_area", True)),
             "show_buyer_signature_area": bool(getattr(row, "show_buyer_signature_area", True)),
+            "stamp_scale_percent": clamp_scale_percent(
+                getattr(row, "stamp_scale_percent", STAMP_SCALE_DEFAULT)
+            ),
+            "signature_scale_percent": clamp_scale_percent(
+                getattr(row, "signature_scale_percent", STAMP_SCALE_DEFAULT)
+            ),
         }
 
     default_settings: Dict[str, Any] = {
@@ -1155,6 +1166,8 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         "show_customer_balance": True,
         "show_seller_signature_area": True,
         "show_buyer_signature_area": True,
+        "stamp_scale_percent": STAMP_SCALE_DEFAULT,
+        "signature_scale_percent": STAMP_SCALE_DEFAULT,
     }
     per_type: Dict[str, Any] = {}
 
@@ -1189,6 +1202,11 @@ def update_business_print_settings(
       }
     }
     """
+    from app.services.print_stamp_scale import (
+        STAMP_SCALE_DEFAULT,
+        clamp_scale_percent,
+    )
+
     default_data = (settings_payload or {}).get("default") or {}
     per_type_data: Dict[str, Any] = (settings_payload or {}).get("per_type") or {}
 
@@ -1207,6 +1225,33 @@ def update_business_print_settings(
                 return False
         return default
 
+    def _apply_print_cfg_to_row(row: BusinessPrintSettings, cfg: Dict[str, Any]) -> None:
+        row.show_logo = _get_bool(cfg, "show_logo", True)
+        row.show_stamp = _get_bool(cfg, "show_stamp", True)
+        row.show_payments = _get_bool(cfg, "show_payments", True)
+        row.show_installment_plan = _get_bool(cfg, "show_installment_plan", True)
+        row.show_share_qr = _get_bool(cfg, "show_share_qr", False)
+        row.show_footer_print_time = _get_bool(cfg, "show_footer_print_time", True)
+        row.show_footer_preparer = _get_bool(cfg, "show_footer_preparer", True)
+        row.show_customer_balance = _get_bool(cfg, "show_customer_balance", True)
+        row.show_seller_signature_area = _get_bool(
+            cfg, "show_seller_signature_area", True
+        )
+        row.show_buyer_signature_area = _get_bool(
+            cfg, "show_buyer_signature_area", True
+        )
+        row.stamp_scale_percent = clamp_scale_percent(
+            cfg.get("stamp_scale_percent"), STAMP_SCALE_DEFAULT
+        )
+        row.signature_scale_percent = clamp_scale_percent(
+            cfg.get("signature_scale_percent"), STAMP_SCALE_DEFAULT
+        )
+        row.footer_note = (
+            (cfg.get("footer_note") or None)
+            if isinstance(cfg.get("footer_note"), str)
+            else cfg.get("footer_note")
+        )
+
     # ابتدا رکورد تنظیمات عمومی (all) را به‌روزرسانی یا ایجاد می‌کنیم
     default_row = (
         db.query(BusinessPrintSettings)
@@ -1223,35 +1268,7 @@ def update_business_print_settings(
                 document_type="all",
             )
             db.add(default_row)
-        default_row.show_logo = _get_bool(default_data, "show_logo", True)
-        default_row.show_stamp = _get_bool(default_data, "show_stamp", True)
-        default_row.show_payments = _get_bool(default_data, "show_payments", True)
-        default_row.show_installment_plan = _get_bool(
-            default_data,
-            "show_installment_plan",
-            True,
-        )
-        default_row.show_share_qr = _get_bool(default_data, "show_share_qr", False)
-        default_row.show_footer_print_time = _get_bool(
-            default_data, "show_footer_print_time", True
-        )
-        default_row.show_footer_preparer = _get_bool(
-            default_data, "show_footer_preparer", True
-        )
-        default_row.show_customer_balance = _get_bool(
-            default_data, "show_customer_balance", True
-        )
-        default_row.show_seller_signature_area = _get_bool(
-            default_data, "show_seller_signature_area", True
-        )
-        default_row.show_buyer_signature_area = _get_bool(
-            default_data, "show_buyer_signature_area", True
-        )
-        default_row.footer_note = (
-            (default_data.get("footer_note") or None)
-            if isinstance(default_data.get("footer_note"), str)
-            else default_data.get("footer_note")
-        )
+        _apply_print_cfg_to_row(default_row, default_data)
 
     # سپس تنظیمات اختصاصی هر نوع سند را به‌روزرسانی / ایجاد می‌کنیم
     # document_type فقط برای انواعی نگهداری می‌شود که در per_type ارسال شده‌اند.
@@ -1284,25 +1301,7 @@ def update_business_print_settings(
                 document_type=doc_type_str,
             )
             db.add(row)
-        row.show_logo = _get_bool(cfg, "show_logo", True)
-        row.show_stamp = _get_bool(cfg, "show_stamp", True)
-        row.show_payments = _get_bool(cfg, "show_payments", True)
-        row.show_installment_plan = _get_bool(
-            cfg,
-            "show_installment_plan",
-            True,
-        )
-        row.show_share_qr = _get_bool(cfg, "show_share_qr", False)
-        row.show_footer_print_time = _get_bool(cfg, "show_footer_print_time", True)
-        row.show_footer_preparer = _get_bool(cfg, "show_footer_preparer", True)
-        row.show_customer_balance = _get_bool(cfg, "show_customer_balance", True)
-        row.show_seller_signature_area = _get_bool(cfg, "show_seller_signature_area", True)
-        row.show_buyer_signature_area = _get_bool(cfg, "show_buyer_signature_area", True)
-        row.footer_note = (
-            (cfg.get("footer_note") or None)
-            if isinstance(cfg.get("footer_note"), str)
-            else cfg.get("footer_note")
-        )
+        _apply_print_cfg_to_row(row, cfg)
 
     # سایر رکوردهای موجود که دیگر در per_type نیستند حذف می‌شوند
     for doc_type, row in existing_map.items():

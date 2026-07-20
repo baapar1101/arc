@@ -359,7 +359,6 @@
 
     .invoice-layout .sig-stamp {
       display: inline-block;
-      max-width: 160px;
       width: auto;
       height: auto;
       vertical-align: bottom;
@@ -369,7 +368,6 @@
 
     .invoice-layout .sig-image {
       display: inline-block;
-      max-width: 140px;
       width: auto;
       height: auto;
       vertical-align: bottom;
@@ -879,11 +877,13 @@
           <tr class="sig-images-row">
             {% if _show_sig_seller %}
               <td>
+                {% set _stamp_mw = stamp_max_width_px | default(160) %}
+                {% set _sig_mw = signature_max_width_px | default(140) %}
                 {% if business_stamp_data_uri %}
-                  <img class="sig-stamp" src="{{ business_stamp_data_uri }}" alt="Stamp" />
+                  <img class="sig-stamp" src="{{ business_stamp_data_uri }}" alt="Stamp" style="max-width: {{ _stamp_mw }}px;" />
                 {% endif %}
                 {% if owner_signature_data_uri %}
-                  <img class="sig-image" src="{{ owner_signature_data_uri }}" alt="Owner signature" />
+                  <img class="sig-image" src="{{ owner_signature_data_uri }}" alt="Owner signature" style="max-width: {{ _sig_mw }}px;" />
                 {% endif %}
               </td>
             {% endif %}

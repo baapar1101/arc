@@ -541,6 +541,10 @@ async def export_single_receipt_payment_pdf(
     business_logo_data_uri: Optional[str] = None
     business_stamp_data_uri: Optional[str] = None
     owner_signature_data_uri: Optional[str] = None
+    receipt_print_cfg: Dict[str, Any] = {
+        "stamp_scale_percent": 100,
+        "signature_scale_percent": 100,
+    }
     storage = FileStorageService(db)
 
     async def _load_image_data_uri(file_id_str: Optional[str]) -> Optional[str]:
@@ -576,21 +580,38 @@ async def export_single_receipt_payment_pdf(
                 rows = []
 
             def _pick_cfg() -> dict:
-                cfg = {"show_logo": True, "show_stamp": True, "footer_note": None}
+                from app.services.print_stamp_scale import (
+                    STAMP_SCALE_DEFAULT,
+                    clamp_scale_percent,
+                )
+
+                cfg = {
+                    "show_logo": True,
+                    "show_stamp": True,
+                    "footer_note": None,
+                    "stamp_scale_percent": STAMP_SCALE_DEFAULT,
+                    "signature_scale_percent": STAMP_SCALE_DEFAULT,
+                }
                 per_type = None
+
+                def _row_cfg(r) -> dict:
+                    return {
+                        "show_logo": bool(getattr(r, "show_logo", True)),
+                        "show_stamp": bool(getattr(r, "show_stamp", True)),
+                        "footer_note": getattr(r, "footer_note", None),
+                        "stamp_scale_percent": clamp_scale_percent(
+                            getattr(r, "stamp_scale_percent", STAMP_SCALE_DEFAULT)
+                        ),
+                        "signature_scale_percent": clamp_scale_percent(
+                            getattr(r, "signature_scale_percent", STAMP_SCALE_DEFAULT)
+                        ),
+                    }
+
                 for r in rows:
                     if r.document_type == "all":
-                        cfg = {
-                            "show_logo": bool(getattr(r, "show_logo", True)),
-                            "show_stamp": bool(getattr(r, "show_stamp", True)),
-                            "footer_note": getattr(r, "footer_note", None),
-                        }
+                        cfg = _row_cfg(r)
                     elif r.document_type in ("receipt", "payment"):
-                        per_type = {
-                            "show_logo": bool(getattr(r, "show_logo", True)),
-                            "show_stamp": bool(getattr(r, "show_stamp", True)),
-                            "footer_note": getattr(r, "footer_note", None),
-                        }
+                        per_type = _row_cfg(r)
                 if per_type:
                     merged = dict(cfg)
                     merged.update({k: v for k, v in per_type.items() if v is not None})
@@ -608,6 +629,7 @@ async def export_single_receipt_payment_pdf(
                     owner_user = None
                 if owner_user is not None:
                     owner_signature_data_uri = await _load_image_data_uri(getattr(owner_user, "signature_file_id", None))
+            receipt_print_cfg = cfg
     except Exception:
         business_name = business_name or ""
 
@@ -674,6 +696,14 @@ async def export_single_receipt_payment_pdf(
             "business_stamp_data_uri": business_stamp_data_uri,
             "owner_signature_data_uri": owner_signature_data_uri,
         }
+        from app.services.print_stamp_scale import receipt_stamp_signature_sizes
+
+        template_context.update(
+            receipt_stamp_signature_sizes(
+                receipt_print_cfg.get("stamp_scale_percent", 100),
+                receipt_print_cfg.get("signature_scale_percent", 100),
+            )
+        )
         resolved_html = ReportTemplateService.try_render_resolved(
             db=db,
             business_id=business_id,
@@ -695,6 +725,12 @@ async def export_single_receipt_payment_pdf(
         paper_size = None
         orientation = None
         disposition = "attachment"
+    from app.services.print_stamp_scale import receipt_stamp_signature_sizes
+
+    _rp_sizes = receipt_stamp_signature_sizes(
+        receipt_print_cfg.get("stamp_scale_percent", 100),
+        receipt_print_cfg.get("signature_scale_percent", 100),
+    )
     html_content = resolved_html or render_template(
         "pdf/receipts_payments/detail.html",
         {
@@ -716,6 +752,7 @@ async def export_single_receipt_payment_pdf(
             "business_logo_data_uri": business_logo_data_uri,
             "business_stamp_data_uri": business_stamp_data_uri,
             "owner_signature_data_uri": owner_signature_data_uri,
+            **_rp_sizes,
         },
     )
 
