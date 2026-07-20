@@ -17,6 +17,7 @@ import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
 import 'package:hesabix_ui/services/voice/voice_phase.dart';
 import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/hscript_code_extract.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
@@ -46,12 +47,24 @@ class AIChatDialog extends StatefulWidget {
   /// وقتی true باشد داخل [AIChatPage] و go_router نمایش داده می‌شود (بدون دکمه بستن fullscreen).
   final bool embeddedInShell;
 
+  /// پیام اولیه (مثلاً از استودیو HScript).
+  final String? initialPrompt;
+
+  /// اگر true باشد پس از آماده‌شدن جلسه، [initialPrompt] ارسال می‌شود.
+  final bool autoSendInitialPrompt;
+
+  /// وقتی از استودیو HScript باز شود، امکان اعمال مستقیم اسکریپت از پیام‌ها.
+  final void Function(String code)? onApplyHScriptCode;
+
   const AIChatDialog({
     super.key,
     this.businessId,
     required this.authStore,
     this.calendarController,
     this.embeddedInShell = false,
+    this.initialPrompt,
+    this.autoSendInitialPrompt = true,
+    this.onApplyHScriptCode,
   });
 
   static Future<void> show(
@@ -59,6 +72,9 @@ class AIChatDialog extends StatefulWidget {
     required AuthStore authStore,
     int? businessId,
     CalendarController? calendarController,
+    String? initialPrompt,
+    bool autoSendInitialPrompt = true,
+    void Function(String code)? onApplyHScriptCode,
   }) {
     return Navigator.of(context).push<void>(
       PageRouteBuilder<void>(
@@ -70,6 +86,9 @@ class AIChatDialog extends StatefulWidget {
           businessId: businessId,
           authStore: authStore,
           calendarController: calendarController,
+          initialPrompt: initialPrompt,
+          autoSendInitialPrompt: autoSendInitialPrompt,
+          onApplyHScriptCode: onApplyHScriptCode,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(
@@ -127,6 +146,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool _modelsLoading = false;
   bool _focusChatMode = false;
   String _executionMode = AIExecutionMode.defaultMode;
+  bool _initialPromptHandled = false;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
@@ -203,7 +223,26 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _isHomeMode) _focusNode.requestFocus();
+      unawaited(_maybeBootstrapInitialPrompt());
     });
+  }
+
+  Future<void> _maybeBootstrapInitialPrompt() async {
+    if (_initialPromptHandled) return;
+    final prompt = widget.initialPrompt?.trim();
+    if (prompt == null || prompt.isEmpty) return;
+    // صبر تا بارگذاری جلسات تمام شود
+    for (var i = 0; i < 40 && mounted && _sessionsLoading; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    if (!mounted || _initialPromptHandled) return;
+    _initialPromptHandled = true;
+    if (widget.autoSendInitialPrompt) {
+      await _sendMessage(contentOverride: prompt);
+    } else {
+      setState(() => _messageCtrl.text = prompt);
+      _focusNode.requestFocus();
+    }
   }
 
   Future<void> _loadExecutionModePreference() async {
@@ -403,6 +442,19 @@ class _AIChatDialogState extends State<AIChatDialog> {
                     _copyToClipboard(msg.content);
                   },
                 ),
+                if (widget.onApplyHScriptCode != null &&
+                    HScriptCodeExtract.extract(msg.content) != null)
+                  ListTile(
+                    leading: const Icon(Icons.code_rounded),
+                    title: const Text('اعمال به استودیو HScript'),
+                    onTap: () {
+                      final code = HScriptCodeExtract.extract(msg.content);
+                      Navigator.of(context).pop();
+                      if (code == null || code.isEmpty) return;
+                      widget.onApplyHScriptCode!(code);
+                      Navigator.of(this.context).pop();
+                    },
+                  ),
                 ListTile(
                   leading: const Icon(Icons.share_outlined),
                   title: const Text('اشتراک‌گذاری'),

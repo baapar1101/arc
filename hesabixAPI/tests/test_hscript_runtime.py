@@ -1,0 +1,134 @@
+"""تست‌های هسته HScript: نحو، امنیت، محدودیت منابع."""
+
+from __future__ import annotations
+
+import pytest
+
+from app.services.hscript.errors import ResourceLimitErrorHS, SecurityErrorHS
+from app.services.hscript.limits import ResourceLimits
+from app.services.hscript.runtime import run_script, validate_script
+
+
+class _DummyDB:
+	"""Session جعلی — Gateway در این تست‌ها صدا زده نمی‌شود مگر صریح."""
+
+	pass
+
+
+def _run(source: str, *, preview: bool = True, params: dict | None = None):
+	return run_script(
+		source,
+		db=_DummyDB(),  # type: ignore[arg-type]
+		business_id=1,
+		user_id=1,
+		params=params,
+		preview=preview,
+	)
+
+
+def test_validate_ok():
+	src = "x = 1\nreport.title(\"ok\")\n"
+	assert validate_script(src)["ok"] is True
+
+
+def test_forbidden_import():
+	r = validate_script("import os\n")
+	assert r["ok"] is False
+	assert r["error"]["code"] == "E030_SECURITY"
+
+
+def test_kpi_and_table_without_gateway():
+	src = """
+report.title("Demo")
+rows = [{"name": "A", "total": 10}, {"name": "B", "total": 20}]
+t = table(rows)
+report.kpi("جمع", t.sum("total"), format="currency")
+report.table(t, columns=["name", "total"])
+report.bar_chart(t, x="name", y="total", title="مقایسه")
+"""
+	result = _run(src)
+	assert result.ok, result.error
+	assert result.spec is not None
+	types = [b["type"] for b in result.spec["blocks"]]
+	assert "title" in types
+	assert "kpi" in types
+	assert "table" in types
+	assert "chart" in types
+
+
+def test_functions_and_loops():
+	src = """
+def double(n):
+    return n * 2
+
+total = 0
+for i in range(5):
+    total = total + double(i)
+report.kpi("total", total)
+"""
+	result = _run(src)
+	assert result.ok, result.error
+	kpi = next(b for b in result.spec["blocks"] if b["type"] == "kpi")
+	assert kpi["value"] == 20
+
+
+def test_infinite_loop_capped():
+	lim = ResourceLimits(max_loop_iterations=50, max_steps=10_000, max_execution_ms=2000)
+	src = """
+i = 0
+while True:
+    i = i + 1
+"""
+	result = run_script(src, db=_DummyDB(), business_id=1, user_id=1, limits=lim, preview=True)  # type: ignore[arg-type]
+	assert result.ok is False
+	assert result.error["code"] == "E050_RESOURCE_LIMIT"
+
+
+def test_dunder_blocked():
+	src = "x = __import__\n"
+	r = validate_script(src)
+	# __import__ as identifier might parse as name then fail at runtime, or security at lexer for import keyword
+	# Actually __import__ is IDENT, blocked at lookup
+	result = _run("x = __builtins__\n")
+	assert result.ok is False
+	assert result.error["code"] in ("E030_SECURITY", "E010_NAME")
+
+
+def test_attribute_underscore_blocked():
+	src = """
+rows = table([{"a": 1}])
+x = rows.__class__
+"""
+	result = _run(src)
+	assert result.ok is False
+	assert result.error["code"] == "E030_SECURITY"
+
+
+def test_params_injection_stripped():
+	src = """
+report.kpi("bid", param.get("business_id") if False else param.get("note", "none"))
+"""
+	# param is dict — use index
+	src = """
+report.kpi("note", param["note"])
+"""
+	result = _run(src, params={"business_id": 999, "note": "hello"})
+	assert result.ok, result.error
+	kpi = next(b for b in result.spec["blocks"] if b["type"] == "kpi")
+	assert kpi["value"] == "hello"
+
+
+def test_elif_else():
+	src = """
+x = 2
+if x == 1:
+    msg = "one"
+elif x == 2:
+    msg = "two"
+else:
+    msg = "other"
+report.text(msg)
+"""
+	result = _run(src)
+	assert result.ok, result.error
+	assert any(b.get("text") == "two" for b in result.spec["blocks"])

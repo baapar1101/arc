@@ -75,6 +75,7 @@ from adapters.api.v1.transfers import router as transfers_router
 from adapters.api.v1.fiscal_years import router as fiscal_years_router
 from adapters.api.v1.expense_income import router as expense_income_router
 from adapters.api.v1.goods_expense_income import router as goods_expense_income_router
+from adapters.api.v1.hscript_reports import router as hscript_reports_router
 from adapters.api.v1.documents import router as documents_router
 from adapters.api.v1.kardex import router as kardex_router
 from adapters.api.v1.opening_balance import router as opening_balance_router
@@ -115,6 +116,7 @@ from adapters.api.v1.business.document_monetization import router as business_do
 from adapters.api.v1.jobs import router as jobs_router
 from adapters.api.v1.activity_logs import router as activity_logs_router
 from adapters.api.v1.admin.activity_logs_admin import router as admin_activity_logs_router
+from adapters.api.v1.admin.hscript_admin import router as admin_hscript_router
 from app.services.notification_processor import background_loop as notifications_background_loop
 from app.services.storage_background_jobs import storage_cleanup_loop, storage_subscription_check_loop
 from app.services.document_monetization_background_jobs import document_monetization_finalize_periods_loop
@@ -1041,10 +1043,12 @@ def create_app() -> FastAPI:
     application.include_router(transfers_router, prefix=settings.api_v1_prefix)
     application.include_router(expense_income_router, prefix=settings.api_v1_prefix)
     application.include_router(goods_expense_income_router, prefix=settings.api_v1_prefix)
+    application.include_router(hscript_reports_router, prefix=settings.api_v1_prefix)
     application.include_router(documents_router, prefix=settings.api_v1_prefix)
     application.include_router(fiscal_years_router, prefix=settings.api_v1_prefix)
     application.include_router(activity_logs_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_activity_logs_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_hscript_router, prefix=settings.api_v1_prefix)
     application.include_router(kardex_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.query_schema import router as query_schema_router
     application.include_router(query_schema_router, prefix=settings.api_v1_prefix)

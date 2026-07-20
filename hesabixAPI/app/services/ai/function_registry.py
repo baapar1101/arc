@@ -138,6 +138,11 @@ class AIFunctionRegistry:
         )
 
         register_workflow_ai_functions(self)
+        from app.services.ai.ai_function_extensions_hscript import (
+            register_hscript_ai_functions,
+        )
+
+        register_hscript_ai_functions(self)
         # External HTTP connectors
         self._register_connector_functions()
     

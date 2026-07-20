@@ -151,6 +151,19 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_allowed=True,
 		plans=(("monthly", 180_000), ("yearly", 1_800_000)),
 	),
+	_PluginSeed(
+		code="hscript_custom_reports",
+		name="گزارش‌ساز اسکریپتی (HScript)",
+		description=(
+			"ساخت گزارش و داشبورد سفارشی با زبان امن HScript: KPI، جدول، نمودار، PDF و Excel. "
+			"بدون لایسنس هم با سقف رایگان قابل استفاده است؛ با فعال‌سازی افزونه سقف ذخیره‌سازی و اجرا افزایش می‌یابد."
+		),
+		category="reporting",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 220_000), ("yearly", 2_200_000), ("lifetime", 8_800_000)),
+	),
 )
 
 

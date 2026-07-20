@@ -205,6 +205,8 @@ import 'pages/business/currency_revaluation_page.dart';
 import 'pages/business/report_templates_page.dart';
 import 'pages/business/report_template_studio_page.dart';
 import 'pages/business/report_template_html_editor_page.dart';
+import 'pages/business/hscript/hscript_reports_page.dart';
+import 'pages/business/hscript/hscript_studio_page.dart';
 import 'pages/business/storage_files_page.dart';
 import 'pages/business/storage_file_manager_page.dart';
 import 'pages/business/document_monetization_page.dart';
@@ -3941,6 +3943,47 @@ class _MyAppState extends State<MyApp> {
                 return hesabixNoTransitionPage(state, ReportTemplatesPage(
                     businessId: businessId,
                     authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'hscript',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  HScriptReportsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'hscript/studio/new',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  HScriptStudioPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'hscript/studio/:report_id',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final reportId = int.parse(state.pathParameters['report_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  HScriptStudioPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    reportId: reportId,
                   ),
                 );
               },

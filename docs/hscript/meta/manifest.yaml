@@ -1,0 +1,35 @@
+language_version: "1.0.0"
+corpus: hscript
+entries:
+  - doc_id: hscript.overview
+    path: 00-overview.md
+  - doc_id: hscript.security
+    path: 01-security.md
+  - doc_id: hscript.limits
+    path: 02-limits.md
+  - doc_id: hscript.tutorial.getting-started
+    path: tutorials/getting-started.md
+  - doc_id: hscript.tutorial.charts
+    path: tutorials/charts.md
+  - doc_id: hscript.reference.language
+    path: reference/language.md
+  - doc_id: hscript.api.invoices
+    path: reference/api/invoices.md
+  - doc_id: hscript.api.customers
+    path: reference/api/customers.md
+  - doc_id: hscript.api.products
+    path: reference/api/products.md
+  - doc_id: hscript.api.payments
+    path: reference/api/payments.md
+  - doc_id: hscript.reference.report-blocks
+    path: reference/report-blocks.md
+  - doc_id: hscript.recipe.top-customers
+    path: recipes/top-customers.md
+  - doc_id: hscript.errors.E001
+    path: errors/E001-syntax.md
+  - doc_id: hscript.errors.E030
+    path: errors/E030-security.md
+  - doc_id: hscript.errors.E050
+    path: errors/E050-resource-limit.md
+  - doc_id: hscript.best-practices
+    path: best-practices.md

@@ -884,6 +884,22 @@ class _ReportsPageState extends State<ReportsPage> {
             keywords: const ['کاردکس', 'kardex', 'ریز', 'تراکنش'],
             permissionSection: 'reports',
           ),
+          _ReportLink(
+            key: 'hscript_builder',
+            title: 'گزارش‌ساز اسکریپتی',
+            subtitle: 'ساخت گزارش سفارشی با HScript',
+            icon: Icons.code,
+            route: '/business/$b/hscript',
+            keywords: const [
+              'hscript',
+              'اسکریپت',
+              'گزارش سفارشی',
+              'custom report',
+              'داشبورد',
+              'نمودار',
+            ],
+            permissionSection: 'reports',
+          ),
         ],
       ),
       _ReportSection(
