@@ -113,7 +113,10 @@ import 'pages/business/top_suppliers_report_page.dart';
 import 'pages/business/materials_consumption_report_page.dart';
 import 'pages/business/production_report_page.dart';
 import 'pages/business/trial_balance_report_page.dart';
+import 'pages/business/balance_sheet_report_page.dart';
+import 'pages/business/financial_reports_package_page.dart';
 import 'pages/business/general_ledger_report_page.dart';
+import 'utils/financial_report_navigation.dart';
 import 'pages/business/journal_ledger_report_page.dart';
 import 'pages/business/pnl_period_report_page.dart';
 import 'pages/business/pnl_cumulative_report_page.dart';
@@ -621,6 +624,14 @@ class _MyAppState extends State<MyApp> {
         calendarController: calendarController,
       );
       AccountReviewReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      BalanceSheetReportPage(
+        businessId: dummyBusinessId,
+        calendarController: calendarController,
+      );
+      FinancialReportsPackagePage(
         businessId: dummyBusinessId,
         calendarController: calendarController,
       );
@@ -3113,9 +3124,18 @@ class _MyAppState extends State<MyApp> {
               path: 'reports/general-ledger',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
+                final qp = state.uri.queryParameters;
+                final initialAccount = accountFromQueryParams(qp);
+                final filters = reportFiltersFromQueryParams(qp);
                 return hesabixNoTransitionPage(state, GeneralLedgerReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
+                    initialAccount: initialAccount,
+                    initialFiscalYearId: filters.fiscalYearId,
+                    initialDateFrom: filters.dateFrom,
+                    initialDateTo: filters.dateTo,
+                    initialCurrencyId: filters.currencyId,
+                    initialProjectId: filters.projectId,
                   ),
                 );
               },
@@ -3147,6 +3167,28 @@ class _MyAppState extends State<MyApp> {
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
                 return hesabixNoTransitionPage(state, PnlCumulativeReportPage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/financial-package',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, FinancialReportsPackagePage(
+                    businessId: businessId,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'reports/balance-sheet',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(state, BalanceSheetReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
                   ),

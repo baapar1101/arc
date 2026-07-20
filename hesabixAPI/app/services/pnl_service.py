@@ -135,6 +135,7 @@ def _account_item(account: Account, turnover: Dict[str, Decimal], section: str) 
             "account_id": account.id,
             "account_code": account.code,
             "account_name": account.name,
+            "account_type": account.account_type,
             "section": section,
             "debit": float(turnover["debit"]),
             "credit": float(turnover["credit"]),
@@ -147,6 +148,7 @@ def _account_item(account: Account, turnover: Dict[str, Decimal], section: str) 
         "account_id": account.id,
         "account_code": account.code,
         "account_name": account.name,
+        "account_type": account.account_type,
         "section": section,
         "debit": float(turnover["debit"]),
         "credit": float(turnover["credit"]),
@@ -225,8 +227,10 @@ def _build_statement_lines(
             row = {
                 "type": "account",
                 "section": key,
+                "account_id": item.get("account_id"),
                 "account_code": item["account_code"],
                 "account_name": item["account_name"],
+                "account_type": item.get("account_type", "accounting_document"),
                 "amount": item["amount"],
             }
             if prior_summary and item.get("prior_amount") is not None:

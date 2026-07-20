@@ -21,11 +21,23 @@ import 'package:hesabix_ui/utils/responsive_helper.dart';
 class GeneralLedgerReportPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
+  final Account? initialAccount;
+  final int? initialFiscalYearId;
+  final DateTime? initialDateFrom;
+  final DateTime? initialDateTo;
+  final int? initialCurrencyId;
+  final int? initialProjectId;
   
   const GeneralLedgerReportPage({
     super.key,
     required this.businessId,
     required this.calendarController,
+    this.initialAccount,
+    this.initialFiscalYearId,
+    this.initialDateFrom,
+    this.initialDateTo,
+    this.initialCurrencyId,
+    this.initialProjectId,
   });
 
   @override
@@ -57,6 +69,24 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialAccount != null) {
+      _selectedAccounts = [widget.initialAccount!];
+    }
+    if (widget.initialFiscalYearId != null) {
+      _selectedFiscalYearId = widget.initialFiscalYearId;
+    }
+    if (widget.initialDateFrom != null) {
+      _fromDate = widget.initialDateFrom;
+    }
+    if (widget.initialDateTo != null) {
+      _toDate = widget.initialDateTo;
+    }
+    if (widget.initialCurrencyId != null) {
+      _selectedCurrencyId = widget.initialCurrencyId;
+    }
+    if (widget.initialProjectId != null) {
+      _selectedProjectId = widget.initialProjectId;
+    }
     _loadFiscalYears();
     _loadCurrencies();
   }
@@ -68,13 +98,15 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
+        if (_selectedFiscalYearId == null) {
+          final current = items.firstWhere(
+            (e) => (e['is_current'] == true),
+            orElse: () => const <String, dynamic>{},
+          );
+          final id = current['id'];
+          if (id is int) {
+            _selectedFiscalYearId = id;
+          }
         }
       });
     } catch (_) {
@@ -89,8 +121,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
+        if (_selectedCurrencyId == null && items.isNotEmpty) {
           final defaultCurrency = items.firstWhere(
             (c) => c['is_default'] == true,
             orElse: () => items.first,

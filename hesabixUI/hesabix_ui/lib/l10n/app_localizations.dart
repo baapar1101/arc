@@ -11169,7 +11169,7 @@ abstract class AppLocalizations {
   /// No description provided for @reportsTrialBalanceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'2/4/6/8-column balance'**
+  /// **'2/4/6/8-column balance at multiple levels'**
   String get reportsTrialBalanceSubtitle;
 
   /// No description provided for @reportsGeneralLedgerTitle.
@@ -11237,6 +11237,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account tree structure with balances and transaction details'**
   String get reportsAccountsReviewSubtitle;
+
+  /// No description provided for @reportsBalanceSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance sheet'**
+  String get reportsBalanceSheetTitle;
+
+  /// No description provided for @reportsBalanceSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement of financial position — assets, liabilities and equity'**
+  String get reportsBalanceSheetSubtitle;
+
+  /// No description provided for @reportsFinancialPackageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial reports package'**
+  String get reportsFinancialPackageTitle;
+
+  /// No description provided for @reportsFinancialPackageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial balance, balance sheet and P&L in one view'**
+  String get reportsFinancialPackageSubtitle;
+
+  /// No description provided for @exportFinancialPackagePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Combined PDF (financial package)'**
+  String get exportFinancialPackagePdf;
+
+  /// No description provided for @exportFinancialPackageExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Combined Excel (financial package)'**
+  String get exportFinancialPackageExcel;
 
   /// No description provided for @reportsPnlCumulativeSubtitle.
   ///

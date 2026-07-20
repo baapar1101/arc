@@ -5916,7 +5916,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsTrialBalanceTitle => 'Trial balance';
 
   @override
-  String get reportsTrialBalanceSubtitle => '2/4/6/8-column balance';
+  String get reportsTrialBalanceSubtitle =>
+      '2/4/6/8-column balance at multiple levels';
 
   @override
   String get reportsGeneralLedgerTitle => 'General ledger';
@@ -5953,6 +5954,27 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get reportsAccountsReviewSubtitle =>
       'Account tree structure with balances and transaction details';
+
+  @override
+  String get reportsBalanceSheetTitle => 'Balance sheet';
+
+  @override
+  String get reportsBalanceSheetSubtitle =>
+      'Statement of financial position — assets, liabilities and equity';
+
+  @override
+  String get reportsFinancialPackageTitle => 'Financial reports package';
+
+  @override
+  String get reportsFinancialPackageSubtitle =>
+      'Trial balance, balance sheet and P&L in one view';
+
+  @override
+  String get exportFinancialPackagePdf => 'Combined PDF (financial package)';
+
+  @override
+  String get exportFinancialPackageExcel =>
+      'Combined Excel (financial package)';
 
   @override
   String get reportsPnlCumulativeSubtitle =>

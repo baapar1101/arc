@@ -10,6 +10,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/widgets/reports/pnl_report_shared.dart';
+import 'package:hesabix_ui/utils/financial_report_navigation.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
@@ -154,6 +155,29 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         _loading = false;
       });
     }
+  }
+
+  void _openGeneralLedger(Map<String, dynamic> line) {
+    final accountId = line['account_id'];
+    if (accountId == null && line['account_code'] == null) return;
+    context.push(
+      buildGeneralLedgerRoute(
+        businessId: widget.businessId,
+        accountRow: {
+          'account_id': accountId,
+          'account_code': line['account_code'],
+          'account_name': line['account_name'],
+          'account_type': line['account_type'] ?? 'accounting_document',
+        },
+        context: FinancialReportLedgerContext(
+          fiscalYearId: _selectedFiscalYearId,
+          dateFrom: _fromDate,
+          dateTo: _toDate,
+          currencyId: _selectedCurrencyId,
+          projectId: _selectedProjectId,
+        ),
+      ),
+    );
   }
 
   Future<void> _export(String type) async {
@@ -321,7 +345,10 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                         else if (_error != null)
                           _buildErrorState(cs)
                         else ...[
-                          PnlStatementView(statementLines: _statementLines),
+                          PnlStatementView(
+                            statementLines: _statementLines,
+                            onAccountTap: _openGeneralLedger,
+                          ),
                           const SizedBox(height: 16),
                           if (_salesItems.isNotEmpty) ...[
                             PnlDetailSection(

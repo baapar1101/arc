@@ -377,6 +377,9 @@ def execute_ai_report(
             account_type=args.get("account_type"),
             project_id=args.get("project_id"),
             include_zero_balance=bool(args.get("include_zero_balance", False)),
+            column_mode=int(args.get("column_mode", 8) or 8),
+            display_mode=args.get("display_mode", "flat"),
+            account_level=int(args.get("account_level", 4) or 4),
             **kw,
         )
 
@@ -440,6 +443,23 @@ def execute_ai_report(
             account_id=args.get("account_id"),
             include_zero_balance=bool(args.get("include_zero_balance", False)),
             **kw,
+        )
+
+    if rt == "balance_sheet":
+        from app.services.balance_sheet_service import get_balance_sheet_report
+
+        return get_balance_sheet_report(
+            db,
+            business_id,
+            project_id=args.get("project_id"),
+            include_zero_balance=bool(args.get("include_zero_balance", False)),
+            account_level=int(args.get("account_level", 4) or 4),
+            compare_prior_period=bool(args.get("compare_prior_period", False)),
+            compare_mode=args.get("compare_mode"),
+            fiscal_year_id=kw.get("fiscal_year_id"),
+            currency_id=kw.get("currency_id"),
+            date_from=kw.get("date_from"),
+            date_to=kw.get("date_to"),
         )
 
     if rt == "distribution_dashboard":

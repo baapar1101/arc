@@ -402,8 +402,13 @@ class PnlSummaryPanel extends StatelessWidget {
 /// صورت سود و زیان سلسله‌مراتبی
 class PnlStatementView extends StatelessWidget {
   final List<Map<String, dynamic>> statementLines;
+  final void Function(Map<String, dynamic> accountLine)? onAccountTap;
 
-  const PnlStatementView({super.key, required this.statementLines});
+  const PnlStatementView({
+    super.key,
+    required this.statementLines,
+    this.onAccountTap,
+  });
 
   String _fmt(dynamic value) {
     if (value == null) return '0';
@@ -469,43 +474,57 @@ class PnlStatementView extends StatelessWidget {
 
     if (type == 'account') {
       final hasCompare = line['prior_amount'] != null;
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 72,
-              child: Text(
-                line['account_code']?.toString() ?? '',
-                style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.65)),
-              ),
-            ),
-            Expanded(child: Text(line['account_name']?.toString() ?? '')),
-            SizedBox(width: 100, child: Text(amount, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w500))),
-            if (hasCompare) ...[
+      final canDrill = onAccountTap != null &&
+          line['account_code'] != null &&
+          line['account_code'].toString().isNotEmpty;
+      return InkWell(
+        onTap: canDrill ? () => onAccountTap!(line) : null,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
               SizedBox(
-                width: 100,
+                width: 72,
                 child: Text(
-                  _fmt(line['prior_amount']),
-                  textAlign: TextAlign.end,
-                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                  line['account_code']?.toString() ?? '',
+                  style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.65)),
                 ),
               ),
-              SizedBox(
-                width: 90,
-                child: Text(
-                  _fmt(line['variance']),
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: ((line['variance'] as num?) ?? 0) >= 0
-                        ? const Color(0xFF15803D)
-                        : const Color(0xFFB91C1C),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(child: Text(line['account_name']?.toString() ?? '')),
+                    if (canDrill)
+                      Icon(Icons.menu_book_outlined, size: 16, color: cs.primary.withValues(alpha: 0.7)),
+                  ],
+                ),
+              ),
+              SizedBox(width: 100, child: Text(amount, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w500))),
+              if (hasCompare) ...[
+                SizedBox(
+                  width: 100,
+                  child: Text(
+                    _fmt(line['prior_amount']),
+                    textAlign: TextAlign.end,
+                    style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
                   ),
                 ),
-              ),
+                SizedBox(
+                  width: 90,
+                  child: Text(
+                    _fmt(line['variance']),
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: ((line['variance'] as num?) ?? 0) >= 0
+                          ? const Color(0xFF15803D)
+                          : const Color(0xFFB91C1C),
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       );
     }

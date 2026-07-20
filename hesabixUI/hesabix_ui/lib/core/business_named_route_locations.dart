@@ -91,6 +91,8 @@ abstract final class BusinessNamedRoutes {
     'business_reports_journal_ledger': 'reports/journal-ledger',
     'business_reports_pnl_period': 'reports/pnl-period',
     'business_reports_pnl_cumulative': 'reports/pnl-cumulative',
+    'business_reports_balance_sheet': 'reports/balance-sheet',
+    'business_reports_financial_package': 'reports/financial-package',
     'business_reports_accounts_review': 'reports/accounts-review',
     'business_reports_activity_logs': 'reports/activity-logs',
     'business_reports_basalam_overview': 'reports/basalam/overview',

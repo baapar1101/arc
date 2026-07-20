@@ -5879,7 +5879,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsTrialBalanceTitle => 'تراز آزمایشی';
 
   @override
-  String get reportsTrialBalanceSubtitle => 'تراز دو/چهار/شش/هشت ستونی';
+  String get reportsTrialBalanceSubtitle =>
+      'تراز دو/چهار/شش/هشت ستونی در سطوح مختلف';
 
   @override
   String get reportsGeneralLedgerTitle => 'دفتر کل';
@@ -5915,6 +5916,26 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get reportsAccountsReviewSubtitle =>
       'ساختار درختی حساب‌ها با مانده‌ها و جزئیات تراکنش‌ها';
+
+  @override
+  String get reportsBalanceSheetTitle => 'ترازنامه';
+
+  @override
+  String get reportsBalanceSheetSubtitle =>
+      'صورت وضعیت مالی — دارایی‌ها، بدهی‌ها و حقوق صاحبان سهام';
+
+  @override
+  String get reportsFinancialPackageTitle => 'بسته گزارش‌های مالی';
+
+  @override
+  String get reportsFinancialPackageSubtitle =>
+      'تراز آزمایشی، ترازنامه و سود و زیان در یک نما';
+
+  @override
+  String get exportFinancialPackagePdf => 'خروجی PDF یکجا (بسته مالی)';
+
+  @override
+  String get exportFinancialPackageExcel => 'خروجی Excel یکجا (بسته مالی)';
 
   @override
   String get reportsPnlCumulativeSubtitle => 'مقایسه دوره‌ای و تجمیعی';

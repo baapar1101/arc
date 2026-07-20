@@ -64,6 +64,7 @@ REPORT_DEFINITIONS: Tuple[ReportDefinition, ...] = (
     ReportDefinition("pnl_period", "سود و زیان دوره‌ای", "accounting", ("reports.read", "accounting_documents.view")),
     ReportDefinition("pnl_cumulative", "سود و زیان تجمعی", "accounting", ("reports.read", "accounting_documents.view")),
     ReportDefinition("accounts_review", "مرور حساب‌ها", "accounting", ("reports.read", "accounting_documents.view")),
+    ReportDefinition("balance_sheet", "ترازنامه", "accounting", ("reports.read", "accounting_documents.view")),
     # --- یکپارچه‌سازی / سایر ---
     ReportDefinition("distribution_dashboard", "داشبورد توزیع", "integration", ("reports.read", "distribution.view")),
     ReportDefinition("basalam_overview", "خلاصه باسلام", "integration", ("basalam.view",)),

@@ -32,6 +32,13 @@ from app.services.document_service import (
 )
 from app.services.invoice_service import get_daily_sales_report, get_monthly_sales_report, get_top_customers_report, get_daily_purchases_report, get_top_suppliers_report, get_materials_consumption_report, get_production_report
 from app.services.trial_balance_service import get_trial_balance_report
+from app.services.balance_sheet_service import get_balance_sheet_report
+from app.services.balance_sheet_export_service import balance_sheet_excel_response, balance_sheet_pdf_response
+from app.services.financial_package_service import get_financial_package_report
+from app.services.financial_package_export_service import (
+    financial_package_excel_response,
+    financial_package_pdf_response,
+)
 from app.services.general_ledger_service import get_general_ledger_report
 from app.services.pnl_service import get_pnl_period_report, get_pnl_cumulative_report
 from app.services.pnl_export_service import pnl_excel_response, pnl_pdf_response
@@ -2722,6 +2729,149 @@ async def production_report_endpoint(
     )
 
 
+def _parse_fiscal_year_id(request: Request, body: Dict[str, Any]) -> int | None:
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+    return fiscal_year_id
+
+
+def _parse_trial_balance_body(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+    fiscal_year_id = _parse_fiscal_year_id(request, body)
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    project_id = body.get("project_id")
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
+
+    account_ids = body.get("account_ids")
+    if account_ids is not None and not isinstance(account_ids, list):
+        account_ids = None
+    if account_ids:
+        try:
+            account_ids = [int(aid) for aid in account_ids if aid is not None]
+        except (ValueError, TypeError):
+            account_ids = None
+
+    try:
+        column_mode = int(body.get("column_mode", 8))
+        if column_mode not in (2, 4, 6, 8):
+            column_mode = 8
+    except (ValueError, TypeError):
+        column_mode = 8
+
+    display_mode = body.get("display_mode", "flat")
+    if display_mode not in ("flat", "tree"):
+        display_mode = "flat"
+
+    try:
+        account_level = int(body.get("account_level", 4))
+        if account_level not in (1, 2, 3, 4):
+            account_level = 4
+    except (ValueError, TypeError):
+        account_level = 4
+
+    skip = body.get("skip", 0)
+    take = body.get("take", 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+
+    return {
+        "fiscal_year_id": fiscal_year_id,
+        "date_from": body.get("date_from"),
+        "date_to": body.get("date_to"),
+        "currency_id": currency_id,
+        "account_type": body.get("account_type"),
+        "account_ids": account_ids,
+        "project_id": project_id,
+        "include_zero_balance": bool(body.get("include_zero_balance", False)),
+        "column_mode": column_mode,
+        "display_mode": display_mode,
+        "account_level": account_level,
+        "skip": skip,
+        "take": take,
+    }
+
+
+def _parse_balance_sheet_body(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+    fiscal_year_id = _parse_fiscal_year_id(request, body)
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    project_id = body.get("project_id")
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
+
+    try:
+        account_level = int(body.get("account_level", 4))
+        if account_level not in (1, 2, 3, 4):
+            account_level = 4
+    except (ValueError, TypeError):
+        account_level = 4
+
+    compare_mode = body.get("compare_mode")
+    if compare_mode is not None:
+        compare_mode = str(compare_mode).strip() or None
+
+    return {
+        "fiscal_year_id": fiscal_year_id,
+        "date_from": body.get("date_from"),
+        "date_to": body.get("date_to"),
+        "currency_id": currency_id,
+        "project_id": project_id,
+        "include_zero_balance": bool(body.get("include_zero_balance", False)),
+        "account_level": account_level,
+        "compare_prior_period": bool(body.get("compare_prior_period", False)),
+        "compare_mode": compare_mode,
+    }
+
+
+def _parse_financial_package_body(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+    params = _parse_balance_sheet_body(request, body)
+    try:
+        column_mode = int(body.get("column_mode", 8))
+        if column_mode not in (2, 4, 6, 8):
+            column_mode = 8
+    except (ValueError, TypeError):
+        column_mode = 8
+    params["column_mode"] = column_mode
+    return params
+
+
 @router.post(
     "/businesses/{business_id}/reports/trial-balance",
     summary="گزارش تراز آزمایشی",
@@ -2762,6 +2912,33 @@ async def trial_balance_report_endpoint(
     account_type = body.get('account_type')
     account_ids = body.get('account_ids')
     include_zero_balance = body.get('include_zero_balance', False)
+    project_id = body.get('project_id')
+    column_mode = body.get('column_mode', 8)
+    display_mode = body.get('display_mode', 'flat')
+    account_level = body.get('account_level', 4)
+
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
+
+    try:
+        column_mode = int(column_mode)
+        if column_mode not in (2, 4, 6, 8):
+            column_mode = 8
+    except (ValueError, TypeError):
+        column_mode = 8
+
+    if display_mode not in ('flat', 'tree'):
+        display_mode = 'flat'
+
+    try:
+        account_level = int(account_level)
+        if account_level not in (1, 2, 3, 4):
+            account_level = 4
+    except (ValueError, TypeError):
+        account_level = 4
     
     if currency_id is not None:
         try:
@@ -2803,7 +2980,11 @@ async def trial_balance_report_endpoint(
         date_to=date_to,
         account_type=account_type,
         account_ids=account_ids,
+        project_id=project_id,
         include_zero_balance=include_zero_balance,
+        column_mode=column_mode,
+        display_mode=display_mode,
+        account_level=account_level,
         skip=skip,
         take=take,
     )
@@ -2849,49 +3030,18 @@ async def export_trial_balance_report_excel(
     if not ctx.can_read_section("reports"):
         raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
 
-    # دریافت سال مالی از header یا body
-    fiscal_year_id = None
-    fy_header = request.headers.get('X-Fiscal-Year-ID')
-    if fy_header:
-        try:
-            fiscal_year_id = int(fy_header)
-        except (ValueError, TypeError):
-            pass
-
-    if body.get('fiscal_year_id'):
-        try:
-            fiscal_year_id = int(body['fiscal_year_id'])
-        except (ValueError, TypeError):
-            pass
-
-    # استخراج پارامترها از body
-    date_from = body.get('date_from')
-    date_to = body.get('date_to')
-    currency_id = body.get('currency_id')
-    account_type = body.get('account_type')
-    account_ids = body.get('account_ids')
-    include_zero_balance = bool(body.get('include_zero_balance', False))
-    project_id = body.get('project_id')
-
-    if currency_id is not None:
-        try:
-            currency_id = int(currency_id)
-        except (ValueError, TypeError):
-            currency_id = None
-
-    if project_id is not None:
-        try:
-            project_id = int(project_id)
-        except (ValueError, TypeError):
-            project_id = None
-
-    if account_ids is not None and not isinstance(account_ids, list):
-        account_ids = None
-    if account_ids:
-        try:
-            account_ids = [int(aid) for aid in account_ids if aid is not None]
-        except (ValueError, TypeError):
-            account_ids = None
+    params = _parse_trial_balance_body(request, body)
+    fiscal_year_id = params["fiscal_year_id"]
+    date_from = params["date_from"]
+    date_to = params["date_to"]
+    currency_id = params["currency_id"]
+    account_type = params["account_type"]
+    account_ids = params["account_ids"]
+    include_zero_balance = params["include_zero_balance"]
+    project_id = params["project_id"]
+    column_mode = params["column_mode"]
+    display_mode = params["display_mode"]
+    account_level = params["account_level"]
 
     # برای export، همه رکوردها را بدون pagination می‌گیریم
     max_export_records = 10000
@@ -2906,11 +3056,14 @@ async def export_trial_balance_report_excel(
         account_ids=account_ids,
         project_id=project_id,
         include_zero_balance=include_zero_balance,
+        column_mode=column_mode,
+        display_mode=display_mode,
+        account_level=account_level,
         skip=0,
         take=max_export_records,
     )
 
-    items = result.get('items', [])
+    items = result.get('items', []) or result.get('accounts', [])
     items = [format_datetime_fields(item, request) for item in items]
 
     # Handle selected rows
@@ -3251,49 +3404,18 @@ async def export_trial_balance_report_pdf(
     logger = logging.getLogger(__name__)
     debug_font = str(request.headers.get("X-Debug-Pdf-Font", "") or "").strip().lower() in ("1", "true", "yes", "y", "on")
 
-    # دریافت سال مالی از header یا body
-    fiscal_year_id = None
-    fy_header = request.headers.get('X-Fiscal-Year-ID')
-    if fy_header:
-        try:
-            fiscal_year_id = int(fy_header)
-        except (ValueError, TypeError):
-            pass
-
-    if body.get('fiscal_year_id'):
-        try:
-            fiscal_year_id = int(body['fiscal_year_id'])
-        except (ValueError, TypeError):
-            pass
-
-    # استخراج پارامترها از body
-    date_from = body.get('date_from')
-    date_to = body.get('date_to')
-    currency_id = body.get('currency_id')
-    account_type = body.get('account_type')
-    account_ids = body.get('account_ids')
-    include_zero_balance = bool(body.get('include_zero_balance', False))
-    project_id = body.get('project_id')
-
-    if currency_id is not None:
-        try:
-            currency_id = int(currency_id)
-        except (ValueError, TypeError):
-            currency_id = None
-
-    if project_id is not None:
-        try:
-            project_id = int(project_id)
-        except (ValueError, TypeError):
-            project_id = None
-
-    if account_ids is not None and not isinstance(account_ids, list):
-        account_ids = None
-    if account_ids:
-        try:
-            account_ids = [int(aid) for aid in account_ids if aid is not None]
-        except (ValueError, TypeError):
-            account_ids = None
+    params = _parse_trial_balance_body(request, body)
+    fiscal_year_id = params["fiscal_year_id"]
+    date_from = params["date_from"]
+    date_to = params["date_to"]
+    currency_id = params["currency_id"]
+    account_type = params["account_type"]
+    account_ids = params["account_ids"]
+    include_zero_balance = params["include_zero_balance"]
+    project_id = params["project_id"]
+    column_mode = params["column_mode"]
+    display_mode = params["display_mode"]
+    account_level = params["account_level"]
 
     # برای export، همه رکوردها را بدون pagination می‌گیریم
     max_export_records = 10000
@@ -3308,11 +3430,14 @@ async def export_trial_balance_report_pdf(
         account_ids=account_ids,
         project_id=project_id,
         include_zero_balance=include_zero_balance,
+        column_mode=column_mode,
+        display_mode=display_mode,
+        account_level=account_level,
         skip=0,
         take=max_export_records,
     )
 
-    items = result.get('items', [])
+    items = result.get('items', []) or result.get('accounts', [])
     items = [format_datetime_fields(item, request) for item in items]
 
     # Handle selected rows
@@ -5004,6 +5129,236 @@ async def export_pnl_period_report_pdf(
         project_id=params["project_id"],
         export_filename_timestamp=export_filename_timestamp,
         load_farsi_font_data_uris=load_farsi_font_data_uris,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/balance-sheet",
+    summary="گزارش ترازنامه",
+    description="صورت وضعیت مالی (ترازنامه) با طبقه‌بندی دارایی، بدهی و حقوق صاحبان سهام",
+)
+@require_business_access("business_id")
+async def balance_sheet_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش ترازنامه (صورت وضعیت مالی)"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_balance_sheet_body(request, body)
+    result = get_balance_sheet_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+    )
+
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Balance sheet report retrieved successfully" if locale != "fa" else "گزارش ترازنامه با موفقیت دریافت شد",
+        request=request,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/balance-sheet/export/excel",
+    summary="خروجی Excel گزارش ترازنامه",
+)
+@require_business_access("business_id")
+async def export_balance_sheet_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_balance_sheet_body(request, body)
+    result = get_balance_sheet_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return balance_sheet_excel_response(
+        result,
+        db=db,
+        business_id=business_id,
+        filename_prefix="balance_sheet",
+        is_fa=locale == "fa",
+        export_filename_timestamp=export_filename_timestamp,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/balance-sheet/export/pdf",
+    summary="خروجی PDF گزارش ترازنامه",
+)
+@require_business_access("business_id")
+async def export_balance_sheet_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_balance_sheet_body(request, body)
+    result = get_balance_sheet_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    calendar_type = resolve_calendar_type_for_request(request)
+    generated_at = format_generated_at_for_pdf(business_id, calendar_type)
+    return balance_sheet_pdf_response(
+        result,
+        db=db,
+        business_id=business_id,
+        filename_prefix="balance_sheet",
+        is_fa=locale == "fa",
+        report_title_fa="گزارش ترازنامه (صورت وضعیت مالی)",
+        report_title_en="Balance Sheet Report",
+        generated_at=generated_at,
+        fiscal_year_id=params["fiscal_year_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        currency_id=params["currency_id"],
+        project_id=params["project_id"],
+        account_level=params["account_level"],
+        export_filename_timestamp=export_filename_timestamp,
+        load_farsi_font_data_uris=load_farsi_font_data_uris,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/financial-package/export/pdf",
+    summary="خروجی PDF یکجای بسته گزارش‌های مالی",
+    description="تراز آزمایشی، صورت سود و زیان و ترازنامه در یک فایل PDF",
+)
+@require_business_access("business_id")
+async def export_financial_package_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_financial_package_body(request, body)
+    package = get_financial_package_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        column_mode=params["column_mode"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    calendar_type = resolve_calendar_type_for_request(request)
+    generated_at = format_generated_at_for_pdf(business_id, calendar_type)
+    return financial_package_pdf_response(
+        package,
+        db=db,
+        business_id=business_id,
+        is_fa=locale == "fa",
+        generated_at=generated_at,
+        fiscal_year_id=params["fiscal_year_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        currency_id=params["currency_id"],
+        project_id=params["project_id"],
+        account_level=params["account_level"],
+        column_mode=params["column_mode"],
+        export_filename_timestamp=export_filename_timestamp,
+        load_farsi_font_data_uris=load_farsi_font_data_uris,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/financial-package/export/excel",
+    summary="خروجی Excel یکجای بسته گزارش‌های مالی",
+    description="تراز آزمایشی، صورت سود و زیان و ترازنامه در یک فایل Excel با چند برگه",
+)
+@require_business_access("business_id")
+async def export_financial_package_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_financial_package_body(request, body)
+    package = get_financial_package_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        column_mode=params["column_mode"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return financial_package_excel_response(
+        package,
+        db=db,
+        business_id=business_id,
+        is_fa=locale == "fa",
+        column_mode=params["column_mode"],
+        export_filename_timestamp=export_filename_timestamp,
     )
 
 
