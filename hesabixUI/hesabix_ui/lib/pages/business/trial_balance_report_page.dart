@@ -13,6 +13,7 @@ import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/reports/trial_balance_tree_view.dart';
 import 'package:hesabix_ui/utils/financial_report_navigation.dart';
+import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 
 class TrialBalanceReportPage extends StatefulWidget {
@@ -303,6 +304,293 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
     return DataTableUtils.formatNumber(n);
   }
 
+  InputDecoration _decoration(String label) => InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      );
+
+  String _currencyShortLabel(Map<String, dynamic> currency) {
+    final code = (currency['code'] ?? '').toString().trim();
+    final name = (currency['name'] ?? '').toString().trim();
+    if (code.isNotEmpty) return code;
+    return name;
+  }
+
+  String _currencyFullLabel(Map<String, dynamic> currency) {
+    final code = (currency['code'] ?? '').toString().trim();
+    final name = (currency['name'] ?? '').toString().trim();
+    if (code.isNotEmpty && name.isNotEmpty) return '$code — $name';
+    return code.isNotEmpty ? code : name;
+  }
+
+  Widget _filterField({required double width, required Widget child}) {
+    return SizedBox(width: width, child: child);
+  }
+
+  Widget _buildFiltersPanel(BuildContext context, {required double fieldWidth}) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Material(
+      color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: EdgeInsets.all(ResponsiveHelper.isMobile(context) ? 12 : 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune_rounded, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'فیلترها',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                _filterField(
+                  width: fieldWidth,
+                  child: DropdownButtonFormField<int>(
+                    value: _selectedFiscalYearId,
+                    isExpanded: true,
+                    decoration: _decoration('سال مالی'),
+                    items: _fiscalYears
+                        .map(
+                          (fy) => DropdownMenuItem<int>(
+                            value: fy['id'] as int?,
+                            child: Text(
+                              fy['title']?.toString() ?? '',
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() => _selectedFiscalYearId = value);
+                      _refreshData();
+                    },
+                  ),
+                ),
+                _filterField(
+                  width: fieldWidth,
+                  child: DateInputField(
+                    value: _fromDate,
+                    calendarController: widget.calendarController,
+                    labelText: 'از تاریخ',
+                    isDense: true,
+                    onChanged: (date) {
+                      setState(() => _fromDate = date);
+                      _refreshData();
+                    },
+                  ),
+                ),
+                _filterField(
+                  width: fieldWidth,
+                  child: DateInputField(
+                    value: _toDate,
+                    calendarController: widget.calendarController,
+                    labelText: 'تا تاریخ',
+                    isDense: true,
+                    onChanged: (date) {
+                      setState(() => _toDate = date);
+                      _refreshData();
+                    },
+                  ),
+                ),
+                _filterField(
+                  width: fieldWidth,
+                  child: DropdownButtonFormField<int>(
+                    value: _selectedCurrencyId,
+                    isExpanded: true,
+                    decoration: _decoration('ارز'),
+                    selectedItemBuilder: (context) => [
+                      const Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text('همه ارزها', overflow: TextOverflow.ellipsis, maxLines: 1),
+                      ),
+                      ..._currencies.map(
+                        (c) => Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(
+                            _currencyShortLabel(c),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ),
+                    ],
+                    items: [
+                      const DropdownMenuItem<int>(
+                        value: null,
+                        child: Text('همه ارزها', overflow: TextOverflow.ellipsis, maxLines: 1),
+                      ),
+                      ..._currencies.map((c) {
+                        final id = c['id'] as int?;
+                        return DropdownMenuItem<int>(
+                          key: ValueKey('currency_$id'),
+                          value: id,
+                          child: Text(
+                            _currencyFullLabel(c),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (val) {
+                      setState(() => _selectedCurrencyId = val);
+                      _refreshData();
+                    },
+                  ),
+                ),
+                _filterField(
+                  width: fieldWidth,
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedAccountType,
+                    isExpanded: true,
+                    decoration: _decoration('نوع حساب'),
+                    items: [
+                      const DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('همه انواع', overflow: TextOverflow.ellipsis, maxLines: 1),
+                      ),
+                      ..._accountTypes.map((type) {
+                        final loc = AppLocalizations.of(context);
+                        return DropdownMenuItem<String>(
+                          value: type,
+                          child: Text(
+                            _localizedAccountType(loc, type),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _selectedAccountType = value);
+                      _refreshData();
+                    },
+                  ),
+                ),
+                _filterField(
+                  width: fieldWidth,
+                  child: ProjectSelectorWidget(
+                    businessId: widget.businessId,
+                    apiClient: ApiClient(),
+                    selectedProjectId: _selectedProjectId,
+                    isDense: true,
+                    onChanged: (val) {
+                      setState(() => _selectedProjectId = val);
+                      _refreshData();
+                    },
+                  ),
+                ),
+                _filterField(
+                  width: fieldWidth,
+                  child: DropdownButtonFormField<int>(
+                    value: _columnMode,
+                    isExpanded: true,
+                    decoration: _decoration('تعداد ستون'),
+                    items: const [
+                      DropdownMenuItem(value: 2, child: Text('۲ ستونی')),
+                      DropdownMenuItem(value: 4, child: Text('۴ ستونی')),
+                      DropdownMenuItem(value: 6, child: Text('۶ ستونی')),
+                      DropdownMenuItem(value: 8, child: Text('۸ ستونی')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _columnMode = value);
+                      _refreshData();
+                    },
+                  ),
+                ),
+                _filterField(
+                  width: fieldWidth,
+                  child: DropdownButtonFormField<String>(
+                    value: _displayMode,
+                    isExpanded: true,
+                    decoration: _decoration('نحوه نمایش'),
+                    items: const [
+                      DropdownMenuItem(value: 'flat', child: Text('لیست تخت')),
+                      DropdownMenuItem(value: 'tree', child: Text('درختی')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _displayMode = value);
+                      if (value == 'tree') {
+                        _fetchTreeData();
+                      } else {
+                        setState(() {});
+                      }
+                    },
+                  ),
+                ),
+                _filterField(
+                  width: fieldWidth,
+                  child: DropdownButtonFormField<int>(
+                    value: _accountLevel,
+                    isExpanded: true,
+                    decoration: _decoration('سطح حساب'),
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('گروه')),
+                      DropdownMenuItem(value: 2, child: Text('کل')),
+                      DropdownMenuItem(value: 3, child: Text('معین')),
+                      DropdownMenuItem(value: 4, child: Text('تفصیل')),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setState(() => _accountLevel = value);
+                      _refreshData();
+                    },
+                  ),
+                ),
+                FilterChip(
+                  label: const Text('مانده صفر'),
+                  selected: _includeZeroBalance,
+                  onSelected: (selected) {
+                    setState(() => _includeZeroBalance = selected);
+                    _refreshData();
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTreeContent() {
+    if (_treeLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 48),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_treeError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Center(child: Text(_treeError!)),
+      );
+    }
+    return TrialBalanceTreeView(
+      businessId: widget.businessId,
+      accounts: _treeAccounts,
+      columnMode: _columnMode,
+      ledgerContext: _ledgerContext,
+      summary: _treeSummary,
+    );
+  }
+
   DataTableConfig<Map<String, dynamic>> _buildTableConfig(AppLocalizations t) {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/businesses/${widget.businessId}/reports/trial-balance',
@@ -325,6 +613,8 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
       defaultSortBy: 'account_code',
       defaultSortDesc: false,
       expandBodyHeightToFitRows: true,
+      deferVerticalScrollToParent: true,
+      margin: EdgeInsets.zero,
     );
   }
 
@@ -362,280 +652,43 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Filters
-          Card(
-            margin: const EdgeInsets.all(16),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = ResponsiveHelper.isMobile(context);
+          final pagePadding = ResponsiveHelper.getPadding(context);
+          final fieldWidth = isMobile ? (constraints.maxWidth - pagePadding * 2) : 220.0;
+
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                children: [
-                  // Fiscal Year
-                  SizedBox(
-                    width: 280,
-                    child: DropdownButtonFormField<int>(
-                      value: _selectedFiscalYearId,
-                      decoration: InputDecoration(
-                        labelText: 'سال مالی',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                      ),
-                      items: _fiscalYears.map((fy) {
-                        return DropdownMenuItem<int>(
-                          value: fy['id'] as int?,
-                          child: Text(
-                            fy['title']?.toString() ?? '',
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
+              padding: EdgeInsets.fromLTRB(pagePadding, pagePadding, pagePadding, pagePadding + 24),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1400),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildFiltersPanel(context, fieldWidth: fieldWidth),
+                      const SizedBox(height: 16),
+                      if (_displayMode == 'tree')
+                        _buildTreeContent()
+                      else
+                        DataTableWidget<Map<String, dynamic>>(
+                          key: ValueKey(
+                            'trial_balance_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedAccountType}_${_includeZeroBalance}_${_columnMode}_${_displayMode}_${_accountLevel}_${_selectedProjectId}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
                           ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedFiscalYearId = value;
-                        });
-                        _refreshData();
-                      },
-                    ),
-                  ),
-                  
-                  // Date From
-                  SizedBox(
-                    width: 180,
-                    child: DateInputField(
-                      value: _fromDate,
-                      calendarController: widget.calendarController,
-                      onChanged: (date) {
-                        setState(() {
-                          _fromDate = date;
-                        });
-                        _refreshData();
-                      },
-                    ),
-                  ),
-                  
-                  // Date To
-                  SizedBox(
-                    width: 180,
-                    child: DateInputField(
-                      value: _toDate,
-                      calendarController: widget.calendarController,
-                      onChanged: (date) {
-                        setState(() {
-                          _toDate = date;
-                        });
-                        _refreshData();
-                      },
-                    ),
-                  ),
-                  
-                  // Currency
-                  SizedBox(
-                    width: 200,
-                    child: DropdownButtonFormField<int>(
-                      value: _selectedCurrencyId,
-                      decoration: InputDecoration(
-                        labelText: 'ارز',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                      ),
-                      items: [
-                        const DropdownMenuItem<int>(
-                          value: null,
-                          child: Text('همه ارزها'),
+                          config: _buildTableConfig(t),
+                          fromJson: (json) => Map<String, dynamic>.from(json),
+                          calendarController: widget.calendarController,
                         ),
-                        ..._currencies.map<DropdownMenuItem<int>>((c) {
-                          final id = c['id'] as int?;
-                          final code = (c['code'] ?? '').toString();
-                          final name = (c['name'] ?? '').toString();
-                          final displayName = code.isNotEmpty ? '$code - $name' : name;
-                          return DropdownMenuItem<int>(
-                            key: ValueKey('currency_$id'),
-                            value: id,
-                            child: Text(
-                              displayName,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedCurrencyId = val;
-                        });
-                        _refreshData();
-                      },
-                    ),
+                    ],
                   ),
-                  
-                  // Account Type
-                  SizedBox(
-                    width: 200,
-                    child: DropdownButtonFormField<String>(
-                      value: _selectedAccountType,
-                      decoration: InputDecoration(
-                        labelText: 'نوع حساب',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                      ),
-                      items: [
-                        const DropdownMenuItem<String>(
-                          value: null,
-                          child: Text('همه انواع'),
-                        ),
-                        ..._accountTypes.map((type) {
-                          final t = AppLocalizations.of(context);
-                          return DropdownMenuItem<String>(
-                            value: type,
-                            child: Text(_localizedAccountType(t, type)),
-                          );
-                        }),
-                      ],
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedAccountType = value;
-                        });
-                        _refreshData();
-                      },
-                    ),
-                  ),
-                  
-                  // Project
-                  SizedBox(
-                    width: 220,
-                    child: ProjectSelectorWidget(
-                      businessId: widget.businessId,
-                      apiClient: ApiClient(),
-                      selectedProjectId: _selectedProjectId,
-                      onChanged: (val) {
-                        setState(() => _selectedProjectId = val);
-                        _refreshData();
-                      },
-                    ),
-                  ),
-
-                  // Column mode
-                  SizedBox(
-                    width: 180,
-                    child: DropdownButtonFormField<int>(
-                      value: _columnMode,
-                      decoration: const InputDecoration(
-                        labelText: 'تعداد ستون',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 2, child: Text('۲ ستونی')),
-                        DropdownMenuItem(value: 4, child: Text('۴ ستونی')),
-                        DropdownMenuItem(value: 6, child: Text('۶ ستونی')),
-                        DropdownMenuItem(value: 8, child: Text('۸ ستونی')),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _columnMode = value);
-                        _refreshData();
-                      },
-                    ),
-                  ),
-
-                  // Display mode
-                  SizedBox(
-                    width: 180,
-                    child: DropdownButtonFormField<String>(
-                      value: _displayMode,
-                      decoration: const InputDecoration(
-                        labelText: 'نحوه نمایش',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'flat', child: Text('لیست تخت')),
-                        DropdownMenuItem(value: 'tree', child: Text('درختی')),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _displayMode = value);
-                        if (value == 'tree') {
-                          _fetchTreeData();
-                        } else {
-                          setState(() {});
-                        }
-                      },
-                    ),
-                  ),
-
-                  // Account level
-                  SizedBox(
-                    width: 180,
-                    child: DropdownButtonFormField<int>(
-                      value: _accountLevel,
-                      decoration: const InputDecoration(
-                        labelText: 'سطح حساب',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 1, child: Text('گروه')),
-                        DropdownMenuItem(value: 2, child: Text('کل')),
-                        DropdownMenuItem(value: 3, child: Text('معین')),
-                        DropdownMenuItem(value: 4, child: Text('تفصیل')),
-                      ],
-                      onChanged: (value) {
-                        if (value == null) return;
-                        setState(() => _accountLevel = value);
-                        _refreshData();
-                      },
-                    ),
-                  ),
-
-                  // Include Zero Balance
-                  SizedBox(
-                    width: 200,
-                    child: CheckboxListTile(
-                      title: const Text('نمایش حساب‌های با مانده صفر'),
-                      value: _includeZeroBalance,
-                      onChanged: (value) {
-                        setState(() {
-                          _includeZeroBalance = value ?? false;
-                        });
-                        _refreshData();
-                      },
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-          
-          // Data
-          Expanded(
-            child: _displayMode == 'tree'
-                ? _treeLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _treeError != null
-                        ? Center(child: Text(_treeError!))
-                        : SingleChildScrollView(
-                            child: TrialBalanceTreeView(
-                              businessId: widget.businessId,
-                              accounts: _treeAccounts,
-                              columnMode: _columnMode,
-                              ledgerContext: _ledgerContext,
-                              summary: _treeSummary,
-                            ),
-                          )
-                : DataTableWidget<Map<String, dynamic>>(
-                    key: ValueKey(
-                      'trial_balance_${_selectedFiscalYearId}_${_selectedCurrencyId}_${_selectedAccountType}_${_includeZeroBalance}_${_columnMode}_${_displayMode}_${_accountLevel}_${_selectedProjectId}_${_fromDate?.toIso8601String()}_${_toDate?.toIso8601String()}',
-                    ),
-                    config: _buildTableConfig(t),
-                    fromJson: (json) => Map<String, dynamic>.from(json),
-                    calendarController: widget.calendarController,
-                  ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
