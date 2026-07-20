@@ -61,10 +61,14 @@ def run_script(
 	params: Optional[dict[str, Any]] = None,
 	limits: ResourceLimits | None = None,
 	preview: bool = False,
+	calendar_type: str | None = None,
 ) -> RunResult:
 	"""اجرای امن اسکریپت برای یک کسب‌وکار قفل‌شده."""
+	from app.services.hscript.dates import format_date, normalize_calendar, parse_date
+
 	lim = limits or (ResourceLimits.preview() if preview else ResourceLimits.default())
 	sh = source_hash(source)
+	default_cal = normalize_calendar(calendar_type, default="jalali")
 
 	# دفاع: جلوگیری از تزریق business_id از params
 	safe_params = dict(params or {})
@@ -80,8 +84,10 @@ def run_script(
 			fiscal_year_id=fiscal_year_id,
 			limits=lim,
 			params=safe_params,
+			calendar_type=default_cal,
 		)
 		report = ReportBuilder(max_blocks=lim.max_report_blocks, max_output_bytes=lim.max_output_bytes)
+		report.meta["calendar_type"] = default_cal
 		env: dict[str, Any] = {}
 		env.update(build_builtins(lim))
 		env.update(build_gateway_modules(ctx))
@@ -89,6 +95,11 @@ def run_script(
 		env["params"] = params_mod
 		# دسترسی راحت params["start"] — dict موازی فقط‌خواندنی
 		env["param"] = sanitize_jsonish(safe_params)
+
+		def _set_calendar(calendar: str = "jalali") -> None:
+			cal = normalize_calendar(calendar, default="jalali")
+			report.calendar(cal)
+			ctx.calendar_type = cal
 
 		# report به‌صورت ماژول متددار
 		report_methods = {
@@ -111,9 +122,28 @@ def run_script(
 			"qr": report.qr,
 			"barcode": report.barcode,
 			"dashboard": report.dashboard,
+			"calendar": _set_calendar,
 			"set_meta": report.set_meta,
 		}
 		env["report"] = HModule(name="report", methods=report_methods)
+
+		def _format_date(value: Any, calendar: Any = None, with_time: bool = False) -> str:
+			cal = calendar if calendar is not None else report.meta.get("calendar_type", default_cal)
+			return format_date(value, calendar=cal, with_time=bool(with_time))
+
+		def _parse_date_fn(value: Any, calendar: Any = None) -> str:
+			cal = calendar if calendar is not None else report.meta.get("calendar_type", default_cal)
+			return parse_date(value, calendar=cal)
+
+		env["format_date"] = _format_date
+		env["parse_date"] = _parse_date_fn
+		env["dates"] = HModule(
+			name="dates",
+			methods={
+				"format": _format_date,
+				"parse": _parse_date_fn,
+			},
+		)
 
 		# مسدود کردن نام‌های خطرناک حتی اگر کسی بخواهد override کند — بعد از build دوباره قفل
 		for banned_name in ("__builtins__", "__import__", "open", "eval", "exec", "compile", "globals", "locals", "vars", "dir"):
@@ -130,6 +160,7 @@ def run_script(
 				"gateway_calls": ctx.gateway_calls,
 				"blocks": len(report.blocks),
 				"language_version": HSCRIPT_LANGUAGE_VERSION,
+				"calendar_type": report.meta.get("calendar_type"),
 			},
 			source_hash=sh,
 		)

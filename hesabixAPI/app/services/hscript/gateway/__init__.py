@@ -10,7 +10,7 @@ from app.services.hscript.gateway.context import GatewayContext
 from app.services.hscript.values import HModule, HTable, sanitize_jsonish
 
 
-def _parse_date(value: Any) -> Optional[date]:
+def _parse_date(value: Any, *, calendar: str | None = None) -> Optional[date]:
 	if value is None:
 		return None
 	if isinstance(value, date) and not isinstance(value, datetime):
@@ -20,7 +20,10 @@ def _parse_date(value: Any) -> Optional[date]:
 	s = str(value).strip()
 	if not s:
 		return None
-	return datetime.fromisoformat(s.replace("Z", "+00:00")).date()
+	from app.services.hscript.dates import parse_date as parse_hscript_date
+
+	iso = parse_hscript_date(s, calendar=calendar)
+	return date.fromisoformat(iso)
 
 
 def _month_bounds(ref: Optional[date] = None) -> tuple[date, date]:
@@ -89,8 +92,8 @@ class InvoicesGateway:
 			"sort_by": "document_date",
 			"sort_desc": True,
 		}
-		fd = _parse_date(from_date)
-		td = _parse_date(to_date)
+		fd = _parse_date(from_date, calendar=self.ctx.calendar_type)
+		td = _parse_date(to_date, calendar=self.ctx.calendar_type)
 		if fd:
 			query["from_date"] = fd.isoformat()
 		if td:
@@ -246,8 +249,8 @@ class PaymentsGateway:
 			"sort_by": "document_date",
 			"sort_desc": True,
 		}
-		fd = _parse_date(from_date)
-		td = _parse_date(to_date)
+		fd = _parse_date(from_date, calendar=self.ctx.calendar_type)
+		td = _parse_date(to_date, calendar=self.ctx.calendar_type)
 		if fd:
 			query["from_date"] = fd.isoformat()
 		if td:

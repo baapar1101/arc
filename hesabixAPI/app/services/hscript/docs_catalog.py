@@ -75,6 +75,13 @@ DOC_ENTRIES: list[dict[str, Any]] = [
 		"version": 1,
 	},
 	{
+		"doc_id": "hscript.tutorial.calendar",
+		"path": "tutorials/calendar.md",
+		"title": "تقویم شمسی و میلادی",
+		"tags": ["tutorial", "calendar", "date"],
+		"version": 1,
+	},
+	{
 		"doc_id": "hscript.reference.language",
 		"path": "reference/language.md",
 		"title": "مرجع نحو زبان",

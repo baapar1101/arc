@@ -48,10 +48,18 @@ def _run_or_enqueue(
 	body: HScriptRunRequest,
 	report_id: int | None = None,
 	force_preview: bool | None = None,
+	request: Request | None = None,
 ) -> dict:
 	_guard_concurrency(db, business_id)
 	fiscal_year_id = getattr(ctx, "fiscal_year_id", None)
 	preview = bool(force_preview) if force_preview is not None else bool(body.preview)
+	calendar_type = None
+	if request is not None:
+		calendar_type = getattr(getattr(request, "state", None), "calendar_type", None)
+		if not calendar_type:
+			from app.core.calendar import get_calendar_type_from_header
+
+			calendar_type = get_calendar_type_from_header(request.headers.get("X-Calendar-Type"))
 
 	if body.async_mode:
 		from app.services.hscript.plan_limits import resolve_hscript_entitlement
@@ -73,6 +81,7 @@ def _run_or_enqueue(
 			fiscal_year_id=fiscal_year_id,
 			preview=preview,
 			persist=body.persist,
+			calendar_type=calendar_type,
 		)
 		if queued is not None:
 			return queued
@@ -87,6 +96,7 @@ def _run_or_enqueue(
 		fiscal_year_id=fiscal_year_id,
 		preview=preview,
 		persist=body.persist,
+		calendar_type=calendar_type,
 	)
 
 
@@ -173,6 +183,7 @@ async def run_adhoc_endpoint(
 		body=body,
 		report_id=None,
 		force_preview=True,
+		request=request,
 	)
 	return success_response(data=result, request=request, message="HSCRIPT_RUN_DONE")
 
@@ -355,6 +366,7 @@ async def run_saved_endpoint(
 		body=body,
 		report_id=report_id,
 		force_preview=None,
+		request=request,
 	)
 	return success_response(data=result, request=request, message="HSCRIPT_RUN_DONE")
 

@@ -20,7 +20,8 @@ import '../../../widgets/hscript/hscript_plan_banner.dart';
 import '../../../widgets/hscript/hscript_spec_renderer.dart';
 import '../../../widgets/permission/access_denied_page.dart';
 
-const _kDefaultScript = '''report.dashboard(columns=12)
+const _kDefaultScript = '''report.calendar("jalali")
+report.dashboard(columns=12)
 report.title("داشبورد فروش")
 rows = invoices.all(limit=50)
 report.kpi("تعداد فاکتور", rows.count(), span=4)

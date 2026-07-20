@@ -65,17 +65,30 @@ class _HScriptCodeEditorState extends State<HScriptCodeEditor> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    final editorBg = isDark ? const Color(0xFF0F172A) : const Color(0xFF1E293B);
-    final gutterBg = isDark ? const Color(0xFF0B1220) : const Color(0xFF0F172A);
-    final codeStyle = const TextStyle(
+
+    // تم روشن: پس‌زمینه روشن + متن تیره؛ تم تاریک: پس‌زمینه تیره + متن روشن
+    final editorBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final gutterBg = isDark ? const Color(0xFF0B1220) : const Color(0xFFEEF2F7);
+    final textColor = isDark ? const Color(0xFFE2E8F0) : const Color(0xFF0F172A);
+    final gutterColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+    final borderColor = isDark
+        ? cs.outlineVariant.withValues(alpha: 0.45)
+        : const Color(0xFFCBD5E1);
+    final dividerColor = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : const Color(0xFFCBD5E1);
+    final cursorColor = isDark ? const Color(0xFF38BDF8) : const Color(0xFF0284C7);
+    final hintColor = isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8);
+
+    final codeStyle = TextStyle(
       fontFamily: 'monospace',
       fontSize: 13.5,
       height: 1.55,
-      color: Color(0xFFE2E8F0),
+      color: textColor,
       letterSpacing: 0.2,
     );
     final gutterStyle = codeStyle.copyWith(
-      color: const Color(0xFF64748B),
+      color: gutterColor,
       fontSize: 12.5,
     );
 
@@ -98,70 +111,78 @@ class _HScriptCodeEditorState extends State<HScriptCodeEditor> {
             decoration: BoxDecoration(
               color: editorBg,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
+              border: Border.all(color: borderColor),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(10),
               child: Directionality(
                 textDirection: TextDirection.ltr,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    SizedBox(
-                      width: gutterWidth,
-                      child: ColoredBox(
-                        color: gutterBg,
-                        child: ListView.builder(
-                          controller: _gutterScrollCtrl,
-                          physics: const NeverScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
-                          itemCount: lineCount,
-                          itemBuilder: (_, i) => SizedBox(
-                            height: codeStyle.fontSize! * codeStyle.height!,
-                            child: Text(
-                              '${i + 1}',
-                              textAlign: TextAlign.right,
-                              style: gutterStyle,
+                child: Theme(
+                  // جلوگیری از override رنگ متن توسط InputDecorationTheme تم روشن
+                  data: theme.copyWith(
+                    textSelectionTheme: TextSelectionThemeData(
+                      cursorColor: cursorColor,
+                      selectionColor: cursorColor.withValues(alpha: 0.25),
+                      selectionHandleColor: cursorColor,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SizedBox(
+                        width: gutterWidth,
+                        child: ColoredBox(
+                          color: gutterBg,
+                          child: ListView.builder(
+                            controller: _gutterScrollCtrl,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+                            itemCount: lineCount,
+                            itemBuilder: (_, i) => SizedBox(
+                              height: codeStyle.fontSize! * codeStyle.height!,
+                              child: Text(
+                                '${i + 1}',
+                                textAlign: TextAlign.right,
+                                style: gutterStyle,
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    VerticalDivider(
-                      width: 1,
-                      thickness: 1,
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: widget.controller,
-                        focusNode: _focus,
-                        scrollController: _scrollCtrl,
-                        maxLines: null,
-                        expands: true,
-                        textAlign: TextAlign.left,
-                        textAlignVertical: TextAlignVertical.top,
-                        textDirection: TextDirection.ltr,
-                        keyboardType: TextInputType.multiline,
-                        style: codeStyle,
-                        cursorColor: const Color(0xFF38BDF8),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.fromLTRB(12, 12, 12, 12),
-                          isCollapsed: false,
-                          hintText: '# HScript',
-                          hintStyle: TextStyle(
-                            fontFamily: 'monospace',
-                            color: Color(0xFF64748B),
+                      VerticalDivider(width: 1, thickness: 1, color: dividerColor),
+                      Expanded(
+                        child: TextField(
+                          controller: widget.controller,
+                          focusNode: _focus,
+                          scrollController: _scrollCtrl,
+                          maxLines: null,
+                          expands: true,
+                          textAlign: TextAlign.left,
+                          textAlignVertical: TextAlignVertical.top,
+                          textDirection: TextDirection.ltr,
+                          keyboardType: TextInputType.multiline,
+                          style: codeStyle,
+                          cursorColor: cursorColor,
+                          decoration: InputDecoration(
+                            border: InputBorder.none,
+                            filled: true,
+                            fillColor: editorBg,
+                            contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                            isCollapsed: false,
+                            hintText: '# HScript',
+                            hintStyle: TextStyle(
+                              fontFamily: 'monospace',
+                              color: hintColor,
+                            ),
                           ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.deny(RegExp(r'\u0000')),
+                          ],
+                          onChanged: widget.onChanged,
                         ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.deny(RegExp(r'\u0000')),
-                        ],
-                        onChanged: widget.onChanged,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

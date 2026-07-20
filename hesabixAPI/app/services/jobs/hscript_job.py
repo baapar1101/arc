@@ -18,6 +18,7 @@ def run_hscript_report_job(
 	fiscal_year_id: Optional[int] = None,
 	preview: bool = False,
 	persist: bool = True,
+	calendar_type: Optional[str] = None,
 ) -> dict[str, Any]:
 	"""
 	اجرای گزارش HScript در worker جدا از API process.
@@ -55,6 +56,7 @@ def run_hscript_report_job(
 				preview=bool(preview),
 				persist=bool(persist),
 				use_worker_limits=True,
+				calendar_type=calendar_type,
 			)
 
 		from app.services.hscript.hardening import sanitize_public_error

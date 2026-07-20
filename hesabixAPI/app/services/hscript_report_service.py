@@ -303,6 +303,7 @@ def run_report(
 	preview: bool = False,
 	persist: bool = True,
 	use_worker_limits: bool = False,
+	calendar_type: Optional[str] = None,
 ) -> dict[str, Any]:
 	"""اجرای گزارش ذخیره‌شده یا اسکریپت موقت (preview)."""
 	version_id = None
@@ -348,6 +349,7 @@ def run_report(
 		params=merged_params,
 		limits=limits,
 		preview=preview,
+		calendar_type=calendar_type,
 	)
 	duration_ms = int((time.monotonic() - started) * 1000)
 
@@ -413,6 +415,7 @@ def enqueue_run_report(
 	fiscal_year_id: Optional[int] = None,
 	preview: bool = False,
 	persist: bool = True,
+	calendar_type: Optional[str] = None,
 ) -> Optional[dict[str, Any]]:
 	"""
 	صف‌بندی اجرا روی QUEUE_REPORTS.
@@ -435,6 +438,7 @@ def enqueue_run_report(
 		fiscal_year_id=fiscal_year_id,
 		preview=bool(preview),
 		persist=bool(persist),
+		calendar_type=calendar_type,
 		queue_name=QUEUE_REPORTS,
 		timeout=600 if preview else 1800,
 		result_ttl=86400,

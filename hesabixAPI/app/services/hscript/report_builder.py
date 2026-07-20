@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from app.services.hscript.errors import ResourceLimitErrorHS, TypeErrorHS
 from app.services.hscript.values import HTable, sanitize_jsonish
+from app.services.hscript.dates import format_date_value, normalize_calendar
 
 ALLOWED_BLOCK_TYPES = frozenset({
 	"title",
@@ -100,6 +101,12 @@ class ReportBuilder:
 			cols = list(rows[0].keys())
 		cols = [str(c) for c in (cols or [])][:50]
 		trimmed = [{c: r.get(c) for c in cols} for r in rows]
+		cal = self.meta.get("calendar_type")
+		if cal in ("jalali", "gregorian"):
+			trimmed = [
+				{c: format_date_value(r.get(c), cal) for c in cols}
+				for r in trimmed
+			]
 		block: dict[str, Any] = {"type": "table", "columns": cols, "rows": trimmed}
 		if title:
 			block["title"] = str(title)[:200]
@@ -183,11 +190,20 @@ class ReportBuilder:
 			raise TypeErrorHS("columns داشبورد باید 6، 12 یا 24 باشد")
 		self.meta["dashboard_columns"] = cols
 
+	def calendar(self, calendar_type: str = "jalali") -> None:
+		"""تنظیم تقویم نمایش تاریخ‌ها در Spec: jalali یا gregorian."""
+		cal = normalize_calendar(calendar_type, default="jalali")
+		self.meta["calendar_type"] = cal
+
 	def set_meta(self, **kwargs: Any) -> None:
 		for k, v in kwargs.items():
 			if str(k).startswith("_"):
 				continue
-			self.meta[str(k)[:64]] = sanitize_jsonish(v)
+			key = str(k)[:64]
+			if key == "calendar_type":
+				self.meta[key] = normalize_calendar(v, default="jalali")
+			else:
+				self.meta[key] = sanitize_jsonish(v)
 
 	def to_spec(self) -> dict[str, Any]:
 		spec = {

@@ -163,5 +163,41 @@ report.table(rows, columns=["code", "document_date", "total_debit"])
 	table = next(b for b in result.spec["blocks"] if b["type"] == "table")
 	row = table["rows"][0]
 	assert row["code"] == "INV-1"
-	assert row["document_date"] == "2026-01-02"
+	# با تقویم پیش‌فرض jalali قالب می‌شود
+	assert "/" in str(row["document_date"])
 	assert row["total_debit"] == 1500.5
+
+
+def test_report_calendar_jalali_formats_table_dates():
+	src = """
+report.calendar("jalali")
+rows = table([{"document_date": "2026-07-20", "code": "A"}])
+report.table(rows, columns=["code", "document_date"])
+report.kpi("d", format_date("2026-07-20"))
+"""
+	result = _run(src)
+	assert result.ok, result.error
+	assert result.spec["meta"]["calendar_type"] == "jalali"
+	table = next(b for b in result.spec["blocks"] if b["type"] == "table")
+	assert table["rows"][0]["document_date"] == "1405/04/29"
+	kpi = next(b for b in result.spec["blocks"] if b["type"] == "kpi")
+	assert kpi["value"] == "1405/04/29"
+
+
+def test_report_calendar_gregorian_keeps_iso_style():
+	src = """
+report.calendar("gregorian")
+rows = table([{"document_date": "2026-07-20", "code": "A"}])
+report.table(rows, columns=["document_date"])
+"""
+	result = _run(src)
+	assert result.ok, result.error
+	assert result.spec["meta"]["calendar_type"] == "gregorian"
+	table = next(b for b in result.spec["blocks"] if b["type"] == "table")
+	assert table["rows"][0]["document_date"] == "2026-07-20"
+
+
+def test_parse_jalali_filter_date():
+	from app.services.hscript.dates import parse_date
+
+	assert parse_date("1404/01/01", calendar="jalali") == "2025-03-21"

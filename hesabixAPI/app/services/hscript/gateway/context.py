@@ -22,6 +22,7 @@ class GatewayContext:
 	limits: ResourceLimits = field(default_factory=ResourceLimits.default)
 	gateway_calls: int = 0
 	params: dict[str, Any] = field(default_factory=dict)
+	calendar_type: str = "jalali"
 
 	def bump_call(self) -> None:
 		self.gateway_calls += 1
