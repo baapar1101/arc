@@ -21,16 +21,17 @@ import '../../../widgets/hscript/hscript_spec_renderer.dart';
 import '../../../widgets/permission/access_denied_page.dart';
 
 const _kDefaultScript = '''report.calendar("jalali")
+report.number_format(style="western")
 report.dashboard(columns=12)
 report.title("داشبورد فروش")
 rows = invoices.all(limit=50)
-report.kpi("تعداد فاکتور", rows.count(), span=4)
+report.kpi("تعداد فاکتور", rows.count(), format="integer", span=4)
 report.kpi("جمع بدهکار", rows.sum("total_debit"), format="currency", span=4)
 report.card("وضعیت", "آماده", subtitle="پیش‌نمایش", span=4)
 report.row_break()
 top_rows = rows.top(10, by="total_debit")
 report.bar_chart(top_rows, x="code", y="total_debit", title="بیشترین بدهکار", span=6)
-report.table(rows.limit(15), columns=["code", "document_date", "total_debit", "total_credit"], title="آخرین فاکتورها", span=6)
+report.table(rows.limit(15), columns=["code", "document_date", "total_debit", "total_credit"], formats={"total_debit": "currency", "total_credit": "currency"}, title="آخرین فاکتورها", span=6)
 ''';
 
 /// استودیوی طراحی و اجرای گزارش HScript.

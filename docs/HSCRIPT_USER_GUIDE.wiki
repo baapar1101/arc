@@ -1,0 +1,481 @@
+= راهنمای کامل گزارش‌ساز اسکریپتی (HScript) =
+
+این راهنما برای '''کاربران عادی و گزارش‌نویسان''' نوشته شده است. هدف آن توضیح ساده و کامل سیستم گزارش‌ساز اسکریپتی حسابیکس است؛ از ورود به صفحه تا ساخت داشبورد، قالب‌بندی عدد/تاریخ، خروجی PDF/Excel و کار با هوش مصنوعی.
+
+{| class="wikitable" style="background-color:#f8f9fa; border-left:4px solid #3366cc;"
+|-
+| '''HScript چیست؟''' یک زبان ساده شبیه پایتون است که داخل حسابیکس اجرا می‌شود. با آن می‌توانید داده بگیرید، محاسبه کنید و گزارش/داشبورد بسازید — بدون دسترسی مستقیم به دیتابیس و بدون خطر اجرای کد ناامن.
+|}
+
+== ۱) از کجا شروع کنیم؟ ==
+
+=== مسیر دسترسی ===
+
+# وارد '''پنل کسب‌وکار''' شوید.
+# از منوی راست، بخش '''سرویس‌ها و افزونه‌ها'''، گزینه '''گزارش‌ساز اسکریپتی''' را باز کنید.
+# یا از صفحه '''گزارش‌ها''' کارت '''گزارش‌ساز اسکریپتی''' را انتخاب کنید.
+# آدرس مستقیم: <code>/business/{شناسه-کسب‌وکار}/hscript</code>
+
+=== دسترسی لازم ===
+
+{| class="wikitable"
+! کار !! دسترسی موردنیاز
+|-
+| دیدن/اجرا/ذخیره گزارش || <code>reports</code> → <code>view</code>
+|-
+| خروجی PDF و Excel || <code>reports</code> → <code>export</code>
+|}
+
+اگر دسترسی ندارید، از مدیر کسب‌وکار بخواهید مجوز گزارش‌ها را برای شما فعال کند.
+
+=== افزونه و سقف استفاده ===
+
+* بدون خرید افزونه هم می‌توانید کار کنید (پلن رایگان با سقف محدود).
+* با فعال‌سازی افزونه '''گزارش‌ساز اسکریپتی (HScript)''' از بازار افزونه‌ها، سقف تعداد گزارش ذخیره‌شده و تعداد اجرا بالاتر می‌رود.
+* در بالای صفحه، در صورت نیاز بنر ارتقا نمایش داده می‌شود.
+
+== ۲) آشنایی با صفحه استودیو ==
+
+وقتی گزارش جدید می‌سازید یا یکی را ویرایش می‌کنید، وارد '''استودیو HScript''' می‌شوید.
+
+{| class="wikitable"
+! بخش !! کاربرد
+|-
+| عنوان گزارش || نامی که در فهرست گزارش‌ها دیده می‌شود
+|-
+| ادیتور اسکریپت (چپ‌چین) || محل نوشتن کد HScript
+|-
+| پارامترها (JSON) || مقادیر متغیر مثل بازه تاریخ؛ اختیاری
+|-
+| پیش‌نمایش || نتیجه KPI، جدول و نمودار بعد از اجرا
+|-
+| اعتبارسنجی || فقط بررسی نحو اسکریپت (بدون گرفتن داده)
+|-
+| اجرا || اجرای واقعی و ساخت پیش‌نمایش
+|-
+| ذخیره / انتشار || ذخیره پیش‌نویس یا انتشار برای استفاده
+|-
+| PDF / Excel || خروجی فایل (نیازمند دسترسی export)
+|-
+| از AI بساز || کمک گرفتن از هوش مصنوعی برای نوشتن/اصلاح اسکریپت
+|}
+
+{| class="wikitable" style="background-color:#fff8e1; border-left:4px solid #ff9800;"
+|-
+| '''نکته:''' ادیتور کد همیشه '''چپ‌چین (LTR)''' است تا خواندن کد راحت باشد؛ حتی اگر پنل شما راست‌چین باشد.
+|}
+
+== ۳) اولین گزارش در ۳۰ ثانیه ==
+
+اسکریپت نمونه زیر را در استودیو بگذارید و دکمه '''اجرا''' را بزنید:
+
+<pre>
+report.calendar("jalali")
+report.number_format(style="western")
+report.dashboard(columns=12)
+report.title("داشبورد فروش")
+rows = invoices.all(limit=50)
+report.kpi("تعداد فاکتور", rows.count(), format="integer", span=4)
+report.kpi("جمع بدهکار", rows.sum("total_debit"), format="currency", span=4)
+report.card("وضعیت", "آماده", subtitle="پیش‌نمایش", span=4)
+report.row_break()
+top_rows = rows.top(10, by="total_debit")
+report.bar_chart(top_rows, x="code", y="total_debit", title="بیشترین بدهکار", span=6)
+report.table(
+  rows.limit(15),
+  columns=["code", "document_date", "total_debit", "total_credit"],
+  formats={"total_debit": "currency", "total_credit": "currency"},
+  title="آخرین فاکتورها",
+  span=6
+)
+</pre>
+
+اگر داده فاکتور داشته باشید، KPI، نمودار و جدول را در پیش‌نمایش می‌بینید.
+
+== ۴) مفاهیم پایه به زبان ساده ==
+
+=== داده از کجا می‌آید؟ ===
+
+شما SQL نمی‌نویسید. فقط از '''درگاه‌های مجاز''' استفاده می‌کنید:
+
+{| class="wikitable"
+! ماژول !! معنی ساده !! مثال
+|-
+| <code>invoices</code> || فاکتورها/اسناد فروش و مشابه || <code>invoices.all(limit=50)</code>
+|-
+| <code>customers</code> || مشتریان || <code>customers.all(limit=100)</code>
+|-
+| <code>products</code> || کالا/خدمات || <code>products.all(limit=100)</code>
+|-
+| <code>payments</code> || دریافت/پرداخت || <code>payments.this_month()</code>
+|}
+
+همیشه فقط دادهٔ '''همین کسب‌وکار''' برمی‌گردد؛ نمی‌توانید به کسب‌وکار دیگر دسترسی پیدا کنید.
+
+=== نتیجه گزارش چیست؟ ===
+
+خروجی یک '''Report Spec''' است: ساختار استاندارد شامل عنوان، کارت‌های آماری (KPI)، جدول، نمودار و تنظیمات. همین ساختار در پنل، PDF و Excel استفاده می‌شود.
+
+=== چه چیزهایی ممنوع است؟ ===
+
+* <code>import</code> و دسترسی به فایل/شبکه
+* SQL خام و دستورات سیستم‌عامل
+* تغییر <code>business_id</code> یا دور زدن امنیت
+
+این محدودیت‌ها عمدی است تا گزارش‌نویسی امن بماند.
+
+== ۵) بلوک‌های گزارش (report.*) ==
+
+=== عنوان و متن ===
+
+<pre>
+report.title("گزارش فروش ماه")
+report.heading("خلاصه", level=2)
+report.text("این گزارش به‌صورت خودکار ساخته شده است.")
+report.section("جزئیات")
+</pre>
+
+=== KPI و کارت ===
+
+<pre>
+report.kpi("تعداد", 120, format="integer")
+report.kpi("مبلغ", 15000000, format="currency", hint="ریال")
+report.card("وضعیت", "فعال", subtitle="تا امروز")
+</pre>
+
+=== جدول ===
+
+<pre>
+rows = invoices.all(limit=30)
+report.table(
+  rows,
+  columns=["code", "document_date", "total_debit"],
+  formats={"total_debit": "currency"},
+  title="فاکتورها"
+)
+</pre>
+
+=== نمودار ===
+
+<pre>
+data = rows.top(8, by="total_debit")
+report.bar_chart(data, x="code", y="total_debit", title="بیشترین‌ها")
+report.line_chart(data, x="code", y="total_debit", title="روند")
+report.pie_chart(data, label="code", value="total_debit", title="سهم")
+</pre>
+
+=== داشبورد و چیدمان ===
+
+<pre>
+report.dashboard(columns=12)
+report.kpi("A", 1, span=4)
+report.kpi("B", 2, span=4)
+report.kpi("C", 3, span=4)
+report.row_break()
+report.table(rows, span=12)
+</pre>
+
+* <code>columns</code>: شبکه ۶ یا ۱۲ یا ۲۴ ستونه
+* <code>span</code>: عرض هر بلوک در شبکه
+* <code>row_break()</code>: رفتن به ردیف بعد
+
+== ۶) قالب‌بندی اعداد (جداکننده هزارگان و بیشتر) ==
+
+=== تنظیم پیش‌فرض گزارش ===
+
+<pre>
+# سبک غربی: 1,234,567.50
+report.number_format(style="western")
+
+# سبک فارسی (جداکننده فارسی): 1٬234٬567٫50
+report.number_format(style="fa")
+</pre>
+
+یا دستی:
+
+<pre>
+report.number_format(thousands_sep=",", decimal_sep=".")
+</pre>
+
+=== قالب‌های آماده ===
+
+{| class="wikitable"
+! مقدار format !! نتیجه نمونه برای ۱۲۳۴۵۶۷٫۵
+|-
+| <code>integer</code> || 1,234,568 (گرد شده بدون اعشار)
+|-
+| <code>number</code> || با جداکننده هزارگان
+|-
+| <code>number:2</code> || 1,234,567.50
+|-
+| <code>currency</code> یا <code>money</code> || 1,234,568 (پیش‌فرض بدون اعشار)
+|-
+| <code>currency:0</code> || 1,234,568
+|-
+| <code>decimal:3</code> || 1,234,567.500
+|-
+| <code>percent</code> || ۱۲٫۵٪ برای مقدار ۱۲٫۵
+|-
+| <code>raw</code> || بدون قالب (همان عدد خام)
+|}
+
+=== در KPI ===
+
+<pre>
+report.kpi("فروش", 12500000, format="currency")
+report.kpi("رشد", 12.5, format="percent")
+report.kpi("نرخ", 0.3567, format="number:4")
+</pre>
+
+=== در جدول (برای هر ستون) ===
+
+<pre>
+report.table(
+  rows,
+  columns=["code", "total_debit", "total_credit"],
+  formats={
+    "total_debit": "currency",
+    "total_credit": "currency"
+  }
+)
+</pre>
+
+=== قالب‌بندی دستی داخل متن ===
+
+<pre>
+msg = "جمع کل: " + format_number(2500000, "currency")
+report.text(msg)
+
+# معادل:
+report.text("جمع: " + numbers.format(2500000, "currency"))
+</pre>
+
+== ۷) تقویم شمسی و میلادی ==
+
+حسابیکس دو تقویم دارد: '''جلالی (شمسی)''' و '''میلادی'''.
+
+=== تنظیم تقویم گزارش ===
+
+<pre>
+report.calendar("jalali")      # شمسی
+# یا
+report.calendar("gregorian")  # میلادی
+</pre>
+
+با این کار:
+
+* تاریخ‌های جدول با همان تقویم نمایش داده می‌شوند
+* فیلترهای تاریخی می‌توانند با همان تقویم نوشته شوند
+
+اگر <code>report.calendar</code> ننویسید، معمولاً همان تقویم پنل شما (هدر <code>X-Calendar-Type</code>) استفاده می‌شود.
+
+=== قالب‌بندی تاریخ ===
+
+<pre>
+report.calendar("jalali")
+report.kpi("امروز", format_date("2026-07-20"))
+report.text(dates.format("2026-07-20", calendar="gregorian"))
+</pre>
+
+=== فیلتر با تاریخ شمسی ===
+
+<pre>
+report.calendar("jalali")
+rows = invoices.filter(
+  from_date="1404/01/01",
+  to_date="1404/12/29",
+  limit=200
+)
+report.table(rows, columns=["code", "document_date", "total_debit"], formats={"total_debit": "currency"})
+</pre>
+
+{| class="wikitable" style="background-color:#e8f5e9; border-left:4px solid #2e7d32;"
+|-
+| اگر سال بین حدود ۱۲۰۰ تا ۱۵۰۰ باشد و با <code>/</code> نوشته شود، سیستم آن را '''شمسی''' می‌فهمد و برای جستجو به میلادی تبدیل می‌کند.
+|}
+
+== ۸) کار با جدول داده (HTable) ==
+
+وقتی از <code>invoices.all()</code> یا مشابه استفاده می‌کنید، یک جدول در حافظه می‌گیرید:
+
+<pre>
+rows = invoices.all(limit=100)
+n = rows.count()
+s = rows.sum("total_debit")
+avg = rows.avg("total_debit")
+top10 = rows.top(10, by="total_debit")
+few = rows.limit(20)
+sorted_rows = rows.sort("document_date", desc=True)
+</pre>
+
+ساخت جدول دستی:
+
+<pre>
+demo = table([
+  {"name": "علی", "amount": 1000},
+  {"name": "سارا", "amount": 2500}
+])
+report.table(demo, formats={"amount": "currency"})
+</pre>
+
+== ۹) مثال‌های کاربردی بیشتر ==
+
+=== مثال ۱: فروش ماه جاری ===
+
+<pre>
+report.calendar("jalali")
+report.number_format(style="western")
+report.title("فروش این ماه")
+rows = invoices.this_month(limit=500)
+report.kpi("تعداد", rows.count(), format="integer")
+report.kpi("جمع بدهکار", rows.sum("total_debit"), format="currency")
+report.table(
+  rows.limit(50),
+  columns=["code", "document_date", "total_debit"],
+  formats={"total_debit": "currency"}
+)
+</pre>
+
+=== مثال ۲: مقایسه ماه قبل ===
+
+<pre>
+report.calendar("jalali")
+cur = invoices.this_month(limit=1000)
+prev = invoices.last_month(limit=1000)
+report.kpi("این ماه", cur.sum("total_debit"), format="currency")
+report.kpi("ماه قبل", prev.sum("total_debit"), format="currency")
+</pre>
+
+=== مثال ۳: فیلتر سفارشی ===
+
+<pre>
+report.calendar("jalali")
+rows = invoices.filter(
+  document_type="invoice_sales",
+  from_date="1404/04/01",
+  to_date="1404/04/31",
+  limit=300
+)
+report.bar_chart(rows.top(10, by="total_debit"), x="code", y="total_debit", title="۱۰ فاکتور برتر تیر")
+</pre>
+
+=== مثال ۴: داشبورد دو ستونه ===
+
+<pre>
+report.dashboard(columns=12)
+report.title("نمای کلی")
+rows = invoices.all(limit=80)
+report.kpi("تعداد", rows.count(), format="integer", span=6)
+report.kpi("جمع", rows.sum("total_debit"), format="currency", span=6)
+report.row_break()
+report.pie_chart(rows.top(5, by="total_debit"), label="code", value="total_debit", title="سهم ۵ تای برتر", span=6)
+report.table(rows.limit(10), columns=["code", "total_debit"], formats={"total_debit": "currency"}, span=6)
+</pre>
+
+=== مثال ۵: پارامتر ورودی ===
+
+در کادر پارامترها:
+
+<pre>
+{
+  "min_amount": 1000000
+}
+</pre>
+
+در اسکریپت:
+
+<pre>
+min_amount = param["min_amount"]
+rows = invoices.all(limit=200)
+# فقط نمایش مبلغ حداقل (نمونه ساده با فیلتر جدول)
+report.kpi("آستانه", min_amount, format="currency")
+report.table(rows.limit(30), columns=["code", "total_debit"], formats={"total_debit": "currency"})
+</pre>
+
+== ۱۰) ذخیره، انتشار و خروجی ==
+
+=== ذخیره و انتشار ===
+
+# '''ذخیره''': گزارش به‌صورت پیش‌نویس نگه داشته می‌شود.
+# '''انتشار''': گزارش برای استفاده/اجرای بعدی در وضعیت منتشرشده قرار می‌گیرد.
+# '''بایگانی''': گزارش از فهرست فعال خارج می‌شود (حذف نرم).
+
+=== PDF ===
+
+از دکمه PDF در استودیو (نیازمند <code>reports.export</code>). خروجی همان Spec را به PDF امن تبدیل می‌کند.
+
+=== Excel ===
+
+از دکمه Excel. معمولاً شامل:
+
+* شیت خلاصه (KPIها)
+* یک شیت برای هر جدول
+* شیت داده نمودارها
+
+== ۱۱) کمک گرفتن از هوش مصنوعی ==
+
+# در استودیو روی '''از AI بساز''' کلیک کنید.
+# درخواست خود را بنویسید؛ مثلاً: «گزارش فروش ماه با KPI و نمودار میله‌ای».
+# AI با ابزارهای HScript و مستندات کمک می‌کند.
+# در منوی پیام پاسخ، می‌توانید '''اعمال به استودیو HScript''' را بزنید تا اسکریپت مستقیم وارد ادیتور شود.
+# همیشه قبل از اتکا، '''اجرا''' و در صورت نیاز '''اعتبارسنجی''' کنید.
+
+== ۱۲) خطاهای رایج و راه حل ===
+
+{| class="wikitable"
+! مشکل !! علت محتمل !! راه حل
+|-
+| خطای نحوی || پرانتز/کوتیشن ناقص یا دستور چندخطی نامعتبر || پیام خطا خط را نشان می‌دهد؛ ساده کنید و دوباره اعتبارسنجی کنید
+|-
+| داده خالی || بازه تاریخ یا نوع سند اشتباه || از <code>all</code> یا بازه وسیع‌تر شروع کنید
+|-
+| تاریخ اشتباه دیده می‌شود || تقویم تنظیم نشده || <code>report.calendar("jalali")</code> بگذارید
+|-
+| عدد بدون جداکننده || قالب مشخص نشده || <code>format="currency"</code> یا <code>formats={...}</code>
+|-
+| دسترسی ندارید || مجوز گزارش || از مدیر دسترسی <code>view/export</code> بگیرید
+|-
+| سقف گزارش پر شده || پلن رایگان || افزونه را فعال کنید یا گزارش‌های قدیمی را حذف/بایگانی کنید
+|}
+
+== ۱۳) نکات امنیتی و محدودیت‌ها (به زبان ساده) ==
+
+* اسکریپت فقط داده همان کسب‌وکار را می‌بیند.
+* تعداد فراخوانی داده، حجم خروجی و زمان اجرا سقف دارد.
+* تعداد اجرای زیاد در دقیقه محدود است (برای جلوگیری از فشار به سرور).
+* کد خطرناک (فایل، شبکه، import) اجرا نمی‌شود.
+
+== ۱۴) واژه‌نامه کوتاه ==
+
+{| class="wikitable"
+! واژه !! معنی
+|-
+| HScript || زبان امن گزارش‌نویسی حسابیکس
+|-
+| Spec || ساختار خروجی گزارش (JSON)
+|-
+| KPI || کارت آماری (عدد مهم)
+|-
+| Gateway || درگاه مجاز دریافت داده
+|-
+| Studio || صفحه نوشتن و اجرای اسکریپت
+|-
+| span || عرض بلوک در داشبورد
+|-
+| format || قالب نمایش عدد/مقدار
+|}
+
+== ۱۵) چک‌لیست شروع سریع ==
+
+# منوی '''گزارش‌ساز اسکریپتی''' را باز کنید
+# گزارش جدید بسازید
+# اسکریپت نمونه را اجرا کنید
+# <code>report.calendar</code> و <code>report.number_format</code> را مطابق نیاز تنظیم کنید
+# جدول/نمودار را شخصی‌سازی کنید
+# ذخیره و در صورت نیاز PDF/Excel بگیرید
+# برای گزارش‌های پیچیده‌تر از AI کمک بگیرید و نتیجه را بازبینی کنید
+
+{| class="wikitable" style="background-color:#e3f2fd; border-left:4px solid #1565c0;"
+|-
+| '''جمع‌بندی:''' HScript ابزاری برای ساخت گزارش سفارشی است؛ داده را از درگاه‌های امن می‌گیرد، با دستورات ساده محاسبه می‌کند، و خروجی را به‌صورت داشبورد، PDF یا Excel نشان می‌دهد. با تنظیم تقویم و قالب عدد، گزارش‌ها دقیقاً به سبک کسب‌وکار شما نمایش داده می‌شوند.
+|}

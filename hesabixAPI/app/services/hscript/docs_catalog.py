@@ -82,6 +82,13 @@ DOC_ENTRIES: list[dict[str, Any]] = [
 		"version": 1,
 	},
 	{
+		"doc_id": "hscript.tutorial.number-format",
+		"path": "tutorials/number-format.md",
+		"title": "قالب‌بندی اعداد",
+		"tags": ["tutorial", "number", "format"],
+		"version": 1,
+	},
+	{
 		"doc_id": "hscript.reference.language",
 		"path": "reference/language.md",
 		"title": "مرجع نحو زبان",

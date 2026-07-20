@@ -201,3 +201,29 @@ def test_parse_jalali_filter_date():
 	from app.services.hscript.dates import parse_date
 
 	assert parse_date("1404/01/01", calendar="jalali") == "2025-03-21"
+
+
+def test_format_number_thousands_and_currency():
+	from app.services.hscript.number_format import format_number
+
+	assert format_number(1234567, "currency") == "1,234,567"
+	assert format_number(1234.5, "number:2") == "1,234.50"
+	assert format_number(12.5, "percent") == "12.5%"
+
+
+def test_report_number_format_and_table_formats():
+	src = """
+report.number_format(style="western")
+report.kpi("m", 1500000, format="currency")
+rows = table([{"code": "A", "total": 2500000}])
+report.table(rows, columns=["code", "total"], formats={"total": "currency"})
+report.text(format_number(9999, "number"))
+"""
+	result = _run(src)
+	assert result.ok, result.error
+	assert result.spec["meta"]["number_format"]["thousands_sep"] == ","
+	kpi = next(b for b in result.spec["blocks"] if b["type"] == "kpi")
+	assert kpi["format"] == "currency"
+	table = next(b for b in result.spec["blocks"] if b["type"] == "table")
+	assert table["formats"]["total"] == "currency"
+	assert any(b.get("text") == "9,999" for b in result.spec["blocks"] if b.get("type") == "text")

@@ -9,6 +9,7 @@ from typing import Any, Optional
 from app.services.hscript.errors import ResourceLimitErrorHS, TypeErrorHS
 from app.services.hscript.values import HTable, sanitize_jsonish
 from app.services.hscript.dates import format_date_value, normalize_calendar
+from app.services.hscript.number_format import normalize_number_format_options, parse_format_spec
 
 ALLOWED_BLOCK_TYPES = frozenset({
 	"title",
@@ -67,11 +68,14 @@ class ReportBuilder:
 		self.paragraph(content)
 
 	def kpi(self, label: str, value: Any, *, format: str = "number", hint: str | None = None, span: int | None = None) -> None:
+		fmt = str(format)[:32]
+		# اعتبارسنجی زودهنگام
+		parse_format_spec(fmt)
 		block = {
 			"type": "kpi",
 			"label": str(label)[:200],
 			"value": sanitize_jsonish(value),
-			"format": str(format)[:32],
+			"format": fmt,
 			"hint": (str(hint)[:200] if hint is not None else None),
 		}
 		self._apply_span(block, span)
@@ -94,6 +98,7 @@ class ReportBuilder:
 		columns: list[str] | None = None,
 		title: str | None = None,
 		span: int | None = None,
+		formats: dict[str, Any] | None = None,
 	) -> None:
 		rows = self._normalize_rows(data)
 		cols = columns
@@ -110,6 +115,17 @@ class ReportBuilder:
 		block: dict[str, Any] = {"type": "table", "columns": cols, "rows": trimmed}
 		if title:
 			block["title"] = str(title)[:200]
+		if formats:
+			if not isinstance(formats, dict):
+				raise TypeErrorHS("formats جدول باید dict باشد")
+			clean_fmt: dict[str, str] = {}
+			for k, v in list(formats.items())[:50]:
+				key = str(k)[:64]
+				spec = str(v)[:32]
+				parse_format_spec(spec)
+				clean_fmt[key] = spec
+			if clean_fmt:
+				block["formats"] = clean_fmt
 		self._apply_span(block, span)
 		self._add(block)
 
@@ -194,6 +210,24 @@ class ReportBuilder:
 		"""تنظیم تقویم نمایش تاریخ‌ها در Spec: jalali یا gregorian."""
 		cal = normalize_calendar(calendar_type, default="jalali")
 		self.meta["calendar_type"] = cal
+
+	def number_format(
+		self,
+		*,
+		style: str = "western",
+		thousands_sep: str | None = None,
+		decimal_sep: str | None = None,
+	) -> None:
+		"""
+		تنظیم پیش‌فرض جداکننده هزارگان/اعشار برای کل گزارش.
+		style: western (1,234.56) یا fa (۱٬۲۳۴٫۵۶ با ارقام لاتین و جداکننده فارسی)
+		"""
+		opts: dict[str, Any] = {"style": style}
+		if thousands_sep is not None:
+			opts["thousands_sep"] = thousands_sep
+		if decimal_sep is not None:
+			opts["decimal_sep"] = decimal_sep
+		self.meta["number_format"] = normalize_number_format_options(opts)
 
 	def set_meta(self, **kwargs: Any) -> None:
 		for k, v in kwargs.items():

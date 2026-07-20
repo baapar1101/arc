@@ -123,6 +123,7 @@ def run_script(
 			"barcode": report.barcode,
 			"dashboard": report.dashboard,
 			"calendar": _set_calendar,
+			"number_format": report.number_format,
 			"set_meta": report.set_meta,
 		}
 		env["report"] = HModule(name="report", methods=report_methods)
@@ -135,13 +136,31 @@ def run_script(
 			cal = calendar if calendar is not None else report.meta.get("calendar_type", default_cal)
 			return parse_date(value, calendar=cal)
 
+		from app.services.hscript.number_format import format_number as _fmt_num
+
+		def _format_number(value: Any, fmt: Any = "number") -> str:
+			opts = report.meta.get("number_format") or {}
+			return _fmt_num(
+				value,
+				fmt,
+				thousands_sep=str(opts.get("thousands_sep", ",") or ","),
+				decimal_sep=str(opts.get("decimal_sep", ".") or "."),
+			)
+
 		env["format_date"] = _format_date
 		env["parse_date"] = _parse_date_fn
+		env["format_number"] = _format_number
 		env["dates"] = HModule(
 			name="dates",
 			methods={
 				"format": _format_date,
 				"parse": _parse_date_fn,
+			},
+		)
+		env["numbers"] = HModule(
+			name="numbers",
+			methods={
+				"format": _format_number,
 			},
 		)
 

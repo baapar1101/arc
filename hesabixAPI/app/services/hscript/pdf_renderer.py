@@ -8,6 +8,8 @@ from typing import Any, Optional
 
 from app.services.hscript.errors import TypeErrorHS
 from app.services.hscript.report_builder import ALLOWED_BLOCK_TYPES, ALLOWED_CHART_TYPES
+from app.services.hscript.number_format import format_number
+
 
 logger = logging.getLogger(__name__)
 
@@ -16,19 +18,30 @@ def _esc(value: Any) -> str:
 	return html.escape("" if value is None else str(value), quote=True)
 
 
-def _format_value(value: Any, fmt: str | None = None) -> str:
+def _num_opts(spec: dict[str, Any]) -> dict[str, str]:
+	meta = spec.get("meta") if isinstance(spec.get("meta"), dict) else {}
+	nf = meta.get("number_format") if isinstance(meta.get("number_format"), dict) else {}
+	return {
+		"thousands_sep": str(nf.get("thousands_sep", ",") or ","),
+		"decimal_sep": str(nf.get("decimal_sep", ".") or "."),
+	}
+
+
+def _format_value(value: Any, fmt: str | None = None, *, num_opts: dict[str, str] | None = None) -> str:
 	if value is None:
 		return "—"
-	if fmt == "currency":
+	if fmt:
 		try:
-			n = float(value)
-			return f"{n:,.0f}"
-		except Exception:
-			return _esc(value)
-	if fmt == "percent":
-		try:
-			n = float(value)
-			return f"{n:.1f}%"
+			opts = num_opts or {}
+			return html.escape(
+				format_number(
+					value,
+					fmt,
+					thousands_sep=opts.get("thousands_sep", ","),
+					decimal_sep=opts.get("decimal_sep", "."),
+				),
+				quote=True,
+			)
 		except Exception:
 			return _esc(value)
 	return _esc(value)
@@ -69,19 +82,20 @@ def spec_to_html(spec: dict[str, Any], *, business_name: str | None = None) -> s
 	if business_name:
 		parts.append(f"<div class='meta'>{_esc(business_name)}</div>")
 
+	num_opts = _num_opts(spec)
 	for block in blocks:
 		if not isinstance(block, dict):
 			continue
 		btype = str(block.get("type") or "")
 		if btype not in ALLOWED_BLOCK_TYPES:
 			continue
-		parts.append(_render_block_html(block))
+		parts.append(_render_block_html(block, num_opts=num_opts))
 
 	parts.append("</body></html>")
 	return "".join(parts)
 
 
-def _render_block_html(block: dict[str, Any]) -> str:
+def _render_block_html(block: dict[str, Any], *, num_opts: dict[str, str] | None = None) -> str:
 	btype = str(block.get("type") or "")
 	if btype == "title":
 		# already rendered as doc title; skip duplicate or render as h1 if different
@@ -102,27 +116,27 @@ def _render_block_html(block: dict[str, Any]) -> str:
 		return (
 			"<div class='kpi-row'><div class='kpi'>"
 			f"<div class='label'>{_esc(block.get('label'))}</div>"
-			f"<div class='value'>{_format_value(block.get('value'), block.get('format'))}</div>"
+			f"<div class='value'>{_format_value(block.get('value'), block.get('format'), num_opts=num_opts)}</div>"
 			"</div></div>"
 		)
 	if btype == "card":
 		return (
 			"<div class='kpi-row'><div class='kpi'>"
 			f"<div class='label'>{_esc(block.get('title'))}</div>"
-			f"<div class='value'>{_format_value(block.get('value'))}</div>"
+			f"<div class='value'>{_format_value(block.get('value'), num_opts=num_opts)}</div>"
 			f"<div class='label'>{_esc(block.get('subtitle') or '')}</div>"
 			"</div></div>"
 		)
 	if btype == "table":
-		return _table_html(block)
+		return _table_html(block, num_opts=num_opts)
 	if btype == "chart":
-		return _chart_html(block)
+		return _chart_html(block, num_opts=num_opts)
 	if btype == "gauge":
 		return (
 			"<div class='chart-box'>"
 			f"<strong>{_esc(block.get('label') or 'Gauge')}</strong>: "
-			f"{_format_value(block.get('value'))} "
-			f"(min {_format_value(block.get('min'))} / max {_format_value(block.get('max'))})"
+			f"{_format_value(block.get('value'), 'number', num_opts=num_opts)} "
+			f"(min {_format_value(block.get('min'), 'number', num_opts=num_opts)} / max {_format_value(block.get('max'), 'number', num_opts=num_opts)})"
 			"</div>"
 		)
 	if btype in ("qr", "barcode"):
@@ -140,11 +154,12 @@ def _render_block_html(block: dict[str, Any]) -> str:
 	return ""
 
 
-def _table_html(block: dict[str, Any]) -> str:
+def _table_html(block: dict[str, Any], *, num_opts: dict[str, str] | None = None) -> str:
 	cols = [str(c) for c in (block.get("columns") or [])][:50]
 	rows = block.get("rows") or []
 	if not isinstance(rows, list):
 		rows = []
+	formats = block.get("formats") if isinstance(block.get("formats"), dict) else {}
 	title = block.get("title")
 	out = []
 	if title:
@@ -158,13 +173,14 @@ def _table_html(block: dict[str, Any]) -> str:
 			continue
 		out.append("<tr>")
 		for c in cols:
-			out.append(f"<td>{_format_value(row.get(c))}</td>")
+			fmt = formats.get(c) if formats else None
+			out.append(f"<td>{_format_value(row.get(c), fmt, num_opts=num_opts)}</td>")
 		out.append("</tr>")
 	out.append("</tbody></table>")
 	return "".join(out)
 
 
-def _chart_html(block: dict[str, Any]) -> str:
+def _chart_html(block: dict[str, Any], *, num_opts: dict[str, str] | None = None) -> str:
 	chart_type = str(block.get("chart_type") or "bar")
 	if chart_type not in ALLOWED_CHART_TYPES:
 		chart_type = "bar"
@@ -198,7 +214,7 @@ def _chart_html(block: dict[str, Any]) -> str:
 			"<div class='chart-bar'>"
 			f"<span style='min-width:80px'>{_esc(label)}</span>"
 			f"<span class='bar' style='width:{width}px'></span>"
-			f"<span>{_format_value(val)}</span>"
+			f"<span>{_format_value(val, 'number', num_opts=num_opts)}</span>"
 			"</div>"
 		)
 	parts.append("</div>")

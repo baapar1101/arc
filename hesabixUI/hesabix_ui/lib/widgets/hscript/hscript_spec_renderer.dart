@@ -32,6 +32,7 @@ class HScriptSpecRenderer extends StatelessWidget {
     final blocks = (spec!['blocks'] is List) ? (spec!['blocks'] as List) : const [];
     final title = spec!['title']?.toString();
     final layout = spec!['layout']?.toString() ?? 'document';
+    final numberFormat = _readNumberFormat(spec!);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -48,9 +49,15 @@ class HScriptSpecRenderer extends StatelessWidget {
           _DashboardComposer(
             blocks: blocks,
             columns: _readDashboardColumns(spec!),
+            numberFormat: numberFormat,
           )
         else
-          ...blocks.whereType<Map>().map((b) => _BlockView(block: Map<String, dynamic>.from(b))),
+          ...blocks.whereType<Map>().map(
+                (b) => _BlockView(
+                  block: Map<String, dynamic>.from(b),
+                  numberFormat: numberFormat,
+                ),
+              ),
       ],
     );
   }
@@ -63,6 +70,14 @@ int _readDashboardColumns(Map<String, dynamic> spec) {
     if (n == 6 || n == 12 || n == 24) return n!;
   }
   return 12;
+}
+
+Map<String, dynamic>? _readNumberFormat(Map<String, dynamic> spec) {
+  final meta = spec['meta'];
+  if (meta is Map && meta['number_format'] is Map) {
+    return Map<String, dynamic>.from(meta['number_format'] as Map);
+  }
+  return null;
 }
 
 class _ErrorPanel extends StatelessWidget {
@@ -114,9 +129,14 @@ class _ErrorPanel extends StatelessWidget {
 }
 
 class _DashboardComposer extends StatelessWidget {
-  const _DashboardComposer({required this.blocks, required this.columns});
+  const _DashboardComposer({
+    required this.blocks,
+    required this.columns,
+    this.numberFormat,
+  });
   final List blocks;
   final int columns;
+  final Map<String, dynamic>? numberFormat;
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +181,7 @@ class _DashboardComposer extends StatelessWidget {
           children: [
             for (final row in rows) ...[
               if (row.length == 1 && _isFullBleed(row.first))
-                _BlockView(block: row.first)
+                _BlockView(block: row.first, numberFormat: numberFormat)
               else
                 Wrap(
                   spacing: gap,
@@ -170,7 +190,7 @@ class _DashboardComposer extends StatelessWidget {
                     for (final b in row)
                       SizedBox(
                         width: _widthForSpan(width, gap, _spanOf(b, columns), columns),
-                        child: _BlockView(block: b),
+                        child: _BlockView(block: b, numberFormat: numberFormat),
                       ),
                   ],
                 ),
@@ -205,8 +225,9 @@ class _DashboardComposer extends StatelessWidget {
 }
 
 class _BlockView extends StatelessWidget {
-  const _BlockView({required this.block});
+  const _BlockView({required this.block, this.numberFormat});
   final Map<String, dynamic> block;
+  final Map<String, dynamic>? numberFormat;
 
   @override
   Widget build(BuildContext context) {
@@ -244,9 +265,9 @@ class _BlockView extends StatelessWidget {
         );
       case 'kpi':
       case 'card':
-        return _KpiCard(block: block);
+        return _KpiCard(block: block, numberFormat: numberFormat);
       case 'table':
-        return _TableBlock(block: block);
+        return _TableBlock(block: block, numberFormat: numberFormat);
       case 'chart':
         return _ChartBlock(block: block);
       case 'gauge':
@@ -272,14 +293,19 @@ class _BlockView extends StatelessWidget {
 }
 
 class _KpiCard extends StatelessWidget {
-  const _KpiCard({required this.block});
+  const _KpiCard({required this.block, this.numberFormat});
   final Map<String, dynamic> block;
+  final Map<String, dynamic>? numberFormat;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final label = block['label']?.toString() ?? block['title']?.toString() ?? '';
-    final value = _formatValue(block['value'], block['format']?.toString());
+    final value = _formatValue(
+      block['value'],
+      block['format']?.toString(),
+      numberFormat: numberFormat,
+    );
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: Padding(
@@ -305,8 +331,9 @@ class _KpiCard extends StatelessWidget {
 }
 
 class _TableBlock extends StatelessWidget {
-  const _TableBlock({required this.block});
+  const _TableBlock({required this.block, this.numberFormat});
   final Map<String, dynamic> block;
+  final Map<String, dynamic>? numberFormat;
 
   @override
   Widget build(BuildContext context) {
@@ -317,6 +344,9 @@ class _TableBlock extends StatelessWidget {
         ? (block['rows'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
         : <Map<String, dynamic>>[];
     final title = block['title']?.toString();
+    final formats = (block['formats'] is Map)
+        ? Map<String, dynamic>.from(block['formats'] as Map)
+        : const <String, dynamic>{};
 
     if (cols.isEmpty) {
       return Card(
@@ -362,7 +392,16 @@ class _TableBlock extends StatelessWidget {
                 for (final r in rows.take(200))
                   DataRow(
                     cells: [
-                      for (final c in cols) DataCell(Text(_formatValue(r[c], null))),
+                      for (final c in cols)
+                        DataCell(
+                          Text(
+                            _formatValue(
+                              r[c],
+                              formats[c]?.toString(),
+                              numberFormat: numberFormat,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
               ],
@@ -563,17 +602,60 @@ double _toDouble(dynamic v) {
   return double.tryParse(v?.toString() ?? '') ?? 0;
 }
 
-String _formatValue(dynamic value, String? format) {
+String _formatValue(dynamic value, String? format, {Map<String, dynamic>? numberFormat}) {
   if (value == null) return '—';
-  if (format == 'currency') {
-    final n = _toDouble(value);
-    return n.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]},',
-    );
+  if (format == null || format.isEmpty || format == 'raw' || format == 'plain') {
+    return value.toString();
   }
-  if (format == 'percent') {
-    return '${_toDouble(value).toStringAsFixed(1)}%';
+  final n = _toDouble(value);
+  // اگر عدد نبود، همان متن
+  if (value is! num && double.tryParse(value.toString().replaceAll(',', '')) == null) {
+    return value.toString();
   }
-  return value.toString();
+
+  final parts = format.split(':');
+  final kind = parts.first.toLowerCase();
+  int? decimals = parts.length > 1 ? int.tryParse(parts[1]) : null;
+  final thousandsSep = (numberFormat?['thousands_sep'] ?? ',').toString();
+  final decimalSep = (numberFormat?['decimal_sep'] ?? '.').toString();
+
+  String group(String intPart) {
+    if (thousandsSep.isEmpty) return intPart;
+    return intPart.replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => thousandsSep);
+  }
+
+  String render(double v, int d) {
+    final fixed = v.toStringAsFixed(d);
+    final split = fixed.split('.');
+    final intPart = split[0].startsWith('-') ? split[0].substring(1) : split[0];
+    final sign = split[0].startsWith('-') ? '-' : '';
+    final grouped = group(intPart);
+    if (d <= 0) return '$sign$grouped';
+    return '$sign$grouped$decimalSep${split.length > 1 ? split[1] : ''.padRight(d, '0')}';
+  }
+
+  switch (kind) {
+    case 'currency':
+    case 'money':
+    case 'rial':
+    case 'toman':
+      return render(n, decimals ?? 0);
+    case 'percent':
+    case 'pct':
+    case '%':
+      return '${render(n, decimals ?? 1)}%';
+    case 'integer':
+    case 'int':
+      return render(n, 0);
+    case 'decimal':
+    case 'float':
+      return render(n, decimals ?? 2);
+    case 'number':
+    case 'num':
+    case 'n':
+      final d = decimals ?? ((n == n.roundToDouble()) ? 0 : 2);
+      return render(n, d);
+    default:
+      return value.toString();
+  }
 }
