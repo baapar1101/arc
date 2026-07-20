@@ -5,7 +5,9 @@ import 'package:dio/dio.dart' as dio;
 import 'package:file_picker/file_picker.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/business_models.dart';
+import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -14,6 +16,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/invoice/account_tree_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 
 class BusinessInfoSettingsPage extends StatefulWidget {
@@ -93,11 +96,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   // کالای هزینه‌شده / کالای درآمدشده
   String _geiWorkflowMode = 'simple';
   bool _geiAutoPostInSimpleMode = true;
-  final _geiDefaultExpenseAccountCtrl = TextEditingController(text: '70407');
-  final _geiDefaultIncomeAccountCtrl = TextEditingController(text: '60103');
+  Account? _geiDefaultExpenseAccount;
+  Account? _geiDefaultIncomeAccount;
   String _geiStockCountMode = 'goods_docs';
   bool _geiAllowManualUnitCost = false;
   bool _geiRequirePerson = false;
+  final AccountService _accountService = AccountService();
 
   /// reject | use_default_warehouse — وقتی ردیف انبارداری بدون انبار و ثبت انبار فعال است
   String _invoiceMissingLineWarehousePolicy = 'reject';
@@ -144,9 +148,28 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     _invoiceProfitOverheadPercentController.dispose();
     _invoiceGlobalDiscountMaxPercentController.dispose();
     _invoiceGlobalDiscountMaxAmountController.dispose();
-    _geiDefaultExpenseAccountCtrl.dispose();
-    _geiDefaultIncomeAccountCtrl.dispose();
     super.dispose();
+  }
+
+  Future<Account?> _resolveAccountByCode(String? code) async {
+    final trimmed = (code ?? '').trim();
+    if (trimmed.isEmpty) return null;
+    try {
+      final res = await _accountService.searchAccounts(
+        businessId: widget.businessId,
+        searchQuery: trimmed,
+        limit: 30,
+      );
+      final items = (res['items'] as List<dynamic>?) ?? const [];
+      for (final raw in items) {
+        if (raw is! Map) continue;
+        final account = Account.fromJson(Map<String, dynamic>.from(raw));
+        if (account.code.trim() == trimmed) return account;
+      }
+    } catch (_) {
+      // اگر جستجو شکست خورد، حداقل کد را برای نمایش نگه می‌داریم
+    }
+    return Account(code: trimmed, name: trimmed, accountType: '');
   }
 
   Future<void> _loadData() async {
@@ -206,8 +229,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _warehouseTransferRequirePositiveStock = resp.warehouseTransferRequirePositiveStock;
       _geiWorkflowMode = resp.goodsExpenseIncomeWorkflowMode;
       _geiAutoPostInSimpleMode = resp.goodsExpenseIncomeAutoPostInSimpleMode;
-      _geiDefaultExpenseAccountCtrl.text = resp.goodsExpenseIncomeDefaultExpenseAccountCode;
-      _geiDefaultIncomeAccountCtrl.text = resp.goodsExpenseIncomeDefaultIncomeAccountCode;
+      final geiAccounts = await Future.wait([
+        _resolveAccountByCode(resp.goodsExpenseIncomeDefaultExpenseAccountCode),
+        _resolveAccountByCode(resp.goodsExpenseIncomeDefaultIncomeAccountCode),
+      ]);
+      _geiDefaultExpenseAccount = geiAccounts[0];
+      _geiDefaultIncomeAccount = geiAccounts[1];
       _geiStockCountMode = resp.goodsExpenseIncomeStockCountMode;
       _geiAllowManualUnitCost = resp.goodsExpenseIncomeAllowManualUnitCost;
       _geiRequirePerson = resp.goodsExpenseIncomeRequirePerson;
@@ -402,12 +429,12 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if (_geiAutoPostInSimpleMode != orig.goodsExpenseIncomeAutoPostInSimpleMode) {
       payload['goods_expense_income_auto_post_in_simple_mode'] = _geiAutoPostInSimpleMode;
     }
-    final geiExp = _geiDefaultExpenseAccountCtrl.text.trim();
-    if (geiExp != orig.goodsExpenseIncomeDefaultExpenseAccountCode) {
+    final geiExp = (_geiDefaultExpenseAccount?.code ?? '').trim();
+    if (geiExp.isNotEmpty && geiExp != orig.goodsExpenseIncomeDefaultExpenseAccountCode) {
       payload['goods_expense_income_default_expense_account_code'] = geiExp;
     }
-    final geiInc = _geiDefaultIncomeAccountCtrl.text.trim();
-    if (geiInc != orig.goodsExpenseIncomeDefaultIncomeAccountCode) {
+    final geiInc = (_geiDefaultIncomeAccount?.code ?? '').trim();
+    if (geiInc.isNotEmpty && geiInc != orig.goodsExpenseIncomeDefaultIncomeAccountCode) {
       payload['goods_expense_income_default_income_account_code'] = geiInc;
     }
     if (_geiStockCountMode != orig.goodsExpenseIncomeStockCountMode) {
@@ -1675,22 +1702,25 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
                   : null,
             ),
             const SizedBox(height: 8),
-            TextFormField(
-              controller: _geiDefaultExpenseAccountCtrl,
-              decoration: const InputDecoration(
-                labelText: 'کد حساب پیش‌فرض کالای هزینه‌شده',
-                hintText: '70407',
-                border: OutlineInputBorder(),
-              ),
+            AccountTreeComboboxWidget(
+              businessId: widget.businessId,
+              selectedAccount: _geiDefaultExpenseAccount,
+              label: 'حساب پیش‌فرض کالای هزینه‌شده',
+              hintText: 'انتخاب از درخت حساب‌ها',
+              isRequired: true,
+              dense: true,
+              onChanged: (account) => setState(() => _geiDefaultExpenseAccount = account),
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: _geiDefaultIncomeAccountCtrl,
-              decoration: const InputDecoration(
-                labelText: 'کد حساب پیش‌فرض کالای درآمدشده',
-                hintText: '60103',
-                border: OutlineInputBorder(),
-              ),
+            AccountTreeComboboxWidget(
+              businessId: widget.businessId,
+              selectedAccount: _geiDefaultIncomeAccount,
+              label: 'حساب پیش‌فرض کالای درآمدشده',
+              hintText: 'انتخاب از درخت حساب‌ها',
+              isRequired: true,
+              dense: true,
+              documentTypeFilter: 'income',
+              onChanged: (account) => setState(() => _geiDefaultIncomeAccount = account),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(

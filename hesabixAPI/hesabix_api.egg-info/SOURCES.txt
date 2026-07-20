@@ -38,6 +38,7 @@ adapters/api/v1/document_numbering.py
 adapters/api/v1/documents.py
 adapters/api/v1/expense_income.py
 adapters/api/v1/fiscal_years.py
+adapters/api/v1/goods_expense_income.py
 adapters/api/v1/health.py
 adapters/api/v1/invoices.py
 adapters/api/v1/jobs.py
@@ -253,6 +254,7 @@ adapters/db/models/firewall_rate_policy.py
 adapters/db/models/firewall_rule.py
 adapters/db/models/fiscal_year.py
 adapters/db/models/fx_rate_provider.py
+adapters/db/models/goods_expense_income.py
 adapters/db/models/invoice_item_line.py
 adapters/db/models/marketplace.py
 adapters/db/models/messenger_operator_session.py
@@ -512,6 +514,7 @@ app/services/fx_auto_sync_background_jobs.py
 app/services/fx_rate_background_jobs.py
 app/services/fx_rate_provider_service.py
 app/services/general_ledger_service.py
+app/services/goods_expense_income_service.py
 app/services/invoice_adjustments_service.py
 app/services/invoice_bulk_upsert_service.py
 app/services/invoice_cogs_gl_service.py
@@ -557,6 +560,7 @@ app/services/pnl_export_service.py
 app/services/pnl_service.py
 app/services/price_list_service.py
 app/services/print_footer_settings.py
+app/services/print_stamp_scale.py
 app/services/product_attribute_service.py
 app/services/product_bulk_upsert_service.py
 app/services/product_catalog_profile_service.py
@@ -997,6 +1001,8 @@ migrations/versions/20260714_000002_fix_ai_chat_message_trace_content.py
 migrations/versions/20260714_000003_document_code_reservations.py
 migrations/versions/20260718_000001_fx_rate_providers_global_rates.py
 migrations/versions/20260718_000002_business_fx_auto_sync.py
+migrations/versions/20260720_000001_business_print_settings_stamp_signature_scale.py
+migrations/versions/20260720_000002_goods_expense_income.py
 tests/__init__.py
 tests/test_ai_agent_continuation.py
 tests/test_ai_agent_regression_db.py
@@ -1054,6 +1060,8 @@ tests/test_chat_message_builder.py
 tests/test_datetime_timezone.py
 tests/test_distribution_service.py
 tests/test_document_code_reservation_service.py
+tests/test_goods_expense_income_hardening.py
+tests/test_goods_expense_income_service.py
 tests/test_health.py
 tests/test_hs60_loader.py
 tests/test_invoice_cogs_gl_service.py
@@ -1087,6 +1095,7 @@ tests/test_product_catalog_profile.py
 tests/test_product_excel_import_opening_balance.py
 tests/test_product_inventory_tracking_sync.py
 tests/test_product_opening_balance.py
+tests/test_product_price_partial_update.py
 tests/test_product_tax_update.py
 tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
