@@ -97,17 +97,17 @@ class _SupportBillingPageState extends State<SupportBillingPage>
         final uri = Uri.parse(paymentUrl);
         final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
         if (!ok && mounted) {
-          SnackBarHelper.showError(context, 'نتوانستیم درگاه پرداخت را باز کنیم');
+          SnackBarHelper.showError(context, message: 'نتوانستیم درگاه پرداخت را باز کنیم');
         } else if (mounted) {
-          SnackBarHelper.showSuccess(context, 'در حال انتقال به درگاه پرداخت…');
+          SnackBarHelper.showSuccess(context, message: 'در حال انتقال به درگاه پرداخت…');
         }
       } else {
-        SnackBarHelper.showSuccess(context, 'اشتراک پشتیبانی فعال شد');
+        SnackBarHelper.showSuccess(context, message: 'اشتراک پشتیبانی فعال شد');
         await _load();
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     } finally {
       if (mounted) setState(() => _checkingOut = false);

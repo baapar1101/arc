@@ -117,6 +117,7 @@ adapters/api/v1/admin/notification_templates.py
 adapters/api/v1/admin/payment_gateways.py
 adapters/api/v1/admin/scripts.py
 adapters/api/v1/admin/storage_plans.py
+adapters/api/v1/admin/support_billing.py
 adapters/api/v1/admin/system_services.py
 adapters/api/v1/admin/system_settings.py
 adapters/api/v1/admin/users_permissions.py
@@ -173,10 +174,12 @@ adapters/api/v1/support/__init__.py
 adapters/api/v1/support/ai_tickets.py
 adapters/api/v1/support/attachments_operator.py
 adapters/api/v1/support/attachments_user.py
+adapters/api/v1/support/billing.py
 adapters/api/v1/support/categories.py
 adapters/api/v1/support/dependencies.py
 adapters/api/v1/support/message_helpers.py
 adapters/api/v1/support/operator.py
+adapters/api/v1/support/payment_callbacks.py
 adapters/api/v1/support/priorities.py
 adapters/api/v1/support/schemas.py
 adapters/api/v1/support/statuses.py
@@ -313,6 +316,7 @@ adapters/db/models/workflow_marketplace.py
 adapters/db/models/zohal.py
 adapters/db/models/support/__init__.py
 adapters/db/models/support/attachment.py
+adapters/db/models/support/billing.py
 adapters/db/models/support/category.py
 adapters/db/models/support/message.py
 adapters/db/models/support/priority.py
@@ -842,8 +846,14 @@ app/services/support/__init__.py
 app/services/support/notification_helpers.py
 app/services/support/support_attachment_service.py
 app/services/support/support_background_jobs.py
+app/services/support/support_billing_service.py
+app/services/support/support_billing_settings.py
+app/services/support/support_billing_stats_service.py
 app/services/support/support_broadcast.py
 app/services/support/support_dashboard_service.py
+app/services/support/support_entitlement_service.py
+app/services/support/support_payment_gateway.py
+app/services/support/support_plan_service.py
 app/services/support/support_realtime.py
 app/services/support/support_realtime_fanout.py
 app/services/support/support_sla_service.py
@@ -1039,6 +1049,7 @@ migrations/versions/20260718_000002_business_fx_auto_sync.py
 migrations/versions/20260720_000001_business_print_settings_stamp_signature_scale.py
 migrations/versions/20260720_000002_goods_expense_income.py
 migrations/versions/20260720_000003_hscript_custom_reports.py
+migrations/versions/20260721_000001_support_billing.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_ai_agent_continuation.py

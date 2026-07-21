@@ -192,12 +192,12 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
         await _service.createPlan(payload);
       }
       if (mounted) {
-        SnackBarHelper.showSuccess(context, 'ذخیره شد');
+        SnackBarHelper.showSuccess(context, message: 'ذخیره شد');
         await _load();
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     }
   }
@@ -218,12 +218,12 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
     try {
       await _service.deletePlan(plan['id'] as int);
       if (mounted) {
-        SnackBarHelper.showSuccess(context, 'انجام شد');
+        SnackBarHelper.showSuccess(context, message: 'انجام شد');
         await _load();
       }
     } catch (e) {
       if (mounted) {
-        SnackBarHelper.showError(context, ErrorExtractor.forContext(e, context));
+        SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
       }
     }
   }
