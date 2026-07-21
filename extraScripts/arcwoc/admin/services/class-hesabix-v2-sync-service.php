@@ -155,6 +155,7 @@ class Hesabix_V2_Sync_Service
 			}
 
 			// Get product
+			$parent_product = null;
 			if ($variation_id) {
 				$product = wc_get_product($variation_id);
 				$parent_product = wc_get_product($product_id);
@@ -163,7 +164,6 @@ class Hesabix_V2_Sync_Service
 					throw new Exception(__('محصول یافت نشد', 'hesabix-v2'));
 				}
 
-				$product_data = Hesabix_V2_Mapper::wc_variation_to_api($parent_product, $product, $product_id, $gate['factor']);
 				$wc_id = $variation_id;
 				$wc_parent_id = $product_id;
 			} else {
@@ -173,9 +173,52 @@ class Hesabix_V2_Sync_Service
 					throw new Exception(__('محصول یافت نشد', 'hesabix-v2'));
 				}
 
-				$product_data = Hesabix_V2_Mapper::wc_product_to_api($product, $product_id, $gate['factor']);
 				$wc_id = $product_id;
 				$wc_parent_id = null;
+			}
+
+			// پیش‌نویس / pending / کپی هنوز منتشرنشده → ایجاد یا به‌روزرسانی در حسابیکس انجام نشود.
+			$status_ok = Hesabix_V2_Product_Service::is_syncable_product($product, $parent_product);
+
+			/**
+			 * آیا این محصول باید همگام شود؟
+			 * مقدار اولیه بر اساس وضعیت پست (پیش‌فرض فقط publish) است.
+			 *
+			 * @param bool       $should_sync
+			 * @param WC_Product $product
+			 */
+			$should_sync = (bool) apply_filters('hesabix_v2_should_sync_product', $status_ok, $product);
+
+			if (!$should_sync) {
+				$execution_time = microtime(true) - $start_time;
+				$wc_status = method_exists($product, 'get_status') ? (string) $product->get_status() : '';
+				$skip_reason = $status_ok ? 'filter' : 'status';
+
+				Hesabix_V2_Log_Service::info('Product sync skipped', array(
+					'entity_type' => 'product',
+					'entity_id' => (int) $wc_id,
+					'wc_status' => $wc_status,
+					'reason' => $skip_reason,
+					'execution_time' => $execution_time,
+				));
+
+				$message = $status_ok
+					? __('همگام‌سازی رد شد — فیلتر سفارشی همگام‌سازی را مسدود کرد.', 'hesabix-v2')
+					: __('همگام‌سازی رد شد — فقط محصولات منتشرشده به حسابیکس ارسال می‌شوند (پیش‌نویس همگام نمی‌شود).', 'hesabix-v2');
+
+				return array(
+					'success' => true,
+					'skipped_status' => !$status_ok,
+					'skipped_filter' => $status_ok,
+					'message' => $message,
+					'execution_time' => $execution_time,
+				);
+			}
+
+			if ($variation_id) {
+				$product_data = Hesabix_V2_Mapper::wc_variation_to_api($parent_product, $product, $product_id, $gate['factor']);
+			} else {
+				$product_data = Hesabix_V2_Mapper::wc_product_to_api($product, $product_id, $gate['factor']);
 			}
 
 			$wc_payload_for_log = $product_data;
@@ -197,6 +240,13 @@ class Hesabix_V2_Sync_Service
 
 			if ($is_update && Hesabix_V2_Product_Sync_Payload::is_noop_update($product_data)) {
 				$execution_time = microtime(true) - $start_time;
+
+				Hesabix_V2_Log_Service::debug('Product sync noop update', array(
+					'entity_type' => 'product',
+					'entity_id' => (int) $wc_id,
+					'hesabix_id' => (int) $existing_mapping['hesabix_id'],
+					'preset' => isset($sync_settings['product_sync_preset']) ? (string) $sync_settings['product_sync_preset'] : '',
+				));
 
 				return array(
 					'success' => true,
@@ -234,6 +284,9 @@ class Hesabix_V2_Sync_Service
 					'entity_type' => 'product',
 					'entity_id' => $wc_id,
 					'hesabix_id' => $hesabix_id,
+					'is_update' => $is_update,
+					'fields_sent' => array_keys($product_data),
+					'name_sent' => array_key_exists('name', $product_data),
 					'execution_time' => $execution_time,
 				));
 

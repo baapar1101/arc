@@ -114,6 +114,8 @@ class Hesabix_V2_Product_Sync_Payload
 
 			case self::PRESET_ACCOUNTING:
 			default:
+				// هویت فروشگاهی (نام) از ووکامرس می‌آید؛ داده‌های مالی حسابیکس حفظ می‌شوند.
+				$flags['sync_product_name'] = true;
 				$flags['sync_product_price'] = !empty($sync_settings['sync_product_price']);
 				$flags['sync_product_stock'] = !empty($sync_settings['sync_product_stock']);
 				break;

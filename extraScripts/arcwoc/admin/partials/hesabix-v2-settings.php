@@ -333,7 +333,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="checkbox" name="auto_sync_products" value="1" <?php checked($sync_settings['auto_sync_products'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
-					<p class="description"><?php _e('محصولات جدید به طور خودکار به حسابیکس ارسال شوند', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('با ایجاد یا انتشار محصول جدید (وضعیت منتشرشده)، به‌طور خودکار به حسابیکس ارسال شود. پیش‌نویس و کپیِ منتشرنشده همگام نمی‌شوند.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
@@ -344,7 +344,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="checkbox" name="sync_on_product_update" value="1" <?php checked($sync_settings['sync_on_product_update'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
-					<p class="description"><?php _e('با فعال بودن، تغییرات ووکامرس طبق «سیاست به‌روزرسانی» زیر به حسابیکس اعمال می‌شود.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('با فعال بودن، تغییرات محصولات منتشرشده طبق «سیاست به‌روزرسانی» زیر به حسابیکس اعمال می‌شود. ذخیرهٔ پیش‌نویس همگام نمی‌شود.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
@@ -361,7 +361,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							<?php esc_html_e('فقط ایمپورت اولیه (به‌روزرسانی خودکار هیچ فیلدی)', 'hesabix-v2'); ?>
 						</option>
 						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING); ?>>
-							<?php esc_html_e('حسابداری‌محور (پیشنهادی — حفظ قیمت خرید و داده‌های مالی)', 'hesabix-v2'); ?>
+							<?php esc_html_e('حسابداری‌محور (پیشنهادی — نام از فروشگاه؛ حفظ قیمت خرید و داده‌های مالی)', 'hesabix-v2'); ?>
 						</option>
 						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_LIVE_STORE); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_LIVE_STORE); ?>>
 							<?php esc_html_e('فروشگاه زنده (نام، قیمت، دسته و … از ووکامرس)', 'hesabix-v2'); ?>
@@ -370,7 +370,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							<?php esc_html_e('پیشرفته (انتخاب فیلد به فیلد)', 'hesabix-v2'); ?>
 						</option>
 					</select>
-					<p class="description"><?php esc_html_e('در ایجاد اولیهٔ محصول، اطلاعات پایه از ووکامرس ساخته می‌شود. در به‌روزرسانی‌های بعدی فقط فیلدهای مجاز این سیاست ارسال می‌شوند؛ قیمت خرید و داده‌های حسابداری هرگز از ووکامرس بازنویسی نمی‌شوند.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php esc_html_e('در ایجاد اولیه (معمولاً هنگام انتشار)، اطلاعات پایه از ووکامرس ساخته می‌شود. در به‌روزرسانی‌های بعدی فقط فیلدهای مجاز این سیاست ارسال می‌شوند. در حالت حسابداری‌محور نام محصول از ووکامرس همگام می‌شود؛ قیمت خرید و داده‌های حسابداری هرگز از ووکامرس بازنویسی نمی‌شوند.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 

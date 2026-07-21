@@ -423,7 +423,7 @@ class Hesabix_V2_Opening_Inventory_Service
 
 		$ids = wc_get_products(
 			array(
-				'status' => 'publish',
+				'status' => Hesabix_V2_Product_Service::syncable_statuses(),
 				'limit' => -1,
 				'return' => 'ids',
 			)
