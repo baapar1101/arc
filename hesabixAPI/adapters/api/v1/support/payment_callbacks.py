@@ -20,8 +20,24 @@ from app.core.payment_response import (
 from app.core.responses import success_response
 from app.core.settings import get_settings
 from app.services.support.support_payment_gateway import verify_support_gateway_payment
+from app.services.system_settings_service import resolve_public_app_base_url_for_public_links
 
 router = APIRouter(prefix="/support/payments/callback", tags=["support-payment-callbacks"])
+
+
+def _resolve_frontend_base_url(db: Session) -> str:
+	"""
+	دامنهٔ اپ برای برگشت از درگاه: همان مقدار «تنظیمات لینک‌های اشتراک»
+	(با fallback به env / app_public_url).
+	"""
+	base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
+	if base:
+		return base
+	settings = get_settings()
+	fallback = (settings.app_public_url or settings.share_link_public_app_url or "").strip().rstrip("/")
+	if fallback.lower().endswith("/public"):
+		fallback = fallback[: -len("/public")].rstrip("/")
+	return fallback
 
 
 def _handle_callback(
@@ -40,17 +56,13 @@ def _handle_callback(
 	try:
 		session = db.query(SupportPaymentSession).filter(SupportPaymentSession.id == int(session_id)).first()
 		if session and session.client_return_path:
-			settings = get_settings()
-			app_base = (settings.share_link_public_app_url or settings.app_public_url or "").rstrip("/")
-			# client_return_path معمولاً مسیر فرانت است
 			path = session.client_return_path
 			if path.startswith("http"):
 				target = path
 			else:
-				# از دامنه اپ
-				front = (settings.share_link_public_app_url or "").replace("/public", "").rstrip("/")
+				front = _resolve_frontend_base_url(db)
 				if not front:
-					front = app_base
+					raise ValueError("frontend base url is not configured")
 				target = f"{front}{path if path.startswith('/') else '/' + path}"
 			u = urlparse(target)
 			q = dict(parse_qsl(u.query))

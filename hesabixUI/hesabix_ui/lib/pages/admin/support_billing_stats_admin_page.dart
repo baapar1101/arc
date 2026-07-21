@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/support_billing_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/number_formatters.dart';
 
 class SupportBillingStatsAdminPage extends StatefulWidget {
   const SupportBillingStatsAdminPage({super.key});
@@ -52,10 +53,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
 
   String _money(dynamic v) {
     final n = (v is num) ? v.toDouble() : double.tryParse('$v') ?? 0;
-    return n.toStringAsFixed(0).replaceAllMapped(
-          RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-          (m) => '${m[1]},',
-        );
+    return formatWithThousands(n, decimalPlaces: 0);
   }
 
   Widget _kpi(String title, String value, IconData icon) {
@@ -87,7 +85,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
     final s = _stats;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('آمار پشتیبانی پولی'),
+        title: const Text('آمار پشتیبانی غیر رایگان'),
         actions: [IconButton(onPressed: _load, icon: const Icon(Icons.refresh))],
       ),
       body: _loading

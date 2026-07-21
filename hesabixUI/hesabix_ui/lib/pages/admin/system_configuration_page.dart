@@ -564,7 +564,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       ),
                       items: const [
                         DropdownMenuItem(value: 'free', child: Text('رایگان برای همه')),
-                        DropdownMenuItem(value: 'paid', child: Text('فقط با اشتراک')),
+                        DropdownMenuItem(value: 'paid', child: Text('پشتیبانی غیر رایگان')),
                         DropdownMenuItem(value: 'hybrid', child: Text('ترکیبی (سهمیه + اشتراک)')),
                       ],
                       onChanged: (v) => setState(() => _supportBillingMode = v ?? 'free'),

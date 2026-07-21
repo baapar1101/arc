@@ -43,7 +43,7 @@ class LocalizationHelper {
       case 'settingsSupportPlans':
         return 'پلن‌های پشتیبانی';
       case 'settingsSupportBillingStats':
-        return 'آمار پشتیبانی پولی';
+        return 'آمار پشتیبانی غیر رایگان';
       case 'settingsPaymentGateways':
         return t.settingsPaymentGateways;
       case 'settingsBusinessesManagement':

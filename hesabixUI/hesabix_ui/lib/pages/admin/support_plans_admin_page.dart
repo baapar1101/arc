@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/support_billing_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 
 class SupportPlansAdminPage extends StatefulWidget {
@@ -252,7 +253,7 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
                       child: ListTile(
                         title: Text('${p['name']} (${p['period_months']} ماهه)'),
                         subtitle: Text(
-                          'کد: ${p['code']} · قیمت: ${p['price']} · '
+                          'کد: ${p['code']} · قیمت: ${formatWithThousands(p['price'], decimalPlaces: 0)} ریال · '
                           '${p['is_active'] == true ? 'فعال' : 'غیرفعال'}'
                           '${p['is_free'] == true ? ' · رایگان' : ''}',
                         ),

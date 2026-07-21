@@ -143,7 +143,7 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
                         const SizedBox(height: 8),
                         Text(
                           'دامنه یا آدرس اصلی را وارد کنید (مثلاً https://app.hesabix.com). بخش /public به‌صورت خودکار اضافه می‌شود. '
-                          'همین مقدار برای لینک کارت حساب (شخص) و لینک اشتراک فایل از فضای ذخیره‌سازی استفاده می‌شود.',
+                          'همین مقدار برای لینک کارت حساب، لینک اشتراک فایل، و بازگشت کاربر از درگاه پرداخت اشتراک پشتیبانی استفاده می‌شود.',
                           style: theme.textTheme.bodySmall,
                         ),
                         const SizedBox(height: 16),
