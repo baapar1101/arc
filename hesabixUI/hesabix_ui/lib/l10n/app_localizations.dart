@@ -4178,6 +4178,12 @@ abstract class AppLocalizations {
   /// **'Loading authentication...'**
   String get loadingAuthentication;
 
+  /// No description provided for @loadingStepOfTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {current} of {total}'**
+  String loadingStepOfTotal(int current, int total);
+
   /// No description provided for @businessManagementPlatform.
   ///
   /// In en, this message translates to:

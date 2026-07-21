@@ -62,6 +62,7 @@ from adapters.api.v1.admin.monitoring import router as admin_monitoring_router
 from adapters.api.v1.admin.system_services import router as admin_system_services_router
 from adapters.api.v1.admin.wallet_admin import router as admin_wallet_router
 from adapters.api.v1.admin.storage_plans import router as admin_storage_plans_router
+from adapters.api.v1.admin.support_billing import router as admin_support_billing_router
 from adapters.api.v1.admin.businesses_admin import router as admin_businesses_router
 from adapters.api.v1.admin.document_monetization import router as admin_document_monetization_router
 from adapters.api.v1.admin.zohal import router as admin_zohal_router
@@ -1114,6 +1115,11 @@ def create_app() -> FastAPI:
     application.include_router(public_product_catalog_router)
     
     # Support endpoints
+    from adapters.api.v1.support.billing import router as support_billing_router
+    from adapters.api.v1.support.payment_callbacks import router as support_payment_callbacks_router
+    # billing باید قبل از tickets ثبت شود تا /billing با /{ticket_id} برخورد نکند
+    application.include_router(support_billing_router, prefix=f"{settings.api_v1_prefix}/support")
+    application.include_router(support_payment_callbacks_router, prefix=settings.api_v1_prefix)
     application.include_router(support_tickets_router, prefix=f"{settings.api_v1_prefix}/support")
     application.include_router(support_attachments_user_router, prefix=f"{settings.api_v1_prefix}/support")
     application.include_router(support_operator_router, prefix=f"{settings.api_v1_prefix}/support/operator")
@@ -1135,6 +1141,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_system_services_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_wallet_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_storage_plans_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_support_billing_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_businesses_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_users_permissions_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_scripts_router, prefix=settings.api_v1_prefix)
@@ -1267,9 +1274,13 @@ def create_app() -> FastAPI:
         from app.services.workflow.workflow_background_jobs import workflow_automation_background_loop
         asyncio.create_task(workflow_automation_background_loop(60))
 
-        from app.services.support.support_background_jobs import support_sla_breach_check_loop
+        from app.services.support.support_background_jobs import (
+            support_sla_breach_check_loop,
+            support_subscription_status_loop,
+        )
 
         asyncio.create_task(support_sla_breach_check_loop(300))
+        asyncio.create_task(support_subscription_status_loop(600))
 
         # نرخ ارز متمرکز: بررسی هر ۶۰ثانیه؛ واکشی واقعی طبق fetch_interval هر provider (پیش‌فرض ۱۵دقیقه)
         from app.services.fx_rate_background_jobs import fx_global_rates_fetch_loop

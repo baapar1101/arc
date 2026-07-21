@@ -40,6 +40,10 @@ class LocalizationHelper {
         return t.settingsWalletPayoutsAdmin;
       case 'settingsSupportOperators':
         return t.settingsSupportOperators;
+      case 'settingsSupportPlans':
+        return 'پلن‌های پشتیبانی';
+      case 'settingsSupportBillingStats':
+        return 'آمار پشتیبانی پولی';
       case 'settingsPaymentGateways':
         return t.settingsPaymentGateways;
       case 'settingsBusinessesManagement':
@@ -118,6 +122,10 @@ class LocalizationHelper {
         return t.settingsWalletPayoutsAdminDescription;
       case 'settingsSupportOperatorsDescription':
         return t.settingsSupportOperatorsDescription;
+      case 'settingsSupportPlansDescription':
+        return 'تعریف قیمت و مدت اشتراک‌های پشتیبانی کاربر';
+      case 'settingsSupportBillingStatsDescription':
+        return 'گزارش درآمد، اشتراک فعال و صورت‌حساب‌های پشتیبانی';
       case 'settingsPaymentGatewaysDescription':
         return t.settingsPaymentGatewaysDescription;
       case 'settingsBusinessesManagementDescription':

@@ -32,6 +32,13 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   bool _enableMaintenanceMode = false;
   bool _supportTicketsEnabled = true;
   final TextEditingController _supportTicketsDisabledMessageCtrl = TextEditingController();
+  String _supportBillingMode = 'free';
+  int _supportFreeQuotaPerMonth = 2;
+  int _supportGracePeriodDays = 3;
+  bool _supportAllowReadWithoutSub = true;
+  bool _supportRequireSubToReply = true;
+  bool _supportPaidPriorityBoost = true;
+  final TextEditingController _supportInvoicePrefixCtrl = TextEditingController(text: 'SUP');
   int _sessionTimeout = 30;
   int _maxFileSize = 10;
   int _maxUsers = 0;
@@ -128,6 +135,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   @override
   void dispose() {
     _supportTicketsDisabledMessageCtrl.dispose();
+    _supportInvoicePrefixCtrl.dispose();
     super.dispose();
   }
 
@@ -153,6 +161,20 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _supportTicketsEnabled = data['support_tickets_enabled'] as bool? ?? true;
           _supportTicketsDisabledMessageCtrl.text =
               data['support_tickets_disabled_message']?.toString() ?? '';
+          final billingMode = data['support_billing_mode']?.toString() ?? 'free';
+          _supportBillingMode =
+              const ['free', 'paid', 'hybrid'].contains(billingMode) ? billingMode : 'free';
+          _supportFreeQuotaPerMonth = _asConfigInt(data['support_free_quota_per_month'], 2);
+          _supportGracePeriodDays = _asConfigInt(data['support_grace_period_days'], 3);
+          _supportAllowReadWithoutSub =
+              data['support_allow_read_without_subscription'] as bool? ?? true;
+          _supportRequireSubToReply =
+              data['support_require_subscription_to_reply'] as bool? ?? true;
+          _supportPaidPriorityBoost = data['support_paid_priority_boost'] as bool? ?? true;
+          _supportInvoicePrefixCtrl.text =
+              data['support_invoice_prefix']?.toString().trim().isNotEmpty == true
+                  ? data['support_invoice_prefix'].toString().trim()
+                  : 'SUP';
           _sessionTimeout = data['session_timeout'] as int? ?? 30;
           _maxFileSize = data['max_file_size'] as int? ?? 10;
           _maxUsers = data['max_users'] as int? ?? 0;
@@ -532,6 +554,57 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                         border: const OutlineInputBorder(),
                         alignLabelWithHint: true,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _supportBillingMode,
+                      decoration: const InputDecoration(
+                        labelText: 'حالت صورتحساب پشتیبانی',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'free', child: Text('رایگان برای همه')),
+                        DropdownMenuItem(value: 'paid', child: Text('فقط با اشتراک')),
+                        DropdownMenuItem(value: 'hybrid', child: Text('ترکیبی (سهمیه + اشتراک)')),
+                      ],
+                      onChanged: (v) => setState(() => _supportBillingMode = v ?? 'free'),
+                    ),
+                    if (_supportBillingMode == 'hybrid')
+                      _buildNumberField(
+                        label: 'سهمیه رایگان ماهانه (تیکت)',
+                        value: _supportFreeQuotaPerMonth,
+                        onChanged: (value) => setState(() => _supportFreeQuotaPerMonth = value),
+                        min: 0,
+                        max: 1000,
+                      ),
+                    _buildNumberField(
+                      label: 'مهلت ارفاق بعد از انقضا (روز)',
+                      value: _supportGracePeriodDays,
+                      onChanged: (value) => setState(() => _supportGracePeriodDays = value),
+                      min: 0,
+                      max: 90,
+                    ),
+                    TextFormField(
+                      controller: _supportInvoicePrefixCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'پیشوند کد صورت‌حساب',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    _buildSwitchField(
+                      label: 'مشاهده تیکت‌های قبلی بدون اشتراک',
+                      value: _supportAllowReadWithoutSub,
+                      onChanged: (value) => setState(() => _supportAllowReadWithoutSub = value),
+                    ),
+                    _buildSwitchField(
+                      label: 'برای پاسخ هم اشتراک لازم باشد',
+                      value: _supportRequireSubToReply,
+                      onChanged: (value) => setState(() => _supportRequireSubToReply = value),
+                    ),
+                    _buildSwitchField(
+                      label: 'اولویت‌دهی تیکت مشترکان در صف اپراتور',
+                      value: _supportPaidPriorityBoost,
+                      onChanged: (value) => setState(() => _supportPaidPriorityBoost = value),
                     ),
                   ],
                 ),
@@ -1063,6 +1136,13 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'enable_maintenance_mode': _enableMaintenanceMode,
         'support_tickets_enabled': _supportTicketsEnabled,
         'support_tickets_disabled_message': _supportTicketsDisabledMessageCtrl.text.trim(),
+        'support_billing_mode': _supportBillingMode,
+        'support_free_quota_per_month': _supportFreeQuotaPerMonth,
+        'support_grace_period_days': _supportGracePeriodDays,
+        'support_allow_read_without_subscription': _supportAllowReadWithoutSub,
+        'support_require_subscription_to_reply': _supportRequireSubToReply,
+        'support_invoice_prefix': _supportInvoicePrefixCtrl.text.trim(),
+        'support_paid_priority_boost': _supportPaidPriorityBoost,
         'session_timeout': _sessionTimeout,
         'max_file_size': _maxFileSize,
         'max_users': _maxUsers,

@@ -66,6 +66,9 @@ import 'pages/admin/currencies_admin_page.dart';
 import 'pages/admin/fx_providers_admin_page.dart';
 import 'pages/admin/payment_gateways_page.dart';
 import 'pages/admin/storage_plans_admin_page.dart';
+import 'pages/admin/support_plans_admin_page.dart';
+import 'pages/admin/support_billing_stats_admin_page.dart';
+import 'pages/profile/support_billing_page.dart';
 import 'pages/admin/document_monetization_page.dart';
 import 'pages/admin/share_link_settings_page.dart';
 import 'pages/admin/marketplace_plugins_admin_page.dart';
@@ -183,6 +186,7 @@ import 'pages/business/tax_settings_page.dart';
 import 'pages/business/fiscal_year_settings_page.dart';
 import 'pages/business/installment_plans_page.dart';
 import 'pages/error_404_page.dart';
+import 'core/app_init_progress.dart';
 import 'core/locale_controller.dart';
 import 'core/calendar_controller.dart';
 import 'core/api_client.dart';
@@ -193,7 +197,7 @@ import 'core/mobile_launcher_prefs.dart';
 import 'core/permission_guard.dart';
 import 'core/keyboard_shortcut_listener.dart';
 import 'core/route_registry.dart';
-import 'widgets/simple_splash_screen.dart';
+import 'widgets/progress_splash_screen.dart';
 import 'widgets/url_tracker.dart';
 import 'widgets/user_activity_heartbeat.dart';
 import 'utils/responsive_helper.dart';
@@ -280,6 +284,39 @@ class _MyAppState extends State<MyApp> {
   AuthStore? _authStore;
   bool _isLoading = true;
   DateTime? _loadStartTime;
+  AppInitProgress _initProgress = const AppInitProgress.initial();
+
+  void _reportInitProgress(AppInitPhase phase, {double? progress}) {
+    final value = progress ?? phase.endProgress;
+    final snapshot = AppInitProgress(phase: phase, progress: value);
+    if (!mounted) return;
+    setState(() => _initProgress = snapshot);
+    if (kIsWeb) {
+      notifyWebInitProgress(
+        initProgress: value,
+        currentStep: snapshot.webCurrentStep,
+        totalSteps: snapshot.webTotalSteps,
+        statusKey: phase.statusKey,
+      );
+    }
+  }
+
+  String _initStatusMessage(AppLocalizations t, AppInitPhase phase) {
+    switch (phase.statusKey) {
+      case 'loadingLanguageSettings':
+        return t.loadingLanguageSettings;
+      case 'loadingCalendarSettings':
+        return t.loadingCalendarSettings;
+      case 'loadingThemeSettings':
+        return t.loadingThemeSettings;
+      case 'loadingAuthentication':
+        return t.loadingAuthentication;
+      case 'initializing':
+        return t.initializing;
+      default:
+        return t.loading;
+    }
+  }
 
   @override
   void initState() {
@@ -289,23 +326,32 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> _loadControllers() async {
-    // بارگذاری تمام کنترلرها
+    _reportInitProgress(AppInitPhase.language, progress: 0);
+
     final localeController = await LocaleController.load();
+    if (!mounted) return;
+    setState(() => _controller = localeController);
+    _reportInitProgress(AppInitPhase.language);
+
     final calendarController = await CalendarController.load();
+    if (!mounted) return;
+    setState(() => _calendarController = calendarController);
+    _reportInitProgress(AppInitPhase.calendar);
+
     final themeController = ThemeController();
     await themeController.load();
+    if (!mounted) return;
+    setState(() => _themeController = themeController);
+    _reportInitProgress(AppInitPhase.theme);
+
     final authStore = AuthStore();
-    // بایند کردن AuthStore قبل از load برای ارسال هدر Authorization در درخواست‌های اولیه
     ApiClient.bindAuthStore(authStore);
     await authStore.load();
-    
-    // تنظیم کنترلرها
-    setState(() {
-      _controller = localeController;
-      _calendarController = calendarController;
-      _themeController = themeController;
-      _authStore = authStore;
-    });
+    if (!mounted) return;
+    setState(() => _authStore = authStore);
+    _reportInitProgress(AppInitPhase.auth);
+
+    _reportInitProgress(AppInitPhase.finalizing, progress: AppInitPhase.auth.endProgress);
     
     // اضافه کردن listeners
     _controller!.addListener(() {
@@ -346,6 +392,8 @@ class _MyAppState extends State<MyApp> {
         await Future.delayed(minimumDuration - elapsed);
       }
     }
+
+    _reportInitProgress(AppInitPhase.finalizing, progress: 0.95);
     
     // ذخیره URL فعلی قبل از اتمام loading
     if (_authStore != null) {
@@ -368,6 +416,7 @@ class _MyAppState extends State<MyApp> {
     
     // اتمام loading
     if (mounted) {
+      _reportInitProgress(AppInitPhase.finalizing, progress: 1);
       setState(() {
         _isLoading = false;
       });
@@ -764,74 +813,22 @@ class _MyAppState extends State<MyApp> {
           GoRoute(
             path: '/:path(.*)',
             builder: (context, state) {
-              // تشخیص نوع loading بر اساس controller های موجود
-              String loadingMessage = 'Initializing...';
-              if (_controller == null) {
-                loadingMessage = 'Loading language settings...';
-              } else if (_calendarController == null) {
-                loadingMessage = 'Loading calendar settings...';
-              } else if (_themeController == null) {
-                loadingMessage = 'Loading theme settings...';
-              } else if (_authStore == null) {
-                loadingMessage = 'Loading authentication...';
-              }
-              
-              // اگر controller موجود است، از locale آن استفاده کن
-              if (_controller != null) {
-                final isFa = _controller!.locale.languageCode == 'fa';
-                if (isFa) {
-                  if (_calendarController == null) {
-                    loadingMessage = 'loadingCalendarSettings';
-                  } else if (_themeController == null) {
-                    loadingMessage = 'loadingThemeSettings';
-                  } else if (_authStore == null) {
-                    loadingMessage = 'loadingAuthentication';
-                  } else {
-                    loadingMessage = 'initializing';
-                  }
-                }
-              }
-              
               return Builder(
                 builder: (context) {
                   final t = AppLocalizations.of(context);
-                  String localizedMessage = loadingMessage;
-                  
-                  // تبدیل کلیدهای ترجمه به متن
-                  switch (loadingMessage) {
-                    case 'loadingLanguageSettings':
-                      localizedMessage = t.loadingLanguageSettings;
-                      break;
-                    case 'loadingCalendarSettings':
-                      localizedMessage = t.loadingCalendarSettings;
-                      break;
-                    case 'loadingThemeSettings':
-                      localizedMessage = t.loadingThemeSettings;
-                      break;
-                    case 'loadingAuthentication':
-                      localizedMessage = t.loadingAuthentication;
-                      break;
-                    case 'initializing':
-                      localizedMessage = t.initializing;
-                      break;
-                    default:
-                      localizedMessage = loadingMessage;
-                  }
-                  
+                  final phase = _initProgress.phase;
+                  final localizedMessage = _initStatusMessage(t, phase);
+
                   if (kIsWeb) {
                     return const SizedBox.shrink();
                   }
 
-                  return SimpleSplashScreen(
+                  return ProgressSplashScreen(
                     message: localizedMessage,
                     showLogo: true,
-                    displayDuration: const Duration(seconds: 1),
-                    locale: _controller?.locale,
-                    authStore: _authStore,
-                    onComplete: () {
-                      // این callback زمانی فراخوانی می‌شود که splash screen تمام شود
-                      // اما ما از splash controller استفاده می‌کنیم
-                    },
+                    progress: _initProgress.progress,
+                    currentStep: _initProgress.currentStep,
+                    totalSteps: _initProgress.totalSteps,
                   );
                 },
               );
@@ -1228,6 +1225,11 @@ class _MyAppState extends State<MyApp> {
               path: '/user/profile/support',
               name: 'profile_support',
               builder: (context, state) => SupportPage(calendarController: _calendarController),
+            ),
+            GoRoute(
+              path: '/user/profile/support/billing',
+              name: 'profile_support_billing',
+              builder: (context, state) => const SupportBillingPage(),
             ),
             GoRoute(
               path: '/user/profile/support/new',
@@ -1800,6 +1802,34 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const StoragePlansAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'support-plans',
+                  name: 'system_settings_support_plans',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const SupportPlansAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'support-billing-stats',
+                  name: 'system_settings_support_billing_stats',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed = _authStore!.isSuperAdmin || _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const SupportBillingStatsAdminPage();
                   },
                 ),
                 GoRoute(

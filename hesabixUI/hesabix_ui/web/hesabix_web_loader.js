@@ -21,7 +21,15 @@
       statusUi: 'آماده‌سازی رابط کاربری…',
       statusEngine: 'تقریباً آماده است…',
       statusDone: 'ورود به برنامه…',
+      loadingLanguageSettings: 'در حال بارگذاری تنظیمات زبان…',
+      loadingCalendarSettings: 'در حال بارگذاری تنظیمات تقویم…',
+      loadingThemeSettings: 'در حال بارگذاری تنظیمات تم…',
+      loadingAuthentication: 'در حال بارگذاری احراز هویت…',
+      initializing: 'در حال راه‌اندازی…',
       retry: 'تلاش مجدد',
+      stepOf: function (current, total) {
+        return 'مرحله ' + current + ' از ' + total;
+      },
       quotes: [
         'برای امنیت بیشتر، پس از کار از حساب خود خارج شوید.',
         'ثبت منظم اسناد، پایهٔ گزارش‌های دقیق مالی است.',
@@ -36,7 +44,15 @@
       statusUi: 'Preparing interface…',
       statusEngine: 'Almost ready…',
       statusDone: 'Starting app…',
+      loadingLanguageSettings: 'Loading language settings…',
+      loadingCalendarSettings: 'Loading calendar settings…',
+      loadingThemeSettings: 'Loading theme settings…',
+      loadingAuthentication: 'Loading authentication…',
+      initializing: 'Initializing…',
       retry: 'Try again',
+      stepOf: function (current, total) {
+        return 'Step ' + current + ' of ' + total;
+      },
       quotes: [
         'Sign out when you finish for better security.',
         'Consistent bookkeeping leads to accurate reports.',
@@ -173,12 +189,16 @@
     var wrap = document.getElementById('loading-progress-wrap');
     var bar = document.getElementById('loading-progress-bar');
     var screen = document.getElementById('flutter-loading-screen');
+    var percentEl = document.getElementById('loading-percent');
+    var spinner = document.getElementById('loader-spinner');
     if (!wrap || !bar) return;
 
     if (percent == null || typeof percent !== 'number' || isNaN(percent)) {
       wrap.classList.add('is-indeterminate');
       bar.style.width = '0%';
       if (screen) screen.classList.remove('has-definite-progress');
+      if (percentEl) percentEl.textContent = '';
+      if (spinner) spinner.hidden = false;
       return;
     }
 
@@ -186,6 +206,20 @@
     if (screen) screen.classList.add('has-definite-progress');
     var clamped = Math.max(0, Math.min(100, percent));
     bar.style.width = clamped + '%';
+    if (percentEl) percentEl.textContent = Math.round(clamped) + '%';
+    if (spinner) spinner.hidden = true;
+  }
+
+  function setInitProgress(percent, currentStep, totalSteps, statusKey) {
+    setDownloadProgress(percent);
+    var stepEl = document.getElementById('loading-step');
+    if (stepEl && currentStep > 0 && totalSteps > 0) {
+      var s = t();
+      stepEl.textContent = s.stepOf
+        ? s.stepOf(currentStep, totalSteps)
+        : currentStep + ' / ' + totalSteps;
+    }
+    if (statusKey) setStatusKey(statusKey);
   }
 
   function setStatus(line) {
@@ -248,6 +282,7 @@
   window.__hesabixLoaderUI = {
     setLoadingPhase: applyLoadingPhase,
     setDownloadProgress: setDownloadProgress,
+    setInitProgress: setInitProgress,
     setStatus: setStatus,
     setStatusKey: setStatusKey,
     markSlowLoad: markSlowLoad,
@@ -258,7 +293,7 @@
 
   window.__hesabixSignalAppReady = function () {
     setStatusKey('statusDone');
-    setDownloadProgress(100);
+    setInitProgress(100, 8, 8, 'statusDone');
     hideLoadingScreen();
   };
 

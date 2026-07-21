@@ -886,6 +886,17 @@
   "loadingCalendarSettings": "در حال بارگذاری تنظیمات تقویم...",
   "loadingThemeSettings": "در حال بارگذاری تنظیمات تم...",
   "loadingAuthentication": "در حال بارگذاری احراز هویت...",
+  "loadingStepOfTotal": "مرحله {current} از {total}",
+  "@loadingStepOfTotal": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "businessManagementPlatform": "پلتفرم مدیریت کسب‌وکار",
   "businessDashboard": "داشبورد کسب و کار",
   "businessStatistics": "آمار کسب و کار",

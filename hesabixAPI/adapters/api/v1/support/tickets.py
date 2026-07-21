@@ -32,6 +32,11 @@ from app.services.support.notification_helpers import (
 )
 from app.core.cache import get_cache
 from app.services.support.ticket_engagement_service import mark_user_read, submit_csat
+from app.services.support.support_entitlement_service import (
+    assert_can_create_ticket,
+    assert_can_reply_ticket,
+    increment_hybrid_quota_if_needed,
+)
 import logging
 
 router = APIRouter()
@@ -104,6 +109,7 @@ async def create_ticket(
     db: Session = Depends(get_db)
 ):
     """ایجاد تیکت جدید"""
+    entitlement = assert_can_create_ticket(db, current_user.get_user_id())
     ticket_repo = TicketRepository(db)
     
     # ایجاد تیکت
@@ -118,6 +124,11 @@ async def create_ticket(
     }
     
     ticket = ticket_repo.create(ticket_data)
+    increment_hybrid_quota_if_needed(db, current_user.get_user_id(), entitlement)
+    try:
+        db.commit()
+    except Exception:
+        pass
 
     from app.services.support.support_sla_service import SupportSlaService
     from app.services.support.support_broadcast import broadcast_ticket_created
@@ -234,6 +245,7 @@ async def reopen_ticket(
     db: Session = Depends(get_db),
 ):
     """بازگشایی تیکت توسط کاربر"""
+    assert_can_create_ticket(db, current_user.get_user_id())
     lifecycle = TicketLifecycleService(db)
     ticket = lifecycle.reopen_by_user(ticket_id, current_user.get_user_id())
     ticket_data = ticket_response_dict(ticket, db)
@@ -279,6 +291,7 @@ async def send_message(
     db: Session = Depends(get_db)
 ):
     """ارسال پیام به تیکت"""
+    assert_can_reply_ticket(db, current_user.get_user_id())
     access = TicketAccessService(db)
     message_repo = MessageRepository(db)
     

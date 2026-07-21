@@ -2187,6 +2187,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get loadingAuthentication => 'Loading authentication...';
 
   @override
+  String loadingStepOfTotal(int current, int total) {
+    return 'Step $current of $total';
+  }
+
+  @override
   String get businessManagementPlatform => 'Business Management Platform';
 
   @override

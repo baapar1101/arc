@@ -7,6 +7,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/services/support_tickets_public_config.dart';
+import 'package:hesabix_ui/services/support_billing_service.dart';
 import 'package:hesabix_ui/services/saved_filters_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/models/saved_filter.dart';
@@ -34,6 +35,8 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   static const double _masterDetailBreakpoint = 768;
 
   final SupportService _supportService = SupportService(ApiClient());
+  final SupportBillingService _billingService = SupportBillingService(ApiClient());
+  Map<String, dynamic>? _entitlement;
   bool _supportGateResolved = false;
   SupportTicketsPublicConfig _supportPublic = const SupportTicketsPublicConfig();
   List<SupportStatus> _statuses = [];
@@ -163,6 +166,38 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   }
 
   void _navigateToCreateTicket() async {
+    try {
+      final ent = await _billingService.getEntitlement();
+      if (!mounted) return;
+      setState(() => _entitlement = ent);
+      if (ent['can_create_ticket'] != true) {
+        final goBilling = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('نیاز به اشتراک پشتیبانی'),
+            content: Text(
+              ent['reason_code'] == 'quota_exceeded'
+                  ? 'سهمیه رایگان ماهانه شما تمام شده است. برای ادامه، اشتراک پشتیبانی تهیه کنید.'
+                  : 'برای ثبت تیکت جدید نیاز به اشتراک پشتیبانی دارید.',
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('بستن')),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('خرید اشتراک'),
+              ),
+            ],
+          ),
+        );
+        if (goBilling == true && mounted) {
+          context.go('/user/profile/support/billing');
+        }
+        return;
+      }
+    } catch (_) {
+      // اگر entitlement در دسترس نبود، اجازه بده API بک‌اند تصمیم بگیرد
+    }
+
     final width = MediaQuery.of(context).size.width;
     if (width >= 768) {
       final result = await context.push<bool>('/user/profile/support/new');
@@ -953,6 +988,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
             onSearchSubmitted: _submitSearch,
             onOpenFilters: () => _showMobileFiltersBottomSheet(t, theme),
             onCreateTicket: _navigateToCreateTicket,
+            onOpenBilling: () => context.go('/user/profile/support/billing'),
             ticketList: _buildTicketsList(t, theme, forSidebar: true),
           ),
         ),
@@ -975,6 +1011,11 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
                   t.supportTickets,
                   style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
+              ),
+              IconButton(
+                tooltip: 'اشتراک و صورتحساب',
+                onPressed: () => context.go('/user/profile/support/billing'),
+                icon: const Icon(Icons.card_membership_outlined),
               ),
               IconButton(
                 onPressed: () => _showMobileFiltersBottomSheet(t, theme),

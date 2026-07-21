@@ -61,3 +61,29 @@ async def support_sla_breach_check_loop(interval_seconds: int = 300) -> None:
         except Exception:
             logger.exception("Error in support SLA breach loop")
         await asyncio.sleep(interval_seconds)
+
+
+def _refresh_subscription_statuses() -> int:
+    try:
+        with get_db_session(retries=1, delay=0.5) as db:
+            from app.services.support.support_billing_service import refresh_subscription_statuses
+
+            return refresh_subscription_statuses(db)
+    except SQLTimeoutError as exc:
+        logger.warning("Support subscription status refresh skipped (pool exhausted): %s", exc)
+        return 0
+    except Exception:
+        logger.exception("Support subscription status refresh failed")
+        return 0
+
+
+async def support_subscription_status_loop(interval_seconds: int = 600) -> None:
+    """هر ۱۰ دقیقه وضعیت اشتراک‌ها و نشست‌های پرداخت را به‌روز می‌کند."""
+    while True:
+        try:
+            changed = await asyncio.to_thread(_refresh_subscription_statuses)
+            if changed:
+                logger.info("Support billing: updated %s subscription/session row(s)", changed)
+        except Exception:
+            logger.exception("Error in support subscription status loop")
+        await asyncio.sleep(interval_seconds)

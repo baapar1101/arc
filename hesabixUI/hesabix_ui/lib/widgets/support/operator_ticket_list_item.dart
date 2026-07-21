@@ -149,6 +149,14 @@ class OperatorTicketListItem extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
+                        if (row['is_priority_subscriber'] == true) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.workspace_premium_rounded,
+                            size: 14,
+                            color: theme.colorScheme.tertiary,
+                          ),
+                        ],
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(

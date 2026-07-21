@@ -766,6 +766,17 @@
   "loadingCalendarSettings": "Loading calendar settings...",
   "loadingThemeSettings": "Loading theme settings...",
   "loadingAuthentication": "Loading authentication...",
+  "loadingStepOfTotal": "Step {current} of {total}",
+  "@loadingStepOfTotal": {
+    "placeholders": {
+      "current": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "businessManagementPlatform": "Business Management Platform",
   "businessDashboard": "Business Dashboard",
   "businessStatistics": "Business Statistics",

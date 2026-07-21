@@ -15,6 +15,7 @@ class UserSupportInboxSidebar extends StatelessWidget {
   final VoidCallback onSearchSubmitted;
   final VoidCallback onOpenFilters;
   final VoidCallback onCreateTicket;
+  final VoidCallback? onOpenBilling;
   final Widget ticketList;
 
   const UserSupportInboxSidebar({
@@ -29,6 +30,7 @@ class UserSupportInboxSidebar extends StatelessWidget {
     required this.onSearchSubmitted,
     required this.onOpenFilters,
     required this.onCreateTicket,
+    this.onOpenBilling,
     required this.ticketList,
   });
 
@@ -55,6 +57,13 @@ class UserSupportInboxSidebar extends StatelessWidget {
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const Spacer(),
+                if (onOpenBilling != null)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'اشتراک و صورتحساب',
+                    onPressed: onOpenBilling,
+                    icon: const Icon(Icons.card_membership_outlined, size: 20),
+                  ),
                 Badge(
                   isLabelVisible: activeFilterCount > 0,
                   label: Text('$activeFilterCount'),

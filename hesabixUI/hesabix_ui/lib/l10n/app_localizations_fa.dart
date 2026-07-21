@@ -2171,6 +2171,11 @@ class AppLocalizationsFa extends AppLocalizations {
   String get loadingAuthentication => 'در حال بارگذاری احراز هویت...';
 
   @override
+  String loadingStepOfTotal(int current, int total) {
+    return 'مرحله $current از $total';
+  }
+
+  @override
   String get businessManagementPlatform => 'پلتفرم مدیریت کسب‌وکار';
 
   @override

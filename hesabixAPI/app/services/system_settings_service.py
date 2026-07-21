@@ -136,9 +136,14 @@ def assert_end_user_support_tickets_allowed(db: Session) -> None:
 
 def support_tickets_public_config_dict(db: Session) -> Dict[str, Any]:
 	enabled = is_support_tickets_enabled_for_users(db)
+	from app.services.support.support_billing_settings import support_billing_settings_dict
+
+	billing = support_billing_settings_dict(db)
 	return {
 		"support_tickets_enabled": enabled,
 		"support_tickets_disabled_message": "" if enabled else get_support_tickets_disabled_user_message(db),
+		"support_billing_mode": billing.get("support_billing_mode"),
+		"support_free_quota_per_month": billing.get("support_free_quota_per_month"),
 	}
 
 
@@ -928,7 +933,7 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 			:MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN
 		]
 
-	return {
+	out = {
 		"app_name": (app_name.value_string if app_name and app_name.value_string else env.app_name),
 		"app_version": (app_version.value_string if app_version and app_version.value_string else env.app_version),
 		"default_language": (default_language.value_string if default_language and default_language.value_string else "fa"),
@@ -972,6 +977,10 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"support_tickets_enabled": is_support_tickets_enabled_for_users(db),
 		"support_tickets_disabled_message": support_disabled_msg_storage,
 	}
+	from app.services.support.support_billing_settings import support_billing_settings_dict
+
+	out.update(support_billing_settings_dict(db))
+	return out
 
 
 def set_system_configuration(
@@ -987,6 +996,15 @@ def set_system_configuration(
 	enable_maintenance_mode: bool | None = None,
 	support_tickets_enabled: bool | None = None,
 	support_tickets_disabled_message: str | None = None,
+	support_billing_mode: str | None = None,
+	support_free_quota_per_month: int | None = None,
+	support_grace_period_days: int | None = None,
+	support_allow_read_without_subscription: bool | None = None,
+	support_require_subscription_to_reply: bool | None = None,
+	support_default_gateway_id: int | None = None,
+	support_invoice_prefix: str | None = None,
+	support_expiry_notify_days: list | None = None,
+	support_paid_priority_boost: bool | None = None,
 	session_timeout: int | None = None,
 	max_file_size: int | None = None,
 	max_users: int | None = None,
@@ -1090,6 +1108,21 @@ def set_system_configuration(
 				http_status=400,
 			)
 		_upsert_setting_string(db, SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE, text)
+
+	from app.services.support.support_billing_settings import apply_support_billing_settings
+
+	apply_support_billing_settings(
+		db,
+		support_billing_mode=support_billing_mode,
+		support_free_quota_per_month=support_free_quota_per_month,
+		support_grace_period_days=support_grace_period_days,
+		support_allow_read_without_subscription=support_allow_read_without_subscription,
+		support_require_subscription_to_reply=support_require_subscription_to_reply,
+		support_default_gateway_id=support_default_gateway_id,
+		support_invoice_prefix=support_invoice_prefix,
+		support_expiry_notify_days=support_expiry_notify_days,
+		support_paid_priority_boost=support_paid_priority_boost,
+	)
 	
 	if session_timeout is not None:
 		# 0 به معنی نامحدود است

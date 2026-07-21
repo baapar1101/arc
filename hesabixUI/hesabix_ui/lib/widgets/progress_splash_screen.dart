@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/core/app_init_progress.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'dart:async';
 
+/// Splash با پیشرفت determinate بر اساس مراحل واقعی init (سناریو B).
 class ProgressSplashScreen extends StatefulWidget {
   final String? message;
   final bool showLogo;
   final Color? backgroundColor;
   final Color? primaryColor;
-  final Duration minimumDisplayDuration;
-  final VoidCallback? onComplete;
+
+  /// ۰ تا ۱ — null یعنی مرحله نامشخص (فقط اسپینر).
+  final double? progress;
+  final int currentStep;
+  final int totalSteps;
 
   const ProgressSplashScreen({
     super.key,
@@ -16,8 +20,9 @@ class ProgressSplashScreen extends StatefulWidget {
     this.showLogo = true,
     this.backgroundColor,
     this.primaryColor,
-    this.minimumDisplayDuration = const Duration(seconds: 2),
-    this.onComplete,
+    this.progress,
+    this.currentStep = 1,
+    this.totalSteps = AppInitPhase.totalSteps,
   });
 
   @override
@@ -25,92 +30,53 @@ class ProgressSplashScreen extends StatefulWidget {
 }
 
 class _ProgressSplashScreenState extends State<ProgressSplashScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _fadeController;
-  late AnimationController _scaleController;
-  late AnimationController _progressController;
+    with SingleTickerProviderStateMixin {
+  late AnimationController _entranceController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _progressAnimation;
-  
-  Timer? _countdownTimer;
-  int _remainingSeconds = 0;
+  double _displayedProgress = 0;
 
   @override
   void initState() {
     super.initState();
-    
-    _remainingSeconds = widget.minimumDisplayDuration.inSeconds;
-    
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+    _displayedProgress = widget.progress ?? 0;
+
+    _entranceController = AnimationController(
+      duration: const Duration(milliseconds: 550),
       vsync: this,
     );
-    
-    _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _entranceController,
+      curve: Curves.easeOutCubic,
     );
-    
-    _progressController = AnimationController(
-      duration: widget.minimumDisplayDuration,
-      vsync: this,
+
+    _scaleAnimation = Tween<double>(begin: 0.92, end: 1).animate(
+      CurvedAnimation(
+        parent: _entranceController,
+        curve: Curves.easeOutCubic,
+      ),
     );
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
-    
-    _scaleAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _scaleController,
-      curve: Curves.elasticOut,
-    ));
-    
-    _progressAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _progressController,
-      curve: Curves.easeInOut,
-    ));
-    
-    // Start animations
-    _fadeController.forward();
-    _scaleController.forward();
-    _progressController.forward();
-    
-    // Start countdown timer
-    _startCountdown();
+
+    _entranceController.forward();
   }
 
-  void _startCountdown() {
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() {
-          _remainingSeconds = widget.minimumDisplayDuration.inSeconds - timer.tick;
-          if (_remainingSeconds <= 0) {
-            timer.cancel();
-            widget.onComplete?.call();
-          }
-        });
-      }
-    });
+  @override
+  void didUpdateWidget(ProgressSplashScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.progress != null && oldWidget.progress != widget.progress) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
-    _fadeController.dispose();
-    _scaleController.dispose();
-    _progressController.dispose();
-    _countdownTimer?.cancel();
+    _entranceController.dispose();
     super.dispose();
+  }
+
+  String _stepLabel(AppLocalizations t) {
+    return t.loadingStepOfTotal(widget.currentStep, widget.totalSteps);
   }
 
   @override
@@ -118,179 +84,225 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-    
+    final t = AppLocalizations.of(context);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
     final bgColor = widget.backgroundColor ?? colorScheme.surface;
     final primary = widget.primaryColor ?? colorScheme.primary;
-    
+    final targetProgress = (widget.progress ?? 0).clamp(0.0, 1.0);
+    final isDeterminate = widget.progress != null;
+    final percentLabel = '${(targetProgress * 100).round()}%';
+
     return Scaffold(
       backgroundColor: bgColor,
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: isDark 
-              ? [
-                  bgColor,
-                  bgColor.withValues(alpha: 0.95),
-                ]
-              : [
-                  bgColor,
-                  bgColor.withValues(alpha: 0.98),
-                ],
+      body: Semantics(
+        label: widget.message ?? t.loading,
+        value: isDeterminate ? percentLabel : null,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? [bgColor, bgColor.withValues(alpha: 0.95)]
+                  : [bgColor, bgColor.withValues(alpha: 0.98)],
+            ),
           ),
-        ),
-        child: AnimatedBuilder(
-          animation: Listenable.merge([_fadeAnimation, _scaleAnimation, _progressAnimation]),
-          builder: (context, child) {
-            return Transform.scale(
-              scale: _scaleAnimation.value,
-              child: Opacity(
-                opacity: _fadeAnimation.value,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Logo Section
-                    if (widget.showLogo) ...[
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: primary.withValues(alpha: 0.2),
-                              blurRadius: 20,
-                              spreadRadius: 2,
+          child: AnimatedBuilder(
+            animation: _entranceController,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _scaleAnimation.value,
+                child: Opacity(
+                  opacity: _fadeAnimation.value,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      children: [
+                        const Spacer(flex: 2),
+                        if (widget.showLogo) ...[
+                          Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: primary.withValues(alpha: 0.18),
+                                  blurRadius: 20,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Image.asset(
-                            isDark ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png',
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: primary,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Icon(
-                                  Icons.account_balance,
-                                  size: 60,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              );
-                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: Image.asset(
+                                isDark
+                                    ? 'assets/images/logo-light.png'
+                                    : 'assets/images/logo-blue.png',
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    decoration: BoxDecoration(
+                                      color: primary,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Icon(
+                                      Icons.account_balance,
+                                      size: 50,
+                                      color: colorScheme.onPrimary,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+                        ],
+                        Text(
+                          t.appTitle,
+                          style: theme.textTheme.headlineLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onSurface,
+                            letterSpacing: 1.2,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 32),
-                    ],
-                    
-                    // App Name
-                    Text(
-                      'Hesabix',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    
-                    // Subtitle
-                    Text(
-                      AppLocalizations.of(context).businessManagementPlatform,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 48),
-                    
-                    // Loading Indicator with Progress
-                    Column(
-                      children: [
-                        SizedBox(
-                          width: 40,
-                          height: 40,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            valueColor: AlwaysStoppedAnimation<Color>(primary),
+                        const SizedBox(height: 10),
+                        Text(
+                          t.businessManagementPlatform,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        const SizedBox(height: 48),
+                        _buildProgressSection(
+                          theme: theme,
+                          colorScheme: colorScheme,
+                          primary: primary,
+                          targetProgress: targetProgress,
+                          isDeterminate: isDeterminate,
+                          percentLabel: percentLabel,
+                          stepLabel: _stepLabel(t),
+                          statusMessage: widget.message ?? t.loading,
+                          reduceMotion: reduceMotion,
+                        ),
+                        const Spacer(flex: 3),
+                        Text(
+                          t.version,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.55),
                           ),
                         ),
                         const SizedBox(height: 24),
-                        
-                        // Progress Bar
-                        Container(
-                          width: 200,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(2),
-                            color: colorScheme.surfaceContainerHighest,
-                          ),
-                          child: AnimatedBuilder(
-                            animation: _progressAnimation,
-                            builder: (context, child) {
-                              return FractionallySizedBox(
-                                alignment: Alignment.centerLeft,
-                                widthFactor: _progressAnimation.value,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(2),
-                                    gradient: LinearGradient(
-                                      colors: [primary, primary.withValues(alpha: 0.8)],
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Loading Message
-                        Text(
-                          widget.message ?? AppLocalizations.of(context).loading,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        
-                        // Countdown Timer
-                        if (_remainingSeconds > 0)
-                          Text(
-                            '${_remainingSeconds}s',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
                       ],
                     ),
-                    
-                    const SizedBox(height: 80),
-                    
-                    // Version Info
-                    Text(
-                      AppLocalizations.of(context).version,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildProgressSection({
+    required ThemeData theme,
+    required ColorScheme colorScheme,
+    required Color primary,
+    required double targetProgress,
+    required bool isDeterminate,
+    required String percentLabel,
+    required String stepLabel,
+    required String statusMessage,
+    required bool reduceMotion,
+  }) {
+    if (!isDeterminate) {
+      return Column(
+        children: [
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: CircularProgressIndicator(
+              strokeWidth: 3,
+              valueColor: AlwaysStoppedAnimation<Color>(primary),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            statusMessage,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return TweenAnimationBuilder<double>(
+      key: ValueKey(targetProgress),
+      tween: Tween(begin: _displayedProgress, end: targetProgress),
+      duration:
+          reduceMotion ? Duration.zero : const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+      onEnd: () => _displayedProgress = targetProgress,
+      builder: (context, value, child) {
+        return Column(
+          children: [
+            SizedBox(
+              width: 260,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    stepLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant
+                          .withValues(alpha: 0.85),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    percentLabel,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: primary,
+                      fontWeight: FontWeight.w600,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: value,
+                minHeight: 4,
+                backgroundColor: colorScheme.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(primary),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              statusMessage,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

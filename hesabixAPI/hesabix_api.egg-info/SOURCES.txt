@@ -757,6 +757,7 @@ app/services/ai/prompt_service.py
 app/services/hscript/__init__.py
 app/services/hscript/ast_nodes.py
 app/services/hscript/builtins.py
+app/services/hscript/dates.py
 app/services/hscript/docs_catalog.py
 app/services/hscript/errors.py
 app/services/hscript/excel_renderer.py
@@ -764,6 +765,7 @@ app/services/hscript/hardening.py
 app/services/hscript/interpreter.py
 app/services/hscript/lexer.py
 app/services/hscript/limits.py
+app/services/hscript/number_format.py
 app/services/hscript/parser.py
 app/services/hscript/pdf_renderer.py
 app/services/hscript/plan_limits.py
