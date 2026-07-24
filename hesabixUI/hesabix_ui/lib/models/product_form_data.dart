@@ -1,4 +1,5 @@
 import 'catalog_specification_item.dart';
+import 'product_supplier_item.dart';
 
 const Object _kProductFormCodeUnset = Object();
 const Object _kProductFormFieldUnset = Object();
@@ -74,6 +75,9 @@ class ProductFormData {
   String? catalogVideoUrl;
   List<String> catalogGalleryFileIds;
 
+  /// تأمین‌کنندگان کالا
+  List<ProductSupplierItem> suppliers;
+
   ProductFormData({
     this.itemType = 'کالا',
     this.code,
@@ -116,9 +120,11 @@ class ProductFormData {
     this.catalogCountryOfOrigin,
     this.catalogVideoUrl,
     List<String>? catalogGalleryFileIds,
+    List<ProductSupplierItem>? suppliers,
   })  : selectedAttributeIds = selectedAttributeIds ?? <int>{},
         catalogSpecifications = catalogSpecifications ?? <CatalogSpecificationItem>[],
-        catalogGalleryFileIds = catalogGalleryFileIds ?? <String>[];
+        catalogGalleryFileIds = catalogGalleryFileIds ?? <String>[],
+        suppliers = suppliers ?? <ProductSupplierItem>[];
 
   ProductFormData copyWith({
     String? itemType,
@@ -162,6 +168,7 @@ class ProductFormData {
     Object? catalogCountryOfOrigin = _kProductFormFieldUnset,
     Object? catalogVideoUrl = _kProductFormFieldUnset,
     Object? catalogGalleryFileIds = _kProductFormFieldUnset,
+    Object? suppliers = _kProductFormFieldUnset,
   }) {
     return ProductFormData(
       itemType: itemType ?? this.itemType,
@@ -213,6 +220,11 @@ class ProductFormData {
       catalogGalleryFileIds: identical(catalogGalleryFileIds, _kProductFormFieldUnset)
           ? this.catalogGalleryFileIds
           : List<String>.from((catalogGalleryFileIds as List<String>?) ?? const <String>[]),
+      suppliers: identical(suppliers, _kProductFormFieldUnset)
+          ? this.suppliers
+          : List<ProductSupplierItem>.from(
+              (suppliers as List<ProductSupplierItem>?) ?? const <ProductSupplierItem>[],
+            ),
     );
   }
 
@@ -277,6 +289,15 @@ class ProductFormData {
           : catalogCountryOfOrigin?.trim(),
       'catalog_video_url': catalogVideoUrl?.trim().isEmpty == true ? null : catalogVideoUrl?.trim(),
       'catalog_gallery_file_ids': catalogGalleryFileIds.isEmpty ? null : catalogGalleryFileIds,
+      'suppliers': suppliers.isEmpty
+          ? []
+          : suppliers
+              .where((s) => !s.isEffectivelyEmpty)
+              .toList()
+              .asMap()
+              .entries
+              .map((e) => e.value.toApiWrite(sortOrder: e.key))
+              .toList(),
     };
     // Remove only nulls we intentionally kept nullable
     // فیلدهای زیر حتی با null هم ارسال می‌شوند تا بک‌اند بتواند آن‌ها را به‌روزرسانی/پاک کند
@@ -336,6 +357,7 @@ class ProductFormData {
       catalogCountryOfOrigin: product['catalog_country_of_origin']?.toString(),
       catalogVideoUrl: product['catalog_video_url']?.toString(),
       catalogGalleryFileIds: _parseStringList(product['catalog_gallery_file_ids']),
+      suppliers: _parseSuppliers(product['suppliers']),
     );
   }
 
@@ -370,6 +392,14 @@ class ProductFormData {
   static List<String> _parseStringList(dynamic value) {
     if (value is! List) return <String>[];
     return value.map((e) => e.toString()).where((s) => s.trim().isNotEmpty).toList();
+  }
+
+  static List<ProductSupplierItem> _parseSuppliers(dynamic value) {
+    if (value is! List) return <ProductSupplierItem>[];
+    return value
+        .whereType<Map>()
+        .map((e) => ProductSupplierItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 }
 

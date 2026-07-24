@@ -38,6 +38,10 @@ from app.services.product_inventory_tracking_sync import (
     product_has_stale_inventory_tracking_lines,
     sync_product_inventory_tracking_change,
 )
+from app.services.product_supplier_service import (
+    load_product_suppliers,
+    upsert_product_suppliers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -518,6 +522,7 @@ def create_product(
             # _upsert_attributes را بدون commit صدا می‌زنیم تا همه چیز در یک transaction باشد
             logger.debug(f"[CREATE_PRODUCT] Upserting attributes - attribute_ids={payload.attribute_ids}")
             _upsert_attributes(db, obj.id, business_id, payload.attribute_ids, auto_commit=False)
+            upsert_product_suppliers(db, obj.id, business_id, payload.suppliers, auto_commit=False)
             
             # Commit همه چیز (product و attributes)
             logger.info(f"[CREATE_PRODUCT] Committing transaction for product ID={obj.id}...")
@@ -921,6 +926,8 @@ def update_product(
         replace_general_barcode_aliases(db, business_id, product_id, general_tokens)
 
     _upsert_attributes(db, product_id, business_id, payload.attribute_ids, auto_commit=False)
+    if "suppliers" in fields_set:
+        upsert_product_suppliers(db, product_id, business_id, payload.suppliers, auto_commit=False)
 
     if track_inventory_changed or (
         new_track_inventory
@@ -1379,6 +1386,7 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "is_public_catalog": bool(getattr(obj, "is_public_catalog", False)),
         "catalog_public_uuid": getattr(obj, "catalog_public_uuid", None),
         **catalog_profile_from_product(obj),
+        "suppliers": load_product_suppliers(db, obj.id) if db is not None else [],
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }

@@ -56,133 +56,134 @@ def _get_document_type_name(doc_type: str | None) -> str:
     return mapping.get(doc_type, doc_type)
 
 
-def _find_general_account(account_id: int, accounts_map: Dict[int, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """
-    پیدا کردن حساب کل با پیمایش به سمت بالا تا parent_id = NULL
-    
-    Args:
-        account_id: شناسه حساب
-        accounts_map: دیکشنری کامل تمام حساب‌ها با parent_id
-    
-    Returns:
-        دیکشنری حساب کل یا None
-    """
+def _get_ancestor_chain(account_id: int, accounts_map: Dict[int, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """زنجیرهٔ اجداد از ریشه تا حساب (شامل خود حساب)."""
     if account_id not in accounts_map:
-        return None
-    
-    current_id = account_id
-    visited = set()  # جلوگیری از حلقه بی‌نهایت
-    
+        return []
+
+    chain: List[Dict[str, Any]] = []
+    current_id: Optional[int] = account_id
+    visited: set[int] = set()
+
     while current_id and current_id in accounts_map:
         if current_id in visited:
-            break  # حلقه پیدا شد
+            break
         visited.add(current_id)
-        
-        account = accounts_map[current_id]
-        # اگر parent_id ندارد، این حساب کل است
-        if account['parent_id'] is None:
-            return account
-        
-        # به والد برو
-        current_id = account['parent_id']
-    
+        chain.append(accounts_map[current_id])
+        current_id = accounts_map[current_id]["parent_id"]
+
+    chain.reverse()
+    return chain
+
+
+def _compute_branch_max_depths(accounts_map: Dict[int, Dict[str, Any]]) -> Dict[int, int]:
+    """حداکثر عمق هر شاخه از ریشه‌های آن."""
+    children: Dict[int, List[int]] = {}
+    roots: List[int] = []
+
+    for acc_id, acc in accounts_map.items():
+        parent_id = acc["parent_id"]
+        if parent_id is None:
+            roots.append(acc_id)
+        else:
+            children.setdefault(parent_id, []).append(acc_id)
+
+    branch_max: Dict[int, int] = {}
+
+    def max_depth(node_id: int) -> int:
+        kids = children.get(node_id, [])
+        if not kids:
+            return 1
+        return 1 + max(max_depth(child_id) for child_id in kids)
+
+    for root_id in roots:
+        branch_max[root_id] = max_depth(root_id)
+
+    return branch_max
+
+
+def _get_group_offset(
+    chain: List[Dict[str, Any]],
+    branch_max_depths: Dict[int, int],
+) -> int:
+    """
+    آفست سطح گروه در نمودار حساب:
+    - نمودار ۴ سطحی (گروه/کل/معین/تفصیل): ۱
+    - نمودار ۳ سطحی (کل/معین/تفصیل): ۰
+    """
+    if not chain:
+        return 0
+    root_id = chain[0]["id"]
+    return 1 if branch_max_depths.get(root_id, len(chain)) >= 4 else 0
+
+
+def _find_general_account(
+    account_id: int,
+    accounts_map: Dict[int, Dict[str, Any]],
+    branch_max_depths: Optional[Dict[int, int]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    پیدا کردن حساب کل بر اساس عمق درخت (سطح ۲ در نمودار ۴ سطحی، سطح ۱ در نمودار ۳ سطحی).
+    """
+    chain = _get_ancestor_chain(account_id, accounts_map)
+    if not chain:
+        return None
+
+    if branch_max_depths is None:
+        branch_max_depths = _compute_branch_max_depths(accounts_map)
+
+    general_idx = _get_group_offset(chain, branch_max_depths)
+    if len(chain) > general_idx:
+        return chain[general_idx]
     return None
 
 
 def _find_subsidiary_account(
-    account_id: int, 
-    accounts_map: Dict[int, Dict[str, Any]], 
-    general_account: Optional[Dict[str, Any]]
+    account_id: int,
+    accounts_map: Dict[int, Dict[str, Any]],
+    general_account: Optional[Dict[str, Any]] = None,
+    branch_max_depths: Optional[Dict[int, int]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    پیدا کردن حساب معین:
-    - اگر خود حساب، مستقیماً زیر حساب کل است → خودش حساب معین است
-    - اگر حساب زیر حساب معین است → والد مستقیم حساب معین است
-    
-    Args:
-        account_id: شناسه حساب
-        accounts_map: دیکشنری کامل تمام حساب‌ها با parent_id
-        general_account: حساب کل (اگر پیدا شده باشد)
-    
-    Returns:
-        دیکشنری حساب معین یا None
+    پیدا کردن حساب معین بر اساس عمق درخت (سطح ۳ در نمودار ۴ سطحی، سطح ۲ در نمودار ۳ سطحی).
     """
-    if account_id not in accounts_map:
+    chain = _get_ancestor_chain(account_id, accounts_map)
+    if not chain:
         return None
-    
-    account = accounts_map[account_id]
-    
-    # اگر خودش حساب کل است
-    if account['parent_id'] is None:
-        return None  # حساب معین ندارد
-    
-    # اگر حساب کل پیدا نشده، ابتدا آن را پیدا کن
-    if general_account is None:
-        general_account = _find_general_account(account_id, accounts_map)
-        if general_account is None:
-            return None
-    
-    # اگر والد مستقیم، حساب کل است
-    parent_id = account['parent_id']
-    if parent_id == general_account['id']:
-        # خود حساب، حساب معین است
-        return account
-    
-    # اگر والد مستقیم، خودش حساب معین است (parent_id آن = حساب کل)
-    if parent_id in accounts_map:
-        parent = accounts_map[parent_id]
-        if parent['parent_id'] == general_account['id']:
-            return parent
-    
-    # در غیر این صورت، به سمت بالا برو تا حساب معین را پیدا کنی
-    current_id = account_id
-    visited = set()
-    
-    while current_id and current_id in accounts_map:
-        if current_id in visited:
-            break
-        visited.add(current_id)
-        
-        acc = accounts_map[current_id]
-        if acc['parent_id'] is None:
-            break
-        
-        parent_id = acc['parent_id']
-        if parent_id in accounts_map:
-            parent = accounts_map[parent_id]
-            # اگر والد، مستقیماً زیر حساب کل است
-            if parent['parent_id'] == general_account['id']:
-                return parent
-        
-        current_id = parent_id
-    
+
+    if branch_max_depths is None:
+        branch_max_depths = _compute_branch_max_depths(accounts_map)
+
+    subsidiary_idx = _get_group_offset(chain, branch_max_depths) + 1
+    if len(chain) > subsidiary_idx:
+        return chain[subsidiary_idx]
     return None
 
 
 def _find_detail_account(
     account_id: int,
     accounts_map: Dict[int, Dict[str, Any]],
-    subsidiary_account: Optional[Dict[str, Any]],
+    subsidiary_account: Optional[Dict[str, Any]] = None,
+    branch_max_depths: Optional[Dict[int, int]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     پیدا کردن حساب تفصیلی:
     - اگر حساب ثبت‌شده زیر سطح معین باشد، خود آن حساب تفصیلی است
     - اگر حساب در سطح کل یا معین باشد، تفصیلی ندارد
     """
-    if account_id not in accounts_map or subsidiary_account is None:
-        return None
-    if account_id == subsidiary_account["id"]:
+    if account_id not in accounts_map:
         return None
 
-    current_id = account_id
-    visited: set[int] = set()
-    while current_id and current_id in accounts_map:
-        if current_id in visited:
-            break
-        visited.add(current_id)
-        if current_id == subsidiary_account["id"]:
-            return accounts_map.get(account_id)
-        current_id = accounts_map[current_id]["parent_id"]
+    chain = _get_ancestor_chain(account_id, accounts_map)
+    if not chain:
+        return None
+
+    if branch_max_depths is None:
+        branch_max_depths = _compute_branch_max_depths(accounts_map)
+
+    subsidiary_idx = _get_group_offset(chain, branch_max_depths) + 1
+    if len(chain) > subsidiary_idx + 1:
+        return accounts_map.get(account_id)
     return None
 
 
@@ -318,6 +319,7 @@ def get_journal_ledger_report(
             'name': acc.name,
             'parent_id': acc.parent_id,
         }
+    branch_max_depths = _compute_branch_max_depths(accounts_full_map)
     
     # دریافت اطلاعات حساب‌های استفاده شده (برای نمایش در خروجی)
     accounts_map = {}
@@ -399,16 +401,22 @@ def get_journal_ledger_report(
         subsidiary_account = None
         detail_account = None
         if account_id_for_general_subsidiary:
-            general_account = _find_general_account(account_id_for_general_subsidiary, accounts_full_map)
+            general_account = _find_general_account(
+                account_id_for_general_subsidiary,
+                accounts_full_map,
+                branch_max_depths,
+            )
             subsidiary_account = _find_subsidiary_account(
-                account_id_for_general_subsidiary, 
-                accounts_full_map, 
-                general_account
+                account_id_for_general_subsidiary,
+                accounts_full_map,
+                general_account,
+                branch_max_depths,
             )
             detail_account = _find_detail_account(
                 account_id_for_general_subsidiary,
                 accounts_full_map,
                 subsidiary_account,
+                branch_max_depths,
             )
         
         items.append({

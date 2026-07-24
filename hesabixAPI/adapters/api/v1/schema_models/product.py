@@ -30,6 +30,70 @@ class CatalogSpecificationItem(BaseModel):
     sort_order: int = Field(default=0, ge=0)
 
 
+class ProductSupplierSocialContactInput(BaseModel):
+    """راه ارتباط پیام‌رسان برای تأمین‌کنندهٔ کالا"""
+    model_config = ConfigDict(extra="ignore")
+
+    platform_key: str = Field(..., min_length=1, max_length=64)
+    custom_label: Optional[str] = Field(default=None, max_length=128)
+    value: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("platform_key", mode="before")
+    @classmethod
+    def _norm_platform_key(cls, v) -> str:
+        return ("" if v is None else str(v)).strip().lower()
+
+    @field_validator("custom_label", mode="before")
+    @classmethod
+    def _empty_custom_to_none(cls, v):
+        if v is None:
+            return None
+        t = str(v).strip()
+        return t if t else None
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _norm_value(cls, v) -> str:
+        return ("" if v is None else str(v)).strip()
+
+    @model_validator(mode="after")
+    def _other_needs_label(self):
+        if self.platform_key == "other" and not self.custom_label:
+            raise ValueError("برای پلتفرم «سایر» باید نام/برچسب وارد شود")
+        return self
+
+
+class ProductSupplierInput(BaseModel):
+    """تأمین‌کنندهٔ یک کالا (ورودی ایجاد/ویرایش)"""
+    model_config = ConfigDict(extra="ignore")
+
+    id: Optional[int] = Field(default=None, description="شناسه (فقط برای نمایش؛ در ذخیره نادیده گرفته می‌شود)")
+    person_id: Optional[int] = Field(default=None, gt=0, description="لینک به شخص تأمین‌کننده (اختیاری)")
+    name: Optional[str] = Field(default=None, max_length=255, description="نام/عنوان")
+    website: Optional[str] = Field(default=None, max_length=512)
+    phone: Optional[str] = Field(default=None, max_length=64)
+    email: Optional[str] = Field(default=None, max_length=255)
+    notes: Optional[str] = Field(default=None, max_length=4000)
+    is_preferred: bool = Field(default=False)
+    sort_order: int = Field(default=0, ge=0)
+    social_contacts: List[ProductSupplierSocialContactInput] = Field(default_factory=list)
+
+
+class ProductSupplierResponse(BaseModel):
+    """تأمین‌کنندهٔ یک کالا (خروجی API)"""
+    id: int
+    person_id: Optional[int] = None
+    person_name: Optional[str] = None
+    name: str
+    website: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    notes: Optional[str] = None
+    is_preferred: bool = False
+    sort_order: int = 0
+    social_contacts: List[Dict[str, Any]] = Field(default_factory=list)
+
+
 class ProductOpeningBalanceInput(BaseModel):
     """تعداد اولیه کالا — فقط در سند تراز افتتاحیه ذخیره می‌شود."""
     model_config = ConfigDict(extra="ignore")
@@ -287,6 +351,11 @@ class ProductCreateRequest(ProductCatalogProfileMixin):
         default=None,
         description="تعداد اولیه — در سند تراز افتتاحیه سال مالی جاری ثبت می‌شود",
     )
+
+    suppliers: Optional[List[ProductSupplierInput]] = Field(
+        default=None,
+        description="تأمین‌کنندگان کالا (جایگزینی کامل در ویرایش)",
+    )
     
     class Config:
         json_schema_extra = {
@@ -355,6 +424,11 @@ class ProductUpdateRequest(ProductCatalogProfileMixin):
     opening_balance: Optional[ProductOpeningBalanceInput] = Field(
         default=None,
         description="تعداد اولیه — در سند تراز افتتاحیه سال مالی جاری ثبت/به‌روزرسانی می‌شود",
+    )
+
+    suppliers: Optional[List[ProductSupplierInput]] = Field(
+        default=None,
+        description="تأمین‌کنندگان کالا؛ اگر ارسال شود جایگزین کامل است",
     )
 
 
@@ -500,6 +574,11 @@ class ProductResponse(BaseModel):
     # ویژگی‌ها
     attributes: Optional[List[dict]] = None
     attribute_ids: Optional[List[int]] = None
+
+    suppliers: Optional[List[ProductSupplierResponse]] = Field(
+        default=None,
+        description="تأمین‌کنندگان کالا",
+    )
     
     # موجودی (برای جستجو با include_inventory)
     inventory_stock_accounting: Optional[Decimal] = None

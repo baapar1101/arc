@@ -9,6 +9,7 @@ import '../../../utils/product_form_validator.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
+import 'product_suppliers_section.dart';
 
 
 class ProductPricingInventorySection extends StatefulWidget {
@@ -152,6 +153,12 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
         _buildPricingSection(context),
         const SizedBox(height: 24),
         _buildPerPriceListPricing(context),
+        const SizedBox(height: 24),
+        ProductSuppliersSection(
+          businessId: widget.businessId,
+          formData: widget.formData,
+          onChanged: _updateFormData,
+        ),
       ],
     );
   }
