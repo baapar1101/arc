@@ -11,7 +11,6 @@ from app.services.account_balance_core import (
     apply_column_mode,
     apply_column_mode_to_tree,
     build_account_tree,
-    build_flat_leaf_items,
     build_tree_items,
     compute_leaf_balances,
     fetch_business_accounts,
@@ -113,14 +112,7 @@ def get_trial_balance_report(
         output_items = apply_column_mode_to_tree(tree_items, column_mode)
         flat_for_totals = tree_items
     else:
-        if account_level >= 4:
-            flat_items = build_flat_leaf_items(
-                account_tree,
-                leaf_balances,
-                include_zero_balance=include_zero_balance,
-            )
-        else:
-            flat_items = flatten_tree_at_level(tree_items, account_level)
+        flat_items = flatten_tree_at_level(tree_items, account_level)
         output_items = [apply_column_mode(item, column_mode) for item in flat_items]
         flat_for_totals = flat_items
 

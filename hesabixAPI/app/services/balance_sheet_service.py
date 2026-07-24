@@ -183,6 +183,18 @@ def _build_permanent_account_tree(
         return nodes
 
     all_nodes = build_nodes(None, 0)
+    return _group_nodes_by_subsection(all_nodes)
+
+
+def _group_nodes_by_subsection(
+    nodes: List[Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """توزیع گره‌های درخت به زیربخش‌های ترازنامه.
+
+    ریشه‌های گروه (۱، ۲) subsection ندارند؛ فرزندان مستقیم و غیرمستقیم آن‌ها
+    (مثلاً ۱۰۱، ۱۰۲، ۲۰۱) بر اساس کد حساب در بخش مناسب قرار می‌گیرند.
+    ریشه حقوق صاحبان سهام (۳) خودش subsection دارد و با زیردرخت کامل نگه داشته می‌شود.
+    """
     grouped: Dict[str, List[Dict[str, Any]]] = {
         "current_assets": [],
         "non_current_assets": [],
@@ -190,19 +202,25 @@ def _build_permanent_account_tree(
         "non_current_liabilities": [],
         "equity": [],
     }
-    for node in all_nodes:
+
+    def assign_node(node: Dict[str, Any]) -> None:
         subsection = node.get("subsection")
         if subsection in grouped:
             grouped[subsection].append(node)
+            return
+        for child in node.get("children") or []:
+            assign_node(child)
+
+    for node in nodes:
+        assign_node(node)
     return grouped
 
 
 def _sum_section_amount(items: List[Dict[str, Any]]) -> Decimal:
+    """جمع مبالغ سطرهای سطح اول هر بخش (مانده والد از قبل rollup شده است)."""
     total = Decimal(0)
     for item in items:
         total += Decimal(str(item.get("amount", 0) or 0))
-        if item.get("children"):
-            total += _sum_section_amount(item["children"])
     return total
 
 

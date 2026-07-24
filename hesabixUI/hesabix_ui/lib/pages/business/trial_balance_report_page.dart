@@ -66,8 +66,17 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
   String _localizedAccountType(AppLocalizations t, String? value) {
     if (value == null || value.isEmpty) return '-';
     final ln = t.localeName;
+    // مقادیر عددی از seed قدیمی چارت حساب
+    const numericTypeMap = {
+      '0': 'accounting_document',
+      '1': 'cash_register',
+      '2': 'petty_cash',
+      '3': 'bank',
+      '4': 'check',
+    };
+    final normalized = numericTypeMap[value] ?? value;
     if (ln.startsWith('fa')) {
-      switch (value) {
+      switch (normalized) {
         case 'bank':
           return t.accountTypeBank;
         case 'cash_register':
@@ -95,7 +104,7 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
           .map((p) => p.isEmpty ? p : (p[0].toUpperCase() + p.substring(1)))
           .join(' ');
     }
-    switch (value) {
+    switch (normalized) {
       case 'bank':
         return t.accountTypeBank;
       case 'cash_register':

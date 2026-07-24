@@ -20,6 +20,18 @@ DISPLAY_MODES = frozenset({"flat", "tree"})
 ACCOUNT_LEVELS = frozenset({1, 2, 3, 4})
 BALANCE_TOLERANCE = Decimal("0.01")
 
+# نگاشت نوع حساب UI/API به مقادیر ممکن در دیتابیس (رشته‌ای یا عددی از seed قدیمی)
+ACCOUNT_TYPE_FILTER_ALIASES: Dict[str, tuple[str, ...]] = {
+    "bank": ("bank", "3"),
+    "cash_register": ("cash_register", "1"),
+    "petty_cash": ("petty_cash", "2"),
+    "check": ("check", "4"),
+    "person": ("person", "5"),
+    "product": ("product", "6"),
+    "service": ("service", "7"),
+    "accounting_document": ("accounting_document", "0"),
+}
+
 
 @dataclass
 class AccountBalance:
@@ -97,6 +109,19 @@ def resolve_date_range(
     return fy_id, date_from_obj, date_to_obj
 
 
+def resolve_account_type_filter(account_type: Optional[str]) -> Optional[tuple[str, ...]]:
+    """تبدیل نوع حساب درخواستی به مجموعه مقادیر قابل جستجو در دیتابیس."""
+    if not account_type:
+        return None
+    key = str(account_type).strip()
+    if not key:
+        return None
+    aliases = ACCOUNT_TYPE_FILTER_ALIASES.get(key)
+    if aliases:
+        return aliases
+    return (key,)
+
+
 def fetch_business_accounts(
     db: Session,
     business_id: int,
@@ -107,8 +132,12 @@ def fetch_business_accounts(
     query = db.query(Account).filter(
         (Account.business_id == None) | (Account.business_id == business_id)  # noqa: E711
     )
-    if account_type:
-        query = query.filter(Account.account_type == account_type)
+    type_filter = resolve_account_type_filter(account_type)
+    if type_filter:
+        if len(type_filter) == 1:
+            query = query.filter(Account.account_type == type_filter[0])
+        else:
+            query = query.filter(Account.account_type.in_(type_filter))
     if account_ids:
         query = query.filter(Account.id.in_(account_ids))
     accounts = query.order_by(Account.code.asc()).all()
@@ -141,7 +170,12 @@ def build_account_tree(accounts: List[Account]) -> Dict[int, Dict[str, Any]]:
 
 
 def get_root_account_ids(account_tree: Dict[int, Dict[str, Any]]) -> List[int]:
-    roots = [aid for aid, data in account_tree.items() if data["parent_id"] is None]
+    """ریشه‌های درخت؛ حساب‌هایی که والدشان در مجموعه فیلترشده نیست نیز ریشه محسوب می‌شوند."""
+    roots = [
+        aid
+        for aid, data in account_tree.items()
+        if data["parent_id"] is None or data["parent_id"] not in account_tree
+    ]
     roots.sort(key=lambda aid: account_tree[aid]["code"])
     return roots
 
