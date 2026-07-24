@@ -29,7 +29,11 @@ from adapters.api.v1.support.message_helpers import serialize_message, serialize
 from adapters.api.v1.support.ticket_serialize import ticket_to_dict, ticket_response_dict
 from app.services.support.ticket_engagement_service import mark_operator_read
 from adapters.db.repositories.support.attachment_repository import AttachmentRepository
-from app.services.support.notification_helpers import support_notification_context
+from app.services.support.notification_helpers import (
+    support_notification_context,
+    support_operator_notification_context,
+    resolve_announcement_navigation,
+)
 import logging
 
 router = APIRouter()
@@ -298,15 +302,13 @@ async def assign_ticket(
             operator = user_repo.get_by_id(new_operator_id)
             operator_name = f"{operator.first_name or ''} {operator.last_name or ''}".strip() if operator else "اپراتور پشتیبانی"
             
-            context = {
+            context = support_operator_notification_context({
                 "subject": f"تیکت جدید به شما تخصیص داده شد: #{ticket_id}",
                 "message": f"تیکت #{ticket_id}: {ticket_with_details.title} به شما تخصیص داده شد.",
-                "ticket_id": ticket_id,
                 "ticket_title": ticket_with_details.title,
                 "operator_name": operator_name,
                 "user_id": ticket_with_details.user_id,
-                "deep_link": f"/user/profile/operator?ticket={ticket_id}",
-            }
+            }, ticket_id)
             
             notification_service.send(
                 user_id=new_operator_id,
@@ -499,8 +501,9 @@ async def bulk_assign_tickets(
                 "subject": f"{updated_count} تیکت به شما تخصیص داده شد",
                 "message": f"{updated_count} تیکت به شما تخصیص داده شد.",
                 "operator_name": operator_name,
-                "ticket_count": updated_count
+                "ticket_count": updated_count,
             }
+            context.update(resolve_announcement_navigation("support.tickets_bulk_assigned", context))
             
             notification_service.send(
                 user_id=bulk_request.operator_id,
@@ -571,8 +574,12 @@ async def bulk_update_ticket_status(
                     "message": f"وضعیت {len(user_tickets)} تیکت شما به '{new_status_name}' تغییر کرد.",
                     "operator_name": operator_name,
                     "new_status": new_status_name,
-                    "ticket_count": len(user_tickets)
+                    "ticket_count": len(user_tickets),
                 }
+                if len(user_tickets) == 1:
+                    context = support_notification_context(context, user_tickets[0].id)
+                else:
+                    context.update(resolve_announcement_navigation("support.tickets_bulk_status_changed", context))
                 
                 notification_service.send(
                     user_id=user_id,

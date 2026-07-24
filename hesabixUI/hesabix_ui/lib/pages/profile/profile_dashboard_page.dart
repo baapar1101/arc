@@ -17,6 +17,7 @@ import '../../core/mobile_launcher_prefs.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/announcement_navigation.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../theme/tokens/extensions.dart';
 import '../../widgets/support/ticket_details_dialog.dart';
@@ -868,6 +869,27 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
             final busy = annId != null && _annBusyIds.contains(annId);
             return ListTile(
               dense: true,
+              onTap: () async {
+                await AnnouncementNavigation.handleTap(
+                  context,
+                  it,
+                  isSupportOperator: widget.authStore.canAccessSupportOperator,
+                  onMarkedRead: (id) async {
+                    if (_annOnlyUnread) {
+                      final current = (_data['profile_announcements'] as Map?)?['items'];
+                      if (current is List) {
+                        setState(() {
+                          current.removeWhere(
+                            (e) => AnnouncementNavigation.parseAnnouncementId((e as Map)['id']) == id,
+                          );
+                        });
+                      }
+                    } else {
+                      await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
+                    }
+                  },
+                );
+              },
               leading: Icon(pinned ? Icons.push_pin : Icons.notifications, color: pinned ? theme.colorScheme.primary : null),
               title: Row(
                 children: [

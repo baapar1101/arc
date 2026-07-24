@@ -21,6 +21,9 @@ class Announcement(Base):
 	starts_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
 	ends_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True, index=True)
 	audience_filters: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+	deep_link: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+	ticket_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+	event_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
 
 	created_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

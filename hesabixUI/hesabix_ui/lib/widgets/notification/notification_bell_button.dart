@@ -12,6 +12,7 @@ import '../../services/announcements_service.dart';
 import '../../services/in_app_notification_preferences_controller.dart';
 import '../../services/notification_alert_sound_player.dart';
 import '../../services/notifications_ws_client.dart';
+import '../../utils/announcement_navigation.dart';
 import '../../utils/snackbar_helper.dart';
 
 String _localizedAnnouncementLevel(BuildContext context, String raw) {
@@ -131,15 +132,20 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
               final dynamic aid = msg['announcement_id'];
               final int? annId = aid is int ? aid : int.tryParse('$aid');
               final deepLink = msg['deep_link']?.toString();
+              final eventKey = msg['event_key']?.toString();
+              final ticketId = msg['ticket_id'];
               if (!mounted) return;
               setState(() {
-                _notifications.insert(0, <String, dynamic>{
+                _notifications.insert(0, AnnouncementNavigation.normalizeItem(<String, dynamic>{
                   'title': title,
                   'body': body,
                   'level': level,
                   if (annId != null) 'id': annId,
                   if (deepLink != null && deepLink.isNotEmpty) 'deep_link': deepLink,
-                });
+                  if (eventKey != null && eventKey.isNotEmpty) 'event_key': eventKey,
+                  if (ticketId != null) 'ticket_id': ticketId,
+                  'is_read': false,
+                }));
                 _unreadCount = (_unreadCount + 1).clamp(0, 99);
               });
               if (prefs.mode == InAppAlertMode.normal && prefs.soundEnabled) {
@@ -152,10 +158,36 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
                   SnackBar(
                     content: Text('$title: $body'),
                     duration: const Duration(seconds: 4),
-                    action: deepLink != null && deepLink.isNotEmpty
+                    action: AnnouncementNavigation.hasNavigableTarget(<String, dynamic>{
+                          if (annId != null) 'id': annId,
+                          if (deepLink != null && deepLink.isNotEmpty) 'deep_link': deepLink,
+                          if (eventKey != null && eventKey.isNotEmpty) 'event_key': eventKey,
+                          if (ticketId != null) 'ticket_id': ticketId,
+                        })
                         ? SnackBarAction(
                             label: 'مشاهده',
-                            onPressed: () => context.go(deepLink),
+                            onPressed: () {
+                              unawaited(
+                                AnnouncementNavigation.handleTap(
+                                  context,
+                                  <String, dynamic>{
+                                    if (annId != null) 'id': annId,
+                                    if (deepLink != null && deepLink.isNotEmpty) 'deep_link': deepLink,
+                                    if (eventKey != null && eventKey.isNotEmpty) 'event_key': eventKey,
+                                    if (ticketId != null) 'ticket_id': ticketId,
+                                  },
+                                  onMarkedRead: (id) {
+                                    if (!mounted) return;
+                                    setState(() {
+                                      _notifications.removeWhere(
+                                        (e) => AnnouncementNavigation.parseAnnouncementId(e['id']) == id,
+                                      );
+                                      _unreadCount = (_unreadCount - 1).clamp(0, 99);
+                                    });
+                                  },
+                                ),
+                              );
+                            },
                           )
                         : null,
                   ),
@@ -191,12 +223,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
       setState(() {
         _notifications.clear();
         for (final it in items) {
-          _notifications.add(<String, dynamic>{
-            'title': '${it['title'] ?? 'اعلان'}',
-            'body': '${it['body'] ?? ''}',
-            'level': '${it['level'] ?? 'info'}',
-            'id': it['id'],
-          });
+          _notifications.add(AnnouncementNavigation.normalizeItem(it));
         }
         _unreadCount = total.clamp(0, 99);
       });
@@ -204,9 +231,6 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
   }
 
   void _openNotificationCenter() {
-    setState(() {
-      _unreadCount = 0;
-    });
     showDialog<void>(
       context: context,
       builder: (context) {
@@ -280,14 +304,26 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
                               icon = Icons.notifications_none;
                               levelColor = cs.primary;
                           }
-                          final int? annId = it['id'] is int ? it['id'] as int : int.tryParse('${it['id']}');
-                          final deepLink = it['deep_link']?.toString();
+                          final int? annId = AnnouncementNavigation.parseAnnouncementId(it['id']);
+                          final bool canNavigate = AnnouncementNavigation.hasNavigableTarget(it);
                           final bool busy = annId != null && _busyAnnIds.contains(annId);
                           return InkWell(
-                            onTap: deepLink != null && deepLink.isNotEmpty
-                                ? () {
-                                    Navigator.of(context).pop();
-                                    context.go(deepLink);
+                            onTap: canNavigate
+                                ? () async {
+                                    await AnnouncementNavigation.handleTap(
+                                      context,
+                                      it,
+                                      onBeforeNavigate: () => Navigator.of(context).pop(),
+                                      onMarkedRead: (id) {
+                                        setState(() {
+                                          _notifications.removeWhere(
+                                            (e) => AnnouncementNavigation.parseAnnouncementId(e['id']) == id,
+                                          );
+                                          _unreadCount = (_unreadCount - 1).clamp(0, 99);
+                                        });
+                                        dialogSetState(() {});
+                                      },
+                                    );
                                   }
                                 : null,
                             borderRadius: BorderRadius.circular(12),

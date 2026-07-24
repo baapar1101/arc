@@ -12,6 +12,7 @@ from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.db.repositories.support.message_repository import MessageRepository
 from adapters.api.v1.schemas import QueryInfo
 from app.services.notification_service import NotificationService
+from app.services.support.notification_helpers import support_notification_context
 from pydantic import BaseModel
 import logging
 
@@ -188,14 +189,15 @@ async def ai_auto_reply(
             operator_name = f"{ctx.user.first_name or ''} {ctx.user.last_name or ''}".strip() or "اپراتور پشتیبانی"
             message_preview = suggested_reply[:200] + ("..." if len(suggested_reply) > 200 else "")
             
-            context = {
+            context = support_notification_context({
                 "subject": f"پاسخ جدید به تیکت #{ticket_id}",
                 "message": f"اپراتور {operator_name} به تیکت شما پاسخ داد:\n\n{message_preview}",
                 "ticket_id": ticket_id,
                 "ticket_title": ticket.title if hasattr(ticket, 'title') else "تیکت",
                 "operator_name": operator_name,
-                "message_preview": message_preview
-            }
+                "message_preview": message_preview,
+                "user_id": ticket.user_id,
+            }, ticket_id)
             
             notification_service.send(
                 user_id=ticket.user_id,
