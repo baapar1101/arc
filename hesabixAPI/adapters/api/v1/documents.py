@@ -44,6 +44,8 @@ from app.services.pnl_service import get_pnl_period_report, get_pnl_cumulative_r
 from app.services.pnl_export_service import pnl_excel_response, pnl_pdf_response
 from app.services.account_review_service import get_accounts_review_report
 from app.services.journal_ledger_service import get_journal_ledger_report
+from app.services.journal_ledger_electronic_export_service import export_electronic_journal_books
+from app.services.general_ledger_electronic_export_service import export_electronic_general_ledger_books
 from app.core.cache import get_cache
 from app.core.i18n import negotiate_locale
 from app.services.pdf.template_renderer import render_template, load_farsi_font_data_uris
@@ -4450,6 +4452,66 @@ async def export_general_ledger_report_excel(
 
 
 @router.post(
+    "/businesses/{business_id}/reports/general-ledger/export/electronic-books",
+    summary="خروجی دفتر کل الکترونیکی (سازمان امور مالیاتی)",
+    description=(
+        "خروجی Excel یا CSV دفتر کل مطابق قالب سامانه دفاتر تجاری الکترونیکی. "
+        "شامل حساب کل، معین و تفصیلی به‌همراه گردش بدهکار/بستانکار و تاریخ گردش."
+    ),
+)
+@require_business_access("business_id")
+async def export_general_ledger_electronic_books(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی دفتر کل الکترونیکی برای بارگذاری در سامانه مالیاتی"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    date_from = body.get("date_from")
+    date_to = body.get("date_to")
+    currency_id = body.get("currency_id")
+    document_type = body.get("document_type")
+    include_proforma = body.get("include_proforma", False)
+    export_format = body.get("format", "auto")
+
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    return export_electronic_general_ledger_books(
+        db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        document_type=document_type,
+        include_proforma=include_proforma,
+        export_format=str(export_format),
+    )
+
+
+@router.post(
     "/businesses/{business_id}/reports/general-ledger/export/pdf",
     summary="خروجی PDF گزارش دفتر کل",
     description="خروجی PDF گزارش دفتر کل با قابلیت فیلتر، انتخاب سطرها و رعایت ترتیب/نمایش ستون‌ها",
@@ -6816,6 +6878,66 @@ async def export_journal_ledger_report_excel(
             "Content-Length": str(len(content)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/journal-ledger/export/electronic-books",
+    summary="خروجی دفتر روزنامه الکترونیکی (سازمان امور مالیاتی)",
+    description=(
+        "خروجی Excel یا CSV دفتر روزنامه مطابق قالب سامانه دفاتر تجاری الکترونیکی. "
+        "ستون‌ها، ترتیب و فرمت تاریخ/مبالغ ریالی مطابق استاندارد رسمی است."
+    ),
+)
+@require_business_access("business_id")
+async def export_journal_ledger_electronic_books(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی دفتر روزنامه الکترونیکی برای بارگذاری در سامانه مالیاتی"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    date_from = body.get("date_from")
+    date_to = body.get("date_to")
+    currency_id = body.get("currency_id")
+    document_type = body.get("document_type")
+    include_proforma = body.get("include_proforma", False)
+    export_format = body.get("format", "auto")
+
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    return export_electronic_journal_books(
+        db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        document_type=document_type,
+        include_proforma=include_proforma,
+        export_format=str(export_format),
     )
 
 

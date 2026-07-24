@@ -159,6 +159,33 @@ def _find_subsidiary_account(
     return None
 
 
+def _find_detail_account(
+    account_id: int,
+    accounts_map: Dict[int, Dict[str, Any]],
+    subsidiary_account: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """
+    پیدا کردن حساب تفصیلی:
+    - اگر حساب ثبت‌شده زیر سطح معین باشد، خود آن حساب تفصیلی است
+    - اگر حساب در سطح کل یا معین باشد، تفصیلی ندارد
+    """
+    if account_id not in accounts_map or subsidiary_account is None:
+        return None
+    if account_id == subsidiary_account["id"]:
+        return None
+
+    current_id = account_id
+    visited: set[int] = set()
+    while current_id and current_id in accounts_map:
+        if current_id in visited:
+            break
+        visited.add(current_id)
+        if current_id == subsidiary_account["id"]:
+            return accounts_map.get(account_id)
+        current_id = accounts_map[current_id]["parent_id"]
+    return None
+
+
 def get_journal_ledger_report(
     db: Session,
     business_id: int,
@@ -171,6 +198,7 @@ def get_journal_ledger_report(
     include_proforma: bool = False,
     skip: int = 0,
     take: int = 50,
+    disable_pagination: bool = False,
 ) -> Dict[str, Any]:
     """
     گزارش دفتر روزنامه
@@ -191,6 +219,7 @@ def get_journal_ledger_report(
         include_proforma: شامل اسناد پیش‌نویس (پیش‌فرض: False)
         skip: تعداد رکوردهای رد شده برای pagination
         take: تعداد رکوردهای برگشتی
+        disable_pagination: بازگرداندن تمام سطرها بدون صفحه‌بندی (برای export)
     
     Returns:
         dict: {
@@ -368,12 +397,18 @@ def get_journal_ledger_report(
         
         general_account = None
         subsidiary_account = None
+        detail_account = None
         if account_id_for_general_subsidiary:
             general_account = _find_general_account(account_id_for_general_subsidiary, accounts_full_map)
             subsidiary_account = _find_subsidiary_account(
                 account_id_for_general_subsidiary, 
                 accounts_full_map, 
                 general_account
+            )
+            detail_account = _find_detail_account(
+                account_id_for_general_subsidiary,
+                accounts_full_map,
+                subsidiary_account,
             )
         
         items.append({
@@ -387,6 +422,8 @@ def get_journal_ledger_report(
             'general_account_name': general_account['name'] if general_account else None,
             'subsidiary_account_code': subsidiary_account['code'] if subsidiary_account else None,
             'subsidiary_account_name': subsidiary_account['name'] if subsidiary_account else None,
+            'detail_account_code': detail_account['code'] if detail_account else None,
+            'detail_account_name': detail_account['name'] if detail_account else None,
             'debit_account_id': debit_account['id'] if debit_account else None,
             'debit_account_code': debit_account['code'] if debit_account else None,
             'debit_account_name': debit_account['name'] if debit_account else None,
@@ -402,9 +439,14 @@ def get_journal_ledger_report(
     
     # Pagination
     total = len(items)
-    current_page = (skip // take) + 1
-    total_pages = (total + take - 1) // take if take > 0 else 1
-    paginated_items = items[skip:skip + take]
+    if disable_pagination:
+        paginated_items = items
+        current_page = 1
+        total_pages = 1
+    else:
+        current_page = (skip // take) + 1
+        total_pages = (total + take - 1) // take if take > 0 else 1
+        paginated_items = items[skip:skip + take]
     
     # بررسی تراز (Trial Balance Check)
     balance_valid = True

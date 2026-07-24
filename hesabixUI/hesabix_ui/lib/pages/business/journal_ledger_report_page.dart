@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
+import 'package:file_saver/file_saver.dart';
+import 'dart:typed_data';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -11,6 +14,8 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
 
 class JournalLedgerReportPage extends StatefulWidget {
   final int businessId;
@@ -41,6 +46,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
   
   // Summary from API response
   Map<String, dynamic>? _summary;
+  bool _isExportingElectronic = false;
 
   // Document types
   final Map<String, String> _documentTypes = {
@@ -160,6 +166,91 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
     };
   }
 
+  bool _isSelectedCurrencyRial() {
+    if (_selectedCurrencyId == null) return false;
+    for (final currency in _currencies) {
+      if (currency['id'] == _selectedCurrencyId) {
+        final code = (currency['code'] ?? currency['name'] ?? '').toString().toUpperCase();
+        return code == 'IRR' || code == 'RIAL';
+      }
+    }
+    return false;
+  }
+
+  Future<void> _exportElectronicBooks() async {
+    if (_isExportingElectronic) return;
+
+    if (!_isSelectedCurrencyRial()) {
+      SnackBarHelper.showError(
+        context,
+        message: 'برای خروجی دفتر الکترونیکی باید ارز ریال (IRR) انتخاب شود.',
+      );
+      return;
+    }
+
+    setState(() => _isExportingElectronic = true);
+    final t = AppLocalizations.of(context);
+
+    try {
+      final api = ApiClient();
+      final response = await api.post<List<int>>(
+        '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/electronic-books',
+        data: {
+          ..._additionalParams(),
+          'format': 'auto',
+        },
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {
+            'X-Calendar-Type': widget.calendarController.isJalali ? 'jalali' : 'gregorian',
+          },
+        ),
+      );
+
+      final data = response.data;
+      if (data == null || data.isEmpty) {
+        throw Exception('پاسخ خالی از سرور');
+      }
+
+      final exportFormat = response.headers.value('x-export-format')?.toLowerCase() ?? 'xlsx';
+      final extension = exportFormat == 'csv' ? 'csv' : 'xlsx';
+
+      String filename = 'electronic_journal_ledger_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      final contentDisposition = response.headers.value('content-disposition');
+      if (contentDisposition != null) {
+        final match = RegExp(r'filename=([^;]+)').firstMatch(contentDisposition);
+        if (match != null) {
+          var name = match.group(1)?.trim() ?? '';
+          if (name.startsWith('"') && name.endsWith('"') && name.length >= 2) {
+            name = name.substring(1, name.length - 1);
+          }
+          if (name.isNotEmpty) {
+            filename = name;
+          }
+        }
+      }
+
+      await FileSaver.instance.saveFile(
+        name: filename,
+        bytes: Uint8List.fromList(data),
+        ext: extension,
+      );
+
+      if (!mounted) return;
+      SnackBarHelper.showSuccess(context, message: t.exportSuccess);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: '${t.exportError}: ${ErrorExtractor.forContext(e, context)}',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingElectronic = false);
+      }
+    }
+  }
+
   String _formatNumber(dynamic value) {
     if (value == null) return '0';
     final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
@@ -274,6 +365,22 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
       defaultPageSize: 50,
       additionalParams: _additionalParams(),
       showExportButtons: true,
+      customHeaderActions: [
+        Tooltip(
+          message: 'خروجی مطابق قالب سامانه دفاتر الکترونیکی سازمان امور مالیاتی',
+          child: FilledButton.tonalIcon(
+            onPressed: _isExportingElectronic ? null : _exportElectronicBooks,
+            icon: _isExportingElectronic
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_outlined),
+            label: const Text('دفتر الکترونیکی'),
+          ),
+        ),
+      ],
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/excel',
       pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/pdf',
       getExportParams: () => _additionalParams(),
