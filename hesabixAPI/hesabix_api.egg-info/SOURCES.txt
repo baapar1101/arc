@@ -285,6 +285,7 @@ adapters/db/models/product_attribute_link.py
 adapters/db/models/product_bom.py
 adapters/db/models/product_general_barcode_alias.py
 adapters/db/models/product_instance.py
+adapters/db/models/product_supplier.py
 adapters/db/models/product_tax_code.py
 adapters/db/models/profile_dashboard_layout.py
 adapters/db/models/project.py
@@ -528,6 +529,7 @@ app/services/fiscal_year_rollback_service.py
 app/services/fx_auto_sync_background_jobs.py
 app/services/fx_rate_background_jobs.py
 app/services/fx_rate_provider_service.py
+app/services/general_ledger_electronic_export_service.py
 app/services/general_ledger_service.py
 app/services/goods_expense_income_service.py
 app/services/hscript_report_service.py
@@ -543,6 +545,7 @@ app/services/invoice_service.py
 app/services/invoice_tag_service.py
 app/services/invoice_warehouse_bulk_service.py
 app/services/job_manager.py
+app/services/journal_ledger_electronic_export_service.py
 app/services/journal_ledger_service.py
 app/services/kardex_service.py
 app/services/list_report_export_service.py
@@ -586,6 +589,7 @@ app/services/product_general_barcode_service.py
 app/services/product_inventory_tracking_sync.py
 app/services/product_opening_balance_service.py
 app/services/product_service.py
+app/services/product_supplier_service.py
 app/services/profile_dashboard_widgets_service.py
 app/services/project_service.py
 app/services/public_catalog_service.py
@@ -1050,8 +1054,13 @@ migrations/versions/20260720_000001_business_print_settings_stamp_signature_scal
 migrations/versions/20260720_000002_goods_expense_income.py
 migrations/versions/20260720_000003_hscript_custom_reports.py
 migrations/versions/20260721_000001_support_billing.py
+migrations/versions/20260724_000001_product_suppliers.py
+migrations/versions/20260724_000002_support_ticket_last_message_at.py
+migrations/versions/20260724_000003_announcement_navigation.py
 tests/__init__.py
 tests/test_account_balance_core.py
+tests/test_account_tree_roots.py
+tests/test_account_type_filter.py
 tests/test_ai_agent_continuation.py
 tests/test_ai_agent_regression_db.py
 tests/test_ai_agent_regression_v2.py
@@ -1097,6 +1106,7 @@ tests/test_ai_tool_intent.py
 tests/test_ai_trace_content.py
 tests/test_ai_write_guard.py
 tests/test_balance_sheet_classification.py
+tests/test_balance_sheet_grouping.py
 tests/test_basalam_currency.py
 tests/test_basalam_dlq.py
 tests/test_basalam_observability.py
@@ -1109,6 +1119,7 @@ tests/test_chat_message_builder.py
 tests/test_datetime_timezone.py
 tests/test_distribution_service.py
 tests/test_document_code_reservation_service.py
+tests/test_general_ledger_electronic_export.py
 tests/test_goods_expense_income_hardening.py
 tests/test_goods_expense_income_service.py
 tests/test_health.py
@@ -1128,6 +1139,8 @@ tests/test_invoice_tax_snapshot_refresh.py
 tests/test_invoice_tax_type_change_guard.py
 tests/test_invoice_type_change_stock.py
 tests/test_invoice_warehouse_fulfillment.py
+tests/test_journal_ledger_electronic_export.py
+tests/test_journal_ledger_service.py
 tests/test_legacy_import.py
 tests/test_legacy_sql_account_resolver.py
 tests/test_legacy_sql_dump_reader.py
@@ -1150,6 +1163,7 @@ tests/test_product_excel_import_opening_balance.py
 tests/test_product_inventory_tracking_sync.py
 tests/test_product_opening_balance.py
 tests/test_product_price_partial_update.py
+tests/test_product_suppliers.py
 tests/test_product_tax_update.py
 tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
