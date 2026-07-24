@@ -279,7 +279,7 @@ class ProfileDashboardService {
           final res = await support.searchUserTickets({
             'page': 1,
             'limit': 5,
-            'sort_by': 'updated_at',
+            'sort_by': 'last_message_at',
             'sort_desc': true,
           });
           out['profile_support_tickets'] = {
@@ -288,7 +288,8 @@ class ProfileDashboardService {
                 'id': t.id,
                 'subject': t.title,
                 'status': t.status?.name ?? '',
-                'updated_at': t.updatedAt.toIso8601String(),
+                'updated_at': t.lastActivityAt.toIso8601String(),
+                'last_message_at': t.lastMessageAt?.toIso8601String(),
               };
             }).toList(),
           };

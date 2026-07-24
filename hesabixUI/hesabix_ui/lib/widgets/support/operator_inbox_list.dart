@@ -237,7 +237,7 @@ class _OperatorInboxListState extends State<OperatorInboxList> {
         search: _searchQuery.isEmpty ? null : _searchQuery,
         searchFields: operatorInboxSearchFields,
         filters: filters.isEmpty ? null : filters,
-        sortBy: 'updated_at',
+        sortBy: 'last_message_at',
         sortDesc: true,
         take: take,
         skip: skip,

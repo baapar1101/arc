@@ -349,7 +349,7 @@ async def send_tickets_menu(
 	from adapters.api.v1.schemas import QueryInfo
 	
 	ticket_repo = TicketRepository(service.db)
-	query_info = QueryInfo(skip=0, take=20, filters=None, sort_by="created_at", sort_desc=True)
+	query_info = QueryInfo(skip=0, take=20, filters=None, sort_by="last_message_at", sort_desc=True)
 	tickets, total = ticket_repo.get_operator_tickets(query_info)
 	
 	if not tickets:

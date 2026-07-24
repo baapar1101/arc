@@ -5,10 +5,15 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from adapters.db.models.support.message import Message, SenderType
 from adapters.db.models.support.ticket import Ticket
+
+
+def ticket_last_activity_at(ticket: Ticket) -> datetime:
+    return ticket.last_message_at or ticket.created_at
 
 
 def _latest_public_message(db: Session, ticket_id: int) -> Optional[Message]:
@@ -49,16 +54,24 @@ def is_unread_for_operator(ticket: Ticket, latest: Optional[Message] = None) -> 
 
 
 def mark_user_read(db: Session, ticket: Ticket) -> Ticket:
-    ticket.user_last_read_at = datetime.utcnow()
-    db.add(ticket)
+    now = datetime.utcnow()
+    db.execute(
+        update(Ticket)
+        .where(Ticket.id == ticket.id)
+        .values(user_last_read_at=now)
+    )
     db.commit()
     db.refresh(ticket)
     return ticket
 
 
 def mark_operator_read(db: Session, ticket: Ticket) -> Ticket:
-    ticket.operator_last_read_at = datetime.utcnow()
-    db.add(ticket)
+    now = datetime.utcnow()
+    db.execute(
+        update(Ticket)
+        .where(Ticket.id == ticket.id)
+        .values(operator_last_read_at=now)
+    )
     db.commit()
     db.refresh(ticket)
     return ticket
@@ -88,5 +101,7 @@ def engagement_fields(db: Session, ticket: Ticket) -> dict:
         "csat_rating": ticket.csat_rating,
         "csat_comment": ticket.csat_comment,
         "csat_submitted_at": ticket.csat_submitted_at,
+        "last_message_at": ticket.last_message_at,
+        "last_activity_at": ticket_last_activity_at(ticket),
         "last_message_from_user": _sender_is(latest.sender_type, SenderType.USER) if latest else None,
     }

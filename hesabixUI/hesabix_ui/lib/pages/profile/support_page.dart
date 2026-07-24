@@ -348,7 +348,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       final query = QueryInfo(
         search: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
         searchFields: const ['title', 'description'],
-        sortBy: 'created_at',
+        sortBy: 'last_message_at',
         sortDesc: true,
         take: _ticketPageSize,
         skip: (_ticketPage - 1) * _ticketPageSize,

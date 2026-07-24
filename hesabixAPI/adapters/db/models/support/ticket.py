@@ -37,6 +37,7 @@ class Ticket(Base):
     csat_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     csat_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     csat_submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

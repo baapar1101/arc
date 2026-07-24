@@ -76,11 +76,13 @@ class MessageRepository(BaseRepository[Message]):
         )
         
         self.db.add(message)
-        
-        # Update ticket's updated_at field
+        self.db.flush()
+
         ticket = self.db.query(Ticket).filter(Ticket.id == ticket_id).first()
         if ticket:
-            ticket.updated_at = datetime.utcnow()
+            now = message.created_at or datetime.utcnow()
+            if not is_internal:
+                ticket.last_message_at = now
         
         self.db.commit()
         self.db.refresh(message)

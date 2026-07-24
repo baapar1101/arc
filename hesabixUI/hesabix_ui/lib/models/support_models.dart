@@ -339,6 +339,7 @@ class SupportTicket {
   final DateTime? closedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final DateTime? lastMessageAt;
   final DateTime? firstResponseDueAt;
   final DateTime? resolutionDueAt;
   final DateTime? firstRespondedAt;
@@ -370,6 +371,7 @@ class SupportTicket {
     this.closedAt,
     required this.createdAt,
     required this.updatedAt,
+    this.lastMessageAt,
     this.firstResponseDueAt,
     this.resolutionDueAt,
     this.firstRespondedAt,
@@ -398,6 +400,10 @@ class SupportTicket {
     if (updatedAtData == null) {
       updatedAtData = json['updated_at_raw'] ?? json['updated_at'];
     }
+    dynamic lastMessageAtData = json['last_message_at_formatted'];
+    if (lastMessageAtData == null) {
+      lastMessageAtData = json['last_message_at_raw'] ?? json['last_message_at'];
+    }
     dynamic closedAtData = json['closed_at_formatted'];
     if (closedAtData == null) {
       closedAtData = json['closed_at_raw'] ?? json['closed_at'];
@@ -417,6 +423,7 @@ class SupportTicket {
       closedAt: closedAtData != null ? SupportCategory._parseDateTime(closedAtData) : null,
       createdAt: SupportCategory._parseDateTime(createdAtData),
       updatedAt: SupportCategory._parseDateTime(updatedAtData),
+      lastMessageAt: lastMessageAtData != null ? SupportCategory._parseDateTime(lastMessageAtData) : null,
       firstResponseDueAt: parseOpt(json['first_response_due_at_raw'] ?? json['first_response_due_at']),
       resolutionDueAt: parseOpt(json['resolution_due_at_raw'] ?? json['resolution_due_at']),
       firstRespondedAt: parseOpt(json['first_responded_at_raw'] ?? json['first_responded_at']),
@@ -451,6 +458,7 @@ class SupportTicket {
       'closed_at': closedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
+      'last_message_at': lastMessageAt?.toIso8601String(),
       'user': user?.toJson(),
       'assigned_operator': assignedOperator?.toJson(),
       'category': category?.toJson(),
@@ -473,6 +481,9 @@ class SupportTicket {
   bool get isClosed => statusId == 4;
   bool get isResolved => statusId == 5;
   bool get isClosedFinal => status?.isFinal ?? false;
+
+  /// زمان آخرین فعالیت مکالمه (پیام عمومی یا ایجاد تیکت).
+  DateTime get lastActivityAt => lastMessageAt ?? createdAt;
 
   String get slaStatus {
     if (slaBreached) return 'breached';

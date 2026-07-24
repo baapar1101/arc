@@ -30,6 +30,7 @@ def ticket_to_dict(ticket: Ticket, db: Session) -> dict:
         "closed_at": ticket.closed_at,
         "created_at": ticket.created_at,
         "updated_at": ticket.updated_at,
+        "last_message_at": ticket.last_message_at,
         "first_response_due_at": ticket.first_response_due_at,
         "resolution_due_at": ticket.resolution_due_at,
         "first_responded_at": ticket.first_responded_at,

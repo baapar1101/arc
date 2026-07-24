@@ -92,7 +92,7 @@ class OperatorTicketListItem extends StatelessWidget {
         : '';
     final slaStatus = slaStatusFromRow(row);
     final slaSide = slaRowBorderSide(slaStatus);
-    final updatedAt = ticket?.updatedAt ?? DateTime.now();
+    final activityAt = ticket?.lastActivityAt ?? DateTime.now();
     final showCheckbox = onToggleSelect != null && isChecked != null;
 
     return Material(
@@ -171,7 +171,7 @@ class OperatorTicketListItem extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          _relativeTime(updatedAt, l10n),
+                          _relativeTime(activityAt, l10n),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                             fontSize: 11,

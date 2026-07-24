@@ -161,7 +161,7 @@ class SupportDashboardService:
             self.db.query(Ticket)
             .options(joinedload(Ticket.status), joinedload(Ticket.priority))
             .filter(Ticket.user_id == user_id)
-            .order_by(Ticket.created_at.desc())
+            .order_by(func.coalesce(Ticket.last_message_at, Ticket.created_at).desc(), Ticket.id.desc())
             .limit(take)
             .all()
         )

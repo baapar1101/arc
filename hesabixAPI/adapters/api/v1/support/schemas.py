@@ -147,6 +147,7 @@ class TicketResponse(TicketBase):
     closed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    last_message_at: Optional[datetime] = None
     first_response_due_at: Optional[datetime] = None
     resolution_due_at: Optional[datetime] = None
     first_responded_at: Optional[datetime] = None

@@ -18,6 +18,23 @@ class TicketRepository(BaseRepository[Ticket]):
     def __init__(self, db: Session):
         super().__init__(db, Ticket)
 
+    def _apply_ticket_sort(self, query, query_info: QueryInfo):
+        """مرتب‌سازی تیکت‌ها؛ پیش‌فرض: آخرین فعالیت مکالمه (last_message_at یا created_at)."""
+        sort_key = (query_info.sort_by or "last_message_at").strip()
+        sort_desc = query_info.sort_desc if query_info.sort_desc is not None else True
+
+        activity = func.coalesce(Ticket.last_message_at, Ticket.created_at)
+        if sort_key in ("last_message_at", "last_activity_at", "updated_at", "created_at"):
+            sort_col = activity
+        elif hasattr(Ticket, sort_key):
+            sort_col = getattr(Ticket, sort_key)
+        else:
+            sort_col = activity
+
+        if sort_desc:
+            return query.order_by(sort_col.desc(), Ticket.id.desc())
+        return query.order_by(sort_col.asc(), Ticket.id.asc())
+
     def _last_public_message_subquery(self):
         return (
             self.db.query(
@@ -203,14 +220,7 @@ class TicketRepository(BaseRepository[Ticket]):
         total = query.count()
         
         # اعمال مرتب‌سازی
-        if query_info.sort_by and hasattr(Ticket, query_info.sort_by):
-            sort_column = getattr(Ticket, query_info.sort_by)
-            if query_info.sort_desc:
-                query = query.order_by(sort_column.desc())
-            else:
-                query = query.order_by(sort_column.asc())
-        else:
-            query = query.order_by(Ticket.created_at.desc())
+        query = self._apply_ticket_sort(query, query_info)
         
         # اعمال صفحه‌بندی
         query = query.offset(query_info.skip).limit(query_info.take)
@@ -321,14 +331,7 @@ class TicketRepository(BaseRepository[Ticket]):
         total = query.count()
         
         # اعمال مرتب‌سازی
-        if query_info.sort_by and hasattr(Ticket, query_info.sort_by):
-            sort_column = getattr(Ticket, query_info.sort_by)
-            if query_info.sort_desc:
-                query = query.order_by(sort_column.desc())
-            else:
-                query = query.order_by(sort_column.asc())
-        else:
-            query = query.order_by(Ticket.created_at.desc())
+        query = self._apply_ticket_sort(query, query_info)
         
         # اعمال صفحه‌بندی
         query = query.offset(query_info.skip).limit(query_info.take)

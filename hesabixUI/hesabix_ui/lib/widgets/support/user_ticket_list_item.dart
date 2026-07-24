@@ -113,7 +113,7 @@ class UserTicketListItem extends StatelessWidget {
                     TicketStatusChip(status: ticket.status!, isSmall: true),
                   const Spacer(),
                   Text(
-                    _relativeTime(ticket.updatedAt, l10n),
+                    _relativeTime(ticket.lastActivityAt, l10n),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -213,7 +213,7 @@ class UserTicketListItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    _relativeTime(ticket.updatedAt, l10n),
+                    _relativeTime(ticket.lastActivityAt, l10n),
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
