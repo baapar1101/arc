@@ -125,15 +125,60 @@ class Hesabix_V2_Sync_Service
 	}
 
 	/**
+	 * جلوگیری از همگام‌سازی تکراری همان واریانت در یک درخواست PHP
+	 * (مثلاً ذخیرهٔ محصول متغیر که هم هوک والد و هم هوک واریانت را می‌زند).
+	 *
+	 * @var array<string, array>
+	 */
+	private static $variation_sync_guard = array();
+
+	/**
 	 * Sync product to Hesabix
 	 *
+	 * برای محصول متغیر (بدون variation_id): همهٔ واریانت‌ها همگام می‌شوند؛ خود والد به‌عنوان کالای ساده ارسال نمی‌شود.
+	 * برای واریانت: اگر فقط شناسهٔ واریانت پاس شود، والد به‌صورت خودکار تشخیص داده می‌شود.
+	 *
 	 * @since    2.0.0
-	 * @param    int       $product_id
-	 * @param    int       $variation_id
+	 * @param    int         $product_id             شناسهٔ محصول والد (یا شناسهٔ واریانت اگر variation_id خالی باشد)
+	 * @param    int|null    $variation_id
+	 * @param    string|null $wc_currency_override
 	 * @return   array
 	 */
 	public function sync_product($product_id, $variation_id = null, $wc_currency_override = null)
 	{
+		$product_id = absint($product_id);
+		$variation_id = ($variation_id !== null && (int) $variation_id > 0) ? absint($variation_id) : null;
+
+		// نرمال‌سازی آرگومان‌ها قبل از همگام‌سازی واقعی
+		if ($variation_id === null && $product_id > 0) {
+			$probe = wc_get_product($product_id);
+			if ($probe && $probe->is_type('variation')) {
+				$parent_id = absint($probe->get_parent_id());
+				if ($parent_id > 0) {
+					return $this->sync_product($parent_id, $product_id, $wc_currency_override);
+				}
+			}
+			if ($probe && $probe->is_type('variable')) {
+				return $this->sync_variable_product_children($product_id, $wc_currency_override);
+			}
+		}
+
+		// اگر variation_id هست ولی product_id والد واقعی نیست (باگ مسیر سفارش و مشابه)
+		if ($variation_id !== null) {
+			$variation_probe = wc_get_product($variation_id);
+			if ($variation_probe && $variation_probe->is_type('variation')) {
+				$real_parent = absint($variation_probe->get_parent_id());
+				if ($real_parent > 0 && $real_parent !== $product_id) {
+					return $this->sync_product($real_parent, $variation_id, $wc_currency_override);
+				}
+			}
+
+			$guard_key = $product_id . ':' . $variation_id;
+			if (isset(self::$variation_sync_guard[ $guard_key ])) {
+				return self::$variation_sync_guard[ $guard_key ];
+			}
+		}
+
 		$start_time = microtime(true);
 		$wc_payload_for_log = null;
 		$api_last_result = null;
@@ -164,6 +209,10 @@ class Hesabix_V2_Sync_Service
 					throw new Exception(__('محصول یافت نشد', 'hesabix-v2'));
 				}
 
+				if (!$product->is_type('variation')) {
+					throw new Exception(__('شناسهٔ واریانت نامعتبر است', 'hesabix-v2'));
+				}
+
 				$wc_id = $variation_id;
 				$wc_parent_id = $product_id;
 			} else {
@@ -171,6 +220,11 @@ class Hesabix_V2_Sync_Service
 				
 				if (!$product) {
 					throw new Exception(__('محصول یافت نشد', 'hesabix-v2'));
+				}
+
+				// محصول متغیر هرگز نباید به‌عنوان یک کالای ساده ارسال شود
+				if ($product->is_type('variable')) {
+					return $this->sync_variable_product_children($product_id, $wc_currency_override);
 				}
 
 				$wc_id = $product_id;
@@ -206,13 +260,13 @@ class Hesabix_V2_Sync_Service
 					? __('همگام‌سازی رد شد — فیلتر سفارشی همگام‌سازی را مسدود کرد.', 'hesabix-v2')
 					: __('همگام‌سازی رد شد — فقط محصولات منتشرشده به حسابیکس ارسال می‌شوند (پیش‌نویس همگام نمی‌شود).', 'hesabix-v2');
 
-				return array(
+				return $this->remember_variation_sync_result($product_id, $variation_id, array(
 					'success' => true,
 					'skipped_status' => !$status_ok,
 					'skipped_filter' => $status_ok,
 					'message' => $message,
 					'execution_time' => $execution_time,
-				);
+				));
 			}
 
 			if ($variation_id) {
@@ -248,13 +302,15 @@ class Hesabix_V2_Sync_Service
 					'preset' => isset($sync_settings['product_sync_preset']) ? (string) $sync_settings['product_sync_preset'] : '',
 				));
 
-				return array(
+				$result = array(
 					'success' => true,
 					'message' => __('به‌روزرسانی لازم نبود؛ داده‌های حسابیکس حفظ شد.', 'hesabix-v2'),
 					'hesabix_id' => (int) $existing_mapping['hesabix_id'],
 					'skipped_noop' => true,
 					'execution_time' => $execution_time,
 				);
+
+				return $this->remember_variation_sync_result($product_id, $variation_id, $result);
 			}
 
 			if ($existing_mapping) {
@@ -290,11 +346,13 @@ class Hesabix_V2_Sync_Service
 					'execution_time' => $execution_time,
 				));
 
-				return array(
+				$result = array(
 					'success' => true,
 					'hesabix_id' => $hesabix_id,
 					'message' => __('محصول با موفقیت همگام‌سازی شد', 'hesabix-v2'),
 				);
+
+				return $this->remember_variation_sync_result($product_id, $variation_id, $result);
 			} else {
 				throw new Exception($api_last_result['message'] ?? __('خطا در همگام‌سازی', 'hesabix-v2'));
 			}
@@ -335,6 +393,192 @@ class Hesabix_V2_Sync_Service
 				'message' => $e->getMessage(),
 			);
 		}
+	}
+
+	/**
+	 * ذخیرهٔ نتیجهٔ موفق همگام‌سازی واریانت برای جلوگیری از تکرار در همان درخواست.
+	 *
+	 * @since 4.7.2
+	 * @param int        $product_id
+	 * @param int|null   $variation_id
+	 * @param array      $result
+	 * @return array
+	 */
+	private function remember_variation_sync_result($product_id, $variation_id, array $result)
+	{
+		if ($variation_id) {
+			self::$variation_sync_guard[ (int) $product_id . ':' . (int) $variation_id ] = $result;
+		}
+
+		return $result;
+	}
+
+	/**
+	 * همگام‌سازی همهٔ واریانت‌های یک محصول متغیر (بدون ارسال خود والد به‌عنوان کالای ساده).
+	 *
+	 * @since 4.7.2
+	 * @param int         $parent_id
+	 * @param string|null $wc_currency_override
+	 * @return array
+	 */
+	private function sync_variable_product_children($parent_id, $wc_currency_override = null)
+	{
+		$start_time = microtime(true);
+		$parent_id = absint($parent_id);
+
+		$parent = wc_get_product($parent_id);
+		if (!$parent || !$parent->is_type('variable')) {
+			return array(
+				'success' => false,
+				'message' => __('محصول متغیر یافت نشد', 'hesabix-v2'),
+			);
+		}
+
+		$status_ok = Hesabix_V2_Product_Service::is_syncable_product($parent, null);
+		$should_sync = (bool) apply_filters('hesabix_v2_should_sync_product', $status_ok, $parent);
+
+		if (!$should_sync) {
+			$execution_time = microtime(true) - $start_time;
+			$wc_status = method_exists($parent, 'get_status') ? (string) $parent->get_status() : '';
+			$skip_reason = $status_ok ? 'filter' : 'status';
+
+			Hesabix_V2_Log_Service::info('Variable product sync skipped', array(
+				'entity_type' => 'product',
+				'entity_id' => $parent_id,
+				'wc_status' => $wc_status,
+				'reason' => $skip_reason,
+				'execution_time' => $execution_time,
+			));
+
+			$message = $status_ok
+				? __('همگام‌سازی رد شد — فیلتر سفارشی همگام‌سازی را مسدود کرد.', 'hesabix-v2')
+				: __('همگام‌سازی رد شد — فقط محصولات منتشرشده به حسابیکس ارسال می‌شوند (پیش‌نویس همگام نمی‌شود).', 'hesabix-v2');
+
+			return array(
+				'success' => true,
+				'skipped_status' => !$status_ok,
+				'skipped_filter' => $status_ok,
+				'message' => $message,
+				'execution_time' => $execution_time,
+				'variable_parent_id' => $parent_id,
+			);
+		}
+
+		$children = $parent->get_children();
+		if (empty($children)) {
+			Hesabix_V2_Log_Service::info('Variable product has no variations — skip parent-as-simple sync', array(
+				'entity_type' => 'product',
+				'entity_id' => $parent_id,
+			));
+
+			return array(
+				'success' => true,
+				'skipped_empty_variable' => true,
+				'message' => __('محصول متغیر بدون واریانت — همگام‌سازی انجام نشد.', 'hesabix-v2'),
+				'variable_parent_id' => $parent_id,
+				'execution_time' => microtime(true) - $start_time,
+			);
+		}
+
+		// نگاشت اشتباه قبلی «والد متغیر به‌عنوان محصول ساده» را فقط از جدول محلی پاک می‌کنیم
+		$orphan = $this->db->get_mapping('product', $parent_id, null);
+		if ($orphan) {
+			$orphan_hid = isset($orphan['hesabix_id']) ? absint($orphan['hesabix_id']) : 0;
+			if ($orphan_hid > 0 && class_exists('Hesabix_V2_Orphan_Product_Service')) {
+				Hesabix_V2_Orphan_Product_Service::register(
+					array(
+						'hesabix_id' => $orphan_hid,
+						'wc_parent_id' => $parent_id,
+						'parent_name' => $parent->get_title(),
+						'source' => 'auto_sync',
+						'tier' => Hesabix_V2_Orphan_Product_Service::TIER_HIGH,
+						'status' => 'pending',
+						'force_reopen' => true,
+					)
+				);
+			}
+
+			$this->db->delete_parent_only_product_mapping($parent_id);
+			Hesabix_V2_Log_Service::info('Removed orphan parent-as-simple product mapping', array(
+				'entity_type' => 'product',
+				'entity_id' => $parent_id,
+				'hesabix_id' => $orphan_hid > 0 ? $orphan_hid : null,
+			));
+		}
+
+		$ok = 0;
+		$failed = 0;
+		$skipped = 0;
+		$errors = array();
+		$last_hesabix_id = null;
+
+		foreach ($children as $vid) {
+			$vid = absint($vid);
+			if ($vid < 1) {
+				continue;
+			}
+
+			$res = $this->sync_product($parent_id, $vid, $wc_currency_override);
+
+			if (empty($res['success'])) {
+				$failed++;
+				$errors[] = array(
+					'variation_id' => $vid,
+					'message' => isset($res['message']) ? (string) $res['message'] : '',
+				);
+				continue;
+			}
+
+			if (!empty($res['skipped_status']) || !empty($res['skipped_filter'])) {
+				$skipped++;
+				continue;
+			}
+
+			$ok++;
+			if (!empty($res['hesabix_id'])) {
+				$last_hesabix_id = (int) $res['hesabix_id'];
+			}
+		}
+
+		$execution_time = microtime(true) - $start_time;
+		$success = ($failed === 0);
+
+		if ($success) {
+			$message = sprintf(
+				/* translators: 1: synced count 2: skipped count */
+				__('محصول متغیر: %1$d واریانت همگام شد (%2$d رد شد).', 'hesabix-v2'),
+				$ok,
+				$skipped
+			);
+		} else {
+			$message = sprintf(
+				/* translators: 1: failed count 2: synced count */
+				__('محصول متغیر: %1$d واریانت ناموفق، %2$d موفق.', 'hesabix-v2'),
+				$failed,
+				$ok
+			);
+		}
+
+		Hesabix_V2_Log_Service::info('Variable product children sync finished', array(
+			'entity_type' => 'product',
+			'entity_id' => $parent_id,
+			'variations_synced' => $ok,
+			'variations_failed' => $failed,
+			'variations_skipped' => $skipped,
+			'execution_time' => $execution_time,
+		));
+
+		return array(
+			'success' => $success,
+			'message' => $message,
+			'hesabix_id' => $last_hesabix_id,
+			'variable_parent_id' => $parent_id,
+			'variations_synced' => $ok,
+			'variations_failed' => $failed,
+			'variations_skipped' => $skipped,
+			'errors' => $errors,
+			'execution_time' => $execution_time,
+		);
 	}
 
 	/**
@@ -1494,6 +1738,30 @@ class Hesabix_V2_Sync_Service
 				);
 			}
 
+			// محصول متغیر نباید به‌عنوان یک سطر ساده در bulk ارسال شود
+			if ($product->is_type('variable')) {
+				return array(
+					'ok' => false,
+					'message' => __('محصول متغیر باید از طریق واریانت‌ها همگام شود', 'hesabix-v2'),
+					'wc_id' => $pid,
+					'wc_parent_id' => null,
+				);
+			}
+
+			if ($product->is_type('variation')) {
+				$parent_id = absint($product->get_parent_id());
+				if ($parent_id < 1) {
+					return array(
+						'ok' => false,
+						'message' => __('واریانت بدون محصول والد', 'hesabix-v2'),
+						'wc_id' => $pid,
+						'wc_parent_id' => null,
+					);
+				}
+
+				return $this->collect_product_bulk_item($parent_id, $pid, $gate);
+			}
+
 			$product_data = Hesabix_V2_Mapper::wc_product_to_api($product, $pid, $gate['factor']);
 			$wc_id = $pid;
 			$wc_parent_id = null;
@@ -1690,6 +1958,8 @@ class Hesabix_V2_Sync_Service
 				if (empty($collected['item']) || !is_array($collected['item'])) {
 					continue;
 				}
+
+				$cref = isset($collected['item']['client_ref']) ? trim((string) $collected['item']['client_ref']) : '';
 				if ($cref === '') {
 					continue;
 				}

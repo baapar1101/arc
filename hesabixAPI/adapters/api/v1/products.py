@@ -40,6 +40,7 @@ from app.services.product_service import (
     get_product,
     update_product,
     delete_product,
+    check_product_has_related_documents,
     preview_bulk_default_warehouse_update,
     apply_bulk_default_warehouse_update,
     get_item_movements_report,
@@ -1009,6 +1010,49 @@ def delete_product_endpoint(
         raise HTTPException(status_code=404, detail="کالا یافت نشد")
     
     return success_response({"deleted": True}, request, message="کالا با موفقیت حذف شد")
+
+
+@router.get(
+    "/business/{business_id}/{product_id}/usage-check",
+    summary="بررسی امکان حذف کالا (اسناد مرتبط)",
+    description="""
+    بررسی می‌کند آیا کالا در فاکتور، سند حسابداری، حواله انبار، BOM یا سایر وابستگی‌ها استفاده شده است.
+    برای پیش‌نمایش پاک‌سازی امن (بدون حذف واقعی) مناسب است.
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {"description": "نتیجه بررسی استفاده"},
+        404: {"description": "کالا یافت نشد"},
+    },
+)
+@require_business_access("business_id")
+def check_product_usage_endpoint(
+    request: Request,
+    business_id: int,
+    product_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("products", "view", Product, "product_id")),
+) -> Dict[str, Any]:
+    obj = db.get(Product, product_id)
+    if not obj or int(obj.business_id) != int(business_id):
+        raise HTTPException(status_code=404, detail="کالا یافت نشد")
+
+    has_documents, document_types = check_product_has_related_documents(db, product_id)
+
+    return success_response(
+        {
+            "product_id": product_id,
+            "is_used": bool(has_documents),
+            "can_delete": not bool(has_documents),
+            "document_types": document_types or [],
+            "is_active": bool(getattr(obj, "is_active", True)),
+            "name": getattr(obj, "name", None),
+            "code": getattr(obj, "code", None),
+        },
+        request,
+        message="بررسی استفاده کالا انجام شد",
+    )
 
 
 @router.post(

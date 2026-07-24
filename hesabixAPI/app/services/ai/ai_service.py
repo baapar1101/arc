@@ -518,7 +518,6 @@ class AIService:
     ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
         from app.services.ai.ai_history_summarizer import (
             build_rule_based_history_summary,
-            summarize_history_with_llm,
         )
 
         if provider is None:
@@ -535,10 +534,26 @@ class AIService:
 
                 bid = self.business_id
                 uid = self.ctx.get_user_id()
+                # بدون اشتراک/سهمیه به LLM نزن — فقط خلاصهٔ rule-based
+                can_bill = False
                 if bid and uid and can_use_llm_summarize(uid, int(bid)):
+                    try:
+                        can_bill = bool(
+                            self.check_availability(
+                                estimated_tokens=800,
+                                user_query="history_summary",
+                            ).get("can_use")
+                        )
+                    except Exception:
+                        can_bill = False
+                if can_bill:
+                    from app.services.ai.ai_history_summarizer import (
+                        summarize_history_with_llm_detailed,
+                    )
                     from app.services.ai.ai_language_prompt import (
                         detect_message_language,
                     )
+                    from app.services.ai.ai_usage_accumulate import merge_usage
 
                     last_user = next(
                         (
@@ -549,7 +564,7 @@ class AIService:
                         ),
                         None,
                     )
-                    text = summarize_history_with_llm(
+                    text, summary_usage = summarize_history_with_llm_detailed(
                         provider,
                         self.get_effective_model_api_id(
                             operation=AI_OPERATION_HISTORY_SUMMARY,
@@ -559,6 +574,11 @@ class AIService:
                         language=detect_message_language(last_user),
                     )
                     if text:
+                        if summary_usage:
+                            self._turn_usage = merge_usage(
+                                getattr(self, "_turn_usage", None),
+                                summary_usage,
+                            )
                         record_llm_summarize(uid, int(bid))
                         from app.services.ai.ai_ops_metrics import log_ai_event
 
@@ -963,6 +983,67 @@ class AIService:
                 "suggestions": suggestions
             }
         }
+
+    def ensure_availability_or_raise(
+        self,
+        estimated_tokens: int = 1000,
+        model: Optional[str] = None,
+        user_query: Optional[str] = None,
+        history_messages: Optional[List[Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """پیش‌چک اجباری؛ در صورت عدم امکان استفاده، ApiError می‌اندازد."""
+        availability = self.check_availability(
+            estimated_tokens=estimated_tokens,
+            model=model,
+            user_query=user_query,
+            history_messages=history_messages,
+        )
+        if availability.get("can_use"):
+            return availability
+        details = availability.get("details") or {}
+        reason = availability.get("reason") or "AI_UNAVAILABLE"
+        message = details.get("message") or "امکان استفاده از هوش مصنوعی وجود ندارد"
+        raise ApiError(
+            reason,
+            message,
+            http_status=400,
+            details=details,
+        )
+
+    def _charge_and_log_usage(
+        self,
+        *,
+        input_tokens: int,
+        output_tokens: int,
+        usage: Optional[Dict[str, Any]] = None,
+        model_code: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """شارژ سهمیه/کیف پول و ثبت لاگ استفاده در یک فراخوانی."""
+        effective_model = model_code or self.get_effective_model_code()
+        charge_result = self.check_quota_and_charge(
+            input_tokens,
+            output_tokens,
+            model_code=effective_model,
+        )
+        try:
+            provider_name = self.get_effective_provider_type()
+        except Exception:
+            provider_name = self.config.provider if self.config else "openai"
+        self.log_usage(
+            provider=provider_name,
+            model=effective_model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost=charge_result.get("cost", 0),
+            payment_method=charge_result.get("payment_method", "free"),
+            wallet_transaction_id=charge_result.get("wallet_transaction_id"),
+            document_id=charge_result.get("document_id"),
+            context=None if usage is None else {
+                "source": "aux_metered_call",
+                **{k: v for k, v in (usage or {}).items() if isinstance(v, (int, float, str))},
+            },
+        )
+        return charge_result
     
     @staticmethod
     def _last_user_query(messages: List[Dict[str, Any]]) -> Optional[str]:
@@ -1644,7 +1725,7 @@ class AIService:
                 "NO_ACTIVE_SUBSCRIPTION",
                 "اشتراک فعالی وجود ندارد. لطفاً یک پلن را انتخاب کنید.",
                 http_status=400,
-                extra_data={
+                details={
                     "available_plans": [
                         {"id": p.id, "name": p.name, "plan_type": p.plan_type}
                         for p in available_plans[:3]
@@ -1658,7 +1739,7 @@ class AIService:
                 "SUBSCRIPTION_INACTIVE",
                 "اشتراک شما منقضی شده است. لطفاً اشتراک خود را تمدید کنید.",
                 http_status=400,
-                extra_data={
+                details={
                     "expired_at": self.subscription.expires_at.isoformat() if self.subscription.expires_at else None,
                     "plan_name": self.subscription.plan.name if self.subscription.plan else "نامشخص"
                 }
@@ -1700,7 +1781,7 @@ class AIService:
                     "QUOTA_EXCEEDED",
                     f"سهمیه رایگان تمام شده است. باقیمانده: {remaining:,} توکن",
                     http_status=400,
-                    extra_data={
+                    details={
                         "tokens_used": tokens_used,
                         "tokens_limit": cap,
                         "tokens_remaining": remaining,
@@ -1734,7 +1815,7 @@ class AIService:
                     "QUOTA_EXCEEDED",
                     f"سهمیه اشتراک تمام شده است. باقیمانده: {remaining:,} توکن",
                     http_status=400,
-                    extra_data={
+                    details={
                         "tokens_used": tokens_used,
                         "tokens_limit": cap,
                         "tokens_remaining": remaining,
@@ -1967,6 +2048,9 @@ class AIService:
 
         accumulated_function_calls: List[Dict[str, Any]] = []
         accumulated_function_results: Dict[str, Any] = {}
+        from app.services.ai.ai_usage_accumulate import empty_usage, merge_usage
+
+        self._turn_usage = empty_usage()
 
         complexity = estimate_query_complexity(effective_user_query, messages)
         adaptive_max_iterations = iterations_for_query(
@@ -2063,6 +2147,9 @@ class AIService:
                         ),
                     )
                     if response.get("usage"):
+                        self._turn_usage = merge_usage(
+                            self._turn_usage, response.get("usage")
+                        )
                         budget.add_tokens(response["usage"].get("total_tokens"))
                     break
                 except ApiError as api_exc:
@@ -2207,6 +2294,9 @@ class AIService:
                         ),
                     )
                     if response.get("usage"):
+                        self._turn_usage = merge_usage(
+                            self._turn_usage, response.get("usage")
+                        )
                         budget.add_tokens(response["usage"].get("total_tokens"))
                 except ApiError:
                     raise
@@ -2242,10 +2332,19 @@ class AIService:
                         "Failed to merge session todos into sync results: %s", exc
                     )
                     safe_db_rollback(self.db)
+
+            # صورتحساب باید مجموع همهٔ نوبت‌ها (+ خلاصهٔ تاریخچه) باشد
+            if self._turn_usage and (
+                self._turn_usage.get("input_tokens")
+                or self._turn_usage.get("output_tokens")
+                or self._turn_usage.get("total_tokens")
+            ):
+                response["usage"] = dict(self._turn_usage)
             
             return response
         finally:
             self.clear_routing_context()
+            self._turn_usage = None
     
     def chat_completion_sync(
         self,
@@ -2387,6 +2486,10 @@ class AIService:
         try:
             accumulated_content = ""
             final_usage = None
+            from app.services.ai.ai_usage_accumulate import empty_usage, merge_usage
+
+            billed_usage = empty_usage()
+            self._turn_usage = empty_usage()
             iteration = 0
             trace_steps: List[Dict[str, Any]] = []
             trace_step_counter = 0
@@ -2520,7 +2623,7 @@ class AIService:
                 collected = ""
 
                 async def _consume() -> None:
-                    nonlocal collected
+                    nonlocal collected, billed_usage
                     async for syn_chunk in provider.chat_completion_stream(
                         messages=synthesis_messages,
                         model=self.get_effective_model_api_id(),
@@ -2537,6 +2640,13 @@ class AIService:
                         piece = syn_delta.get("content", "")
                         if piece:
                             collected += piece
+                        if syn_chunk.get("usage"):
+                            billed_usage = merge_usage(
+                                billed_usage, syn_chunk.get("usage")
+                            )
+                            budget.add_tokens(
+                                (syn_chunk.get("usage") or {}).get("total_tokens")
+                            )
                         if syn_chunk.get("done"):
                             break
 
@@ -2774,6 +2884,7 @@ class AIService:
                 )
 
                 llm_round_complete = False
+                round_usage_this_iter: Optional[Dict[str, Any]] = None
                 while not llm_round_complete:
                     try:
                         stream_source = provider.chat_completion_stream(
@@ -2802,7 +2913,8 @@ class AIService:
                                 await asyncio.sleep(0)
                                 continue
                             if chunk.get("usage"):
-                                final_usage = chunk["usage"]
+                                round_usage_this_iter = chunk["usage"]
+                                final_usage = round_usage_this_iter
                             if chunk.get("function_calls"):
                                 function_calls = chunk["function_calls"]
                                 tool_call_id_map = chunk.get("tool_call_id_map", {}) or {}
@@ -2903,6 +3015,14 @@ class AIService:
                                 "done": False,
                             }
                             await asyncio.sleep(0)
+                            if round_usage_this_iter:
+                                billed_usage = merge_usage(
+                                    billed_usage, round_usage_this_iter
+                                )
+                                budget.add_tokens(
+                                    round_usage_this_iter.get("total_tokens")
+                                )
+                                round_usage_this_iter = None
                             round_text = ""
                             function_calls = None
                             writing_status_sent = False
@@ -2926,6 +3046,14 @@ class AIService:
                                 iteration=iteration,
                             )
                             await asyncio.sleep(0.5 * llm_stream_retry_count)
+                            if round_usage_this_iter:
+                                billed_usage = merge_usage(
+                                    billed_usage, round_usage_this_iter
+                                )
+                                budget.add_tokens(
+                                    round_usage_this_iter.get("total_tokens")
+                                )
+                                round_usage_this_iter = None
                             round_text = ""
                             function_calls = None
                             writing_status_sent = False
@@ -3000,9 +3128,10 @@ class AIService:
                         iteration=iteration,
                     )
 
-                # ثبت توکن مصرف‌شدهٔ این نوبت در بودجهٔ یکپارچه
-                if final_usage:
-                    budget.add_tokens(final_usage.get("total_tokens"))
+                # ثبت توکن مصرف‌شدهٔ این نوبت در بودجه و صورتحساب
+                if round_usage_this_iter:
+                    billed_usage = merge_usage(billed_usage, round_usage_this_iter)
+                    budget.add_tokens(round_usage_this_iter.get("total_tokens"))
                     yield _emit_agent_budget()
 
                 if budget_stop_reason == STOP_REASON_WALL_CLOCK:
@@ -3812,9 +3941,18 @@ class AIService:
                 except Exception as exc:
                     logger.warning("Failed to merge session todos into results: %s", exc)
                     safe_db_rollback(self.db)
+            # usage خلاصهٔ تاریخچه (در صورت وجود) را به صورتحساب اضافه کن
+            if getattr(self, "_turn_usage", None):
+                billed_usage = merge_usage(billed_usage, self._turn_usage)
             yield {
                 "delta": {"content": ""},
-                "usage": final_usage,
+                "usage": billed_usage
+                if (
+                    billed_usage.get("input_tokens")
+                    or billed_usage.get("output_tokens")
+                    or billed_usage.get("total_tokens")
+                )
+                else final_usage,
                 "done": True,
                 "awaiting_approval": awaiting_approval,
                 "function_calls": accumulated_function_calls or None,
@@ -3845,7 +3983,7 @@ class AIService:
             )
         finally:
             self.clear_routing_context()
-    
+            self._turn_usage = None
     def handle_function_calls(
         self,
         function_calls: List[Dict[str, Any]],
@@ -4043,14 +4181,24 @@ class AIService:
     async def generate_chat_title(self, user_message: str) -> Optional[str]:
         """
         تولید عنوان کوتاه و هوشمند برای گفت‌وگو بر اساس اولین پیام کاربر (async version)
+
+        در صورت نبود اشتراک/سهمیه، بدون فراخوانی provider فقط از متن کاربر عنوان می‌سازد
+        تا اعتبار آروان نسوزد. در صورت فراخوانی LLM، usage شارژ می‌شود.
         """
         if not self.config or not self.config.is_active:
-            return None
+            return self._heuristic_chat_title(user_message)
         self.set_routing_context(
             operation=AI_OPERATION_TITLE,
             user_query=user_message,
         )
         try:
+            availability = self.check_availability(
+                estimated_tokens=300,
+                user_query=user_message,
+            )
+            if not availability.get("can_use"):
+                return self._heuristic_chat_title(user_message)
+
             provider = self._make_provider()
             loop = asyncio.get_event_loop()
             response = await loop.run_in_executor(
@@ -4079,6 +4227,23 @@ class AIService:
                     tools=None,
                 ),
             )
+            usage = response.get("usage") if isinstance(response, dict) else None
+            if usage:
+                try:
+                    self._charge_and_log_usage(
+                        input_tokens=int(usage.get("input_tokens", 0) or 0),
+                        output_tokens=int(usage.get("output_tokens", 0) or 0),
+                        usage=usage,
+                        model_code=self.get_effective_model_code(
+                            operation=AI_OPERATION_TITLE,
+                            user_query=user_message,
+                        ),
+                    )
+                except ApiError as charge_exc:
+                    logger.warning(
+                        "Chat title charged failed after provider call: %s",
+                        charge_exc,
+                    )
             title = self._extract_chat_title_from_response(response)
             if not title:
                 logger.warning(
@@ -4088,11 +4253,16 @@ class AIService:
                         user_query=user_message,
                     ),
                 )
-                return None
+                return self._heuristic_chat_title(user_message)
             return title
         except Exception as exc:
             logger.warning(f"Failed to generate chat title: {exc}")
-            return None
+            return self._heuristic_chat_title(user_message)
         finally:
             self.clear_routing_context()
 
+    @staticmethod
+    def _heuristic_chat_title(user_message: str) -> Optional[str]:
+        from app.services.ai.ai_usage_accumulate import heuristic_chat_title
+
+        return heuristic_chat_title(user_message)

@@ -33,12 +33,33 @@ DEFAULT_CHAT_TITLE = "گفت‌وگوی جدید"
 
 from app.services.ai.ai_constants import AI_OPERATION_CHAT
 from app.services.ai.ai_tool_intent import estimate_query_complexity
+from app.services.ai.ai_usage_accumulate import estimate_chat_tokens, merge_usage
 
 
 def _prepare_ai_service_model(ai_service: AIService, model: Optional[str]) -> None:
     if model:
         ai_service.set_request_model(model)
         ai_service._validate_request_model_if_set()
+
+
+def _ensure_chat_availability(
+    db,
+    ctx: AuthContext,
+    business_id: Optional[int],
+    *,
+    user_text: str,
+    model: Optional[str] = None,
+    messages: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    """قبل از هر فراخوانی LLM روی مسیر چت، اشتراک/سهمیه را اجباری چک کن."""
+    ai_service = AIService(db, ctx, business_id)
+    _prepare_ai_service_model(ai_service, model)
+    ai_service.ensure_availability_or_raise(
+        estimated_tokens=estimate_chat_tokens(user_text),
+        model=model,
+        user_query=user_text,
+        history_messages=messages,
+    )
 
 
 def _apply_chat_routing_context(
@@ -1128,6 +1149,15 @@ async def send_message(
         mode, message_data.mode, execution_mode
     )
     session.execution_mode = execution_mode
+
+    # پیش‌چک اجباری قبل از ذخیره پیام / فراخوانی provider
+    _ensure_chat_availability(
+        db,
+        ctx,
+        session.business_id,
+        user_text=message_data.content or "",
+        model=message_data.model,
+    )
     
     # دریافت پیام‌های قبلی
     message_repo = AIChatMessageRepository(db)
@@ -1720,7 +1750,12 @@ async def _stream_message_response(
         if content_chunk:
             accumulated_content += content_chunk
         if chunk.get("usage"):
-            final_usage = chunk["usage"]
+            # chunk نهایی (done) usage تجمیعی authoritative دارد؛
+            # نوبت‌های میانی را merge می‌کنیم تا چیزی از دست نرود.
+            if chunk.get("done"):
+                final_usage = chunk["usage"]
+            else:
+                final_usage = merge_usage(final_usage, chunk["usage"])
         if chunk.get("function_calls"):
             final_function_calls = chunk["function_calls"]
         if chunk.get("function_results"):
@@ -1754,6 +1789,18 @@ async def _stream_message_response(
     try:
         yield _sse_payload({"type": "status", "phase": "connecting", "done": False})
         await asyncio.sleep(0)
+
+        # پیش‌چک اجباری در ابتدای استریم (قبل از هر فراخوانی LLM)
+        with get_db_session() as gate_db:
+            _ensure_chat_availability(
+                gate_db,
+                ctx,
+                business_id,
+                user_text=message_content or "",
+                model=request_model,
+                messages=messages,
+            )
+
         yield _sse_payload({"type": "status", "phase": "thinking", "done": False})
         await asyncio.sleep(0)
 
@@ -1938,6 +1985,15 @@ async def regenerate_last_response(
     approved_write_calls = _extract_pending_write_approvals(remaining) if approve_writes else []
     execution_mode = _session_execution_mode(session)
     exploration_mode = exploration_mode_for_execution(execution_mode)
+
+    _ensure_chat_availability(
+        db,
+        ctx,
+        business_id,
+        user_text=last_user.content or "",
+        model=model,
+        messages=messages,
+    )
 
     if stream:
         db.close()
@@ -2165,6 +2221,15 @@ async def edit_user_message(
             request,
             "پیام به‌روزرسانی شد",
         )
+
+    _ensure_chat_availability(
+        db,
+        ctx,
+        business_id,
+        user_text=user_text or "",
+        model=params.model,
+        messages=messages,
+    )
 
     if stream:
         db.close()
@@ -2434,6 +2499,10 @@ async def run_scheduled_task_now(
         raise ApiError("BUSINESS_REQUIRED", "کسب‌وکار مشخص نشده", http_status=400)
 
     ai_service = AIService(db, ctx, business_id)
+    ai_service.ensure_availability_or_raise(
+        estimated_tokens=2000,
+        user_query=(task.get("prompt") or task_id)[:500],
+    )
     result = await run_scheduled_task(db, task, business_id, ai_service)
     return success_response(result, request)
 

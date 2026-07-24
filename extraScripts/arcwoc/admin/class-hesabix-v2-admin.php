@@ -320,11 +320,19 @@ class Hesabix_V2_Admin
 						'ajax_url' => admin_url('admin-ajax.php'),
 						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
 						'chunk_size' => max(5, min(Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS, $p_chunk)),
+						'orphan_chunk_size' => 8,
 						'strings' => array(
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
 							'confirmSync' => __('این محصول (و در صورت متغیر بودن، واریانت‌ها) با حسابیکس همگام شود؟', 'hesabix-v2'),
 							'confirmBulkSync' => __('برای تمام محصولات انتخاب‌شده همگام‌سازی با حسابیکس انجام شود؟', 'hesabix-v2'),
+							'orphanScanning' => __('در حال اسکن…', 'hesabix-v2'),
+							'orphanNoSelection' => __('حداقل یک کاندیدا را انتخاب کنید.', 'hesabix-v2'),
+							'orphanConfirmDryRun' => __('پیش‌نمایش پاک‌سازی برای موارد انتخاب‌شده انجام شود؟ (حذف واقعی انجام نمی‌شود)', 'hesabix-v2'),
+							'orphanConfirmCleanup' => __('پاک‌سازی امن انجام شود؟ کالاهای استفاده‌نشده حذف و کالاهای در استفاده غیرفعال می‌شوند. این عمل برای حذف‌ها غیرقابل بازگشت است.', 'hesabix-v2'),
+							'orphanTierHigh' => __('بالا', 'hesabix-v2'),
+							'orphanTierMedium' => __('متوسط', 'hesabix-v2'),
+							'orphanDone' => __('عملیات تمام شد.', 'hesabix-v2'),
 						),
 					)
 				);
@@ -1001,6 +1009,7 @@ class Hesabix_V2_Admin
 		
 		if (isset($sync_settings['auto_sync_products']) && $sync_settings['auto_sync_products']) {
 			$sync_service = new Hesabix_V2_Sync_Service();
+			// برای محصول متغیر، sync_product همهٔ واریانت‌ها را گسترش می‌دهد
 			$sync_service->sync_product($product_id);
 		}
 	}
@@ -1017,8 +1026,70 @@ class Hesabix_V2_Admin
 		
 		if (isset($sync_settings['sync_on_product_update']) && $sync_settings['sync_on_product_update']) {
 			$sync_service = new Hesabix_V2_Sync_Service();
+			// برای محصول متغیر، sync_product همهٔ واریانت‌ها را گسترش می‌دهد
 			$sync_service->sync_product($product_id);
 		}
+	}
+
+	/**
+	 * On product variation create
+	 *
+	 * @since 4.7.2
+	 * @param int $variation_id
+	 */
+	public function on_product_variation_create($variation_id)
+	{
+		$sync_settings = get_option('hesabix_v2_sync_settings', array());
+
+		if (empty($sync_settings['auto_sync_products'])) {
+			return;
+		}
+
+		$this->sync_variation_from_hook($variation_id);
+	}
+
+	/**
+	 * On product variation update
+	 *
+	 * @since 4.7.2
+	 * @param int $variation_id
+	 */
+	public function on_product_variation_update($variation_id)
+	{
+		$sync_settings = get_option('hesabix_v2_sync_settings', array());
+
+		if (empty($sync_settings['sync_on_product_update'])) {
+			return;
+		}
+
+		$this->sync_variation_from_hook($variation_id);
+	}
+
+	/**
+	 * همگام‌سازی یک واریانت از هوک ووکامرس.
+	 *
+	 * @since 4.7.2
+	 * @param int $variation_id
+	 */
+	private function sync_variation_from_hook($variation_id)
+	{
+		$variation_id = absint($variation_id);
+		if ($variation_id < 1) {
+			return;
+		}
+
+		$variation = wc_get_product($variation_id);
+		if (!$variation || !$variation->is_type('variation')) {
+			return;
+		}
+
+		$parent_id = absint($variation->get_parent_id());
+		if ($parent_id < 1) {
+			return;
+		}
+
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$sync_service->sync_product($parent_id, $variation_id);
 	}
 
 	/**
@@ -1029,13 +1100,26 @@ class Hesabix_V2_Admin
 	 */
 	public function on_product_delete($product_id)
 	{
-		// Only if it's a product
-		if (get_post_type($product_id) !== 'product') {
+		$post_type = get_post_type($product_id);
+		if ($post_type !== 'product' && $post_type !== 'product_variation') {
 			return;
 		}
 
 		$db = new Hesabix_V2_DB_Service();
-		$db->delete_mapping('product', $product_id);
+
+		if ($post_type === 'product_variation') {
+			$parent_id = absint(wp_get_post_parent_id($product_id));
+			if ($parent_id > 0) {
+				$db->delete_mapping('product', $product_id, $parent_id);
+			} else {
+				$db->delete_mapping('product', $product_id);
+			}
+			return;
+		}
+
+		// والد ساده یا متغیر: نگاشت والد + همهٔ واریانت‌های فرزند
+		$db->delete_parent_only_product_mapping($product_id);
+		$db->delete_child_product_mappings($product_id);
 	}
 
 	/**
@@ -1516,6 +1600,74 @@ class Hesabix_V2_Admin
 		}
 
 		wp_send_json_success(array('results' => $results));
+	}
+
+	/**
+	 * AJAX: اسکن کالاهای یتیم والد متغیر.
+	 *
+	 * @since 4.7.2
+	 * @return void
+	 */
+	public function ajax_orphans_scan()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$include_heuristic = !empty($_POST['include_name_heuristics']);
+		$svc = new Hesabix_V2_Orphan_Product_Service();
+		$result = $svc->scan_candidates(
+			array(
+				'include_name_heuristics' => $include_heuristic,
+			)
+		);
+
+		wp_send_json_success($result);
+	}
+
+	/**
+	 * AJAX: پیش‌نمایش یا پاک‌سازی دسته‌ای کالاهای یتیم.
+	 *
+	 * @since 4.7.2
+	 * @return void
+	 */
+	public function ajax_orphans_cleanup_batch()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$raw = isset($_POST['hesabix_ids']) ? wp_unslash($_POST['hesabix_ids']) : array();
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, 20);
+		if (empty($ids)) {
+			wp_send_json_error(array('message' => __('کالایی انتخاب نشده است.', 'hesabix-v2')));
+		}
+
+		$dry_run = !empty($_POST['dry_run']);
+		$allow_medium = !empty($_POST['allow_medium']);
+		$deactivate_if_used = !isset($_POST['deactivate_if_used']) || !empty($_POST['deactivate_if_used']);
+
+		$svc = new Hesabix_V2_Orphan_Product_Service();
+		$result = $svc->cleanup_batch(
+			$ids,
+			array(
+				'dry_run' => $dry_run,
+				'allow_medium' => $allow_medium,
+				'deactivate_if_used' => $deactivate_if_used,
+			)
+		);
+
+		wp_send_json_success($result);
 	}
 
 	/**

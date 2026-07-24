@@ -126,6 +126,7 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-customer-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-invoice-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-sync-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-orphan-product-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-opening-inventory-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-queue-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-stock-pull-service.php';
@@ -173,6 +174,8 @@ class Hesabix_V2
 			// Product sync hooks
 			$this->loader->add_action('woocommerce_update_product', $plugin_admin, 'on_product_update');
 			$this->loader->add_action('woocommerce_new_product', $plugin_admin, 'on_product_create');
+			$this->loader->add_action('woocommerce_new_product_variation', $plugin_admin, 'on_product_variation_create');
+			$this->loader->add_action('woocommerce_update_product_variation', $plugin_admin, 'on_product_variation_update');
 			$this->loader->add_action('before_delete_post', $plugin_admin, 'on_product_delete');
 			
 			// Order → invoice: زمان‌بندی از تنظیمات (چک‌اوت، پرداخت، تغییر وضعیت)
@@ -203,6 +206,8 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_orders_sync_batch', $plugin_admin, 'ajax_orders_sync_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_customers_sync_batch', $plugin_admin, 'ajax_customers_sync_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_products_sync_batch', $plugin_admin, 'ajax_products_sync_batch');
+		$this->loader->add_action('wp_ajax_hesabix_v2_orphans_scan', $plugin_admin, 'ajax_orphans_scan');
+		$this->loader->add_action('wp_ajax_hesabix_v2_orphans_cleanup_batch', $plugin_admin, 'ajax_orphans_cleanup_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_orders_unsync_batch', $plugin_admin, 'ajax_orders_unsync_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_orders_set_pause', $plugin_admin, 'ajax_orders_set_pause');
 		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_accounts', $plugin_admin, 'ajax_opening_inventory_accounts');

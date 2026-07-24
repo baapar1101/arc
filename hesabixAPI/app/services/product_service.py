@@ -1276,6 +1276,30 @@ def check_product_has_related_documents(db: Session, product_id: int) -> tuple[b
     if (bom_component_count and bom_component_count > 0) or (bom_output_count and bom_output_count > 0):
         if "فرمول تولید (BOM)" not in related_types:
             related_types.append("فرمول تولید (BOM)")
+
+    # اسناد هزینه/درآمد کالا (FK: RESTRICT) — باید قبل از حذف چک شود
+    try:
+        from adapters.db.models.goods_expense_income import GoodsExpenseIncomeLine
+        gei_count = db.query(func.count(GoodsExpenseIncomeLine.id)).filter(
+            GoodsExpenseIncomeLine.product_id == product_id
+        ).scalar()
+        if gei_count and gei_count > 0:
+            if "اسناد هزینه/درآمد کالا" not in related_types:
+                related_types.append("اسناد هزینه/درآمد کالا")
+    except Exception:
+        pass
+
+    # قطعات تعمیر (FK: RESTRICT)
+    try:
+        from adapters.db.models.repair_shop import RepairOrderPart
+        repair_count = db.query(func.count(RepairOrderPart.id)).filter(
+            RepairOrderPart.product_id == product_id
+        ).scalar()
+        if repair_count and repair_count > 0:
+            if "قطعات تعمیر" not in related_types:
+                related_types.append("قطعات تعمیر")
+    except Exception:
+        pass
     
     return len(related_types) > 0, related_types
 

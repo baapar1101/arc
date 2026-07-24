@@ -227,6 +227,7 @@ class Hesabix_V2_Api
 		// برای پاسخ‌های خطا، یک پیام قابل‌نمایش بساز (API ممکن است message، error یا errors برگرداند)
 		if (is_array($result) && ($status_code >= 400 || (isset($result['success']) && $result['success'] === false))) {
 			$result['success'] = false;
+			$result['status_code'] = (int) $status_code;
 			if (empty($result['message'])) {
 				$result['message'] = self::extract_error_message($result, $status_code, $body);
 			}
@@ -726,6 +727,46 @@ class Hesabix_V2_Api
 		return $this->request(
 			'DELETE',
 			"/products/business/{$this->business_id}/{$product_id}"
+		);
+	}
+
+	/**
+	 * بررسی استفاده کالا در اسناد (فاکتور، سند، انبار، BOM، …).
+	 *
+	 * @since 4.7.2
+	 * @param int $product_id
+	 * @return array
+	 */
+	public function check_product_usage($product_id)
+	{
+		return $this->request(
+			'GET',
+			"/products/business/{$this->business_id}/" . absint($product_id) . '/usage-check'
+		);
+	}
+
+	/**
+	 * حذف گروهی کالاها.
+	 *
+	 * @since 4.7.2
+	 * @param int[] $product_ids
+	 * @return array
+	 */
+	public function bulk_delete_products(array $product_ids)
+	{
+		$ids = array_values(array_filter(array_map('absint', $product_ids)));
+		if (empty($ids)) {
+			return array(
+				'success' => false,
+				'message' => 'empty ids',
+			);
+		}
+
+		return $this->request(
+			'POST',
+			"/products/business/{$this->business_id}/bulk-delete",
+			array('ids' => $ids),
+			90
 		);
 	}
 
