@@ -28,6 +28,7 @@ import '../../services/business_api_service.dart';
 import '../../services/currency_service.dart';
 import '../../services/business_currency_rate_service.dart';
 import '../../utils/currency_display_utils.dart';
+import '../../utils/number_normalizer.dart';
 import '../../widgets/invoice/invoice_installments_editor.dart';
 import '../../widgets/invoice/keep_alive_tab_child.dart';
 import '../../widgets/invoice/invoice_adjustments_form.dart';
@@ -146,17 +147,17 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     if (_manualFxRateId != null) {
       for (final row in _fxRateRows) {
         if ((row['id'] as num?)?.toInt() == _manualFxRateId) {
-          return (row['rate'] as num?)?.toDouble();
+          return parseJsonDoubleOrNull(row['rate']);
         }
       }
     }
     // نرخ ذخیره‌شده روی سند
     final fx = _originalExtraInfo['fx'];
     if (fx is Map && fx['skipped'] != true && fx['rate'] != null) {
-      return (fx['rate'] as num?)?.toDouble() ?? double.tryParse('${fx['rate']}');
+      return parseJsonDoubleOrNull(fx['rate']);
     }
     if (_fxRateRows.isEmpty) return null;
-    return (_fxRateRows.first['rate'] as num?)?.toDouble();
+    return parseJsonDoubleOrNull(_fxRateRows.first['rate']);
   }
 
   String get _baseCurrencyUnitLabel {

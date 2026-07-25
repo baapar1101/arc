@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../widgets/multi_currency_gate.dart';
 import '../../utils/number_formatters.dart';
+import '../../utils/number_normalizer.dart';
 
 /// نمایش جمع دوگانه فاکتور ارزی (ارز سند + معادل پایه) — فقط وقتی MC=ON و showDual.
 class InvoiceFxDualTotalsBanner extends StatelessWidget {
@@ -93,13 +94,13 @@ class InvoiceFxDualTotalsBanner extends StatelessWidget {
     final base = fxTotals['base'];
     if (foreign is! Map || base is! Map) return null;
 
-    final foreignPayable = (foreign['payable'] as num?)?.toDouble() ??
-        (foreign['net'] as num?)?.toDouble() ??
+    final foreignPayable = parseJsonDoubleOrNull(foreign['payable']) ??
+        parseJsonDoubleOrNull(foreign['net']) ??
         0.0;
-    final basePayable = (base['payable'] as num?)?.toDouble() ??
-        (base['net'] as num?)?.toDouble() ??
+    final basePayable = parseJsonDoubleOrNull(base['payable']) ??
+        parseJsonDoubleOrNull(base['net']) ??
         0.0;
-    final rate = (base['rate'] as num?)?.toDouble() ?? 0.0;
+    final rate = parseJsonDoubleOrNull(base['rate']) ?? 0.0;
     final baseLabel = (baseCurrency?['code'] as String?) ??
         (baseCurrency?['symbol'] as String?) ??
         (baseCurrency?['title'] as String?) ??

@@ -267,12 +267,12 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     if (_manualFxRateId != null) {
       for (final row in _fxRateRows) {
         if ((row['id'] as num?)?.toInt() == _manualFxRateId) {
-          return (row['rate'] as num?)?.toDouble();
+          return parseJsonDoubleOrNull(row['rate']);
         }
       }
     }
     if (_fxRateRows.isEmpty) return null;
-    return (_fxRateRows.first['rate'] as num?)?.toDouble();
+    return parseJsonDoubleOrNull(_fxRateRows.first['rate']);
   }
 
   String get _baseCurrencyUnitLabel {
