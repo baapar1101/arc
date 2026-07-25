@@ -1451,9 +1451,9 @@ class _ProductsPageState extends State<ProductsPage> {
               config: DataTableConfig<Map<String, dynamic>>(
                 endpoint: '/api/v1/products/business/${widget.businessId}/search',
           title: t.products,
-          excelEndpoint: '/api/v1/products/business/${widget.businessId}/price-report/export/excel',
-          pdfEndpoint: '/api/v1/products/business/${widget.businessId}/price-report/export/pdf',
-          showExportButtons: false,
+          excelEndpoint: '/api/v1/products/business/${widget.businessId}/export/excel',
+          pdfEndpoint: '/api/v1/products/business/${widget.businessId}/export/pdf',
+          showExportButtons: true,
           businessId: widget.businessId,
           reportModuleKey: 'products',
           reportSubtype: 'list',
@@ -2294,11 +2294,15 @@ class _ProductPriceReportExportDialogState extends State<_ProductPriceReportExpo
 
     setState(() => _exporting = true);
     try {
+      final priceReportBase =
+          '/api/v1/products/business/${widget.businessId}/price-report/export';
       final ok = await (st.exportWithMergedBodyParams(
         format: format,
         selectedOnly: _selectedRowsOnly,
         mergedBodyParams: _mergedExportParams(),
         pdfTemplateId: format == 'pdf' ? _pdfTemplateId : null,
+        endpointOverride:
+            format == 'excel' ? '$priceReportBase/excel' : '$priceReportBase/pdf',
       )) as bool;
       if (ok && mounted) Navigator.of(context).pop();
     } finally {

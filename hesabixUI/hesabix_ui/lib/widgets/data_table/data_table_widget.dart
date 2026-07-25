@@ -1458,6 +1458,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     required bool selectedOnly,
     required Map<String, dynamic> mergedBodyParams,
     int? pdfTemplateId,
+    String? endpointOverride,
   }) async {
     return _runExport(
       format,
@@ -1465,6 +1466,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       mergedBodyParamsOverride: mergedBodyParams,
       useGetExportParams: false,
       pdfTemplateOverride: pdfTemplateId,
+      endpointOverride: endpointOverride,
     );
   }
 
@@ -1474,8 +1476,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     Map<String, dynamic>? mergedBodyParamsOverride,
     required bool useGetExportParams,
     int? pdfTemplateOverride,
+    String? endpointOverride,
   }) async {
-    if (widget.config.excelEndpoint == null &&
+    if (endpointOverride == null &&
+        widget.config.excelEndpoint == null &&
         widget.config.pdfEndpoint == null) {
       return false;
     }
@@ -1488,9 +1492,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     try {
       final api = ApiClient();
-      final endpoint = format == 'excel'
-          ? widget.config.excelEndpoint!
-          : widget.config.pdfEndpoint!;
+      final endpoint = endpointOverride ??
+          (format == 'excel'
+              ? widget.config.excelEndpoint!
+              : widget.config.pdfEndpoint!);
 
       // Build QueryInfo object
       final filters = <Map<String, dynamic>>[];
