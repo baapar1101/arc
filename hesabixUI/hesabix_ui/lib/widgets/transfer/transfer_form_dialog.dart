@@ -42,6 +42,8 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
   final _amountController = TextEditingController();
   final _commissionController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _destinationAmountController = TextEditingController();
+  final _fxRateController = TextEditingController();
   
   bool _isLoading = false;
   DateTime _transferDate = DateTime.now();
@@ -52,6 +54,21 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
   String? _toType = 'bank';   // پیش‌فرض بانک
   String? _fromId;
   String? _toId;
+  int? _fromCurrencyId;
+  int? _toCurrencyId;
+
+  bool get _isMultiCurrency => widget.authStore?.isMultiCurrency ?? false;
+
+  int? get _baseCurrencyId =>
+      widget.authStore?.currentBusiness?.defaultCurrency?.id;
+
+  bool get _isCrossCurrency {
+    if (!_isMultiCurrency) return false;
+    final a = _fromCurrencyId;
+    final b = _toCurrencyId;
+    if (a == null || b == null) return false;
+    return a != b;
+  }
 
   @override
   void initState() {
@@ -103,6 +120,20 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
           final pid = dst['petty_cash_id'];
           _toId = (bid ?? cid ?? pid)?.toString();
         }
+        final fx = init['extra_info'];
+        if (fx is Map && fx['cross_currency_transfer'] is Map) {
+          final cc = Map<String, dynamic>.from(fx['cross_currency_transfer'] as Map);
+          final da = num.tryParse('${cc['destination_amount']}');
+          final rate = num.tryParse('${cc['rate']}');
+          if (da != null) {
+            _destinationAmountController.text = formatNumberForInput(da);
+          }
+          if (rate != null) {
+            _fxRateController.text = rate.toString();
+          }
+          _fromCurrencyId = (cc['source_currency_id'] as num?)?.toInt();
+          _toCurrencyId = (cc['destination_currency_id'] as num?)?.toInt();
+        }
       } catch (_) {}
     }
     // If still not set (create), use business default currency
@@ -114,6 +145,8 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     _amountController.dispose();
     _commissionController.dispose();
     _descriptionController.dispose();
+    _destinationAmountController.dispose();
+    _fxRateController.dispose();
     super.dispose();
   }
 
@@ -136,6 +169,28 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
       return;
     }
 
+    double? destinationAmount;
+    double? fxRate;
+    if (_isCrossCurrency) {
+      fxRate = parseFormattedDouble(_fxRateController.text);
+      // فرعی↔فرعی: نرخ می‌تواند از جدول خوانده شود؛ اگر خالی بود اجازه می‌دهیم API resolve کند
+      final baseId = _baseCurrencyId;
+      final bothForeign = baseId != null &&
+          _fromCurrencyId != null &&
+          _toCurrencyId != null &&
+          _fromCurrencyId != baseId &&
+          _toCurrencyId != baseId;
+      if (!bothForeign && (fxRate == null || fxRate <= 0)) {
+        SnackBarHelper.showError(context, message: 'نرخ تبدیل برای انتقال بین‌ارزی الزامی است');
+        return;
+      }
+      destinationAmount = parseFormattedDouble(_destinationAmountController.text);
+      if (destinationAmount == null || destinationAmount <= 0) {
+        SnackBarHelper.showError(context, message: 'مبلغ مقصد برای انتقال بین‌ارزی الزامی است');
+        return;
+      }
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -143,7 +198,10 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     try {
       final api = widget.apiClient ?? ApiClient();
       final service = TransferService(api);
-      final currencyId = _currencyId;
+      // سند هم‌ارز: ارز انتخابی؛ بین‌ارزی: backend به ارز پایه سوئیچ می‌کند
+      final currencyId = _isCrossCurrency
+          ? (_baseCurrencyId ?? _currencyId)
+          : _currencyId;
       if (currencyId == null) throw Exception('ارز انتخاب نشده است');
 
       final double amount = parseFormattedDouble(_amountController.text) ?? 0;
@@ -163,6 +221,14 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
 
       final isEdit = widget.initial != null && widget.initial!['id'] != null;
       if (isEdit) {
+        if (_isCrossCurrency) {
+          SnackBarHelper.showError(
+            context,
+            message: 'ویرایش انتقال بین‌ارزی از UI فعلاً پشتیبانی نمی‌شود؛ سند را حذف و دوباره ثبت کنید',
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
         await service.update(
           documentId: widget.initial!['id'] as int,
           documentDate: _transferDate,
@@ -181,7 +247,9 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
           source: src,
           destination: dst,
           amount: amount,
-          commission: commission,
+          commission: _isCrossCurrency ? null : commission,
+          destinationAmount: destinationAmount,
+          fxRate: fxRate,
           description: _descriptionController.text.trim(),
         );
       }
@@ -211,6 +279,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     required String? selectedId,
     required ValueChanged<String?> onTypeChanged,
     required ValueChanged<String?> onIdChanged,
+    required bool isSource,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -332,7 +401,12 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
               AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
-                child: _buildAccountCombobox(selectedType, selectedId, onIdChanged),
+                child: _buildAccountCombobox(
+                  selectedType,
+                  selectedId,
+                  onIdChanged,
+                  isSource: isSource,
+                ),
               ),
           ],
         ),
@@ -340,7 +414,23 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
     );
   }
 
-  Widget _buildAccountCombobox(String accountType, String? selectedId, ValueChanged<String?> onIdChanged) {
+  Widget _buildAccountCombobox(
+    String accountType,
+    String? selectedId,
+    ValueChanged<String?> onIdChanged, {
+    required bool isSource,
+  }) {
+    final filterCur = _isMultiCurrency ? null : _currencyId;
+    void onPick(int? currencyId) {
+      setState(() {
+        if (isSource) {
+          _fromCurrencyId = currencyId;
+        } else {
+          _toCurrencyId = currencyId;
+        }
+      });
+    }
+
     switch (accountType) {
       case 'bank':
         return BankAccountComboboxWidget(
@@ -348,11 +438,12 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
           selectedAccountId: selectedId,
           onChanged: (option) {
             onIdChanged(option?.id);
+            onPick(option?.currencyId);
           },
           label: 'انتخاب بانک',
           hintText: 'جست‌وجو و انتخاب بانک',
           isRequired: true,
-          filterCurrencyId: _currencyId,
+          filterCurrencyId: filterCur,
         );
       case 'cash_register':
         return CashRegisterComboboxWidget(
@@ -360,11 +451,12 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
           selectedRegisterId: selectedId,
           onChanged: (option) {
             onIdChanged(option?.id);
+            onPick(option?.currencyId);
           },
           label: 'انتخاب صندوق',
           hintText: 'جست‌وجو و انتخاب صندوق',
           isRequired: true,
-          filterCurrencyId: _currencyId,
+          filterCurrencyId: filterCur,
         );
       case 'petty_cash':
         return PettyCashComboboxWidget(
@@ -372,17 +464,147 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
           selectedPettyCashId: selectedId,
           onChanged: (option) {
             onIdChanged(option?.id);
+            onPick(option?.currencyId);
           },
           label: 'انتخاب تنخواه گردان',
           hintText: 'جست‌وجو و انتخاب تنخواه گردان',
           isRequired: true,
-          filterCurrencyId: _currencyId,
+          filterCurrencyId: filterCur,
         );
       default:
         return Container();
     }
   }
 
+
+  Widget _buildCrossCurrencyFields() {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'انتقال بین‌ارزی',
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'مبلغ مبدأ به ارز حساب مبدأ است. مبلغ مقصد لازم است. '
+            'نرخ: ۱ واحد ارز غیرپایه = نرخ × ارز پایه؛ برای فرعی↔فرعی می‌توانید مبلغ مقصد را دستی وارد کنید '
+            '(نرخ‌ها از جدول تسعیر به پایه خوانده می‌شوند).',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          _buildInputField(
+            controller: _destinationAmountController,
+            labelText: 'مبلغ مقصد *',
+            icon: Icons.south_west,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              EnglishDigitsFormatter(),
+              ThousandsSeparatorInputFormatter(allowDecimal: true),
+            ],
+            validator: (value) {
+              if (!_isCrossCurrency) return null;
+              if (value == null || value.isEmpty) return 'مبلغ مقصد الزامی است';
+              final val = parseFormattedDouble(value);
+              if (val == null || val <= 0) return 'مبلغ مقصد نامعتبر است';
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          _buildInputField(
+            controller: _fxRateController,
+            labelText: 'نرخ تبدیل *',
+            icon: Icons.currency_exchange,
+            helperText: '۱ واحد ارز غیرپایه = نرخ × ارز پایه',
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              EnglishDigitsFormatter(),
+              ThousandsSeparatorInputFormatter(allowDecimal: true),
+            ],
+            validator: (value) {
+              if (!_isCrossCurrency) return null;
+              final baseId = _baseCurrencyId;
+              final bothForeign = baseId != null &&
+                  _fromCurrencyId != null &&
+                  _toCurrencyId != null &&
+                  _fromCurrencyId != baseId &&
+                  _toCurrencyId != baseId;
+              if (bothForeign && (value == null || value.isEmpty)) {
+                return null; // API از جدول نرخ resolve می‌کند
+              }
+              if (value == null || value.isEmpty) return 'نرخ الزامی است';
+              final val = parseFormattedDouble(value);
+              if (val == null || val <= 0) return 'نرخ نامعتبر است';
+              return null;
+            },
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _suggestDestinationFromRate,
+              icon: const Icon(Icons.calculate_outlined, size: 18),
+              label: const Text('محاسبه مبلغ مقصد از نرخ'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _suggestDestinationFromRate() {
+    final amount = parseFormattedDouble(_amountController.text);
+    final rate = parseFormattedDouble(_fxRateController.text);
+    final baseId = _baseCurrencyId;
+    if (amount == null || amount <= 0 || baseId == null) {
+      SnackBarHelper.showError(context, message: 'ابتدا مبلغ مبدأ معتبر وارد کنید');
+      return;
+    }
+    double dest;
+    if (_fromCurrencyId != baseId && _toCurrencyId == baseId) {
+      if (rate == null || rate <= 0) {
+        SnackBarHelper.showError(context, message: 'نرخ معتبر وارد کنید');
+        return;
+      }
+      // مبدأ ارزی → مقصد پایه
+      dest = amount * rate;
+    } else if (_fromCurrencyId == baseId && _toCurrencyId != baseId) {
+      if (rate == null || rate <= 0) {
+        SnackBarHelper.showError(context, message: 'نرخ معتبر وارد کنید');
+        return;
+      }
+      // مبدأ پایه → مقصد ارزی
+      dest = amount / rate;
+    } else if (
+        _fromCurrencyId != null &&
+        _toCurrencyId != null &&
+        _fromCurrencyId != baseId &&
+        _toCurrencyId != baseId) {
+      if (rate == null || rate <= 0) {
+        SnackBarHelper.showError(
+          context,
+          message: 'برای فرعی↔فرعی، نرخ متقاطع (۱ مبدأ = نرخ × مقصد) را وارد کنید یا مبلغ مقصد را دستی بزنید',
+        );
+        return;
+      }
+      // نرخ متقاطع: ۱ واحد مبدأ = rate واحد مقصد
+      dest = amount * rate;
+    } else {
+      SnackBarHelper.showError(context, message: 'ارز مبدأ/مقصد نامشخص است');
+      return;
+    }
+    setState(() {
+      _destinationAmountController.text = formatNumberForInput(dest);
+    });
+  }
 
   Widget _buildInputField({
     required TextEditingController controller,
@@ -712,23 +934,24 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // ردیف 0: انتخاب ارز
-                              Row(
-                                children: [
-                                  SizedBox(
-                                    width: 260,
-                                    child: CurrencyPickerWidget(
-                                      businessId: widget.businessId,
-                                      selectedCurrencyId: _currencyId,
-                                      onChanged: (id) => setState(() => _currencyId = id),
-                                      label: 'ارز',
-                                      hintText: 'انتخاب ارز',
+                              // ردیف 0: انتخاب ارز سند (هم‌ارز؛ بین‌ارزی از ارز پایه استفاده می‌شود)
+                              if (!_isCrossCurrency)
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 260,
+                                      child: CurrencyPickerWidget(
+                                        businessId: widget.businessId,
+                                        selectedCurrencyId: _currencyId,
+                                        onChanged: (id) => setState(() => _currencyId = id),
+                                        label: 'ارز',
+                                        hintText: 'انتخاب ارز',
+                                      ),
                                     ),
-                                  ),
-                                  const Spacer(),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
+                                    const Spacer(),
+                                  ],
+                                ),
+                              if (!_isCrossCurrency) const SizedBox(height: 16),
                               // ردیف اول: انتخاب مبدا و مقصد
                               Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -738,10 +961,12 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                       label: 'از (مبدا)',
                                       selectedType: _fromType,
                                       selectedId: _fromId,
+                                      isSource: true,
                                       onTypeChanged: (value) {
                                         setState(() {
                                           _fromType = value;
                                           _fromId = null;
+                                          _fromCurrencyId = null;
                                         });
                                       },
                                       onIdChanged: (value) {
@@ -757,10 +982,12 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                       label: 'به (مقصد)',
                                       selectedType: _toType,
                                       selectedId: _toId,
+                                      isSource: false,
                                       onTypeChanged: (value) {
                                         setState(() {
                                           _toType = value;
                                           _toId = null;
+                                          _toCurrencyId = null;
                                         });
                                       },
                                       onIdChanged: (value) {
@@ -782,7 +1009,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                   Expanded(
                                     child: _buildInputField(
                                       controller: _amountController,
-                                      labelText: 'مبلغ انتقال',
+                                      labelText: _isCrossCurrency ? 'مبلغ مبدأ' : 'مبلغ انتقال',
                                       icon: Icons.attach_money,
                                       suffixText: 'ریال',
                                       keyboardType: TextInputType.number,
@@ -807,7 +1034,9 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                   ),
                                   const SizedBox(width: 32),
                                   Expanded(
-                                    child: _buildInputField(
+                                    child: _isCrossCurrency
+                                        ? const SizedBox.shrink()
+                                        : _buildInputField(
                                       controller: _commissionController,
                                       labelText: 'کارمزد',
                                       icon: Icons.percent,
@@ -834,6 +1063,10 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                   ),
                                 ],
                               ),
+                              if (_isCrossCurrency) ...[
+                                const SizedBox(height: 16),
+                                _buildCrossCurrencyFields(),
+                              ],
                               
                               const SizedBox(height: 32),
                               
@@ -862,24 +1095,28 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // ارز
-                              CurrencyPickerWidget(
-                                businessId: widget.businessId,
-                                selectedCurrencyId: _currencyId,
-                                onChanged: (id) => setState(() => _currencyId = id),
-                                label: 'ارز',
-                                hintText: 'انتخاب ارز',
-                              ),
-                              const SizedBox(height: 16),
+                              // ارز سند (هم‌ارز؛ بین‌ارزی از ارز پایه)
+                              if (!_isCrossCurrency) ...[
+                                CurrencyPickerWidget(
+                                  businessId: widget.businessId,
+                                  selectedCurrencyId: _currencyId,
+                                  onChanged: (id) => setState(() => _currencyId = id),
+                                  label: 'ارز',
+                                  hintText: 'انتخاب ارز',
+                                ),
+                                const SizedBox(height: 16),
+                              ],
                               // انتخاب مبدا
                               _buildAccountSelector(
                                 label: 'از (مبدا)',
                                 selectedType: _fromType,
                                 selectedId: _fromId,
+                                isSource: true,
                                 onTypeChanged: (value) {
                                   setState(() {
                                     _fromType = value;
                                     _fromId = null;
+                                    _fromCurrencyId = null;
                                   });
                                 },
                                 onIdChanged: (value) {
@@ -896,10 +1133,12 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                 label: 'به (مقصد)',
                                 selectedType: _toType,
                                 selectedId: _toId,
+                                isSource: false,
                                 onTypeChanged: (value) {
                                   setState(() {
                                     _toType = value;
                                     _toId = null;
+                                    _toCurrencyId = null;
                                   });
                                 },
                                 onIdChanged: (value) {
@@ -914,7 +1153,7 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                               // مبلغ
                               _buildInputField(
                                 controller: _amountController,
-                                labelText: 'مبلغ انتقال',
+                                labelText: _isCrossCurrency ? 'مبلغ مبدأ' : 'مبلغ انتقال',
                                 icon: Icons.attach_money,
                                 suffixText: 'ریال',
                                 keyboardType: TextInputType.number,
@@ -936,10 +1175,16 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
                                   return null;
                                 },
                               ),
+
+                              if (_isCrossCurrency) ...[
+                                const SizedBox(height: 16),
+                                _buildCrossCurrencyFields(),
+                              ],
                               
                               const SizedBox(height: 24),
                               
                               // کارمزد
+                              if (!_isCrossCurrency)
                               _buildInputField(
                                 controller: _commissionController,
                                 labelText: 'کارمزد',

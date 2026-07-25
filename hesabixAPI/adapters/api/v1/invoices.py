@@ -2389,7 +2389,16 @@ async def export_single_invoice_pdf(
         "signature_scale_percent": _stamp_sig_sizes["signature_scale_percent"],
         "stamp_max_width_px": _stamp_sig_sizes["stamp_max_width_px"],
         "signature_max_width_px": _stamp_sig_sizes["signature_max_width_px"],
+        "is_multi_currency": False,
+        "base_currency": item.get("base_currency") if isinstance(item.get("base_currency"), dict) else {},
     }
+    try:
+        from app.services.fx_rate_provider_service import business_is_multi_currency as _biz_mc
+
+        template_context["is_multi_currency"] = bool(_biz_mc(db, int(business_id)))
+    except Exception:
+        fx_t = item.get("fx_totals") if isinstance(item.get("fx_totals"), dict) else {}
+        template_context["is_multi_currency"] = bool(fx_t.get("show_dual"))
 
     # تلاش برای رندر با قالب سفارشی
     resolved_html = None

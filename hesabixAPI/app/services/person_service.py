@@ -554,12 +554,16 @@ def get_persons_by_business(
         all_items = []
         person_ids = [p.id for p in all_persons]
         balances = calculate_persons_balances_bulk(db, person_ids, fiscal_year_id)
+        fx_codes = calculate_persons_foreign_currency_codes_bulk(
+            db, person_ids, business_id, fiscal_year_id
+        )
         
         for person in all_persons:
             item = _person_to_dict(person)
             balance, status = balances.get(person.id, (0.0, "بدون تراکنش"))
             item['balance'] = balance
             item['status'] = status
+            item['foreign_currency_codes'] = fx_codes.get(person.id, [])
             all_items.append(item)
         
         # اعمال فیلتر balance و status
@@ -612,12 +616,16 @@ def get_persons_by_business(
         # محاسبه تراز برای persons فعلی
         person_ids = [p.id for p in persons]
         balances = calculate_persons_balances_bulk(db, person_ids, fiscal_year_id)
+        fx_codes = calculate_persons_foreign_currency_codes_bulk(
+            db, person_ids, business_id, fiscal_year_id
+        )
         
         for item in items:
             person_id = item['id']
             balance, status = balances.get(person_id, (0.0, "بدون تراکنش"))
             item['balance'] = balance
             item['status'] = status
+            item['foreign_currency_codes'] = fx_codes.get(person_id, [])
     
     # محاسبه اطلاعات صفحه‌بندی
     total_pages = (total + take - 1) // take if take > 0 else 0
@@ -1139,13 +1147,33 @@ def _person_line_amount_to_base(
     *,
     rate_cache: Dict[int, Decimal],
     base_currency_by_business: Dict[int, Optional[int]],
+    line: Optional["DocumentLine"] = None,
+    side: Optional[str] = None,
 ) -> Decimal:
+    """
+    تبدیل مبلغ به ارز پایه.
+    اگر line و side داده شود، اولویت با debit_base/credit_base ذخیره‌شده روی خط است (P2.5).
+    """
     try:
         amt = Decimal(str(amount or 0))
     except Exception:
         return Decimal(0)
     if amt == 0:
         return Decimal(0)
+
+    if line is not None and side in ("debit", "credit"):
+        from app.services.document_line_fx_service import line_side_amount_to_base
+
+        return line_side_amount_to_base(
+            db,
+            document,
+            line,
+            amt,
+            side=side,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+
     bid = int(document.business_id)
     if bid not in base_currency_by_business:
         bz = db.get(Business, bid)
@@ -1166,6 +1194,8 @@ def amount_in_document_currency_to_base(
     *,
     rate_cache: Dict[int, Decimal],
     base_currency_by_business: Dict[int, Optional[int]],
+    line: Optional["DocumentLine"] = None,
+    side: Optional[str] = None,
 ) -> Decimal:
     """تبدیل مبلغ به ارز پایه با همان منطق خط سند (fx ذخیره‌شده یا resolve_rate؛ در نبود نرخ ۱:۱)."""
     return _person_line_amount_to_base(
@@ -1174,6 +1204,8 @@ def amount_in_document_currency_to_base(
         amount,
         rate_cache=rate_cache,
         base_currency_by_business=base_currency_by_business,
+        line=line,
+        side=side,
     )
 
 
@@ -1218,10 +1250,22 @@ def _filtered_person_balances_in_base(
         if pid not in debit_by_person:
             continue
         debit_by_person[pid] += _person_line_amount_to_base(
-            db, doc, line.debit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+            db,
+            doc,
+            line.debit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="debit",
         )
         credit_by_person[pid] += _person_line_amount_to_base(
-            db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+            db,
+            doc,
+            line.credit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="credit",
         )
         dd = doc.document_date
         if dd is not None:
@@ -1243,6 +1287,192 @@ def _filtered_person_balances_in_base(
             "last_transaction_date": ld.isoformat() if ld else None,
         }
     return out
+
+
+def calculate_person_balances_by_currency(
+    db: Session,
+    person_id: int,
+    fiscal_year_id: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    مانده شخص به تفکیک ارز سند (مبالغ بومی) + معادل ارز پایه.
+
+    قواعد حسابداری:
+    - تجمیع عادی بر اساس Document.currency_id و debit/credit بومی
+    - اگر خط دارای extra_info.fx_settlement باشد (پرداخت بین‌ارزی):
+      ماندهٔ ارز تسویه (settles_currency) با settles_amount جابه‌جا می‌شود
+      و مبلغ خط به ارز پرداخت در ماندهٔ شخص لحاظ نمی‌شود (تا AR ارزی دوبار شمرده نشود)
+    - base_equivalent از debit_base/credit_base یا تبدیل نرخ
+    """
+    from adapters.db.models.currency import Currency
+    from app.services.fx_rate_provider_service import business_is_multi_currency
+
+    pers = db.query(Person).filter(Person.id == person_id).first()
+    if not pers:
+        return {
+            "person_id": person_id,
+            "is_multi_currency": False,
+            "base_currency_id": None,
+            "balances": [],
+            "total_base": 0.0,
+            "status": "بدون تراکنش",
+        }
+
+    business_id = int(pers.business_id)
+    biz = db.get(Business, business_id)
+    base_currency_id = int(biz.default_currency_id) if biz and biz.default_currency_id else None
+    is_mc = business_is_multi_currency(db, business_id)
+
+    line_query = (
+        db.query(DocumentLine, Document)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            DocumentLine.person_id == person_id,
+            Document.is_proforma == False,  # noqa: E712
+        )
+    )
+    if fiscal_year_id:
+        line_query = line_query.filter(Document.fiscal_year_id == fiscal_year_id)
+    rows = line_query.all()
+
+    # currency_id -> {debit, credit, debit_base, credit_base}
+    buckets: Dict[int, Dict[str, Decimal]] = {}
+
+    def _bucket(cid: int) -> Dict[str, Decimal]:
+        if cid not in buckets:
+            buckets[cid] = {
+                "debit": Decimal(0),
+                "credit": Decimal(0),
+                "debit_base": Decimal(0),
+                "credit_base": Decimal(0),
+            }
+        return buckets[cid]
+
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+
+    for line, doc in rows:
+        extra = line.extra_info if isinstance(line.extra_info, dict) else {}
+        fx_set = extra.get("fx_settlement") if isinstance(extra, dict) else None
+
+        debit_base = _person_line_amount_to_base(
+            db,
+            doc,
+            line.debit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="debit",
+        )
+        credit_base = _person_line_amount_to_base(
+            db,
+            doc,
+            line.credit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="credit",
+        )
+
+        if isinstance(fx_set, dict) and fx_set.get("settles_amount") is not None and fx_set.get("settles_currency_id") is not None:
+            try:
+                settles_cid = int(fx_set["settles_currency_id"])
+                settles_amt = Decimal(str(fx_set["settles_amount"]))
+            except Exception:
+                settles_cid = int(doc.currency_id)
+                settles_amt = Decimal(0)
+            if settles_amt < 0:
+                settles_amt = Decimal(0)
+            b = _bucket(settles_cid)
+            # دریافت: کاهش بدهی شخص → credit ؛ پرداخت: کاهش بستانکاری → debit
+            # جهت از علامت خطوط شخص سند: اگر credit>0 دریافت/تسویه بدهکار است
+            if Decimal(str(line.credit or 0)) > 0:
+                b["credit"] += settles_amt
+                b["credit_base"] += credit_base
+            elif Decimal(str(line.debit or 0)) > 0:
+                b["debit"] += settles_amt
+                b["debit_base"] += debit_base
+            else:
+                # fallback: credit
+                b["credit"] += settles_amt
+                b["credit_base"] += credit_base
+            continue
+
+        # تسعیر پایان دوره: فقط ارزش پایه ارز هدف؛ مانده بومی تغییر نمی‌کند
+        if extra.get("fx_period_revaluation") and extra.get("account_currency_id") is not None:
+            try:
+                rev_cid = int(extra["account_currency_id"])
+            except Exception:
+                continue
+            b = _bucket(rev_cid)
+            b["debit_base"] += debit_base
+            b["credit_base"] += credit_base
+            continue
+
+        cid = int(doc.currency_id or 0)
+        if cid <= 0:
+            continue
+        b = _bucket(cid)
+        b["debit"] += Decimal(str(line.debit or 0))
+        b["credit"] += Decimal(str(line.credit or 0))
+        b["debit_base"] += debit_base
+        b["credit_base"] += credit_base
+
+    if not buckets:
+        return {
+            "person_id": person_id,
+            "is_multi_currency": is_mc,
+            "base_currency_id": base_currency_id,
+            "balances": [],
+            "total_base": 0.0,
+            "status": "بدون تراکنش",
+        }
+
+    currency_ids = list(buckets.keys())
+    currencies = {
+        int(c.id): c
+        for c in db.query(Currency).filter(Currency.id.in_(currency_ids)).all()
+    }
+
+    balances_out: List[Dict[str, Any]] = []
+    total_debit_base = Decimal(0)
+    total_credit_base = Decimal(0)
+
+    for cid, tot in sorted(buckets.items(), key=lambda x: x[0]):
+        bal = tot["credit"] - tot["debit"]
+        bal_base = tot["credit_base"] - tot["debit_base"]
+        total_debit_base += tot["debit_base"]
+        total_credit_base += tot["credit_base"]
+        cur = currencies.get(cid)
+        status = _person_balance_status_from_totals(tot["credit"], tot["debit"], bal)
+        balances_out.append(
+            {
+                "currency_id": cid,
+                "currency_code": getattr(cur, "code", None) if cur else None,
+                "currency_title": getattr(cur, "title", None) if cur else None,
+                "currency_symbol": getattr(cur, "symbol", None) if cur else None,
+                "decimal_places": int(getattr(cur, "decimal_places", 2) or 2) if cur else 2,
+                "total_debit": float(tot["debit"]),
+                "total_credit": float(tot["credit"]),
+                "balance": float(bal),
+                "base_equivalent": float(bal_base),
+                "status": status,
+                "is_base_currency": base_currency_id is not None and cid == int(base_currency_id),
+            }
+        )
+
+    total_base = total_credit_base - total_debit_base
+    overall_status = _person_balance_status_from_totals(
+        total_credit_base, total_debit_base, total_base
+    )
+    return {
+        "person_id": person_id,
+        "is_multi_currency": is_mc,
+        "base_currency_id": base_currency_id,
+        "balances": balances_out,
+        "total_base": float(total_base),
+        "status": overall_status,
+    }
 
 
 def calculate_person_balance(
@@ -1291,10 +1521,22 @@ def calculate_person_balance(
     total_debit_base = Decimal(0)
     for line, doc in rows:
         total_debit_base += _person_line_amount_to_base(
-            db, doc, line.debit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+            db,
+            doc,
+            line.debit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="debit",
         )
         total_credit_base += _person_line_amount_to_base(
-            db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+            db,
+            doc,
+            line.credit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="credit",
         )
 
     balance = total_credit_base - total_debit_base
@@ -1352,10 +1594,22 @@ def calculate_persons_balances_bulk(
         if pid not in debit_by_person:
             continue
         debit_by_person[pid] += _person_line_amount_to_base(
-            db, doc, line.debit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+            db,
+            doc,
+            line.debit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="debit",
         )
         credit_by_person[pid] += _person_line_amount_to_base(
-            db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+            db,
+            doc,
+            line.credit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="credit",
         )
 
     for pid in person_ids:
@@ -1367,6 +1621,92 @@ def calculate_persons_balances_bulk(
         balances[pid] = (float(bal), status)
 
     return balances
+
+
+def calculate_persons_foreign_currency_codes_bulk(
+    db: Session,
+    person_ids: List[int],
+    business_id: int,
+    fiscal_year_id: Optional[int] = None,
+) -> Dict[int, List[str]]:
+    """کد ارزهای غیرپایه که شخص در آن‌ها گردش دارد (کشف‌پذیری لیست؛ سبک)."""
+    from adapters.db.models.currency import Currency
+    from app.services.fx_rate_provider_service import business_is_multi_currency
+
+    out: Dict[int, List[str]] = {int(pid): [] for pid in person_ids}
+    if not person_ids or not business_is_multi_currency(db, int(business_id)):
+        return out
+
+    biz = db.get(Business, int(business_id))
+    base_id = int(biz.default_currency_id) if biz and biz.default_currency_id else None
+    if not base_id:
+        return out
+
+    q = (
+        db.query(DocumentLine.person_id, Document.currency_id)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            DocumentLine.person_id.in_(person_ids),
+            Document.is_proforma == False,  # noqa: E712
+            Document.currency_id.isnot(None),
+            Document.currency_id != int(base_id),
+        )
+        .distinct()
+    )
+    if fiscal_year_id:
+        q = q.filter(Document.fiscal_year_id == int(fiscal_year_id))
+
+    pairs = q.all()
+    # همچنین خطوط تسعیر پایان‌دوره که ارز هدف غیرپایه دارند
+    rev_q = (
+        db.query(DocumentLine.person_id, DocumentLine.extra_info)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            DocumentLine.person_id.in_(person_ids),
+            Document.is_proforma == False,  # noqa: E712
+        )
+    )
+    if fiscal_year_id:
+        rev_q = rev_q.filter(Document.fiscal_year_id == int(fiscal_year_id))
+
+    currency_ids: set[int] = set()
+    person_cur: Dict[int, set[int]] = {int(pid): set() for pid in person_ids}
+    for pid, cid in pairs:
+        if pid is None or cid is None:
+            continue
+        person_cur[int(pid)].add(int(cid))
+        currency_ids.add(int(cid))
+
+    for pid, extra in rev_q.all():
+        if pid is None or not isinstance(extra, dict):
+            continue
+        if not extra.get("fx_period_revaluation") and not extra.get("fx_settlement"):
+            continue
+        cid = None
+        if extra.get("fx_period_revaluation") and extra.get("account_currency_id") is not None:
+            try:
+                cid = int(extra["account_currency_id"])
+            except Exception:
+                cid = None
+        fx_set = extra.get("fx_settlement")
+        if cid is None and isinstance(fx_set, dict) and fx_set.get("settles_currency_id") is not None:
+            try:
+                cid = int(fx_set["settles_currency_id"])
+            except Exception:
+                cid = None
+        if cid is None or cid == int(base_id):
+            continue
+        person_cur[int(pid)].add(cid)
+        currency_ids.add(cid)
+
+    code_map: Dict[int, str] = {}
+    if currency_ids:
+        for c in db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all():
+            code_map[int(c.id)] = str(c.code or c.id)
+
+    for pid, cids in person_cur.items():
+        out[pid] = sorted({code_map.get(cid, str(cid)) for cid in cids if cid})
+    return out
 
 
 def get_debtors_report(

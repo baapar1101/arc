@@ -91,13 +91,8 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // پیش‌فرض: همه ارزها (= تبدیل به پایه در بک‌اند)
+        _selectedCurrencyId = null;
       });
     } catch (_) {}
   }

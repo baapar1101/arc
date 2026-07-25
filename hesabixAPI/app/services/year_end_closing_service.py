@@ -1607,6 +1607,8 @@ def _create_opening_balance_for_new_fiscal_year(
                 line.debit,
                 rate_cache=fx_rate_cache,
                 base_currency_by_business=base_currency_by_business,
+                line=line,
+                side="debit",
             )
             total_credit += amount_in_document_currency_to_base(
                 db,
@@ -1614,6 +1616,8 @@ def _create_opening_balance_for_new_fiscal_year(
                 line.credit,
                 rate_cache=fx_rate_cache,
                 base_currency_by_business=base_currency_by_business,
+                line=line,
+                side="credit",
             )
         closing_balance = total_debit - total_credit
         
@@ -1663,6 +1667,8 @@ def _create_opening_balance_for_new_fiscal_year(
                 line.debit,
                 rate_cache=fx_rate_cache,
                 base_currency_by_business=base_currency_by_business,
+                line=line,
+                side="debit",
             )
             person_credit += amount_in_document_currency_to_base(
                 db,
@@ -1670,6 +1676,8 @@ def _create_opening_balance_for_new_fiscal_year(
                 line.credit,
                 rate_cache=fx_rate_cache,
                 base_currency_by_business=base_currency_by_business,
+                line=line,
+                side="credit",
             )
         person_balance = person_debit - person_credit
         
@@ -1731,6 +1739,8 @@ def _create_opening_balance_for_new_fiscal_year(
             line.debit,
             rate_cache=fx_rate_cache,
             base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="debit",
         )
         bank_cash_totals[key]["credit"] += amount_in_document_currency_to_base(
             db,
@@ -1738,6 +1748,8 @@ def _create_opening_balance_for_new_fiscal_year(
             line.credit,
             rate_cache=fx_rate_cache,
             base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="credit",
         )
 
     for (bank_account_id, cash_register_id, petty_cash_id, account_id), totals in bank_cash_totals.items():

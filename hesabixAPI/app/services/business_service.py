@@ -587,6 +587,20 @@ def update_business(db: Session, business_id: int, business_data, owner_id: int)
                 "کسب‌وکار شما قبلاً ارز پیش‌فرض تنظیم کرده است و امکان تغییر آن وجود ندارد",
                 http_status=400
             )
+
+        # V2-P7 دفاع: حتی برای اولین تنظیم، پس از وجود سند قفل
+        has_docs = (
+            db.query(Document.id)
+            .filter(Document.business_id == business_id)
+            .limit(1)
+            .first()
+        )
+        if has_docs is not None:
+            raise ApiError(
+                "CANNOT_SET_DEFAULT_CURRENCY_AFTER_DOCUMENTS",
+                "پس از ثبت سند حسابداری امکان تنظیم ارز پایه وجود ندارد",
+                http_status=400,
+            )
         
         # بررسی وجود ارز
         if new_default_currency_id is not None:
@@ -641,18 +655,9 @@ def update_business(db: Session, business_id: int, business_data, owner_id: int)
 
 def check_currency_usage_in_documents(db: Session, business_id: int, currency_id: int) -> int:
     """
-    بررسی تعداد اسناد استفاده‌کننده از یک ارز در کسب‌وکار
-    
-    Args:
-        db: Database session
-        business_id: شناسه کسب‌وکار
-        currency_id: شناسه ارز
-        
-    Returns:
-        تعداد اسناد استفاده‌کننده از این ارز
+    تعداد اسناد با currency_id مستقیم.
+    برای بررسی کامل حذف ارز از get_business_currency_usage استفاده کنید.
     """
-    from sqlalchemy import func
-    
     count = (
         db.query(func.count(Document.id))
         .filter(
@@ -664,6 +669,155 @@ def check_currency_usage_in_documents(db: Session, business_id: int, currency_id
         .scalar()
     )
     return count or 0
+
+
+def get_business_currency_usage(db: Session, business_id: int, currency_id: int) -> Dict[str, Any]:
+    """
+    V2-P7 / D6: شمارش استفاده ارز در اسناد، خطوط (account_currency در extra)،
+    حساب‌های بانکی/صندوق/تنخواه، چک، قیمت ارزی کالا و اقلام لیست قیمت.
+    """
+    from adapters.db.models.bank_account import BankAccount
+    from adapters.db.models.cash_register import CashRegister
+    from adapters.db.models.petty_cash import PettyCash
+    from adapters.db.models.check import Check
+    from adapters.db.models.document_line import DocumentLine
+    from adapters.db.models.price_list import PriceList, PriceItem
+    from sqlalchemy import cast, String, or_
+
+    bid = int(business_id)
+    cid = int(currency_id)
+    cid_str = str(cid)
+
+    def _cnt(q) -> int:
+        n = q.scalar()
+        return int(n or 0)
+
+    documents = _cnt(
+        db.query(func.count(Document.id)).filter(
+            Document.business_id == bid,
+            Document.currency_id == cid,
+        )
+    )
+
+    # اسناد بازنویسی‌شده به پایه با settles_currency_id در extra_info
+    documents_settles = 0
+    try:
+        documents_settles = _cnt(
+            db.query(func.count(Document.id)).filter(
+                Document.business_id == bid,
+                Document.currency_id != cid,
+                or_(
+                    cast(Document.extra_info["settles_currency_id"], String) == cid_str,
+                    cast(Document.extra_info["fx_settlement"]["settles_currency_id"], String) == cid_str,
+                ),
+            )
+        )
+    except Exception:
+        documents_settles = 0
+
+    # خطوط با account_currency_id بومی
+    document_lines_native = 0
+    try:
+        document_lines_native = _cnt(
+            db.query(func.count(DocumentLine.id))
+            .join(Document, Document.id == DocumentLine.document_id)
+            .filter(
+                Document.business_id == bid,
+                cast(DocumentLine.extra_info["account_currency_id"], String) == cid_str,
+            )
+        )
+    except Exception:
+        document_lines_native = 0
+
+    bank_accounts = _cnt(
+        db.query(func.count(BankAccount.id)).filter(
+            BankAccount.business_id == bid,
+            BankAccount.currency_id == cid,
+        )
+    )
+    cash_registers = _cnt(
+        db.query(func.count(CashRegister.id)).filter(
+            CashRegister.business_id == bid,
+            CashRegister.currency_id == cid,
+        )
+    )
+    petty_cashes = _cnt(
+        db.query(func.count(PettyCash.id)).filter(
+            PettyCash.business_id == bid,
+            PettyCash.currency_id == cid,
+        )
+    )
+    checks = _cnt(
+        db.query(func.count(Check.id)).filter(
+            Check.business_id == bid,
+            Check.currency_id == cid,
+        )
+    )
+    products_fx = _cnt(
+        db.query(func.count(Product.id)).filter(
+            Product.business_id == bid,
+            Product.price_fx_currency_id == cid,
+        )
+    )
+    price_items = _cnt(
+        db.query(func.count(PriceItem.id))
+        .join(PriceList, PriceList.id == PriceItem.price_list_id)
+        .filter(
+            PriceList.business_id == bid,
+            PriceItem.currency_id == cid,
+        )
+    )
+
+    breakdown = {
+        "documents": documents,
+        "documents_settles_extra": documents_settles,
+        "document_lines_native": document_lines_native,
+        "bank_accounts": bank_accounts,
+        "cash_registers": cash_registers,
+        "petty_cashes": petty_cashes,
+        "checks": checks,
+        "products_fx": products_fx,
+        "price_items": price_items,
+    }
+    total = sum(int(v) for v in breakdown.values())
+
+    # تعداد ارزهای فرعی فعال کسب‌وکار
+    secondary_count = _cnt(
+        db.query(func.count(BusinessCurrency.id)).filter(
+            BusinessCurrency.business_id == bid,
+        )
+    )
+    is_last_secondary = secondary_count <= 1
+
+    blockers: List[str] = []
+    labels = {
+        "documents": "اسناد حسابداری",
+        "documents_settles_extra": "اسناد با تسویه این ارز",
+        "document_lines_native": "خطوط سند با مبلغ بومی این ارز",
+        "bank_accounts": "حساب‌های بانکی",
+        "cash_registers": "صندوق‌ها",
+        "petty_cashes": "تنخواه‌ها",
+        "checks": "چک‌ها",
+        "products_fx": "کالاها با قیمت ارزی",
+        "price_items": "اقلام لیست قیمت",
+    }
+    for key, n in breakdown.items():
+        if n > 0:
+            blockers.append(f"{labels.get(key, key)} ({n} مورد)")
+
+    if is_last_secondary and total > 0:
+        blockers.append("آخرین ارز فرعی کسب‌وکار در حضور اسناد/حساب‌های ارزی قابل حذف نیست")
+
+    return {
+        "breakdown": breakdown,
+        "total": total,
+        "is_used": total > 0,
+        "document_count": documents + documents_settles,  # سازگاری با UI قبلی
+        "can_delete": total == 0,
+        "is_last_secondary": is_last_secondary,
+        "secondary_count": secondary_count,
+        "blockers": blockers,
+    }
 
 
 def add_business_currency(db: Session, business_id: int, currency_id: int, owner_id: int) -> Dict[str, Any]:
@@ -780,13 +934,15 @@ def remove_business_currency(db: Session, business_id: int, currency_id: int, ow
             http_status=400
         )
     
-    # بررسی استفاده در اسناد
-    document_count = check_currency_usage_in_documents(db, business_id, currency_id)
-    if document_count > 0:
+    # بررسی استفاده در اسناد / حساب‌ها / کالا (V2-P7 D6)
+    usage = get_business_currency_usage(db, business_id, currency_id)
+    if usage.get("is_used"):
+        blockers = usage.get("blockers") or []
+        detail = "؛ ".join(blockers) if blockers else f"{usage.get('total')} مورد"
         raise ApiError(
             "CURRENCY_IN_USE",
-            f"این ارز در {document_count} سند حسابداری استفاده شده و قابل حذف نیست",
-            http_status=400
+            f"این ارز قابل حذف نیست: {detail}",
+            http_status=400,
         )
     
     # حذف ارز

@@ -351,6 +351,24 @@ class ProductService {
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
   }
 
+  /// به‌روزرسانی فوری قیمت پایه از قیمت ارزی × نرخ روز.
+  Future<Map<String, dynamic>> syncBasePriceFromFx({
+    required int businessId,
+    required int productId,
+    bool syncPriceList = false,
+    int? priceListId,
+  }) async {
+    final q = <String, dynamic>{
+      if (syncPriceList) 'sync_price_list': true,
+      if (priceListId != null) 'price_list_id': priceListId,
+    };
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/products/business/$businessId/$productId/sync-base-price-from-fx',
+      query: q.isEmpty ? null : q,
+    );
+    return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
   /// تاریخ محلی یکسان با تقویمی که کاربر دید؛ برای جلوگیری از شیفت یک‌روزی در API.
   String _localCalendarYmd(DateTime d) {
     final y = d.year.toString().padLeft(4, '0');

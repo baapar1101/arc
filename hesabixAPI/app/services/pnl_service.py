@@ -116,10 +116,22 @@ def _turnover_by_account_in_base_currency(
         if aid not in turnover_by_account:
             turnover_by_account[aid] = {"debit": Decimal(0), "credit": Decimal(0)}
         turnover_by_account[aid]["debit"] += _person_line_amount_to_base(
-            db, doc, line.debit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+            db,
+            doc,
+            line.debit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="debit",
         )
         turnover_by_account[aid]["credit"] += _person_line_amount_to_base(
-            db, doc, line.credit, rate_cache=rate_cache, base_currency_by_business=base_currency_by_business
+            db,
+            doc,
+            line.credit,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+            line=line,
+            side="credit",
         )
     return turnover_by_account
 

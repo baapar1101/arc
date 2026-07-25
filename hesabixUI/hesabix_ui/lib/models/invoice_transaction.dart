@@ -40,9 +40,16 @@ class InvoiceTransaction {
   final String? accountId;
   final String? accountName;
   final DateTime transactionDate;
+  /// مبلغ واقعی پرداخت به ارز حساب پرداخت.
   final num amount;
   final num? commission;
   final String? description;
+  /// مبلغ تسویه به ارز فاکتور (پرداخت بین‌ارزی).
+  final num? settlesAmount;
+  /// نرخ تبدیل تراکنش (۱ واحد ارز غیرپایه = rate × پایه / یا طبق قرارداد API).
+  final num? fxRate;
+  /// ارز حساب پرداخت (برای نمایش و تشخیص بین‌ارزی در UI).
+  final int? paymentCurrencyId;
 
   const InvoiceTransaction({
     required this.id,
@@ -63,7 +70,16 @@ class InvoiceTransaction {
     required this.amount,
     this.commission,
     this.description,
+    this.settlesAmount,
+    this.fxRate,
+    this.paymentCurrencyId,
   });
+
+  /// مبلغ مؤثر برای مانده فاکتور (به ارز فاکتور).
+  num get settlesAgainstInvoice => settlesAmount ?? amount;
+
+  bool get isCrossCurrency =>
+      settlesAmount != null && paymentCurrencyId != null;
 
   InvoiceTransaction copyWith({
     String? id,
@@ -84,6 +100,9 @@ class InvoiceTransaction {
     num? amount,
     num? commission,
     String? description,
+    Object? settlesAmount = _unset,
+    Object? fxRate = _unset,
+    Object? paymentCurrencyId = _unset,
   }) {
     return InvoiceTransaction(
       id: id ?? this.id,
@@ -104,11 +123,18 @@ class InvoiceTransaction {
       amount: amount ?? this.amount,
       commission: commission ?? this.commission,
       description: description ?? this.description,
+      settlesAmount: identical(settlesAmount, _unset)
+          ? this.settlesAmount
+          : settlesAmount as num?,
+      fxRate: identical(fxRate, _unset) ? this.fxRate : fxRate as num?,
+      paymentCurrencyId: identical(paymentCurrencyId, _unset)
+          ? this.paymentCurrencyId
+          : paymentCurrencyId as int?,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {
+    final map = <String, dynamic>{
       'id': id,
       'type': type.value,
       'bank_id': bankId,
@@ -128,6 +154,16 @@ class InvoiceTransaction {
       'commission': commission,
       'description': description,
     };
+    if (settlesAmount != null) {
+      map['settles_amount'] = settlesAmount;
+    }
+    if (fxRate != null) {
+      map['fx_rate'] = fxRate;
+    }
+    if (paymentCurrencyId != null) {
+      map['payment_currency_id'] = paymentCurrencyId;
+    }
+    return map;
   }
 
   factory InvoiceTransaction.fromJson(Map<String, dynamic> json) {
@@ -150,6 +186,11 @@ class InvoiceTransaction {
       amount: json['amount'] as num,
       commission: json['commission'] as num?,
       description: json['description'] as String?,
+      settlesAmount: json['settles_amount'] as num?,
+      fxRate: json['fx_rate'] as num? ?? json['exchange_rate'] as num?,
+      paymentCurrencyId: (json['payment_currency_id'] as num?)?.toInt(),
     );
   }
 }
+
+const Object _unset = Object();

@@ -784,6 +784,57 @@ def get_product_commercial_insights_endpoint(
     return success_response(data=format_datetime_fields(data, request), request=request)
 
 
+@router.post(
+    "/business/{business_id}/{product_id}/sync-base-price-from-fx",
+    summary="به‌روزرسانی قیمت پایه کالا از قیمت ارزی × نرخ روز",
+    tags=["products", "currency_revaluation"],
+)
+@require_business_access("business_id")
+async def sync_product_base_price_from_fx_endpoint(
+    request: Request,
+    business_id: int,
+    product_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("products", "edit", Product, "product_id")),
+    sync_price_list: bool = Query(False, description="همگام اختیاری با لیست قیمت پیش‌فرض"),
+    price_list_id: Optional[int] = Query(None, description="شناسه لیست قیمت (اختیاری؛ پیش‌فرض Quick Sales)"),
+) -> Dict[str, Any]:
+    from app.services.product_fx_price_service import sync_product_base_from_fx
+
+    data = sync_product_base_from_fx(
+        db,
+        business_id,
+        product_id,
+        force=True,
+        sync_price_list=bool(sync_price_list),
+        price_list_id=price_list_id,
+    )
+    return success_response(data=data, request=request)
+
+
+@router.post(
+    "/business/{business_id}/sync-base-prices-from-fx",
+    summary="به‌روزرسانی گروهی قیمت پایه کالاها از نرخ (auto_update)",
+    tags=["products", "currency_revaluation"],
+)
+@require_business_access("business_id")
+async def sync_business_product_base_prices_from_fx_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "edit")),
+    sync_price_list: bool = Query(False, description="همگام اختیاری با لیست قیمت پیش‌فرض"),
+) -> Dict[str, Any]:
+    from app.services.product_fx_price_service import sync_business_products_base_from_fx
+
+    data = sync_business_products_base_from_fx(
+        db, business_id, only_auto=True, sync_price_list=bool(sync_price_list)
+    )
+    return success_response(data=data, request=request)
+
+
 @router.put(
     "/business/{business_id}/{product_id}",
     summary="ویرایش محصول",

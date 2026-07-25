@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 import logging
 
@@ -150,6 +150,40 @@ def create_transfer(
     if src_type == dst_type and src_id and dst_id and str(src_id) == str(dst_id):
         raise ApiError("SAME_SOURCE_DESTINATION", "source and destination cannot be the same", http_status=400)
 
+    from app.services.cross_currency_settlement_service import (
+        FX_GAIN_ACCOUNT_CODE,
+        FX_LOSS_ACCOUNT_CODE,
+        resolve_cross_currency_transfer_plan,
+    )
+
+    dest_amount_raw = data.get("destination_amount")
+    fx_rate_raw = data.get("fx_rate") or data.get("exchange_rate")
+    src_rate_raw = data.get("source_rate_to_base")
+    dst_rate_raw = data.get("destination_rate_to_base")
+    xplan = resolve_cross_currency_transfer_plan(
+        db,
+        business_id=business_id,
+        source_type=src_type,
+        source_id=src_id,
+        destination_type=dst_type,
+        destination_id=dst_id,
+        source_amount=amount,
+        destination_amount=Decimal(str(dest_amount_raw)) if dest_amount_raw is not None else None,
+        fx_rate=Decimal(str(fx_rate_raw)) if fx_rate_raw is not None else None,
+        source_rate_to_base=Decimal(str(src_rate_raw)) if src_rate_raw is not None else None,
+        destination_rate_to_base=Decimal(str(dst_rate_raw)) if dst_rate_raw is not None else None,
+        as_of=(
+            datetime(document_date.year, document_date.month, document_date.day, tzinfo=timezone.utc)
+            if isinstance(document_date, date)
+            else None
+        ),
+    )
+    if xplan is not None:
+        currency_id = int(xplan["document_currency_id"])
+        currency = db.query(Currency).filter(Currency.id == int(currency_id)).first()
+        if not currency:
+            raise ApiError("CURRENCY_NOT_FOUND", "Currency not found", http_status=404)
+
     # Resolve accounts by fixed codes
     src_account = _get_fixed_account_by_code(db, _account_code_for_type(src_type))
     dst_account = _get_fixed_account_by_code(db, _account_code_for_type(dst_type))
@@ -239,13 +273,18 @@ def create_transfer(
     dest_line = DocumentLine(
         document_id=document.id,
         account_id=dst_account.id,
-        debit=amount,
+        debit=(xplan["destination_base"] if xplan else amount),
         credit=Decimal(0),
         description=data.get("destination_description") or data.get("description"),
         extra_info={
             "side": "destination",
             "destination_type": dst_type,
             "destination_id": dst_id,
+            **({
+                "account_currency_amount": str(xplan["destination_amount"]),
+                "account_currency_id": int(xplan["destination_currency_id"]),
+                "cross_currency_transfer": True,
+            } if xplan else {}),
         },
         **dest_kwargs,
     )
@@ -267,18 +306,53 @@ def create_transfer(
         document_id=document.id,
         account_id=src_account.id,
         debit=Decimal(0),
-        credit=amount,
+        credit=(xplan["source_base"] if xplan else amount),
         description=data.get("source_description") or data.get("description"),
         extra_info={
             "side": "source",
             "source_type": src_type,
             "source_id": src_id,
+            **({
+                "account_currency_amount": str(xplan["source_amount"]),
+                "account_currency_id": int(xplan["source_currency_id"]),
+                "cross_currency_transfer": True,
+            } if xplan else {}),
         },
         **src_kwargs,
     )
     db.add(src_line)
 
-    if commission > 0:
+    # تسعیر اختلاف مبدأ/مقصد در انتقال بین‌ارزی
+    if xplan is not None:
+        fx_diff = Decimal(str(xplan["fx_diff"]))
+        if abs(fx_diff) > 0:
+            if fx_diff > 0:
+                # منبع پایه بیشتر از مقصد → زیان
+                fx_acc = _get_fixed_account_by_code(db, FX_LOSS_ACCOUNT_CODE)
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=fx_acc.id,
+                    debit=fx_diff,
+                    credit=Decimal(0),
+                    description="زیان تسعیر ارز انتقال",
+                    extra_info={"fx_adjustment": True, "cross_currency_transfer": True},
+                ))
+            else:
+                fx_acc = _get_fixed_account_by_code(db, FX_GAIN_ACCOUNT_CODE)
+                db.add(DocumentLine(
+                    document_id=document.id,
+                    account_id=fx_acc.id,
+                    debit=Decimal(0),
+                    credit=(-fx_diff),
+                    description="سود تسعیر ارز انتقال",
+                    extra_info={"fx_adjustment": True, "cross_currency_transfer": True},
+                ))
+        # برای تراز: اگر fx_diff اعمال شد، مبدأ/مقصد ممکن است نیاز به تنظیم داشته باشند
+        # با تعریف fx_diff = source_base - destination_base:
+        # Dr dest (dest_base) + Dr loss(fx) = Cr src (src_base) وقتی fx>0
+        # Dr dest (dest_base) = Cr src (src_base) + Cr gain(-fx) وقتی fx<0
+
+    if commission > 0 and xplan is None:
         # Debit commission expense 70902
         commission_service_account = _get_fixed_account_by_code(db, "70902")
         commission_expense_line = DocumentLine(
@@ -311,6 +385,25 @@ def create_transfer(
             **src_kwargs,
         )
         db.add(commission_credit_line)
+
+    if xplan is not None:
+        extra = dict(document.extra_info or {}) if isinstance(document.extra_info, dict) else {}
+        extra["cross_currency_transfer"] = {
+            "source_currency_id": int(xplan["source_currency_id"]),
+            "destination_currency_id": int(xplan["destination_currency_id"]),
+            "source_amount": str(xplan["source_amount"]),
+            "destination_amount": str(xplan["destination_amount"]),
+            "rate": str(xplan["rate"]),
+            "fx_diff": str(xplan["fx_diff"]),
+        }
+        document.extra_info = extra
+
+    try:
+        from app.services.document_line_fx_service import stamp_document_lines_fx_base
+
+        stamp_document_lines_fx_base(db, document, only_missing=False, allow_infer=True)
+    except Exception:
+        logger.exception("transfer fx base stamp failed")
 
     if commit:
         db.commit()

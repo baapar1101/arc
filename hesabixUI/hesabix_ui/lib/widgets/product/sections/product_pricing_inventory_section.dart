@@ -3,12 +3,16 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 
 import '../../../controllers/product_form_controller.dart';
+import '../../../core/auth_store.dart';
 import '../../../models/product_form_data.dart';
+import '../../../services/product_service.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
+import '../../../widgets/multi_currency_gate.dart';
 import 'product_suppliers_section.dart';
 
 
@@ -24,6 +28,8 @@ class ProductPricingInventorySection extends StatefulWidget {
   final void Function(Map<String, dynamic> item) onDeletePriceItem;
   final dynamic controller; // ProductFormController
   final int? productId; // برای تشخیص ویرایش
+  final AuthStore? authStore;
+  final bool isMultiCurrency;
 
   const ProductPricingInventorySection({
     super.key,
@@ -38,6 +44,8 @@ class ProductPricingInventorySection extends StatefulWidget {
     required this.onDeletePriceItem,
     this.controller,
     this.productId,
+    this.authStore,
+    this.isMultiCurrency = false,
   });
 
   @override
@@ -52,6 +60,8 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
   late TextEditingController _openingQuantityController;
   late TextEditingController _openingCostPriceController;
   ProductFormController? _boundController;
+  bool _syncingFxBase = false;
+  bool _syncPriceListWithFx = true;
 
   @override
   void initState() {
@@ -608,6 +618,105 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             ),
           ),
         ),
+        if (widget.isMultiCurrency)
+          MultiCurrencyGate(
+            isMultiCurrency: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                Text('قیمت ارزی (چندارزی)', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int?>(
+                  value: widget.formData.priceFxCurrencyId,
+                  decoration: const InputDecoration(
+                    labelText: 'ارز قیمت ارزی',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                    ...widget.currencies.map((c) {
+                      final id = (c['id'] as num?)?.toInt();
+                      final label =
+                          '${c['code'] ?? ''} ${c['title'] ?? c['symbol'] ?? ''}'.trim();
+                      return DropdownMenuItem<int?>(value: id, child: Text(label));
+                    }),
+                  ],
+                  onChanged: (v) => _updateFormData(
+                    widget.formData.copyWith(priceFxCurrencyId: v),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: formatNumberForInput(widget.formData.salesPriceFx),
+                  decoration: const InputDecoration(labelText: 'قیمت فروش ارزی'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    ThousandsSeparatorInputFormatter(),
+                  ],
+                  onChanged: (value) => _updateFormData(
+                    widget.formData.copyWith(
+                      salesPriceFx: num.tryParse(value.replaceAll(',', '')),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: formatNumberForInput(widget.formData.purchasePriceFx),
+                  decoration: const InputDecoration(labelText: 'قیمت خرید ارزی'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    ThousandsSeparatorInputFormatter(),
+                  ],
+                  onChanged: (value) => _updateFormData(
+                    widget.formData.copyWith(
+                      purchasePriceFx: num.tryParse(value.replaceAll(',', '')),
+                    ),
+                  ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('به‌روزرسانی خودکار قیمت پایه از نرخ'),
+                  subtitle: const Text('پس از ثبت نرخ جدید، base = قیمت ارزی × نرخ'),
+                  value: widget.formData.autoUpdateBaseFromFx,
+                  onChanged: (v) => _updateFormData(
+                    widget.formData.copyWith(autoUpdateBaseFromFx: v),
+                  ),
+                ),
+                if (widget.productId != null) ...[
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('همگام با لیست قیمت پیش‌فرض'),
+                    subtitle: const Text('پس از sync، قیمت فروش پایه در PriceList به‌روز شود'),
+                    value: _syncPriceListWithFx,
+                    onChanged: _syncingFxBase
+                        ? null
+                        : (v) => setState(() => _syncPriceListWithFx = v ?? true),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: OutlinedButton.icon(
+                      onPressed: _syncingFxBase ? null : _syncBasePriceFromFx,
+                      icon: _syncingFxBase
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.currency_exchange, size: 18),
+                      label: Text(_syncingFxBase
+                          ? 'در حال بروزرسانی…'
+                          : 'بروزرسانی قیمت پایه از نرخ'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -1095,6 +1204,71 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
         ),
       ),
     );
+  }
+
+  Future<void> _syncBasePriceFromFx() async {
+    final productId = widget.productId;
+    if (productId == null) return;
+    if (widget.formData.priceFxCurrencyId == null) {
+      SnackBarHelper.showError(context, message: 'ابتدا ارز قیمت ارزی را انتخاب کنید');
+      return;
+    }
+    setState(() => _syncingFxBase = true);
+    try {
+      final result = await ProductService().syncBasePriceFromFx(
+        businessId: widget.businessId,
+        productId: productId,
+        syncPriceList: _syncPriceListWithFx,
+      );
+      if (!mounted) return;
+      if (result['updated'] == true) {
+        final after = result['after'];
+        num? sales;
+        num? purchase;
+        if (after is Map) {
+          sales = num.tryParse('${after['base_sales_price'] ?? ''}');
+          purchase = num.tryParse('${after['base_purchase_price'] ?? ''}');
+        }
+        final updated = widget.formData.copyWith(
+          baseSalesPrice: sales ?? widget.formData.baseSalesPrice,
+          basePurchasePrice: purchase ?? widget.formData.basePurchasePrice,
+        );
+        _updateFormData(updated);
+        if (sales != null) {
+          _salesPriceController.text = formatNumberForInput(sales);
+        }
+        if (purchase != null) {
+          _purchasePriceController.text = formatNumberForInput(purchase);
+        }
+        SnackBarHelper.show(
+          context,
+          message: 'قیمت پایه از نرخ بروزرسانی شد'
+              '${result['rate'] != null ? ' (نرخ: ${result['rate']})' : ''}',
+        );
+      } else {
+        final reason = result['reason']?.toString() ?? 'بدون تغییر';
+        final messages = <String, String>{
+          'no_fx_currency': 'ارز قیمت ارزی تنظیم نشده است',
+          'no_rate': 'نرخ تسعیر برای این ارز یافت نشد',
+          'fx_currency_is_base': 'ارز قیمت ارزی با ارز پایه یکی است',
+          'auto_update_disabled': 'به‌روزرسانی خودکار غیرفعال است',
+          'no_base_currency': 'ارز پایه کسب‌وکار تنظیم نشده است',
+        };
+        SnackBarHelper.show(
+          context,
+          message: messages[reason] ?? 'قیمت پایه تغییر نکرد ($reason)',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _syncingFxBase = false);
+    }
   }
 
   void _updateFormData(ProductFormData newData) {

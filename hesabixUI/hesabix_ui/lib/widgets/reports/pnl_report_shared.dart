@@ -152,29 +152,30 @@ class PnlReportFilters extends StatelessWidget {
                       ),
                     ),
                   ),
-                SizedBox(
-                  width: fieldWidth,
-                  child: DropdownButtonFormField<int>(
-                    value: selectedCurrencyId,
-                    isExpanded: true,
-                    decoration: _decoration('ارز'),
-                    items: [
-                      const DropdownMenuItem<int>(value: null, child: Text('همه ارزها')),
-                      ...currencies.map((c) {
-                        final id = c['id'] as int?;
-                        final code = (c['code'] ?? '').toString();
-                        final name = (c['name'] ?? '').toString();
-                        final displayName = code.isNotEmpty ? '$code - $name' : name;
-                        return DropdownMenuItem<int>(
-                          key: ValueKey('currency_$id'),
-                          value: id,
-                          child: Text(displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
-                        );
-                      }),
-                    ],
-                    onChanged: onCurrencyChanged,
+                if (currencies.length > 1)
+                  SizedBox(
+                    width: fieldWidth,
+                    child: DropdownButtonFormField<int>(
+                      value: selectedCurrencyId,
+                      isExpanded: true,
+                      decoration: _decoration('ارز'),
+                      items: [
+                        const DropdownMenuItem<int>(value: null, child: Text('همه ارزها')),
+                        ...currencies.map((c) {
+                          final id = c['id'] as int?;
+                          final code = (c['code'] ?? '').toString();
+                          final name = (c['name'] ?? '').toString();
+                          final displayName = code.isNotEmpty ? '$code - $name' : name;
+                          return DropdownMenuItem<int>(
+                            key: ValueKey('currency_$id'),
+                            value: id,
+                            child: Text(displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
+                          );
+                        }),
+                      ],
+                      onChanged: onCurrencyChanged,
+                    ),
                   ),
-                ),
                 SizedBox(
                   width: isMobile ? double.infinity : 260,
                   child: ProjectSelectorWidget(

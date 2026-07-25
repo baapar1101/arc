@@ -717,6 +717,7 @@ class _BusinessShellState extends State<BusinessShell> {
           isReceipt: true, // پیش‌فرض دریافت
           businessInfo: widget.authStore.currentBusiness,
           apiClient: ApiClient(),
+          authStore: widget.authStore,
         ),
       );
       if (result == true) {

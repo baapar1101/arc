@@ -127,12 +127,14 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        if (_selectedCurrencyId == null && items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
+        if (items.length <= 1) {
+          // تک‌ارزی: بدون فیلتر ارز
+          _selectedCurrencyId = null;
+        } else if (_selectedCurrencyId == null && widget.initialCurrencyId == null) {
+          // چندارزی: پیش‌فرض همه (= پایه)
+          _selectedCurrencyId = null;
+        } else if (_selectedCurrencyId == null && widget.initialCurrencyId != null) {
+          _selectedCurrencyId = widget.initialCurrencyId;
         }
       });
     } catch (_) {
@@ -494,7 +496,8 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
               ),
             ),
             cell(
-              DropdownButtonFormField<int>(
+              _currencies.length > 1
+                  ? DropdownButtonFormField<int>(
                 value: _selectedCurrencyId,
                 decoration: InputDecoration(
                   hintText: 'ارز',
@@ -522,7 +525,8 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                   setState(() => _selectedCurrencyId = val);
                   _refreshData();
                 },
-              ),
+              )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),

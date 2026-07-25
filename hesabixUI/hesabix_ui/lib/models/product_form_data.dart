@@ -37,6 +37,12 @@ class ProductFormData {
   num? basePurchasePrice;
   String? baseSalesNote;
   String? basePurchaseNote;
+  /// قیمت فروش ارزی (چندارزی)
+  num? salesPriceFx;
+  /// قیمت خرید ارزی (چندارزی)
+  num? purchasePriceFx;
+  int? priceFxCurrencyId;
+  bool autoUpdateBaseFromFx;
   
   // Units
   String? mainUnit;
@@ -97,6 +103,10 @@ class ProductFormData {
     this.basePurchasePrice,
     this.baseSalesNote,
     this.basePurchaseNote,
+    this.salesPriceFx,
+    this.purchasePriceFx,
+    this.priceFxCurrencyId,
+    this.autoUpdateBaseFromFx = false,
     this.mainUnit = 'عدد',
     this.secondaryUnit,
     this.unitConversionFactor = 1,
@@ -145,6 +155,10 @@ class ProductFormData {
     Object? basePurchasePrice = _kProductFormFieldUnset,
     Object? baseSalesNote = _kProductFormFieldUnset,
     Object? basePurchaseNote = _kProductFormFieldUnset,
+    Object? salesPriceFx = _kProductFormFieldUnset,
+    Object? purchasePriceFx = _kProductFormFieldUnset,
+    Object? priceFxCurrencyId = _kProductFormFieldUnset,
+    bool? autoUpdateBaseFromFx,
     String? mainUnit,
     Object? secondaryUnit = _kProductFormFieldUnset,
     num? unitConversionFactor,
@@ -189,6 +203,10 @@ class ProductFormData {
       basePurchasePrice: _nullableCopyField<num>(basePurchasePrice, this.basePurchasePrice),
       baseSalesNote: _nullableCopyField<String>(baseSalesNote, this.baseSalesNote),
       basePurchaseNote: _nullableCopyField<String>(basePurchaseNote, this.basePurchaseNote),
+      salesPriceFx: _nullableCopyField<num>(salesPriceFx, this.salesPriceFx),
+      purchasePriceFx: _nullableCopyField<num>(purchasePriceFx, this.purchasePriceFx),
+      priceFxCurrencyId: _nullableCopyField<int>(priceFxCurrencyId, this.priceFxCurrencyId),
+      autoUpdateBaseFromFx: autoUpdateBaseFromFx ?? this.autoUpdateBaseFromFx,
       mainUnit: mainUnit ?? this.mainUnit,
       secondaryUnit: _nullableCopyField<String>(secondaryUnit, this.secondaryUnit),
       unitConversionFactor: unitConversionFactor ?? this.unitConversionFactor,
@@ -253,6 +271,10 @@ class ProductFormData {
       // Default numeric fields to zero when null
       'base_sales_price': baseSalesPrice ?? 0,
       'base_purchase_price': basePurchasePrice ?? 0,
+      'sales_price_fx': salesPriceFx,
+      'purchase_price_fx': purchasePriceFx,
+      'price_fx_currency_id': priceFxCurrencyId,
+      'auto_update_base_from_fx': autoUpdateBaseFromFx,
       'reorder_point': reorderPoint ?? 0,
       'min_order_qty': minOrderQty ?? 0,
       'lead_time_days': leadTimeDays ?? 0,
@@ -329,6 +351,10 @@ class ProductFormData {
       trackBarcode: (product['track_barcode'] == true),
       baseSalesPrice: _parseNumeric(product['base_sales_price']),
       basePurchasePrice: _parseNumeric(product['base_purchase_price']),
+      salesPriceFx: _parseNumeric(product['sales_price_fx']),
+      purchasePriceFx: _parseNumeric(product['purchase_price_fx']),
+      priceFxCurrencyId: _parseInt(product['price_fx_currency_id']),
+      autoUpdateBaseFromFx: product['auto_update_base_from_fx'] == true,
       mainUnit: product['main_unit']?.toString(),
       secondaryUnit: product['secondary_unit']?.toString(),
       unitConversionFactor: _parseNumeric(product['unit_conversion_factor']) ?? 1,

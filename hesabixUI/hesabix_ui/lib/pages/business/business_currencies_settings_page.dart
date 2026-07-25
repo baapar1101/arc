@@ -145,14 +145,24 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       );
       
       if (usage['is_used'] == true) {
-        final count = usage['document_count'] as int;
+        final blockers = (usage['blockers'] as List?)
+                ?.map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toList() ??
+            const <String>[];
+        final count = usage['document_count'] as int? ?? usage['total'] as int? ?? 0;
+        final detail = blockers.isNotEmpty
+            ? blockers.join('\n• ')
+            : 'این ارز در $count مورد استفاده شده و قابل حذف نیست.';
         if (mounted) {
           await showDialog(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('امکان حذف وجود ندارد'),
               content: Text(
-                'این ارز در $count سند حسابداری استفاده شده و قابل حذف نیست.',
+                blockers.isNotEmpty
+                    ? 'این ارز قابل حذف نیست:\n• $detail'
+                    : detail,
               ),
               actions: [
                 TextButton(

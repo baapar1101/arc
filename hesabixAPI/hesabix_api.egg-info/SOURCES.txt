@@ -52,6 +52,7 @@ adapters/api/v1/opening_balance.py
 adapters/api/v1/payment_callbacks.py
 adapters/api/v1/payment_gateways.py
 adapters/api/v1/payroll.py
+adapters/api/v1/period_end_fx_revaluation.py
 adapters/api/v1/person_group_routes.py
 adapters/api/v1/persons.py
 adapters/api/v1/petty_cash.py
@@ -441,6 +442,7 @@ app/integrations/moadian/v2_client.py
 app/integrations/moadian/v2_crypto.py
 app/integrations/moadian/verhoeff.py
 app/services/account_balance_core.py
+app/services/account_native_balance.py
 app/services/account_review_service.py
 app/services/account_service.py
 app/services/activity_log_service.py
@@ -496,6 +498,7 @@ app/services/crm_calendar_note_service.py
 app/services/crm_chat_realtime.py
 app/services/crm_chat_realtime_fanout.py
 app/services/crm_chat_service.py
+app/services/cross_currency_settlement_service.py
 app/services/currency_admin_service.py
 app/services/currency_quant.py
 app/services/customer_club_analytics_service.py
@@ -508,6 +511,7 @@ app/services/distribution_geo.py
 app/services/distribution_phase3_service.py
 app/services/distribution_service.py
 app/services/document_code_reservation_service.py
+app/services/document_line_fx_service.py
 app/services/document_list_sort.py
 app/services/document_monetization_background_jobs.py
 app/services/document_monetization_jobs.py
@@ -527,6 +531,7 @@ app/services/financial_package_service.py
 app/services/firewall_service.py
 app/services/fiscal_year_rollback_service.py
 app/services/fx_auto_sync_background_jobs.py
+app/services/fx_data_health_service.py
 app/services/fx_rate_background_jobs.py
 app/services/fx_rate_provider_service.py
 app/services/general_ledger_electronic_export_service.py
@@ -567,6 +572,7 @@ app/services/payroll_excel.py
 app/services/payroll_reports.py
 app/services/payroll_service.py
 app/services/payroll_statutory.py
+app/services/period_end_fx_revaluation_service.py
 app/services/person_bulk_upsert_service.py
 app/services/person_excel_import.py
 app/services/person_group_service.py
@@ -585,6 +591,7 @@ app/services/product_bulk_upsert_service.py
 app/services/product_catalog_profile_service.py
 app/services/product_commercial_insights_service.py
 app/services/product_excel_import_opening_balance.py
+app/services/product_fx_price_service.py
 app/services/product_general_barcode_service.py
 app/services/product_inventory_tracking_sync.py
 app/services/product_opening_balance_service.py
@@ -752,6 +759,7 @@ app/services/ai/ai_tool_keys.py
 app/services/ai/ai_tool_query_params.py
 app/services/ai/ai_tool_routing_prompt.py
 app/services/ai/ai_trace.py
+app/services/ai/ai_usage_accumulate.py
 app/services/ai/ai_visualization_prompt.py
 app/services/ai/ai_workflow_agent_policy.py
 app/services/ai/ai_workflow_catalog_service.py
@@ -1057,6 +1065,9 @@ migrations/versions/20260721_000001_support_billing.py
 migrations/versions/20260724_000001_product_suppliers.py
 migrations/versions/20260724_000002_support_ticket_last_message_at.py
 migrations/versions/20260724_000003_announcement_navigation.py
+migrations/versions/20260724_000004_telegram_link_tokens_timestamps.py
+migrations/versions/20260725_000001_document_lines_fx_base_amounts.py
+migrations/versions/20260725_000002_product_fx_prices.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1096,6 +1107,7 @@ tests/test_ai_quota_helpers.py
 tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
 tests/test_ai_routing_alignment.py
+tests/test_ai_scheduled_task_metering.py
 tests/test_ai_session_todo_service.py
 tests/test_ai_skill_parser.py
 tests/test_ai_stream_budget.py
@@ -1104,6 +1116,7 @@ tests/test_ai_subscription_renew.py
 tests/test_ai_tool_catalog.py
 tests/test_ai_tool_intent.py
 tests/test_ai_trace_content.py
+tests/test_ai_usage_accumulate.py
 tests/test_ai_write_guard.py
 tests/test_balance_sheet_classification.py
 tests/test_balance_sheet_grouping.py
@@ -1116,9 +1129,11 @@ tests/test_business_backup_financial_policy.py
 tests/test_business_backup_orphan_cleanup.py
 tests/test_business_backup_schema_compat.py
 tests/test_chat_message_builder.py
+tests/test_cross_currency_and_person_fx.py
 tests/test_datetime_timezone.py
 tests/test_distribution_service.py
 tests/test_document_code_reservation_service.py
+tests/test_document_line_fx_service.py
 tests/test_general_ledger_electronic_export.py
 tests/test_goods_expense_income_hardening.py
 tests/test_goods_expense_income_service.py
@@ -1160,6 +1175,7 @@ tests/test_physical_stock.py
 tests/test_pnl_service.py
 tests/test_product_catalog_profile.py
 tests/test_product_excel_import_opening_balance.py
+tests/test_product_fx_and_period_end.py
 tests/test_product_inventory_tracking_sync.py
 tests/test_product_opening_balance.py
 tests/test_product_price_partial_update.py
@@ -1172,8 +1188,16 @@ tests/test_security_hardening.py
 tests/test_stock_count.py
 tests/test_sunway_sms_provider.py
 tests/test_tax_key_material_service.py
+tests/test_telegram_link_token_expiry.py
 tests/test_template_design_v2_compiler.py
 tests/test_user_list_query_service.py
+tests/test_v2_p0_p1_fx_reports.py
+tests/test_v2_p2_period_end_person_fx.py
+tests/test_v2_p3_foreign_foreign_fx.py
+tests/test_v2_p4_standalone_rp_fx.py
+tests/test_v2_p6_price_list_sync.py
+tests/test_v2_p7_currency_remove_d6.py
+tests/test_v2_p7_d5_d2_helpers.py
 tests/test_voice_ws_helpers.py
 tests/test_warehouse_document_search.py
 tests/test_webm_decode.py

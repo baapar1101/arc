@@ -2321,11 +2321,58 @@ def _validate_invoice_payment_item_currency(
     invoice_currency_id: int,
     payment_item: Dict[str, Any],
     invoice_type: str,
-) -> None:
-    """اعتبارسنجی ارز حساب پرداخت و تطابق نوع چک با نوع فاکتور."""
+    *,
+    business_id: Optional[int] = None,
+    invoice: Optional[Document] = None,
+    allow_cross_currency: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """اعتبارسنجی ارز حساب پرداخت.
+
+    اگر allow_cross_currency و MC: طرح تسویه بین‌ارزی برمی‌گرداند؛ وگرنه None.
+    """
+    from app.services.cross_currency_settlement_service import (
+        get_payment_item_account_currency_id,
+        resolve_cross_currency_payment_plan,
+    )
+
     ttype = (payment_item.get("transaction_type") or payment_item.get("type") or "").strip().lower()
     if ttype not in ("bank", "cash_register", "petty_cash", "check"):
-        return
+        return None
+
+    pay_cur = get_payment_item_account_currency_id(db, payment_item)
+
+    # مسیر بین‌ارزی
+    if (
+        allow_cross_currency
+        and business_id is not None
+        and invoice is not None
+        and pay_cur is not None
+        and int(pay_cur) != int(invoice_currency_id)
+    ):
+        plan = resolve_cross_currency_payment_plan(
+            db,
+            business_id=int(business_id),
+            invoice=invoice,
+            payment_item=payment_item,
+        )
+        # چک نوع چک همچنان اعمال شود
+        if ttype == "check":
+            ref_id = payment_item.get("check_id")
+            if ref_id:
+                chk = db.query(Check).filter(Check.id == int(ref_id)).first()
+                if chk:
+                    is_receipt_invoice = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                    expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
+                    if chk.type != expected_check_type:
+                        check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
+                        expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
+                        invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
+                        raise ApiError(
+                            "CHECK_TYPE_MISMATCH_WITH_INVOICE",
+                            f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
+                            http_status=400,
+                        )
+        return plan
 
     if ttype == "bank":
         ref_id = payment_item.get("bank_id")
@@ -2366,7 +2413,7 @@ def _validate_invoice_payment_item_currency(
     elif ttype == "check":
         ref_id = payment_item.get("check_id")
         if not ref_id:
-            return
+            return None
         chk = db.query(Check).filter(Check.id == int(ref_id)).first()
         if not chk:
             raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
@@ -2388,6 +2435,7 @@ def _validate_invoice_payment_item_currency(
                 f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
                 http_status=400,
             )
+    return None
 
 
 def _create_receipt_payment_documents_for_invoice_payments(
@@ -2405,18 +2453,33 @@ def _create_receipt_payment_documents_for_invoice_payments(
         create_receipt_payment,
         resolve_receipt_document_date_from_account_lines,
     )
+    from app.services.cross_currency_settlement_service import (
+        FX_GAIN_ACCOUNT_CODE,
+        FX_LOSS_ACCOUNT_CODE,
+        build_fx_settlement_extra,
+    )
+    from app.services.fx_rate_provider_service import business_is_multi_currency
 
     payment_docs: List[int] = []
     invoice_currency_id = int(document.currency_id)
     is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
     person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+    allow_x = business_is_multi_currency(db, int(business_id))
 
     for p in payments:
         amount = Decimal(str(p.get("amount", 0) or 0))
         if amount <= 0:
             continue
 
-        _validate_invoice_payment_item_currency(db, invoice_currency_id, p, invoice_type)
+        xplan = _validate_invoice_payment_item_currency(
+            db,
+            invoice_currency_id,
+            p,
+            invoice_type,
+            business_id=business_id,
+            invoice=document,
+            allow_cross_currency=allow_x,
+        )
         account_line = _build_invoice_payment_account_line(p)
         if not account_line:
             continue
@@ -2425,23 +2488,108 @@ def _create_receipt_payment_documents_for_invoice_payments(
             document.document_date,
             [account_line],
         )
-        rp_data = {
-            "document_type": "receipt" if is_receipt else "payment",
-            "document_date": rp_document_date.isoformat(),
-            "currency_id": document.currency_id,
-            "description": f"تسویه مرتبط با فاکتور {document.code}",
-            "person_lines": [{
+
+        if xplan is None:
+            # مسیر هم‌ارز (بدون تغییر رفتار)
+            rp_data = {
+                "document_type": "receipt" if is_receipt else "payment",
+                "document_date": rp_document_date.isoformat(),
+                "currency_id": document.currency_id,
+                "description": f"تسویه مرتبط با فاکتور {document.code}",
+                "person_lines": [{
+                    "person_id": person_id,
+                    "amount": float(amount),
+                    "description": f"طرف حساب فاکتور {document.code}",
+                }],
+                "account_lines": [account_line],
+                "extra_info": {
+                    "source": "invoice",
+                    "invoice_id": document.id,
+                    "person_is_receivable": person_is_receivable,
+                },
+            }
+        else:
+            # مسیر بین‌ارزی (E2): سند همیشه به ارز پایه؛ مانده بومی حساب با account_currency_amount
+            pay_cur = int(xplan["payment_currency_id"])
+            base_id = int(xplan["base_currency_id"])
+            doc_cur = int(xplan.get("document_currency_id") or base_id)
+            fx_settlement = build_fx_settlement_extra(xplan)
+            fx_diff = Decimal(str(xplan["fx_diff"]))
+            person_amount = float(xplan["ar_base"])
+            cash_base = float(xplan["cash_base"])
+            payment_native = float(xplan["payment_amount"])
+            extra_account_lines: List[Dict[str, Any]] = []
+
+            if abs(fx_diff) > 0:
+                if is_receipt:
+                    if fx_diff > 0:
+                        extra_account_lines.append({
+                            "account_code": FX_LOSS_ACCOUNT_CODE,
+                            "amount": float(fx_diff),
+                            "description": "زیان تسعیر ارز تسویه فاکتور",
+                            "side": "debit",
+                        })
+                    elif fx_diff < 0:
+                        extra_account_lines.append({
+                            "account_code": FX_GAIN_ACCOUNT_CODE,
+                            "amount": float(-fx_diff),
+                            "description": "سود تسعیر ارز تسویه فاکتور",
+                            "side": "credit",
+                        })
+                else:
+                    if fx_diff > 0:
+                        extra_account_lines.append({
+                            "account_code": FX_GAIN_ACCOUNT_CODE,
+                            "amount": float(fx_diff),
+                            "description": "سود تسعیر ارز تسویه فاکتور",
+                            "side": "credit",
+                        })
+                    elif fx_diff < 0:
+                        extra_account_lines.append({
+                            "account_code": FX_LOSS_ACCOUNT_CODE,
+                            "amount": float(-fx_diff),
+                            "description": "زیان تسعیر ارز تسویه فاکتور",
+                            "side": "debit",
+                        })
+
+            # مبلغ خط حساب = ارزش پایه؛ بومی در account_currency_amount
+            account_line = {
+                **account_line,
+                "amount": cash_base,
+                "account_currency_amount": payment_native,
+                "account_currency_id": pay_cur,
+            }
+
+            person_line_extra = {
+                "fx_settlement": fx_settlement,
+                "side": "person",
                 "person_id": person_id,
-                "amount": float(amount),
-                "description": f"طرف حساب فاکتور {document.code}",
-            }],
-            "account_lines": [account_line],
-            "extra_info": {
-                "source": "invoice",
                 "invoice_id": document.id,
-                "person_is_receivable": person_is_receivable,
-            },
-        }
+                "invoice_code": document.code,
+                "link_to_invoice": True,
+            }
+            rp_data = {
+                "document_type": "receipt" if is_receipt else "payment",
+                "document_date": rp_document_date.isoformat(),
+                "currency_id": doc_cur,
+                "description": f"تسویه بین‌ارزی فاکتور {document.code}",
+                "person_lines": [{
+                    "person_id": person_id,
+                    "amount": float(person_amount),
+                    "description": f"تسویه ارزی فاکتور {document.code}",
+                    "extra_info": person_line_extra,
+                }],
+                "account_lines": [account_line],
+                "fx_adjustment_lines": extra_account_lines,
+                "extra_info": {
+                    "source": "invoice",
+                    "invoice_id": document.id,
+                    "person_is_receivable": person_is_receivable,
+                    "fx_settlement": fx_settlement,
+                    "cross_currency": True,
+                },
+            }
+
         rp_doc = create_receipt_payment(
             db=db,
             business_id=business_id,
@@ -5358,6 +5506,22 @@ def create_invoice(
         )
         db.flush()
 
+    # P2.5: قفل مبالغ پایه روی خطوط پس از تکمیل همه ثبت‌های حسابداری فاکتور
+    try:
+        from app.services.document_line_fx_service import stamp_document_lines_fx_base
+
+        stamp_document_lines_fx_base(
+            db,
+            document,
+            business=db.get(Business, int(business_id)),
+            only_missing=False,
+            allow_infer=True,
+        )
+        db.flush()
+    except Exception:
+        logger.exception("stamp_document_lines_fx_base failed (create) doc_id=%s", getattr(document, "id", None))
+        raise ApiError("FX_BASE_STAMP_ERROR", "خطا در ثبت مبالغ پایه خطوط سند", http_status=400)
+
     if commit:
         db.commit()
         db.refresh(document)
@@ -6480,6 +6644,21 @@ def update_invoice(
         db, int(document.business_id), document, inv_type, lines_input, data
     )
 
+    # P2.5: قفل مبالغ پایه روی خطوط پس از تکمیل به‌روزرسانی فاکتور
+    try:
+        from app.services.document_line_fx_service import stamp_document_lines_fx_base
+
+        stamp_document_lines_fx_base(
+            db,
+            document,
+            business=biz_fx if "biz_fx" in locals() else None,
+            only_missing=False,
+            allow_infer=True,
+        )
+    except Exception:
+        logger.exception("stamp_document_lines_fx_base failed (update) doc_id=%s", getattr(document, "id", None))
+        raise ApiError("FX_BASE_STAMP_ERROR", "خطا در ثبت مبالغ پایه خطوط سند", http_status=400)
+
     db.commit()
     db.refresh(document)
     result = invoice_document_to_dict(db, document)
@@ -7142,6 +7321,32 @@ def invoice_document_to_dict(
             "tax edit constraints for invoice %s failed: %s",
             document.id,
             tax_meta_ex,
+            exc_info=True,
+        )
+
+    # P2: جمع دوگانه (ارزی + پایه) برای UI چندارزی؛ تک‌ارزی show_dual=false
+    try:
+        from app.services.document_line_fx_service import build_invoice_dual_totals
+
+        dual = build_invoice_dual_totals(db, document, business=business)
+        result["fx_totals"] = dual
+        # ارز پایه برای نمایش برچسب در کلاینت
+        if business and getattr(business, "default_currency", None):
+            bc = business.default_currency
+            result["base_currency"] = {
+                "id": bc.id,
+                "code": getattr(bc, "code", None),
+                "title": getattr(bc, "title", None),
+                "symbol": getattr(bc, "symbol", None),
+                "decimal_places": getattr(bc, "decimal_places", 0),
+            }
+        elif business and business.default_currency_id:
+            result["base_currency"] = {"id": int(business.default_currency_id)}
+    except Exception as fx_tot_ex:
+        logger.warning(
+            "fx dual totals for invoice %s failed: %s",
+            document.id,
+            fx_tot_ex,
             exc_info=True,
         )
 
@@ -9479,24 +9684,51 @@ def _sum_receipt_doc_account_payments(doc: Document) -> Decimal:
 
 
 def _sum_receipt_doc_payments_for_invoice(doc: Document, invoice_id: int, *, via_person_line: bool) -> Decimal:
-    """مبلغ پرداخت‌شدهٔ سند دریافت/پرداخت نسبت به یک فاکتور."""
+    """مبلغ پرداخت‌شدهٔ سند دریافت/پرداخت نسبت به یک فاکتور (به ارز فاکتور)."""
+    inv_id = int(invoice_id)
+    doc_extra = doc.extra_info if isinstance(doc.extra_info, dict) else {}
+    doc_inv = doc_extra.get("invoice_id")
+    try:
+        doc_matches = doc_inv is not None and int(doc_inv) == inv_id
+    except (TypeError, ValueError):
+        doc_matches = False
+
     if via_person_line:
         total = Decimal(0)
-        inv_id = int(invoice_id)
         for line in doc.lines:
             if line.person_id is None:
                 continue
             extra = line.extra_info or {}
             raw_inv = extra.get("invoice_id")
-            if raw_inv is None:
+            line_matches = False
+            if raw_inv is not None:
+                try:
+                    line_matches = int(raw_inv) == inv_id
+                except (TypeError, ValueError):
+                    line_matches = False
+            if not line_matches and not doc_matches:
                 continue
-            try:
-                if int(raw_inv) != inv_id:
+            # پرداخت بین‌ارزی: مبلغ تسویه به ارز فاکتور
+            fx_set = extra.get("fx_settlement") if isinstance(extra, dict) else None
+            if isinstance(fx_set, dict) and fx_set.get("settles_amount") is not None:
+                try:
+                    total += Decimal(str(fx_set["settles_amount"]))
                     continue
-            except (TypeError, ValueError):
-                continue
+                except Exception:
+                    pass
+            if isinstance(doc_extra.get("fx_settlement"), dict) and doc_extra["fx_settlement"].get("settles_amount") is not None:
+                try:
+                    total += Decimal(str(doc_extra["fx_settlement"]["settles_amount"]))
+                    continue
+                except Exception:
+                    pass
             total += Decimal(str(line.debit)) + Decimal(str(line.credit))
         return total
+    if doc_matches and isinstance(doc_extra.get("fx_settlement"), dict):
+        try:
+            return Decimal(str(doc_extra["fx_settlement"].get("settles_amount") or 0))
+        except Exception:
+            pass
     return _sum_receipt_doc_account_payments(doc)
 
 

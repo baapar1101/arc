@@ -232,6 +232,8 @@ class BusinessWithPermission {
   final List<CurrencyLite> currencies;
   /// از API: حداقل یک ارز فرعی غیر از ارز اصلی.
   final bool isMultiCurrency;
+  /// سیاست تسعیر (شامل rate_display_unit برای D2).
+  final Map<String, dynamic>? fxRevaluationPolicy;
   // Soft Delete fields
   final String? deletedAt;
   final String? autoDeleteAt;
@@ -254,6 +256,7 @@ class BusinessWithPermission {
     this.defaultCurrency,
     this.currencies = const <CurrencyLite>[],
     this.isMultiCurrency = false,
+    this.fxRevaluationPolicy,
     this.deletedAt,
     this.autoDeleteAt,
     this.isDeleted = false,
@@ -302,6 +305,9 @@ class BusinessWithPermission {
       defaultCurrency: defaultCurrency,
       currencies: currencies,
       isMultiCurrency: isMc,
+      fxRevaluationPolicy: json['fx_revaluation_policy'] != null
+          ? Map<String, dynamic>.from(json['fx_revaluation_policy'] as Map)
+          : null,
       deletedAt: json['deleted_at'] as String?,
       autoDeleteAt: json['auto_delete_at'] as String?,
       isDeleted: (json['is_deleted'] as bool?) ?? false,

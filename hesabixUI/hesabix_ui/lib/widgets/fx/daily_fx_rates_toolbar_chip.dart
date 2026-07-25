@@ -109,7 +109,14 @@ class _DailyFxRatesToolbarChipState extends State<DailyFxRatesToolbarChip> {
 
   String _shortRate(dynamic raw) {
     if (raw == null) return '—';
-    final s = formatFxRateForDisplay(raw);
+    final policy = widget.authStore.currentBusiness?.fxRevaluationPolicy;
+    final unit = policy?['rate_display_unit']?.toString();
+    final baseCode = widget.authStore.currentBusiness?.defaultCurrency?.code;
+    final s = formatFxRateForDisplay(
+      raw,
+      rateDisplayUnit: unit,
+      baseCurrencyCode: baseCode,
+    );
     // فشرده‌سازی نمایش‌های خیلی بلند
     final n = double.tryParse(s.replaceAll(',', ''));
     if (n == null) return s;

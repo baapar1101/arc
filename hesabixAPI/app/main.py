@@ -83,6 +83,7 @@ from adapters.api.v1.opening_balance import router as opening_balance_router
 from adapters.api.v1.business_currency_rates import router as business_currency_rates_router
 from adapters.api.v1.business_fx_global_rates import router as business_fx_global_rates_router
 from adapters.api.v1.business_fx_auto_sync import router as business_fx_auto_sync_router
+from adapters.api.v1.period_end_fx_revaluation import router as period_end_fx_revaluation_router
 from adapters.api.v1.report_templates import router as report_templates_router
 from adapters.api.v1.wallet import router as wallet_router
 from adapters.api.v1.zohal import router as zohal_router
@@ -1057,6 +1058,7 @@ def create_app() -> FastAPI:
     application.include_router(business_currency_rates_router, prefix=settings.api_v1_prefix)
     application.include_router(business_fx_global_rates_router, prefix=settings.api_v1_prefix)
     application.include_router(business_fx_auto_sync_router, prefix=settings.api_v1_prefix)
+    application.include_router(period_end_fx_revaluation_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_fx_providers_router, prefix=settings.api_v1_prefix)
     application.include_router(report_templates_router, prefix=settings.api_v1_prefix)
     application.include_router(wallet_router, prefix=settings.api_v1_prefix)

@@ -292,6 +292,9 @@ class Person {
   final int? personGroupId;
   final String? personGroupName;
 
+  /// کد ارزهای غیرپایه با گردش (کشف‌پذیری MC)
+  final List<String> foreignCurrencyCodes;
+
   Person({
     this.id,
     required this.businessId,
@@ -336,6 +339,7 @@ class Person {
     this.status,
     this.personGroupId,
     this.personGroupName,
+    this.foreignCurrencyCodes = const [],
   });
 
   factory Person.fromJson(Map<String, dynamic> json) {
@@ -394,6 +398,11 @@ class Person {
       status: json['status'] as String?,
       personGroupId: json['person_group_id'] as int?,
       personGroupName: json['person_group_name'] as String?,
+      foreignCurrencyCodes: (json['foreign_currency_codes'] as List?)
+              ?.map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toList() ??
+          const [],
     );
   }
 
@@ -442,6 +451,7 @@ class Person {
       'status': status,
       'person_group_id': personGroupId,
       'person_group_name': personGroupName,
+      'foreign_currency_codes': foreignCurrencyCodes,
     };
   }
 
@@ -478,6 +488,7 @@ class Person {
     List<PersonSocialContact>? socialContacts,
     int? personGroupId,
     String? personGroupName,
+    List<String>? foreignCurrencyCodes,
   }) {
     return Person(
       id: id ?? this.id,
@@ -522,6 +533,7 @@ class Person {
       status: status,
       personGroupId: personGroupId ?? this.personGroupId,
       personGroupName: personGroupName ?? this.personGroupName,
+      foreignCurrencyCodes: foreignCurrencyCodes ?? this.foreignCurrencyCodes,
     );
   }
 

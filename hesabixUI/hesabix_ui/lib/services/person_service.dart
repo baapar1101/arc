@@ -116,6 +116,24 @@ class PersonService {
     }
   }
 
+  /// مانده شخص به تفکیک ارز (چندارزی)
+  Future<Map<String, dynamic>> getPersonBalancesByCurrency(int personId) async {
+    try {
+      final response = await _apiClient.get(
+        '/api/v1/persons/persons/$personId/balances-by-currency',
+      );
+      if (response.statusCode == 200) {
+        final data = response.data['data'];
+        if (data is Map<String, dynamic>) return data;
+        if (data is Map) return Map<String, dynamic>.from(data);
+        return <String, dynamic>{};
+      }
+      throw Exception('خطا در دریافت مانده ارزی شخص');
+    } catch (e) {
+      throw Exception('خطا در دریافت مانده ارزی شخص: $e');
+    }
+  }
+
   /// ایجاد شخص جدید
   Future<Person> createPerson({
     required int businessId,

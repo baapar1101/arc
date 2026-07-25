@@ -272,7 +272,7 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                                       child: const Text('ویرایش'),
                                     ),
                                     FilledButton.tonal(
-                                      onPressed: busy || code == 'mesghal'
+                                      onPressed: busy
                                           ? null
                                           : () => _run(code, () => _service.testProvider(code), 'تست موفق'),
                                       child: busy
@@ -284,7 +284,7 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
                                           : const Text('تست و ذخیره'),
                                     ),
                                     FilledButton(
-                                      onPressed: busy || code == 'mesghal'
+                                      onPressed: busy
                                           ? null
                                           : () => _run(code, () => _service.fetchNow(code), 'واکشی انجام شد'),
                                       child: const Text('واکشی اکنون'),

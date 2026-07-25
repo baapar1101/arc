@@ -107,13 +107,8 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // پیش‌فرض: همه ارزها (= مبالغ پایه در بک‌اند)
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -495,7 +490,8 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
                                     ),
                                   ),
                                   
-                                  // Currency
+                                  // Currency — فقط چندارزی
+                                  if (_currencies.length > 1)
                                   SizedBox(
                                     width: 200,
                                     child: DropdownButtonFormField<int>(

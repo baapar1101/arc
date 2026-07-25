@@ -144,6 +144,17 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 4,
         ),
+      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+        _item(
+          id: 'period_end_fx',
+          title: 'تسعیر پایان دوره',
+          description: 'سند تعدیلی سود/زیان تسعیر تحقق‌نیافته برای مانده‌های ارزی',
+          icon: Icons.balance_outlined,
+          color: const Color(0xFF455A64),
+          route: ctx.panelRoute('settings/period-end-fx'),
+          categoryId: 'business_finance',
+          order: 5,
+        ),
       if (ctx.canEditFiscalYear)
         _item(
           id: 'fiscal_year',
@@ -153,7 +164,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFF00897B),
           route: ctx.panelRoute('settings/fiscal-year'),
           categoryId: 'business_finance',
-          order: 5,
+          order: 6,
         ),
       if (ctx.canJoinSettings)
         _item(
@@ -164,7 +175,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFFEF6C00),
           route: ctx.panelRoute('settings/credit'),
           categoryId: 'business_finance',
-          order: 6,
+          order: 7,
         ),
     ];
 

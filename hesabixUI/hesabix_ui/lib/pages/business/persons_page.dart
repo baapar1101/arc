@@ -488,14 +488,37 @@ class _PersonsPageState extends State<PersonsPage> {
             } else {
               balanceColor = Colors.grey;
             }
+
+            final fxCodes = person.foreignCurrencyCodes;
+            final showFx = widget.authStore.isMultiCurrency && fxCodes.isNotEmpty;
             
-            return Text(
-              formattedBalance,
-              style: TextStyle(
-                color: balanceColor,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  formattedBalance,
+                  style: TextStyle(
+                    color: balanceColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                if (showFx)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      fxCodes.join(' · '),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
             );
           },
         ),

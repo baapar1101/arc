@@ -220,6 +220,25 @@ class ProductCreateRequest(ProductCatalogProfileMixin):
         ge=0,
         example=12000000
     )
+    sales_price_fx: Optional[Decimal] = Field(
+        None,
+        description="قیمت فروش ارزی (چندارزی)",
+        ge=0,
+    )
+    purchase_price_fx: Optional[Decimal] = Field(
+        None,
+        description="قیمت خرید ارزی (چندارزی)",
+        ge=0,
+    )
+    price_fx_currency_id: Optional[int] = Field(
+        None,
+        description="ارز قیمت‌های ارزی",
+        gt=0,
+    )
+    auto_update_base_from_fx: bool = Field(
+        default=False,
+        description="به‌روزرسانی خودکار قیمت پایه از نرخ × قیمت ارزی",
+    )
     
     # موجودی و انبارداری
     track_inventory: bool = Field(
@@ -392,6 +411,10 @@ class ProductUpdateRequest(ProductCatalogProfileMixin):
     
     base_sales_price: Optional[Decimal] = Field(None, ge=0)
     base_purchase_price: Optional[Decimal] = Field(None, ge=0)
+    sales_price_fx: Optional[Decimal] = Field(None, ge=0)
+    purchase_price_fx: Optional[Decimal] = Field(None, ge=0)
+    price_fx_currency_id: Optional[int] = Field(None, gt=0)
+    auto_update_base_from_fx: Optional[bool] = None
     
     track_inventory: Optional[bool] = None
     default_warehouse_id: Optional[int] = Field(None, gt=0)
@@ -509,6 +532,10 @@ class ProductResponse(BaseModel):
     
     base_sales_price: Optional[Decimal] = None
     base_purchase_price: Optional[Decimal] = None
+    sales_price_fx: Optional[Decimal] = None
+    purchase_price_fx: Optional[Decimal] = None
+    price_fx_currency_id: Optional[int] = None
+    auto_update_base_from_fx: bool = False
     
     track_inventory: bool
     default_warehouse_id: Optional[int] = None

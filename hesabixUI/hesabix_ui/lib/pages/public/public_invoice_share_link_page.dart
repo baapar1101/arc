@@ -18,6 +18,7 @@ import 'package:hesabix_ui/utils/number_normalizer.dart'
 import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/widgets/invoice/invoice_fx_dual_totals_banner.dart';
 
 class PublicInvoiceShareLinkPage extends StatefulWidget {
   final String code;
@@ -330,6 +331,10 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
               ],
               const SizedBox(height: 16),
               _buildTotalsCard(theme, totals, curSuffix, adjustments: adjustments),
+              if (_fxDualBanner(business, invoice) != null) ...[
+                const SizedBox(height: 8),
+                _fxDualBanner(business, invoice)!,
+              ],
               if (_showOnlinePayment(data)) ...[
                 const SizedBox(height: 16),
                 _buildOnlinePaymentCard(theme, data, curSuffix),
@@ -1011,6 +1016,30 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   }
 
   String _suffix(String? c) => c != null && c.isNotEmpty ? ' ($c)' : '';
+
+  Widget? _fxDualBanner(
+    Map<String, dynamic>? business,
+    Map<String, dynamic> invoice,
+  ) {
+    final isMc = business?['is_multi_currency'] == true;
+    final fxTotals = invoice['fx_totals'] is Map
+        ? Map<String, dynamic>.from(invoice['fx_totals'] as Map)
+        : null;
+    final baseCurrency = invoice['base_currency'] is Map
+        ? Map<String, dynamic>.from(invoice['base_currency'] as Map)
+        : null;
+    final foreignLabel = invoice['currency_code']?.toString() ??
+        invoice['currency_symbol']?.toString() ??
+        '';
+    final foreignDp = (invoice['currency_decimal_places'] as num?)?.toInt() ?? 0;
+    return InvoiceFxDualTotalsBanner.fromInvoicePayload(
+      isMultiCurrency: isMc || (fxTotals?['show_dual'] == true),
+      fxTotals: fxTotals,
+      baseCurrency: baseCurrency,
+      foreignCurrencyLabel: foreignLabel,
+      foreignDecimalPlaces: foreignDp,
+    );
+  }
 
   Widget _buildTotalsCard(
     ThemeData theme,

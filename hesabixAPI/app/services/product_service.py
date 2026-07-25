@@ -487,6 +487,10 @@ def create_product(
                 base_sales_note=payload.base_sales_note,
                 base_purchase_price=payload.base_purchase_price,
                 base_purchase_note=payload.base_purchase_note,
+                sales_price_fx=getattr(payload, "sales_price_fx", None),
+                purchase_price_fx=getattr(payload, "purchase_price_fx", None),
+                price_fx_currency_id=getattr(payload, "price_fx_currency_id", None),
+                auto_update_base_from_fx=bool(getattr(payload, "auto_update_base_from_fx", False) or False),
                 track_inventory=payload.track_inventory,
                 reorder_point=payload.reorder_point,
                 min_order_qty=payload.min_order_qty,
@@ -866,6 +870,14 @@ def update_product(
         price_update_kwargs["base_purchase_price"] = payload.base_purchase_price
     if "base_purchase_note" in fields_set:
         price_update_kwargs["base_purchase_note"] = payload.base_purchase_note
+    if "sales_price_fx" in fields_set:
+        price_update_kwargs["sales_price_fx"] = payload.sales_price_fx
+    if "purchase_price_fx" in fields_set:
+        price_update_kwargs["purchase_price_fx"] = payload.purchase_price_fx
+    if "price_fx_currency_id" in fields_set:
+        price_update_kwargs["price_fx_currency_id"] = payload.price_fx_currency_id
+    if "auto_update_base_from_fx" in fields_set:
+        price_update_kwargs["auto_update_base_from_fx"] = bool(payload.auto_update_base_from_fx)
 
     updated = repo.update(
         product_id,
@@ -1383,6 +1395,10 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "base_sales_note": obj.base_sales_note,
         "base_purchase_price": obj.base_purchase_price,
         "base_purchase_note": obj.base_purchase_note,
+        "sales_price_fx": getattr(obj, "sales_price_fx", None),
+        "purchase_price_fx": getattr(obj, "purchase_price_fx", None),
+        "price_fx_currency_id": getattr(obj, "price_fx_currency_id", None),
+        "auto_update_base_from_fx": bool(getattr(obj, "auto_update_base_from_fx", False)),
         "track_inventory": obj.track_inventory,
         "reorder_point": obj.reorder_point,
         "min_order_qty": obj.min_order_qty,

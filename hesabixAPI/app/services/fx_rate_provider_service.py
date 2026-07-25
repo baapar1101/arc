@@ -21,8 +21,33 @@ from app.services.encryption_service import get_encryption_service
 logger = logging.getLogger(__name__)
 
 ENV_BRSAPI_KEY = "HESABIX_FX_BRSAPI_API_KEY"
+ENV_MESGHAL_KEY = "HESABIX_FX_MESGHAL_API_KEY"
 DEFAULT_BRS_BASE = "https://Api.BrsApi.ir"
 DEFAULT_BRS_PATH = "/Market/Gold_Currency.php"
+DEFAULT_MESGHAL_BASE = "https://api.tala.ir"
+DEFAULT_MESGHAL_PATH = "/v1/rates"
+DEFAULT_MESGHAL_SYMBOL_MAP = {
+	"USD": "USD",
+	"DOLLAR": "USD",
+	"USDT": "USD",
+	"EUR": "EUR",
+	"EURO": "EUR",
+	"GBP": "GBP",
+	"AED": "AED",
+	"TRY": "TRY",
+	"CNY": "CNY",
+	"JPY": "JPY",
+	"CAD": "CAD",
+	"AUD": "AUD",
+	"CHF": "CHF",
+	"IQD": "IQD",
+	"SAR": "SAR",
+	"KWD": "KWD",
+	"QAR": "QAR",
+	"OMR": "OMR",
+	"BHD": "BHD",
+	"RUB": "RUB",
+}
 
 
 def business_is_multi_currency(db: Session, business_id: int) -> bool:
@@ -77,6 +102,10 @@ def resolve_provider_api_key(provider: FxRateProvider) -> str:
 		return key.strip()
 	if provider.code == "brsapi":
 		env_key = (os.getenv(ENV_BRSAPI_KEY) or "").strip()
+		if env_key:
+			return env_key
+	if provider.code == "mesghal":
+		env_key = (os.getenv(ENV_MESGHAL_KEY) or "").strip()
 		if env_key:
 			return env_key
 	return ""
@@ -319,6 +348,166 @@ def fetch_brsapi_currency_payload(api_key: str, base_url: str, path: str) -> Tup
 	) from last_exc
 
 
+def _dig_path(payload: Any, path: str) -> Any:
+	"""استخراج مقدار از مسیر نقطه‌ای مثل rates یا data.items."""
+	cur = payload
+	for part in (path or "").split("."):
+		part = part.strip()
+		if not part:
+			continue
+		if not isinstance(cur, dict):
+			return None
+		cur = cur.get(part)
+	return cur
+
+
+def _map_raw_items_to_currency_shape(
+	raw_items: List[Any],
+	cfg: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+	"""نرمال‌سازی آیتم‌های خام به شکل BRS-like برای _normalize_currency_items."""
+	symbol_field = str(cfg.get("item_symbol_field") or "symbol")
+	price_field = str(cfg.get("item_price_field") or "price")
+	name_field = str(cfg.get("item_name_field") or "name")
+	unit_field = str(cfg.get("item_unit_field") or "unit")
+	out: List[Dict[str, Any]] = []
+	for it in raw_items:
+		if not isinstance(it, dict):
+			continue
+		# BRS native already has symbol/price
+		if "symbol" in it and "price" in it and symbol_field == "symbol":
+			out.append(it)
+			continue
+		symbol = it.get(symbol_field) or it.get("symbol") or it.get("key") or it.get("code")
+		price = it.get(price_field) or it.get("price") or it.get("value") or it.get("sell")
+		if symbol is None or price is None:
+			continue
+		unit = it.get(unit_field) or it.get("unit") or it.get("currency") or cfg.get("quote_unit") or "IRT"
+		out.append(
+			{
+				"symbol": str(symbol).strip().upper(),
+				"price": price,
+				"name": it.get(name_field) or it.get("title") or it.get("name"),
+				"name_en": it.get("name_en"),
+				"unit": unit,
+				"time_unix": it.get("time_unix"),
+			}
+		)
+	return out
+
+
+def extract_currency_items_from_provider_payload(
+	payload: Dict[str, Any],
+	cfg: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+	"""استخراج لیست ارز از پاسخ JSON عمومی (BRS / Tala / سفارشی)."""
+	items_path = str(cfg.get("items_path") or "").strip()
+	raw: Any = None
+	if items_path:
+		raw = _dig_path(payload, items_path)
+	if raw is None and isinstance(payload.get("currency"), list):
+		raw = payload["currency"]
+	if raw is None and isinstance(payload.get("rates"), list):
+		raw = payload["rates"]
+	if raw is None and isinstance(payload.get("data"), list):
+		raw = payload["data"]
+	if not isinstance(raw, list):
+		raise ApiError(
+			"FX_PROVIDER_BAD_RESPONSE",
+			"لیست نرخ ارز در پاسخ ارائه‌دهنده یافت نشد (items_path را در config بررسی کنید)",
+			http_status=502,
+		)
+	return _map_raw_items_to_currency_shape(raw, cfg)
+
+
+def fetch_mesghal_currency_payload(
+	api_key: str,
+	base_url: str,
+	path: str,
+	*,
+	auth_type: str = "header",
+	auth_name: str = "x-api-key",
+) -> Tuple[Dict[str, Any], int]:
+	"""
+	واکشی JSON عمومی برای provider دوم (mesghal).
+	پیش‌فرض سازگار با api.tala.ir (x-api-key) و قابل پیکربندی برای سایر APIها.
+	"""
+	base = (base_url or DEFAULT_MESGHAL_BASE).rstrip("/")
+	p = path if path.startswith("/") else f"/{path}"
+	url = f"{base}{p}"
+	headers = {
+		"User-Agent": "HesabixFX/1.0 (+https://hesabix.ir)",
+		"Accept": "application/json,text/plain,*/*",
+	}
+	params: Dict[str, str] = {}
+	atype = (auth_type or "header").strip().lower()
+	aname = (auth_name or "x-api-key").strip() or "x-api-key"
+	if api_key:
+		if atype == "query":
+			params[aname] = api_key
+		else:
+			headers[aname] = api_key
+
+	last_exc: Exception | None = None
+	with httpx.Client(timeout=45.0, headers=headers, follow_redirects=True) as client:
+		for attempt in range(3):
+			try:
+				resp = client.get(url, params=params or None)
+				http_status = int(resp.status_code)
+				try:
+					payload = resp.json()
+				except Exception as exc:
+					raise ApiError(
+						"FX_PROVIDER_BAD_RESPONSE",
+						f"پاسخ JSON نامعتبر از مثقال/ارائه‌دهنده دوم (HTTP {http_status})",
+						http_status=502,
+					) from exc
+				if http_status >= 400:
+					msg = None
+					if isinstance(payload, dict):
+						msg = payload.get("message") or payload.get("error") or payload.get("message_error")
+					raise ApiError(
+						"FX_PROVIDER_HTTP_ERROR",
+						str(msg or f"خطای HTTP {http_status} از ارائه‌دهنده دوم"),
+						http_status=502,
+					)
+				if not isinstance(payload, dict):
+					raise ApiError("FX_PROVIDER_BAD_RESPONSE", "ساختار پاسخ نامعتبر است", http_status=502)
+				return payload, http_status
+			except ApiError:
+				raise
+			except Exception as exc:
+				last_exc = exc
+				if attempt < 2:
+					continue
+	raise ApiError(
+		"FX_PROVIDER_NETWORK",
+		f"خطای شبکه هنگام تماس با ارائه‌دهنده دوم: {last_exc}",
+		http_status=502,
+	) from last_exc
+
+
+def _mesghal_effective_config(provider: FxRateProvider) -> Dict[str, Any]:
+	cfg = _parse_config(provider.config_json)
+	# پیش‌فرض‌های سازگار با Tala API اگر ادمین هنوز config خالی گذاشته
+	if not cfg.get("symbol_map"):
+		cfg["symbol_map"] = dict(DEFAULT_MESGHAL_SYMBOL_MAP)
+	else:
+		merged = dict(DEFAULT_MESGHAL_SYMBOL_MAP)
+		merged.update({str(k).upper(): str(v).upper() for k, v in dict(cfg["symbol_map"]).items()})
+		cfg["symbol_map"] = merged
+	cfg.setdefault("quote_unit", "IRT")
+	cfg.setdefault("endpoint_path", DEFAULT_MESGHAL_PATH)
+	cfg.setdefault("items_path", "rates")
+	cfg.setdefault("item_symbol_field", "key")
+	cfg.setdefault("item_price_field", "value")
+	cfg.setdefault("item_name_field", "title")
+	cfg.setdefault("item_unit_field", "currency")
+	cfg.setdefault("auth_type", "header")
+	cfg.setdefault("auth_name", "x-api-key")
+	return cfg
+
+
 def upsert_global_rates_from_normalized(
 	db: Session,
 	provider: FxRateProvider,
@@ -406,11 +595,49 @@ def fetch_and_store_provider(db: Session, provider: FxRateProvider) -> Dict[str,
 				"fetched_at": now,
 			}
 		if code == "mesghal":
-			raise ApiError(
-				"FX_PROVIDER_NOT_IMPLEMENTED",
-				"ارائه‌دهنده مثقال هنوز پیاده‌سازی نشده است",
-				http_status=501,
+			api_key = resolve_provider_api_key(provider)
+			if not api_key:
+				raise ApiError(
+					"FX_API_KEY_MISSING",
+					"کلید API برای مثقال/ارائه‌دهنده دوم تنظیم نشده است (ادمین یا HESABIX_FX_MESGHAL_API_KEY)",
+					http_status=400,
+				)
+			cfg = _mesghal_effective_config(provider)
+			path = str(cfg.get("endpoint_path") or DEFAULT_MESGHAL_PATH)
+			base = provider.api_base_url or DEFAULT_MESGHAL_BASE
+			payload, http_status = fetch_mesghal_currency_payload(
+				api_key,
+				base,
+				path,
+				auth_type=str(cfg.get("auth_type") or "header"),
+				auth_name=str(cfg.get("auth_name") or "x-api-key"),
 			)
+			currency_items = extract_currency_items_from_provider_payload(payload, cfg)
+			# فقط نمادهایی که به ارز نگاشت می‌شوند (نه طلا/سکه) — یا همه با map
+			normalized = _normalize_currency_items(currency_items, cfg)
+			# فیلتر: فقط currency_codeهای شناخته‌شده ۳ حرفی رایج مگر include_all
+			if not bool(cfg.get("include_all_symbols")):
+				normalized = [
+					n for n in normalized
+					if len(str(n.get("currency_code") or "")) == 3
+					and str(n.get("currency_code")).upper() not in ("IRR", "IRT", "XAU")
+				]
+			n = upsert_global_rates_from_normalized(db, provider, normalized, fetched_at=now)
+			provider.last_fetch_at = now
+			provider.last_fetch_status = "ok"
+			provider.last_fetch_error = None
+			provider.last_fetch_http_status = http_status
+			if not provider.api_base_url:
+				provider.api_base_url = DEFAULT_MESGHAL_BASE
+			provider.updated_at = now
+			db.flush()
+			return {
+				"provider": provider.code,
+				"status": "ok",
+				"http_status": http_status,
+				"rates_upserted": n,
+				"fetched_at": now,
+			}
 		raise ApiError(
 			"FX_PROVIDER_NOT_IMPLEMENTED",
 			f"واکشی برای ارائه‌دهنده «{code}» پیاده‌سازی نشده است",
@@ -432,11 +659,9 @@ def fetch_and_store_provider(db: Session, provider: FxRateProvider) -> Dict[str,
 
 def test_provider_connection(db: Session, provider: FxRateProvider) -> Dict[str, Any]:
 	"""تست سبک: fetch بدون الزام به commit جدا — caller commit می‌کند."""
-	if provider.code == "brsapi":
-		result = fetch_and_store_provider(db, provider)
-		sample = list_global_rates(db, provider_code="brsapi")[:5]
-		return {**result, "sample_rates": sample}
-	return fetch_and_store_provider(db, provider)
+	result = fetch_and_store_provider(db, provider)
+	sample = list_global_rates(db, provider_code=provider.code)[:5]
+	return {**result, "sample_rates": sample}
 
 
 def providers_due_for_fetch(db: Session, *, now: Optional[datetime] = None) -> List[FxRateProvider]:
@@ -446,7 +671,7 @@ def providers_due_for_fetch(db: Session, *, now: Optional[datetime] = None) -> L
 	).scalars().all()
 	due: List[FxRateProvider] = []
 	for p in rows:
-		if p.code not in ("brsapi",):  # فقط پیاده‌سازی‌شده‌ها
+		if p.code not in ("brsapi", "mesghal"):  # فقط پیاده‌سازی‌شده‌ها
 			continue
 		if not resolve_provider_api_key(p):
 			continue

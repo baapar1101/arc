@@ -82,6 +82,7 @@ import 'pages/business/business_info_settings_page.dart';
 import 'pages/business/business_currencies_settings_page.dart';
 import 'pages/business/fx_revaluation_settings_page.dart';
 import 'pages/business/fx_auto_sync_settings_page.dart';
+import 'pages/business/period_end_fx_revaluation_page.dart';
 import 'pages/business/reports_page.dart';
 import 'pages/business/kardex_page.dart';
 import 'pages/business/debtors_report_page.dart';
@@ -3466,6 +3467,40 @@ class _MyAppState extends State<MyApp> {
                 return hesabixNoTransitionPage(
                   state,
                   FxAutoSyncSettingsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'settings/period-end-fx',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.isMultiCurrency) {
+                  return hesabixNoTransitionPage(
+                    state,
+                    Scaffold(
+                      appBar: AppBar(title: const Text('تسعیر پایان دوره')),
+                      body: const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Text(
+                            'این بخش فقط برای کسب‌وکارهای چندارزی فعال است.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }
+                if (!_authStore!.hasBusinessPermission('currency_revaluation', 'view') &&
+                    !_authStore!.hasBusinessPermission('settings', 'business')) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  PeriodEndFxRevaluationPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

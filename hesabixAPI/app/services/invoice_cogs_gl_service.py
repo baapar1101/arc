@@ -296,6 +296,18 @@ def resync_invoice_cogs_gl_lines(db: Session, document_id: int) -> bool:
 
     _post_cogs_gl_lines(db, document, new_amount, cogs_account, inventory_account)
 
+    try:
+        from app.services.document_line_fx_service import stamp_document_lines_fx_base
+
+        stamp_document_lines_fx_base(db, document, only_missing=False, allow_infer=True)
+    except Exception as fx_stamp_ex:
+        logger.warning(
+            "invoice_cogs_gl: fx base stamp failed doc_id=%s err=%s",
+            document_id,
+            fx_stamp_ex,
+            exc_info=True,
+        )
+
     from adapters.db.repositories.document_repository import DocumentRepository
 
     doc_repo = DocumentRepository(db)

@@ -347,10 +347,19 @@ def get_journal_ledger_report(
     items = []
     total_debit = Decimal(0)
     total_credit = Decimal(0)
+    use_base_amounts = currency_id is None
     
     for line, doc in all_lines:
-        debit = Decimal(str(line.debit or 0))
-        credit = Decimal(str(line.credit or 0))
+        if use_base_amounts:
+            debit = Decimal(str(line.debit_base if line.debit_base is not None else line.debit or 0))
+            credit = Decimal(str(line.credit_base if line.credit_base is not None else line.credit or 0))
+            native_debit = Decimal(str(line.debit or 0))
+            native_credit = Decimal(str(line.credit or 0))
+        else:
+            debit = Decimal(str(line.debit or 0))
+            credit = Decimal(str(line.credit or 0))
+            native_debit = debit
+            native_credit = credit
         
         total_debit += debit
         total_credit += credit
@@ -440,6 +449,10 @@ def get_journal_ledger_report(
             'credit_account_code': credit_account['code'] if credit_account else None,
             'credit_account_name': credit_account['name'] if credit_account else None,
             'credit_amount': float(credit),
+            'native_debit_amount': float(native_debit),
+            'native_credit_amount': float(native_credit),
+            'document_currency_id': int(doc.currency_id) if doc.currency_id else None,
+            'amounts_in_base': use_base_amounts,
             'person_id': person_info['id'] if person_info else None,
             'person_name': person_info['name'] if person_info else None,
             'person_code': person_info['code'] if person_info else None,
@@ -472,6 +485,7 @@ def get_journal_ledger_report(
             'total_credit': float(total_credit),
             'balance_valid': balance_valid,
             'balance_diff': float(balance_diff),
+            'amounts_in_base': use_base_amounts,
         },
         'pagination': {
             'total': total,

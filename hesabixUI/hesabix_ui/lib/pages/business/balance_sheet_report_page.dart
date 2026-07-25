@@ -84,10 +84,8 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere((c) => c['is_default'] == true, orElse: () => items.first);
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // تک‌ارزی یا چندارزی: پیش‌فرض «همه» (= مبالغ پایه در بک‌اند)
+        _selectedCurrencyId = null;
       });
     } catch (_) {}
   }
@@ -281,24 +279,35 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
                                     },
                                   ),
                                 ),
-                                SizedBox(
-                                  width: fieldWidth,
-                                  child: DropdownButtonFormField<int>(
-                                    value: _selectedCurrencyId,
-                                    isExpanded: true,
-                                    decoration: _decoration('ارز'),
-                                    items: _currencies
-                                        .map((c) => DropdownMenuItem<int>(
-                                              value: c['id'] as int?,
-                                              child: Text(c['code']?.toString() ?? c['name']?.toString() ?? ''),
-                                            ))
-                                        .toList(),
-                                    onChanged: (v) {
-                                      setState(() => _selectedCurrencyId = v);
-                                      _fetchData();
-                                    },
+                                if (_currencies.length > 1)
+                                  SizedBox(
+                                    width: fieldWidth,
+                                    child: DropdownButtonFormField<int>(
+                                      value: _selectedCurrencyId,
+                                      isExpanded: true,
+                                      decoration: _decoration('ارز'),
+                                      items: [
+                                        const DropdownMenuItem<int>(
+                                          value: null,
+                                          child: Text('همه ارزها'),
+                                        ),
+                                        ..._currencies.map(
+                                          (c) => DropdownMenuItem<int>(
+                                            value: c['id'] as int?,
+                                            child: Text(
+                                              c['code']?.toString() ??
+                                                  c['name']?.toString() ??
+                                                  '',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                      onChanged: (v) {
+                                        setState(() => _selectedCurrencyId = v);
+                                        _fetchData();
+                                      },
+                                    ),
                                   ),
-                                ),
                                 SizedBox(
                                   width: fieldWidth,
                                   child: ProjectSelectorWidget(

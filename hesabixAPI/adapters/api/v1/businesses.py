@@ -44,7 +44,7 @@ from app.services.business_service import (
     update_business_invoice_share_settings,
     add_business_currency,
     remove_business_currency,
-    check_currency_usage_in_documents,
+    get_business_currency_usage,
 )
 from app.services.file_storage_service import FileStorageService
 from adapters.db.models.business import Business
@@ -1401,10 +1401,15 @@ def check_currency_usage_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    """بررسی استفاده ارز در اسناد"""
-    document_count = check_currency_usage_in_documents(db, business_id, currency_id)
+    """بررسی استفاده ارز در اسناد، حساب‌ها و کالاها (V2-P7 D6)"""
+    usage = get_business_currency_usage(db, business_id, currency_id)
     return success_response({
-        "is_used": document_count > 0,
-        "document_count": document_count,
-        "can_delete": document_count == 0,
+        "is_used": usage["is_used"],
+        "document_count": usage["document_count"],
+        "total": usage["total"],
+        "can_delete": usage["can_delete"],
+        "is_last_secondary": usage["is_last_secondary"],
+        "secondary_count": usage["secondary_count"],
+        "breakdown": usage["breakdown"],
+        "blockers": usage["blockers"],
     }, request)

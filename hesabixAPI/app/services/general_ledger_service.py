@@ -242,10 +242,23 @@ def get_general_ledger_report(
     if date_from_obj:
         date_before_from = date_from_obj - timedelta(days=1)
         
-        opening_query = db.query(
-            func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-            func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-        ).join(
+        if currency_id is None:
+            opening_query = db.query(
+                func.coalesce(
+                    func.sum(func.coalesce(DocumentLine.debit_base, DocumentLine.debit)),
+                    0,
+                ).label('total_debit'),
+                func.coalesce(
+                    func.sum(func.coalesce(DocumentLine.credit_base, DocumentLine.credit)),
+                    0,
+                ).label('total_credit'),
+            )
+        else:
+            opening_query = db.query(
+                func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+                func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
+            )
+        opening_query = opening_query.join(
             Document, DocumentLine.document_id == Document.id
         ).filter(
             and_(
@@ -403,12 +416,17 @@ def get_general_ledger_report(
     running_balance = opening_balance
     total_debit = Decimal(0)
     total_credit = Decimal(0)
+    use_base_amounts = currency_id is None
     
     accounts_map = {acc.id: acc for acc in accounts}
     
     for line, doc in all_lines:
-        debit = Decimal(str(line.debit or 0))
-        credit = Decimal(str(line.credit or 0))
+        if use_base_amounts:
+            debit = Decimal(str(line.debit_base if line.debit_base is not None else line.debit or 0))
+            credit = Decimal(str(line.credit_base if line.credit_base is not None else line.credit or 0))
+        else:
+            debit = Decimal(str(line.debit or 0))
+            credit = Decimal(str(line.credit or 0))
         
         # به‌روزرسانی مانده تجمعی: بدهکار اضافه می‌کند، بستانکار کم می‌کند
         running_balance = running_balance + debit - credit

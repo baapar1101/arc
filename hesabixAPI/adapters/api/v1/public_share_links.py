@@ -594,7 +594,20 @@ async def get_public_invoice_document_pdf(
 		"paper_size": None,
 		"orientation": "landscape",
 		"footer_text": "",
+		"is_multi_currency": False,
+		"base_currency": invoice.get("base_currency")
+		if isinstance(invoice.get("base_currency"), dict)
+		else {},
 	}
+	try:
+		from app.services.fx_rate_provider_service import business_is_multi_currency
+
+		bid = business.get("id") or invoice.get("business_id")
+		if bid is not None:
+			template_context["is_multi_currency"] = bool(business_is_multi_currency(db, int(bid)))
+	except Exception:
+		fx_t = invoice.get("fx_totals") if isinstance(invoice.get("fx_totals"), dict) else {}
+		template_context["is_multi_currency"] = bool(fx_t.get("show_dual"))
 
 	html_content = render_template("pdf/invoices/detail.html", template_context)
 

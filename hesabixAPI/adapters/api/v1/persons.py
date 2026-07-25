@@ -38,6 +38,7 @@ from app.services.person_service import (
     create_person,
     get_person_by_id,
     get_persons_by_business,
+    calculate_person_balances_by_currency,
     update_person,
     delete_person,
     get_person_summary,
@@ -964,6 +965,50 @@ async def get_person_endpoint(
         data=format_datetime_fields(result, request),
         request=request,
         message="جزئیات شخص با موفقیت دریافت شد",
+    )
+
+
+@router.get(
+    "/persons/{person_id}/balances-by-currency",
+    summary="مانده شخص به تفکیک ارز",
+    description=(
+        "مانده بومی شخص در هر ارز + معادل ارز پایه. "
+        "برای کسب‌وکار تک‌ارزی معمولاً یک ردیف (ارز پایه) برمی‌گردد."
+    ),
+    response_model=SuccessResponse,
+)
+async def get_person_balances_by_currency_endpoint(
+    request: Request,
+    person_id: int,
+    db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_by_entity_dep("people", "view", Person, "person_id")),
+):
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="شخص یافت نشد")
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(FiscalYear.business_id == person.business_id, FiscalYear.is_last == True)
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+
+    data = calculate_person_balances_by_currency(
+        db, person_id, fiscal_year_id=fiscal_year_id
+    )
+    return success_response(
+        data=data,
+        request=request,
+        message="مانده به تفکیک ارز با موفقیت دریافت شد",
     )
 
 

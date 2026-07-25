@@ -109,10 +109,8 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        if (items.isNotEmpty) {
-          final d = items.firstWhere((c) => c['is_default'] == true, orElse: () => items.first);
-          _selectedCurrencyId = d['id'] as int?;
-        }
+        // پیش‌فرض: همه ارزها (= مبالغ پایه)
+        _selectedCurrencyId = null;
       });
     } catch (_) {}
   }
@@ -437,24 +435,31 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
                               },
                             ),
                           ),
-                          SizedBox(
-                            width: fieldWidth,
-                            child: DropdownButtonFormField<int>(
-                              value: _selectedCurrencyId,
-                              isExpanded: true,
-                              decoration: _decoration('ارز'),
-                              items: _currencies
-                                  .map((c) => DropdownMenuItem<int>(
-                                        value: c['id'] as int?,
-                                        child: Text(c['code']?.toString() ?? ''),
-                                      ))
-                                  .toList(),
-                              onChanged: (v) {
-                                setState(() => _selectedCurrencyId = v);
-                                _fetchAll();
-                              },
+                          if (_currencies.length > 1)
+                            SizedBox(
+                              width: fieldWidth,
+                              child: DropdownButtonFormField<int>(
+                                value: _selectedCurrencyId,
+                                isExpanded: true,
+                                decoration: _decoration('ارز'),
+                                items: [
+                                  const DropdownMenuItem<int>(
+                                    value: null,
+                                    child: Text('همه ارزها'),
+                                  ),
+                                  ..._currencies.map(
+                                    (c) => DropdownMenuItem<int>(
+                                      value: c['id'] as int?,
+                                      child: Text(c['code']?.toString() ?? ''),
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  setState(() => _selectedCurrencyId = v);
+                                  _fetchAll();
+                                },
+                              ),
                             ),
-                          ),
                           SizedBox(
                             width: fieldWidth,
                             child: ProjectSelectorWidget(

@@ -189,8 +189,30 @@ def compute_leaf_balances(
     fiscal_year_id: int,
     currency_id: Optional[int] = None,
     project_id: Optional[int] = None,
+    *,
+    amounts_in_base: Optional[bool] = None,
 ) -> Dict[int, AccountBalance]:
-    """مانده هر حساب برگ (بدون جمع‌زدن فرزندان)."""
+    """مانده هر حساب برگ (بدون جمع‌زدن فرزندان).
+
+    amounts_in_base:
+      - True: جمع از debit_base/credit_base (با fallback به debit/credit)
+      - False: جمع بومی debit/credit
+      - None (پیش‌فرض): اگر currency_id مشخص باشد → بومی؛ وگرنه → پایه
+        (جلوگیری از جمع خام چند ارز مختلف در حالت «همه ارزها»)
+    """
+    use_base = bool(amounts_in_base) if amounts_in_base is not None else (currency_id is None)
+
+    debit_expr = (
+        func.coalesce(DocumentLine.debit_base, DocumentLine.debit)
+        if use_base
+        else DocumentLine.debit
+    )
+    credit_expr = (
+        func.coalesce(DocumentLine.credit_base, DocumentLine.credit)
+        if use_base
+        else DocumentLine.credit
+    )
+
     balances: Dict[int, AccountBalance] = {
         acc_id: AccountBalance(Decimal(0), Decimal(0), Decimal(0), Decimal(0))
         for acc_id in account_ids
@@ -202,8 +224,8 @@ def compute_leaf_balances(
         if ob_doc:
             ob_lines_query = db.query(
                 DocumentLine.account_id,
-                func.coalesce(func.sum(DocumentLine.debit), 0).label("debit"),
-                func.coalesce(func.sum(DocumentLine.credit), 0).label("credit"),
+                func.coalesce(func.sum(debit_expr), 0).label("debit"),
+                func.coalesce(func.sum(credit_expr), 0).label("credit"),
             ).filter(
                 DocumentLine.document_id == ob_doc.id,
                 DocumentLine.account_id.isnot(None),
@@ -226,8 +248,8 @@ def compute_leaf_balances(
     opening_query = (
         db.query(
             DocumentLine.account_id,
-            func.coalesce(func.sum(DocumentLine.debit), 0).label("total_debit"),
-            func.coalesce(func.sum(DocumentLine.credit), 0).label("total_credit"),
+            func.coalesce(func.sum(debit_expr), 0).label("total_debit"),
+            func.coalesce(func.sum(credit_expr), 0).label("total_credit"),
         )
         .join(Document, DocumentLine.document_id == Document.id)
         .filter(
@@ -250,8 +272,8 @@ def compute_leaf_balances(
     period_query = (
         db.query(
             DocumentLine.account_id,
-            func.coalesce(func.sum(DocumentLine.debit), 0).label("total_debit"),
-            func.coalesce(func.sum(DocumentLine.credit), 0).label("total_credit"),
+            func.coalesce(func.sum(debit_expr), 0).label("total_debit"),
+            func.coalesce(func.sum(credit_expr), 0).label("total_credit"),
         )
         .join(Document, DocumentLine.document_id == Document.id)
         .filter(

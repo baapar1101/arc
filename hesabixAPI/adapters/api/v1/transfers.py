@@ -406,6 +406,14 @@ async def create_transfer_endpoint(
         service_data["description"] = body_dict.get("description")
     if body_dict.get("fiscal_year_id") is not None:
         service_data["fiscal_year_id"] = body_dict.get("fiscal_year_id")
+    if body_dict.get("destination_amount") is not None:
+        service_data["destination_amount"] = body_dict.get("destination_amount")
+    if body_dict.get("fx_rate") is not None:
+        service_data["fx_rate"] = body_dict.get("fx_rate")
+    if body_dict.get("source_rate_to_base") is not None:
+        service_data["source_rate_to_base"] = body_dict.get("source_rate_to_base")
+    if body_dict.get("destination_rate_to_base") is not None:
+        service_data["destination_rate_to_base"] = body_dict.get("destination_rate_to_base")
     
     created = create_transfer(db, business_id, ctx.get_user_id(), service_data)
     return success_response(data=format_datetime_fields(created, request), request=request, message="TRANSFER_CREATED")

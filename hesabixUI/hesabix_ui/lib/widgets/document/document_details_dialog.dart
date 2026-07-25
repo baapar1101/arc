@@ -6,6 +6,7 @@ import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/widgets/invoice/invoice_fx_dual_totals_banner.dart';
 import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/services/warehouse_service.dart';
@@ -3796,6 +3797,26 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   Container(width: 2, height: 40, color: theme.dividerColor),
                   _buildTotalItem('قابل پرداخت', formatWithThousands(payable.toInt()), theme.colorScheme.primary),
                 ],
+              ),
+              Builder(
+                builder: (context) {
+                  final auth = ApiClient.getAuthStore();
+                  final isMc = auth?.isMultiCurrency ?? false;
+                  final fxTotals = _rawDocumentData?['fx_totals'] as Map<String, dynamic>?;
+                  final baseCur = _rawDocumentData?['base_currency'] as Map<String, dynamic>?;
+                  final banner = InvoiceFxDualTotalsBanner.fromInvoicePayload(
+                    isMultiCurrency: isMc,
+                    fxTotals: fxTotals,
+                    baseCurrency: baseCur,
+                    foreignCurrencyLabel: _document?.currencyCode ?? '',
+                    foreignDecimalPlaces: 0,
+                  );
+                  if (banner == null) return const SizedBox.shrink();
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: banner,
+                  );
+                },
               ),
               const Divider(height: 24),
               // جمع بدهکار و بستانکار

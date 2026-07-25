@@ -1600,9 +1600,10 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
   double _sumPersons() =>
       _personLines.fold<double>(0, (p, e) => p + e.amount);
 
+  /// مجموع به ارز سند/تسویه (بین‌ارزی: settlesAmount؛ وگرنه amount).
   double _sumCenters() => _centerTransactions.fold<double>(
         0,
-        (p, e) => p + e.amount.toDouble(),
+        (p, e) => p + e.settlesAgainstInvoice.toDouble(),
       );
 
   /// اختلافی که باید صفر شود (همان [diff] در فوتر).
@@ -1651,7 +1652,24 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
     final addToLastCenter = sumP - sumC;
     if (addToLastCenter.abs() < _balanceEpsilon) return;
     final last = _centerTransactions.length - 1;
-    final newAmt = _centerTransactions[last].amount.toDouble() + addToLastCenter;
+    final tx = _centerTransactions[last];
+    // بین‌ارزی: مبلغ تسویه به ارز سند تعدیل می‌شود؛ مبلغ پرداخت دست‌نخورده می‌ماند
+    if (tx.settlesAmount != null) {
+      final newSettle = tx.settlesAmount!.toDouble() + addToLastCenter;
+      if (newSettle < -_balanceEpsilon) {
+        SnackBarHelper.showError(
+          context,
+          message:
+              'مبلغ تسویه ردیف آخر پس از تعدیل منفی می‌شود. اختلاف را در چند ردیف تقسیم کنید.',
+        );
+        return;
+      }
+      setState(() {
+        _centerTransactions[last] = tx.copyWith(settlesAmount: newSettle);
+      });
+      return;
+    }
+    final newAmt = tx.amount.toDouble() + addToLastCenter;
     if (newAmt < -_balanceEpsilon) {
       SnackBarHelper.showError(
         context,
@@ -1660,8 +1678,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
       return;
     }
     setState(() {
-      _centerTransactions[last] =
-          _centerTransactions[last].copyWith(amount: newAmt);
+      _centerTransactions[last] = tx.copyWith(amount: newAmt);
     });
   }
 
@@ -1703,9 +1720,8 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
     final sumC = _sumCenters();
     final addToLastCenter = sumP - sumC;
     final last = _centerTransactions.length - 1;
-    final canMatchPeople = _centerTransactions[last].amount.toDouble() +
-            addToLastCenter >=
-        -_balanceEpsilon;
+    final lastSettle = _centerTransactions[last].settlesAgainstInvoice.toDouble();
+    final canMatchPeople = lastSettle + addToLastCenter >= -_balanceEpsilon;
     final addToPerson = sumC - sumP;
     final canMatchAccounts = addToPerson.abs() >= _balanceEpsilon &&
         _personLineIndexForBalanceDelta(addToPerson) != null;
@@ -1741,9 +1757,9 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
 
   Widget _buildMobileLayout() {
     final t = AppLocalizations.of(context);
-    final sumPersons = _personLines.fold<double>(0, (p, e) => p + e.amount);
-    final sumCenters = _centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
-    final diff = (_isReceipt ? sumCenters - sumPersons : sumPersons - sumCenters).toDouble();
+    final sumPersons = _sumPersons();
+    final sumCenters = _sumCenters();
+    final diff = _diffAmount();
     final padding = ResponsiveHelper.getPadding(context);
 
     return Dialog(
@@ -1967,9 +1983,9 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
 
   Widget _buildDesktopLayout() {
     final t = AppLocalizations.of(context);
-    final sumPersons = _personLines.fold<double>(0, (p, e) => p + e.amount);
-    final sumCenters = _centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
-    final diff = (_isReceipt ? sumCenters - sumPersons : sumPersons - sumCenters).toDouble();
+    final sumPersons = _sumPersons();
+    final sumCenters = _sumCenters();
+    final diff = _diffAmount();
     final padding = ResponsiveHelper.getPadding(context);
 
     return Dialog(
@@ -2244,36 +2260,43 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
       }).toList();
       
       // تبدیل centerTransactions به فرمت مورد نیاز API
-      final accountLinesData = _centerTransactions.map((tx) => {
-        'account_id': tx.accountId,
-        'amount': tx.amount.toDouble(),
-        'transaction_type': tx.type.value,
-        'transaction_date': tx.transactionDate.toIso8601String(),
-        if (tx.commission != null && tx.commission! > 0)
-          'commission': tx.commission!.toDouble(),
-        if (tx.description != null && tx.description!.isNotEmpty)
-          'description': tx.description,
-        // اطلاعات اضافی بر اساس نوع تراکنش
-        if (tx.type == TransactionType.bank) ...{
-          'bank_id': tx.bankId,
-          'bank_name': tx.bankName,
-        },
-        if (tx.type == TransactionType.cashRegister) ...{
-          'cash_register_id': tx.cashRegisterId,
-          'cash_register_name': tx.cashRegisterName,
-        },
-        if (tx.type == TransactionType.pettyCash) ...{
-          'petty_cash_id': tx.pettyCashId,
-          'petty_cash_name': tx.pettyCashName,
-        },
-        if (tx.type == TransactionType.check) ...{
-          'check_id': tx.checkId,
-          'check_number': tx.checkNumber,
-        },
-        if (tx.type == TransactionType.person) ...{
-          'person_id': tx.personId,
-          'person_name': tx.personName,
-        },
+      final accountLinesData = _centerTransactions.map((tx) {
+        final map = <String, dynamic>{
+          'account_id': tx.accountId,
+          'amount': tx.amount.toDouble(),
+          'transaction_type': tx.type.value,
+          'transaction_date': tx.transactionDate.toIso8601String(),
+          if (tx.commission != null && tx.commission! > 0)
+            'commission': tx.commission!.toDouble(),
+          if (tx.description != null && tx.description!.isNotEmpty)
+            'description': tx.description,
+          if (tx.type == TransactionType.bank) ...{
+            'bank_id': tx.bankId,
+            'bank_name': tx.bankName,
+          },
+          if (tx.type == TransactionType.cashRegister) ...{
+            'cash_register_id': tx.cashRegisterId,
+            'cash_register_name': tx.cashRegisterName,
+          },
+          if (tx.type == TransactionType.pettyCash) ...{
+            'petty_cash_id': tx.pettyCashId,
+            'petty_cash_name': tx.pettyCashName,
+          },
+          if (tx.type == TransactionType.check) ...{
+            'check_id': tx.checkId,
+            'check_number': tx.checkNumber,
+          },
+          if (tx.type == TransactionType.person) ...{
+            'person_id': tx.personId,
+            'person_name': tx.personName,
+          },
+          // V2-P4 بین‌ارزی
+          if (tx.settlesAmount != null) 'settles_amount': tx.settlesAmount,
+          if (tx.fxRate != null) 'fx_rate': tx.fxRate,
+          if (tx.paymentCurrencyId != null)
+            'payment_currency_id': tx.paymentCurrencyId,
+        };
+        return map;
       }).toList();
       
       // ساخت extra_info (تخصیص اقساط بر اساس ردیف‌های شخص)

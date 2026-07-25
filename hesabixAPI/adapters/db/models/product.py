@@ -76,6 +76,27 @@ class Product(Base):
     base_purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     base_purchase_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # قیمت ارزی (P6 — فقط کسب‌وکار چندارزی استفاده می‌کند)
+    sales_price_fx: Mapped[Decimal | None] = mapped_column(
+        Numeric(18, 6), nullable=True, comment="قیمت فروش ارزی"
+    )
+    purchase_price_fx: Mapped[Decimal | None] = mapped_column(
+        Numeric(18, 6), nullable=True, comment="قیمت خرید ارزی"
+    )
+    price_fx_currency_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("currencies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="ارز قیمت‌های ارزی",
+    )
+    auto_update_base_from_fx: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        comment="به‌روزرسانی خودکار قیمت پایه از نرخ × قیمت ارزی",
+    )
+
     # کنترل موجودی
     track_inventory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     reorder_point: Mapped[int | None] = mapped_column(Integer, nullable=True)

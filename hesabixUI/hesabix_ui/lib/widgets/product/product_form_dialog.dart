@@ -251,6 +251,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         },
         controller: _controller,
         productId: widget.product?['id'] as int?,
+        authStore: widget.authStore,
+        isMultiCurrency: widget.authStore.isMultiCurrency,
       ),
     );
   }

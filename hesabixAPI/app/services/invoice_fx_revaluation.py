@@ -28,6 +28,8 @@ DEFAULT_FX_REVALUATION_POLICY: Dict[str, str] = {
 	"document_date_effective": "end_of_day",  # start_of_day | noon | end_of_day
 	# block: بدون نرخ ثبت ممنوع | allow_without_fx: بدون بلوک، fx ممکن است ناقص باشد
 	"when_no_rate": "block",
+	# D2: نمایش نرخ در UI — as_base | irr | toman (فقط نمایش؛ نرخ ذخیره‌شده دست‌نخورده)
+	"rate_display_unit": "as_base",
 }
 
 
@@ -54,7 +56,39 @@ def _validate_policy(p: Dict[str, str]) -> None:
 		raise ValueError("document_date_effective نامعتبر")
 	if p.get("when_no_rate") not in ("block", "allow_without_fx"):
 		raise ValueError("when_no_rate نامعتبر")
+	if p.get("rate_display_unit") not in ("as_base", "irr", "toman"):
+		raise ValueError("rate_display_unit نامعتبر")
 
+
+def display_rate_factor_for_unit(*, base_currency_code: Optional[str], display_unit: str) -> Decimal:
+	"""
+	ضریب نمایشی D2: نرخ ذخیره‌شده همیشه نسبت به ارز پایه است.
+	- as_base: ۱
+	- toman روی پایه IRR: ÷۱۰
+	- irr روی پایه IRT/TOMAN: ×۱۰
+	"""
+	unit = (display_unit or "as_base").strip().lower()
+	code = (base_currency_code or "").strip().upper()
+	if unit == "as_base":
+		return Decimal(1)
+	base_is_irr = code in ("IRR", "RIAL", "")
+	base_is_toman = code in ("IRT", "TMN", "TOMAN")
+	if unit == "toman":
+		return Decimal("0.1") if base_is_irr else Decimal(1)
+	if unit == "irr":
+		return Decimal(10) if base_is_toman else Decimal(1)
+	return Decimal(1)
+
+
+def apply_rate_display_unit(rate: Any, *, base_currency_code: Optional[str], display_unit: str) -> Optional[Decimal]:
+	try:
+		r = Decimal(str(rate))
+	except Exception:
+		return None
+	return r * display_rate_factor_for_unit(
+		base_currency_code=base_currency_code,
+		display_unit=display_unit,
+	)
 
 def validate_and_normalize_fx_revaluation_policy_payload(raw: Any) -> Optional[Dict[str, str]]:
 	"""برای API ویرایش کسب‌وکار: اعتبارسنجی و برگرداندن دیکشنار نهایی یا None."""

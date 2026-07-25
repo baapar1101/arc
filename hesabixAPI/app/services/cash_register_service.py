@@ -236,40 +236,28 @@ def _calculate_cash_register_balance(
 	business_id: int,
 	fiscal_year_id: Optional[int] = None,
 ) -> Decimal:
-	"""
-	محاسبه موجودی یک صندوق
-	
-	Args:
-		db: نشست پایگاه داده
-		cash_register_id: شناسه صندوق
-		business_id: شناسه کسب‌وکار
-		fiscal_year_id: شناسه سال مالی (اختیاری)
-	
-	Returns:
-		Decimal: موجودی صندوق (debit - credit)
-	"""
-	query = db.query(
-		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-	).join(
+	"""موجودی صندوق به ارز همان صندوق (با پشتیبانی مبلغ بومی بین‌ارزی)."""
+	from app.services.account_native_balance import line_native_signed_amount_for_account
+
+	cr = db.query(CashRegister).filter(CashRegister.id == int(cash_register_id)).first()
+	cr_currency_id = int(cr.currency_id) if cr else None
+
+	query = db.query(DocumentLine, Document).join(
 		Document, DocumentLine.document_id == Document.id
 	).filter(
 		Document.business_id == business_id,
 		Document.is_proforma == False,
-		DocumentLine.cash_register_id == cash_register_id
+		DocumentLine.cash_register_id == cash_register_id,
 	)
-	
-	# فیلتر سال مالی
 	if fiscal_year_id:
 		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
-	
-	result = query.first()
-	if result:
-		total_debit = Decimal(str(result.total_debit or 0))
-		total_credit = Decimal(str(result.total_credit or 0))
-		return total_debit - total_credit
-	
-	return Decimal(0)
+
+	total = Decimal(0)
+	for line, doc in query.all():
+		total += line_native_signed_amount_for_account(
+			line, doc, account_currency_id=cr_currency_id
+		)
+	return total
 
 
 def _calculate_cash_registers_balances_bulk(
@@ -278,54 +266,36 @@ def _calculate_cash_registers_balances_bulk(
 	business_id: int,
 	fiscal_year_id: Optional[int] = None,
 ) -> Dict[int, Decimal]:
-	"""
-	محاسبه موجودی چند صندوق به صورت bulk
-	
-	Args:
-		db: نشست پایگاه داده
-		cash_register_ids: لیست شناسه‌های صندوق‌ها
-		business_id: شناسه کسب‌وکار
-		fiscal_year_id: شناسه سال مالی (اختیاری)
-	
-	Returns:
-		Dict[int, Decimal]: دیکشنری {cash_register_id: balance}
-	"""
+	"""موجودی چند صندوق bulk با پشتیبانی مبلغ بومی."""
+	from app.services.account_native_balance import line_native_signed_amount_for_account
+
 	if not cash_register_ids:
 		return {}
-	
-	query = db.query(
-		DocumentLine.cash_register_id,
-		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-	).join(
+
+	crs = {
+		int(c.id): c
+		for c in db.query(CashRegister).filter(CashRegister.id.in_(cash_register_ids)).all()
+	}
+	out: Dict[int, Decimal] = {int(i): Decimal(0) for i in cash_register_ids}
+
+	query = db.query(DocumentLine, Document).join(
 		Document, DocumentLine.document_id == Document.id
 	).filter(
 		Document.business_id == business_id,
 		Document.is_proforma == False,
-		DocumentLine.cash_register_id.in_(cash_register_ids)
-	).group_by(
-		DocumentLine.cash_register_id
+		DocumentLine.cash_register_id.in_(cash_register_ids),
 	)
-	
-	# فیلتر سال مالی
 	if fiscal_year_id:
 		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
-	
-	results = query.all()
-	
-	balances = {}
-	for result in results:
-		cr_id = result.cash_register_id
-		total_debit = Decimal(str(result.total_debit or 0))
-		total_credit = Decimal(str(result.total_credit or 0))
-		balances[cr_id] = total_debit - total_credit
-	
-	# برای صندوق‌هایی که تراکنشی ندارند، موجودی صفر است
-	for cr_id in cash_register_ids:
-		if cr_id not in balances:
-			balances[cr_id] = Decimal(0)
-	
-	return balances
+
+	for line, doc in query.all():
+		cid = int(line.cash_register_id)
+		cr = crs.get(cid)
+		cr_currency_id = int(cr.currency_id) if cr else None
+		out[cid] += line_native_signed_amount_for_account(
+			line, doc, account_currency_id=cr_currency_id
+		)
+	return out
 
 
 def list_cash_registers(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:

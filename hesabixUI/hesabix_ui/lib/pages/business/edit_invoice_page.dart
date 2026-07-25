@@ -8,6 +8,7 @@ import '../../widgets/permission/access_denied_page.dart';
 import '../../widgets/invoice/invoice_info_form.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
+import '../../widgets/invoice/invoice_fx_dual_totals_banner.dart';
 import '../../utils/number_formatters.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
@@ -138,6 +139,43 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final c = _selectedCurrencyId;
     if (b == null || c == null) return false;
     return c != b;
+  }
+
+  double? get _previewFxRate {
+    if (!_showInvoiceFxField || !widget.authStore.isMultiCurrency) return null;
+    if (_manualFxRateId != null) {
+      for (final row in _fxRateRows) {
+        if ((row['id'] as num?)?.toInt() == _manualFxRateId) {
+          return (row['rate'] as num?)?.toDouble();
+        }
+      }
+    }
+    // نرخ ذخیره‌شده روی سند
+    final fx = _originalExtraInfo['fx'];
+    if (fx is Map && fx['skipped'] != true && fx['rate'] != null) {
+      return (fx['rate'] as num?)?.toDouble() ?? double.tryParse('${fx['rate']}');
+    }
+    if (_fxRateRows.isEmpty) return null;
+    return (_fxRateRows.first['rate'] as num?)?.toDouble();
+  }
+
+  String get _baseCurrencyUnitLabel {
+    final defId = _defaultBusinessCurrencyId;
+    return currencyUnitLabelForBusinessCurrencyIdOrNull(defId, _businessCurrenciesCache) ??
+        'پایه';
+  }
+
+  int get _baseCurrencyDecimalPlaces {
+    final defId = _defaultBusinessCurrencyId;
+    final cache = _businessCurrenciesCache;
+    if (defId == null || cache == null) return 0;
+    for (final raw in cache) {
+      final c = Map<String, dynamic>.from(raw as Map);
+      if ((c['id'] as num?)?.toInt() == defId) {
+        return (c['decimal_places'] as num?)?.toInt() ?? 0;
+      }
+    }
+    return 0;
   }
 
   bool get _invoiceTypeSupportsAdjustments =>
@@ -1108,6 +1146,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                       Text('مالیات اضافات/کسورات: ${formatWithThousands(_adjustmentsTaxSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyMedium),
                     ],
                     Text('${t.invoiceSummaryTotal}: ${formatWithThousands(_invoiceGrandTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+                    if (widget.authStore.isMultiCurrency &&
+                        _showInvoiceFxField &&
+                        _previewFxRate != null &&
+                        _previewFxRate! > 0)
+                      InvoiceFxDualTotalsBanner(
+                        isMultiCurrency: true,
+                        showDual: true,
+                        foreignPayable: _invoiceGrandTotal.toDouble(),
+                        basePayable: _invoiceGrandTotal.toDouble() * _previewFxRate!,
+                        rate: _previewFxRate!,
+                        foreignCurrencyLabel: _invoiceCurrencyUnitLabel,
+                        baseCurrencyLabel: _baseCurrencyUnitLabel,
+                        foreignDecimalPlaces: _invoiceCurrencyDecimalPlaces,
+                        baseDecimalPlaces: _baseCurrencyDecimalPlaces,
+                      ),
                   ],
                 ),
               ),
@@ -1152,6 +1205,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             selectedCurrencyId: _selectedCurrencyId,
             authStore: widget.authStore,
             invoiceTotal: _invoiceGrandTotal,
+            invoiceFxRate: _previewFxRate,
           ),
         ),
       ),

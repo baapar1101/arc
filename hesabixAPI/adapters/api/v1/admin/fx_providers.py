@@ -118,3 +118,47 @@ def admin_fetch_fx_provider_now(
 		request=request,
 		message="FX_PROVIDER_FETCHED",
 	)
+
+
+@router.get("/data-health/{business_id}", summary="سلامت داده چندارزی یک کسب‌وکار")
+def admin_fx_data_health(
+	request: Request,
+	business_id: int = Path(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_require_admin(ctx)
+	from app.services.fx_data_health_service import get_fx_data_health
+
+	data = get_fx_data_health(db, business_id)
+	return success_response(data=data, request=request, message="FX_DATA_HEALTH")
+
+
+@router.post("/data-health/{business_id}/backfill-base", summary="Backfill خطوط *_base (dry-run پیش‌فرض)")
+def admin_fx_backfill_base(
+	request: Request,
+	business_id: int = Path(...),
+	body: Dict[str, Any] = Body(default={}),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	_require_admin(ctx)
+	from app.services.fx_data_health_service import run_fx_base_backfill
+
+	dry_run = bool((body or {}).get("dry_run", True))
+	allow_infer = bool((body or {}).get("allow_infer", False))
+	only_with_fx = bool((body or {}).get("only_with_fx_snapshot", True))
+	max_docs = (body or {}).get("max_documents", 200)
+	try:
+		max_docs_i = int(max_docs) if max_docs is not None else None
+	except Exception:
+		max_docs_i = 200
+	data = run_fx_base_backfill(
+		db,
+		business_id,
+		dry_run=dry_run,
+		only_with_fx_snapshot=only_with_fx,
+		allow_infer=allow_infer,
+		max_documents=max_docs_i,
+	)
+	return success_response(data=data, request=request, message="FX_BACKFILL_BASE")

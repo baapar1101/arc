@@ -181,7 +181,14 @@ String _stripTrailingZerosAndDot(String s) {
 }
 
 /// نمایش نرخ تسعیر و اعداد مشابه: جداکننده هزارگان و حذف صفرهای انتهایی اعشار.
-String formatFxRateForDisplay(dynamic value) {
+///
+/// [rateDisplayUnit]: `as_base` | `irr` | `toman` (D2 — فقط نمایش).
+/// [baseCurrencyCode]: کد ارز پایه کسب‌وکار (مثلاً IRR / IRT).
+String formatFxRateForDisplay(
+  dynamic value, {
+  String? rateDisplayUnit,
+  String? baseCurrencyCode,
+}) {
   if (value == null) return '—';
   final raw = value.toString().trim();
   if (raw.isEmpty || raw == '—') return '—';
@@ -189,12 +196,36 @@ String formatFxRateForDisplay(dynamic value) {
   var canonical = toEnglishDigits(raw.replaceAll(RegExp(r'[\s,]'), ''));
   if (canonical.isEmpty) return '—';
 
-  final n = num.tryParse(canonical);
+  var n = num.tryParse(canonical);
   if (n == null) return raw;
+
+  final unit = (rateDisplayUnit ?? 'as_base').trim().toLowerCase();
+  final code = (baseCurrencyCode ?? '').trim().toUpperCase();
+  final baseIsIrr = code.isEmpty || code == 'IRR' || code == 'RIAL';
+  final baseIsToman = code == 'IRT' || code == 'TMN' || code == 'TOMAN';
+  if (unit == 'toman' && baseIsIrr) {
+    n = n / 10;
+  } else if (unit == 'irr' && baseIsToman) {
+    n = n * 10;
+  }
 
   var s = n.toDouble().toStringAsFixed(12);
   s = _stripTrailingZerosAndDot(s);
   return _addThousandsSeparator(s);
+}
+
+/// برچسب واحد نمایش نرخ (D2).
+String fxRateDisplayUnitLabel({
+  String? rateDisplayUnit,
+  String? baseCurrencyCode,
+}) {
+  final unit = (rateDisplayUnit ?? 'as_base').trim().toLowerCase();
+  if (unit == 'toman') return 'تومان';
+  if (unit == 'irr') return 'ریال';
+  final code = (baseCurrencyCode ?? '').trim().toUpperCase();
+  if (code == 'IRT' || code == 'TMN' || code == 'TOMAN') return 'تومان';
+  if (code == 'IRR' || code == 'RIAL') return 'ریال';
+  return code.isEmpty ? 'ارز پایه' : code;
 }
 
 /// فرمت کردن عدد برای نمایش در فیلد ورودی با جداکننده هزارگان

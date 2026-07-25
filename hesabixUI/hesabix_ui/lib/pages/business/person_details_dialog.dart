@@ -28,6 +28,7 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:hesabix_ui/widgets/person/person_balances_by_currency_card.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 
@@ -78,6 +79,9 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   String? _summaryStatus;
   bool _loadingSummary = false;
   String? _summaryError;
+  Map<String, dynamic>? _balancesByCurrency;
+  bool _loadingBalancesByCurrency = false;
+  String? _balancesByCurrencyError;
   int? _currentFiscalYearId;
   String? _currentFiscalYearName;
   bool _loadingFiscalYear = false;
@@ -529,12 +533,38 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         _person = data;
         _loadingDetails = false;
       });
+      // مانده per currency فقط برای چندارزی
+      if (widget.authStore.isMultiCurrency) {
+        _loadBalancesByCurrency(personId);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _detailsError =
             'خطا در بارگذاری اطلاعات شخص: ${ErrorExtractor.forContext(e, context)}';
         _loadingDetails = false;
+      });
+    }
+  }
+
+  Future<void> _loadBalancesByCurrency(int personId) async {
+    if (!widget.authStore.isMultiCurrency) return;
+    setState(() {
+      _loadingBalancesByCurrency = true;
+      _balancesByCurrencyError = null;
+    });
+    try {
+      final data = await _personService.getPersonBalancesByCurrency(personId);
+      if (!mounted) return;
+      setState(() {
+        _balancesByCurrency = data;
+        _loadingBalancesByCurrency = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _balancesByCurrencyError = ErrorExtractor.forContext(e, context);
+        _loadingBalancesByCurrency = false;
       });
     }
   }
@@ -615,62 +645,74 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           bottom: BorderSide(color: theme.dividerColor),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-            child: Text(
-              (_person?.aliasName ?? '?').isNotEmpty ? (_person?.aliasName ?? '?')[0] : '?',
-              style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _person?.displayName ?? 'بدون نام',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                child: Text(
+                  (_person?.aliasName ?? '?').isNotEmpty ? (_person?.aliasName ?? '?')[0] : '?',
+                  style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
                 ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_person?.code != null)
-                      _buildHeaderChip('کد: ${_person!.code}', theme),
-                    _buildHeaderChip(
-                      'تراز: ${formatter.format(balance)}',
-                      theme,
-                      icon: Icons.account_balance,
-                      iconColor: balanceColor,
+                    Text(
+                      _person?.displayName ?? 'بدون نام',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    if ((_person?.status ?? '').isNotEmpty)
-                      _buildHeaderChip('وضعیت: ${_person!.status}', theme, icon: Icons.circle, iconColor: balanceColor),
-                    if (_loadingDetails)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 4,
+                      children: [
+                        if (_person?.code != null)
+                          _buildHeaderChip('کد: ${_person!.code}', theme),
+                        _buildHeaderChip(
+                          'تراز: ${formatter.format(balance)}',
+                          theme,
+                          icon: Icons.account_balance,
+                          iconColor: balanceColor,
+                        ),
+                        if ((_person?.status ?? '').isNotEmpty)
+                          _buildHeaderChip('وضعیت: ${_person!.status}', theme, icon: Icons.circle, iconColor: balanceColor),
+                        if (_loadingDetails)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 6),
+                              Text('در حال بروزرسانی...'),
+                            ],
                           ),
-                          SizedBox(width: 6),
-                          Text('در حال بروزرسانی...'),
-                        ],
-                      ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          if (widget.authStore.isMultiCurrency)
+            PersonBalancesByCurrencyCard(
+              isMultiCurrency: true,
+              payload: _balancesByCurrency,
+              loading: _loadingBalancesByCurrency,
+              error: _balancesByCurrencyError,
             ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close),
-          ),
         ],
       ),
     );

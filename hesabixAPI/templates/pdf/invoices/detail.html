@@ -862,6 +862,34 @@
               <span>{{ 'قابل پرداخت' if is_fa else 'Payable' }}:</span>
               <span class="amount">{{ _final_payable | format_amount(0) | ltr | safe }}</span>
             </div>
+
+            {% set _fx = invoice.fx_totals if invoice.fx_totals is mapping else none %}
+            {% set _show_dual = _fx and (_fx.show_dual | default(false)) %}
+            {% if is_multi_currency | default(false) and _show_dual %}
+              {% set _fx_foreign = _fx.foreign if _fx.foreign is mapping else {} %}
+              {% set _fx_base = _fx.base if _fx.base is mapping else {} %}
+              {% set _base_cur = base_currency if base_currency is mapping else {} %}
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #ccc; font-size: 11px;">
+                <div class="meta" style="margin-bottom: 4px;">{{ 'معادل ارز پایه' if is_fa else 'Base currency equivalent' }}</div>
+                <div style="display:flex; justify-content: space-between;">
+                  <span class="meta">
+                    {{ (_fx_foreign.payable | default(_fx_foreign.net, true)) | default(0, true) | format_amount(0) | ltr | safe }}
+                    {{ invoice.currency.code if invoice.currency and invoice.currency.code else '' }}
+                  </span>
+                  <span class="amount">
+                    ≈
+                    {{ (_fx_base.payable | default(_fx_base.net, true)) | default(0, true) | format_amount(0) | ltr | safe }}
+                    {{ _base_cur.code | default('', true) }}
+                  </span>
+                </div>
+                {% if _fx_base.rate %}
+                  <div class="meta" style="margin-top: 2px;">
+                    {{ 'نرخ' if is_fa else 'Rate' }}:
+                    {{ _fx_base.rate | format_amount(4) | ltr | safe }}
+                  </div>
+                {% endif %}
+              </div>
+            {% endif %}
           </div>
         </div>
       </div>

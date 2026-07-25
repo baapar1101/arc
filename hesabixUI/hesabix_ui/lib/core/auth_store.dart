@@ -92,6 +92,7 @@ class AuthStore with ChangeNotifier {
       defaultCurrency: defLite,
       currencies: list,
       isMultiCurrency: isMc,
+      fxRevaluationPolicy: current.fxRevaluationPolicy,
       deletedAt: current.deletedAt,
       autoDeleteAt: current.autoDeleteAt,
       isDeleted: current.isDeleted,
@@ -473,6 +474,7 @@ class AuthStore with ChangeNotifier {
               }
             : null,
         'is_multi_currency': _currentBusiness!.isMultiCurrency,
+        'fx_revaluation_policy': _currentBusiness!.fxRevaluationPolicy,
         'currencies': _currentBusiness!.currencies
             .map((c) => {
                   'id': c.id,

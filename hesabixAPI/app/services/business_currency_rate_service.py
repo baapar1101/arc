@@ -348,4 +348,12 @@ def bulk_create_business_currency_rates(
 			"note": raw.get("note") if raw.get("note") is not None else note_default,
 		}
 		created.append(create_business_currency_rate(db, business_id, user_id, body))
-	return {"created": created, "count": len(created)}
+	# P6: همگام‌سازی اختیاری قیمت پایه کالاهایی که auto_update دارند
+	product_sync: Dict[str, Any] = {}
+	try:
+		from app.services.product_fx_price_service import sync_business_products_base_from_fx
+
+		product_sync = sync_business_products_base_from_fx(db, business_id, only_auto=True)
+	except Exception:
+		product_sync = {"updated_count": 0, "error": "sync_skipped"}
+	return {"created": created, "count": len(created), "product_price_sync": product_sync}

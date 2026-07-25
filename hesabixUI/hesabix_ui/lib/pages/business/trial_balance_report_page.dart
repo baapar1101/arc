@@ -161,13 +161,11 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
+        // تک‌ارزی: بدون فیلتر ارز (جمع پایه/بومی یکسان). چندارزی: پیش‌فرض «همه ارزها»
+        if (items.length <= 1) {
+          _selectedCurrencyId = null;
+        } else {
+          _selectedCurrencyId = null; // همه ارزها = مبالغ پایه
         }
       });
     } catch (_) {
@@ -415,6 +413,7 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
                     },
                   ),
                 ),
+                if (_currencies.length > 1)
                 _filterField(
                   width: fieldWidth,
                   child: DropdownButtonFormField<int>(
