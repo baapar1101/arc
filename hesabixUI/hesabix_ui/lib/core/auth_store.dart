@@ -21,7 +21,10 @@ class AuthStore with ChangeNotifier {
   static const _kSelectedCurrencyCode = 'selected_currency_code';
   static const _kSelectedCurrencyId = 'selected_currency_id';
 
-  final FlutterSecureStorage _secure = const FlutterSecureStorage();
+  final FlutterSecureStorage _secure = const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
   String? _apiKey;
   String? _deviceId;
   Map<String, dynamic>? _appPermissions;
@@ -105,6 +108,44 @@ class AuthStore with ChangeNotifier {
   String? get selectedCurrencyCode => _selectedCurrencyCode;
   int? get selectedCurrencyId => _selectedCurrencyId;
 
+  Future<String?> _readSecureOrPrefs(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (kIsWeb) {
+      return prefs.getString(key);
+    }
+    try {
+      final secureValue = await _secure.read(key: key);
+      if (secureValue != null && secureValue.isNotEmpty) {
+        return secureValue;
+      }
+    } catch (_) {}
+    return prefs.getString(key);
+  }
+
+  Future<void> _writeSecureAndPrefs(String key, String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (kIsWeb) {
+      await prefs.setString(key, value);
+      return;
+    }
+    await prefs.setString(key, value);
+    try {
+      await _secure.write(key: key, value: value);
+    } catch (_) {}
+  }
+
+  Future<void> _deleteSecureAndPrefs(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (kIsWeb) {
+      await prefs.remove(key);
+      return;
+    }
+    try {
+      await _secure.delete(key: key);
+    } catch (_) {}
+    await prefs.remove(key);
+  }
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     _deviceId = prefs.getString(_kDeviceId);
@@ -116,14 +157,15 @@ class AuthStore with ChangeNotifier {
     if (kIsWeb) {
       _apiKey = prefs.getString(_kApiKey);
     } else {
-      _apiKey = await _secure.read(key: _kApiKey);
-      _apiKey ??= prefs.getString(_kApiKey);
+      _apiKey = await _readSecureOrPrefs(_kApiKey);
     }
 
     // بارگذاری دسترسی‌های اپلیکیشن
     await _loadAppPermissions();
     // بارگذاری ارز انتخاب‌شده (در سطح اپ/کسب‌وکار)
     await _loadSelectedCurrency();
+    // بازیابی کسب‌وکار فعلی از حافظه محلی
+    await _loadCurrentBusiness();
     
     // اگر API key موجود است اما دسترسی‌ها نیست، از سرور دریافت کن
     if (_apiKey != null && _apiKey!.isNotEmpty && (_appPermissions == null || _appPermissions!.isEmpty)) {
@@ -155,23 +197,34 @@ class AuthStore with ChangeNotifier {
       _currentUserId = prefs.getInt(_kCurrentUserId);
     } else {
       try {
-        final permissionsJson = await _secure.read(key: _kAppPermissions);
-        if (permissionsJson != null) {
+        final permissionsJson = await _readSecureOrPrefs(_kAppPermissions);
+        if (permissionsJson != null && permissionsJson.isNotEmpty) {
           _appPermissions = Map<String, dynamic>.from(
             const JsonDecoder().convert(permissionsJson),
           );
         } else {
           _appPermissions = null;
         }
-        final superAdminStr = await _secure.read(key: _kIsSuperAdmin);
-        _isSuperAdmin = superAdminStr == 'true';
-        _currentUserName = await _secure.read(key: _kUserName);
-        _currentUserMobile = await _secure.read(key: _kUserMobile);
+        final superAdminStr = await _readSecureOrPrefs(_kIsSuperAdmin);
+        _isSuperAdmin = superAdminStr == 'true' || (prefs.getBool(_kIsSuperAdmin) ?? false);
+        _currentUserName = await _readSecureOrPrefs(_kUserName) ?? prefs.getString(_kUserName);
+        _currentUserMobile = await _readSecureOrPrefs(_kUserMobile) ?? prefs.getString(_kUserMobile);
       } catch (e) {
-        _appPermissions = null;
-        _isSuperAdmin = false;
-        _currentUserName = null;
-        _currentUserMobile = null;
+        final permissionsJson = prefs.getString(_kAppPermissions);
+        if (permissionsJson != null) {
+          try {
+            _appPermissions = Map<String, dynamic>.from(
+              const JsonDecoder().convert(permissionsJson),
+            );
+          } catch (_) {
+            _appPermissions = null;
+          }
+        } else {
+          _appPermissions = null;
+        }
+        _isSuperAdmin = prefs.getBool(_kIsSuperAdmin) ?? false;
+        _currentUserName = prefs.getString(_kUserName);
+        _currentUserMobile = prefs.getString(_kUserMobile);
       }
       _currentUserId = prefs.getInt(_kCurrentUserId);
     }
@@ -184,25 +237,20 @@ class AuthStore with ChangeNotifier {
       if (kIsWeb) {
         await prefs.remove(_kApiKey);
       } else {
-        try {
-          await _secure.delete(key: _kApiKey);
-        } catch (_) {}
-        await prefs.remove(_kApiKey);
+        await _deleteSecureAndPrefs(_kApiKey);
       }
       final uid = _currentUserId;
       await MobileLauncherPrefs.clearSession(userId: uid);
       // پاک کردن دسترسی‌ها و آخرین URL هنگام خروج
       await _clearAppPermissions();
+      await clearCurrentBusiness();
       await clearLastUrl();
       BusinessPanelUiStore.instance.reset();
     } else {
       if (kIsWeb) {
         await prefs.setString(_kApiKey, key);
       } else {
-        try {
-          await _secure.write(key: _kApiKey, value: key);
-        } catch (_) {}
-        await prefs.setString(_kApiKey, key);
+        await _writeSecureAndPrefs(_kApiKey, key);
       }
     }
     notifyListeners();
@@ -243,33 +291,18 @@ class AuthStore with ChangeNotifier {
           await prefs.remove(_kUserMobile);
         }
       } else {
-        try {
-          await _secure.write(key: _kAppPermissions, value: permissionsJson);
-          await _secure.write(key: _kIsSuperAdmin, value: isSuperAdmin.toString());
-          if (userName != null) {
-            await _secure.write(key: _kUserName, value: userName);
-          } else {
-            await _secure.delete(key: _kUserName);
-          }
-          if (userMobile != null) {
-            await _secure.write(key: _kUserMobile, value: userMobile);
-          } else {
-            await _secure.delete(key: _kUserMobile);
-          }
-        } catch (_) {
-          // Fallback to SharedPreferences
-          await prefs.setString(_kAppPermissions, permissionsJson);
-          await prefs.setBool(_kIsSuperAdmin, isSuperAdmin);
-          if (userName != null) {
-            await prefs.setString(_kUserName, userName);
-          } else {
-            await prefs.remove(_kUserName);
-          }
-          if (userMobile != null) {
-            await prefs.setString(_kUserMobile, userMobile);
-          } else {
-            await prefs.remove(_kUserMobile);
-          }
+        await _writeSecureAndPrefs(_kAppPermissions, permissionsJson);
+        await _writeSecureAndPrefs(_kIsSuperAdmin, isSuperAdmin.toString());
+        await prefs.setBool(_kIsSuperAdmin, isSuperAdmin);
+        if (userName != null) {
+          await _writeSecureAndPrefs(_kUserName, userName);
+        } else {
+          await _deleteSecureAndPrefs(_kUserName);
+        }
+        if (userMobile != null) {
+          await _writeSecureAndPrefs(_kUserMobile, userMobile);
+        } else {
+          await _deleteSecureAndPrefs(_kUserMobile);
         }
       }
       if (userId != null) {
@@ -294,17 +327,28 @@ class AuthStore with ChangeNotifier {
       await prefs.remove(_kUserMobile);
       await prefs.remove(_kCurrentUserId);
     } else {
-      try {
-        await _secure.delete(key: _kAppPermissions);
-        await _secure.delete(key: _kIsSuperAdmin);
-        await _secure.delete(key: _kUserName);
-        await _secure.delete(key: _kUserMobile);
-      } catch (_) {}
-      await prefs.remove(_kAppPermissions);
-      await prefs.remove(_kIsSuperAdmin);
-      await prefs.remove(_kUserName);
-      await prefs.remove(_kUserMobile);
+      await _deleteSecureAndPrefs(_kAppPermissions);
+      await _deleteSecureAndPrefs(_kIsSuperAdmin);
+      await _deleteSecureAndPrefs(_kUserName);
+      await _deleteSecureAndPrefs(_kUserMobile);
       await prefs.remove(_kCurrentUserId);
+    }
+  }
+
+  Future<void> _loadCurrentBusiness() async {
+    try {
+      final businessJson = await _readSecureOrPrefs(_kCurrentBusiness);
+      if (businessJson == null || businessJson.isEmpty) return;
+
+      final map = Map<String, dynamic>.from(
+        const JsonDecoder().convert(businessJson) as Map,
+      );
+      _currentBusiness = BusinessWithPermission.fromJson(map);
+      _businessPermissions = _currentBusiness?.permissions;
+      await _ensureCurrencyForBusiness();
+    } catch (_) {
+      _currentBusiness = null;
+      _businessPermissions = null;
     }
   }
 
@@ -488,11 +532,7 @@ class AuthStore with ChangeNotifier {
       if (kIsWeb) {
         await prefs.setString(_kCurrentBusiness, businessJson);
       } else {
-        try {
-          await _secure.write(key: _kCurrentBusiness, value: businessJson);
-        } catch (_) {
-          await prefs.setString(_kCurrentBusiness, businessJson);
-        }
+        await _writeSecureAndPrefs(_kCurrentBusiness, businessJson);
       }
     } catch (e) {
       // Silent fail
@@ -506,10 +546,7 @@ class AuthStore with ChangeNotifier {
       if (kIsWeb) {
         await prefs.remove(_kCurrentBusiness);
       } else {
-        try {
-          await _secure.delete(key: _kCurrentBusiness);
-        } catch (_) {}
-        await prefs.remove(_kCurrentBusiness);
+        await _deleteSecureAndPrefs(_kCurrentBusiness);
       }
     } catch (e) {
       // Silent fail

@@ -260,6 +260,7 @@ import 'pages/business/crm/crm_web_chat_page.dart';
 import 'pages/business/crm/business_crm_settings_page.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   // Use path-based routing instead of hash routing
   usePathUrlStrategy();
   // با push/replace؛ آدرس مرورگر باید آخرین صفحهٔ پشته را نشان دهد؛ وگرنه URL روی مسیر قبلی می‌ماند و دکمهٔ بازگشت درست عمل نمی‌کند.

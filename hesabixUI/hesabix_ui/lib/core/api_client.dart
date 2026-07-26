@@ -28,6 +28,7 @@ class ApiClient {
   static AuthStore? _authStore;
   static CalendarController? _calendarController;
   static ValueNotifier<int?>? _fiscalYearId;
+  static bool _handlingUnauthorized = false;
 
   static void setCurrentLocale(Locale locale) {
     _currentLocale = locale;
@@ -61,10 +62,17 @@ class ApiClient {
 
   /// مدیریت خطاهای نامعتبر بودن سشن یا API key
   static void _handleUnauthorizedError() {
-    if (_authStore == null) return;
+    if (_authStore == null || _handlingUnauthorized) return;
+
+    final currentKey = _authStore!.apiKey;
+    if (currentKey == null || currentKey.isEmpty) return;
+
+    _handlingUnauthorized = true;
     
     // حذف API key و اطلاعات ورود
-    _authStore!.saveApiKey(null);
+    _authStore!.saveApiKey(null).whenComplete(() {
+      _handlingUnauthorized = false;
+    });
     
     // هدایت به صفحه ورود
     final context = navigatorKey.currentContext;
