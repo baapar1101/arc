@@ -20,13 +20,14 @@ pluginManagement {
     includeBuild("$flutterSdkPath/packages/flutter_tools/gradle")
 
     repositories {
+        maven { url = uri("https://maven.myket.ir/") }
+        maven { url = uri("${hesabixGradleMirror}/") }
         maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
         maven { url = uri("${hesabixGradleMirror}/maven2/") }
         maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
-        // Fallback if mirror misses an artifact (init script mirrors composite builds too)
-        gradlePluginPortal()
         google()
         mavenCentral()
+        gradlePluginPortal()
     }
 }
 

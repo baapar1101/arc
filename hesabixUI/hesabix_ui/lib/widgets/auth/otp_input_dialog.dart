@@ -147,17 +147,27 @@ class _OtpInputDialogState extends State<OtpInputDialog> {
             SizedBox(
               height: 48,
               child: FilledButton(
-                onPressed: _verifying || _otp.length != 6 ? null : _handleVerify,
+                onPressed: _verifying ? () {} : (_otp.length != 6 ? null : _handleVerify),
                 style: FilledButton.styleFrom(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  disabledBackgroundColor: colorScheme.primary,
+                  disabledForegroundColor: colorScheme.onPrimary,
                 ),
                 child: _verifying
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 22,
                         height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: colorScheme.onPrimary,
+                        ),
                       )
-                    : Text(t.login),
+                    : Text(
+                        t.login,
+                        style: TextStyle(color: colorScheme.onPrimary),
+                      ),
               ),
             ),
             if (widget.onResend != null) ...[
@@ -172,10 +182,13 @@ class _OtpInputDialogState extends State<OtpInputDialog> {
                   TextButton(
                     onPressed: (_resending || _resendCooldown > 0) ? null : _handleResend,
                     child: _resending
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colorScheme.primary,
+                            ),
                           )
                         : Text(
                             _resendCooldown > 0 ? 'ارسال مجدد (${_resendCooldown}s)' : 'ارسال مجدد',

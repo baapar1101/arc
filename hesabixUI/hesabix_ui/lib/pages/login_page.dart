@@ -1228,7 +1228,13 @@ class _LoginPageState extends State<LoginPage> {
               child: const Text('انصراف'),
             ),
             FilledButton(
-              onPressed: saving ? null : () async {
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.primary,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
+                disabledBackgroundColor: Theme.of(dialogContext).colorScheme.primary,
+                disabledForegroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
+              ),
+              onPressed: saving ? () {} : () async {
                 if (!formKey.currentState!.validate()) return;
                 
                 if (captchaId == null || captchaCtrl.text.trim().isEmpty) {
@@ -1279,12 +1285,18 @@ class _LoginPageState extends State<LoginPage> {
                 }
               },
               child: saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Theme.of(dialogContext).colorScheme.onPrimary,
+                      ),
                     )
-                  : const Text('تغییر رمز عبور'),
+                  : Text(
+                      'تغییر رمز عبور',
+                      style: TextStyle(color: Theme.of(dialogContext).colorScheme.onPrimary),
+                    ),
             ),
           ],
         ),

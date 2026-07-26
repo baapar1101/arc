@@ -265,14 +265,15 @@ setup_gradle_mirror_init() {
     local init_file="$init_dir/hesabix-mirror.init.gradle"
     mkdir -p "$init_dir" 2>/dev/null || true
     cat >"$init_file" <<'EOF'
-def base = (System.getenv("HESABIX_GRADLE_MIRROR") ?: "https://gradle.mirror.hesabix.ir").replaceAll('/+$','')
+def base = (System.getenv("HESABIX_GRADLE_MIRROR") ?: "https://maven.myket.ir").replaceAll('/+$','')
 def mirrorRepos = { repoHandler ->
+    repoHandler.maven { url = uri("${base}/") }
     repoHandler.maven { url = uri("${base}/android/maven2/") }
     repoHandler.maven { url = uri("${base}/maven2/") }
     repoHandler.maven { url = uri("${base}/gradle-plugins/") }
-    repoHandler.gradlePluginPortal()
     repoHandler.google()
     repoHandler.mavenCentral()
+    repoHandler.gradlePluginPortal()
 }
 settingsEvaluated { settings ->
     settings.pluginManagement { repositories { mirrorRepos(delegate) } }
@@ -294,7 +295,7 @@ EOF
     user_home="$(getent passwd "$invoke_user" | cut -d: -f6 || true)"
     write_gradle_init_file "$user_home"
   fi
-  export HESABIX_GRADLE_MIRROR="${HESABIX_GRADLE_MIRROR:-https://gradle.mirror.hesabix.ir}"
+  export HESABIX_GRADLE_MIRROR="${HESABIX_GRADLE_MIRROR:-https://maven.myket.ir}"
 }
 
 # curl به آینهٔ hesabix: اول TLS با -k؛ در صورت شکست (مثلاً hairpin DNS) همان URL با --resolve به 127.0.0.1

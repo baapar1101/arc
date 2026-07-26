@@ -16,33 +16,45 @@ class AuthPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final foreground = scheme.onPrimary;
+
     final child = loading
-        ? const SizedBox(
+        ? SizedBox(
             height: 22,
             width: 22,
-            child: CircularProgressIndicator(strokeWidth: 2.5),
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: foreground,
+            ),
           )
         : icon != null
             ? Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 20),
+                  Icon(icon, size: 20, color: foreground),
                   const SizedBox(width: 8),
-                  Text(label),
+                  Text(label, style: TextStyle(color: foreground)),
                 ],
               )
-            : Text(label);
+            : Text(label, style: TextStyle(color: foreground));
 
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: FilledButton(
-        onPressed: loading ? null : onPressed,
+        // Keep enabled styling while loading so label/spinner stay onPrimary.
+        onPressed: loading ? () {} : onPressed,
         style: FilledButton.styleFrom(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          backgroundColor: scheme.primary,
+          foregroundColor: foreground,
+          disabledBackgroundColor: scheme.primary,
+          disabledForegroundColor: foreground,
           textStyle: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: foreground,
               ),
         ),
         child: child,
