@@ -5783,11 +5783,11 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsCreditorsSubtitle => 'نمایش اشخاص با مانده بستانکار';
 
   @override
-  String get reportsPeopleTransactionsTitle => 'گزارش تراکنش‌های اشخاص';
+  String get reportsPeopleTransactionsTitle => 'معین اشخاص (خرید/فروش + دریافت/پرداخت)';
 
   @override
   String get reportsPeopleTransactionsSubtitle =>
-      'ریز دریافت‌ها و پرداخت‌ها به تفکیک شخص';
+      'ریز اقلام فاکتور همراه دریافت و پرداخت برای هر طرف‌حساب';
 
   @override
   String get reportsItemMovementsTitle => 'گردش کالا';
@@ -10251,7 +10251,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiToolGetBusinessDashboard => 'داشبورد کسب‌وکار';
 
   @override
-  String get aiToolGetPersonTransactions => 'گردش حساب شخص';
+  String get aiToolGetPersonTransactions => 'معین جامع حساب شخص';
 
   @override
   String get aiToolSearchProjects => 'جستجوی پروژه';
@@ -10562,7 +10562,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get personShareIncludeLedger => 'نمایش کارت حساب';
 
   @override
-  String get personShareIncludeLedgerSubtitle => 'فهرست تراکنش‌های حساب شخص';
+  String get personShareIncludeLedgerSubtitle =>
+      'فهرست تراکنش‌های حساب شخص همراه ریز اقلام فاکتور';
 
   @override
   String get personShareIncludeInvoices => 'نمایش لیست فاکتورها';

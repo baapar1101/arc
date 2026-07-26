@@ -188,7 +188,7 @@ TOOL_LABELS_FA: Dict[str, str] = {
     "list_fiscal_years": "لیست سال مالی",
     "get_current_fiscal_year": "سال مالی جاری",
     "get_business_dashboard": "داشبورد کسب‌وکار",
-    "get_person_transactions": "گردش حساب شخص",
+    "get_person_transactions": "معین جامع حساب شخص",
     "search_projects": "جستجوی پروژه",
     "get_project_summary": "خلاصه پروژه",
     "list_boms": "لیست BOM",

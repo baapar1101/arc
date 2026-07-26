@@ -237,7 +237,8 @@ def execute_ai_report(
             person_ids=_ids_arg(args, "person_ids"),
             document_type=args.get("document_type"),
             search=args.get("search"),
-            **kw,
+            detail_level=args.get("detail_level") or "comprehensive",
+            **{k: v for k, v in kw.items() if k != "detail_level"},
         )
 
     if rt == "bank_accounts_turnover":

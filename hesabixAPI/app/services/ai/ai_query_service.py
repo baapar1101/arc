@@ -266,6 +266,7 @@ def _entity_search(
             search=filters.get("search"),
             skip=q["skip"],
             take=q["take"],
+            detail_level=filters.get("detail_level") or "comprehensive",
         )
 
     raise ValueError(f"entity پیاده‌سازی نشده: {entity}")

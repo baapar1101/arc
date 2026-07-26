@@ -444,6 +444,10 @@ class PersonShareLinkOptions(BaseModel):
     include_invoices: bool = Field(
         default=True, description="آیا فهرست فاکتورها نمایش داده شود"
     )
+    include_invoice_lines: bool = Field(
+        default=True,
+        description="در کارت حساب، ریز اقلام خرید/فروش همراه دریافت/پرداخت نمایش داده شود",
+    )
     documents_limit: int = Field(
         default=50,
         ge=10,

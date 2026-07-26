@@ -23,7 +23,7 @@ REPORT_DEFINITIONS: Tuple[ReportDefinition, ...] = (
     ReportDefinition("debtors", "بدهکاران", "financial", ("reports.read", "persons.read")),
     ReportDefinition("creditors", "بستانکاران", "financial", ("reports.read", "persons.read")),
     ReportDefinition("cash_flow", "جریان نقدی (دریافت/پرداخت)", "financial", ("reports.read",)),
-    ReportDefinition("people_transactions", "گردش اشخاص", "financial", ("reports.read", "persons.read")),
+    ReportDefinition("people_transactions", "معین / گردش اشخاص (با ریز اقلام)", "financial", ("reports.read", "persons.read")),
     ReportDefinition("bank_accounts_turnover", "گردش حساب بانکی", "financial", ("reports.read", "bank_accounts.view")),
     ReportDefinition("cash_petty_turnover", "گردش صندوق/تنخواه", "financial", ("reports.read", "cash_registers.view")),
     # --- فروش و خرید ---

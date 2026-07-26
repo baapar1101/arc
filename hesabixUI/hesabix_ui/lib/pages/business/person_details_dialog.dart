@@ -94,6 +94,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   int? _selectedExpiryHours = 168;
   bool _includeLedger = true;
   bool _includeInvoices = true;
+  bool _includeInvoiceLines = true;
   int _documentsLimit = 50;
   int _activitiesRefreshKey = 0;
   final TextEditingController _maxViewsController = TextEditingController();
@@ -229,6 +230,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   void _applyShareLinkOptions(PersonShareLink link) {
     _includeLedger = link.options.includeLedger;
     _includeInvoices = link.options.includeInvoices;
+    _includeInvoiceLines = link.options.includeInvoiceLines;
     _documentsLimit = link.options.documentsLimit;
     _maxViewsController.text = link.maxViewCount?.toString() ?? '';
     final remaining = link.remainingHours;
@@ -285,6 +287,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       final options = PersonShareLinkOptionsModel(
         includeLedger: _includeLedger,
         includeInvoices: _includeInvoices,
+        includeInvoiceLines: _includeInvoiceLines,
         documentsLimit: _documentsLimit,
       );
       final link = await _personService.createPersonShareLink(
@@ -326,6 +329,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         _selectedExpiryHours = 168;
         _includeLedger = true;
         _includeInvoices = true;
+        _includeInvoiceLines = true;
         _documentsLimit = 50;
       });
       SnackBarHelper.show(context, message: AppLocalizations.of(context).personShareLinkRevoked);
@@ -453,7 +457,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
 
   Future<_FinancialSummaryResult> _fetchLedgerTotals(int personId, int? fiscalYearId) async {
     final api = ApiClient();
-    const pageSize = 100;
+    const pageSize = 200;
     int skip = 0;
     double totalDebit = 0;
     double totalCredit = 0;
@@ -461,22 +465,20 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       final payload = <String, dynamic>{
         'take': pageSize,
         'skip': skip,
-        'sort_desc': false,
-        'sort_by': 'document_date',
         'person_ids': [personId],
-        'match_mode': 'any',
-        'result_scope': 'lines_matching',
+        // برای جمع، سطح خلاصه کافی است و از دوبرابر شدن اقلام جلوگیری می‌کند
+        'detail_level': 'summary',
       };
       if (fiscalYearId != null) {
         payload['fiscal_year_id'] = fiscalYearId;
       }
       final response = await api.post<Map<String, dynamic>>(
-        '/api/v1/kardex/businesses/${widget.businessId}/lines',
+        '/api/v1/persons/businesses/${widget.businessId}/reports/people-transactions',
         data: payload,
       );
       final body = response.data;
       if (body is! Map<String, dynamic> || body['success'] != true) {
-        final message = body?['message']?.toString() ?? 'خطا در دریافت اطلاعات کاردکس';
+        final message = body?['message']?.toString() ?? 'خطا در دریافت اطلاعات کارت حساب';
         throw Exception(message);
       }
       final data = body['data'] as Map<String, dynamic>? ?? const {};
@@ -829,7 +831,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           child: Row(
             children: [
               Text(
-                'لیست اسناد مرتبط با شخص',
+                'معین جامع طرف‌حساب (ریز خرید/فروش + دریافت/پرداخت)',
                 style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(width: 12),
@@ -895,9 +897,16 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       );
     }
 
+    String formatNum(dynamic value) {
+      if (value == null) return '';
+      final n = value is num ? value.toDouble() : double.tryParse('$value');
+      if (n == null) return '';
+      return n == n.roundToDouble() ? n.toStringAsFixed(0) : n.toStringAsFixed(2);
+    }
+
     return DataTableConfig<Map<String, dynamic>>(
-      endpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines',
-      title: t.kardexDocuments,
+      endpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/people-transactions',
+      title: t.reportsPeopleTransactionsTitle,
       showActiveFilters: false,
       showClearFiltersButton: false,
       showColumnSearch: false,
@@ -906,7 +915,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       showBackButton: false,
       additionalParams: {
         'person_ids': [widget.person.id],
-        'result_scope': 'lines_matching',
+        'detail_level': 'comprehensive',
         if (_currentFiscalYearId != null) 'fiscal_year_id': _currentFiscalYearId,
       },
       columns: [
@@ -922,7 +931,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           formatter: (item) => (item as Map<String, dynamic>)['document_code']?.toString(),
         ),
         TextColumn(
-          'document_type',
+          'document_type_name',
           t.documentType,
           formatter: (item) {
             final map = item as Map<String, dynamic>;
@@ -930,14 +939,27 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           },
         ),
         TextColumn(
-          'check_number',
-          'شماره چک',
-          width: ColumnWidth.medium,
+          'product_name',
+          'کالا/خدمت',
+          width: ColumnWidth.large,
           formatter: (item) {
-            final map = item as Map<String, dynamic>;
-            final cn = map['check_number']?.toString();
-            return (cn != null && cn.isNotEmpty) ? cn : '-';
+            final m = item as Map<String, dynamic>;
+            final name = m['product_name']?.toString();
+            final code = m['product_code']?.toString();
+            if (name == null || name.isEmpty) return '';
+            if (code != null && code.isNotEmpty) return '$code — $name';
+            return name;
           },
+        ),
+        NumberColumn(
+          'quantity',
+          t.quantity,
+          formatter: (item) => formatNum((item as Map<String, dynamic>)['quantity']),
+        ),
+        NumberColumn(
+          'unit_price',
+          'فی',
+          formatter: (item) => formatNum((item as Map<String, dynamic>)['unit_price']),
         ),
         TextColumn(
           'description',
@@ -948,18 +970,18 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         NumberColumn(
           'debit',
           t.debit,
-          formatter: (item) => (item as Map<String, dynamic>)['debit']?.toString(),
+          formatter: (item) => formatNum((item as Map<String, dynamic>)['debit']),
         ),
         NumberColumn(
           'credit',
           t.credit,
-          formatter: (item) => (item as Map<String, dynamic>)['credit']?.toString(),
+          formatter: (item) => formatNum((item as Map<String, dynamic>)['credit']),
         ),
         CustomColumn(
-          'running_amount',
+          'running_balance',
           t.runningAmount,
           builder: (item, _) {
-            final value = (item as Map<String, dynamic>)['running_amount'];
+            final value = (item as Map<String, dynamic>)['running_balance'];
             final double amount = (value is num) ? value.toDouble() : double.tryParse('$value') ?? 0;
             final color = amount > 0
                 ? Colors.green[700]
@@ -987,7 +1009,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           ],
         ),
       ],
-      searchFields: const ['document_code', 'document_type', 'description'],
+      searchFields: const ['document_code', 'document_type_name', 'description', 'product_name'],
       defaultPageSize: 10,
     );
   }
@@ -1858,6 +1880,13 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
               subtitle: Text(t.personShareIncludeLedgerSubtitle),
               onChanged: (value) => setState(() => _includeLedger = value),
             ),
+            if (_includeLedger)
+              SwitchListTile.adaptive(
+                value: _includeInvoiceLines,
+                title: const Text('ریز اقلام خرید/فروش در کارت حساب'),
+                subtitle: const Text('نمایش کالا، تعداد و فی همراه دریافت و پرداخت'),
+                onChanged: (value) => setState(() => _includeInvoiceLines = value),
+              ),
             SwitchListTile.adaptive(
               value: _includeInvoices,
               title: Text(t.personShareIncludeInvoices),

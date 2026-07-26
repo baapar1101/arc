@@ -1885,7 +1885,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     return int.tryParse(v.toString().trim());
   }
 
-  /// شناسهٔ شخص طرف حساب برای لینک کاردکس و بارگذاری جزئیات.
+  /// شناسهٔ شخص طرف حساب برای لینک معین/کارت حساب و بارگذاری جزئیات.
   int? _resolvedCounterpartyPersonId(DocumentModel document) {
     final extra = document.extraInfo;
     if (extra != null) {
@@ -1933,7 +1933,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final ctx = navigatorKey.currentContext;
       if (ctx == null || !ctx.mounted) return;
-      ctx.go('/business/$bid/reports/kardex?person_ids=$id');
+      ctx.go('/business/$bid/reports/people-transactions?person_ids=$id');
     });
   }
 

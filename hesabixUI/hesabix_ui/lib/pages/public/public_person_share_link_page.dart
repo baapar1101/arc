@@ -408,16 +408,37 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
                   if (dateText.isNotEmpty) {
                     subtitleParts.add(dateText);
                   }
+                  final productName = item.productName?.trim();
+                  if (productName != null && productName.isNotEmpty) {
+                    final code = item.productCode?.trim();
+                    subtitleParts.add(
+                      (code != null && code.isNotEmpty) ? '$code — $productName' : productName,
+                    );
+                  }
+                  if (item.quantity != null) {
+                    subtitleParts.add('تعداد: ${formatter.format(item.quantity)}');
+                  }
+                  if (item.unitPrice != null) {
+                    subtitleParts.add('فی: ${formatter.format(item.unitPrice)}');
+                  }
                   final subtitleText = subtitleParts.join(' • ');
                   final desc = item.description?.trim();
+                  final titleText = (productName != null && productName.isNotEmpty)
+                      ? productName
+                      : (item.documentCode ?? '-');
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     isThreeLine: desc != null && desc.isNotEmpty,
                     leading: CircleAvatar(
                       backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                      child: Icon(Icons.receipt_long, color: theme.colorScheme.primary),
+                      child: Icon(
+                        (item.rowKind == 'invoice_item')
+                            ? Icons.inventory_2_outlined
+                            : Icons.receipt_long,
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
-                    title: Text(item.documentCode ?? '-', style: theme.textTheme.titleMedium),
+                    title: Text(titleText, style: theme.textTheme.titleMedium),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -425,6 +446,18 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
                           subtitleText.isEmpty ? '-' : subtitleText,
                           style: theme.textTheme.bodySmall,
                         ),
+                        if (item.documentCode != null &&
+                            productName != null &&
+                            productName.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              'سند: ${item.documentCode}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.outline,
+                              ),
+                            ),
+                          ),
                         if (desc != null && desc.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),

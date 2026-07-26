@@ -145,6 +145,12 @@ class PublicLedgerItem {
   final double? debit;
   final double? credit;
   final String? currencyCode;
+  final String? rowKind;
+  final String? productName;
+  final String? productCode;
+  final double? quantity;
+  final double? unitPrice;
+  final double? lineAmount;
 
   const PublicLedgerItem({
     required this.lineId,
@@ -157,6 +163,12 @@ class PublicLedgerItem {
     required this.debit,
     required this.credit,
     required this.currencyCode,
+    this.rowKind,
+    this.productName,
+    this.productCode,
+    this.quantity,
+    this.unitPrice,
+    this.lineAmount,
   });
 
   factory PublicLedgerItem.fromJson(Map<String, dynamic> json) {
@@ -171,6 +183,12 @@ class PublicLedgerItem {
       debit: _toDouble(json['debit']),
       credit: _toDouble(json['credit']),
       currencyCode: json['currency_code']?.toString(),
+      rowKind: json['row_kind']?.toString(),
+      productName: json['product_name']?.toString(),
+      productCode: json['product_code']?.toString(),
+      quantity: _toDouble(json['quantity']),
+      unitPrice: _toDouble(json['unit_price']),
+      lineAmount: _toDouble(json['line_amount']),
     );
   }
 

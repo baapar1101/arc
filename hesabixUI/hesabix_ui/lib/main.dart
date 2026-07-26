@@ -2856,9 +2856,16 @@ class _MyAppState extends State<MyApp> {
               path: 'reports/people-transactions',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
+                final personIdsRaw = state.uri.queryParameters['person_ids'] ??
+                    state.uri.queryParameters['person_id'];
+                int? initialPersonId;
+                if (personIdsRaw != null && personIdsRaw.trim().isNotEmpty) {
+                  initialPersonId = int.tryParse(personIdsRaw.split(',').first.trim());
+                }
                 return hesabixNoTransitionPage(state, PeopleTransactionsReportPage(
                     businessId: businessId,
                     calendarController: _calendarController!,
+                    initialPersonId: initialPersonId,
                   ),
                 );
               },

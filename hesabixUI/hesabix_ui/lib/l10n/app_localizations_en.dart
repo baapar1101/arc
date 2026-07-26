@@ -5818,11 +5818,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportsCreditorsSubtitle => 'People with credit balances';
 
   @override
-  String get reportsPeopleTransactionsTitle => 'People transactions';
+  String get reportsPeopleTransactionsTitle => 'Party subsidiary ledger';
 
   @override
   String get reportsPeopleTransactionsSubtitle =>
-      'Detailed receipts and payments by person';
+      'Invoice line items with receipts and payments per person';
 
   @override
   String get reportsItemMovementsTitle => 'Item movements';
@@ -10314,7 +10314,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiToolGetBusinessDashboard => 'Business dashboard';
 
   @override
-  String get aiToolGetPersonTransactions => 'Person transactions';
+  String get aiToolGetPersonTransactions => 'Comprehensive person ledger';
 
   @override
   String get aiToolSearchProjects => 'Search projects';
@@ -10625,7 +10625,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get personShareIncludeLedgerSubtitle =>
-      'List of person account transactions';
+      'Person account transactions including invoice line items';
 
   @override
   String get personShareIncludeInvoices => 'Show invoice list';

@@ -3487,9 +3487,22 @@ async def export_creditors_report_pdf(
     )
 
 
+def _people_tx_detail_level_from_body(body: Dict[str, Any]) -> str:
+    """خواندن detail_level از body؛ پیش‌فرض summary برای سازگاری عقب‌رو."""
+    from app.services.person_service import _normalize_people_tx_detail_level
+
+    raw = body.get("detail_level")
+    if raw is None and body.get("include_invoice_lines") is True:
+        raw = "comprehensive"
+    return _normalize_people_tx_detail_level(raw if isinstance(raw, str) else None)
+
+
 @router.post("/businesses/{business_id}/reports/people-transactions",
-    summary="گزارش تراکنش‌های اشخاص",
-    description="گزارش ریز دریافت‌ها و پرداخت‌ها به تفکیک شخص",
+    summary="گزارش تراکنش‌های اشخاص / معین طرف‌حساب",
+    description=(
+        "گردش حساب اشخاص شامل فاکتور خرید/فروش و دریافت/پرداخت. "
+        "با detail_level=comprehensive ریز اقلام فاکتور نیز نمایش داده می‌شود."
+    ),
 )
 @require_business_access("business_id")
 async def people_transactions_report_endpoint(
@@ -3549,6 +3562,7 @@ async def people_transactions_report_endpoint(
         document_type = None
     
     search = body.get('search')
+    detail_level = _people_tx_detail_level_from_body(body)
     
     # Pagination
     skip = body.get('skip', 0)
@@ -3578,6 +3592,7 @@ async def people_transactions_report_endpoint(
         search=search,
         skip=skip,
         take=take,
+        detail_level=detail_level,
     )
     
     items = result.get('items', [])
@@ -3663,6 +3678,7 @@ async def export_people_transactions_report_excel(
         document_type = None
 
     search = body.get('search')
+    detail_level = _people_tx_detail_level_from_body(body)
 
     max_export_records = 10000
     result = get_people_transactions_report(
@@ -3677,6 +3693,7 @@ async def export_people_transactions_report_excel(
         search=search,
         skip=0,
         take=max_export_records,
+        detail_level=detail_level,
     )
 
     items = result.get('items', [])
@@ -3825,12 +3842,17 @@ async def export_people_transactions_report_excel(
             ('document_code', 'کد سند' if is_fa else 'Document Code'),
             ('person_name', 'نام شخص' if is_fa else 'Person Name'),
             ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+            ('product_name', 'کالا/خدمت' if is_fa else 'Product/Service'),
+            ('quantity', 'تعداد' if is_fa else 'Quantity'),
+            ('unit_price', 'فی' if is_fa else 'Unit Price'),
             ('debit', 'بدهکار' if is_fa else 'Debit'),
             ('credit', 'بستانکار' if is_fa else 'Credit'),
             ('running_balance', 'تراز متحرک' if is_fa else 'Running Balance'),
             ('description', 'توضیحات' if is_fa else 'Description'),
         ]
         for key, label in default_columns:
+            if detail_level != 'comprehensive' and key in ('product_name', 'quantity', 'unit_price'):
+                continue
             if items and (key in items[0] or key == 'person_name'):
                 keys.append(key)
                 headers.append(label)
@@ -3878,7 +3900,7 @@ async def export_people_transactions_report_excel(
                     f"{item.get('first_name', '')} {item.get('last_name', '')}".strip()
                 )
 
-            if key in ['debit', 'credit', 'running_balance'] and value:
+            if key in ['debit', 'credit', 'running_balance', 'quantity', 'unit_price', 'line_amount'] and value:
                 try:
                     num_value = float(value) if not isinstance(value, (int, float)) else value
                     value = num_value
@@ -4027,6 +4049,7 @@ async def export_people_transactions_report_pdf(
         document_type = None
     
     search = body.get('search')
+    detail_level = _people_tx_detail_level_from_body(body)
     
     # برای export، همه رکوردها را بدون pagination می‌گیریم
     max_export_records = 10000
@@ -4042,6 +4065,7 @@ async def export_people_transactions_report_pdf(
         search=search,
         skip=0,
         take=max_export_records,
+        detail_level=detail_level,
     )
     
     items = result.get('items', [])
@@ -4191,12 +4215,17 @@ async def export_people_transactions_report_pdf(
             ('document_code', 'کد سند' if is_fa else 'Document Code'),
             ('person_name', 'نام شخص' if is_fa else 'Person Name'),
             ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+            ('product_name', 'کالا/خدمت' if is_fa else 'Product/Service'),
+            ('quantity', 'تعداد' if is_fa else 'Quantity'),
+            ('unit_price', 'فی' if is_fa else 'Unit Price'),
             ('debit', 'بدهکار' if is_fa else 'Debit'),
             ('credit', 'بستانکار' if is_fa else 'Credit'),
             ('running_balance', 'تراز متحرک' if is_fa else 'Running Balance'),
             ('description', 'توضیحات' if is_fa else 'Description'),
         ]
         for key, label in default_columns:
+            if detail_level != 'comprehensive' and key in ('product_name', 'quantity', 'unit_price'):
+                continue
             if items and (key in items[0] or key == 'person_name'):
                 keys.append(key)
                 headers.append(label)
@@ -4237,7 +4266,7 @@ async def export_people_transactions_report_pdf(
                 )
             
             # Format numbers
-            if key in ['debit', 'credit', 'running_balance'] and value:
+            if key in ['debit', 'credit', 'running_balance', 'quantity', 'unit_price', 'line_amount'] and value:
                 try:
                     num_value = float(value) if not isinstance(value, (int, float)) else value
                     # Format with thousand separators

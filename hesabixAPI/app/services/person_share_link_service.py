@@ -29,6 +29,7 @@ BASE62_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 DEFAULT_OPTIONS: Dict[str, Any] = {
     "include_ledger": True,
     "include_invoices": True,
+    "include_invoice_lines": True,
     "documents_limit": 50,
 }
 MIN_DOCUMENT_LIMIT = 10
@@ -110,6 +111,9 @@ def _normalize_options(raw: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     )
     options["include_invoices"] = _normalize_bool(
         options.get("include_invoices"), DEFAULT_OPTIONS["include_invoices"]
+    )
+    options["include_invoice_lines"] = _normalize_bool(
+        options.get("include_invoice_lines"), DEFAULT_OPTIONS["include_invoice_lines"]
     )
     return options
 
@@ -389,42 +393,52 @@ def _fetch_ledger_items(
     business_id: int,
     person_id: int,
     limit: int,
+    *,
+    include_invoice_lines: bool = True,
 ) -> list[Dict[str, Any]]:
-    rows = (
-        db.query(DocumentLine, Document, Currency)
-        .join(Document, Document.id == DocumentLine.document_id)
-        .join(Currency, Currency.id == Document.currency_id)
-        .filter(
-            Document.business_id == business_id,
-            DocumentLine.person_id == person_id,
-            Document.is_proforma == False,  # noqa: E712
-        )
-        .order_by(
-            Document.document_date.desc(),
-            Document.id.desc(),
-            DocumentLine.id.desc(),
-        )
-        .limit(limit)
-        .all()
+    from app.services.person_service import get_people_transactions_report
+
+    # همه ردیف‌های مرتبط را می‌گیریم، سپس آخرین‌ها را برای نمایش عمومی نگه می‌داریم
+    result = get_people_transactions_report(
+        db=db,
+        business_id=business_id,
+        person_ids=[person_id],
+        skip=0,
+        take=10000,
+        detail_level="comprehensive" if include_invoice_lines else "summary",
     )
-    items: list[Dict[str, Any]] = []
-    for line, doc, cur in rows:
-        items.append(
+    items = list(result.get("items") or [])
+    if limit > 0 and len(items) > limit:
+        items = items[-limit:]
+    items.reverse()  # جدیدترین اول
+
+    out: list[Dict[str, Any]] = []
+    for item in items:
+        out.append(
             {
-                "line_id": line.id,
-                "document_id": doc.id,
-                "document_code": doc.code,
-                "document_type": doc.document_type,
-                "document_type_name": _document_type_label(doc.document_type),
-                "document_date": doc.document_date.isoformat(),
-                "description": line.description,
-                "debit": float(line.debit or 0),
-                "credit": float(line.credit or 0),
-                "currency_code": getattr(cur, "code", None),
-                "extra_info": line.extra_info or {},
+                "line_id": item.get("line_id"),
+                "document_id": item.get("document_id"),
+                "document_code": item.get("document_code"),
+                "document_type": item.get("document_type"),
+                "document_type_name": item.get("document_type_name")
+                or _document_type_label(item.get("document_type")),
+                "document_date": item.get("document_date"),
+                "description": item.get("description"),
+                "debit": float(item.get("debit") or 0),
+                "credit": float(item.get("credit") or 0),
+                "running_balance": item.get("running_balance"),
+                "row_kind": item.get("row_kind") or "document",
+                "product_id": item.get("product_id"),
+                "product_code": item.get("product_code"),
+                "product_name": item.get("product_name"),
+                "quantity": item.get("quantity"),
+                "unit_price": item.get("unit_price"),
+                "line_amount": item.get("line_amount"),
+                "currency_code": item.get("currency_code"),
+                "extra_info": {},
             }
         )
-    return items
+    return out
 
 
 def _fetch_invoice_items(
@@ -513,6 +527,7 @@ def build_public_payload(
             link.business_id,
             link.person_id,
             options["documents_limit"],
+            include_invoice_lines=bool(options.get("include_invoice_lines", True)),
         )
         if options["include_ledger"]
         else []

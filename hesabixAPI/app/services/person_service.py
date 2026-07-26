@@ -2052,6 +2052,238 @@ def get_creditors_report(
     }
 
 
+# انواع فاکتوری که در حالت «جامع» به ریز اقلام کالا/خدمت گسترش می‌یابند
+_PEOPLE_TX_INVOICE_EXPAND_TYPES = frozenset({
+    "invoice_sales",
+    "invoice_sales_return",
+    "invoice_purchase",
+    "invoice_purchase_return",
+})
+
+
+def _people_tx_document_type_name(doc_type: str | None) -> str:
+    """تبدیل document_type به نام فارسی"""
+    if not doc_type:
+        return ""
+    doc_type = doc_type.strip()
+    mapping = {
+        "invoice_sales": "فروش",
+        "invoice_sales_return": "برگشت از فروش",
+        "invoice_purchase": "خرید",
+        "invoice_purchase_return": "برگشت از خرید",
+        "invoice_direct_consumption": "مصرف مستقیم",
+        "invoice_production": "تولید",
+        "invoice_waste": "ضایعات",
+        "inventory_transfer": "انتقال موجودی",
+        "production": "تولید",
+        "opening_balance": "موجودی اولیه",
+        "expense": "هزینه",
+        "income": "درآمد",
+        "receipt": "دریافت",
+        "payment": "پرداخت",
+        "transfer": "انتقال",
+        "manual": "سند دستی",
+        "invoice": "فاکتور",
+        "check": "چک",
+    }
+    return mapping.get(doc_type, doc_type)
+
+
+def _invoice_item_line_amount(quantity: Any, extra_info: Optional[Dict[str, Any]]) -> float:
+    """مبلغ ردیف اقلام فاکتور (با احتساب تخفیف و مالیات خط)."""
+    info = extra_info or {}
+    qty = Decimal(str(quantity or 0))
+    if info.get("line_total") is not None:
+        try:
+            return float(Decimal(str(info.get("line_total") or 0)))
+        except Exception:
+            pass
+    unit_price = Decimal(str(info.get("unit_price", 0) or 0))
+    line_discount = Decimal(str(info.get("line_discount", 0) or 0))
+    tax_amount = Decimal(str(info.get("tax_amount", 0) or 0))
+    return float((qty * unit_price) - line_discount + tax_amount)
+
+
+def _normalize_people_tx_detail_level(detail_level: Optional[str]) -> str:
+    value = (detail_level or "summary").strip().lower()
+    if value in ("comprehensive", "detailed", "items", "invoice_lines"):
+        return "comprehensive"
+    return "summary"
+
+
+def _expand_people_tx_with_invoice_items(
+    db: Session,
+    business_id: int,
+    base_items: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    گسترش ردیف‌های فاکتور خرید/فروش به ریز اقلام کالا.
+    دریافت/پرداخت و سایر اسناد بدون تغییر می‌مانند.
+    هر فاکتور فقط یک‌بار (روی خط اصلی شخص، نه سود اقساط) گسترش می‌یابد تا مبلغ تراز حفظ شود.
+    """
+    from collections import defaultdict
+
+    from adapters.db.models.invoice_item_line import InvoiceItemLine
+    from adapters.db.models.product import Product
+
+    invoice_doc_ids = sorted({
+        int(item["document_id"])
+        for item in base_items
+        if item.get("document_type") in _PEOPLE_TX_INVOICE_EXPAND_TYPES
+        and item.get("document_id") is not None
+    })
+    if not invoice_doc_ids:
+        return base_items
+
+    inv_lines = (
+        db.query(InvoiceItemLine)
+        .filter(InvoiceItemLine.document_id.in_(invoice_doc_ids))
+        .order_by(InvoiceItemLine.document_id.asc(), InvoiceItemLine.id.asc())
+        .all()
+    )
+    lines_by_doc: Dict[int, List[Any]] = defaultdict(list)
+    product_ids: set[int] = set()
+    for inv_line in inv_lines:
+        lines_by_doc[int(inv_line.document_id)].append(inv_line)
+        if inv_line.product_id is not None:
+            product_ids.add(int(inv_line.product_id))
+
+    products_by_id: Dict[int, Any] = {}
+    if product_ids:
+        for product in (
+            db.query(Product)
+            .filter(
+                Product.business_id == business_id,
+                Product.id.in_(list(product_ids)),
+            )
+            .all()
+        ):
+            products_by_id[int(product.id)] = product
+
+    expanded: List[Dict[str, Any]] = []
+    expanded_docs: set[int] = set()
+
+    for item in base_items:
+        doc_id = item.get("document_id")
+        doc_type = item.get("document_type")
+        line_extra = item.get("line_extra_info") or {}
+        is_installment_person_line = bool(
+            isinstance(line_extra, dict) and line_extra.get("installment")
+        )
+
+        can_expand = (
+            doc_type in _PEOPLE_TX_INVOICE_EXPAND_TYPES
+            and doc_id is not None
+            and int(doc_id) not in expanded_docs
+            and not is_installment_person_line
+            and int(doc_id) in lines_by_doc
+            and len(lines_by_doc[int(doc_id)]) > 0
+        )
+        if not can_expand:
+            row = dict(item)
+            row.setdefault("row_kind", "document")
+            expanded.append(row)
+            continue
+
+        doc_id_int = int(doc_id)
+        expanded_docs.add(doc_id_int)
+        person_debit = float(item.get("debit") or 0)
+        person_credit = float(item.get("credit") or 0)
+        use_debit_side = person_debit >= person_credit
+        person_amount = person_debit if use_debit_side else person_credit
+
+        item_amounts: List[float] = []
+        for inv_line in lines_by_doc[doc_id_int]:
+            item_amounts.append(
+                _invoice_item_line_amount(inv_line.quantity, inv_line.extra_info)
+            )
+        items_sum = float(sum(Decimal(str(a)) for a in item_amounts))
+
+        for inv_line, amount in zip(lines_by_doc[doc_id_int], item_amounts):
+            info = inv_line.extra_info or {}
+            product = products_by_id.get(int(inv_line.product_id)) if inv_line.product_id else None
+            product_name = product.name if product is not None else None
+            product_code = product.code if product is not None else None
+            qty = float(inv_line.quantity or 0) if inv_line.quantity is not None else None
+            unit_price = None
+            try:
+                if info.get("unit_price") is not None:
+                    unit_price = float(Decimal(str(info.get("unit_price") or 0)))
+            except Exception:
+                unit_price = None
+            line_discount = None
+            try:
+                if info.get("line_discount") is not None:
+                    line_discount = float(Decimal(str(info.get("line_discount") or 0)))
+            except Exception:
+                line_discount = None
+            tax_amount = None
+            try:
+                if info.get("tax_amount") is not None:
+                    tax_amount = float(Decimal(str(info.get("tax_amount") or 0)))
+            except Exception:
+                tax_amount = None
+
+            desc_parts = []
+            if product_name:
+                desc_parts.append(product_name)
+            if inv_line.description:
+                desc_parts.append(str(inv_line.description))
+            description = " — ".join(desc_parts) if desc_parts else (item.get("description") or "")
+
+            debit = float(amount) if use_debit_side else 0.0
+            credit = 0.0 if use_debit_side else float(amount)
+            row = dict(item)
+            row.update({
+                "row_kind": "invoice_item",
+                "line_id": item.get("line_id"),
+                "parent_line_id": item.get("line_id"),
+                "invoice_item_line_id": inv_line.id,
+                "product_id": int(inv_line.product_id) if inv_line.product_id is not None else None,
+                "product_code": product_code,
+                "product_name": product_name,
+                "quantity": qty,
+                "unit_price": unit_price,
+                "line_discount": line_discount,
+                "tax_amount": tax_amount,
+                "line_amount": float(amount),
+                "debit": debit,
+                "credit": credit,
+                "description": description,
+            })
+            expanded.append(row)
+
+        remainder = float(Decimal(str(person_amount)) - Decimal(str(items_sum)))
+        if abs(remainder) >= 0.01:
+            if use_debit_side:
+                debit = remainder if remainder > 0 else 0.0
+                credit = (-remainder) if remainder < 0 else 0.0
+            else:
+                credit = remainder if remainder > 0 else 0.0
+                debit = (-remainder) if remainder < 0 else 0.0
+            row = dict(item)
+            row.update({
+                "row_kind": "invoice_remainder",
+                "line_id": item.get("line_id"),
+                "parent_line_id": item.get("line_id"),
+                "invoice_item_line_id": None,
+                "product_id": None,
+                "product_code": None,
+                "product_name": None,
+                "quantity": None,
+                "unit_price": None,
+                "line_discount": None,
+                "tax_amount": None,
+                "line_amount": remainder,
+                "debit": debit,
+                "credit": credit,
+                "description": "سایر / مالیات و تعدیلات فاکتور",
+            })
+            expanded.append(row)
+
+    return expanded
+
+
 def get_people_transactions_report(
     db: Session,
     business_id: int,
@@ -2064,32 +2296,19 @@ def get_people_transactions_report(
     search: Optional[str] = None,
     skip: int = 0,
     take: int = 50,
+    detail_level: Optional[str] = "summary",
 ) -> Dict[str, Any]:
     """
-    گزارش تراکنش‌های اشخاص
-    
-    Args:
-        db: نشست پایگاه داده
-        business_id: شناسه کسب‌وکار
-        fiscal_year_id: شناسه سال مالی (اختیاری)
-        currency_id: شناسه ارز (اختیاری)
-        date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
-        date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
-        person_ids: لیست شناسه‌های اشخاص برای فیلتر (اختیاری)
-        document_type: نوع سند (receipt, payment) یا None برای همه
-        search: جستجو در کد سند یا نام شخص (اختیاری)
-        skip: تعداد رکوردهای رد شده برای pagination
-        take: تعداد رکوردهای برگشتی
-    
-    Returns:
-        dict: {
-            'items': لیست تراکنش‌ها,
-            'summary': خلاصه آمار,
-            'pagination': اطلاعات pagination
-        }
+    گزارش تراکنش‌های اشخاص / معین طرف‌حساب
+
+    detail_level:
+      - summary: یک ردیف به‌ازای هر خط حسابداری شخص (مبلغ کل فاکتور)
+      - comprehensive: ریز اقلام خرید/فروش + دریافت/پرداخت در یک گردش واحد
     """
     from datetime import datetime
-    
+
+    detail_level_norm = _normalize_people_tx_detail_level(detail_level)
+
     # Query پایه: DocumentLine join Document و Person
     query = db.query(
         DocumentLine,
@@ -2104,15 +2323,15 @@ def get_people_transactions_report(
         Document.is_proforma == False,  # فقط اسناد قطعی
         DocumentLine.person_id.isnot(None)  # فقط خطوط با person_id
     )
-    
+
     # فیلتر سال مالی
     if fiscal_year_id:
         query = query.filter(Document.fiscal_year_id == fiscal_year_id)
-    
+
     # فیلتر ارز
     if currency_id:
         query = query.filter(Document.currency_id == currency_id)
-    
+
     # فیلتر تاریخ
     if date_from:
         try:
@@ -2120,22 +2339,22 @@ def get_people_transactions_report(
             query = query.filter(Document.document_date >= date_from_obj)
         except ValueError:
             pass
-    
+
     if date_to:
         try:
             date_to_obj = datetime.strptime(date_to, '%Y-%m-%d').date()
             query = query.filter(Document.document_date <= date_to_obj)
         except ValueError:
             pass
-    
+
     # فیلتر اشخاص
     if person_ids:
         query = query.filter(DocumentLine.person_id.in_(person_ids))
-    
+
     # فیلتر نوع سند - پشتیبانی از همه انواع اسناد
     if document_type:
         query = query.filter(Document.document_type == document_type)
-    
+
     # فیلتر جستجو
     if search and search.strip():
         search_filter = or_(
@@ -2146,17 +2365,16 @@ def get_people_transactions_report(
             Person.last_name.ilike(f'%{search}%'),
         )
         query = query.filter(search_filter)
-    
+
     # مرتب‌سازی: تاریخ سند، کد سند، شناسه خط
     query = query.order_by(
         Document.document_date.asc(),
         Document.id.asc(),
         DocumentLine.id.asc()
     )
-    
-    # دریافت همه نتایج برای محاسبه running balance
+
     all_results = query.all()
-    
+
     if not all_results:
         return {
             'items': [],
@@ -2164,6 +2382,7 @@ def get_people_transactions_report(
                 'total_count': 0,
                 'total_debit': 0.0,
                 'total_credit': 0.0,
+                'detail_level': detail_level_norm,
             },
             'pagination': {
                 'total': 0,
@@ -2174,18 +2393,12 @@ def get_people_transactions_report(
                 'has_prev': False,
             }
         }
-    
-    # محاسبه running balance و ساخت لیست آیتم‌ها
-    items = []
-    running_balance = 0.0
-    
+
+    base_items: List[Dict[str, Any]] = []
     for line, doc, person in all_results:
         debit = float(line.debit or 0)
         credit = float(line.credit or 0)
-        balance_change = credit - debit
-        running_balance += balance_change
-        
-        # نام شخص
+
         person_name = None
         if person:
             person_name = (
@@ -2193,39 +2406,12 @@ def get_people_transactions_report(
                 person.company_name or
                 f"{person.first_name or ''} {person.last_name or ''}".strip()
             )
-        
-        # نوع سند (نام فارسی) - استفاده از mapping کامل
-        def _get_document_type_name(doc_type: str | None) -> str:
-            """تبدیل document_type به نام فارسی"""
-            if not doc_type:
-                return ""
-            doc_type = doc_type.strip()
-            mapping = {
-                "invoice_sales": "فروش",
-                "invoice_sales_return": "برگشت از فروش",
-                "invoice_purchase": "خرید",
-                "invoice_purchase_return": "برگشت از خرید",
-                "invoice_direct_consumption": "مصرف مستقیم",
-                "invoice_production": "تولید",
-                "invoice_waste": "ضایعات",
-                "inventory_transfer": "انتقال موجودی",
-                "production": "تولید",
-                "opening_balance": "موجودی اولیه",
-                "expense": "هزینه",
-                "income": "درآمد",
-                "receipt": "دریافت",
-                "payment": "پرداخت",
-                "transfer": "انتقال",
-                "manual": "سند دستی",
-                "invoice": "فاکتور",
-                "check": "چک",
-            }
-            return mapping.get(doc_type, doc_type)
-        
-        document_type_name = _get_document_type_name(doc.document_type)
-        
+
+        document_type_name = _people_tx_document_type_name(doc.document_type)
+
         item_dict = _person_to_dict(person) if person else {}
         item_dict.update({
+            'row_kind': 'document',
             'line_id': line.id,
             'document_id': doc.id,
             'document_code': doc.code,
@@ -2236,30 +2422,54 @@ def get_people_transactions_report(
             'person_name': person_name,
             'debit': debit,
             'credit': credit,
-            'balance_change': balance_change,
-            'running_balance': running_balance,
             'description': line.description,
+            'line_extra_info': line.extra_info or {},
+            'product_id': None,
+            'product_code': None,
+            'product_name': None,
+            'quantity': None,
+            'unit_price': None,
+            'line_discount': None,
+            'tax_amount': None,
+            'line_amount': None,
+            'invoice_item_line_id': None,
+            'parent_line_id': None,
         })
-        items.append(item_dict)
-    
-    # محاسبه خلاصه
+        base_items.append(item_dict)
+
+    if detail_level_norm == "comprehensive":
+        items = _expand_people_tx_with_invoice_items(db, business_id, base_items)
+    else:
+        items = base_items
+
+    running_balance = 0.0
+    for item in items:
+        debit = float(item.get('debit') or 0)
+        credit = float(item.get('credit') or 0)
+        balance_change = credit - debit
+        running_balance += balance_change
+        item['balance_change'] = balance_change
+        item['running_balance'] = running_balance
+        # فیلد داخلی؛ برای کلاینت لازم نیست
+        item.pop('line_extra_info', None)
+
     total_count = len(items)
-    total_debit = sum(item['debit'] for item in items)
-    total_credit = sum(item['credit'] for item in items)
-    
-    # اعمال pagination
+    total_debit = sum(float(item.get('debit') or 0) for item in items)
+    total_credit = sum(float(item.get('credit') or 0) for item in items)
+
     total = len(items)
     paginated_items = items[skip:skip + take]
-    
+
     total_pages = (total + take - 1) // take if take > 0 else 0
     current_page = (skip // take) + 1 if take > 0 else 1
-    
+
     return {
         'items': paginated_items,
         'summary': {
             'total_count': total_count,
             'total_debit': total_debit,
             'total_credit': total_credit,
+            'detail_level': detail_level_norm,
         },
         'pagination': {
             'total': total,
