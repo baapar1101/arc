@@ -124,6 +124,7 @@ adapters/api/v1/admin/system_settings.py
 adapters/api/v1/admin/users_permissions.py
 adapters/api/v1/admin/wallet_admin.py
 adapters/api/v1/admin/zohal.py
+adapters/api/v1/ai/business_provider.py
 adapters/api/v1/ai/chat.py
 adapters/api/v1/ai/crm_ai.py
 adapters/api/v1/ai/mcp.py
@@ -224,6 +225,7 @@ adapters/db/models/auth_security_event.py
 adapters/db/models/bale.py
 adapters/db/models/bank_account.py
 adapters/db/models/business.py
+adapters/db/models/business_ai_provider_config.py
 adapters/db/models/business_backup_import_log.py
 adapters/db/models/business_catalog_spec_field.py
 adapters/db/models/business_crm_settings.py
@@ -340,6 +342,7 @@ adapters/db/repositories/ai_usage_log_repository.py
 adapters/db/repositories/api_key_repo.py
 adapters/db/repositories/bale_repo.py
 adapters/db/repositories/base_repo.py
+adapters/db/repositories/business_ai_provider_config_repository.py
 adapters/db/repositories/business_notification_repo.py
 adapters/db/repositories/business_permission_repo.py
 adapters/db/repositories/business_repo.py
@@ -766,6 +769,7 @@ app/services/ai/ai_workflow_catalog_service.py
 app/services/ai/ai_workflow_prompt.py
 app/services/ai/ai_workflow_service.py
 app/services/ai/ai_write_guard.py
+app/services/ai/business_ai_provider_service.py
 app/services/ai/chat_message_builder.py
 app/services/ai/encryption.py
 app/services/ai/function_registry.py
@@ -1068,6 +1072,7 @@ migrations/versions/20260724_000003_announcement_navigation.py
 migrations/versions/20260724_000004_telegram_link_tokens_timestamps.py
 migrations/versions/20260725_000001_document_lines_fx_base_amounts.py
 migrations/versions/20260725_000002_product_fx_prices.py
+migrations/versions/20260726_000001_business_ai_provider_configs.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1125,6 +1130,7 @@ tests/test_basalam_dlq.py
 tests/test_basalam_observability.py
 tests/test_basalam_openapi_contract.py
 tests/test_basalam_workflow_license_gate.py
+tests/test_business_ai_provider_byok.py
 tests/test_business_backup_financial_policy.py
 tests/test_business_backup_orphan_cleanup.py
 tests/test_business_backup_schema_compat.py

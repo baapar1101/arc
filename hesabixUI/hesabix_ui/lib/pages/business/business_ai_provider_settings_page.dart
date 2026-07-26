@@ -5,7 +5,7 @@ import 'package:hesabix_ui/core/business_route_paths.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
-import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 /// تنظیمات ارائه‌دهنده AI اختصاصی (پلن BYOK) برای کسب‌وکار.
 class BusinessAIProviderSettingsPage extends StatefulWidget {
@@ -200,7 +200,7 @@ class _BusinessAIProviderSettingsPageState
     return Scaffold(
       appBar: AppBar(
         title: const Text('ارائه‌دهنده هوش مصنوعی'),
-        leading: BusinessSubpageBackLeading(businessId: widget.businessId),
+        leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
           if (_hasByok)
             IconButton(
