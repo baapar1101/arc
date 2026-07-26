@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/business_route_paths.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
+import 'package:hesabix_ui/services/wallet_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
@@ -27,6 +28,7 @@ class AISubscriptionPage extends StatefulWidget {
 
 class _AISubscriptionPageState extends State<AISubscriptionPage> {
   late final AIService _aiService;
+  late final WalletService _walletService;
   bool _loading = true;
   String? _loadError;
   UserAISubscription? _currentSubscription;
@@ -35,13 +37,25 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
   bool _isRefreshing = false;
   bool _actionInProgress = false;
   String _billingPeriod = 'monthly';
+  String _walletCurrencyLabel = '';
 
   @override
   void initState() {
     super.initState();
     final api = ApiClient();
     _aiService = AIService(api);
+    _walletService = WalletService(api);
     _load();
+  }
+
+  String _currencyLabelFromWallet(Map<String, dynamic> wallet) {
+    final title = wallet['base_currency_title']?.toString().trim();
+    final symbol = wallet['base_currency_symbol']?.toString().trim();
+    final code = wallet['base_currency_code']?.toString().trim();
+    if (title != null && title.isNotEmpty) return title;
+    if (symbol != null && symbol.isNotEmpty) return symbol;
+    if (code != null && code.isNotEmpty) return code;
+    return '';
   }
 
   Future<void> _load() async {
@@ -54,6 +68,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
     UserAISubscription? subscription;
     List<AIPlan> plans = [];
     Map<String, dynamic> usageStats = {};
+    String currencyLabel = _walletCurrencyLabel;
     String? loadError;
 
     try {
@@ -82,6 +97,16 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       }
     }
 
+    final businessId = widget.businessId;
+    if (businessId != null) {
+      try {
+        final wallet = await _walletService.getOverview(businessId: businessId);
+        currencyLabel = _currencyLabelFromWallet(wallet);
+      } catch (_) {
+        // برچسب قبلی حفظ می‌شود؛ مبلغ همان ارز پایه کیف پول است
+      }
+    }
+
     usageStats = await _loadUsageStatsSafe(
       periodStart: subscription?.periodStart,
     );
@@ -91,6 +116,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       _currentSubscription = subscription;
       _availablePlans = plans;
       _usageStats = usageStats;
+      _walletCurrencyLabel = currencyLabel;
       _loading = false;
       _isRefreshing = false;
       _loadError = loadError;
@@ -422,6 +448,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
                       plans: _availablePlans,
                       currentSubscription: _currentSubscription,
                       billingPeriod: _billingPeriod,
+                      currencyLabel: _walletCurrencyLabel,
                       actionInProgress: _actionInProgress,
                       onSelect: _subscribeToPlan,
                       onUpgrade: _upgradeSubscription,
@@ -766,6 +793,7 @@ class _PlanGrid extends StatelessWidget {
   final List<AIPlan> plans;
   final UserAISubscription? currentSubscription;
   final String billingPeriod;
+  final String currencyLabel;
   final bool actionInProgress;
   final void Function(AIPlan plan) onSelect;
   final void Function(AIPlan plan) onUpgrade;
@@ -774,6 +802,7 @@ class _PlanGrid extends StatelessWidget {
     required this.plans,
     required this.currentSubscription,
     required this.billingPeriod,
+    required this.currencyLabel,
     required this.actionInProgress,
     required this.onSelect,
     required this.onUpgrade,
@@ -810,6 +839,7 @@ class _PlanGrid extends StatelessWidget {
                 isCurrent: isCurrentPlan,
                 canUpgrade: canUpgrade,
                 billingPeriod: billingPeriod,
+                currencyLabel: currencyLabel,
                 actionInProgress: actionInProgress,
                 onSelect: () => onSelect(plan),
                 onUpgrade: () => onUpgrade(plan),
@@ -827,6 +857,7 @@ class _PlanCard extends StatelessWidget {
   final bool isCurrent;
   final bool canUpgrade;
   final String billingPeriod;
+  final String currencyLabel;
   final bool actionInProgress;
   final VoidCallback onSelect;
   final VoidCallback onUpgrade;
@@ -836,6 +867,7 @@ class _PlanCard extends StatelessWidget {
     required this.isCurrent,
     required this.canUpgrade,
     required this.billingPeriod,
+    required this.currencyLabel,
     required this.actionInProgress,
     required this.onSelect,
     required this.onUpgrade,
@@ -844,7 +876,7 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final priceText = _planPriceText(plan, billingPeriod);
+    final priceText = _planPriceText(plan, billingPeriod, currencyLabel);
     return Card(
       elevation: isCurrent ? 6 : 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -976,7 +1008,8 @@ class _PlanCard extends StatelessWidget {
     );
   }
 
-  String? _planPriceText(AIPlan plan, String billingPeriod) {
+  String? _planPriceText(AIPlan plan, String billingPeriod, String currencyLabel) {
+    final currency = currencyLabel.trim().isEmpty ? '' : ' ${currencyLabel.trim()}';
     final pc = plan.pricingConfig;
     if (pc.isEmpty) return null;
     if (plan.planType == AIPlanType.free) {
@@ -994,8 +1027,8 @@ class _PlanCard extends StatelessWidget {
           if (n != null && n > 0) {
             parts.add(
               plan.planType == AIPlanType.byok
-                  ? '${formatWithThousands(n)} تومان کارمزد / ماه'
-                  : '${formatWithThousands(n)} تومان / ماه',
+                  ? '${formatWithThousands(n)}$currency کارمزد / ماه'
+                  : '${formatWithThousands(n)}$currency / ماه',
             );
           } else if (plan.planType == AIPlanType.byok) {
             parts.add('بدون کارمزد پلتفرم — هزینه مدل با شما');
@@ -1006,8 +1039,8 @@ class _PlanCard extends StatelessWidget {
           if (n != null && n > 0) {
             parts.add(
               plan.planType == AIPlanType.byok
-                  ? '${formatWithThousands(n)} تومان کارمزد / سال'
-                  : '${formatWithThousands(n)} تومان / سال',
+                  ? '${formatWithThousands(n)}$currency کارمزد / سال'
+                  : '${formatWithThousands(n)}$currency / سال',
             );
           } else if (plan.planType == AIPlanType.byok) {
             parts.add('بدون کارمزد پلتفرم — هزینه مدل با شما');
@@ -1036,7 +1069,7 @@ class _PlanCard extends StatelessWidget {
             chunks.add('خروجی: ${formatWithThousands(outN)}');
           }
           if (chunks.isNotEmpty) {
-            return 'هر ۱۰۰۰ توکن — ${chunks.join('، ')} تومان';
+            return 'هر ۱۰۰۰ توکن — ${chunks.join('، ')}$currency';
           }
         }
       }
