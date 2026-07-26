@@ -74,8 +74,54 @@ def list_reports(db: Session, business_id: int, *, status: Optional[str] = None)
 	return {"items": [_serialize_report(r, include_source=False) for r in rows], "total": len(rows)}
 
 
+def get_plan_status(db: Session, business_id: int) -> dict[str, Any]:
+	ent = resolve_hscript_entitlement(db, business_id)
+	data = ent.to_public_dict()
+	data["saved_reports_count"] = count_saved_reports(db, business_id)
+	from app.services.hscript_schedule_service import count_schedules
+
+	data["schedules_count"] = count_schedules(db, business_id)
+	return data
+
+
 def get_report(db: Session, business_id: int, report_id: int) -> dict[str, Any]:
-	return _serialize_report(_get_report(db, business_id, report_id))
+	row = _get_report(db, business_id, report_id)
+	data = _serialize_report(row)
+	from app.services.hscript.param_schema import infer_param_schema
+
+	data["param_schema"] = infer_param_schema(
+		source_code=row.source_code,
+		default_params=row.default_params or {},
+	)
+	return data
+
+
+def infer_report_param_schema(
+	*,
+	source_code: str | None = None,
+	default_params: dict[str, Any] | None = None,
+	params: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+	from app.services.hscript.param_schema import infer_param_schema
+
+	return infer_param_schema(
+		source_code=source_code,
+		default_params=default_params,
+		runtime_params=params,
+	)
+
+
+def get_catalog() -> dict[str, Any]:
+	from app.services.hscript.catalog import build_catalog
+
+	return build_catalog()
+
+
+def list_recipes() -> dict[str, Any]:
+	from app.services.hscript.catalog import list_recipes as _list
+
+	items = _list()
+	return {"items": items, "total": len(items)}
 
 
 def count_saved_reports(db: Session, business_id: int) -> int:
@@ -87,13 +133,6 @@ def count_saved_reports(db: Session, business_id: int) -> int:
 		)
 		.count()
 	)
-
-
-def get_plan_status(db: Session, business_id: int) -> dict[str, Any]:
-	ent = resolve_hscript_entitlement(db, business_id)
-	data = ent.to_public_dict()
-	data["saved_reports_count"] = count_saved_reports(db, business_id)
-	return data
 
 
 def create_report(
@@ -285,9 +324,142 @@ def list_versions(db: Session, business_id: int, report_id: int) -> dict[str, An
 			"changelog": v.changelog,
 			"created_by_user_id": v.created_by_user_id,
 			"created_at": v.created_at.isoformat() if v.created_at else None,
+			"source_preview": (v.source_code or "")[:240],
+			"source_lines": (v.source_code or "").count("\n") + (1 if v.source_code else 0),
 		}
 		for v in rows
 	]
+	return {"items": items, "total": len(items)}
+
+
+def get_version(db: Session, business_id: int, report_id: int, version_id: int) -> dict[str, Any]:
+	_get_report(db, business_id, report_id)
+	v = (
+		db.query(HScriptReportVersion)
+		.filter(
+			HScriptReportVersion.id == version_id,
+			HScriptReportVersion.report_id == report_id,
+			HScriptReportVersion.business_id == business_id,
+		)
+		.first()
+	)
+	if not v:
+		raise ApiError("HSCRIPT_VERSION_NOT_FOUND", "نسخه یافت نشد", http_status=404)
+	return {
+		"id": v.id,
+		"report_id": v.report_id,
+		"version_no": v.version_no,
+		"source_code": v.source_code,
+		"source_hash": v.source_hash,
+		"language_version": v.language_version,
+		"changelog": v.changelog,
+		"created_by_user_id": v.created_by_user_id,
+		"created_at": v.created_at.isoformat() if v.created_at else None,
+	}
+
+
+def restore_version(
+	db: Session,
+	business_id: int,
+	report_id: int,
+	version_id: int,
+	*,
+	user_id: int,
+	changelog: Optional[str] = None,
+) -> dict[str, Any]:
+	"""بازگردانی محتوای یک نسخهٔ قبلی به‌عنوان نسخهٔ جدید (immutable history حفظ می‌شود)."""
+	row = _get_report(db, business_id, report_id)
+	ver = (
+		db.query(HScriptReportVersion)
+		.filter(
+			HScriptReportVersion.id == version_id,
+			HScriptReportVersion.report_id == report_id,
+			HScriptReportVersion.business_id == business_id,
+		)
+		.first()
+	)
+	if not ver:
+		raise ApiError("HSCRIPT_VERSION_NOT_FOUND", "نسخه یافت نشد", http_status=404)
+
+	code = ver.source_code or ""
+	sh = source_hash(code)
+	last = (
+		db.query(HScriptReportVersion)
+		.filter(HScriptReportVersion.report_id == row.id, HScriptReportVersion.business_id == business_id)
+		.order_by(HScriptReportVersion.version_no.desc())
+		.first()
+	)
+	next_no = (last.version_no + 1) if last else 1
+	note = changelog or f"بازگردانی از نسخه {ver.version_no}"
+	new_ver = HScriptReportVersion(
+		report_id=row.id,
+		business_id=business_id,
+		version_no=next_no,
+		source_code=code,
+		source_hash=sh,
+		language_version=HSCRIPT_LANGUAGE_VERSION,
+		changelog=note,
+		created_by_user_id=user_id,
+		created_at=utc_now_aware(),
+	)
+	row.source_code = code
+	row.source_hash = sh
+	row.language_version = HSCRIPT_LANGUAGE_VERSION
+	row.updated_by_user_id = user_id
+	row.updated_at = utc_now_aware()
+	if row.status == "published":
+		row.status = "draft"
+		row.published_at = None
+	db.add(new_ver)
+	db.commit()
+	db.refresh(row)
+	data = _serialize_report(row)
+	data["restored_from_version_id"] = ver.id
+	data["restored_from_version_no"] = ver.version_no
+	data["new_version_no"] = next_no
+	return data
+
+
+def list_runs(
+	db: Session,
+	business_id: int,
+	report_id: int,
+	*,
+	limit: int = 30,
+) -> dict[str, Any]:
+	_get_report(db, business_id, report_id)
+	take = max(1, min(int(limit), 100))
+	rows = (
+		db.query(HScriptReportRun)
+		.filter(
+			HScriptReportRun.business_id == business_id,
+			HScriptReportRun.report_id == report_id,
+		)
+		.order_by(HScriptReportRun.id.desc())
+		.limit(take)
+		.all()
+	)
+	items = []
+	for r in rows:
+		err = r.error if isinstance(r.error, dict) else None
+		items.append(
+			{
+				"id": r.id,
+				"status": r.status,
+				"is_preview": r.is_preview,
+				"source_hash": r.source_hash,
+				"duration_ms": r.duration_ms,
+				"ran_by_user_id": r.ran_by_user_id,
+				"created_at": r.created_at.isoformat() if r.created_at else None,
+				"error_code": (err or {}).get("code"),
+				"error_message": (err or {}).get("message"),
+				"stats": {
+					"steps": (r.stats or {}).get("steps") if isinstance(r.stats, dict) else None,
+					"gateway_calls": (r.stats or {}).get("gateway_calls") if isinstance(r.stats, dict) else None,
+					"blocks": (r.stats or {}).get("blocks") if isinstance(r.stats, dict) else None,
+				},
+			}
+		)
 	return {"items": items, "total": len(items)}
 
 
@@ -477,7 +649,9 @@ def build_assist_context(query: str, *, source_code: Optional[str] = None, limit
 	guide = (
 		"تو دستیار گزارش‌نویسی HScript حسابیکس هستی. "
 		"فقط اسکریپت HScript امن تولید کن (بدون import/SQL/فایل/شبکه). "
-		"از ماژول‌های invoices/customers/products/payments و report.* استفاده کن. "
+		"از ماژول‌های invoices/customers/persons/products/payments/banks/warehouses/debtors/creditors "
+		"و جدول‌های HTable (where/join/pivot/distinct) و report.* استفاده کن. "
+		"در صورت نیاز پارامترها را با کامنت # @param تعریف کن. "
 		"اسکریپت نهایی را داخل بلوک ```hscript قرار بده."
 	)
 	return {
@@ -485,7 +659,7 @@ def build_assist_context(query: str, *, source_code: Optional[str] = None, limit
 		"query": query,
 		"docs": docs,
 		"current_source_excerpt": (source_code or "")[:4000] or None,
-		"language_version": "1.0.0",
+		"language_version": HSCRIPT_LANGUAGE_VERSION,
 	}
 
 

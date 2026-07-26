@@ -1240,6 +1240,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'view': '${t.view} ${t.reports}',
         'export': '${t.export} ${t.reports}',
       },
+      'hscript': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهده گزارش‌ساز اسکریپتی' : 'View script report builder',
+        'write': t.localeName.startsWith('fa') ? 'ویرایش و ساخت اسکریپت' : 'Edit & create scripts',
+        'publish': t.localeName.startsWith('fa') ? 'انتشار گزارش اسکریپتی' : 'Publish script reports',
+        'export': t.localeName.startsWith('fa') ? 'خروجی PDF/Excel اسکریپت' : 'Export script PDF/Excel',
+        'schedule': t.localeName.startsWith('fa') ? 'زمان‌بندی گزارش اسکریپتی' : 'Schedule script reports',
+      },
       'fiscal_years': {
         'view': '${t.view} ${t.fiscalYears}',
         'edit': t.permissionFiscalYearEditCurrent,
@@ -1825,7 +1832,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': t.reports,
         'icon': Icons.assessment,
-        'sections': ['reports'],
+        'sections': ['reports', 'hscript'],
       },
       {
         'title': t.workflowCategoryCrm,
@@ -2005,6 +2012,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.marketplace;
       case 'reports':
         return t.reports;
+      case 'hscript':
+        return t.localeName.startsWith('fa') ? 'گزارش‌ساز اسکریپتی' : 'Script report builder';
       case 'fiscal_years':
         return t.fiscalYears;
       case 'warranty':
@@ -2149,6 +2158,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.distributionPermissionReportsTeam;
       case 'reports':
         return sectionKey == 'crm' ? t.permissionCrmViewReports : t.reports;
+      case 'schedule':
+        return t.localeName.startsWith('fa') ? 'زمان‌بندی' : 'Schedule';
+      case 'publish':
+        return t.localeName.startsWith('fa') ? 'انتشار' : 'Publish';
       default:
         return action;
     }

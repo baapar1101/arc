@@ -17,6 +17,7 @@ PLUGIN_CODE = "hscript_custom_reports"
 _TIER_LIMITS: dict[str, dict[str, Any]] = {
 	"free": {
 		"max_saved_reports": 25,
+		"max_schedules": 2,
 		"runs_per_minute": 8,
 		"async_allowed": True,
 		"excel_allowed": True,
@@ -26,6 +27,7 @@ _TIER_LIMITS: dict[str, dict[str, Any]] = {
 	},
 	"trial": {
 		"max_saved_reports": 100,
+		"max_schedules": 10,
 		"runs_per_minute": 20,
 		"async_allowed": True,
 		"excel_allowed": True,
@@ -43,6 +45,7 @@ _TIER_LIMITS: dict[str, dict[str, Any]] = {
 	},
 	"monthly": {
 		"max_saved_reports": 200,
+		"max_schedules": 25,
 		"runs_per_minute": 30,
 		"async_allowed": True,
 		"excel_allowed": True,
@@ -67,6 +70,7 @@ _TIER_LIMITS: dict[str, dict[str, Any]] = {
 	},
 	"yearly": {
 		"max_saved_reports": 500,
+		"max_schedules": 50,
 		"runs_per_minute": 40,
 		"async_allowed": True,
 		"excel_allowed": True,
@@ -91,6 +95,7 @@ _TIER_LIMITS: dict[str, dict[str, Any]] = {
 	},
 	"lifetime": {
 		"max_saved_reports": 1_000,
+		"max_schedules": 100,
 		"runs_per_minute": 60,
 		"async_allowed": True,
 		"excel_allowed": True,
@@ -126,6 +131,7 @@ class HScriptPlanEntitlement:
 	plan_period: Optional[str]
 	is_trial: bool
 	max_saved_reports: int
+	max_schedules: int
 	runs_per_minute: int
 	async_allowed: bool
 	excel_allowed: bool
@@ -144,6 +150,7 @@ class HScriptPlanEntitlement:
 			"plan_period": self.plan_period,
 			"is_trial": self.is_trial,
 			"max_saved_reports": self.max_saved_reports,
+			"max_schedules": self.max_schedules,
 			"runs_per_minute": self.runs_per_minute,
 			"async_allowed": self.async_allowed,
 			"excel_allowed": self.excel_allowed,
@@ -197,6 +204,7 @@ def resolve_hscript_entitlement(db: Session, business_id: int) -> HScriptPlanEnt
 			plan_period=None,
 			is_trial=False,
 			max_saved_reports=int(cfg["max_saved_reports"]),
+			max_schedules=int(cfg["max_schedules"]),
 			runs_per_minute=int(cfg["runs_per_minute"]),
 			async_allowed=bool(cfg["async_allowed"]),
 			excel_allowed=bool(cfg["excel_allowed"]),
@@ -216,6 +224,7 @@ def resolve_hscript_entitlement(db: Session, business_id: int) -> HScriptPlanEnt
 		plan_period=period,
 		is_trial=is_trial,
 		max_saved_reports=int(cfg["max_saved_reports"]),
+		max_schedules=int(cfg["max_schedules"]),
 		runs_per_minute=int(cfg["runs_per_minute"]),
 		async_allowed=bool(cfg["async_allowed"]),
 		excel_allowed=bool(cfg["excel_allowed"]),

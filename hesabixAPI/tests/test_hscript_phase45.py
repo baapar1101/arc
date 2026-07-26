@@ -24,7 +24,7 @@ def test_assist_context_structure():
 	ctx = build_assist_context("فروش ماهانه با KPI", source_code="report.title(\"x\")")
 	assert "system_guide" in ctx
 	assert "docs" in ctx
-	assert ctx["language_version"] == "1.0.0"
+	assert ctx["language_version"] == "1.1.0"
 
 
 def test_sanitize_public_error():

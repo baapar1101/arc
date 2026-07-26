@@ -101,3 +101,49 @@ class HScriptReportRun(Base):
 	stats: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now_aware, nullable=False)
+
+
+class HScriptReportSchedule(Base):
+	"""زمان‌بندی اجرای خودکار گزارش منتشرشده و تحویل خروجی."""
+
+	__tablename__ = "hscript_report_schedules"
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+	)
+	report_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("hscript_reports.id", ondelete="CASCADE"), nullable=False, index=True
+	)
+	title: Mapped[str] = mapped_column(String(255), nullable=False, default="")
+	enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+	# simple | cron
+	schedule_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="simple")
+	# برای mode=simple: daily|weekly|every_hours
+	simple_repeat: Mapped[str | None] = mapped_column(String(32), nullable=True, default="daily")
+	simple_time: Mapped[str | None] = mapped_column(String(8), nullable=True, default="08:00")
+	simple_weekday: Mapped[int | None] = mapped_column(Integer, nullable=True, default=0)
+	simple_interval: Mapped[int | None] = mapped_column(Integer, nullable=True, default=1)
+	cron_expression: Mapped[str | None] = mapped_column(String(120), nullable=True)
+	timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Asia/Tehran")
+	# pdf | excel | none (فقط اعلان)
+	output_format: Mapped[str] = mapped_column(String(16), nullable=False, default="pdf")
+	# کانال‌ها: ["inapp","email"]
+	channels: Mapped[list | None] = mapped_column(JSON, nullable=True)
+	# لیست user_id گیرنده‌ها؛ خالی = سازنده زمان‌بندی
+	recipient_user_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+	params: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+	last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+	last_run_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+	last_run_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+	created_by_user_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+	)
+	updated_by_user_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+	)
+	created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now_aware, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(
+		DateTime(timezone=True), default=utc_now_aware, onupdate=utc_now_aware, nullable=False
+	)

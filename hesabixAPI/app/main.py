@@ -1296,6 +1296,11 @@ def create_app() -> FastAPI:
 
         asyncio.create_task(fx_auto_sync_loop(60))
 
+        # زمان‌بندی گزارش‌های HScript
+        from app.services.hscript_schedule_background_jobs import hscript_schedule_loop
+
+        asyncio.create_task(hscript_schedule_loop(60))
+
     @application.middleware("http")
     async def global_rate_limit_middleware(request: Request, call_next):
         import time

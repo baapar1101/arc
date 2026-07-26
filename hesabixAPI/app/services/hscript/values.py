@@ -106,14 +106,82 @@ class HTable:
 				raise TypeErrorHS("ردیف جدول باید dict باشد")
 		return cls(rows=out, _max_rows=max_rows)
 
+	@staticmethod
+	def _safe_cmp(op: str, a: Any, b: Any) -> bool:
+		try:
+			if op == "eq":
+				return a == b
+			if op == "ne":
+				return a != b
+			if a is None or b is None:
+				return False
+			if op == "gt":
+				return a > b
+			if op == "gte":
+				return a >= b
+			if op == "lt":
+				return a < b
+			if op == "lte":
+				return a <= b
+		except TypeError:
+			return False
+		return False
+
+	_WHERE_OPS = {
+		"eq": lambda a, b: HTable._safe_cmp("eq", a, b),
+		"ne": lambda a, b: HTable._safe_cmp("ne", a, b),
+		"gt": lambda a, b: HTable._safe_cmp("gt", a, b),
+		"gte": lambda a, b: HTable._safe_cmp("gte", a, b),
+		"lt": lambda a, b: HTable._safe_cmp("lt", a, b),
+		"lte": lambda a, b: HTable._safe_cmp("lte", a, b),
+		"contains": lambda a, b: b is not None and str(b).lower() in str(a or "").lower(),
+		"startswith": lambda a, b: b is not None and str(a or "").lower().startswith(str(b).lower()),
+		"in": lambda a, b: a in (b if isinstance(b, (list, tuple, set)) else [b]),
+		"isnull": lambda a, b: (a is None) if bool(b) else (a is not None),
+	}
+
 	def filter(self, **kwargs: Any) -> "HTable":
+		"""فیلتر تساوی ساده یا با پسوند اپراتور (field__gt=…)."""
+		if not kwargs:
+			return HTable(rows=list(self.rows), _max_rows=self._max_rows)
+
 		def match(row: dict[str, Any]) -> bool:
 			for k, v in kwargs.items():
-				if row.get(k) != v:
+				field, op = self._split_where_key(str(k))
+				fn = self._WHERE_OPS.get(op)
+				if fn is None:
+					raise TypeErrorHS(f"عملگر فیلتر نامعتبر: {op}")
+				if not fn(row.get(field), v):
 					return False
 			return True
 
 		return HTable(rows=[r for r in self.rows if match(r)], _max_rows=self._max_rows)
+
+	def where(self, field: Any = None, op: Any = "eq", value: Any = None, **kwargs: Any) -> "HTable":
+		"""
+		فیلتر امن:
+		  rows.where("amount", "gt", 1000)
+		  rows.where(amount__gt=1000, status="paid")
+		"""
+		merged: dict[str, Any] = dict(kwargs)
+		if field is not None:
+			op_s = str(op or "eq").lower().strip()
+			aliases = {"=": "eq", "==": "eq", "!=": "ne", ">": "gt", ">=": "gte", "<": "lt", "<=": "lte"}
+			op_s = aliases.get(op_s, op_s)
+			if op_s not in self._WHERE_OPS:
+				raise TypeErrorHS(f"عملگر where نامعتبر: {op}")
+			key = f"{field}__{op_s}" if op_s != "eq" else str(field)
+			merged[key] = value
+		return self.filter(**merged)
+
+	@classmethod
+	def _split_where_key(cls, key: str) -> tuple[str, str]:
+		if "__" in key:
+			field, op = key.rsplit("__", 1)
+			op = op.lower()
+			if op in cls._WHERE_OPS:
+				return field, op
+		return key, "eq"
 
 	def select(self, *columns: str) -> "HTable":
 		cols = [str(c) for c in columns]
@@ -121,6 +189,128 @@ class HTable:
 			rows=[{c: r.get(c) for c in cols} for r in self.rows],
 			_max_rows=self._max_rows,
 		)
+
+	def rename(self, **mapping: Any) -> "HTable":
+		mp = {str(k): str(v) for k, v in mapping.items()}
+		out = []
+		for row in self.rows:
+			nr = {}
+			for k, v in row.items():
+				nr[mp.get(str(k), str(k))] = v
+			out.append(nr)
+		return HTable(rows=out, _max_rows=self._max_rows)
+
+	def distinct(self, *columns: str) -> "HTable":
+		cols = [str(c) for c in columns] if columns else None
+		seen: set[Any] = set()
+		out: list[dict[str, Any]] = []
+		for row in self.rows:
+			if cols:
+				key = tuple(row.get(c) for c in cols)
+				payload = {c: row.get(c) for c in cols}
+			else:
+				key = tuple(sorted((str(k), sanitize_jsonish(v)) for k, v in row.items()))
+				payload = dict(row)
+			if key in seen:
+				continue
+			seen.add(key)
+			out.append(payload)
+			if len(out) >= self._max_rows:
+				raise ResourceLimitErrorHS(f"تعداد ردیف جدول از سقف {self._max_rows} بیشتر شد")
+		return HTable(rows=out, _max_rows=self._max_rows)
+
+	def join(
+		self,
+		other: Any,
+		*,
+		left_on: str,
+		right_on: Optional[str] = None,
+		how: str = "inner",
+		prefix: Optional[str] = None,
+	) -> "HTable":
+		if not isinstance(other, HTable):
+			raise TypeErrorHS("join فقط با HTable مجاز است")
+		how_s = str(how or "inner").lower()
+		if how_s not in {"inner", "left"}:
+			raise TypeErrorHS("how باید inner یا left باشد")
+		lkey = str(left_on)
+		rkey = str(right_on or left_on)
+		pfx = str(prefix) if prefix else ""
+		index: dict[Any, list[dict[str, Any]]] = {}
+		for r in other.rows:
+			index.setdefault(r.get(rkey), []).append(r)
+		out: list[dict[str, Any]] = []
+		for left in self.rows:
+			matches = index.get(left.get(lkey), [])
+			if not matches:
+				if how_s == "left":
+					merged = dict(left)
+					out.append(merged)
+					if len(out) >= self._max_rows:
+						raise ResourceLimitErrorHS(f"تعداد ردیف جدول از سقف {self._max_rows} بیشتر شد")
+				continue
+			for right in matches:
+				merged = dict(left)
+				for rk, rv in right.items():
+					mk = f"{pfx}{rk}" if pfx else str(rk)
+					if mk in merged and mk != rkey:
+						mk = f"right_{rk}"
+					merged[mk] = rv
+				out.append(merged)
+				if len(out) >= self._max_rows:
+					raise ResourceLimitErrorHS(f"تعداد ردیف جدول از سقف {self._max_rows} بیشتر شد")
+		return HTable(rows=out, _max_rows=self._max_rows)
+
+	def pivot(
+		self,
+		*,
+		index: str,
+		columns: str,
+		values: str,
+		agg: str = "sum",
+	) -> "HTable":
+		agg_s = str(agg or "sum").lower()
+		if agg_s not in {"sum", "count", "avg"}:
+			raise TypeErrorHS("agg باید sum یا count یا avg باشد")
+		idx_f = str(index)
+		col_f = str(columns)
+		val_f = str(values)
+		# {(index_val, col_val): [nums]}
+		buckets: dict[tuple[Any, Any], list[float]] = {}
+		col_values: set[Any] = set()
+		for row in self.rows:
+			iv = row.get(idx_f)
+			cv = row.get(col_f)
+			col_values.add(cv)
+			raw = row.get(val_f)
+			num = float(raw) if raw is not None and agg_s != "count" else (1.0 if agg_s == "count" else 0.0)
+			if agg_s == "count":
+				num = 1.0
+			buckets.setdefault((iv, cv), []).append(num)
+		sorted_cols = sorted(col_values, key=lambda x: (x is None, str(x)))
+		out: list[dict[str, Any]] = []
+		index_vals = []
+		seen_idx: set[Any] = set()
+		for (iv, _), _ in buckets.items():
+			if iv in seen_idx:
+				continue
+			seen_idx.add(iv)
+			index_vals.append(iv)
+		for iv in index_vals:
+			row: dict[str, Any] = {idx_f: iv}
+			for cv in sorted_cols:
+				nums = buckets.get((iv, cv), [])
+				col_name = "null" if cv is None else str(cv)
+				if not nums:
+					row[col_name] = 0 if agg_s == "count" else 0.0
+				elif agg_s == "sum" or agg_s == "count":
+					row[col_name] = float(sum(nums)) if agg_s == "sum" else float(len(nums))
+				else:
+					row[col_name] = float(sum(nums) / len(nums))
+			out.append(row)
+			if len(out) >= self._max_rows:
+				raise ResourceLimitErrorHS(f"تعداد ردیف جدول از سقف {self._max_rows} بیشتر شد")
+		return HTable(rows=out, _max_rows=self._max_rows)
 
 	def sort(self, by: str, *, desc: bool = False) -> "HTable":
 		key = str(by)

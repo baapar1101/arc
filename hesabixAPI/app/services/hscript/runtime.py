@@ -20,7 +20,7 @@ from app.services.hscript.report_builder import ReportBuilder
 from app.services.hscript.values import HModule, sanitize_jsonish
 
 
-HSCRIPT_LANGUAGE_VERSION = "1.0.0"
+HSCRIPT_LANGUAGE_VERSION = "1.1.0"
 
 
 @dataclass
@@ -64,7 +64,7 @@ def run_script(
 	calendar_type: str | None = None,
 ) -> RunResult:
 	"""اجرای امن اسکریپت برای یک کسب‌وکار قفل‌شده."""
-	from app.services.hscript.dates import format_date, normalize_calendar, parse_date
+	from app.services.hscript.dates import format_date, normalize_calendar, parse_date, today, month_bounds, last_month_bounds, days_ago
 
 	lim = limits or (ResourceLimits.preview() if preview else ResourceLimits.default())
 	sh = source_hash(source)
@@ -155,6 +155,10 @@ def run_script(
 			methods={
 				"format": _format_date,
 				"parse": _parse_date_fn,
+				"today": today,
+				"month_bounds": month_bounds,
+				"last_month_bounds": last_month_bounds,
+				"days_ago": days_ago,
 			},
 		)
 		env["numbers"] = HModule(

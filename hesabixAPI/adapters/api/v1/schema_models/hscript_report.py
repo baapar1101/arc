@@ -44,6 +44,33 @@ class HScriptAssistContextRequest(BaseModel):
 	limit: int = Field(default=5, ge=1, le=8)
 
 
+class HScriptParamSchemaRequest(BaseModel):
+	source_code: Optional[str] = None
+	default_params: Optional[dict[str, Any]] = None
+	params: Optional[dict[str, Any]] = None
+
+
+class HScriptRestoreVersionRequest(BaseModel):
+	changelog: Optional[str] = Field(default=None, max_length=500)
+
+
+class HScriptScheduleUpsertRequest(BaseModel):
+	title: Optional[str] = Field(default=None, max_length=255)
+	enabled: bool = True
+	schedule_mode: str = Field(default="simple", max_length=32)
+	simple_repeat: Optional[str] = Field(default="daily", max_length=32)
+	simple_time: Optional[str] = Field(default="08:00", max_length=8)
+	simple_weekday: Optional[int] = Field(default=0, ge=0, le=6)
+	simple_interval: Optional[int] = Field(default=1, ge=1, le=23)
+	cron_expression: Optional[str] = Field(default=None, max_length=120)
+	timezone: str = Field(default="Asia/Tehran", max_length=64)
+	output_format: str = Field(default="pdf", max_length=16)
+	channels: Optional[list[str]] = None
+	recipient_user_ids: Optional[list[int]] = None
+	params: Optional[dict[str, Any]] = None
+	report_id: Optional[int] = None  # فقط برای create سطح کسب‌وکار
+
+
 class HScriptPdfExportRequest(BaseModel):
 	"""خروجی PDF/Excel از اسکریپت، گزارش ذخیره‌شده، یا Spec آماده‌شده."""
 

@@ -260,4 +260,153 @@ class HScriptReportService {
     if (raw is List<int>) return Uint8List.fromList(raw);
     throw StateError('پاسخ Excel نامعتبر است');
   }
+
+  Future<Map<String, dynamic>> getCatalog({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('${_base(businessId)}/catalog');
+    return _data(res);
+  }
+
+  Future<List<Map<String, dynamic>>> listRecipes({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>('${_base(businessId)}/recipes');
+    final data = _data(res);
+    final items = data['items'];
+    if (items is List) {
+      return items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> inferParamSchema({
+    required int businessId,
+    String? sourceCode,
+    Map<String, dynamic>? defaultParams,
+    Map<String, dynamic>? params,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '${_base(businessId)}/param-schema',
+      data: {
+        if (sourceCode != null) 'source_code': sourceCode,
+        if (defaultParams != null) 'default_params': defaultParams,
+        if (params != null) 'params': params,
+      },
+    );
+    return _data(res);
+  }
+
+  Future<List<Map<String, dynamic>>> listVersions({
+    required int businessId,
+    required int reportId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '${_base(businessId)}/reports/$reportId/versions',
+    );
+    final data = _data(res);
+    final items = data['items'];
+    if (items is List) {
+      return items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> getVersion({
+    required int businessId,
+    required int reportId,
+    required int versionId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '${_base(businessId)}/reports/$reportId/versions/$versionId',
+    );
+    return _data(res);
+  }
+
+  Future<Map<String, dynamic>> restoreVersion({
+    required int businessId,
+    required int reportId,
+    required int versionId,
+    String? changelog,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '${_base(businessId)}/reports/$reportId/versions/$versionId/restore',
+      data: {
+        if (changelog != null) 'changelog': changelog,
+      },
+    );
+    return _data(res);
+  }
+
+  Future<List<Map<String, dynamic>>> listRuns({
+    required int businessId,
+    required int reportId,
+    int limit = 30,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '${_base(businessId)}/reports/$reportId/runs',
+      query: {'limit': limit},
+    );
+    final data = _data(res);
+    final items = data['items'];
+    if (items is List) {
+      return items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return const [];
+  }
+
+  Future<List<Map<String, dynamic>>> listSchedules({
+    required int businessId,
+    int? reportId,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '${_base(businessId)}/schedules',
+      query: {
+        if (reportId != null) 'report_id': reportId,
+      },
+    );
+    final data = _data(res);
+    final items = data['items'];
+    if (items is List) {
+      return items.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return const [];
+  }
+
+  Future<Map<String, dynamic>> createSchedule({
+    required int businessId,
+    required int reportId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '${_base(businessId)}/reports/$reportId/schedules',
+      data: payload,
+    );
+    return _data(res);
+  }
+
+  Future<Map<String, dynamic>> updateSchedule({
+    required int businessId,
+    required int scheduleId,
+    required Map<String, dynamic> payload,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '${_base(businessId)}/schedules/$scheduleId',
+      data: payload,
+    );
+    return _data(res);
+  }
+
+  Future<void> deleteSchedule({
+    required int businessId,
+    required int scheduleId,
+  }) async {
+    await _api.delete<Map<String, dynamic>>('${_base(businessId)}/schedules/$scheduleId');
+  }
+
+  Future<Map<String, dynamic>> runScheduleNow({
+    required int businessId,
+    required int scheduleId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '${_base(businessId)}/schedules/$scheduleId/run-now',
+    );
+    return _data(res);
+  }
 }

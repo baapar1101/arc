@@ -704,6 +704,31 @@ class AuthStore with ChangeNotifier {
         hasBusinessPermission('crm', 'write');
   }
 
+  /// HScript با سازگاری عقب‌رو به reports.* وقتی بخش hscript تنظیم نشده باشد.
+  bool hasHScriptPermission(String action) {
+    if (_currentBusiness?.isOwner == true) return true;
+    final hasHscriptSection = _businessPermissions != null && _businessPermissions!.containsKey('hscript');
+    if (hasHscriptSection) {
+      return hasBusinessPermission('hscript', action);
+    }
+    switch (action) {
+      case 'export':
+        return hasBusinessPermission('reports', 'export');
+      case 'view':
+      case 'write':
+      case 'publish':
+      case 'schedule':
+      default:
+        return hasBusinessPermission('reports', 'view');
+    }
+  }
+
+  bool canViewHScript() => hasHScriptPermission('view');
+  bool canWriteHScript() => hasHScriptPermission('write');
+  bool canPublishHScript() => hasHScriptPermission('publish');
+  bool canExportHScript() => hasHScriptPermission('export');
+  bool canScheduleHScript() => hasHScriptPermission('schedule');
+
   // دریافت دسترسی‌های موجود برای یک بخش
   List<String> getAvailableActions(String section) {
     if (_currentBusiness?.isOwner == true) {

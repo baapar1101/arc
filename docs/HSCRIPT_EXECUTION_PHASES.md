@@ -16,6 +16,8 @@
 | ۵ | Isolation سخت + Queue | ✅ | QUEUE_REPORTS، polling، rate limit، worker limits |
 | ۶ | Excel + Dashboard composer | ✅ | Excel از Spec + span/row_break داشبورد |
 | ۷ | Marketplace + پلن محدودیت | ✅ | پلاگین + سقف پلن + audit ادمین + cross-tenant |
+| ۸ | Studio UX + Semantic Gateway | ✅ | فرم پارامتر، نسخه‌ها، recipes، HTable، debtors/banks/… |
+| ۹ | Schedule + Permissions + Dual-mode | ✅ | زمان‌بندی تحویل، hscript.*، صفحه فقط‌اجرا |
 
 ---
 
@@ -143,6 +145,42 @@ alembic upgrade head   # اعمال migration
 - Admin audit: `GET /admin/hscript/runs`
 - Flutter: بنر ارتقا + «اعمال به استودیو HScript» از چت AI
 - تست‌های cross-tenant و سقف ذخیره
+
+---
+
+## فاز ۸ — Studio UX و گسترش معنایی (انجام‌شده)
+
+### تحویل‌شده
+- **HTable 1.1:** `where` / `field__op`، `join`، `distinct`، `pivot`، `rename`
+- **Gateway جدید:** `persons`, `banks`, `warehouses`, `debtors`, `creditors`
+- **dates:** `today`, `month_bounds`, `last_month_bounds`, `days_ago`
+- **Param schema:** پارس `# @param` + استنتاج از `params.get` / default_params
+- **API:** `/catalog`, `/recipes`, `/param-schema`, version detail/restore، `/runs`
+- **Studio Flutter:** فرم پارامتر (با حالت JSON)، گالری دستورپخت، تاریخچه نسخه+بازگردانی، ساختار خروجی، بایگانی، سابقه اجرا
+- زبان: `1.1.0`
+
+### تست
+```bash
+cd hesabixAPI && pytest tests/test_hscript_phase8.py tests/test_hscript_runtime.py -q
+```
+
+---
+
+## فاز ۹ — زمان‌بندی، مجوز ریز، Dual-mode (انجام‌شده)
+
+### تحویل‌شده
+- جدول `hscript_report_schedules` + migration
+- سرویس زمان‌بندی با cron ساده/پیشرفته + لوپ پس‌زمینه ۶۰ثانیه
+- تحویل: اعلان in-app + ایمیل پیوست PDF/Excel
+- مجوزهای `hscript.view|write|publish|export|schedule` با fallback به `reports.*`
+- Dual-mode lite: بدون write فقط اجرای گزارش منتشرشده (`/hscript/run/:id`)
+- UI زمان‌بندی در فهرست و استودیو + صفحه مجوزها
+
+### تست
+```bash
+cd hesabixAPI && pytest tests/test_hscript_phase9.py -q
+alembic upgrade head
+```
 
 ---
 

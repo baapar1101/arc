@@ -109,3 +109,41 @@ def format_date_value(value: Any, calendar: CalendarType) -> Any:
 		return format_date(s, calendar=calendar, with_time=with_time)
 	except TypeErrorHS:
 		return value
+
+
+def today(*, calendar: Any = "gregorian") -> str:
+	"""تاریخ امروز؛ خروجی همیشه ISO میلادی برای فیلتر Gateway است مگر calendar=jalali برای نمایش."""
+	cal = normalize_calendar(calendar, default="gregorian")
+	d = date.today()
+	if cal == "jalali":
+		return format_date(d, calendar="jalali")
+	return d.isoformat()
+
+
+def month_bounds(ref: Any = None) -> dict[str, str]:
+	"""بازه ماه جاری میلادی ISO: {from_date, to_date}."""
+	from datetime import timedelta
+
+	base = _to_datetime(ref).date() if ref is not None else date.today()
+	start = base.replace(day=1)
+	if start.month == 12:
+		end = start.replace(year=start.year + 1, month=1, day=1) - timedelta(days=1)
+	else:
+		end = start.replace(year=start.year, month=start.month + 1, day=1) - timedelta(days=1)
+	return {"from_date": start.isoformat(), "to_date": end.isoformat()}
+
+
+def last_month_bounds(ref: Any = None) -> dict[str, str]:
+	from datetime import timedelta
+
+	base = _to_datetime(ref).date() if ref is not None else date.today()
+	first_this = base.replace(day=1)
+	end = first_this - timedelta(days=1)
+	start = end.replace(day=1)
+	return {"from_date": start.isoformat(), "to_date": end.isoformat()}
+
+
+def days_ago(n: int) -> str:
+	from datetime import timedelta
+
+	return (date.today() - timedelta(days=int(n))).isoformat()

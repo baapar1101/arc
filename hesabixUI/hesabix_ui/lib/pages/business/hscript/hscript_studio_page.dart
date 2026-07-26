@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/auth_store.dart';
+import '../../../core/business_nav.dart';
 import '../../../models/ai_models.dart';
 import '../../../services/ai_service.dart';
 import '../../../services/hscript_report_service.dart';
@@ -19,15 +22,21 @@ import '../../../widgets/ai/ai_chat_model_chip.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../widgets/data_table/helpers/file_saver.dart';
 import '../../../widgets/hscript/hscript_code_editor.dart';
+import '../../../widgets/hscript/hscript_outline_panel.dart';
+import '../../../widgets/hscript/hscript_params_form.dart';
 import '../../../widgets/hscript/hscript_plan_banner.dart';
+import '../../../widgets/hscript/hscript_recipes_sheet.dart';
+import '../../../widgets/hscript/hscript_schedules_sheet.dart';
 import '../../../widgets/hscript/hscript_spec_renderer.dart';
+import '../../../widgets/hscript/hscript_versions_sheet.dart';
 import '../../../widgets/permission/access_denied_page.dart';
 
-const _kDefaultScript = '''report.calendar("jalali")
+const _kDefaultScript = '''# @param limit integer "سقف فاکتور" default=50
+report.calendar("jalali")
 report.number_format(style="western")
 report.dashboard(columns=12)
 report.title("داشبورد فروش")
-rows = invoices.all(limit=50)
+rows = invoices.this_month(limit=params.get("limit", 50))
 report.kpi("تعداد فاکتور", rows.count(), format="integer", span=4)
 report.kpi("جمع بدهکار", rows.sum("total_debit"), format="currency", span=4)
 report.card("وضعیت", "آماده", subtitle="پیش‌نمایش", span=4)
@@ -59,11 +68,13 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
   late final JobService _jobs;
   final _titleCtrl = TextEditingController(text: 'گزارش جدید');
   final _codeCtrl = TextEditingController(text: _kDefaultScript);
-  final _paramsCtrl = TextEditingController(text: '{\n  \n}');
+  final _paramsJsonCtrl = TextEditingController(text: '{\n  "limit": 50\n}');
 
   bool _loading = false;
   bool _running = false;
   bool _useAsync = false;
+  bool _paramsAsJson = false;
+  bool _showOutline = true;
   String? _jobStatusMsg;
   int? _reportId;
   String _status = 'draft';
@@ -71,9 +82,15 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
   Map<String, dynamic>? _error;
   Map<String, dynamic>? _stats;
   String? _validateMsg;
+  List<Map<String, dynamic>> _paramFields = const [];
+  Map<String, dynamic> _paramValues = {'limit': 50};
+  Timer? _schemaDebounce;
 
-  bool get _canView => widget.authStore.hasBusinessPermission('reports', 'view');
-  bool get _canExport => widget.authStore.hasBusinessPermission('reports', 'export');
+  bool get _canView => widget.authStore.canViewHScript();
+  bool get _canWrite => widget.authStore.canWriteHScript();
+  bool get _canPublish => widget.authStore.canPublishHScript();
+  bool get _canExport => widget.authStore.canExportHScript();
+  bool get _canSchedule => widget.authStore.canScheduleHScript();
 
   @override
   void initState() {
@@ -81,21 +98,73 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
     _service = HScriptReportService(ApiClient());
     _jobs = JobService(apiClient: ApiClient());
     _reportId = widget.reportId;
+    _codeCtrl.addListener(_onCodeChanged);
+    if (_canView && !_canWrite && _reportId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go(context.businessPanelUrl(widget.businessId, 'hscript/run/$_reportId'));
+      });
+      return;
+    }
     if (_canView && _reportId != null) {
       _loadReport();
+    } else if (_canView) {
+      _refreshParamSchema();
     }
   }
 
   @override
   void dispose() {
+    _schemaDebounce?.cancel();
+    _codeCtrl.removeListener(_onCodeChanged);
     _titleCtrl.dispose();
     _codeCtrl.dispose();
-    _paramsCtrl.dispose();
+    _paramsJsonCtrl.dispose();
     super.dispose();
   }
 
+  void _onCodeChanged() {
+    _schemaDebounce?.cancel();
+    _schemaDebounce = Timer(const Duration(milliseconds: 700), _refreshParamSchema);
+  }
+
+  Future<void> _refreshParamSchema() async {
+    try {
+      final schema = await _service.inferParamSchema(
+        businessId: widget.businessId,
+        sourceCode: _codeCtrl.text,
+        defaultParams: _paramValues,
+        params: _paramValues,
+      );
+      if (!mounted) return;
+      final fields = (schema['fields'] is List)
+          ? (schema['fields'] as List).whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+          : <Map<String, dynamic>>[];
+      final nextValues = Map<String, dynamic>.from(_paramValues);
+      for (final f in fields) {
+        final name = f['name']?.toString();
+        if (name == null || name.isEmpty) continue;
+        if (!nextValues.containsKey(name) && f.containsKey('default')) {
+          nextValues[name] = f['default'];
+        }
+      }
+      setState(() {
+        _paramFields = fields;
+        _paramValues = nextValues;
+        if (!_paramsAsJson) {
+          _paramsJsonCtrl.text = const JsonEncoder.withIndent('  ').convert(nextValues);
+        }
+      });
+    } catch (_) {
+      // schema کمکی است؛ خطا را بی‌صدا نادیده می‌گیریم
+    }
+  }
+
   Map<String, dynamic>? _parseParams() {
-    final raw = _paramsCtrl.text.trim();
+    if (!_paramsAsJson) {
+      return Map<String, dynamic>.from(_paramValues);
+    }
+    final raw = _paramsJsonCtrl.text.trim();
     if (raw.isEmpty) return <String, dynamic>{};
     try {
       final decoded = jsonDecode(raw);
@@ -108,6 +177,16 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
     }
   }
 
+  void _syncJsonFromValues() {
+    _paramsJsonCtrl.text = const JsonEncoder.withIndent('  ').convert(_paramValues);
+  }
+
+  void _syncValuesFromJson() {
+    final parsed = _parseParams();
+    if (parsed == null) return;
+    setState(() => _paramValues = parsed);
+  }
+
   Future<void> _loadReport() async {
     setState(() => _loading = true);
     try {
@@ -116,16 +195,26 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
         reportId: _reportId!,
       );
       if (!mounted) return;
+      final params = data['default_params'];
+      final map = params is Map ? Map<String, dynamic>.from(params) : <String, dynamic>{};
+      final schemaFields = (data['param_schema'] is Map && data['param_schema']['fields'] is List)
+          ? (data['param_schema']['fields'] as List)
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList()
+          : <Map<String, dynamic>>[];
       setState(() {
         _titleCtrl.text = data['title']?.toString() ?? '';
         _codeCtrl.text = data['source_code']?.toString() ?? '';
         _status = data['status']?.toString() ?? 'draft';
-        final params = data['default_params'];
-        if (params is Map) {
-          _paramsCtrl.text = const JsonEncoder.withIndent('  ').convert(params);
-        }
+        _paramValues = map;
+        _paramFields = schemaFields;
+        _paramsJsonCtrl.text = const JsonEncoder.withIndent('  ').convert(map);
         _loading = false;
       });
+      if (schemaFields.isEmpty) {
+        await _refreshParamSchema();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -148,11 +237,15 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
       setState(() {
         _running = false;
         _validateMsg = ok ? 'نحو اسکریپت معتبر است' : null;
-        _error = ok ? null : (res['error'] is Map ? Map<String, dynamic>.from(res['error'] as Map) : {'message': 'خطای نحوی'});
-        if (ok) _spec = _spec; // keep preview
+        _error = ok
+            ? null
+            : (res['error'] is Map
+                ? Map<String, dynamic>.from(res['error'] as Map)
+                : {'message': 'خطای نحوی'});
       });
       if (ok) {
         SnackBarHelper.show(context, message: 'اسکریپت معتبر است');
+        await _refreshParamSchema();
       }
     } catch (e) {
       if (!mounted) return;
@@ -261,9 +354,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
         }
         docsBlock = buf.toString();
       }
-    } catch (_) {
-      // بدون docs هم می‌توان ادامه داد
-    }
+    } catch (_) {}
 
     final current = _codeCtrl.text.trim();
     final prompt = StringBuffer()
@@ -272,8 +363,8 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
       ..writeln()
       ..writeln('قواعد:')
       ..writeln('- فقط HScript امن (بدون import/SQL/فایل/شبکه)')
-      ..writeln('- از invoices/customers/products/payments و report.* استفاده کن')
-      ..writeln('- از ابزارهای hscript_retrieve_docs، hscript_validate_script و در صورت نیاز hscript_run_preview استفاده کن')
+      ..writeln('- از invoices/customers/persons/products/payments/banks/warehouses/debtors/creditors استفاده کن')
+      ..writeln('- در صورت نیاز where/join/pivot و # @param بنویس')
       ..writeln('- اسکریپت نهایی را داخل بلوک ```hscript بگذار')
       ..writeln();
     if (current.isNotEmpty) {
@@ -297,6 +388,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
       onApplyHScriptCode: (code) {
         if (!mounted) return;
         setState(() => _codeCtrl.text = code);
+        _refreshParamSchema();
         SnackBarHelper.show(context, message: 'اسکریپت از AI به ادیتور اعمال شد');
       },
     );
@@ -311,13 +403,163 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
       return;
     }
     setState(() => _codeCtrl.text = extracted);
+    await _refreshParamSchema();
+    if (!mounted) return;
     SnackBarHelper.show(context, message: 'اسکریپت از کلیپ‌بورد اعمال شد');
+  }
+
+  Future<void> _openRecipes() async {
+    final code = await showHScriptRecipesSheet(
+      context: context,
+      businessId: widget.businessId,
+      service: _service,
+    );
+    if (code == null || code.isEmpty || !mounted) return;
+    final replace = _codeCtrl.text.trim().isEmpty ||
+        await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('اعمال دستورپخت'),
+                content: const Text('اسکریپت فعلی با دستورپخت جایگزین شود؟'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+                  FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('جایگزینی')),
+                ],
+              ),
+            ) ==
+            true;
+    if (replace != true || !mounted) return;
+    setState(() => _codeCtrl.text = code);
+    await _refreshParamSchema();
+    if (!mounted) return;
+    SnackBarHelper.show(context, message: 'دستورپخت اعمال شد');
+  }
+
+  Future<void> _openVersions() async {
+    if (_reportId == null) {
+      SnackBarHelper.showError(context, message: 'ابتدا گزارش را ذخیره کنید');
+      return;
+    }
+    final restored = await showHScriptVersionsSheet(
+      context: context,
+      businessId: widget.businessId,
+      reportId: _reportId!,
+      service: _service,
+    );
+    if (restored == null || !mounted) return;
+    setState(() {
+      _codeCtrl.text = restored['source_code']?.toString() ?? _codeCtrl.text;
+      _status = restored['status']?.toString() ?? _status;
+      _titleCtrl.text = restored['title']?.toString() ?? _titleCtrl.text;
+    });
+    await _refreshParamSchema();
+    if (!mounted) return;
+    SnackBarHelper.show(context, message: 'نسخه بازگردانی شد');
+  }
+
+  Future<void> _showRuns() async {
+    if (_reportId == null) {
+      SnackBarHelper.showError(context, message: 'ابتدا گزارش را ذخیره کنید');
+      return;
+    }
+    try {
+      final runs = await _service.listRuns(
+        businessId: widget.businessId,
+        reportId: _reportId!,
+      );
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        builder: (ctx) {
+          final cs = Theme.of(ctx).colorScheme;
+          if (runs.isEmpty) {
+            return const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('هنوز اجرایی ثبت نشده است.'),
+            );
+          }
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            itemCount: runs.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final r = runs[i];
+              final ok = r['status'] == 'success';
+              return ListTile(
+                leading: Icon(
+                  ok ? Icons.check_circle_outline : Icons.error_outline,
+                  color: ok ? cs.primary : cs.error,
+                ),
+                title: Text(ok ? 'موفق' : (r['error_message']?.toString() ?? 'ناموفق')),
+                subtitle: Text(
+                  '${r['created_at'] ?? ''} · ${r['duration_ms'] ?? '—'}ms'
+                  '${r['is_preview'] == true ? ' · پیش‌نمایش' : ''}',
+                ),
+              );
+            },
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _openSchedule() async {
+    if (_reportId == null) {
+      SnackBarHelper.showError(context, message: 'ابتدا گزارش را ذخیره و منتشر کنید');
+      return;
+    }
+    if (_status != 'published') {
+      SnackBarHelper.showError(context, message: 'فقط گزارش منتشرشده قابل زمان‌بندی است');
+      return;
+    }
+    await showHScriptSchedulesSheet(
+      context: context,
+      businessId: widget.businessId,
+      reportId: _reportId!,
+      reportTitle: _titleCtrl.text.trim().isEmpty ? 'گزارش' : _titleCtrl.text.trim(),
+      service: _service,
+    );
+  }
+
+  Future<void> _archive() async {
+    if (_reportId == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('بایگانی گزارش'),
+        content: const Text('این گزارش بایگانی شود؟ بعداً از فهرست بایگانی قابل دسترسی است.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('بایگانی')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final archived = await _service.archiveReport(
+        businessId: widget.businessId,
+        reportId: _reportId!,
+      );
+      if (!mounted) return;
+      setState(() => _status = archived['status']?.toString() ?? 'archived');
+      SnackBarHelper.show(context, message: 'گزارش بایگانی شد');
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
   }
 
   Future<void> _save() async {
     final params = _parseParams();
     if (params == null) return;
-    setState(() => _running = true);
+    setState(() {
+      _paramValues = params;
+      _running = true;
+    });
     try {
       if (_reportId == null) {
         final created = await _service.createReport(
@@ -460,6 +702,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
   @override
   Widget build(BuildContext context) {
     if (!_canView) return const AccessDeniedPage();
+    if (!_canWrite) return const AccessDeniedPage();
     final wide = MediaQuery.sizeOf(context).width >= 1000;
     final cs = Theme.of(context).colorScheme;
 
@@ -474,21 +717,14 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
               child: Chip(label: Text(_statusLabel(_status)), visualDensity: VisualDensity.compact),
             ),
           IconButton(
-            tooltip: _useAsync ? 'اجرای پس‌زمینه روشن' : 'اجرای همگام',
-            onPressed: _running
-                ? null
-                : () => setState(() => _useAsync = !_useAsync),
-            icon: Icon(_useAsync ? Icons.cloud_queue : Icons.bolt),
+            tooltip: 'دستورپخت‌ها',
+            onPressed: _running ? null : _openRecipes,
+            icon: const Icon(Icons.dashboard_customize_outlined),
           ),
           IconButton(
             tooltip: 'از AI بساز',
             onPressed: _running ? null : _openAiAssist,
             icon: const Icon(Icons.auto_awesome),
-          ),
-          IconButton(
-            tooltip: 'اعمال اسکریپت از کلیپ‌بورد',
-            onPressed: _running ? null : _applyFromClipboard,
-            icon: const Icon(Icons.content_paste_go),
           ),
           IconButton(
             tooltip: 'اعتبارسنجی',
@@ -505,22 +741,63 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
             onPressed: _running ? null : _save,
             icon: const Icon(Icons.save_outlined),
           ),
-          IconButton(
-            tooltip: 'انتشار',
-            onPressed: _running ? null : _publish,
-            icon: const Icon(Icons.publish_outlined),
+          if (_canPublish)
+            IconButton(
+              tooltip: 'انتشار',
+              onPressed: _running ? null : _publish,
+              icon: const Icon(Icons.publish_outlined),
+            ),
+          PopupMenuButton<String>(
+            tooltip: 'بیشتر',
+            onSelected: (v) {
+              switch (v) {
+                case 'async':
+                  setState(() => _useAsync = !_useAsync);
+                case 'outline':
+                  setState(() => _showOutline = !_showOutline);
+                case 'clipboard':
+                  _applyFromClipboard();
+                case 'versions':
+                  _openVersions();
+                case 'runs':
+                  _showRuns();
+                case 'schedule':
+                  _openSchedule();
+                case 'archive':
+                  _archive();
+                case 'pdf':
+                  _exportPdf();
+                case 'excel':
+                  _exportExcel();
+              }
+            },
+            itemBuilder: (_) => [
+              CheckedPopupMenuItem(
+                value: 'async',
+                checked: _useAsync,
+                child: const Text('اجرای پس‌زمینه'),
+              ),
+              CheckedPopupMenuItem(
+                value: 'outline',
+                checked: _showOutline,
+                child: const Text('نمایش ساختار خروجی'),
+              ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(value: 'clipboard', child: Text('اعمال از کلیپ‌بورد')),
+              const PopupMenuItem(value: 'versions', child: Text('تاریخچه نسخه‌ها')),
+              const PopupMenuItem(value: 'runs', child: Text('سابقه اجرا')),
+              if (_canSchedule && _reportId != null && _status == 'published')
+                const PopupMenuItem(value: 'schedule', child: Text('زمان‌بندی تحویل')),
+              if (_canPublish && _reportId != null && _status != 'archived')
+                const PopupMenuItem(value: 'archive', child: Text('بایگانی')),
+              if (_canExport) ...[
+                const PopupMenuDivider(),
+                const PopupMenuItem(value: 'pdf', child: Text('خروجی PDF')),
+                const PopupMenuItem(value: 'excel', child: Text('خروجی Excel')),
+              ],
+            ],
           ),
-          IconButton(
-            tooltip: 'PDF',
-            onPressed: _running ? null : _exportPdf,
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-          ),
-          IconButton(
-            tooltip: 'Excel',
-            onPressed: _running ? null : _exportExcel,
-            icon: const Icon(Icons.table_view_outlined),
-          ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       body: _loading
@@ -560,7 +837,8 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                     child: Text(
-                      'گام‌ها: ${_stats!['steps'] ?? '—'} · Gateway: ${_stats!['gateway_calls'] ?? '—'} · ${(_stats!['duration_ms'] ?? '—')}ms',
+                      'گام‌ها: ${_stats!['steps'] ?? '—'} · Gateway: ${_stats!['gateway_calls'] ?? '—'} · ${(_stats!['duration_ms'] ?? '—')}ms'
+                      '${_useAsync ? ' · پس‌زمینه' : ''}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ),
@@ -570,7 +848,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
                           children: [
                             Expanded(flex: 5, child: _editorPane(cs)),
                             VerticalDivider(width: 1, color: cs.outlineVariant),
-                            Expanded(flex: 5, child: _previewPane()),
+                            Expanded(flex: 5, child: _previewPane(cs)),
                           ],
                         )
                       : DefaultTabController(
@@ -578,14 +856,14 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
                           child: Column(
                             children: [
                               const TabBar(tabs: [
-                                Tab(text: 'کد'),
+                                Tab(text: 'کد و پارامتر'),
                                 Tab(text: 'پیش‌نمایش'),
                               ]),
                               Expanded(
                                 child: TabBarView(
                                   children: [
                                     _editorPane(cs),
-                                    _previewPane(),
+                                    _previewPane(cs),
                                   ],
                                 ),
                               ),
@@ -611,29 +889,78 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
             ),
           ),
           const SizedBox(height: 10),
+          Row(
+            children: [
+              Text('پارامترها', style: Theme.of(context).textTheme.titleSmall),
+              const Spacer(),
+              SegmentedButton<bool>(
+                segments: const [
+                  ButtonSegment(value: false, label: Text('فرم'), icon: Icon(Icons.tune, size: 16)),
+                  ButtonSegment(value: true, label: Text('JSON'), icon: Icon(Icons.data_object, size: 16)),
+                ],
+                selected: {_paramsAsJson},
+                onSelectionChanged: (s) {
+                  final asJson = s.first;
+                  if (asJson) {
+                    _syncJsonFromValues();
+                  } else {
+                    _syncValuesFromJson();
+                  }
+                  setState(() => _paramsAsJson = asJson);
+                },
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Expanded(
             flex: 3,
-            child: Directionality(
-              textDirection: TextDirection.ltr,
-              child: TextField(
-                controller: _paramsCtrl,
-                maxLines: null,
-                expands: true,
-                textAlign: TextAlign.left,
-                textAlignVertical: TextAlignVertical.top,
-                textDirection: TextDirection.ltr,
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12.5,
-                  height: 1.45,
-                ),
-                decoration: InputDecoration(
-                  labelText: 'params (JSON)',
-                  alignLabelWithHint: true,
-                  border: const OutlineInputBorder(),
-                  filled: true,
-                  fillColor: cs.surfaceContainerLowest,
-                ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                border: Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.circular(8),
+                color: cs.surfaceContainerLowest,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: _paramsAsJson
+                    ? Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: TextField(
+                          controller: _paramsJsonCtrl,
+                          maxLines: null,
+                          expands: true,
+                          textAlign: TextAlign.left,
+                          textAlignVertical: TextAlignVertical.top,
+                          textDirection: TextDirection.ltr,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12.5,
+                            height: 1.45,
+                          ),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isCollapsed: true,
+                          ),
+                          onChanged: (_) {
+                            try {
+                              final decoded = jsonDecode(_paramsJsonCtrl.text);
+                              if (decoded is Map) {
+                                _paramValues = Map<String, dynamic>.from(decoded);
+                              }
+                            } catch (_) {}
+                          },
+                        ),
+                      )
+                    : HScriptParamsForm(
+                        fields: _paramFields,
+                        values: _paramValues,
+                        onChanged: (v) {
+                          setState(() {
+                            _paramValues = v;
+                            _syncJsonFromValues();
+                          });
+                        },
+                      ),
               ),
             ),
           ),
@@ -642,8 +969,30 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
     );
   }
 
-  Widget _previewPane() {
-    return HScriptSpecRenderer(spec: _spec, error: _error);
+  Widget _previewPane(ColorScheme cs) {
+    final preview = HScriptSpecRenderer(spec: _spec, error: _error);
+    if (!_showOutline || MediaQuery.sizeOf(context).width < 1000) {
+      return preview;
+    }
+    return Row(
+      children: [
+        SizedBox(
+          width: 220,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                child: Text('ساختار خروجی', style: Theme.of(context).textTheme.titleSmall),
+              ),
+              Expanded(child: HScriptOutlinePanel(spec: _spec)),
+            ],
+          ),
+        ),
+        VerticalDivider(width: 1, color: cs.outlineVariant),
+        Expanded(child: preview),
+      ],
+    );
   }
 
   String _statusLabel(String s) {
@@ -705,8 +1054,7 @@ class _HScriptAiAssistDialogState extends State<_HScriptAiAssistDialog> {
       final preferred = result.preferredModelCode;
       if (!mounted) return;
 
-      bool hasCode(String? code) =>
-          code != null && models.any((m) => m.code == code);
+      bool hasCode(String? code) => code != null && models.any((m) => m.code == code);
 
       String? selected;
       if (hasCode(preferred)) {
@@ -755,7 +1103,7 @@ class _HScriptAiAssistDialogState extends State<_HScriptAiAssistDialog> {
               controller: _intentCtrl,
               maxLines: 5,
               decoration: const InputDecoration(
-                hintText: 'مثلاً: گزارش فروش ماه با KPI و نمودار میله‌ای',
+                hintText: 'مثلاً: گزارش بدهکاران برتر با KPI و نمودار',
                 border: OutlineInputBorder(),
               ),
               autofocus: true,
@@ -764,10 +1112,7 @@ class _HScriptAiAssistDialogState extends State<_HScriptAiAssistDialog> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Text(
-                  'مدل:',
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
+                Text('مدل:', style: Theme.of(context).textTheme.labelLarge),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Align(
@@ -794,14 +1139,8 @@ class _HScriptAiAssistDialogState extends State<_HScriptAiAssistDialog> {
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('انصراف'),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('ادامه'),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('انصراف')),
+        FilledButton(onPressed: _submit, child: const Text('ادامه')),
       ],
     );
   }

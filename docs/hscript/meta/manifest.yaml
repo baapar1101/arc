@@ -1,4 +1,4 @@
-language_version: "1.0.0"
+language_version: "1.1.0"
 corpus: hscript
 entries:
   - doc_id: hscript.overview
@@ -13,6 +13,8 @@ entries:
     path: tutorials/charts.md
   - doc_id: hscript.reference.language
     path: reference/language.md
+  - doc_id: hscript.reference.htable
+    path: reference/htable.md
   - doc_id: hscript.api.invoices
     path: reference/api/invoices.md
   - doc_id: hscript.api.customers
@@ -21,10 +23,20 @@ entries:
     path: reference/api/products.md
   - doc_id: hscript.api.payments
     path: reference/api/payments.md
+  - doc_id: hscript.api.debtors
+    path: reference/api/debtors.md
+  - doc_id: hscript.api.banks
+    path: reference/api/banks.md
   - doc_id: hscript.reference.report-blocks
     path: reference/report-blocks.md
   - doc_id: hscript.recipe.top-customers
     path: recipes/top-customers.md
+  - doc_id: hscript.recipe.debtors-top
+    path: recipes/debtors-top.md
+  - doc_id: hscript.recipe.sales-dashboard
+    path: recipes/sales-dashboard.md
+  - doc_id: hscript.recipe.banks-balance
+    path: recipes/banks-balance.md
   - doc_id: hscript.errors.E001
     path: errors/E001-syntax.md
   - doc_id: hscript.errors.E030

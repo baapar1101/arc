@@ -9,15 +9,19 @@ from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.hscript_report import (
 	HScriptAssistContextRequest,
+	HScriptParamSchemaRequest,
 	HScriptPdfExportRequest,
 	HScriptReportCreateRequest,
 	HScriptReportUpdateRequest,
+	HScriptRestoreVersionRequest,
+	HScriptScheduleUpsertRequest,
 	HScriptRunRequest,
 	HScriptValidateRequest,
 )
 from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
-from app.core.permissions import require_business_access, require_business_permission_dep
+from app.core.permissions import require_business_access
+from app.core.hscript_permissions import require_hscript_permission_dep
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services import hscript_report_service as svc
 from app.services.hscript.docs_catalog import list_doc_manifest
@@ -110,7 +114,7 @@ async def docs_manifest_endpoint(
 	business_id: int,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("view")),
 ):
 	return success_response(data=list_doc_manifest(), request=request, message="HSCRIPT_DOCS_MANIFEST")
 
@@ -125,9 +129,60 @@ async def plan_status_endpoint(
 	business_id: int,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("view")),
 ):
 	return success_response(data=svc.get_plan_status(db, business_id), request=request, message="HSCRIPT_PLAN")
+
+
+@router.get(
+	"/businesses/{business_id}/hscript/catalog",
+	summary="کاتالوگ ماژول‌ها، متدهای جدول و دستورپخت‌ها",
+)
+@require_business_access("business_id")
+async def catalog_endpoint(
+	request: Request,
+	business_id: int,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("view")),
+):
+	return success_response(data=svc.get_catalog(), request=request, message="HSCRIPT_CATALOG")
+
+
+@router.get(
+	"/businesses/{business_id}/hscript/recipes",
+	summary="فهرست دستورپخت‌های آماده",
+)
+@require_business_access("business_id")
+async def recipes_endpoint(
+	request: Request,
+	business_id: int,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("view")),
+):
+	return success_response(data=svc.list_recipes(), request=request, message="HSCRIPT_RECIPES")
+
+
+@router.post(
+	"/businesses/{business_id}/hscript/param-schema",
+	summary="استنتاج schema فرم پارامتر از اسکریپت و مقادیر",
+)
+@require_business_access("business_id")
+async def param_schema_endpoint(
+	request: Request,
+	business_id: int,
+	body: HScriptParamSchemaRequest,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("view")),
+):
+	data = svc.infer_report_param_schema(
+		source_code=body.source_code,
+		default_params=body.default_params,
+		params=body.params,
+	)
+	return success_response(data=data, request=request, message="HSCRIPT_PARAM_SCHEMA")
 
 
 @router.post(
@@ -141,7 +196,7 @@ async def assist_context_endpoint(
 	body: HScriptAssistContextRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("view")),
 ):
 	data = svc.build_assist_context(body.query, source_code=body.source_code, limit=body.limit)
 	return success_response(data=data, request=request, message="HSCRIPT_ASSIST_CONTEXT")
@@ -158,7 +213,7 @@ async def validate_endpoint(
 	body: HScriptValidateRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("write")),
 ):
 	return success_response(data=svc.validate_only(body.source_code), request=request, message="HSCRIPT_VALIDATED")
 
@@ -174,7 +229,7 @@ async def run_adhoc_endpoint(
 	body: HScriptRunRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("write")),
 ):
 	result = _run_or_enqueue(
 		db=db,
@@ -199,7 +254,7 @@ async def list_endpoint(
 	status: Optional[str] = Query(default=None),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("view")),
 ):
 	data = svc.list_reports(db, business_id, status=status)
 	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_LIST")
@@ -216,7 +271,7 @@ async def create_endpoint(
 	body: HScriptReportCreateRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("write")),
 ):
 	# نوشتن گزارش: همان سطح view فعلاً؛ فاز بعد می‌توان بخش custom_reports.write جدا کرد
 	data = svc.create_report(
@@ -243,9 +298,14 @@ async def get_endpoint(
 	report_id: int,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("view")),
 ):
+	from app.core.hscript_permissions import has_hscript_permission
+
 	data = svc.get_report(db, business_id, report_id)
+	if not has_hscript_permission(ctx, "write"):
+		data.pop("source_code", None)
+		data["source_hidden"] = True
 	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_FETCHED")
 
 
@@ -261,7 +321,7 @@ async def update_endpoint(
 	body: HScriptReportUpdateRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("write")),
 ):
 	data = svc.update_report(
 		db,
@@ -288,7 +348,7 @@ async def publish_endpoint(
 	report_id: int,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("publish")),
 ):
 	data = svc.publish_report(db, business_id, report_id, user_id=ctx.user.id)
 	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_PUBLISHED")
@@ -305,7 +365,7 @@ async def archive_endpoint(
 	report_id: int,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("publish")),
 ):
 	data = svc.archive_report(db, business_id, report_id, user_id=ctx.user.id)
 	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_ARCHIVED")
@@ -322,7 +382,7 @@ async def delete_endpoint(
 	report_id: int,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("write")),
 ):
 	data = svc.delete_report(db, business_id, report_id, user_id=ctx.user.id)
 	return success_response(data=data, request=request, message="HSCRIPT_DELETED")
@@ -339,10 +399,72 @@ async def versions_endpoint(
 	report_id: int,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("view")),
 ):
 	data = svc.list_versions(db, business_id, report_id)
 	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_VERSIONS")
+
+
+@router.get(
+	"/businesses/{business_id}/hscript/reports/{report_id}/versions/{version_id}",
+	summary="جزئیات یک نسخه",
+)
+@require_business_access("business_id")
+async def version_detail_endpoint(
+	request: Request,
+	business_id: int,
+	report_id: int,
+	version_id: int,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("view")),
+):
+	data = svc.get_version(db, business_id, report_id, version_id)
+	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_VERSION")
+
+
+@router.post(
+	"/businesses/{business_id}/hscript/reports/{report_id}/versions/{version_id}/restore",
+	summary="بازگردانی نسخهٔ قبلی",
+)
+@require_business_access("business_id")
+async def restore_version_endpoint(
+	request: Request,
+	business_id: int,
+	report_id: int,
+	version_id: int,
+	body: HScriptRestoreVersionRequest,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("write")),
+):
+	data = svc.restore_version(
+		db,
+		business_id,
+		report_id,
+		version_id,
+		user_id=ctx.user.id,
+		changelog=body.changelog,
+	)
+	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_VERSION_RESTORED")
+
+
+@router.get(
+	"/businesses/{business_id}/hscript/reports/{report_id}/runs",
+	summary="سابقه اجرای گزارش",
+)
+@require_business_access("business_id")
+async def report_runs_endpoint(
+	request: Request,
+	business_id: int,
+	report_id: int,
+	limit: int = Query(30, ge=1, le=100),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("view")),
+):
+	data = svc.list_runs(db, business_id, report_id, limit=limit)
+	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_RUNS")
 
 
 @router.post(
@@ -357,7 +479,7 @@ async def run_saved_endpoint(
 	body: HScriptRunRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "view")),
+	_: None = Depends(require_hscript_permission_dep("view")),
 ):
 	result = _run_or_enqueue(
 		db=db,
@@ -382,7 +504,7 @@ async def pdf_adhoc_endpoint(
 	body: HScriptPdfExportRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "export")),
+	_: None = Depends(require_hscript_permission_dep("export")),
 ):
 	fiscal_year_id = getattr(ctx, "fiscal_year_id", None)
 	pdf_bytes, filename = svc.export_pdf(
@@ -417,7 +539,7 @@ async def pdf_saved_endpoint(
 	body: HScriptPdfExportRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "export")),
+	_: None = Depends(require_hscript_permission_dep("export")),
 ):
 	fiscal_year_id = getattr(ctx, "fiscal_year_id", None)
 	pdf_bytes, filename = svc.export_pdf(
@@ -451,7 +573,7 @@ async def excel_adhoc_endpoint(
 	body: HScriptPdfExportRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "export")),
+	_: None = Depends(require_hscript_permission_dep("export")),
 ):
 	fiscal_year_id = getattr(ctx, "fiscal_year_id", None)
 	xlsx_bytes, filename = svc.export_excel(
@@ -486,7 +608,7 @@ async def excel_saved_endpoint(
 	body: HScriptPdfExportRequest,
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
-	_: None = Depends(require_business_permission_dep("reports", "export")),
+	_: None = Depends(require_hscript_permission_dep("export")),
 ):
 	fiscal_year_id = getattr(ctx, "fiscal_year_id", None)
 	xlsx_bytes, filename = svc.export_excel(
@@ -507,3 +629,113 @@ async def excel_saved_endpoint(
 			"Access-Control-Expose-Headers": "Content-Disposition",
 		},
 	)
+
+@router.get(
+	"/businesses/{business_id}/hscript/schedules",
+	summary="فهرست زمان‌بندی‌های HScript",
+)
+@require_business_access("business_id")
+async def list_schedules_endpoint(
+	request: Request,
+	business_id: int,
+	report_id: Optional[int] = Query(None),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("schedule")),
+):
+	from app.services import hscript_schedule_service as sched_svc
+
+	data = sched_svc.list_schedules(db, business_id, report_id=report_id)
+	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_SCHEDULES")
+
+
+@router.post(
+	"/businesses/{business_id}/hscript/reports/{report_id}/schedules",
+	summary="ایجاد زمان‌بندی برای گزارش منتشرشده",
+)
+@require_business_access("business_id")
+async def create_schedule_endpoint(
+	request: Request,
+	business_id: int,
+	report_id: int,
+	body: HScriptScheduleUpsertRequest,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("schedule")),
+):
+	from app.services import hscript_schedule_service as sched_svc
+
+	data = sched_svc.create_schedule(
+		db,
+		business_id,
+		user_id=ctx.user.id,
+		report_id=report_id,
+		data=body.model_dump(),
+	)
+	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_SCHEDULE_CREATED")
+
+
+@router.put(
+	"/businesses/{business_id}/hscript/schedules/{schedule_id}",
+	summary="ویرایش زمان‌بندی",
+)
+@require_business_access("business_id")
+async def update_schedule_endpoint(
+	request: Request,
+	business_id: int,
+	schedule_id: int,
+	body: HScriptScheduleUpsertRequest,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("schedule")),
+):
+	from app.services import hscript_schedule_service as sched_svc
+
+	data = sched_svc.update_schedule(
+		db,
+		business_id,
+		schedule_id,
+		user_id=ctx.user.id,
+		data=body.model_dump(exclude_unset=True),
+	)
+	return success_response(data=format_datetime_fields(data, request), request=request, message="HSCRIPT_SCHEDULE_UPDATED")
+
+
+@router.delete(
+	"/businesses/{business_id}/hscript/schedules/{schedule_id}",
+	summary="حذف زمان‌بندی",
+)
+@require_business_access("business_id")
+async def delete_schedule_endpoint(
+	request: Request,
+	business_id: int,
+	schedule_id: int,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("schedule")),
+):
+	from app.services import hscript_schedule_service as sched_svc
+
+	data = sched_svc.delete_schedule(db, business_id, schedule_id)
+	return success_response(data=data, request=request, message="HSCRIPT_SCHEDULE_DELETED")
+
+
+@router.post(
+	"/businesses/{business_id}/hscript/schedules/{schedule_id}/run-now",
+	summary="اجرای فوری زمان‌بندی",
+)
+@require_business_access("business_id")
+async def run_schedule_now_endpoint(
+	request: Request,
+	business_id: int,
+	schedule_id: int,
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_hscript_permission_dep("schedule")),
+):
+	from app.services import hscript_schedule_service as sched_svc
+
+	row = sched_svc._get_schedule(db, business_id, schedule_id)
+	data = sched_svc.run_schedule_now(db, row, triggered_by="manual")
+	return success_response(data=data, request=request, message="HSCRIPT_SCHEDULE_RUN")
+

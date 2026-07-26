@@ -124,6 +124,27 @@ DOC_ENTRIES: list[dict[str, Any]] = [
 		"version": 1,
 	},
 	{
+		"doc_id": "hscript.api.debtors",
+		"path": "reference/api/debtors.md",
+		"title": "API: debtors / creditors",
+		"tags": ["api", "debtors", "creditors"],
+		"version": 1,
+	},
+	{
+		"doc_id": "hscript.api.banks",
+		"path": "reference/api/banks.md",
+		"title": "API: banks / warehouses / persons",
+		"tags": ["api", "banks", "warehouses", "persons"],
+		"version": 1,
+	},
+	{
+		"doc_id": "hscript.reference.htable",
+		"path": "reference/htable.md",
+		"title": "متدهای HTable",
+		"tags": ["reference", "table"],
+		"version": 1,
+	},
+	{
 		"doc_id": "hscript.reference.report-blocks",
 		"path": "reference/report-blocks.md",
 		"title": "بلوک‌های گزارش",
@@ -136,6 +157,31 @@ DOC_ENTRIES: list[dict[str, Any]] = [
 		"title": "دستورپخت: مشتریان برتر",
 		"tags": ["recipe", "example"],
 		"version": 1,
+		"example_id": "ex_top_customers",
+	},
+	{
+		"doc_id": "hscript.recipe.debtors-top",
+		"path": "recipes/debtors-top.md",
+		"title": "دستورپخت: بدهکاران برتر",
+		"tags": ["recipe", "example", "debtors"],
+		"version": 1,
+		"example_id": "ex_debtors_top",
+	},
+	{
+		"doc_id": "hscript.recipe.sales-dashboard",
+		"path": "recipes/sales-dashboard.md",
+		"title": "دستورپخت: داشبورد فروش ماه",
+		"tags": ["recipe", "example", "dashboard"],
+		"version": 1,
+		"example_id": "ex_sales_dashboard",
+	},
+	{
+		"doc_id": "hscript.recipe.banks-balance",
+		"path": "recipes/banks-balance.md",
+		"title": "دستورپخت: مانده بانک‌ها",
+		"tags": ["recipe", "example", "banks"],
+		"version": 1,
+		"example_id": "ex_banks_balance",
 	},
 	{
 		"doc_id": "hscript.errors.E001",
@@ -170,7 +216,7 @@ DOC_ENTRIES: list[dict[str, Any]] = [
 
 def list_doc_manifest() -> dict[str, Any]:
 	return {
-		"language_version": "1.0.0",
+		"language_version": "1.1.0",
 		"docs_root": "docs/hscript",
 		"entries": DOC_ENTRIES,
 	}

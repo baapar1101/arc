@@ -212,6 +212,7 @@ import 'pages/business/report_templates_page.dart';
 import 'pages/business/report_template_studio_page.dart';
 import 'pages/business/report_template_html_editor_page.dart';
 import 'pages/business/hscript/hscript_reports_page.dart';
+import 'pages/business/hscript/hscript_run_page.dart';
 import 'pages/business/hscript/hscript_studio_page.dart';
 import 'pages/business/storage_files_page.dart';
 import 'pages/business/storage_file_manager_page.dart';
@@ -4070,6 +4071,21 @@ class _MyAppState extends State<MyApp> {
                 return hesabixNoTransitionPage(
                   state,
                   HScriptStudioPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    reportId: reportId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'hscript/run/:report_id',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final reportId = int.parse(state.pathParameters['report_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  HScriptRunPage(
                     businessId: businessId,
                     authStore: _authStore!,
                     reportId: reportId,
