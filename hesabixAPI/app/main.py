@@ -1183,6 +1183,7 @@ def create_app() -> FastAPI:
     from adapters.api.v1.ai.mcp import router as ai_mcp_router
     from adapters.api.v1.ai.models import router as ai_models_router
     from adapters.api.v1.ai.skills import router as ai_skills_router
+    from adapters.api.v1.ai.business_provider import router as ai_business_provider_router
     application.include_router(ai_chat_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_mcp_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_models_router, prefix=settings.api_v1_prefix)
@@ -1192,6 +1193,7 @@ def create_app() -> FastAPI:
     application.include_router(ai_prompts_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_usage_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_voice_feedback_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_business_provider_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)
 

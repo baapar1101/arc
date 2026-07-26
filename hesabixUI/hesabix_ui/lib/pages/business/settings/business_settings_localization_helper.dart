@@ -61,6 +61,8 @@ class BusinessSettingsLocalizationHelper {
         return t.dataBackup;
       case 'ftpBackupSettingsTitle':
         return t.ftpBackupSettingsTitle;
+      case 'businessSettingsAiProviderTitle':
+        return 'ارائه‌دهنده هوش مصنوعی';
       case 'dataRestore':
         return t.dataRestore;
       case 'systemLogs':
@@ -132,6 +134,8 @@ class BusinessSettingsLocalizationHelper {
         return t.dataBackupDescription;
       case 'ftpBackupSettingsDescription':
         return t.ftpBackupSettingsDescription;
+      case 'businessSettingsAiProviderDescription':
+        return 'اتصال URL، API Key و مدل‌های اختصاصی کسب‌وکار';
       case 'dataRestoreDescription':
         return t.dataRestoreDescription;
       case 'systemLogsDescription':

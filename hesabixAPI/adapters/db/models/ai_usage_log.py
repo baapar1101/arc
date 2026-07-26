@@ -11,6 +11,7 @@ class PaymentMethod(str, enum.Enum):
     FREE = "free"
     SUBSCRIPTION = "subscription"
     WALLET = "wallet"
+    BYOK = "byok"
 
 
 class AIUsageLog(Base):

@@ -248,6 +248,25 @@ class AIService:
         repo = AIConfigRepository(self.db)
         return repo.get_active_config()
 
+    def _is_byok_subscription(self) -> bool:
+        from app.services.ai.business_ai_provider_service import is_byok_plan
+
+        return bool(self.subscription and is_byok_plan(self.subscription.plan))
+
+    def _byok_require_test(self) -> bool:
+        from app.services.ai.business_ai_provider_service import require_byok_connection_test
+
+        if not self.subscription:
+            return True
+        return require_byok_connection_test(self.subscription.plan)
+
+    def _get_byok_config(self):
+        from app.services.ai.business_ai_provider_service import get_config
+
+        if not self.business_id:
+            return None
+        return get_config(self.db, int(self.business_id))
+
     def set_routing_context(
         self,
         *,
@@ -297,6 +316,7 @@ class AIService:
             subscription=self.subscription,
             plan=plan,
             config=self.config,
+            business_id=int(self.business_id) if self.business_id else None,
         )
 
     def get_effective_model_code(
@@ -322,6 +342,7 @@ class AIService:
             subscription=self.subscription,
             plan=plan,
             config=self.config,
+            business_id=int(self.business_id) if self.business_id else None,
             **routing,
         )
 
@@ -335,16 +356,17 @@ class AIService:
     ) -> str:
         from app.services.ai.ai_model_service import get_api_model_id
 
-        return get_api_model_id(
-            self.db,
-            self.get_effective_model_code(
-                operation=operation,
-                user_query=user_query,
-                history_messages=history_messages,
-                needs_tools=needs_tools,
-            ),
-            self.config,
+        code = self.get_effective_model_code(
+            operation=operation,
+            user_query=user_query,
+            history_messages=history_messages,
+            needs_tools=needs_tools,
         )
+        if self._is_byok_subscription() and self.business_id:
+            from app.services.ai.business_ai_provider_service import get_byok_model_api_id
+
+            return get_byok_model_api_id(self.db, int(self.business_id), code)
+        return get_api_model_id(self.db, code, self.config)
 
     def get_effective_provider_type(
         self,
@@ -354,6 +376,10 @@ class AIService:
         history_messages: Optional[List[Dict[str, Any]]] = None,
         needs_tools: Optional[bool] = None,
     ) -> str:
+        if self._is_byok_subscription():
+            cfg = self._get_byok_config()
+            if cfg and cfg.provider:
+                return cfg.provider
         from app.services.ai.ai_model_service import get_model_provider
 
         return get_model_provider(
@@ -373,7 +399,12 @@ class AIService:
         from app.services.ai.ai_model_service import validate_model_selection
 
         plan = self.subscription.plan if self.subscription else None
-        validate_model_selection(self.db, plan, self._request_model_code)
+        validate_model_selection(
+            self.db,
+            plan,
+            self._request_model_code,
+            business_id=int(self.business_id) if self.business_id else None,
+        )
 
     def _effective_max_tokens(
         self,
@@ -430,6 +461,27 @@ class AIService:
         """ساخت provider فعال برای تخمین توکن و فراخوانی مدل."""
         from app.services.ai.ai_provider import create_provider
         from app.services.ai.ai_provider_service import resolve_provider_connection
+
+        if self._is_byok_subscription():
+            if not self.business_id:
+                raise ApiError(
+                    "BUSINESS_REQUIRED",
+                    "برای پلن ارائه‌دهنده اختصاصی، انتخاب کسب‌وکار الزامی است",
+                    http_status=400,
+                )
+            from app.services.ai.business_ai_provider_service import resolve_byok_connection
+
+            ptype, api_key, api_base_url, _fce = resolve_byok_connection(
+                self.db, int(self.business_id)
+            )
+            if provider_type and provider_type != ptype:
+                # مدل‌های BYOK فقط از همان provider کسب‌وکار استفاده می‌کنند
+                ptype = provider_type if provider_type == ptype else ptype
+            return create_provider(
+                provider_type=ptype,
+                api_key=api_key,
+                api_base_url=api_base_url,
+            )
 
         ptype = provider_type or self.get_effective_provider_type()
         _, api_key, api_base_url, _fce = resolve_provider_connection(
@@ -494,6 +546,12 @@ class AIService:
         return {}
 
     def _provider_supports_tools(self, provider_type: Optional[str] = None) -> bool:
+        if self._is_byok_subscription():
+            cfg = self._get_byok_config()
+            if cfg is not None:
+                return bool(cfg.function_calling_enabled)
+            return True
+
         from app.services.ai.ai_provider_service import resolve_provider_connection
 
         ptype = provider_type or self.get_effective_provider_type()
@@ -702,17 +760,6 @@ class AIService:
                 }
             }
         
-        # بررسی تنظیمات AI
-        if not self.config or not self.config.is_active:
-            return {
-                "can_use": False,
-                "reason": "AI_NOT_CONFIGURED",
-                "details": {
-                    "message": "تنظیمات AI فعال نیست",
-                    "suggestions": ["لطفاً با مدیر سیستم تماس بگیرید"]
-                }
-            }
-        
         # بررسی اشتراک
         if not self.subscription:
             from adapters.db.repositories.ai_plan_repository import AIPlanRepository
@@ -739,7 +786,61 @@ class AIService:
                     ]
                 }
             }
-        
+
+        plan = self.subscription.plan
+        from app.services.ai.business_ai_provider_service import (
+            config_is_ready,
+            is_byok_plan,
+            parse_models_json,
+            require_byok_connection_test,
+        )
+
+        if is_byok_plan(plan):
+            if not self.business_id:
+                return {
+                    "can_use": False,
+                    "reason": "BUSINESS_REQUIRED",
+                    "details": {
+                        "message": "برای پلن ارائه‌دهنده اختصاصی، انتخاب کسب‌وکار الزامی است",
+                        "suggestions": ["لطفاً ابتدا یک کسب‌وکار را انتخاب کنید"],
+                    },
+                }
+            byok_cfg = self._get_byok_config()
+            require_test = require_byok_connection_test(plan)
+            if not config_is_ready(byok_cfg, require_test=require_test):
+                suggestions = [
+                    "از بخش تنظیمات کسب‌وکار → ارائه‌دهنده هوش مصنوعی، URL و API Key را وارد کنید",
+                ]
+                if byok_cfg and byok_cfg.api_key and require_test and byok_cfg.last_test_ok is not True:
+                    reason = "BYOK_TEST_REQUIRED"
+                    message = "اتصال ارائه‌دهنده اختصاصی هنوز با موفقیت تست نشده است"
+                    suggestions = ["دکمه «تست اتصال» را در تنظیمات ارائه‌دهنده بزنید"]
+                elif byok_cfg and not parse_models_json(byok_cfg.models_json):
+                    reason = "BYOK_NO_MODELS"
+                    message = "هیچ مدلی برای ارائه‌دهنده اختصاصی تعریف نشده است"
+                else:
+                    reason = "BYOK_NOT_CONFIGURED"
+                    message = "ارائه‌دهنده اختصاصی هنوز پیکربندی نشده است"
+                return {
+                    "can_use": False,
+                    "reason": reason,
+                    "details": {
+                        "message": message,
+                        "suggestions": suggestions,
+                        "provider_settings_path": "settings/ai-provider",
+                    },
+                }
+        else:
+            # بررسی تنظیمات AI پلتفرم
+            if not self.config or not self.config.is_active:
+                return {
+                    "can_use": False,
+                    "reason": "AI_NOT_CONFIGURED",
+                    "details": {
+                        "message": "تنظیمات AI فعال نیست",
+                        "suggestions": ["لطفاً با مدیر سیستم تماس بگیرید"]
+                    }
+                }
         if not self.subscription.is_active:
             return {
                 "can_use": False,
@@ -788,7 +889,11 @@ class AIService:
         wallet_info = None
         
         # بررسی بر اساس نوع پلن
-        if plan.plan_type == "free":
+        if plan.plan_type == "byok":
+            # هزینه LLM با مالک کسب‌وکار؛ بدون سهمیه/کیف پول پلتفرم
+            suggestions.append("هزینه مصرف مدل توسط ارائه‌دهنده شما محاسبه می‌شود")
+        
+        elif plan.plan_type == "free":
             if quota["has_token_cap"] and not quota_allows_tokens(
                 quota["tokens_used"], self.subscription.tokens_limit, estimated_tokens
             ):
@@ -939,12 +1044,31 @@ class AIService:
         )
 
         requested_model = self.get_requested_model_code()
-        fce = self._provider_supports_tools() and model_supports_tools(
-            self.db, effective_model, self.config
-        )
+        if self._is_byok_subscription():
+            from app.services.ai.business_ai_provider_service import parse_models_json
+
+            byok_cfg = self._get_byok_config()
+            model_tools = True
+            if byok_cfg:
+                for m in parse_models_json(byok_cfg.models_json):
+                    if m["code"] == effective_model:
+                        model_tools = bool(m.get("supports_tools", True))
+                        break
+            fce = bool(byok_cfg and byok_cfg.function_calling_enabled and model_tools)
+        else:
+            fce = self._provider_supports_tools() and model_supports_tools(
+                self.db, effective_model, self.config
+            )
         in_per_1k = out_per_1k = est_cost = 0.0
         model_pricing: Dict[str, Any] = {}
-        if plan:
+        if plan and plan.plan_type == "byok":
+            model_pricing = {
+                "estimated_cost": 0.0,
+                "price_per_1k_input_tokens": 0.0,
+                "price_per_1k_output_tokens": 0.0,
+                "pricing_hint": "هزینه توسط ارائه‌دهنده شما محاسبه می‌شود",
+            }
+        elif plan:
             if is_auto_model_code(requested_model):
                 cost_range = estimate_auto_cost_range(plan, self.db, estimated_tokens)
                 est_cost = float(cost_range["max"])
@@ -1769,6 +1893,17 @@ class AIService:
         
         if total_tokens == 0:
             return {"payment_method": "free", "cost": 0, "wallet_transaction_id": None, "document_id": None}
+
+        if plan.plan_type == "byok":
+            # فقط ثبت مصرف برای آمار؛ بدون شارژ کیف پول پلتفرم
+            self.subscription.tokens_used = (self.subscription.tokens_used or 0) + total_tokens
+            self.db.commit()
+            return {
+                "payment_method": "byok",
+                "cost": 0,
+                "wallet_transaction_id": None,
+                "document_id": None,
+            }
         
         if plan.plan_type == "free":
             tokens_used = self.subscription.tokens_used or 0

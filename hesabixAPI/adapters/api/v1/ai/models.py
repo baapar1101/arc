@@ -37,12 +37,24 @@ async def list_available_models(
             plan = subscription.plan
             preferred_model_code = getattr(subscription, "preferred_model_code", None)
 
-    models = list_models_for_user(db, plan, include_pricing=True)
+    models = list_models_for_user(
+        db,
+        plan,
+        include_pricing=True,
+        business_id=effective_business_id,
+    )
+    plan_default = None
+    if plan and plan.plan_type == "byok" and effective_business_id:
+        from app.services.ai.business_ai_provider_service import get_byok_default_model
+
+        plan_default = get_byok_default_model(db, int(effective_business_id))
+    else:
+        plan_default = get_plan_default_model_code(plan)
     return success_response(
         {
             "models": models,
             "preferred_model_code": preferred_model_code,
-            "plan_default_model": get_plan_default_model_code(plan),
+            "plan_default_model": plan_default,
         },
         request,
     )

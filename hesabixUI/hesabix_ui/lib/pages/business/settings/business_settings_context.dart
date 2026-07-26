@@ -71,6 +71,9 @@ class BusinessSettingsContext {
   bool get canManageFtp =>
       isOwner || authStore.hasBusinessPermission('settings', 'manage_ftp');
 
+  bool get canManageAiProvider =>
+      isOwner || authStore.hasBusinessPermission('settings', 'manage_ai_provider');
+
   bool get canManageUsers =>
       isOwner || authStore.hasBusinessPermission('settings', 'users');
 

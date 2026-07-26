@@ -97,9 +97,23 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
     TextEditingController payOutput,
     Set<String> allowedModels,
     String? defaultModel,
-    Map<String, Map<String, double>> perModelRates,
-  ) {
+    Map<String, Map<String, double>> perModelRates, {
+    Set<String>? byokProviders,
+    bool requireConnectionTest = true,
+  }) {
     final pc = <String, dynamic>{};
+    if (planType == AIPlanType.byok) {
+      pc['byok'] = true;
+      pc['require_connection_test'] = requireConnectionTest;
+      pc['allowed_providers'] = (byokProviders?.toList() ?? ['openai', 'anthropic']);
+      pc['platform_fee'] = <String, dynamic>{
+        'monthly_price': _parseDecimal(monthlyPrice.text),
+        'yearly_price': _parseDecimal(yearlyPrice.text),
+      };
+      // سازگاری با مسیر صورتحساب اشتراک
+      pc['subscription'] = pc['platform_fee'];
+      return pc;
+    }
     if (allowedModels.isNotEmpty) {
       pc['allowed_models'] = allowedModels.toList();
     }
@@ -169,7 +183,9 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
     final payOutput1kController = TextEditingController();
 
     final pc = plan?.pricingConfig ?? const <String, dynamic>{};
-    final sub = Map<String, dynamic>.from((pc['subscription'] as Map?) ?? const {});
+    final sub = Map<String, dynamic>.from(
+      (pc['platform_fee'] as Map?) ?? (pc['subscription'] as Map?) ?? const {},
+    );
     final pay = Map<String, dynamic>.from((pc['pay_as_go'] as Map?) ?? const {});
     monthlyPriceController.text = _formatNumForField(sub['monthly_price']);
     yearlyPriceController.text = _formatNumForField(sub['yearly_price']);
@@ -179,6 +195,10 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
     AIPlanType selectedPlanType = plan?.planType ?? AIPlanType.free;
     bool isActive = plan?.isActive ?? true;
     bool autoRenew = plan?.autoRenew ?? false;
+    bool requireConnectionTest = pc['require_connection_test'] != false;
+    final byokProviders = <String>{
+      ...((pc['allowed_providers'] as List?)?.map((e) => e.toString()) ?? ['openai', 'anthropic']),
+    };
 
     final existingAllowed = <String>{
       ...((pc['allowed_models'] as List?)?.map((e) => e.toString()) ?? []),
@@ -310,11 +330,76 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                   case AIPlanType.hybrid:
                                     label = 'ترکیبی';
                                     break;
+                                  case AIPlanType.byok:
+                                    label = 'ارائه‌دهنده اختصاصی (BYOK)';
+                                    break;
                                 }
                                 return DropdownMenuItem(value: type, child: Text(label));
                               }).toList(),
                               onChanged: (v) => setDialogState(() => selectedPlanType = v!),
                             ),
+                            if (selectedPlanType == AIPlanType.byok) ...[
+                              const SizedBox(height: 12),
+                              Text(
+                                'مالک کسب‌وکار URL و API Key خودش را تنظیم می‌کند و هزینه مدل را مستقیم به ارائه‌دهنده می‌پردازد.',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'کارمزد پلتفرم (اختیاری)$currencySuffix',
+                                style: Theme.of(context).textTheme.titleSmall,
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: monthlyPriceController,
+                                decoration: InputDecoration(
+                                  labelText: 'کارمزد ماهانه$currencySuffix',
+                                ),
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: yearlyPriceController,
+                                decoration: InputDecoration(
+                                  labelText: 'کارمزد سالانه$currencySuffix',
+                                ),
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Text('ارائه‌دهندگان مجاز', style: Theme.of(context).textTheme.titleSmall),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  for (final p in const ['openai', 'anthropic', 'local'])
+                                    FilterChip(
+                                      label: Text(p),
+                                      selected: byokProviders.contains(p),
+                                      onSelected: (v) {
+                                        setDialogState(() {
+                                          if (v) {
+                                            byokProviders.add(p);
+                                          } else if (byokProviders.length > 1) {
+                                            byokProviders.remove(p);
+                                          }
+                                        });
+                                      },
+                                    ),
+                                ],
+                              ),
+                              SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('الزام تست اتصال موفق قبل از استفاده'),
+                                value: requireConnectionTest,
+                                onChanged: (v) => setDialogState(() => requireConnectionTest = v),
+                              ),
+                            ],
                             if (selectedPlanType == AIPlanType.subscription ||
                                 selectedPlanType == AIPlanType.hybrid) ...[
                               const SizedBox(height: 16),
@@ -424,6 +509,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                 }),
                               ],
                             ],
+                            if (selectedPlanType != AIPlanType.byok) ...[
                             const SizedBox(height: 16),
                             Text(
                               'مدل‌های مجاز در این پلن',
@@ -505,6 +591,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                               ),
                               keyboardType: TextInputType.number,
                             ),
+                            ],
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: descriptionController,
@@ -556,6 +643,8 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                                       'output': _parseDecimal(e.value['output']!.text),
                                     },
                                 },
+                                byokProviders: byokProviders,
+                                requireConnectionTest: requireConnectionTest,
                               );
                               final data = <String, dynamic>{
                                 'name': nameController.text.trim(),
@@ -675,6 +764,9 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                       break;
                     case AIPlanType.hybrid:
                       planTypeLabel = 'ترکیبی';
+                      break;
+                    case AIPlanType.byok:
+                      planTypeLabel = 'ارائه‌دهنده اختصاصی';
                       break;
                   }
                   return Card(

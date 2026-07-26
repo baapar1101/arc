@@ -184,6 +184,45 @@ class AIService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  // ========== Business: BYOK provider ==========
+  Future<Map<String, dynamic>> getBusinessAIProvider(int businessId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai-provider',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> saveBusinessAIProvider(
+    int businessId,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai-provider',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> testBusinessAIProvider(
+    int businessId, {
+    String? model,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai-provider/test',
+      data: {if (model != null) 'model': model},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<void> deleteBusinessAIProvider(int businessId) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai-provider',
+    );
+  }
+
   // ========== User: AI Models ==========
   Future<List<AIModelCatalogItem>> listAvailableAIModels({int? businessId}) async {
     final query = <String, dynamic>{};

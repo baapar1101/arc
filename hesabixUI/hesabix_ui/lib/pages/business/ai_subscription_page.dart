@@ -116,7 +116,9 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       return false;
     }
     final pc = plan.pricingConfig;
-    final sub = pc['subscription'];
+    final sub = pc['platform_fee'] is Map
+        ? pc['platform_fee']
+        : pc['subscription'];
     if (sub is! Map) return false;
     final key = _billingPeriod == 'yearly' ? 'yearly_price' : 'monthly_price';
     final raw = sub[key];
@@ -163,6 +165,33 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       if (mounted) {
         SnackBarHelper.show(context, message: 'اشتراک با موفقیت فعال شد');
         _load();
+        if (plan.planType == AIPlanType.byok) {
+          final go = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('تنظیم ارائه‌دهنده'),
+                  content: const Text(
+                    'پلن ارائه‌دهنده اختصاصی فعال شد. برای استفاده از AI باید URL، API Key و مدل‌ها را تنظیم کنید.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('بعداً'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('رفتن به تنظیمات'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+          if (go && mounted) {
+            context.go(
+              BusinessRoutePaths.uri(widget.businessId!, 0, 'settings/ai-provider'),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -350,6 +379,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
                 child: _SubscriptionHero(
                   subscription: _currentSubscription,
                   onCancel: _cancelSubscription,
+                  businessId: widget.businessId,
                   isJalali: isJalali,
                 ),
               ),
@@ -410,11 +440,13 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
 class _SubscriptionHero extends StatelessWidget {
   final UserAISubscription? subscription;
   final VoidCallback onCancel;
+  final int? businessId;
   final bool isJalali;
 
   const _SubscriptionHero({
     required this.subscription,
     required this.onCancel,
+    this.businessId,
     required this.isJalali,
   });
 
@@ -522,6 +554,22 @@ class _SubscriptionHero extends StatelessWidget {
               color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
             ),
           ),
+          if (planType == AIPlanType.byok && businessId != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.onPrimary,
+                side: BorderSide(color: theme.colorScheme.onPrimary.withValues(alpha: 0.6)),
+              ),
+              onPressed: () {
+                context.go(
+                  BusinessRoutePaths.uri(businessId!, 0, 'settings/ai-provider'),
+                );
+              },
+              icon: const Icon(Icons.settings_suggest_outlined, size: 18),
+              label: const Text('تنظیم ارائه‌دهنده اختصاصی'),
+            ),
+          ],
           if (subscription!.periodEnd != null) ...[
             const SizedBox(height: 12),
             Text(
@@ -546,6 +594,8 @@ class _SubscriptionHero extends StatelessWidget {
         return 'پرداخت به ازای استفاده';
       case AIPlanType.hybrid:
         return 'پلن ترکیبی';
+      case AIPlanType.byok:
+        return 'ارائه‌دهنده اختصاصی';
     }
   }
 }
@@ -932,26 +982,42 @@ class _PlanCard extends StatelessWidget {
     if (plan.planType == AIPlanType.free) {
       return 'رایگان';
     }
-    if (plan.planType == AIPlanType.subscription || plan.planType == AIPlanType.hybrid) {
-      final sub = pc['subscription'];
+    if (plan.planType == AIPlanType.subscription ||
+        plan.planType == AIPlanType.hybrid ||
+        plan.planType == AIPlanType.byok) {
+      final sub = pc['platform_fee'] is Map ? pc['platform_fee'] : pc['subscription'];
       if (sub is Map) {
         final parts = <String>[];
         if (billingPeriod == 'monthly') {
           final m = sub['monthly_price'];
           final n = m is num ? m.toDouble() : double.tryParse(m?.toString() ?? '');
           if (n != null && n > 0) {
-            parts.add('${formatWithThousands(n)} تومان / ماه');
+            parts.add(
+              plan.planType == AIPlanType.byok
+                  ? '${formatWithThousands(n)} تومان کارمزد / ماه'
+                  : '${formatWithThousands(n)} تومان / ماه',
+            );
+          } else if (plan.planType == AIPlanType.byok) {
+            parts.add('بدون کارمزد پلتفرم — هزینه مدل با شما');
           }
         } else {
           final y = sub['yearly_price'];
           final n = y is num ? y.toDouble() : double.tryParse(y?.toString() ?? '');
           if (n != null && n > 0) {
-            parts.add('${formatWithThousands(n)} تومان / سال');
+            parts.add(
+              plan.planType == AIPlanType.byok
+                  ? '${formatWithThousands(n)} تومان کارمزد / سال'
+                  : '${formatWithThousands(n)} تومان / سال',
+            );
+          } else if (plan.planType == AIPlanType.byok) {
+            parts.add('بدون کارمزد پلتفرم — هزینه مدل با شما');
           }
         }
         if (parts.isNotEmpty) {
           return parts.join(' — ');
         }
+      } else if (plan.planType == AIPlanType.byok) {
+        return 'بدون کارمزد پلتفرم — هزینه مدل با شما';
       }
     }
     if (plan.planType == AIPlanType.payAsGo || plan.planType == AIPlanType.hybrid) {
@@ -988,6 +1054,8 @@ class _PlanCard extends StatelessWidget {
         return 'پرداخت به ازای استفاده';
       case AIPlanType.hybrid:
         return 'ترکیبی';
+      case AIPlanType.byok:
+        return 'ارائه‌دهنده اختصاصی';
     }
   }
 }

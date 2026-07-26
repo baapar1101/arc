@@ -178,6 +178,7 @@ import 'pages/warehouse/stock_count_page.dart';
 import 'pages/warehouse/goods_expense_income_list_page.dart';
 import 'pages/business/installments_report_page.dart';
 import 'pages/business/credit_settings_page.dart';
+import 'pages/business/business_ai_provider_settings_page.dart';
 import 'pages/business/quick_sales_settings_page.dart';
 import 'pages/business/quick_sales_page.dart';
 import 'pages/business/document_numbering_settings_page.dart';
@@ -3377,6 +3378,22 @@ class _MyAppState extends State<MyApp> {
                   return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
                 }
                 return hesabixNoTransitionPage(state, BusinessFtpBackupSettingsPage(businessId: businessId));
+              },
+            ),
+            GoRoute(
+              path: 'settings/ai-provider',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final isOwner = _authStore!.currentBusiness?.id == businessId &&
+                    _authStore!.currentBusiness?.isOwner == true;
+                final hasPerm = _authStore!.hasBusinessPermission('settings', 'manage_ai_provider');
+                if (!isOwner && !hasPerm) {
+                  return hesabixNoTransitionPage(state, PermissionGuard.buildAccessDeniedPage());
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  BusinessAIProviderSettingsPage(businessId: businessId),
+                );
               },
             ),
             GoRoute(

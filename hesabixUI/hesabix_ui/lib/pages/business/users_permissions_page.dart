@@ -1221,6 +1221,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'history': t.eventHistory,
         'users': t.usersAndPermissions,
         'manage_ftp': t.settingsPermissionManageFtp,
+        'manage_ai_provider': 'مدیریت ارائه‌دهنده هوش مصنوعی',
       },
       'storage': {
         'view': '${t.view} ${t.storageSpace}',
@@ -2092,6 +2093,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.business;
       case 'manage_ftp':
         return t.settingsPermissionManageFtp;
+      case 'manage_ai_provider':
+        return 'مدیریت ارائه‌دهنده هوش مصنوعی';
       case 'collect':
         return t.collect;
       case 'transfer':

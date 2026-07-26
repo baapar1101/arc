@@ -65,7 +65,8 @@ enum AIPlanType {
   free,
   subscription,
   payAsGo,
-  hybrid;
+  hybrid,
+  byok;
 
   String get value {
     switch (this) {
@@ -77,6 +78,8 @@ enum AIPlanType {
         return 'pay_as_go';
       case AIPlanType.hybrid:
         return 'hybrid';
+      case AIPlanType.byok:
+        return 'byok';
     }
   }
 
@@ -90,6 +93,8 @@ enum AIPlanType {
         return AIPlanType.payAsGo;
       case 'hybrid':
         return AIPlanType.hybrid;
+      case 'byok':
+        return AIPlanType.byok;
       default:
         return AIPlanType.free;
     }

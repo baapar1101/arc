@@ -543,6 +543,18 @@ class BusinessSettingsCategorizationService {
           order: 2,
           tags: const ['advanced'],
         ),
+      if (ctx.canManageAiProvider)
+        _item(
+          id: 'ai_provider',
+          title: 'businessSettingsAiProviderTitle',
+          description: 'businessSettingsAiProviderDescription',
+          icon: Icons.smart_toy_outlined,
+          color: const Color(0xFF00695C),
+          route: ctx.panelRoute('settings/ai-provider'),
+          categoryId: 'advanced',
+          order: 3,
+          tags: const ['advanced', 'ai'],
+        ),
       if (ctx.canJoinSettings)
         _item(
           id: 'restore',
@@ -552,7 +564,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFF006064),
           route: ctx.panelRoute('settings/restore'),
           categoryId: 'advanced',
-          order: 3,
+          order: 4,
           tags: const ['advanced'],
         ),
     ];

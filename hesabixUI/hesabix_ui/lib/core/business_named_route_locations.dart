@@ -19,6 +19,7 @@ abstract final class BusinessNamedRoutes {
     'business_wallet': 'wallet',
     'business_ai_chat': 'ai/chat',
     'business_ai_subscription': 'ai/subscription',
+    'business_ai_provider_settings': 'settings/ai-provider',
     'business_ai_usage': 'ai/usage',
     'business_ai_skills_marketplace': 'ai/skills/marketplace',
     'business_ai_skills_publisher': 'ai/skills/publisher',
