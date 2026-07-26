@@ -8,6 +8,7 @@ import 'ai_reasoning_panel.dart';
 import 'ai_chat_chart_widget.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_table_widget.dart';
+import 'ai_copyable_code_block.dart';
 import 'ai_markdown_table_parser.dart';
 import 'ai_visualization_spec.dart';
 import 'ai_workflow_chat_actions.dart';
@@ -190,6 +191,12 @@ class _AssistantRichContent extends StatelessWidget {
               data: normalizeAssistantMarkdown(seg.text.trim()),
               selectable: true,
               styleSheet: _markdownStyle(theme, scheme),
+              builders: {
+                'pre': AICopyableCodeBlockBuilder(
+                  theme: theme,
+                  scheme: scheme,
+                ),
+              },
               onTapLink: businessId != null
                   ? (text, href, title) => _onMarkdownLink(context, businessId!, text, href)
                   : null,
