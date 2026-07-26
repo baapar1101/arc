@@ -53,6 +53,9 @@ class AIChatDialog extends StatefulWidget {
   /// اگر true باشد پس از آماده‌شدن جلسه، [initialPrompt] ارسال می‌شود.
   final bool autoSendInitialPrompt;
 
+  /// مدل از پیش‌انتخاب‌شده (مثلاً از دیالوگ «از AI بساز»).
+  final String? initialModelCode;
+
   /// وقتی از استودیو HScript باز شود، امکان اعمال مستقیم اسکریپت از پیام‌ها.
   final void Function(String code)? onApplyHScriptCode;
 
@@ -64,6 +67,7 @@ class AIChatDialog extends StatefulWidget {
     this.embeddedInShell = false,
     this.initialPrompt,
     this.autoSendInitialPrompt = true,
+    this.initialModelCode,
     this.onApplyHScriptCode,
   });
 
@@ -74,6 +78,7 @@ class AIChatDialog extends StatefulWidget {
     CalendarController? calendarController,
     String? initialPrompt,
     bool autoSendInitialPrompt = true,
+    String? initialModelCode,
     void Function(String code)? onApplyHScriptCode,
   }) {
     return Navigator.of(context).push<void>(
@@ -88,6 +93,7 @@ class AIChatDialog extends StatefulWidget {
           calendarController: calendarController,
           initialPrompt: initialPrompt,
           autoSendInitialPrompt: autoSendInitialPrompt,
+          initialModelCode: initialModelCode,
           onApplyHScriptCode: onApplyHScriptCode,
         ),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -218,6 +224,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _loadSuggestions();
     unawaited(_loadExecutionModePreference());
     if (widget.businessId != null) {
+      _modelsLoading = true;
       unawaited(_loadProactiveAlerts());
       unawaited(_loadAvailableModels());
     }
@@ -234,6 +241,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
     // صبر تا بارگذاری جلسات تمام شود
     for (var i = 0; i < 40 && mounted && _sessionsLoading; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    // صبر تا مدل‌ها لود شوند تا auto-send با model خالی/اشتباه نرود
+    if (widget.businessId != null) {
+      for (var i = 0; i < 60 && mounted && _modelsLoading; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
     }
     if (!mounted || _initialPromptHandled) return;
     _initialPromptHandled = true;
@@ -310,15 +323,30 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (widget.businessId == null) return;
     setState(() => _modelsLoading = true);
     try {
-      final models = await _aiService.listAvailableAIModels(
+      final result = await _aiService.listAvailableAIModelsResult(
         businessId: widget.businessId,
       );
+      final models = result.models;
+      final preferred = result.preferredModelCode;
       if (!mounted) return;
+
+      bool hasCode(String? code) =>
+          code != null && models.any((m) => m.code == code);
+
       String? selected = _selectedModelCode;
-      for (final m in models) {
-        if (m.isDefault) {
-          selected ??= m.code;
-          break;
+      if (!hasCode(selected)) selected = null;
+      if (!hasCode(selected) && hasCode(widget.initialModelCode)) {
+        selected = widget.initialModelCode;
+      }
+      if (!hasCode(selected) && hasCode(preferred)) {
+        selected = preferred;
+      }
+      if (!hasCode(selected)) {
+        for (final m in models) {
+          if (m.isDefault) {
+            selected = m.code;
+            break;
+          }
         }
       }
       selected ??= models.where((m) => m.isAuto).map((m) => m.code).firstOrNull;

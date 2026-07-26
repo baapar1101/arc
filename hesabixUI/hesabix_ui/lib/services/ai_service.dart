@@ -225,6 +225,13 @@ class AIService {
 
   // ========== User: AI Models ==========
   Future<List<AIModelCatalogItem>> listAvailableAIModels({int? businessId}) async {
+    final result = await listAvailableAIModelsResult(businessId: businessId);
+    return result.models;
+  }
+
+  /// کاتالوگ مدل‌ها به‌همراه preferred/plan default (یک درخواست).
+  Future<({List<AIModelCatalogItem> models, String? preferredModelCode})>
+      listAvailableAIModelsResult({int? businessId}) async {
     final query = <String, dynamic>{};
     if (businessId != null) query['business_id'] = businessId;
     final res = await _api.get<Map<String, dynamic>>(
@@ -233,23 +240,17 @@ class AIService {
     );
     final body = res.data as Map<String, dynamic>;
     final data = body['data'] as Map<String, dynamic>;
-    final models = data['models'] as List? ?? [];
-    return models
+    final models = (data['models'] as List? ?? [])
         .map((e) => AIModelCatalogItem.fromJson(e as Map<String, dynamic>))
         .toList();
+    final preferred = data['preferred_model_code'] as String? ??
+        data['plan_default_model'] as String?;
+    return (models: models, preferredModelCode: preferred);
   }
 
   Future<String?> getPreferredModelCode({int? businessId}) async {
-    final query = <String, dynamic>{};
-    if (businessId != null) query['business_id'] = businessId;
-    final res = await _api.get<Map<String, dynamic>>(
-      '/api/v1/ai/models',
-      query: query,
-    );
-    final body = res.data as Map<String, dynamic>;
-    final data = body['data'] as Map<String, dynamic>;
-    return data['preferred_model_code'] as String? ??
-        data['plan_default_model'] as String?;
+    final result = await listAvailableAIModelsResult(businessId: businessId);
+    return result.preferredModelCode;
   }
 
   Future<void> setPreferredModel({

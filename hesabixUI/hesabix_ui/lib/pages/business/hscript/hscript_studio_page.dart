@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 
 import '../../../core/api_client.dart';
 import '../../../core/auth_store.dart';
+import '../../../models/ai_models.dart';
+import '../../../services/ai_service.dart';
 import '../../../services/hscript_report_service.dart';
 import '../../../services/job_service.dart';
 import '../../../utils/error_extractor.dart';
@@ -13,6 +15,7 @@ import '../../../utils/hscript_code_extract.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/web/web_utils.dart' as web_utils;
 import '../../../widgets/ai/ai_chat_dialog.dart';
+import '../../../widgets/ai/ai_chat_model_chip.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../widgets/data_table/helpers/file_saver.dart';
 import '../../../widgets/hscript/hscript_code_editor.dart';
@@ -234,40 +237,17 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
   }
 
   Future<void> _openAiAssist() async {
-    final intentCtrl = TextEditingController();
-    final intent = await showDialog<String>(
+    final result = await showDialog<_HScriptAiAssistResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('از AI بساز / اصلاح کن'),
-        content: SizedBox(
-          width: 420,
-          child: TextField(
-            controller: intentCtrl,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              hintText: 'مثلاً: گزارش فروش ماه با KPI و نمودار میله‌ای',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, intentCtrl.text.trim()),
-            child: const Text('ادامه'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _HScriptAiAssistDialog(businessId: widget.businessId),
     );
-    intentCtrl.dispose();
-    if (intent == null || intent.isEmpty || !mounted) return;
+    if (result == null || result.intent.isEmpty || !mounted) return;
 
     String docsBlock = '';
     try {
       final ctxData = await _service.assistContext(
         businessId: widget.businessId,
-        query: intent,
+        query: result.intent,
         sourceCode: _codeCtrl.text,
       );
       final docs = ctxData['docs'];
@@ -288,7 +268,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
     final current = _codeCtrl.text.trim();
     final prompt = StringBuffer()
       ..writeln('کمک کن یک اسکریپت HScript برای گزارش سفارشی حسابیکس بنویسم/اصلاح کنم.')
-      ..writeln('درخواست کاربر: $intent')
+      ..writeln('درخواست کاربر: ${result.intent}')
       ..writeln()
       ..writeln('قواعد:')
       ..writeln('- فقط HScript امن (بدون import/SQL/فایل/شبکه)')
@@ -313,6 +293,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
       calendarController: ApiClient.getCalendarController(),
       initialPrompt: prompt.toString(),
       autoSendInitialPrompt: true,
+      initialModelCode: result.modelCode,
       onApplyHScriptCode: (code) {
         if (!mounted) return;
         setState(() => _codeCtrl.text = code);
@@ -674,5 +655,154 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
       default:
         return 'پیش‌نویس';
     }
+  }
+}
+
+class _HScriptAiAssistResult {
+  const _HScriptAiAssistResult({required this.intent, this.modelCode});
+
+  final String intent;
+  final String? modelCode;
+}
+
+class _HScriptAiAssistDialog extends StatefulWidget {
+  const _HScriptAiAssistDialog({required this.businessId});
+
+  final int businessId;
+
+  @override
+  State<_HScriptAiAssistDialog> createState() => _HScriptAiAssistDialogState();
+}
+
+class _HScriptAiAssistDialogState extends State<_HScriptAiAssistDialog> {
+  late final TextEditingController _intentCtrl;
+  late final AIService _aiService;
+  List<AIModelCatalogItem> _models = [];
+  String? _selectedModelCode;
+  bool _modelsLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _intentCtrl = TextEditingController();
+    _aiService = AIService(ApiClient());
+    _loadModels();
+  }
+
+  @override
+  void dispose() {
+    _intentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadModels() async {
+    setState(() => _modelsLoading = true);
+    try {
+      final result = await _aiService.listAvailableAIModelsResult(
+        businessId: widget.businessId,
+      );
+      final models = result.models;
+      final preferred = result.preferredModelCode;
+      if (!mounted) return;
+
+      bool hasCode(String? code) =>
+          code != null && models.any((m) => m.code == code);
+
+      String? selected;
+      if (hasCode(preferred)) {
+        selected = preferred;
+      } else {
+        for (final m in models) {
+          if (m.isDefault) {
+            selected = m.code;
+            break;
+          }
+        }
+        selected ??= models.where((m) => m.isAuto).map((m) => m.code).firstOrNull;
+        selected ??= models.isNotEmpty ? models.first.code : null;
+      }
+
+      setState(() {
+        _models = models;
+        _selectedModelCode = selected;
+        _modelsLoading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _modelsLoading = false);
+    }
+  }
+
+  void _submit() {
+    final intent = _intentCtrl.text.trim();
+    if (intent.isEmpty) return;
+    Navigator.pop(
+      context,
+      _HScriptAiAssistResult(intent: intent, modelCode: _selectedModelCode),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('از AI بساز / اصلاح کن'),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _intentCtrl,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                hintText: 'مثلاً: گزارش فروش ماه با KPI و نمودار میله‌ای',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Text(
+                  'مدل:',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: AIChatModelChip(
+                      models: _models,
+                      selectedCode: _selectedModelCode,
+                      loading: _modelsLoading,
+                      onChanged: (code) {
+                        setState(() => _selectedModelCode = code);
+                        if (code != null) {
+                          _aiService.setPreferredModel(
+                            modelCode: code,
+                            businessId: widget.businessId,
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('انصراف'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('ادامه'),
+        ),
+      ],
+    );
   }
 }
