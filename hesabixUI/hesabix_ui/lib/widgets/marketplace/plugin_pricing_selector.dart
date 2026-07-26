@@ -27,8 +27,12 @@ class PluginPricingSelector extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final savings = yearlySavingsPercent(plans);
-    final isPurchased = pluginStatus != null && pluginStatus!.isNotEmpty;
-    final currentPlanId = (pluginStatus?['plan_id'] as num?)?.toInt();
+    // Trial stores a placeholder plan_id (often monthly); do not treat it as purchased.
+    final isTrial = pluginStatus?['is_trial'] == true;
+    final isPurchased =
+        pluginStatus != null && pluginStatus!.isNotEmpty && !isTrial;
+    final currentPlanId =
+        isPurchased ? (pluginStatus?['plan_id'] as num?)?.toInt() : null;
 
     // ترتیب نمایش: ماهانه، سالانه، مادام‌العمر
     final ordered = [...plans]..sort((a, b) {
