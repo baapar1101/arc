@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, Dict, Optional
+
 from sqlalchemy.orm import Session
 
 from adapters.api.v1.support.schemas import TicketResponse
@@ -9,10 +11,44 @@ from adapters.db.models.support.ticket import Ticket
 from app.services.support.ticket_engagement_service import engagement_fields
 
 
+def attach_support_subscription(data: Dict[str, Any], db: Session, user_id: Optional[int]) -> None:
+    """Attach submitter's active/grace support plan fields onto a ticket payload."""
+    data["support_subscription"] = None
+    data["is_priority_subscriber"] = False
+    if not user_id:
+        return
+    try:
+        from app.services.support.support_billing_settings import get_support_paid_priority_boost
+        from app.services.support.support_entitlement_service import get_active_or_grace_subscription
+
+        sub = get_active_or_grace_subscription(db, int(user_id))
+        if not sub or not sub.plan:
+            return
+        plan = sub.plan
+        data["support_subscription"] = {
+            "status": sub.status,
+            "ends_at": sub.ends_at.isoformat() if sub.ends_at else None,
+            "plan_id": plan.id,
+            "plan_name": plan.name,
+            "plan_code": plan.code,
+            "period_months": plan.period_months,
+            "includes_priority_support": bool(plan.includes_priority_support),
+            "priority_weight": int(plan.priority_weight or 0),
+        }
+        if get_support_paid_priority_boost(db) and sub.status == "active":
+            data["is_priority_subscriber"] = bool(plan.includes_priority_support) or int(
+                plan.priority_weight or 0
+            ) > 0
+    except Exception:
+        data["support_subscription"] = None
+        data["is_priority_subscriber"] = False
+
+
 def ticket_response_dict(ticket: Ticket, db: Session) -> dict:
     """Full ticket payload (ORM relations + engagement fields)."""
     data = TicketResponse.from_orm(ticket).dict()
     data.update(engagement_fields(db, ticket))
+    attach_support_subscription(data, db, ticket.user_id)
     return data
 
 
@@ -75,29 +111,7 @@ def ticket_to_dict(ticket: Ticket, db: Session) -> dict:
             "last_name": ticket.user.last_name,
             "email": ticket.user.email,
         }
-        try:
-            from app.services.support.support_entitlement_service import get_active_or_grace_subscription
-            from app.services.support.support_billing_settings import get_support_paid_priority_boost
-
-            sub = get_active_or_grace_subscription(db, ticket.user_id)
-            if sub and sub.plan:
-                data["support_subscription"] = {
-                    "status": sub.status,
-                    "ends_at": sub.ends_at.isoformat() if sub.ends_at else None,
-                    "plan_name": sub.plan.name,
-                    "includes_priority_support": bool(sub.plan.includes_priority_support),
-                    "priority_weight": int(sub.plan.priority_weight or 0),
-                }
-                if get_support_paid_priority_boost(db) and sub.status == "active":
-                    data["is_priority_subscriber"] = bool(sub.plan.includes_priority_support) or int(sub.plan.priority_weight or 0) > 0
-                else:
-                    data["is_priority_subscriber"] = False
-            else:
-                data["support_subscription"] = None
-                data["is_priority_subscriber"] = False
-        except Exception:
-            data["support_subscription"] = None
-            data["is_priority_subscriber"] = False
+    attach_support_subscription(data, db, ticket.user_id)
     if ticket.assigned_operator:
         data["assigned_operator"] = {
             "id": ticket.assigned_operator.id,

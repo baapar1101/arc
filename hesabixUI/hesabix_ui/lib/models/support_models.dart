@@ -263,6 +263,78 @@ class SupportUser {
   }
 }
 
+/// پلن پشتیبانی فعال/مهلت‌دار ارسال‌کننده تیکت (برای اپراتور).
+class TicketSupportSubscription {
+  final String status;
+  final DateTime? endsAt;
+  final int? planId;
+  final String planName;
+  final String? planCode;
+  final int? periodMonths;
+  final bool includesPrioritySupport;
+  final int priorityWeight;
+
+  TicketSupportSubscription({
+    required this.status,
+    this.endsAt,
+    this.planId,
+    required this.planName,
+    this.planCode,
+    this.periodMonths,
+    this.includesPrioritySupport = false,
+    this.priorityWeight = 0,
+  });
+
+  factory TicketSupportSubscription.fromJson(Map<String, dynamic> json) {
+    return TicketSupportSubscription(
+      status: '${json['status'] ?? ''}',
+      endsAt: json['ends_at'] != null
+          ? SupportCategory._parseDateTime(json['ends_at'])
+          : null,
+      planId: json['plan_id'] is int
+          ? json['plan_id'] as int
+          : int.tryParse('${json['plan_id'] ?? ''}'),
+      planName: '${json['plan_name'] ?? ''}',
+      planCode: json['plan_code']?.toString(),
+      periodMonths: json['period_months'] is int
+          ? json['period_months'] as int
+          : int.tryParse('${json['period_months'] ?? ''}'),
+      includesPrioritySupport: json['includes_priority_support'] == true,
+      priorityWeight: json['priority_weight'] is int
+          ? json['priority_weight'] as int
+          : int.tryParse('${json['priority_weight'] ?? 0}') ?? 0,
+    );
+  }
+
+  bool get isGrace => status == 'grace';
+  bool get isActive => status == 'active';
+
+  String get statusLabel {
+    return switch (status) {
+      'active' => 'فعال',
+      'grace' => 'مهلت انقضا',
+      'expired' => 'منقضی',
+      'cancelled' => 'لغو شده',
+      'pending' => 'در انتظار',
+      'replaced' => 'جایگزین شده',
+      _ => status.isEmpty ? '—' : status,
+    };
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'status': status,
+      'ends_at': endsAt?.toIso8601String(),
+      'plan_id': planId,
+      'plan_name': planName,
+      'plan_code': planCode,
+      'period_months': periodMonths,
+      'includes_priority_support': includesPrioritySupport,
+      'priority_weight': priorityWeight,
+    };
+  }
+}
+
 class SupportMessage {
   final int id;
   final int ticketId;
@@ -349,6 +421,8 @@ class SupportTicket {
   final int? csatRating;
   final String? csatComment;
   final DateTime? csatSubmittedAt;
+  final TicketSupportSubscription? supportSubscription;
+  final bool isPrioritySubscriber;
   
   // Related objects
   final SupportUser? user;
@@ -381,6 +455,8 @@ class SupportTicket {
     this.csatRating,
     this.csatComment,
     this.csatSubmittedAt,
+    this.supportSubscription,
+    this.isPrioritySubscriber = false,
     this.user,
     this.assignedOperator,
     this.category,
@@ -433,6 +509,12 @@ class SupportTicket {
       csatRating: json['csat_rating'] is int ? json['csat_rating'] as int : int.tryParse('${json['csat_rating']}'),
       csatComment: json['csat_comment'] as String?,
       csatSubmittedAt: parseOpt(json['csat_submitted_at_raw'] ?? json['csat_submitted_at']),
+      supportSubscription: json['support_subscription'] is Map
+          ? TicketSupportSubscription.fromJson(
+              Map<String, dynamic>.from(json['support_subscription'] as Map),
+            )
+          : null,
+      isPrioritySubscriber: json['is_priority_subscriber'] == true,
       user: json['user'] != null ? SupportUser.fromJson(json['user']) : null,
       assignedOperator: json['assigned_operator'] != null ? SupportUser.fromJson(json['assigned_operator']) : null,
       category: json['category'] != null ? SupportCategory.fromJson(json['category']) : null,
@@ -470,6 +552,8 @@ class SupportTicket {
       'csat_rating': csatRating,
       'csat_comment': csatComment,
       'csat_submitted_at': csatSubmittedAt?.toIso8601String(),
+      'support_subscription': supportSubscription?.toJson(),
+      'is_priority_subscriber': isPrioritySubscriber,
     };
   }
 

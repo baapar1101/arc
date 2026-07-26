@@ -94,6 +94,25 @@ class OperatorTicketListItem extends StatelessWidget {
     final slaSide = slaRowBorderSide(slaStatus);
     final activityAt = ticket?.lastActivityAt ?? DateTime.now();
     final showCheckbox = onToggleSelect != null && isChecked != null;
+    final sub = ticket?.supportSubscription ??
+        (row['support_subscription'] is Map
+            ? TicketSupportSubscription.fromJson(
+                Map<String, dynamic>.from(row['support_subscription'] as Map),
+              )
+            : null);
+    final planTooltip = () {
+      if (sub == null) {
+        return row['is_priority_subscriber'] == true ? 'مشترک اولویت‌دار' : null;
+      }
+      final parts = <String>[sub.planName, sub.statusLabel];
+      if (sub.endsAt != null) {
+        final isJalali = calendarController?.isJalali ?? true;
+        parts.add(
+          'تا ${date_utils.HesabixDateUtils.formatForDisplay(sub.endsAt!, isJalali)}',
+        );
+      }
+      return parts.join(' · ');
+    }();
 
     return Material(
       color: isSelected ? colors.selectedRowBg : null,
@@ -149,12 +168,33 @@ class OperatorTicketListItem extends StatelessWidget {
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (row['is_priority_subscriber'] == true) ...[
+                        if (sub != null || row['is_priority_subscriber'] == true) ...[
                           const SizedBox(width: 4),
-                          Icon(
-                            Icons.workspace_premium_rounded,
-                            size: 14,
-                            color: theme.colorScheme.tertiary,
+                          Tooltip(
+                            message: planTooltip ?? 'مشترک اولویت‌دار',
+                            child: Icon(
+                              Icons.workspace_premium_rounded,
+                              size: 14,
+                              color: sub?.isGrace == true
+                                  ? theme.colorScheme.error
+                                  : theme.colorScheme.tertiary,
+                            ),
+                          ),
+                        ],
+                        if (sub != null && sub.planName.isNotEmpty) ...[
+                          const SizedBox(width: 4),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 88),
+                            child: Text(
+                              sub.planName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.tertiary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10,
+                              ),
+                            ),
                           ),
                         ],
                         const SizedBox(width: 6),

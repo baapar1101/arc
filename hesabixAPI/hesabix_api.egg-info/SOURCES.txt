@@ -406,6 +406,7 @@ app/core/distribution_plugin_dependency.py
 app/core/egress_policy.py
 app/core/error_handlers.py
 app/core/firewall_middleware.py
+app/core/hscript_permissions.py
 app/core/hscript_plugin_dependency.py
 app/core/i18n.py
 app/core/i18n_catalog.py
@@ -541,6 +542,8 @@ app/services/general_ledger_electronic_export_service.py
 app/services/general_ledger_service.py
 app/services/goods_expense_income_service.py
 app/services/hscript_report_service.py
+app/services/hscript_schedule_background_jobs.py
+app/services/hscript_schedule_service.py
 app/services/invoice_adjustments_service.py
 app/services/invoice_bulk_upsert_service.py
 app/services/invoice_cogs_gl_service.py
@@ -777,6 +780,7 @@ app/services/ai/prompt_service.py
 app/services/hscript/__init__.py
 app/services/hscript/ast_nodes.py
 app/services/hscript/builtins.py
+app/services/hscript/catalog.py
 app/services/hscript/dates.py
 app/services/hscript/docs_catalog.py
 app/services/hscript/errors.py
@@ -786,6 +790,7 @@ app/services/hscript/interpreter.py
 app/services/hscript/lexer.py
 app/services/hscript/limits.py
 app/services/hscript/number_format.py
+app/services/hscript/param_schema.py
 app/services/hscript/parser.py
 app/services/hscript/pdf_renderer.py
 app/services/hscript/plan_limits.py
@@ -1073,6 +1078,7 @@ migrations/versions/20260724_000004_telegram_link_tokens_timestamps.py
 migrations/versions/20260725_000001_document_lines_fx_base_amounts.py
 migrations/versions/20260725_000002_product_fx_prices.py
 migrations/versions/20260726_000001_business_ai_provider_configs.py
+migrations/versions/20260726_000002_hscript_schedules.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1149,6 +1155,8 @@ tests/test_hscript_excel_dashboard.py
 tests/test_hscript_pdf_renderer.py
 tests/test_hscript_phase45.py
 tests/test_hscript_phase7.py
+tests/test_hscript_phase8.py
+tests/test_hscript_phase9.py
 tests/test_hscript_runtime.py
 tests/test_invoice_cogs_gl_service.py
 tests/test_invoice_payable_total.py

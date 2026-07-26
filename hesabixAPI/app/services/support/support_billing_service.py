@@ -41,12 +41,22 @@ def _next_invoice_code(db: Session) -> str:
 
 
 def _serialize_invoice(inv: SupportInvoice) -> Dict[str, Any]:
+	user = getattr(inv, "user", None)
+	user_name = None
+	user_email = None
+	if user is not None:
+		parts = [p for p in (getattr(user, "first_name", None), getattr(user, "last_name", None)) if p]
+		user_name = " ".join(parts) if parts else None
+		user_email = getattr(user, "email", None)
 	return {
 		"id": inv.id,
 		"code": inv.code,
 		"user_id": inv.user_id,
+		"user_name": user_name,
+		"user_email": user_email,
 		"plan_id": inv.plan_id,
 		"plan_name": inv.plan.name if inv.plan else None,
+		"plan_code": inv.plan.code if inv.plan else None,
 		"invoice_type": inv.invoice_type,
 		"amount": float(inv.amount or 0),
 		"discount_amount": float(inv.discount_amount or 0),
@@ -397,7 +407,10 @@ def admin_list_invoices(
 	limit: int = 50,
 	offset: int = 0,
 ) -> Dict[str, Any]:
-	q = db.query(SupportInvoice).options(joinedload(SupportInvoice.plan))
+	q = db.query(SupportInvoice).options(
+		joinedload(SupportInvoice.plan),
+		joinedload(SupportInvoice.user),
+	)
 	if status:
 		q = q.filter(SupportInvoice.status == status)
 	if user_id:

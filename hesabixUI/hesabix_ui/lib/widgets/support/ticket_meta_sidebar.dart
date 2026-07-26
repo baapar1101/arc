@@ -53,6 +53,22 @@ class TicketMetaSidebar extends StatelessWidget {
             title: Text(ticket.user!.displayName, style: theme.textTheme.titleSmall),
             subtitle: ticket.user!.email != null ? Text(ticket.user!.email!) : null,
           ),
+          if (ticket.supportSubscription != null) ...[
+            const SizedBox(height: 4),
+            _SupportPlanCard(
+              subscription: ticket.supportSubscription!,
+              isPrioritySubscriber: ticket.isPrioritySubscriber,
+              formatDate: _fmt,
+            ),
+          ] else ...[
+            const SizedBox(height: 4),
+            Text(
+              'بدون پلن پشتیبانی فعال',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
         ],
         _SectionTitle(icon: Icons.tune, title: 'مشخصات'),
@@ -116,6 +132,83 @@ class _SectionTitle extends StatelessWidget {
           Icon(icon, size: 16, color: theme.colorScheme.primary),
           const SizedBox(width: 6),
           Text(title, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupportPlanCard extends StatelessWidget {
+  final TicketSupportSubscription subscription;
+  final bool isPrioritySubscriber;
+  final String Function(DateTime) formatDate;
+
+  const _SupportPlanCard({
+    required this.subscription,
+    required this.isPrioritySubscriber,
+    required this.formatDate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isGrace = subscription.isGrace;
+    final accent = isGrace ? theme.colorScheme.error : theme.colorScheme.tertiary;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: accent.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.workspace_premium_rounded, size: 16, color: accent),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  subscription.planName.isNotEmpty ? subscription.planName : 'پلن پشتیبانی',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: accent,
+                  ),
+                ),
+              ),
+              if (isPrioritySubscriber)
+                Tooltip(
+                  message: 'پشتیبانی اولویت‌دار',
+                  child: Icon(Icons.bolt_rounded, size: 16, color: accent),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'وضعیت: ${subscription.statusLabel}',
+            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          if (subscription.endsAt != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'پایان: ${formatDate(subscription.endsAt!)}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          if (subscription.periodMonths != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              'دوره: ${subscription.periodMonths} ماهه',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ],
       ),
     );
