@@ -10989,13 +10989,13 @@ abstract class AppLocalizations {
   /// No description provided for @reportsPeopleTransactionsTitle.
   ///
   /// In en, this message translates to:
-  /// **'People transactions'**
+  /// **'Party subsidiary ledger'**
   String get reportsPeopleTransactionsTitle;
 
   /// No description provided for @reportsPeopleTransactionsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Detailed receipts and payments by person'**
+  /// **'Invoice line items with receipts and payments per person'**
   String get reportsPeopleTransactionsSubtitle;
 
   /// No description provided for @reportsItemMovementsTitle.
@@ -19215,7 +19215,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiToolGetPersonTransactions.
   ///
   /// In en, this message translates to:
-  /// **'Person transactions'**
+  /// **'Comprehensive person ledger'**
   String get aiToolGetPersonTransactions;
 
   /// No description provided for @aiToolSearchProjects.
@@ -19779,7 +19779,7 @@ abstract class AppLocalizations {
   /// No description provided for @personShareIncludeLedgerSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'List of person account transactions'**
+  /// **'Person account transactions including invoice line items'**
   String get personShareIncludeLedgerSubtitle;
 
   /// No description provided for @personShareIncludeInvoices.

@@ -5783,7 +5783,8 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportsCreditorsSubtitle => 'نمایش اشخاص با مانده بستانکار';
 
   @override
-  String get reportsPeopleTransactionsTitle => 'معین اشخاص (خرید/فروش + دریافت/پرداخت)';
+  String get reportsPeopleTransactionsTitle =>
+      'معین اشخاص (خرید/فروش + دریافت/پرداخت)';
 
   @override
   String get reportsPeopleTransactionsSubtitle =>
