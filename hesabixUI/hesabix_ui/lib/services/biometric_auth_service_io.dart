@@ -3,6 +3,7 @@ import 'package:local_auth/local_auth.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 
 import '../core/biometric_platform.dart';
+export 'biometric_auth_service_stub.dart';
 import 'biometric_auth_service_stub.dart';
 
 BiometricAuthService createBiometricAuthService() => _BiometricAuthServiceIo();
