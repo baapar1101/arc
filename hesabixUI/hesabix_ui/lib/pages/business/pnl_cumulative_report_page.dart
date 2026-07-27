@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -7,12 +6,12 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/widgets/reports/pnl_report_shared.dart';
 import 'package:hesabix_ui/utils/financial_report_navigation.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class PnlCumulativeReportPage extends StatefulWidget {
   final int businessId;
@@ -184,15 +183,12 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
         options: Options(headers: {'Accept': isPdf ? 'application/pdf' : 'application/octet-stream'}),
       );
       final data = bytes.data ?? <int>[];
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          'pnl_cumulative_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
-          mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
-        );
-      } else if (mounted) {
-        SnackBarHelper.show(context, message: 'Export only available on web');
-      }
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: 'pnl_cumulative_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
+        mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, message: 'Export error: ${ErrorExtractor.forContext(e, context)}');

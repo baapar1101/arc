@@ -4,10 +4,10 @@ import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/support_ticket_clipboard.dart';
-import 'package:hesabix_ui/widgets/data_table/helpers/file_saver.dart';
 import 'package:hesabix_ui/widgets/support/support_semantic_colors.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -204,11 +204,12 @@ class MessageBubble extends StatelessWidget {
         attachment.id,
         isOperator: isOperator,
       );
-      await FileSaver.saveBytes(bytes, attachment.originalName);
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: attachment.originalName,
+      );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${attachment.originalName} دانلود شد')),
-        );
+        BytesExportService.showFeedback(context, result);
       }
     } catch (e) {
       if (context.mounted) {

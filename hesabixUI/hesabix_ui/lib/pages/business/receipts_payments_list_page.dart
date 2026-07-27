@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -40,6 +39,7 @@ import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/currency_display_utils.dart';
 import '../../services/business_dashboard_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -4590,12 +4590,8 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
       );
 
       // ذخیره فایل
-      await _savePdfFile(pdfBytes, widget.document.code);
-
-      if (mounted) {
-        final t = AppLocalizations.of(context);
-        SnackBarHelper.showSuccess(context, message: t.exportSuccess);
-      }
+      final result = await _savePdfFile(pdfBytes, widget.document.code);
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
@@ -4613,16 +4609,12 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
     }
   }
 
-  Future<void> _savePdfFile(List<int> bytes, String filename) async {
-    if (kIsWeb) {
-      await web_utils.saveBytesAsFileWeb(
-        bytes,
-        filename.endsWith('.pdf') ? filename : '$filename.pdf',
-        mimeType: 'application/pdf',
-      );
-    } else {
-      throw UnsupportedError('PDF download is only supported on web.');
-    }
+  Future<BytesExportResult> _savePdfFile(List<int> bytes, String filename) async {
+    return BytesExportService.export(
+      bytes: bytes,
+      filename: filename.endsWith('.pdf') ? filename : '$filename.pdf',
+      mimeType: 'application/pdf',
+    );
   }
 }
 

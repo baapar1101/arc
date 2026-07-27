@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// صفحه فایل منیجر برای مدیریت فایل‌های کسب‌وکار
 class StorageFileManagerPage extends StatefulWidget {
@@ -541,21 +539,12 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
         throw Exception('فایل خالی است');
       }
 
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(bytes, fileName, mimeType: mimeType);
-      } else {
-        final uint8Bytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
-        final extension = _getFileExtension(fileName).replaceFirst('.', '');
-        final safeExt = extension.isEmpty ? 'bin' : extension;
-        await FileSaver.instance.saveFile(
-          name: fileName,
-          bytes: uint8Bytes,
-          ext: safeExt,
-        );
-        if (mounted) {
-          SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت ذخیره شد');
-        }
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: fileName,
+        mimeType: mimeType,
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(

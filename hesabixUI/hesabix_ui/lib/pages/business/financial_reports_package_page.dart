@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -14,10 +13,10 @@ import 'package:hesabix_ui/widgets/reports/pnl_report_shared.dart';
 import 'package:hesabix_ui/widgets/reports/trial_balance_tree_view.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/utils/financial_report_navigation.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// بسته یکپارچه گزارش‌های مالی: تراز آزمایشی، ترازنامه و سود و زیان با فیلتر مشترک.
 class FinancialReportsPackagePage extends StatefulWidget {
@@ -220,13 +219,12 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
         responseType: ResponseType.bytes,
         options: Options(headers: {'Accept': isPdf ? 'application/pdf' : 'application/octet-stream'}),
       );
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes.data ?? <int>[],
-          '${names[tab]}_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
-          mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
-        );
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes.data ?? <int>[],
+        filename: '${names[tab]}_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
+        mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
@@ -249,13 +247,12 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
         responseType: ResponseType.bytes,
         options: Options(headers: {'Accept': isPdf ? 'application/pdf' : 'application/octet-stream'}),
       );
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes.data ?? <int>[],
-          'financial_package_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
-          mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
-        );
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes.data ?? <int>[],
+        filename: 'financial_package_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
+        mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));

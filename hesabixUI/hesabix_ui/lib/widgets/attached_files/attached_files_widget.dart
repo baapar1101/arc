@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// کلید برای دسترسی به state از خارج (برای refresh)
 class AttachedFilesWidgetKey {
@@ -138,17 +137,12 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
       );
 
       if (bytes.isNotEmpty) {
-        if (kIsWeb) {
-          await web_utils.saveBytesAsFileWeb(
-            bytes,
-            filename,
-            mimeType: 'application/octet-stream',
-          );
-        } else {
-          if (mounted) {
-            SnackBarHelper.show(context, message: 'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
-          }
-        }
+        final result = await BytesExportService.export(
+          bytes: bytes,
+          filename: filename,
+          mimeType: 'application/octet-stream',
+        );
+        if (mounted) BytesExportService.showFeedback(context, result);
       }
     } catch (e) {
       if (mounted) {

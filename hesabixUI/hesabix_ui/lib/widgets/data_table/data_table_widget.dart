@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/foundation.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +14,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'data_table_config.dart';
 import 'data_table_search_dialog.dart';
 import 'column_settings_dialog.dart';
@@ -1620,47 +1620,18 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       );
 
       if (response.data != null) {
-        String? contentDisposition = response.headers.value(
-          'content-disposition',
+        final ext = format == 'pdf' ? 'pdf' : 'xlsx';
+        final result = await BytesExportService.exportResponse(
+          response: response,
+          fallbackBaseName:
+              'export_${DateTime.now().millisecondsSinceEpoch}',
+          fallbackExt: ext,
         );
-        String filename =
-            'export_${DateTime.now().millisecondsSinceEpoch}.${format == 'pdf' ? 'pdf' : 'xlsx'}';
-        if (contentDisposition != null) {
-          try {
-            final parts = contentDisposition.split(';').map((s) => s.trim());
-            for (final p in parts) {
-              if (p.toLowerCase().startsWith('filename=')) {
-                var name = p.substring('filename='.length).trim();
-                if (name.startsWith('"') &&
-                    name.endsWith('"') &&
-                    name.length >= 2) {
-                  name = name.substring(1, name.length - 1);
-                }
-                if (name.isNotEmpty) {
-                  filename = name;
-                }
-                break;
-              }
-            }
-          } catch (_) {
-            // Fallback to default filename
-          }
-        }
-        final expectedExt = format == 'pdf' ? '.pdf' : '.xlsx';
-        if (!filename.toLowerCase().endsWith(expectedExt)) {
-          filename = '$filename$expectedExt';
-        }
-
-        if (format == 'pdf') {
-          await _downloadPdf(response.data, filename);
-        } else if (format == 'excel') {
-          await _downloadExcel(response.data, filename);
-        }
 
         if (mounted) {
-          SnackBarHelper.showSuccess(context, message: t.exportSuccess);
+          BytesExportService.showFeedback(context, result);
         }
-        return true;
+        return result.isSuccess;
       }
       return false;
     } catch (e) {
@@ -1701,44 +1672,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (v != null && '$v'.isNotEmpty) out[k] = v;
     }
     return out;
-  }
-
-  // Cross-platform save using conditional FileSaver
-  Future<void> _saveBytesToDownloads(dynamic data, String filename) async {
-    Uint8List bytes;
-    if (data is List<int>) {
-      bytes = Uint8List.fromList(data);
-    } else if (data is Uint8List) {
-      bytes = data;
-    } else {
-      throw Exception('Unsupported binary data type: ${data.runtimeType}');
-    }
-
-    // Use file_saver package for cross-platform file saving
-    try {
-      final fileSaver = FileSaver.instance;
-      final extension = filename.split('.').last;
-      await fileSaver.saveFile(name: filename, bytes: bytes, ext: extension);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // Platform-specific download functions for Linux
-  Future<void> _downloadPdf(dynamic data, String filename) async {
-    try {
-      await _saveBytesToDownloads(data, filename);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<void> _downloadExcel(dynamic data, String filename) async {
-    try {
-      await _saveBytesToDownloads(data, filename);
-    } catch (e) {
-      rethrow;
-    }
   }
 
   // Cache for measured text widths to reduce TextPainter.layout calls

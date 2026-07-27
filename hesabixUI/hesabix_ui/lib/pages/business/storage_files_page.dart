@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
@@ -10,9 +9,9 @@ import 'package:hesabix_ui/utils/date_formatters.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// صفحه مدیریت فایل‌های کسب‌وکار
 class StorageFilesPage extends StatefulWidget {
@@ -674,35 +673,30 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       final queryParams = _selectedModuleContext != null 
           ? {'module_context': _selectedModuleContext}
           : null;
-      
-      if (kIsWeb) {
-        // دانلود فایل از طریق API با authentication header
-        final response = await _apiClient.get<List<int>>(
-          baseUrl,
-          query: queryParams,
-          responseType: ResponseType.bytes,
-          options: Options(
-            headers: {
-              'Accept': 'application/zip',
-            },
-          ),
-        );
 
-        if (response.statusCode == 200 && response.data != null) {
-          // ذخیره فایل در مرورگر
-          await web_utils.saveBytesAsFileWeb(
-            response.data!,
-            'hesabix_files_${widget.businessId}.zip',
-            mimeType: 'application/zip',
-          );
-          
-          if (mounted) {
-            SnackBarHelper.showSuccess(context, message: 'فایل ZIP با موفقیت دانلود شد');
-          }
-        }
-      } else {
+      final response = await _apiClient.get<List<int>>(
+        baseUrl,
+        query: queryParams,
+        responseType: ResponseType.bytes,
+        options: Options(
+          headers: {
+            'Accept': 'application/zip',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final result = await BytesExportService.export(
+          bytes: response.data!,
+          filename: 'hesabix_files_${widget.businessId}.zip',
+          mimeType: 'application/zip',
+        );
         if (mounted) {
-          SnackBarHelper.show(context, message: 'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
+          BytesExportService.showFeedback(
+            context,
+            result,
+            successOverride: 'فایل ZIP با موفقیت دانلود شد',
+          );
         }
       }
     } catch (e) {
@@ -2570,22 +2564,18 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         fileId: file['id'] as String,
       );
 
-      if (kIsWeb) {
-        final fileName = file['original_name'] ?? 'file';
-        await web_utils.saveBytesAsFileWeb(
-          fileBytes,
-          fileName,
-          mimeType: file['mime_type'] ?? 'application/octet-stream',
-        );
-      } else {
-        // برای موبایل باید از path_provider استفاده شود
-        if (mounted) {
-          SnackBarHelper.showError(context, message: 'دانلود در موبایل در حال توسعه است');
-        }
-      }
-
+      final fileName = file['original_name'] ?? 'file';
+      final result = await BytesExportService.export(
+        bytes: fileBytes,
+        filename: fileName.toString(),
+        mimeType: (file['mime_type'] ?? 'application/octet-stream').toString(),
+      );
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت دانلود شد');
+        BytesExportService.showFeedback(
+          context,
+          result,
+          successOverride: 'فایل با موفقیت دانلود شد',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -2781,15 +2771,17 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
           fileId: fileId,
         );
 
-        if (kIsWeb) {
-          final fileName = file['original_name'] ?? 'file';
-          await web_utils.saveBytesAsFileWeb(
-            fileBytes,
-            fileName,
-            mimeType: file['mime_type'] ?? 'application/octet-stream',
-          );
+        final fileName = file['original_name'] ?? 'file';
+        final result = await BytesExportService.export(
+          bytes: fileBytes,
+          filename: fileName.toString(),
+          mimeType: (file['mime_type'] ?? 'application/octet-stream').toString(),
+        );
+        if (result.isSuccess) {
+          successCount++;
+        } else if (!result.isCancelled) {
+          failCount++;
         }
-        successCount++;
       } catch (e) {
         failCount++;
       }

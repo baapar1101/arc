@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -13,7 +12,7 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class AccountReviewReportPage extends StatefulWidget {
   final int businessId;
@@ -301,17 +300,12 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
         ),
       );
       final data = bytes.data ?? <int>[];
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          'accounts_review_${widget.businessId}.xlsx',
-          mimeType: 'application/octet-stream',
-        );
-      } else {
-        if (mounted) {
-          SnackBarHelper.show(context, message: 'Export only available on web');
-        }
-      }
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: 'accounts_review_${widget.businessId}.xlsx',
+        mimeType: 'application/octet-stream',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
@@ -345,17 +339,12 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
         ),
       );
       final data = bytes.data ?? <int>[];
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          'accounts_review_${widget.businessId}.pdf',
-          mimeType: 'application/pdf',
-        );
-      } else {
-        if (mounted) {
-          SnackBarHelper.show(context, message: 'Export only available on web');
-        }
-      }
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: 'accounts_review_${widget.businessId}.pdf',
+        mimeType: 'application/pdf',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(

@@ -7,7 +7,6 @@ import '../../core/auth_store.dart';
 import '../../services/product_service.dart';
 import '../../services/price_list_service.dart';
 import '../../utils/responsive_helper.dart';
-import '../../widgets/data_table/helpers/file_saver.dart';
 import '../../widgets/person/file_picker_bridge.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/number_normalizer.dart'
@@ -15,6 +14,7 @@ import '../../utils/number_normalizer.dart'
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/api_datetime_display.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// ویرایش گسترده قیمت پایه و (اختیاری) قیمت‌های لیست قیمت، با صفحه‌بندی.
 class ProductBulkPricesSheetPage extends StatefulWidget {
@@ -366,9 +366,17 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
       }
       final ts = DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
       final fname = 'bulk_prices_sheet_${widget.businessId}_$ts.xlsx';
-      await FileSaver.saveBytes(bytes, fname);
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: fname,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
       if (!mounted) return;
-      SnackBarHelper.showSuccess(context, message: t.operationSuccessful);
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: t.operationSuccessful,
+      );
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, message: ErrorExtractor.extractErrorMessage(e, t));

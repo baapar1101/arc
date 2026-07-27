@@ -4,7 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../person/file_picker_bridge.dart';
 import '../../core/api_client.dart';
-import '../data_table/helpers/file_saver.dart';
+import '../../services/bytes_export/bytes_export_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
@@ -101,10 +101,17 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
           }
         } catch (_) {}
       }
-      await FileSaver.saveBytes((res.data as List<int>), filename);
+      final result = await BytesExportService.export(
+        bytes: res.data as List<int>,
+        filename: filename,
+      );
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: '${t.templateDownloaded}: $filename');
+        BytesExportService.showFeedback(
+          context,
+          result,
+          successOverride: '${t.templateDownloaded}: $filename',
+        );
       }
     } catch (e) {
       if (mounted) {

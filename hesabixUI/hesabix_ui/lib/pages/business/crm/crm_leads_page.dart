@@ -8,7 +8,6 @@ import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
@@ -18,6 +17,7 @@ import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// صفحه لیست سرنخ‌های CRM
 class CrmLeadsPage extends StatefulWidget {
@@ -211,9 +211,17 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
         ].join(','));
       }
       final bytes = utf8.encode(sb.toString());
-      await web_utils.saveBytesAsFileWeb(bytes, 'leads.csv', mimeType: 'text/csv; charset=utf-8');
+      final exportResult = await BytesExportService.export(
+        bytes: bytes,
+        filename: 'leads.csv',
+        mimeType: 'text/csv; charset=utf-8',
+      );
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'فایل leads.csv ذخیره شد');
+      BytesExportService.showFeedback(
+        context,
+        exportResult,
+        successOverride: 'فایل leads.csv ذخیره شد',
+      );
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(

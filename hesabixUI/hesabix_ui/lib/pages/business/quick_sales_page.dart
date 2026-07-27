@@ -17,7 +17,6 @@ import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-import '../../utils/web/web_utils.dart' as web_utils;
 import '../../utils/number_normalizer.dart' as number_utils;
 import '../../utils/number_formatters.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
@@ -42,6 +41,7 @@ import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../widgets/barcode/web_barcode_scan_screen.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// کد کسب‌وکاری برای نمایش در فروش سریع: اگر [code] با [id] یکی باشد، از `product_code`، `tax_code` یا اولین بارکد عمومی استفاده می‌شود.
 String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
@@ -1895,25 +1895,15 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       
       if (!mounted) return;
       
-      if (kIsWeb) {
-        final filename = invoiceCode ?? 'invoice_$invoiceId';
-        final safeName = filename.trim().isEmpty ? 'invoice.pdf' : filename;
-        final finalName = safeName.toLowerCase().endsWith('.pdf') ? safeName : '$safeName.pdf';
-        
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          finalName,
-          mimeType: 'application/pdf',
-        );
-        
-        SnackBarHelper.show(context, message: 'فایل PDF فاکتور دانلود شد');
-      } else {
-        SnackBarHelper.show(
-          context, 
-          message: 'چاپ فاکتور فعلاً فقط در نسخه وب در دسترس است',
-          isError: true,
-        );
-      }
+      final filename = invoiceCode ?? 'invoice_$invoiceId';
+      final safeName = filename.trim().isEmpty ? 'invoice.pdf' : filename;
+      final finalName = safeName.toLowerCase().endsWith('.pdf') ? safeName : '$safeName.pdf';
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: finalName,
+        mimeType: 'application/pdf',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(

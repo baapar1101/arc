@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../../../core/api_client.dart';
@@ -8,12 +7,11 @@ import '../../../core/auth_store.dart';
 import '../../../services/hscript_report_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
-import '../../../utils/web/web_utils.dart' as web_utils;
 import '../../../widgets/business_subpage_back_leading.dart';
-import '../../../widgets/data_table/helpers/file_saver.dart';
 import '../../../widgets/hscript/hscript_params_form.dart';
 import '../../../widgets/hscript/hscript_spec_renderer.dart';
 import '../../../widgets/permission/access_denied_page.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// حالت فقط‌اجرا برای کاربران بدون دسترسی write (Dual-mode lite).
 class HScriptRunPage extends StatefulWidget {
@@ -131,14 +129,18 @@ class _HScriptRunPageState extends State<HScriptRunPage> {
         params: _paramValues,
       );
       final name = '${_title.isEmpty ? 'hscript-report' : _title}.pdf';
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(bytes, name, mimeType: 'application/pdf');
-      } else {
-        await FileSaver.saveBytes(bytes, name);
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: name,
+        mimeType: 'application/pdf',
+      );
       if (!mounted) return;
       setState(() => _running = false);
-      SnackBarHelper.show(context, message: 'PDF آماده شد');
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: 'PDF آماده شد',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _running = false);

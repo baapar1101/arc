@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
-import 'package:file_saver/file_saver.dart';
-import 'dart:typed_data';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -13,6 +11,7 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
@@ -264,29 +263,15 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       final exportFormat = response.headers.value('x-export-format')?.toLowerCase() ?? 'xlsx';
       final extension = exportFormat == 'csv' ? 'csv' : 'xlsx';
 
-      String filename = 'electronic_general_ledger_${DateTime.now().millisecondsSinceEpoch}.$extension';
-      final contentDisposition = response.headers.value('content-disposition');
-      if (contentDisposition != null) {
-        final match = RegExp(r'filename=([^;]+)').firstMatch(contentDisposition);
-        if (match != null) {
-          var name = match.group(1)?.trim() ?? '';
-          if (name.startsWith('"') && name.endsWith('"') && name.length >= 2) {
-            name = name.substring(1, name.length - 1);
-          }
-          if (name.isNotEmpty) {
-            filename = name;
-          }
-        }
-      }
-
-      await FileSaver.instance.saveFile(
-        name: filename,
-        bytes: Uint8List.fromList(data),
-        ext: extension,
+      final result = await BytesExportService.exportResponse(
+        response: response,
+        fallbackBaseName:
+            'electronic_general_ledger_${DateTime.now().millisecondsSinceEpoch}',
+        fallbackExt: extension,
       );
 
       if (!mounted) return;
-      SnackBarHelper.showSuccess(context, message: t.exportSuccess);
+      BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(

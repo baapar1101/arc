@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -13,6 +11,7 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 
 class InstallmentsReportPage extends StatefulWidget {
@@ -1288,25 +1287,19 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         ),
       );
       final data = resp.data ?? <int>[];
-      if (kIsWeb) {
-        final meta = _resolveDownloadMeta(
-          response: resp,
-          data: data,
-          fallbackBaseName: 'installments_${widget.businessId}',
-          fallbackExt: 'xlsx',
-          fallbackMime: 'application/octet-stream',
-        );
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          meta.filename,
-          mimeType: meta.mimeType,
-        );
-      } else {
-        if (mounted) {
-          final t = AppLocalizations.of(context);
-          SnackBarHelper.show(context, message: t.installmentsExportWebOnly);
-        }
-      }
+      final meta = _resolveDownloadMeta(
+        response: resp,
+        data: data,
+        fallbackBaseName: 'installments_${widget.businessId}',
+        fallbackExt: 'xlsx',
+        fallbackMime: 'application/octet-stream',
+      );
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: meta.filename,
+        mimeType: meta.mimeType,
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
@@ -1334,25 +1327,19 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         ),
       );
       final data = resp.data ?? <int>[];
-      if (kIsWeb) {
-        final meta = _resolveDownloadMeta(
-          response: resp,
-          data: data,
-          fallbackBaseName: 'installments_${widget.businessId}',
-          fallbackExt: 'pdf',
-          fallbackMime: 'application/pdf',
-        );
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          meta.filename,
-          mimeType: meta.mimeType,
-        );
-      } else {
-        if (mounted) {
-          final t = AppLocalizations.of(context);
-          SnackBarHelper.show(context, message: t.installmentsExportWebOnly);
-        }
-      }
+      final meta = _resolveDownloadMeta(
+        response: resp,
+        data: data,
+        fallbackBaseName: 'installments_${widget.businessId}',
+        fallbackExt: 'pdf',
+        fallbackMime: 'application/pdf',
+      );
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: meta.filename,
+        mimeType: meta.mimeType,
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);

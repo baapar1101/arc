@@ -1,8 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:file_saver/file_saver.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -14,7 +11,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/marketplace/moadian_plugin_gate.dart';
-import '../../utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class TaxSettingsPage extends StatefulWidget {
   final int businessId;
@@ -901,19 +898,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     final bytes = utf8.encode(trimmed);
 
     try {
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          safeName,
-          mimeType: 'text/plain',
-        );
-      } else {
-        await FileSaver.instance.saveFile(
-          name: safeName,
-          bytes: Uint8List.fromList(bytes),
-          ext: _extractExtension(safeName),
-        );
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: safeName,
+        mimeType: 'text/plain',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
@@ -921,13 +911,6 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     }
   }
 
-  String _extractExtension(String filename) {
-    final dotIndex = filename.lastIndexOf('.');
-    if (dotIndex == -1 || dotIndex == filename.length - 1) {
-      return 'txt';
-    }
-    return filename.substring(dotIndex + 1);
-  }
 
   String _convertDigitsToEnglish(String input) {
     if (input.isEmpty) return input;

@@ -48,6 +48,7 @@ import '../../services/account_service.dart';
 import '../../utils/invoice_form_prefill.dart';
 import '../../utils/invoice_adjustments_account_filter.dart';
 import 'business_shell_side_nav_scope.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 
 class NewInvoicePage extends StatefulWidget {
@@ -2476,10 +2477,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         invoiceId: invoiceId,
         query: query.isEmpty ? null : query,
       );
-      await _saveInvoicePdf(bytes, invoiceCode ?? 'invoice_$invoiceId');
-
+      final result = await _saveInvoicePdf(bytes, invoiceCode ?? 'invoice_$invoiceId');
       if (!mounted) return;
-      SnackBarHelper.showSuccess(context, message: 'فایل PDF فاکتور دانلود شد');
+      BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       _showError(
@@ -2488,16 +2488,13 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     }
   }
 
-  Future<void> _saveInvoicePdf(List<int> bytes, String filename) async {
-    if (!kIsWeb) {
-      throw UnsupportedError('چاپ فاکتور فعلاً فقط در نسخه وب در دسترس است');
-    }
+  Future<BytesExportResult> _saveInvoicePdf(List<int> bytes, String filename) async {
     final trimmed = filename.trim();
     final safeName = trimmed.isEmpty ? 'invoice.pdf' : trimmed;
     final finalName = safeName.toLowerCase().endsWith('.pdf') ? safeName : '$safeName.pdf';
-    await web_utils.saveBytesAsFileWeb(
-      bytes,
-      finalName,
+    return BytesExportService.export(
+      bytes: bytes,
+      filename: finalName,
       mimeType: 'application/pdf',
     );
   }

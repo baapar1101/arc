@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../../../services/bytes_export/bytes_export_service.dart';
 import '../../../services/payroll_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
-import '../../../widgets/data_table/helpers/file_saver.dart';
 import '../../../widgets/person/file_picker_bridge.dart';
 import 'payroll_ui.dart';
 
@@ -41,7 +41,19 @@ class _PayrollEmployeeImportDialogState extends State<PayrollEmployeeImportDialo
     setState(() => _loading = true);
     try {
       final bytes = await _svc.downloadEmployeesTemplate(businessId: widget.businessId);
-      await FileSaver.saveBytes(bytes, 'payroll_employees_template.xlsx');
+      const filename = 'payroll_employees_template.xlsx';
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: filename,
+      );
+      if (mounted) {
+        final t = AppLocalizations.of(context);
+        BytesExportService.showFeedback(
+          context,
+          result,
+          successOverride: '${t.templateDownloaded}: $filename',
+        );
+      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));

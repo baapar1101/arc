@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/utils/financial_report_navigation.dart';
 import 'package:dio/dio.dart';
@@ -10,8 +9,8 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/widgets/reports/balance_sheet_report_shared.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -145,15 +144,12 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
         options: Options(headers: {'Accept': isPdf ? 'application/pdf' : 'application/octet-stream'}),
       );
       final data = bytes.data ?? <int>[];
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          'balance_sheet_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
-          mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
-        );
-      } else if (mounted) {
-        SnackBarHelper.show(context, message: 'Export only available on web');
-      }
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: 'balance_sheet_${widget.businessId}.${isPdf ? 'pdf' : 'xlsx'}',
+        mimeType: isPdf ? 'application/pdf' : 'application/octet-stream',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, message: 'Export error: ${ErrorExtractor.forContext(e, context)}');

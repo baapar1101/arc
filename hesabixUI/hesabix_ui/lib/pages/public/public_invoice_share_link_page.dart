@@ -1,10 +1,8 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hesabix_ui/config/app_config.dart';
@@ -17,8 +15,8 @@ import 'package:hesabix_ui/utils/number_normalizer.dart'
     show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, formatNumberForInput, parseFormattedDouble;
 import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/invoice/invoice_fx_dual_totals_banner.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class PublicInvoiceShareLinkPage extends StatefulWidget {
   final String code;
@@ -187,21 +185,17 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
       );
       if (bytes.isEmpty) return;
       final name = 'invoice_${widget.code}.pdf';
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          name,
-          mimeType: 'application/pdf',
-        );
-      } else {
-        await Printing.sharePdf(
-          bytes: Uint8List.fromList(bytes),
-          filename: name,
-        );
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: name,
+        mimeType: 'application/pdf',
+        mode: BytesExportMode.share,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فایل PDF آماده شد')),
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: 'فایل PDF آماده شد',
       );
     } on DioException catch (e) {
       if (!mounted) return;

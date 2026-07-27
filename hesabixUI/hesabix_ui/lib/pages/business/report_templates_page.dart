@@ -13,12 +13,12 @@ import '../../services/report_template_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/web/web_utils.dart' as web_utils;
-import '../../widgets/data_table/helpers/file_saver.dart';
 import '../../widgets/report_template/embedded_pdf_iframe.dart';
 
 import '../../core/business_named_route_locations.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'report_template_html_editor_page.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class ReportTemplatesPage extends StatefulWidget {
   final int businessId;
@@ -1070,17 +1070,17 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                           final rows = await loadAllFiltered();
                           final csv = toCsv(rows);
                           final bytes = utf8.encode(csv);
-                          if (kIsWeb) {
-                            await web_utils.saveBytesAsFileWeb(
-                              bytes,
-                              'report_template_status_audit.csv',
-                              mimeType: 'text/csv;charset=utf-8',
-                            );
-                          } else {
-                            await FileSaver.saveBytes(bytes, 'report_template_status_audit.csv');
-                          }
+                          final result = await BytesExportService.export(
+                            bytes: bytes,
+                            filename: 'report_template_status_audit.csv',
+                            mimeType: 'text/csv;charset=utf-8',
+                          );
                           if (ctx.mounted) {
-                            SnackBarHelper.show(ctx, message: 'فایل گزارش کامل (${rows.length} ردیف) ذخیره شد');
+                            BytesExportService.showFeedback(
+                              ctx,
+                              result,
+                              successOverride: 'فایل گزارش کامل (${rows.length} ردیف) ذخیره شد',
+                            );
                           }
                         } catch (e) {
                           if (ctx.mounted) {
@@ -1099,17 +1099,17 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                           final rows = await loadAllFiltered();
                           final html = toExcelHtml(rows);
                           final bytes = utf8.encode(html);
-                          if (kIsWeb) {
-                            await web_utils.saveBytesAsFileWeb(
-                              bytes,
-                              'report_template_status_audit.xls',
-                              mimeType: 'application/vnd.ms-excel;charset=utf-8',
-                            );
-                          } else {
-                            await FileSaver.saveBytes(bytes, 'report_template_status_audit.xls');
-                          }
+                          final result = await BytesExportService.export(
+                            bytes: bytes,
+                            filename: 'report_template_status_audit.xls',
+                            mimeType: 'application/vnd.ms-excel;charset=utf-8',
+                          );
                           if (ctx.mounted) {
-                            SnackBarHelper.show(ctx, message: 'فایل Excel (${rows.length} ردیف) ذخیره شد');
+                            BytesExportService.showFeedback(
+                              ctx,
+                              result,
+                              successOverride: 'فایل Excel (${rows.length} ردیف) ذخیره شد',
+                            );
                           }
                         } catch (e) {
                           if (ctx.mounted) {
@@ -1333,23 +1333,17 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                 TextButton.icon(
                   onPressed: () async {
                     try {
-                      if (kIsWeb) {
-                        await web_utils.saveBytesAsFileWeb(
-                          pdfBytes,
-                          'report_preview.pdf',
-                          mimeType: 'application/pdf',
+                      final result = await BytesExportService.export(
+                        bytes: pdfBytes,
+                        filename: 'report_preview.pdf',
+                        mimeType: 'application/pdf',
+                      );
+                      if (mounted) {
+                        BytesExportService.showFeedback(
+                          context,
+                          result,
+                          successOverride: t.reportTemplatePdfDownloadStarted,
                         );
-                        if (mounted) {
-                          SnackBarHelper.show(context, message: t.reportTemplatePdfDownloadStarted);
-                        }
-                      } else {
-                        final path = await FileSaver.saveBytes(pdfBytes, 'report_preview.pdf');
-                        if (mounted) {
-                          SnackBarHelper.show(
-                            context,
-                            message: path != null ? t.reportTemplatePdfSavedToPath(path) : t.reportTemplatePdfSavedGeneric,
-                          );
-                        }
                       }
                     } catch (e) {
                       if (mounted) {

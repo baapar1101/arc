@@ -50,6 +50,7 @@ import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/invoice_transaction_preferences.dart';
 import 'package:hesabix_ui/models/invoice_transaction.dart' show TransactionType;
 import 'package:share_plus/share_plus.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 int? _parseInstallmentSeq(dynamic v) {
   if (v == null) return null;
@@ -675,9 +676,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         final api = ApiClient();
         final path = '/documents/${doc.id}/pdf';
         final bytes = await api.downloadPdf(path, query: null);
-        await InvoicePdfPrintFlow.savePdfBytesWeb(bytes, doc.code);
+        final result = await InvoicePdfPrintFlow.savePdfBytesWeb(bytes, doc.code);
         if (!mounted) return;
-        SnackBarHelper.showSuccess(context, message: 'فایل PDF با موفقیت ذخیره شد');
+        BytesExportService.showFeedback(context, result);
       }
     } catch (e) {
       if (!mounted) return;

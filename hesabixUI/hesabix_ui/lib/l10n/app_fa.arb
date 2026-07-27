@@ -542,6 +542,17 @@
   "exporting": "در حال خروجی...",
   "exportSuccess": "خروجی با موفقیت انجام شد",
   "exportError": "خطا در خروجی",
+  "exportDownloadStarted": "دانلود شروع شد",
+  "exportFileSaved": "فایل ذخیره شد",
+  "exportFileSavedToPath": "فایل ذخیره شد: {path}",
+  "@exportFileSavedToPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "exportFileShared": "فایل آماده اشتراک‌گذاری است",
   "export": "خروجی",
   "importFromExcel": "ایمپورت از اکسل",
   "rowNumber": "ردیف",

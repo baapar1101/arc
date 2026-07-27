@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -16,11 +15,9 @@ import '../../../services/job_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/hscript_code_extract.dart';
 import '../../../utils/snackbar_helper.dart';
-import '../../../utils/web/web_utils.dart' as web_utils;
 import '../../../widgets/ai/ai_chat_dialog.dart';
 import '../../../widgets/ai/ai_chat_model_chip.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
-import '../../../widgets/data_table/helpers/file_saver.dart';
 import '../../../widgets/hscript/hscript_code_editor.dart';
 import '../../../widgets/hscript/hscript_outline_panel.dart';
 import '../../../widgets/hscript/hscript_params_form.dart';
@@ -30,6 +27,7 @@ import '../../../widgets/hscript/hscript_schedules_sheet.dart';
 import '../../../widgets/hscript/hscript_spec_renderer.dart';
 import '../../../widgets/hscript/hscript_versions_sheet.dart';
 import '../../../widgets/permission/access_denied_page.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 const _kDefaultScript = '''# @param limit integer "سقف فاکتور" default=50
 report.calendar("jalali")
@@ -644,14 +642,18 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
               params: params,
             );
       final name = '${_titleCtrl.text.trim().isEmpty ? 'hscript-report' : _titleCtrl.text.trim()}.pdf';
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(bytes, name, mimeType: 'application/pdf');
-      } else {
-        await FileSaver.saveBytes(bytes, name);
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: name,
+        mimeType: 'application/pdf',
+      );
       if (!mounted) return;
       setState(() => _running = false);
-      SnackBarHelper.show(context, message: 'PDF آماده شد');
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: 'PDF آماده شد',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _running = false);
@@ -680,18 +682,18 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
               params: params,
             );
       final name = '${_titleCtrl.text.trim().isEmpty ? 'hscript-report' : _titleCtrl.text.trim()}.xlsx';
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          name,
-          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        );
-      } else {
-        await FileSaver.saveBytes(bytes, name);
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: name,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
       if (!mounted) return;
       setState(() => _running = false);
-      SnackBarHelper.show(context, message: 'Excel آماده شد');
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: 'Excel آماده شد',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _running = false);

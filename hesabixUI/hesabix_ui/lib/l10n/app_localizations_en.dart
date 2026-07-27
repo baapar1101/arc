@@ -1222,6 +1222,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get exportError => 'Export error';
 
   @override
+  String get exportDownloadStarted => 'Download started';
+
+  @override
+  String get exportFileSaved => 'File saved';
+
+  @override
+  String exportFileSavedToPath(String path) {
+    return 'File saved: $path';
+  }
+
+  @override
+  String get exportFileShared => 'File ready to share';
+
+  @override
   String get export => 'Export';
 
   @override

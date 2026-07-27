@@ -1216,6 +1216,20 @@ class AppLocalizationsFa extends AppLocalizations {
   String get exportError => 'خطا در خروجی';
 
   @override
+  String get exportDownloadStarted => 'دانلود شروع شد';
+
+  @override
+  String get exportFileSaved => 'فایل ذخیره شد';
+
+  @override
+  String exportFileSavedToPath(String path) {
+    return 'فایل ذخیره شد: $path';
+  }
+
+  @override
+  String get exportFileShared => 'فایل آماده اشتراک‌گذاری است';
+
+  @override
   String get export => 'خروجی';
 
   @override

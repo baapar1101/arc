@@ -15,6 +15,7 @@ import 'payroll_calendar_utils.dart';
 import 'payroll_post_payment_dialog.dart';
 import 'payroll_run_import_dialog.dart';
 import 'payroll_ui.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// ایجاد یا ویرایش سند حقوق (اجرای حقوق).
 class PayrollRunEditPage extends StatefulWidget {
@@ -414,9 +415,13 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
         runId: widget.runId!,
       );
       final code = '${_run?['code'] ?? widget.runId}';
-      await InvoicePdfPrintFlow.savePdfBytesWeb(bytes, 'payslip_$code');
+      final result = await InvoicePdfPrintFlow.savePdfBytesWeb(bytes, 'payslip_$code');
       if (!mounted) return;
-      SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).payrollPayslipSaved);
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: AppLocalizations.of(context).payrollPayslipSaved,
+      );
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));

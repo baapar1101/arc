@@ -148,8 +148,8 @@ class DocumentService {
     }
   }
 
-  /// خروجی Excel لیست اسناد
-  Future<void> exportToExcel({
+  /// خروجی Excel لیست اسناد — بایت‌های فایل را برمی‌گرداند؛ ذخیره با [BytesExportService].
+  Future<Uint8List> exportToExcel({
     required int businessId,
     String? documentType,
     int? fiscalYearId,
@@ -168,7 +168,7 @@ class DocumentService {
         if (isProforma != null) 'is_proforma': isProforma,
       };
 
-      await _apiClient.post(
+      final response = await _apiClient.post(
         '/businesses/$businessId/documents/export/excel',
         data: body,
         options: Options(
@@ -176,10 +176,10 @@ class DocumentService {
         ),
       );
 
-      // ذخیره فایل
-      // TODO: پیاده‌سازی ذخیره فایل
-      // می‌توان از file_picker یا path_provider استفاده کرد
-      throw UnimplementedError('Export to Excel is not implemented yet');
+      final data = response.data;
+      if (data is Uint8List) return data;
+      if (data is List<int>) return Uint8List.fromList(data);
+      throw Exception('پاسخ خالی از سرور برای خروجی اکسل');
     } on DioException {
       rethrow;
     }
