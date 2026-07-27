@@ -29,7 +29,6 @@ from app.core.permissions import (
 from app.core.cache import get_cache
 from app.services.business_service import (
     create_business,
-    get_business_by_id,
     get_businesses_by_owner,
     get_user_businesses,
     update_business,
@@ -798,6 +797,9 @@ async def update_business_invoice_share_settings_endpoint(
         401: {
             "description": "کاربر احراز هویت نشده است"
         },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        },
         404: {
             "description": "کسب و کار یافت نشد"
         }
@@ -832,6 +834,9 @@ async def update_business_invoice_share_settings_endpoint(
         401: {
             "description": "کاربر احراز هویت نشده است"
         },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        },
         404: {
             "description": "کسب و کار یافت نشد"
         }
@@ -844,13 +849,17 @@ def get_business(
     db: Session = Depends(get_db)
 ) -> dict:
     """دریافت جزئیات کسب و کار"""
-    owner_id = ctx.get_user_id()
-    business = get_business_by_id(db, business_id, owner_id)
-    
-    if not business:
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
-    formatted_data = format_datetime_fields(business, request)
+    from adapters.db.repositories.business_repo import BusinessRepository
+    from app.services.business_service import _business_to_dict
+
+    business_repo = BusinessRepository(db)
+    business = business_repo.get_by_id(business_id)
+    if not business or getattr(business, "deleted_at", None) is not None:
+        raise ApiError("NOT_FOUND", "کسب و کار یافت نشد", http_status=404)
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "دسترسی غیرمجاز به این کسب و کار", http_status=403)
+
+    formatted_data = format_datetime_fields(_business_to_dict(business), request)
     return success_response(formatted_data, request)
 
 

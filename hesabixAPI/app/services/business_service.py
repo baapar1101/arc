@@ -369,14 +369,19 @@ def create_business(
     return result
 
 
-def get_business_by_id(db: Session, business_id: int, owner_id: int) -> Optional[Dict[str, Any]]:
-    """دریافت کسب و کار بر اساس شناسه"""
+def get_business_by_id(db: Session, business_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    """دریافت کسب و کار برای مالک یا عضو با دسترسی join فعال."""
+    from app.core.auth_dependency import _user_can_access_business
+
     business_repo = BusinessRepository(db)
     business = business_repo.get_by_id(business_id)
-    
-    if not business or business.owner_id != owner_id:
+
+    if not business or getattr(business, "deleted_at", None) is not None:
         return None
-    
+
+    if not _user_can_access_business(db, user_id, business_id):
+        return None
+
     return _business_to_dict(business)
 
 
