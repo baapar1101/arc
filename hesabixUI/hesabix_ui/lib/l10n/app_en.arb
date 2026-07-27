@@ -422,6 +422,17 @@
   "exporting": "Exporting...",
   "exportSuccess": "Export completed successfully",
   "exportError": "Export error",
+  "exportDownloadStarted": "Download started",
+  "exportFileSaved": "File saved",
+  "exportFileSavedToPath": "File saved: {path}",
+  "@exportFileSavedToPath": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "exportFileShared": "File ready to share",
   "export": "Export",
   "importFromExcel": "Import from Excel",
   "rowNumber": "Row",

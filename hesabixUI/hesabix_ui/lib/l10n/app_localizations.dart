@@ -2330,6 +2330,30 @@ abstract class AppLocalizations {
   /// **'Export error'**
   String get exportError;
 
+  /// No description provided for @exportDownloadStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Download started'**
+  String get exportDownloadStarted;
+
+  /// No description provided for @exportFileSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved'**
+  String get exportFileSaved;
+
+  /// No description provided for @exportFileSavedToPath.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved: {path}'**
+  String exportFileSavedToPath(String path);
+
+  /// No description provided for @exportFileShared.
+  ///
+  /// In en, this message translates to:
+  /// **'File ready to share'**
+  String get exportFileShared;
+
   /// No description provided for @export.
   ///
   /// In en, this message translates to:
