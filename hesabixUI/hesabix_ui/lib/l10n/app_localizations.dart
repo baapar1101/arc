@@ -23323,96 +23323,189 @@ abstract class AppLocalizations {
   String get accountSettingsLoginSessionsDescription;
 
   /// No description provided for @accountSettingsBiometricLockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint Login'**
   String get accountSettingsBiometricLockTitle;
 
   /// No description provided for @accountSettingsBiometricLockDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock the app with fingerprint when returning to the app'**
   String get accountSettingsBiometricLockDescription;
 
   /// No description provided for @biometricOptInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint Login'**
   String get biometricOptInTitle;
 
   /// No description provided for @biometricOptInMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Would you like to use your fingerprint to unlock the app from now on? You can change this anytime in account settings.'**
   String get biometricOptInMessage;
 
   /// No description provided for @biometricOptInEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
   String get biometricOptInEnable;
 
   /// No description provided for @biometricOptInNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
   String get biometricOptInNotNow;
 
   /// No description provided for @biometricOptInAuthReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your fingerprint to enable fingerprint login'**
   String get biometricOptInAuthReason;
 
   /// No description provided for @biometricLockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Locked'**
   String get biometricLockTitle;
 
   /// No description provided for @biometricLockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your fingerprint to continue'**
   String get biometricLockSubtitle;
 
   /// No description provided for @biometricLockAuthReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your fingerprint to access your account'**
   String get biometricLockAuthReason;
 
   /// No description provided for @biometricLockRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
   String get biometricLockRetry;
 
   /// No description provided for @biometricLockAuthenticating.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticating…'**
   String get biometricLockAuthenticating;
 
   /// No description provided for @biometricLockSignInWithPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with password'**
   String get biometricLockSignInWithPassword;
 
   /// No description provided for @biometricLockAttemptsRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} attempt(s) remaining'**
   String biometricLockAttemptsRemaining(int count);
 
   /// No description provided for @biometricSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint Login'**
   String get biometricSettingsTitle;
 
   /// No description provided for @biometricSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, you must confirm your fingerprint each time you open the app or return from the background.'**
   String get biometricSettingsDescription;
 
   /// No description provided for @biometricSettingsToggleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable fingerprint lock'**
   String get biometricSettingsToggleTitle;
 
   /// No description provided for @biometricSettingsToggleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint will be required when returning to the app'**
   String get biometricSettingsToggleSubtitle;
 
   /// No description provided for @biometricSettingsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint sensor is not available or not set up on this device'**
   String get biometricSettingsUnavailable;
 
   /// No description provided for @biometricSettingsEnableReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your fingerprint to enable'**
   String get biometricSettingsEnableReason;
 
   /// No description provided for @biometricSettingsEnableFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint verification failed'**
   String get biometricSettingsEnableFailed;
 
   /// No description provided for @biometricSettingsEnabledSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint login enabled'**
   String get biometricSettingsEnabledSuccess;
 
   /// No description provided for @biometricSettingsDisabledSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint login disabled'**
   String get biometricSettingsDisabledSuccess;
 
   /// No description provided for @biometricSettingsAvailableMethods.
+  ///
+  /// In en, this message translates to:
+  /// **'Available methods'**
   String get biometricSettingsAvailableMethods;
 
   /// No description provided for @biometricSettingsInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Security note'**
   String get biometricSettingsInfoTitle;
 
   /// No description provided for @biometricSettingsInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint only locks access to the app. Initial sign-in or switching accounts still requires your password.'**
   String get biometricSettingsInfoBody;
 
   /// No description provided for @biometricTypeFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint'**
   String get biometricTypeFingerprint;
 
   /// No description provided for @biometricTypeFace.
+  ///
+  /// In en, this message translates to:
+  /// **'Face recognition'**
   String get biometricTypeFace;
 
   /// No description provided for @biometricTypeIris.
+  ///
+  /// In en, this message translates to:
+  /// **'Iris'**
   String get biometricTypeIris;
 
   /// No description provided for @biometricTypeWeak.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak biometric'**
   String get biometricTypeWeak;
 
   /// No description provided for @biometricTypeStrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Strong biometric'**
   String get biometricTypeStrong;
 
   /// No description provided for @accountSettingsChangePasswordDescription.

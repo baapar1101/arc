@@ -12523,7 +12523,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get biometricLockSignInWithPassword => 'ورود با رمز عبور';
 
   @override
-  String biometricLockAttemptsRemaining(int count) => '$count تلاش باقی‌مانده';
+  String biometricLockAttemptsRemaining(int count) {
+    return '$count تلاش باقی‌مانده';
+  }
 
   @override
   String get biometricSettingsTitle => 'ورود با اثر انگشت';
@@ -12544,7 +12546,8 @@ class AppLocalizationsFa extends AppLocalizations {
       'سنسور اثر انگشت در این دستگاه در دسترس نیست یا تنظیم نشده است';
 
   @override
-  String get biometricSettingsEnableReason => 'برای فعال‌سازی، اثر انگشت خود را تأیید کنید';
+  String get biometricSettingsEnableReason =>
+      'برای فعال‌سازی، اثر انگشت خود را تأیید کنید';
 
   @override
   String get biometricSettingsEnableFailed => 'تأیید اثر انگشت ناموفق بود';

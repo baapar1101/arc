@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../core/biometric_lock_controller.dart';
+import '../../core/biometric_lock_controller.dart';
 
 class BiometricLockScope extends InheritedNotifier<BiometricLockController> {
   const BiometricLockScope({

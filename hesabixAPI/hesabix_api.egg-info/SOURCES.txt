@@ -487,6 +487,7 @@ app/services/business_fx_auto_sync_service.py
 app/services/business_membership_background_jobs.py
 app/services/business_menu_preferences_service.py
 app/services/business_notification_service.py
+app/services/business_print_settings_resolver.py
 app/services/business_quick_links_service.py
 app/services/business_sample_data_service.py
 app/services/business_service.py
@@ -592,6 +593,7 @@ app/services/pnl_service.py
 app/services/price_list_service.py
 app/services/print_footer_settings.py
 app/services/print_stamp_scale.py
+app/services/print_tax_discount_display.py
 app/services/product_attribute_service.py
 app/services/product_bulk_upsert_service.py
 app/services/product_catalog_profile_service.py
@@ -1079,6 +1081,7 @@ migrations/versions/20260725_000001_document_lines_fx_base_amounts.py
 migrations/versions/20260725_000002_product_fx_prices.py
 migrations/versions/20260726_000001_business_ai_provider_configs.py
 migrations/versions/20260726_000002_hscript_schedules.py
+migrations/versions/20260727_000001_business_print_settings_tax_discount_display.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1140,6 +1143,8 @@ tests/test_business_ai_provider_byok.py
 tests/test_business_backup_financial_policy.py
 tests/test_business_backup_orphan_cleanup.py
 tests/test_business_backup_schema_compat.py
+tests/test_business_get_access.py
+tests/test_business_print_settings_resolver.py
 tests/test_chat_message_builder.py
 tests/test_cross_currency_and_person_fx.py
 tests/test_datetime_timezone.py
@@ -1187,6 +1192,7 @@ tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
 tests/test_physical_stock.py
 tests/test_pnl_service.py
+tests/test_print_tax_discount_display.py
 tests/test_product_catalog_profile.py
 tests/test_product_excel_import_opening_balance.py
 tests/test_product_fx_and_period_end.py

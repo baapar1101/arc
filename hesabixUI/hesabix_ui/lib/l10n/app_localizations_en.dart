@@ -12592,8 +12592,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get biometricLockSignInWithPassword => 'Sign in with password';
 
   @override
-  String biometricLockAttemptsRemaining(int count) =>
-      '$count attempt${count == 1 ? '' : 's'} remaining';
+  String biometricLockAttemptsRemaining(int count) {
+    return '$count attempt(s) remaining';
+  }
 
   @override
   String get biometricSettingsTitle => 'Fingerprint Login';
@@ -12614,7 +12615,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Fingerprint sensor is not available or not set up on this device';
 
   @override
-  String get biometricSettingsEnableReason => 'Confirm your fingerprint to enable';
+  String get biometricSettingsEnableReason =>
+      'Confirm your fingerprint to enable';
 
   @override
   String get biometricSettingsEnableFailed => 'Fingerprint verification failed';
