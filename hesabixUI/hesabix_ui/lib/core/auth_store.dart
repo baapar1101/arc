@@ -270,12 +270,18 @@ class AuthStore with ChangeNotifier {
     _isSuperAdmin = isSuperAdmin;
     if (userId != null) {
       _currentUserId = userId;
+      await prefs.setInt(_kCurrentUserId, userId);
     }
     _currentUserName = userName;
     _currentUserMobile = userMobile;
 
     if (permissions == null) {
       await _clearAppPermissions();
+      // Re-apply userId if caller provided one after clear.
+      if (userId != null) {
+        _currentUserId = userId;
+        await prefs.setInt(_kCurrentUserId, userId);
+      }
     } else {
       final permissionsJson = const JsonEncoder().convert(permissions);
 

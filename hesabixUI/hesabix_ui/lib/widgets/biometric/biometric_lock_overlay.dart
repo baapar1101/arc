@@ -61,13 +61,19 @@ class _BiometricLockOverlayState extends State<BiometricLockOverlay> {
 
     setState(() => _authenticating = true);
     final t = AppLocalizations.of(context);
-    final ok = await _biometric.authenticate(reason: t.biometricLockAuthReason);
+    final result = await _biometric.authenticate(reason: t.biometricLockAuthReason);
     if (!mounted) return;
     setState(() => _authenticating = false);
 
-    if (ok) {
+    if (result.success) {
       _failedAttempts = 0;
       widget.lockController.unlock();
+      return;
+    }
+
+    if (result.canceled) {
+      // User dismissed the system sheet — keep lock UI, don't count as hard failure.
+      if (mounted) setState(() {});
       return;
     }
 

@@ -1,5 +1,6 @@
 package ir.hsxn.hesabix_ui
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+/// local_auth requires FragmentActivity (BiometricPrompt).
+class MainActivity : FlutterFragmentActivity()

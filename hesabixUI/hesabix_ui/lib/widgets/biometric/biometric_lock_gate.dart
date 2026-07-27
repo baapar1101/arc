@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth_store.dart';
 import '../../core/biometric_lock_controller.dart';
+import '../../core/biometric_lock_prefs.dart';
 import '../../core/biometric_platform.dart';
 import 'biometric_lock_overlay.dart';
 import 'biometric_lock_scope.dart';
@@ -52,12 +53,12 @@ class _BiometricLockGateState extends State<BiometricLockGate>
   void _scheduleInitialLock() {
     if (_initialLockScheduled) return;
     _initialLockScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(
-        widget.lockController.lockIfNeeded(
-          hasApiKey: _hasApiKey,
-          userId: widget.authStore.currentUserId,
-        ),
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await BiometricLockPrefs.runMigrationIfNeeded();
+      if (!mounted) return;
+      await widget.lockController.lockIfNeeded(
+        hasApiKey: _hasApiKey,
+        userId: widget.authStore.currentUserId,
       );
     });
   }
@@ -77,9 +78,9 @@ class _BiometricLockGateState extends State<BiometricLockGate>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!supportsBiometricLock) return;
 
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden) {
+    // فقط paused/hidden = واقعاً به پس‌زمینه رفته.
+    // inactive معمولاً هنگام نمایش BiometricPrompt سیستم رخ می‌دهد و نباید قفل را تریگر کند.
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
       _wentToBackground = true;
       return;
     }
@@ -87,6 +88,8 @@ class _BiometricLockGateState extends State<BiometricLockGate>
     if (state == AppLifecycleState.resumed && _wentToBackground) {
       _wentToBackground = false;
       if (!_hasApiKey) return;
+      // اگر همین الان در حال احراز هویت هستیم، دوباره قفل نکن
+      if (widget.lockController.isLocked) return;
       unawaited(
         widget.lockController.forceLock(
           hasApiKey: true,

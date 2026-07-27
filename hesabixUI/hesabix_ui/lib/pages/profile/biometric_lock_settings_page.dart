@@ -58,9 +58,14 @@ class _BiometricLockSettingsPageState extends State<BiometricLockSettingsPage> {
           return;
         }
         final verified = await _biometric.authenticate(reason: t.biometricSettingsEnableReason);
-        if (!verified) {
+        if (!verified.success) {
           if (mounted) {
-            SnackBarHelper.showError(context, message: t.biometricSettingsEnableFailed);
+            final msg = verified.canceled
+                ? t.biometricSettingsEnableFailed
+                : (verified.errorMessage?.isNotEmpty == true
+                    ? '${t.biometricSettingsEnableFailed} (${verified.errorCode ?? ''})'
+                    : t.biometricSettingsEnableFailed);
+            SnackBarHelper.showError(context, message: msg);
           }
           return;
         }

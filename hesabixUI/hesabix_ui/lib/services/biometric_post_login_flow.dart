@@ -3,12 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../core/auth_store.dart';
-import '../core/biometric_lock_controller.dart';
 import '../core/biometric_lock_prefs.dart';
 import '../core/biometric_platform.dart';
 import '../core/mobile_launcher_prefs.dart';
 import '../services/biometric_auth_service.dart';
 import '../widgets/biometric/biometric_lock_scope.dart';
+import '../utils/snackbar_helper.dart';
 
 /// Post-login opt-in dialog and navigation helper for biometric lock.
 class BiometricPostLoginFlow {
@@ -61,13 +61,28 @@ class BiometricPostLoginFlow {
       },
     );
 
-    await BiometricLockPrefs.markPrompted(userId);
+    if (!context.mounted) return;
 
     if (enable == true) {
-      final verified = await _biometric.authenticate(reason: t.biometricOptInAuthReason);
-      if (verified) {
+      final result = await _biometric.authenticate(reason: t.biometricOptInAuthReason);
+      if (result.success) {
         await BiometricLockPrefs.setEnabled(userId, true);
+        await BiometricLockPrefs.markPrompted(userId);
+        if (context.mounted) {
+          SnackBarHelper.show(context, message: t.biometricSettingsEnabledSuccess);
+        }
+      } else if (!result.canceled && context.mounted) {
+        // Auth failed for a real reason — do NOT mark prompted so user can try again
+        // next login / from settings.
+        SnackBarHelper.showError(
+          context,
+          message: t.biometricSettingsEnableFailed,
+        );
       }
+      // If canceled: leave prompted=false so we can ask again later.
+    } else {
+      // Explicit "not now"
+      await BiometricLockPrefs.markPrompted(userId);
     }
   }
 

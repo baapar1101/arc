@@ -290,6 +290,7 @@ class _MyAppState extends State<MyApp> {
   CalendarController? _calendarController;
   ThemeController? _themeController;
   AuthStore? _authStore;
+  GoRouter? _router;
   final BiometricLockController _biometricLockController = BiometricLockController();
   bool _isLoading = true;
   DateTime? _loadStartTime;
@@ -329,6 +330,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
+    _router?.dispose();
     _biometricLockController.dispose();
     super.dispose();
   }
@@ -381,10 +383,10 @@ class _MyAppState extends State<MyApp> {
     _themeController!.addListener(() {
       setState(() {});
     });
-    
-    _authStore!.addListener(() {
-      setState(() {});
-    });
+
+    // AuthStore changes must NOT call setState here: that rebuilt MyApp and
+    // recreated GoRouter (resetting Android navigation to / → user dashboard).
+    // GoRouter.refreshListenable handles login/logout redirects instead.
     
     // تنظیم API Client
     ApiClient.setCurrentLocale(_controller!.locale);
@@ -869,19 +871,20 @@ class _MyAppState extends State<MyApp> {
     final controller = _controller!;
     final themeController = _themeController!;
 
-    // حفظ URL فعلی مرورگر هنگام سوئیچ از لودینگ به روتر اصلی
-    final currentInitialLocation = () {
-      final base = Uri.base;
-      final path = base.path.isNotEmpty ? base.path : '/';
-      final query = base.hasQuery ? '?${base.query}' : '';
-      final fragment = base.fragment.isNotEmpty ? '#${base.fragment}' : '';
-      return '$path$query$fragment';
-    }();
-
-    final router = GoRouter(
+    // Create GoRouter once. Recreating it on every AuthStore/theme rebuild
+    // resets navigation (on Android Uri.base stays "/") and kicks the user
+    // back to the profile dashboard after entering a business.
+    _router ??= GoRouter(
       navigatorKey: navigatorKey,
       observers: [routeObserver],
-      initialLocation: currentInitialLocation,
+      refreshListenable: _authStore,
+      initialLocation: () {
+        final base = Uri.base;
+        final path = base.path.isNotEmpty ? base.path : '/';
+        final query = base.hasQuery ? '?${base.query}' : '';
+        final fragment = base.fragment.isNotEmpty ? '#${base.fragment}' : '';
+        return '$path$query$fragment';
+      }(),
       redirect: (context, state) async {
         final currentPath = state.uri.path;
         final isPublicRoute = currentPath.startsWith('/public');
@@ -4304,7 +4307,7 @@ class _MyAppState extends State<MyApp> {
               seed: themeController.seedColor,
             ),
             themeMode: themeController.mode,
-            routerConfig: router,
+            routerConfig: _router!,
             locale: controller.locale,
             supportedLocales: AppLocalizations.supportedLocales,
             localizationsDelegates: const [

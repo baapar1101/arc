@@ -28,6 +28,13 @@ import 'auth/widgets/sign_in_form.dart';
 import '../services/biometric_post_login_flow.dart';
 import 'auth/widgets/sign_up_wizard.dart';
 
+int? _parseUserId(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is int) return raw;
+  if (raw is num) return raw.toInt();
+  return int.tryParse(raw.toString());
+}
+
 
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
@@ -550,7 +557,7 @@ class _LoginPageState extends State<LoginPage> {
                   // ذخیره اطلاعات کاربر
                   final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
                   final isSuperAdmin = appPermissions?['superadmin'] == true;
-                  final userId = user?['id'] as int?;
+                  final userId = _parseUserId(user?['id']);
                   final referralCode = user?['referral_code']?.toString();
                   
                   String? userName;
@@ -562,14 +569,12 @@ class _LoginPageState extends State<LoginPage> {
                     }
                   }
                   
-                  if (appPermissions != null) {
-                    await widget.authStore.saveAppPermissions(
-                      appPermissions,
-                      isSuperAdmin,
-                      userId: userId,
-                      userName: userName,
-                    );
-                  }
+                  await widget.authStore.saveAppPermissions(
+                    appPermissions ?? <String, dynamic>{},
+                    isSuperAdmin,
+                    userId: userId,
+                    userName: userName,
+                  );
                   
                   if (referralCode != null) {
                     unawaited(ReferralStore.saveUserReferralCode(referralCode));
@@ -735,7 +740,7 @@ class _LoginPageState extends State<LoginPage> {
       // ذخیره دسترسی‌های اپلیکیشن و اطلاعات کاربر برای نمایش در منو
       final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
       final isSuperAdmin = appPermissions?['superadmin'] == true;
-      final userId = user?['id'] as int?;
+      final userId = _parseUserId(user?['id']);
       String? userName;
       String? userMobile;
       if (user != null) {
@@ -762,15 +767,13 @@ class _LoginPageState extends State<LoginPage> {
           userMobile = mobile;
         }
       }
-      if (appPermissions != null) {
-        await widget.authStore.saveAppPermissions(
-          appPermissions,
-          isSuperAdmin,
-          userId: userId,
-          userName: userName,
-          userMobile: userMobile,
-        );
-      }
+      await widget.authStore.saveAppPermissions(
+        appPermissions ?? <String, dynamic>{},
+        isSuperAdmin,
+        userId: userId,
+        userName: userName,
+        userMobile: userMobile,
+      );
 
       if (!mounted) return;
       _showSnack(t.homeWelcome);
@@ -879,7 +882,7 @@ class _LoginPageState extends State<LoginPage> {
       // ذخیره دسترسی‌های اپلیکیشن و اطلاعات کاربر برای نمایش در منو
       final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
       final isSuperAdmin = appPermissions?['superadmin'] == true;
-      final userId = user?['id'] as int?;
+      final userId = _parseUserId(user?['id']);
       String? userName;
       String? userMobile;
       if (user != null) {
@@ -906,15 +909,13 @@ class _LoginPageState extends State<LoginPage> {
           userMobile = mobile;
         }
       }
-      if (appPermissions != null) {
-        await widget.authStore.saveAppPermissions(
-          appPermissions,
-          isSuperAdmin,
-          userId: userId,
-          userName: userName,
-          userMobile: userMobile,
-        );
-      }
+      await widget.authStore.saveAppPermissions(
+        appPermissions ?? <String, dynamic>{},
+        isSuperAdmin,
+        userId: userId,
+        userName: userName,
+        userMobile: userMobile,
+      );
       _showSnack(t.registerSuccess);
       // پاکسازی کد معرف پس از ثبت‌نام موفق
       unawaited(ReferralStore.clearReferrer());
