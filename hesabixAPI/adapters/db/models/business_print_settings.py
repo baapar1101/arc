@@ -75,6 +75,29 @@ class BusinessPrintSettings(Base):
     # متن ثابت انتهای فاکتور (پاورقی قابل تنظیم برای این نوع سند)
     footer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # نمایش ستون‌ها/ردیف‌های مالیات و تخفیف: smart | always | never
+    line_discount_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    line_tax_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    line_amount_before_discount_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    line_amount_before_tax_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    summary_discount_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    summary_tax_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    summary_amount_without_tax_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )

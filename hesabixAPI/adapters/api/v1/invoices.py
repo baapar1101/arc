@@ -1392,23 +1392,18 @@ async def export_single_invoice_pdf(
 
     show_stamp_override = None
 
+    from app.services.business_print_settings_resolver import (
+        default_print_settings_dict,
+        pick_print_settings,
+    )
+    from app.services.print_tax_discount_display import (
+        build_invoice_tax_discount_display_flags,
+        enrich_line_amount_fields,
+    )
+
     # تنظیمات چاپ کسب‌وکار (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی)
     # یک کانفیگ پیش‌فرض تعریف می‌کنیم تا در صورت بروز خطا یا نبود کسب‌وکار، همچنان در دسترس باشد
-    print_settings: Dict[str, Any] = {
-        "show_logo": True,
-        "show_stamp": True,
-        "show_payments": True,
-        "show_installment_plan": True,
-        "show_share_qr": False,
-        "show_footer_print_time": True,
-        "show_footer_preparer": True,
-        "footer_note": None,
-        "show_customer_balance": True,
-        "show_seller_signature_area": True,
-        "show_buyer_signature_area": True,
-        "stamp_scale_percent": 100,
-        "signature_scale_percent": 100,
-    }
+    print_settings: Dict[str, Any] = default_print_settings_dict()
     invoice_footer_note: Optional[str] = None
 
     try:
@@ -1442,59 +1437,7 @@ async def export_single_invoice_pdf(
                 print_rows = []
 
             def _pick_print_settings() -> dict:
-                from app.services.print_stamp_scale import (
-                    STAMP_SCALE_DEFAULT,
-                    clamp_scale_percent,
-                )
-
-                # از print_settings فعلی به‌عنوان مقدار اولیه استفاده می‌کنیم
-                default_cfg = dict(print_settings)
-                per_type_cfg = None
-
-                def _row_cfg(r) -> dict:
-                    return {
-                        "show_logo": bool(getattr(r, "show_logo", True)),
-                        "show_stamp": bool(getattr(r, "show_stamp", True)),
-                        "show_payments": bool(getattr(r, "show_payments", True)),
-                        "show_installment_plan": bool(
-                            getattr(r, "show_installment_plan", True)
-                        ),
-                        "show_share_qr": bool(getattr(r, "show_share_qr", False)),
-                        "show_footer_print_time": bool(
-                            getattr(r, "show_footer_print_time", True)
-                        ),
-                        "show_footer_preparer": bool(
-                            getattr(r, "show_footer_preparer", True)
-                        ),
-                        "footer_note": getattr(r, "footer_note", None),
-                        "show_customer_balance": bool(
-                            getattr(r, "show_customer_balance", True)
-                        ),
-                        "show_seller_signature_area": bool(
-                            getattr(r, "show_seller_signature_area", True)
-                        ),
-                        "show_buyer_signature_area": bool(
-                            getattr(r, "show_buyer_signature_area", True)
-                        ),
-                        "stamp_scale_percent": clamp_scale_percent(
-                            getattr(r, "stamp_scale_percent", STAMP_SCALE_DEFAULT)
-                        ),
-                        "signature_scale_percent": clamp_scale_percent(
-                            getattr(r, "signature_scale_percent", STAMP_SCALE_DEFAULT)
-                        ),
-                    }
-
-                for r in print_rows:
-                    if r.document_type == "all":
-                        default_cfg = _row_cfg(r)
-                    elif r.document_type == doc.document_type:
-                        per_type_cfg = _row_cfg(r)
-                if per_type_cfg is None:
-                    return default_cfg
-                # per_type روی default override می‌شود
-                merged = dict(default_cfg)
-                merged.update({k: v for k, v in per_type_cfg.items() if v is not None})
-                return merged
+                return pick_print_settings(print_rows, doc.document_type, base=print_settings)
 
             print_settings = _pick_print_settings()
 
@@ -1782,20 +1725,22 @@ async def export_single_invoice_pdf(
             if not isinstance(lc_attrs, dict):
                 lc_attrs = {}
             normalized_lines.append(
-                {
-                    "product_code": pl.get("product_code"),
-                    "product_name": pl.get("product_name"),
-                    "description": pl.get("description"),
-                    "quantity": qty,
-                    "quantity_display": qty_display,
-                    "unit_display": _invoice_line_unit_display_for_pdf(pl if isinstance(pl, dict) else {}),
-                    "unit_price": unit_price,
-                    "discount": line_discount,
-                    "tax_amount": tax_amount,
-                    "line_total": line_total,
-                    "line_custom_attributes": lc_attrs,
-                    "attributes_display": attrs_display,
-                }
+                enrich_line_amount_fields(
+                    {
+                        "product_code": pl.get("product_code"),
+                        "product_name": pl.get("product_name"),
+                        "description": pl.get("description"),
+                        "quantity": qty,
+                        "quantity_display": qty_display,
+                        "unit_display": _invoice_line_unit_display_for_pdf(pl if isinstance(pl, dict) else {}),
+                        "unit_price": unit_price,
+                        "discount": line_discount,
+                        "tax_amount": tax_amount,
+                        "line_total": line_total,
+                        "line_custom_attributes": lc_attrs,
+                        "attributes_display": attrs_display,
+                    }
+                )
             )
     except Exception:
         normalized_lines = []
@@ -2276,6 +2221,16 @@ async def export_single_invoice_pdf(
     except Exception:
         item["is_installment_sale"] = False
 
+    tax_discount_display_flags = build_invoice_tax_discount_display_flags(
+        print_settings,
+        has_line_discount=has_line_discount,
+        has_line_tax=has_line_tax,
+        discount_total=discount_total,
+        tax_total=tax_total,
+        amount_without_tax=amount_without_tax,
+        subtotal=subtotal,
+    )
+
     # نام کاربر صادرکننده فاکتور
     issuer_name: Optional[str] = None
     try:
@@ -2362,8 +2317,21 @@ async def export_single_invoice_pdf(
         "lines": normalized_lines,
         "buyer": buyer_info,
         "seller": seller_info,
-        "has_line_discount": has_line_discount,
-        "has_line_tax": has_line_tax,
+        "has_line_discount": tax_discount_display_flags["has_line_discount"],
+        "has_line_tax": tax_discount_display_flags["has_line_tax"],
+        "show_line_discount_column": tax_discount_display_flags["show_line_discount_column"],
+        "show_line_tax_column": tax_discount_display_flags["show_line_tax_column"],
+        "show_line_amount_before_discount_column": tax_discount_display_flags[
+            "show_line_amount_before_discount_column"
+        ],
+        "show_line_amount_before_tax_column": tax_discount_display_flags[
+            "show_line_amount_before_tax_column"
+        ],
+        "show_summary_discount": tax_discount_display_flags["show_summary_discount"],
+        "show_summary_tax": tax_discount_display_flags["show_summary_tax"],
+        "show_summary_amount_without_tax": tax_discount_display_flags[
+            "show_summary_amount_without_tax"
+        ],
         "payments": payments,
         "installment_plan": installment_plan,
         "invoice_date_jalali": invoice_date_jalali,

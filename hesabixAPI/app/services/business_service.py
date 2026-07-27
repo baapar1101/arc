@@ -1285,6 +1285,10 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         STAMP_SCALE_DEFAULT,
         clamp_scale_percent,
     )
+    from app.services.print_tax_discount_display import (
+        DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS,
+        normalize_display_mode,
+    )
 
     rows = (
         db.query(BusinessPrintSettings)
@@ -1312,6 +1316,10 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
             "signature_scale_percent": clamp_scale_percent(
                 getattr(row, "signature_scale_percent", STAMP_SCALE_DEFAULT)
             ),
+            **{
+                key: normalize_display_mode(getattr(row, key, None))
+                for key in DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS
+            },
         }
 
     default_settings: Dict[str, Any] = {
@@ -1329,6 +1337,7 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         "show_buyer_signature_area": True,
         "stamp_scale_percent": STAMP_SCALE_DEFAULT,
         "signature_scale_percent": STAMP_SCALE_DEFAULT,
+        **DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS,
     }
     per_type: Dict[str, Any] = {}
 
@@ -1366,6 +1375,10 @@ def update_business_print_settings(
     from app.services.print_stamp_scale import (
         STAMP_SCALE_DEFAULT,
         clamp_scale_percent,
+    )
+    from app.services.print_tax_discount_display import (
+        DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS,
+        normalize_display_mode,
     )
 
     default_data = (settings_payload or {}).get("default") or {}
@@ -1412,6 +1425,8 @@ def update_business_print_settings(
             if isinstance(cfg.get("footer_note"), str)
             else cfg.get("footer_note")
         )
+        for key in DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS:
+            setattr(row, key, normalize_display_mode(cfg.get(key)))
 
     # ابتدا رکورد تنظیمات عمومی (all) را به‌روزرسانی یا ایجاد می‌کنیم
     default_row = (

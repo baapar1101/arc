@@ -46,10 +46,14 @@ def _cols(items: List[tuple[str, str, str, str]]) -> List[Dict[str, Any]]:
 
 def _invoice_detail_columns() -> List[Dict[str, Any]]:
 	return _cols([
-		("product_name", "شرح", "", "32%"),
-		("quantity", "تعداد", "", "10%"),
-		("unit_price", "فی", "money", "14%"),
-		("line_total", "مبلغ", "money", "14%"),
+		("product_name", "شرح", "", "24%"),
+		("quantity", "تعداد", "", "8%"),
+		("unit_price", "فی", "money", "12%"),
+		("discount", "تخفیف", "money", "10%"),
+		("amount_before_discount", "جمع بدون تخفیف", "money", "12%"),
+		("amount_before_tax", "جمع بدون مالیات", "money", "12%"),
+		("tax_amount", "مالیات", "money", "10%"),
+		("line_total", "مبلغ", "money", "12%"),
 	])
 
 
@@ -57,6 +61,7 @@ def _invoice_detail_totals() -> List[Dict[str, Any]]:
 	return [
 		{"key": "subtotal", "title": "جمع اقلام", "expr": "invoice.subtotal", "visible": True, "format": "money"},
 		{"key": "discount", "title": "تخفیف", "expr": "invoice.discount_total", "visible": True, "format": "money"},
+		{"key": "amount_without_tax", "title": "مبلغ بدون مالیات", "expr": "invoice.amount_without_tax", "visible": True, "format": "money"},
 		{"key": "tax", "title": "مالیات", "expr": "invoice.tax_total", "visible": True, "format": "money"},
 		{"key": "payable", "title": "قابل پرداخت", "expr": "invoice.payable_total", "visible": True, "format": "money", "emphasis": True},
 	]

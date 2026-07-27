@@ -317,7 +317,9 @@ async def get_public_invoice_document_pdf(
 
 	def _normalize_line(row: dict) -> dict:
 		q = _num(row.get("quantity"))
-		return {
+		from app.services.print_tax_discount_display import enrich_line_amount_fields
+
+		return enrich_line_amount_fields({
 			"product_code": row.get("product_code"),
 			"product_name": row.get("product_name"),
 			"description": row.get("description"),
@@ -329,7 +331,7 @@ async def get_public_invoice_document_pdf(
 			"tax_amount": _num(row.get("tax_amount")),
 			"line_total": _num(row.get("line_total")),
 			"attributes_display": "",
-		}
+		})
 
 	normalized_lines = [_normalize_line(row) for row in lines if isinstance(row, dict)]
 	has_line_discount = any((_num(x.get("discount")) != 0) for x in normalized_lines)
@@ -412,6 +414,25 @@ async def get_public_invoice_document_pdf(
 	invoice_view["payable_total"] = float(payable_total_from_totals_dict(totals))
 	invoice_view["amount_before_discount_and_tax"] = _num(totals.get("gross"))
 	invoice_view["amount_without_tax"] = _num(totals.get("gross")) - _num(totals.get("discount"))
+
+	from app.services.business_print_settings_resolver import load_print_settings
+	from app.services.print_tax_discount_display import build_invoice_tax_discount_display_flags
+
+	business_id = invoice.get("business_id") or business.get("id")
+	print_settings = load_print_settings(
+		db,
+		int(business_id or 0),
+		str(invoice.get("document_type") or ""),
+	)
+	tax_discount_display_flags = build_invoice_tax_discount_display_flags(
+		print_settings,
+		has_line_discount=has_line_discount,
+		has_line_tax=has_line_tax,
+		discount_total=invoice_view.get("discount_total"),
+		tax_total=invoice_view.get("tax_total"),
+		amount_without_tax=invoice_view.get("amount_without_tax"),
+		subtotal=invoice_view.get("subtotal"),
+	)
 
 	invoice_adjustments_rows: list = []
 	adjustments_net_signed = 0.0
@@ -572,8 +593,21 @@ async def get_public_invoice_document_pdf(
 		"buyer": buyer_info,
 		"invoice": invoice_view,
 		"lines": normalized_lines,
-		"has_line_discount": has_line_discount,
-		"has_line_tax": has_line_tax,
+		"has_line_discount": tax_discount_display_flags["has_line_discount"],
+		"has_line_tax": tax_discount_display_flags["has_line_tax"],
+		"show_line_discount_column": tax_discount_display_flags["show_line_discount_column"],
+		"show_line_tax_column": tax_discount_display_flags["show_line_tax_column"],
+		"show_line_amount_before_discount_column": tax_discount_display_flags[
+			"show_line_amount_before_discount_column"
+		],
+		"show_line_amount_before_tax_column": tax_discount_display_flags[
+			"show_line_amount_before_tax_column"
+		],
+		"show_summary_discount": tax_discount_display_flags["show_summary_discount"],
+		"show_summary_tax": tax_discount_display_flags["show_summary_tax"],
+		"show_summary_amount_without_tax": tax_discount_display_flags[
+			"show_summary_amount_without_tax"
+		],
 		"payments": [],
 		"installment_plan": installment_plan,
 		"business_logo_data_uri": business_logo_data_uri,

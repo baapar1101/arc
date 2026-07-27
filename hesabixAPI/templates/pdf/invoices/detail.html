@@ -610,12 +610,16 @@
                 <th class="line-numeric-strong">{{ 'تعداد' if is_fa else 'Qty' }}</th>
                 <th class="line-numeric-strong">{{ 'واحد' if is_fa else 'Unit' }}</th>
                 <th class="line-numeric-strong">{{ 'فی' if is_fa else 'Price' }}</th>
-                {% if has_line_discount %}
+                {% if show_line_discount_column | default(has_line_discount) %}
                   <th class="line-numeric-strong">{{ 'تخفیف' if is_fa else 'Discount' }}</th>
                 {% endif %}
-                <th class="line-numeric-strong">{{ 'جمع بدون تخفیف' if is_fa else 'Amount before discount' }}</th>
-                <th class="line-numeric-strong">{{ 'جمع بدون مالیات' if is_fa else 'Amount before tax' }}</th>
-                {% if has_line_tax %}
+                {% if show_line_amount_before_discount_column | default(true) %}
+                  <th class="line-numeric-strong">{{ 'جمع بدون تخفیف' if is_fa else 'Amount before discount' }}</th>
+                {% endif %}
+                {% if show_line_amount_before_tax_column | default(true) %}
+                  <th class="line-numeric-strong">{{ 'جمع بدون مالیات' if is_fa else 'Amount before tax' }}</th>
+                {% endif %}
+                {% if show_line_tax_column | default(has_line_tax) %}
                   <th class="line-numeric-strong">{{ 'مالیات' if is_fa else 'Tax' }}</th>
                 {% endif %}
                 <th class="line-numeric-strong">{{ 'مبلغ' if is_fa else 'Amount' }}</th>
@@ -643,16 +647,20 @@
                   <td class="line-numeric-strong">{{ line.quantity_display | default('') | ltr | safe }}</td>
                   <td class="line-numeric-strong">{{ line.unit_display | default('-') }}</td>
                   <td class="amount line-numeric-strong">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}</td>
-                  {% if has_line_discount %}
+                  {% if show_line_discount_column | default(has_line_discount) %}
                     <td class="amount line-numeric-strong">{{ (line.discount or 0) | format_amount(0) | ltr | safe }}</td>
                   {% endif %}
+                  {% if show_line_amount_before_discount_column | default(true) %}
                   <td class="amount line-numeric-strong">
-                    {{ ((line.line_total or 0) + (line.discount or 0) - (line.tax_amount or 0)) | format_amount(0) | ltr | safe }}
+                    {{ (line.amount_before_discount if line.amount_before_discount is defined else ((line.line_total or 0) + (line.discount or 0) - (line.tax_amount or 0))) | format_amount(0) | ltr | safe }}
                   </td>
+                  {% endif %}
+                  {% if show_line_amount_before_tax_column | default(true) %}
                   <td class="amount line-numeric-strong">
-                    {{ ((line.line_total or 0) - (line.tax_amount or 0)) | format_amount(0) | ltr | safe }}
+                    {{ (line.amount_before_tax if line.amount_before_tax is defined else ((line.line_total or 0) - (line.tax_amount or 0))) | format_amount(0) | ltr | safe }}
                   </td>
-                  {% if has_line_tax %}
+                  {% endif %}
+                  {% if show_line_tax_column | default(has_line_tax) %}
                     <td class="amount line-numeric-strong">{{ (line.tax_amount or 0) | format_amount(0) | ltr | safe }}</td>
                   {% endif %}
                   <td class="amount line-numeric-strong">{{ (line.line_total or 0) | format_amount(0) | ltr | safe }}</td>
@@ -817,19 +825,19 @@
               <span class="meta">{{ 'مبلغ قبل از تخفیف و مالیات' if is_fa else 'Amount before discount & tax' }}:</span>
               <span class="amount">{{ (invoice.amount_before_discount_and_tax or invoice.subtotal or 0) | format_amount(0) | ltr | safe }}</span>
             </div>
-            {% if invoice.discount_total %}
+            {% if show_summary_discount | default(invoice.discount_total) %}
               <div style="display:flex; justify-content: space-between;">
                 <span class="meta">{{ 'تخفیف' if is_fa else 'Discount' }}:</span>
                 <span class="amount">{{ (invoice.discount_total or 0) | format_amount(0) | ltr | safe }}</span>
               </div>
             {% endif %}
-            {% if invoice.amount_without_tax is not none %}
+            {% if show_summary_amount_without_tax | default(invoice.amount_without_tax is not none) %}
               <div style="display:flex; justify-content: space-between;">
                 <span class="meta">{{ 'مبلغ بدون مالیات' if is_fa else 'Amount without tax' }}:</span>
                 <span class="amount">{{ (invoice.amount_without_tax or 0) | format_amount(0) | ltr | safe }}</span>
               </div>
             {% endif %}
-            {% if invoice.tax_total %}
+            {% if show_summary_tax | default(invoice.tax_total) %}
               <div style="display:flex; justify-content: space-between;">
                 <span class="meta">{{ 'مالیات' if is_fa else 'Tax' }}:</span>
                 <span class="amount">{{ (invoice.tax_total or 0) | format_amount(0) | ltr | safe }}</span>

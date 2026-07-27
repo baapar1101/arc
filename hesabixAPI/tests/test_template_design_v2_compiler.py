@@ -30,6 +30,13 @@ def _sample_invoice_context() -> dict:
 		"generated_at": "now",
 		"issuer_name": "user",
 		"is_fa": True,
+		"show_line_discount_column": True,
+		"show_line_tax_column": True,
+		"show_line_amount_before_discount_column": True,
+		"show_line_amount_before_tax_column": True,
+		"show_summary_discount": True,
+		"show_summary_tax": True,
+		"show_summary_amount_without_tax": True,
 	}
 
 
@@ -54,6 +61,8 @@ def test_compile_and_render_invoice_classic():
 	assert "<table" in html
 	assert "lines" in html
 	env = SandboxedEnvironment(loader=BaseLoader(), autoescape=True)
+	env.filters["money"] = lambda value, *args, **kwargs: str(value if value is not None else "")
+	env.filters["date"] = lambda value, *args, **kwargs: str(value if value is not None else "")
 	full = f"<style>{css}</style>{header}{html}{footer}"
 	rendered = env.from_string(full).render(**_sample_invoice_context())
 	assert "INV-1" in rendered

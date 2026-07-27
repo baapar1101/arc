@@ -42,6 +42,36 @@ def _visible_columns(columns: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 	return out
 
 
+_COLUMN_DISPLAY_FLAGS = {
+	"discount": "show_line_discount_column",
+	"tax_amount": "show_line_tax_column",
+	"amount_before_discount": "show_line_amount_before_discount_column",
+	"amount_before_tax": "show_line_amount_before_tax_column",
+}
+
+_TOTAL_DISPLAY_FLAGS = {
+	"discount": "show_summary_discount",
+	"tax": "show_summary_tax",
+	"amount_without_tax": "show_summary_amount_without_tax",
+}
+
+
+def _column_display_flag(col: Dict[str, Any]) -> str | None:
+	key = str(col.get("key") or "").strip()
+	return _COLUMN_DISPLAY_FLAGS.get(key)
+
+
+def _total_display_flag(row: Dict[str, Any]) -> str | None:
+	key = str(row.get("key") or "").strip()
+	return _TOTAL_DISPLAY_FLAGS.get(key)
+
+
+def _wrap_if_flag(flag: str | None, inner: str) -> str:
+	if not flag:
+		return inner
+	return f"{{% if {flag} %}}{inner}{{% endif %}}"
+
+
 def _cell_expr(col: Dict[str, Any]) -> str:
 	key = _esc(col.get("key") or "")
 	fmt = str(col.get("format") or "").lower()
@@ -336,10 +366,16 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
 
 	if columns:
 		headers = "".join(
-			f"<th style='width:{_esc(col.get('width') or 'auto')};'>{_esc(col.get('title') or col.get('key') or '')}</th>"
+			_wrap_if_flag(
+				_column_display_flag(col),
+				f"<th style='width:{_esc(col.get('width') or 'auto')};'>{_esc(col.get('title') or col.get('key') or '')}</th>",
+			)
 			for col in columns
 		)
-		cells = "".join(f"<td class='num'>{_cell_expr(col)}</td>" for col in columns)
+		cells = "".join(
+			_wrap_if_flag(_column_display_flag(col), f"<td class='num'>{_cell_expr(col)}</td>")
+			for col in columns
+		)
 		body_parts.append(
 			f"""
 <div class="rt-card table-card">
@@ -366,7 +402,8 @@ def _compile_invoice_detail(design: Dict[str, Any]) -> Tuple[str, str, str, str]
 			emphasis = " class='emphasis'" if row.get("emphasis") else ""
 			title = _esc(row.get("title") or "")
 			val = _total_expr(row)
-			rows_html.append(f"<tr{emphasis}><td>{title}</td><td>{val}</td></tr>")
+			row_html = f"<tr{emphasis}><td>{title}</td><td>{val}</td></tr>"
+			rows_html.append(_wrap_if_flag(_total_display_flag(row), row_html))
 		body_parts.append(
 			f"""
 <div class="rt-card">
