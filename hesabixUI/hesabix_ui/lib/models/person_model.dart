@@ -94,8 +94,8 @@ class PersonBankAccount {
       cardNumber: json['card_number'],
       shebaNumber: json['sheba_number'],
       isActive: _fromJsonBool(json['is_active'], true),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      createdAt: _parsePersonDateTime(json['created_at'] ?? json['created_at_raw']),
+      updatedAt: _parsePersonDateTime(json['updated_at'] ?? json['updated_at_raw']),
     );
   }
 
@@ -167,12 +167,8 @@ class PersonSocialContact {
       customLabel: json['custom_label'] as String?,
       value: (json['value'] as String?) ?? '',
       sortOrder: (json['sort_order'] as int?) ?? 0,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : DateTime.now(),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : DateTime.now(),
+      createdAt: _parsePersonDateTime(json['created_at'] ?? json['created_at_raw']),
+      updatedAt: _parsePersonDateTime(json['updated_at'] ?? json['updated_at_raw']),
     );
   }
 
