@@ -12480,6 +12480,107 @@ class AppLocalizationsFa extends AppLocalizations {
       'مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری';
 
   @override
+  String get accountSettingsBiometricLockTitle => 'ورود با اثر انگشت';
+
+  @override
+  String get accountSettingsBiometricLockDescription =>
+      'قفل اپلیکیشن با اثر انگشت هنگام بازگشت به برنامه';
+
+  @override
+  String get biometricOptInTitle => 'ورود با اثر انگشت';
+
+  @override
+  String get biometricOptInMessage =>
+      'آیا می‌خواهید از این پس برای باز کردن اپلیکیشن از اثر انگشت استفاده کنید؟ می‌توانید هر زمان از تنظیمات حساب این گزینه را تغییر دهید.';
+
+  @override
+  String get biometricOptInEnable => 'فعال‌سازی';
+
+  @override
+  String get biometricOptInNotNow => 'الان نه';
+
+  @override
+  String get biometricOptInAuthReason =>
+      'برای فعال‌سازی ورود با اثر انگشت، اثر انگشت خود را تأیید کنید';
+
+  @override
+  String get biometricLockTitle => 'قفل اپلیکیشن';
+
+  @override
+  String get biometricLockSubtitle => 'برای ادامه، اثر انگشت خود را اسکن کنید';
+
+  @override
+  String get biometricLockAuthReason =>
+      'برای دسترسی به حساب کاربری، اثر انگشت خود را تأیید کنید';
+
+  @override
+  String get biometricLockRetry => 'تلاش مجدد';
+
+  @override
+  String get biometricLockAuthenticating => 'در حال تأیید…';
+
+  @override
+  String get biometricLockSignInWithPassword => 'ورود با رمز عبور';
+
+  @override
+  String biometricLockAttemptsRemaining(int count) => '$count تلاش باقی‌مانده';
+
+  @override
+  String get biometricSettingsTitle => 'ورود با اثر انگشت';
+
+  @override
+  String get biometricSettingsDescription =>
+      'با فعال‌سازی این گزینه، هر بار که اپلیکیشن را باز می‌کنید یا از پس‌زمینه برمی‌گردید، برای دسترسی به حساب باید اثر انگشت خود را تأیید کنید.';
+
+  @override
+  String get biometricSettingsToggleTitle => 'فعال‌سازی قفل با اثر انگشت';
+
+  @override
+  String get biometricSettingsToggleSubtitle =>
+      'هنگام بازگشت به اپلیکیشن از شما اثر انگشت خواسته می‌شود';
+
+  @override
+  String get biometricSettingsUnavailable =>
+      'سنسور اثر انگشت در این دستگاه در دسترس نیست یا تنظیم نشده است';
+
+  @override
+  String get biometricSettingsEnableReason => 'برای فعال‌سازی، اثر انگشت خود را تأیید کنید';
+
+  @override
+  String get biometricSettingsEnableFailed => 'تأیید اثر انگشت ناموفق بود';
+
+  @override
+  String get biometricSettingsEnabledSuccess => 'ورود با اثر انگشت فعال شد';
+
+  @override
+  String get biometricSettingsDisabledSuccess => 'ورود با اثر انگشت غیرفعال شد';
+
+  @override
+  String get biometricSettingsAvailableMethods => 'روش‌های در دسترس';
+
+  @override
+  String get biometricSettingsInfoTitle => 'نکته امنیتی';
+
+  @override
+  String get biometricSettingsInfoBody =>
+      'اثر انگشت فقط دسترسی به اپلیکیشن را قفل می‌کند. برای ورود اولیه یا تغییر حساب همچنان به رمز عبور نیاز دارید.';
+
+  @override
+  String get biometricTypeFingerprint => 'اثر انگشت';
+
+  @override
+  String get biometricTypeFace => 'تشخیص چهره';
+
+  @override
+  String get biometricTypeIris => 'تشخیص عنبیه';
+
+  @override
+  String get biometricTypeWeak => 'بیومتریک ضعیف';
+
+  @override
+  String get biometricTypeStrong => 'بیومتریک قوی';
+
+  @override
   String get accountSettingsChangePasswordDescription =>
       'تغییر کلمه عبور حساب کاربری';
 

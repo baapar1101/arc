@@ -23322,6 +23322,99 @@ abstract class AppLocalizations {
   /// **'View and manage connected devices to your account'**
   String get accountSettingsLoginSessionsDescription;
 
+  /// No description provided for @accountSettingsBiometricLockTitle.
+  String get accountSettingsBiometricLockTitle;
+
+  /// No description provided for @accountSettingsBiometricLockDescription.
+  String get accountSettingsBiometricLockDescription;
+
+  /// No description provided for @biometricOptInTitle.
+  String get biometricOptInTitle;
+
+  /// No description provided for @biometricOptInMessage.
+  String get biometricOptInMessage;
+
+  /// No description provided for @biometricOptInEnable.
+  String get biometricOptInEnable;
+
+  /// No description provided for @biometricOptInNotNow.
+  String get biometricOptInNotNow;
+
+  /// No description provided for @biometricOptInAuthReason.
+  String get biometricOptInAuthReason;
+
+  /// No description provided for @biometricLockTitle.
+  String get biometricLockTitle;
+
+  /// No description provided for @biometricLockSubtitle.
+  String get biometricLockSubtitle;
+
+  /// No description provided for @biometricLockAuthReason.
+  String get biometricLockAuthReason;
+
+  /// No description provided for @biometricLockRetry.
+  String get biometricLockRetry;
+
+  /// No description provided for @biometricLockAuthenticating.
+  String get biometricLockAuthenticating;
+
+  /// No description provided for @biometricLockSignInWithPassword.
+  String get biometricLockSignInWithPassword;
+
+  /// No description provided for @biometricLockAttemptsRemaining.
+  String biometricLockAttemptsRemaining(int count);
+
+  /// No description provided for @biometricSettingsTitle.
+  String get biometricSettingsTitle;
+
+  /// No description provided for @biometricSettingsDescription.
+  String get biometricSettingsDescription;
+
+  /// No description provided for @biometricSettingsToggleTitle.
+  String get biometricSettingsToggleTitle;
+
+  /// No description provided for @biometricSettingsToggleSubtitle.
+  String get biometricSettingsToggleSubtitle;
+
+  /// No description provided for @biometricSettingsUnavailable.
+  String get biometricSettingsUnavailable;
+
+  /// No description provided for @biometricSettingsEnableReason.
+  String get biometricSettingsEnableReason;
+
+  /// No description provided for @biometricSettingsEnableFailed.
+  String get biometricSettingsEnableFailed;
+
+  /// No description provided for @biometricSettingsEnabledSuccess.
+  String get biometricSettingsEnabledSuccess;
+
+  /// No description provided for @biometricSettingsDisabledSuccess.
+  String get biometricSettingsDisabledSuccess;
+
+  /// No description provided for @biometricSettingsAvailableMethods.
+  String get biometricSettingsAvailableMethods;
+
+  /// No description provided for @biometricSettingsInfoTitle.
+  String get biometricSettingsInfoTitle;
+
+  /// No description provided for @biometricSettingsInfoBody.
+  String get biometricSettingsInfoBody;
+
+  /// No description provided for @biometricTypeFingerprint.
+  String get biometricTypeFingerprint;
+
+  /// No description provided for @biometricTypeFace.
+  String get biometricTypeFace;
+
+  /// No description provided for @biometricTypeIris.
+  String get biometricTypeIris;
+
+  /// No description provided for @biometricTypeWeak.
+  String get biometricTypeWeak;
+
+  /// No description provided for @biometricTypeStrong.
+  String get biometricTypeStrong;
+
   /// No description provided for @accountSettingsChangePasswordDescription.
   ///
   /// In en, this message translates to:

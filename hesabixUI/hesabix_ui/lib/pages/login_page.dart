@@ -10,7 +10,6 @@ import '../core/api_client.dart';
 import '../core/calendar_controller.dart';
 import '../core/auth_store.dart';
 import '../core/locale_controller.dart';
-import '../core/mobile_launcher_prefs.dart';
 import '../core/referral_store.dart';
 import '../theme/theme_controller.dart';
 import '../utils/number_normalizer.dart';
@@ -26,6 +25,7 @@ import 'auth/widgets/auth_shell.dart';
 import 'auth/widgets/forgot_password_form.dart';
 import 'auth/widgets/otp_login_form.dart';
 import 'auth/widgets/sign_in_form.dart';
+import '../services/biometric_post_login_flow.dart';
 import 'auth/widgets/sign_up_wizard.dart';
 
 
@@ -575,12 +575,6 @@ class _LoginPageState extends State<LoginPage> {
                     unawaited(ReferralStore.saveUserReferralCode(referralCode));
                   }
                   
-                  if (!mounted) return true;
-                  SnackBarHelper.show(context, message: AppLocalizations.of(context).homeWelcome);
-
-                  final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
-                  if (!mounted) return true;
-                  context.go(home);
                   return true;
                 }
                 return false;
@@ -654,8 +648,11 @@ class _LoginPageState extends State<LoginPage> {
         );
         
         if (verified == true && mounted) {
-          // ورود موفق - صفحه بسته می‌شود
-          Navigator.of(context).pop();
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).homeWelcome);
+          await BiometricPostLoginFlow.completeLoginAndNavigate(
+            context,
+            authStore: widget.authStore,
+          );
         }
       } else {
         SnackBarHelper.showError(context, message: 'خطا در ارسال کد ورود');
@@ -781,18 +778,22 @@ class _LoginPageState extends State<LoginPage> {
       try {
         final currentPath = GoRouterState.of(context).uri.path;
         if (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/acc/') || currentPath.startsWith('/business/')) {
-          // اگر در صفحه محافظت شده بود، همان صفحه را refresh کند
-          context.go(currentPath);
+          await BiometricPostLoginFlow.completeLoginAndNavigate(
+            context,
+            authStore: widget.authStore,
+            preferredPath: currentPath,
+          );
         } else {
-          final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
-          if (!mounted) return;
-          context.go(home);
+          await BiometricPostLoginFlow.completeLoginAndNavigate(
+            context,
+            authStore: widget.authStore,
+          );
         }
       } catch (e) {
-        // اگر GoRouterState در دسترس نیست، به dashboard برود
-        final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
-        if (!mounted) return;
-        context.go(home);
+        await BiometricPostLoginFlow.completeLoginAndNavigate(
+          context,
+          authStore: widget.authStore,
+        );
       }
     } catch (e) {
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
@@ -918,9 +919,10 @@ class _LoginPageState extends State<LoginPage> {
       // پاکسازی کد معرف پس از ثبت‌نام موفق
       unawaited(ReferralStore.clearReferrer());
       if (mounted) {
-        final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
-        if (!mounted) return;
-        context.go(home);
+        await BiometricPostLoginFlow.completeLoginAndNavigate(
+          context,
+          authStore: widget.authStore,
+        );
       }
     } catch (e) {
       if (!mounted) return;

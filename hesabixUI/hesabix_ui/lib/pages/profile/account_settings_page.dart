@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/auth_store.dart';
+import 'biometric_lock_settings_page.dart';
 
 class AccountSettingsPage extends StatelessWidget {
   final CalendarController calendarController;
@@ -96,6 +97,14 @@ class AccountSettingsPage extends StatelessWidget {
                       color: Colors.indigo,
                       onTap: () => context.go('/user/profile/sessions'),
                     ),
+                    if (showBiometricLockSettingsEntry())
+                      _SettingsCard(
+                        title: t.accountSettingsBiometricLockTitle,
+                        description: t.accountSettingsBiometricLockDescription,
+                        icon: Icons.fingerprint,
+                        color: Colors.blueGrey,
+                        onTap: () => context.go('/user/profile/biometric-lock-settings'),
+                      ),
                     _SettingsCard(
                       title: t.changePassword,
                       description: t.accountSettingsChangePasswordDescription,

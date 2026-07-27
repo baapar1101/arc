@@ -12549,6 +12549,108 @@ class AppLocalizationsEn extends AppLocalizations {
       'View and manage connected devices to your account';
 
   @override
+  String get accountSettingsBiometricLockTitle => 'Fingerprint Login';
+
+  @override
+  String get accountSettingsBiometricLockDescription =>
+      'Lock the app with fingerprint when returning to the app';
+
+  @override
+  String get biometricOptInTitle => 'Fingerprint Login';
+
+  @override
+  String get biometricOptInMessage =>
+      'Would you like to use your fingerprint to unlock the app from now on? You can change this anytime in account settings.';
+
+  @override
+  String get biometricOptInEnable => 'Enable';
+
+  @override
+  String get biometricOptInNotNow => 'Not now';
+
+  @override
+  String get biometricOptInAuthReason =>
+      'Confirm your fingerprint to enable fingerprint login';
+
+  @override
+  String get biometricLockTitle => 'App Locked';
+
+  @override
+  String get biometricLockSubtitle => 'Scan your fingerprint to continue';
+
+  @override
+  String get biometricLockAuthReason =>
+      'Confirm your fingerprint to access your account';
+
+  @override
+  String get biometricLockRetry => 'Try again';
+
+  @override
+  String get biometricLockAuthenticating => 'Authenticating…';
+
+  @override
+  String get biometricLockSignInWithPassword => 'Sign in with password';
+
+  @override
+  String biometricLockAttemptsRemaining(int count) =>
+      '$count attempt${count == 1 ? '' : 's'} remaining';
+
+  @override
+  String get biometricSettingsTitle => 'Fingerprint Login';
+
+  @override
+  String get biometricSettingsDescription =>
+      'When enabled, you must confirm your fingerprint each time you open the app or return from the background.';
+
+  @override
+  String get biometricSettingsToggleTitle => 'Enable fingerprint lock';
+
+  @override
+  String get biometricSettingsToggleSubtitle =>
+      'Fingerprint will be required when returning to the app';
+
+  @override
+  String get biometricSettingsUnavailable =>
+      'Fingerprint sensor is not available or not set up on this device';
+
+  @override
+  String get biometricSettingsEnableReason => 'Confirm your fingerprint to enable';
+
+  @override
+  String get biometricSettingsEnableFailed => 'Fingerprint verification failed';
+
+  @override
+  String get biometricSettingsEnabledSuccess => 'Fingerprint login enabled';
+
+  @override
+  String get biometricSettingsDisabledSuccess => 'Fingerprint login disabled';
+
+  @override
+  String get biometricSettingsAvailableMethods => 'Available methods';
+
+  @override
+  String get biometricSettingsInfoTitle => 'Security note';
+
+  @override
+  String get biometricSettingsInfoBody =>
+      'Fingerprint only locks access to the app. Initial sign-in or switching accounts still requires your password.';
+
+  @override
+  String get biometricTypeFingerprint => 'Fingerprint';
+
+  @override
+  String get biometricTypeFace => 'Face recognition';
+
+  @override
+  String get biometricTypeIris => 'Iris';
+
+  @override
+  String get biometricTypeWeak => 'Weak biometric';
+
+  @override
+  String get biometricTypeStrong => 'Strong biometric';
+
+  @override
   String get accountSettingsChangePasswordDescription =>
       'Change account password';
 
