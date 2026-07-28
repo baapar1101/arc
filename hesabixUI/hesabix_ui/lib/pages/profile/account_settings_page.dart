@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/auth_store.dart';
+import 'android_update_settings_page.dart';
 import 'biometric_lock_settings_page.dart';
 
 class AccountSettingsPage extends StatelessWidget {
@@ -104,6 +105,14 @@ class AccountSettingsPage extends StatelessWidget {
                         icon: Icons.fingerprint,
                         color: Colors.blueGrey,
                         onTap: () => context.go('/user/profile/biometric-lock-settings'),
+                      ),
+                    if (showAndroidUpdateSettingsEntry())
+                      _SettingsCard(
+                        title: t.accountSettingsAndroidUpdateTitle,
+                        description: t.accountSettingsAndroidUpdateDescription,
+                        icon: Icons.system_update_alt,
+                        color: Colors.cyan,
+                        onTap: () => context.go('/user/profile/android-update-settings'),
                       ),
                     _SettingsCard(
                       title: t.changePassword,

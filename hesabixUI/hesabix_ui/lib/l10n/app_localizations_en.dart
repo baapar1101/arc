@@ -12570,6 +12570,140 @@ class AppLocalizationsEn extends AppLocalizations {
       'Lock the app with fingerprint when returning to the app';
 
   @override
+  String get accountSettingsAndroidUpdateTitle => 'App Update';
+
+  @override
+  String get accountSettingsAndroidUpdateDescription =>
+      'Check, download and install new Android releases';
+
+  @override
+  String get androidUpdateSettingsTitle => 'App Update';
+
+  @override
+  String get androidUpdateSettingsDescription =>
+      'New versions are fetched from official Hesabix releases. This feature is Android-only.';
+
+  @override
+  String get androidUpdateUnsupported =>
+      'Automatic updates are only supported on the Android app.';
+
+  @override
+  String get androidUpdateInstalledVersion => 'Installed version';
+
+  @override
+  String get androidUpdateLatestVersion => 'Latest published version';
+
+  @override
+  String get androidUpdateAvailableBadge => 'New version';
+
+  @override
+  String get androidUpdateLastChecked => 'Last checked';
+
+  @override
+  String get androidUpdateAutoCheckTitle => 'Check on startup';
+
+  @override
+  String get androidUpdateAutoCheckSubtitle =>
+      'Look for a new version after the app opens';
+
+  @override
+  String get androidUpdateAutoDownloadTitle => 'Prompt download when found';
+
+  @override
+  String get androidUpdateAutoDownloadSubtitle =>
+      'When a new version is found, show an update notice ready for download';
+
+  @override
+  String get androidUpdateCheckNow => 'Check for updates';
+
+  @override
+  String get androidUpdateDownloadAndInstall => 'Download & install';
+
+  @override
+  String get androidUpdateOpenPermissionSettings =>
+      'Unknown apps install settings';
+
+  @override
+  String get androidUpdateInfoTitle => 'Note';
+
+  @override
+  String get androidUpdateInfoBody =>
+      'Final install requires your confirmation in the Android system installer. The app versionName should match the release tag (e.g. 70.9.911).';
+
+  @override
+  String get androidUpdateAvailableTitle => 'Update available';
+
+  @override
+  String androidUpdateAvailableMessage(String latest, String current) {
+    return 'Version $latest is available. Your current version: $current';
+  }
+
+  @override
+  String get androidUpdateChangelogTitle => 'Release notes';
+
+  @override
+  String androidUpdateApkSizeHint(String size) {
+    return 'Approximate file size: $size';
+  }
+
+  @override
+  String get androidUpdateLater => 'Later';
+
+  @override
+  String get androidUpdateAutoDownloadStarting =>
+      'Confirm to start download and install.';
+
+  @override
+  String get androidUpdateDownloadingTitle => 'Downloading update';
+
+  @override
+  String get androidUpdateDownloadingPreparing => 'Preparing download…';
+
+  @override
+  String androidUpdateDownloadProgress(
+    int percent,
+    String received,
+    String total,
+  ) {
+    return '$percent% — $received of $total';
+  }
+
+  @override
+  String get androidUpdateDownloadCancelled => 'Download cancelled';
+
+  @override
+  String androidUpdateDownloadFailed(String error) {
+    return 'Download failed: $error';
+  }
+
+  @override
+  String get androidUpdateUpToDate => 'You are on the latest version';
+
+  @override
+  String get androidUpdateCheckFailed =>
+      'Update check failed. Please check your internet connection.';
+
+  @override
+  String get androidUpdatePermissionTitle => 'Install permission required';
+
+  @override
+  String get androidUpdatePermissionMessage =>
+      'To install the new version, allow Hesabix to install unknown apps.';
+
+  @override
+  String get androidUpdatePermissionReturnHint =>
+      'After enabling the permission, tap Download & install again.';
+
+  @override
+  String get androidUpdateInstallStarted =>
+      'System installer opened. Please confirm the install.';
+
+  @override
+  String androidUpdateInstallFailed(String error) {
+    return 'Could not start install: $error';
+  }
+
+  @override
   String get biometricOptInTitle => 'Fingerprint Login';
 
   @override

@@ -26,6 +26,21 @@ Flutter به طور خودکار این نسخه را به پلتفرم‌های
 - **macOS**: `CFBundleShortVersionString` و `CFBundleVersion`
 - **Web**: از `pubspec.yaml` خوانده می‌شود
 
+## هم‌ترازی با ریلیز اندروید (Forgejo)
+
+از این پس برای APKهای منتشرشده در
+[ریلیزهای مخزن](https://source.hesabix.ir/hesabix/arc/releases):
+
+- `versionName` / تگ ریلیز باید یکسان باشد: `MAJOR.MINOR.PATCH` (مثلاً `70.9.911`)
+- `versionCode` پیشنهادی: `MAJOR * 1000000 + MINOR * 1000 + PATCH`
+- جزئیات به‌روزرسانی خودکار: [`docs/ANDROID_AUTO_UPDATE.md`](./ANDROID_AUTO_UPDATE.md)
+
+مثال در `pubspec.yaml`:
+
+```yaml
+version: 70.9.911+70009911
+```
+
 ## استفاده از اسکریپت‌های مدیریت نسخه
 
 ### Linux/macOS (Bash)

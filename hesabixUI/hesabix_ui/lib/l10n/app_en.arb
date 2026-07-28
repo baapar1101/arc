@@ -4803,6 +4803,70 @@
   "accountSettingsLoginSessionsDescription": "View and manage connected devices to your account",
   "accountSettingsBiometricLockTitle": "Fingerprint Login",
   "accountSettingsBiometricLockDescription": "Lock the app with fingerprint when returning to the app",
+  "accountSettingsAndroidUpdateTitle": "App Update",
+  "accountSettingsAndroidUpdateDescription": "Check, download and install new Android releases",
+  "androidUpdateSettingsTitle": "App Update",
+  "androidUpdateSettingsDescription": "New versions are fetched from official Hesabix releases. This feature is Android-only.",
+  "androidUpdateUnsupported": "Automatic updates are only supported on the Android app.",
+  "androidUpdateInstalledVersion": "Installed version",
+  "androidUpdateLatestVersion": "Latest published version",
+  "androidUpdateAvailableBadge": "New version",
+  "androidUpdateLastChecked": "Last checked",
+  "androidUpdateAutoCheckTitle": "Check on startup",
+  "androidUpdateAutoCheckSubtitle": "Look for a new version after the app opens",
+  "androidUpdateAutoDownloadTitle": "Prompt download when found",
+  "androidUpdateAutoDownloadSubtitle": "When a new version is found, show an update notice ready for download",
+  "androidUpdateCheckNow": "Check for updates",
+  "androidUpdateDownloadAndInstall": "Download & install",
+  "androidUpdateOpenPermissionSettings": "Unknown apps install settings",
+  "androidUpdateInfoTitle": "Note",
+  "androidUpdateInfoBody": "Final install requires your confirmation in the Android system installer. The app versionName should match the release tag (e.g. 70.9.911).",
+  "androidUpdateAvailableTitle": "Update available",
+  "androidUpdateAvailableMessage": "Version {latest} is available. Your current version: {current}",
+  "@androidUpdateAvailableMessage": {
+    "placeholders": {
+      "latest": { "type": "String" },
+      "current": { "type": "String" }
+    }
+  },
+  "androidUpdateChangelogTitle": "Release notes",
+  "androidUpdateApkSizeHint": "Approximate file size: {size}",
+  "@androidUpdateApkSizeHint": {
+    "placeholders": {
+      "size": { "type": "String" }
+    }
+  },
+  "androidUpdateLater": "Later",
+  "androidUpdateAutoDownloadStarting": "Confirm to start download and install.",
+  "androidUpdateDownloadingTitle": "Downloading update",
+  "androidUpdateDownloadingPreparing": "Preparing download…",
+  "androidUpdateDownloadProgress": "{percent}% — {received} of {total}",
+  "@androidUpdateDownloadProgress": {
+    "placeholders": {
+      "percent": { "type": "int" },
+      "received": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "androidUpdateDownloadCancelled": "Download cancelled",
+  "androidUpdateDownloadFailed": "Download failed: {error}",
+  "@androidUpdateDownloadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "androidUpdateUpToDate": "You are on the latest version",
+  "androidUpdateCheckFailed": "Update check failed. Please check your internet connection.",
+  "androidUpdatePermissionTitle": "Install permission required",
+  "androidUpdatePermissionMessage": "To install the new version, allow Hesabix to install unknown apps.",
+  "androidUpdatePermissionReturnHint": "After enabling the permission, tap Download & install again.",
+  "androidUpdateInstallStarted": "System installer opened. Please confirm the install.",
+  "androidUpdateInstallFailed": "Could not start install: {error}",
+  "@androidUpdateInstallFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "biometricOptInTitle": "Fingerprint Login",
   "biometricOptInMessage": "Would you like to use your fingerprint to unlock the app from now on? You can change this anytime in account settings.",
   "biometricOptInEnable": "Enable",

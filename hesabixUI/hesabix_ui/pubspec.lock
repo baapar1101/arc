@@ -748,6 +748,22 @@ packages:
       url: "https://dart.devneeds.ir"
     source: hosted
     version: "2.2.0"
+  package_info_plus:
+    dependency: "direct main"
+    description:
+      name: package_info_plus
+      sha256: "16eee997588c60225bda0488b6dcfac69280a6b7a3cf02c741895dd370a02968"
+      url: "https://dart.devneeds.ir"
+    source: hosted
+    version: "8.3.1"
+  package_info_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: package_info_plus_platform_interface
+      sha256: "202a487f08836a592a6bd4f901ac69b3a8f146af552bbd14407b6b41e1c3f086"
+      url: "https://dart.devneeds.ir"
+    source: hosted
+    version: "3.2.1"
   path:
     dependency: transitive
     description:
@@ -765,7 +781,7 @@ packages:
     source: hosted
     version: "1.1.0"
   path_provider:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: path_provider
       sha256: a7f4874f987173da295a61c181b8ee71dab59b332a486b391babf26a1b884825

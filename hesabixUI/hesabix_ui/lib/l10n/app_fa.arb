@@ -4845,6 +4845,70 @@
   "accountSettingsLoginSessionsDescription": "مشاهده و مدیریت دستگاه‌های متصل به حساب کاربری",
   "accountSettingsBiometricLockTitle": "ورود با اثر انگشت",
   "accountSettingsBiometricLockDescription": "قفل اپلیکیشن با اثر انگشت هنگام بازگشت به برنامه",
+  "accountSettingsAndroidUpdateTitle": "به‌روزرسانی برنامه",
+  "accountSettingsAndroidUpdateDescription": "بررسی، دانلود و نصب نسخه‌های جدید اندروید",
+  "androidUpdateSettingsTitle": "به‌روزرسانی برنامه",
+  "androidUpdateSettingsDescription": "نسخه‌های جدید از ریلیزهای رسمی حسابیکس دریافت می‌شوند. این قابلیت فقط روی اندروید در دسترس است.",
+  "androidUpdateUnsupported": "به‌روزرسانی خودکار فقط در نسخه اندروید پشتیبانی می‌شود.",
+  "androidUpdateInstalledVersion": "نسخه نصب‌شده",
+  "androidUpdateLatestVersion": "آخرین نسخه منتشرشده",
+  "androidUpdateAvailableBadge": "نسخه جدید",
+  "androidUpdateLastChecked": "آخرین بررسی",
+  "androidUpdateAutoCheckTitle": "بررسی خودکار هنگام شروع",
+  "androidUpdateAutoCheckSubtitle": "پس از باز شدن اپلیکیشن، وجود نسخه جدید بررسی شود",
+  "androidUpdateAutoDownloadTitle": "دانلود پس از تأیید",
+  "androidUpdateAutoDownloadSubtitle": "در صورت یافتن نسخه جدید، اعلان نمایش داده شود و آمادگی دانلود اعلام گردد",
+  "androidUpdateCheckNow": "بررسی به‌روزرسانی",
+  "androidUpdateDownloadAndInstall": "دانلود و نصب",
+  "androidUpdateOpenPermissionSettings": "تنظیمات نصب از منابع ناشناس",
+  "androidUpdateInfoTitle": "نکته",
+  "androidUpdateInfoBody": "نصب نهایی نیاز به تأیید شما در صفحه سیستم اندروید دارد. نسخه برنامه باید با تگ ریلیز (مثلاً 70.9.911) هم‌خوان باشد.",
+  "androidUpdateAvailableTitle": "نسخه جدید آماده است",
+  "androidUpdateAvailableMessage": "نسخه {latest} در دسترس است. نسخه فعلی شما: {current}",
+  "@androidUpdateAvailableMessage": {
+    "placeholders": {
+      "latest": { "type": "String" },
+      "current": { "type": "String" }
+    }
+  },
+  "androidUpdateChangelogTitle": "تغییرات این نسخه",
+  "androidUpdateApkSizeHint": "حجم تقریبی فایل: {size}",
+  "@androidUpdateApkSizeHint": {
+    "placeholders": {
+      "size": { "type": "String" }
+    }
+  },
+  "androidUpdateLater": "بعداً",
+  "androidUpdateAutoDownloadStarting": "با تأیید، دانلود و نصب آغاز می‌شود.",
+  "androidUpdateDownloadingTitle": "در حال دانلود به‌روزرسانی",
+  "androidUpdateDownloadingPreparing": "آماده‌سازی دانلود…",
+  "androidUpdateDownloadProgress": "{percent}% — {received} از {total}",
+  "@androidUpdateDownloadProgress": {
+    "placeholders": {
+      "percent": { "type": "int" },
+      "received": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "androidUpdateDownloadCancelled": "دانلود لغو شد",
+  "androidUpdateDownloadFailed": "دانلود ناموفق بود: {error}",
+  "@androidUpdateDownloadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "androidUpdateUpToDate": "شما از آخرین نسخه استفاده می‌کنید",
+  "androidUpdateCheckFailed": "بررسی به‌روزرسانی ناموفق بود. اتصال اینترنت را بررسی کنید.",
+  "androidUpdatePermissionTitle": "مجوز نصب لازم است",
+  "androidUpdatePermissionMessage": "برای نصب نسخه جدید، اجازه «نصب از منابع ناشناس» را برای حسابیکس فعال کنید.",
+  "androidUpdatePermissionReturnHint": "پس از فعال‌سازی مجوز، دوباره «دانلود و نصب» را بزنید.",
+  "androidUpdateInstallStarted": "نصب‌کننده سیستم باز شد. نصب را تأیید کنید.",
+  "androidUpdateInstallFailed": "شروع نصب ناموفق بود: {error}",
+  "@androidUpdateInstallFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "biometricOptInTitle": "ورود با اثر انگشت",
   "biometricOptInMessage": "آیا می‌خواهید از این پس برای باز کردن اپلیکیشن از اثر انگشت استفاده کنید؟ می‌توانید هر زمان از تنظیمات حساب این گزینه را تغییر دهید.",
   "biometricOptInEnable": "فعال‌سازی",

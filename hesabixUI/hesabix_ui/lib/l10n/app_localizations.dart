@@ -23358,6 +23358,226 @@ abstract class AppLocalizations {
   /// **'Lock the app with fingerprint when returning to the app'**
   String get accountSettingsBiometricLockDescription;
 
+  /// No description provided for @accountSettingsAndroidUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Update'**
+  String get accountSettingsAndroidUpdateTitle;
+
+  /// No description provided for @accountSettingsAndroidUpdateDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Check, download and install new Android releases'**
+  String get accountSettingsAndroidUpdateDescription;
+
+  /// No description provided for @androidUpdateSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Update'**
+  String get androidUpdateSettingsTitle;
+
+  /// No description provided for @androidUpdateSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'New versions are fetched from official Hesabix releases. This feature is Android-only.'**
+  String get androidUpdateSettingsDescription;
+
+  /// No description provided for @androidUpdateUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic updates are only supported on the Android app.'**
+  String get androidUpdateUnsupported;
+
+  /// No description provided for @androidUpdateInstalledVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed version'**
+  String get androidUpdateInstalledVersion;
+
+  /// No description provided for @androidUpdateLatestVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest published version'**
+  String get androidUpdateLatestVersion;
+
+  /// No description provided for @androidUpdateAvailableBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'New version'**
+  String get androidUpdateAvailableBadge;
+
+  /// No description provided for @androidUpdateLastChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Last checked'**
+  String get androidUpdateLastChecked;
+
+  /// No description provided for @androidUpdateAutoCheckTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check on startup'**
+  String get androidUpdateAutoCheckTitle;
+
+  /// No description provided for @androidUpdateAutoCheckSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Look for a new version after the app opens'**
+  String get androidUpdateAutoCheckSubtitle;
+
+  /// No description provided for @androidUpdateAutoDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt download when found'**
+  String get androidUpdateAutoDownloadTitle;
+
+  /// No description provided for @androidUpdateAutoDownloadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When a new version is found, show an update notice ready for download'**
+  String get androidUpdateAutoDownloadSubtitle;
+
+  /// No description provided for @androidUpdateCheckNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get androidUpdateCheckNow;
+
+  /// No description provided for @androidUpdateDownloadAndInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Download & install'**
+  String get androidUpdateDownloadAndInstall;
+
+  /// No description provided for @androidUpdateOpenPermissionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown apps install settings'**
+  String get androidUpdateOpenPermissionSettings;
+
+  /// No description provided for @androidUpdateInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get androidUpdateInfoTitle;
+
+  /// No description provided for @androidUpdateInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Final install requires your confirmation in the Android system installer. The app versionName should match the release tag (e.g. 70.9.911).'**
+  String get androidUpdateInfoBody;
+
+  /// No description provided for @androidUpdateAvailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get androidUpdateAvailableTitle;
+
+  /// No description provided for @androidUpdateAvailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {latest} is available. Your current version: {current}'**
+  String androidUpdateAvailableMessage(String latest, String current);
+
+  /// No description provided for @androidUpdateChangelogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Release notes'**
+  String get androidUpdateChangelogTitle;
+
+  /// No description provided for @androidUpdateApkSizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate file size: {size}'**
+  String androidUpdateApkSizeHint(String size);
+
+  /// No description provided for @androidUpdateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get androidUpdateLater;
+
+  /// No description provided for @androidUpdateAutoDownloadStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm to start download and install.'**
+  String get androidUpdateAutoDownloadStarting;
+
+  /// No description provided for @androidUpdateDownloadingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update'**
+  String get androidUpdateDownloadingTitle;
+
+  /// No description provided for @androidUpdateDownloadingPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing download…'**
+  String get androidUpdateDownloadingPreparing;
+
+  /// No description provided for @androidUpdateDownloadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% — {received} of {total}'**
+  String androidUpdateDownloadProgress(
+    int percent,
+    String received,
+    String total,
+  );
+
+  /// No description provided for @androidUpdateDownloadCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Download cancelled'**
+  String get androidUpdateDownloadCancelled;
+
+  /// No description provided for @androidUpdateDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed: {error}'**
+  String androidUpdateDownloadFailed(String error);
+
+  /// No description provided for @androidUpdateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You are on the latest version'**
+  String get androidUpdateUpToDate;
+
+  /// No description provided for @androidUpdateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update check failed. Please check your internet connection.'**
+  String get androidUpdateCheckFailed;
+
+  /// No description provided for @androidUpdatePermissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Install permission required'**
+  String get androidUpdatePermissionTitle;
+
+  /// No description provided for @androidUpdatePermissionMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'To install the new version, allow Hesabix to install unknown apps.'**
+  String get androidUpdatePermissionMessage;
+
+  /// No description provided for @androidUpdatePermissionReturnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After enabling the permission, tap Download & install again.'**
+  String get androidUpdatePermissionReturnHint;
+
+  /// No description provided for @androidUpdateInstallStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'System installer opened. Please confirm the install.'**
+  String get androidUpdateInstallStarted;
+
+  /// No description provided for @androidUpdateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start install: {error}'**
+  String androidUpdateInstallFailed(String error);
+
   /// No description provided for @biometricOptInTitle.
   ///
   /// In en, this message translates to:

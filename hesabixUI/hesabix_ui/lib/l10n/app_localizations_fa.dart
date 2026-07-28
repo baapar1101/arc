@@ -12501,6 +12501,140 @@ class AppLocalizationsFa extends AppLocalizations {
       'قفل اپلیکیشن با اثر انگشت هنگام بازگشت به برنامه';
 
   @override
+  String get accountSettingsAndroidUpdateTitle => 'به‌روزرسانی برنامه';
+
+  @override
+  String get accountSettingsAndroidUpdateDescription =>
+      'بررسی، دانلود و نصب نسخه‌های جدید اندروید';
+
+  @override
+  String get androidUpdateSettingsTitle => 'به‌روزرسانی برنامه';
+
+  @override
+  String get androidUpdateSettingsDescription =>
+      'نسخه‌های جدید از ریلیزهای رسمی حسابیکس دریافت می‌شوند. این قابلیت فقط روی اندروید در دسترس است.';
+
+  @override
+  String get androidUpdateUnsupported =>
+      'به‌روزرسانی خودکار فقط در نسخه اندروید پشتیبانی می‌شود.';
+
+  @override
+  String get androidUpdateInstalledVersion => 'نسخه نصب‌شده';
+
+  @override
+  String get androidUpdateLatestVersion => 'آخرین نسخه منتشرشده';
+
+  @override
+  String get androidUpdateAvailableBadge => 'نسخه جدید';
+
+  @override
+  String get androidUpdateLastChecked => 'آخرین بررسی';
+
+  @override
+  String get androidUpdateAutoCheckTitle => 'بررسی خودکار هنگام شروع';
+
+  @override
+  String get androidUpdateAutoCheckSubtitle =>
+      'پس از باز شدن اپلیکیشن، وجود نسخه جدید بررسی شود';
+
+  @override
+  String get androidUpdateAutoDownloadTitle => 'دانلود پس از تأیید';
+
+  @override
+  String get androidUpdateAutoDownloadSubtitle =>
+      'در صورت یافتن نسخه جدید، اعلان نمایش داده شود و آمادگی دانلود اعلام گردد';
+
+  @override
+  String get androidUpdateCheckNow => 'بررسی به‌روزرسانی';
+
+  @override
+  String get androidUpdateDownloadAndInstall => 'دانلود و نصب';
+
+  @override
+  String get androidUpdateOpenPermissionSettings =>
+      'تنظیمات نصب از منابع ناشناس';
+
+  @override
+  String get androidUpdateInfoTitle => 'نکته';
+
+  @override
+  String get androidUpdateInfoBody =>
+      'نصب نهایی نیاز به تأیید شما در صفحه سیستم اندروید دارد. نسخه برنامه باید با تگ ریلیز (مثلاً 70.9.911) هم‌خوان باشد.';
+
+  @override
+  String get androidUpdateAvailableTitle => 'نسخه جدید آماده است';
+
+  @override
+  String androidUpdateAvailableMessage(String latest, String current) {
+    return 'نسخه $latest در دسترس است. نسخه فعلی شما: $current';
+  }
+
+  @override
+  String get androidUpdateChangelogTitle => 'تغییرات این نسخه';
+
+  @override
+  String androidUpdateApkSizeHint(String size) {
+    return 'حجم تقریبی فایل: $size';
+  }
+
+  @override
+  String get androidUpdateLater => 'بعداً';
+
+  @override
+  String get androidUpdateAutoDownloadStarting =>
+      'با تأیید، دانلود و نصب آغاز می‌شود.';
+
+  @override
+  String get androidUpdateDownloadingTitle => 'در حال دانلود به‌روزرسانی';
+
+  @override
+  String get androidUpdateDownloadingPreparing => 'آماده‌سازی دانلود…';
+
+  @override
+  String androidUpdateDownloadProgress(
+    int percent,
+    String received,
+    String total,
+  ) {
+    return '$percent% — $received از $total';
+  }
+
+  @override
+  String get androidUpdateDownloadCancelled => 'دانلود لغو شد';
+
+  @override
+  String androidUpdateDownloadFailed(String error) {
+    return 'دانلود ناموفق بود: $error';
+  }
+
+  @override
+  String get androidUpdateUpToDate => 'شما از آخرین نسخه استفاده می‌کنید';
+
+  @override
+  String get androidUpdateCheckFailed =>
+      'بررسی به‌روزرسانی ناموفق بود. اتصال اینترنت را بررسی کنید.';
+
+  @override
+  String get androidUpdatePermissionTitle => 'مجوز نصب لازم است';
+
+  @override
+  String get androidUpdatePermissionMessage =>
+      'برای نصب نسخه جدید، اجازه «نصب از منابع ناشناس» را برای حسابیکس فعال کنید.';
+
+  @override
+  String get androidUpdatePermissionReturnHint =>
+      'پس از فعال‌سازی مجوز، دوباره «دانلود و نصب» را بزنید.';
+
+  @override
+  String get androidUpdateInstallStarted =>
+      'نصب‌کننده سیستم باز شد. نصب را تأیید کنید.';
+
+  @override
+  String androidUpdateInstallFailed(String error) {
+    return 'شروع نصب ناموفق بود: $error';
+  }
+
+  @override
   String get biometricOptInTitle => 'ورود با اثر انگشت';
 
   @override
