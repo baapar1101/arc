@@ -203,6 +203,7 @@ import 'core/biometric_platform.dart';
 import 'core/android_update_platform.dart';
 import 'widgets/biometric/biometric_lock_gate.dart';
 import 'widgets/android_update/android_update_gate.dart';
+import 'widgets/notification/in_app_notifications_bootstrap.dart';
 import 'core/permission_guard.dart';
 import 'core/keyboard_shortcut_listener.dart';
 import 'core/route_registry.dart';
@@ -4338,14 +4339,17 @@ class _MyAppState extends State<MyApp> {
             builder: (context, child) {
               final theme = Theme.of(context);
               final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle();
-              return AndroidUpdateGate(
-                child: BiometricLockGate(
-                  authStore: _authStore!,
-                  lockController: _biometricLockController,
-                  child: DefaultTextStyle(
-                    style: baseStyle,
-                    child: KeyboardShortcutListener(
-                      child: child ?? const SizedBox(),
+              return InAppNotificationsBootstrap(
+                authStore: _authStore!,
+                child: AndroidUpdateGate(
+                  child: BiometricLockGate(
+                    authStore: _authStore!,
+                    lockController: _biometricLockController,
+                    child: DefaultTextStyle(
+                      style: baseStyle,
+                      child: KeyboardShortcutListener(
+                        child: child ?? const SizedBox(),
+                      ),
                     ),
                   ),
                 ),
