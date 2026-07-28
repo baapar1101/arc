@@ -3,7 +3,8 @@
 set -euo pipefail
 
 # Build script for Flutter Android in this repo.
-# Creates Android App Bundle (AAB) and APK files for release.
+# پیش‌فرض بدون پارامتر: release + یک APK universal (همهٔ ABIها) + API hsxn.hesabix.ir
+# برای AAB یا split APK از --aab / --split-apk استفاده کنید.
 #
 # پس از pull اگر pubspec.lock یا third_party/desktop_drop عوض شد: cd hesabixUI/hesabix_ui && flutter pub get
 #
@@ -21,16 +22,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR"
 
-# Hesabix mirrors (defaults; overridden if corresponding env vars are already set)
-DEFAULT_PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
-DEFAULT_FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
+# Mirrors (defaults; overridden if corresponding env vars are already set)
+DEFAULT_PUB_HOSTED_URL="https://dart.devneeds.ir"
+DEFAULT_FLUTTER_STORAGE_BASE_URL="https://storage.devneeds.ir"
 DEFAULT_FLUTTER_SDK_TARBALL_URL="https://shell.hesabix.ir/flutter_linux_3.41.1-stable.tar.xz"
 
 DEFAULT_MODE="release" # debug|profile|release
-DEFAULT_BUILD_AAB=true
+DEFAULT_BUILD_AAB=false
 DEFAULT_BUILD_APK=true
-DEFAULT_BUILD_UNIVERSAL_APK=false
-DEFAULT_BUILD_SPLIT_APK=true
+DEFAULT_BUILD_UNIVERSAL_APK=true
+DEFAULT_BUILD_SPLIT_APK=false
 DEFAULT_API_BASE_URL="https://hsxn.hesabix.ir"
 
 USER_PROJECT=""
@@ -73,18 +74,18 @@ HESABIX_CMDLINE_TOOLS_LINUX_ZIP_SHA1="${HESABIX_CMDLINE_TOOLS_LINUX_ZIP_SHA1:-d3
 
 print_usage() {
   cat <<EOF
-Usage: ./build_android.sh [--project <path>] [--mode <debug|profile|release>] [--api-base-url <url>] [--aab] [--no-aab] [--apk] [--no-apk] [--universal-apk] [--split-apk] [--clean] [--install-deps] [--auto-setup-android] [--bootstrap-only] [--quiet] [--help]
+Usage: ./build_android.sh [--project <path>] [--mode <debug|profile|release>] [--api-base-url <url>] [--aab] [--no-aab] [--apk] [--no-apk] [--universal-apk] [--no-universal-apk] [--split-apk] [--no-split-apk] [--clean] [--install-deps] [--auto-setup-android] [--bootstrap-only] [--quiet] [--help]
 
 Options:
   --project PATH     Flutter project path (contains pubspec.yaml). If not specified, will be auto-detected.
   --mode MODE        Build type: debug, profile, or release (default: $DEFAULT_MODE).
   --api-base-url URL API base URL (default: $DEFAULT_API_BASE_URL).
-  --aab              Build Android App Bundle (default: enabled).
+  --aab              Build Android App Bundle (default: disabled).
   --no-aab           Skip building Android App Bundle.
   --apk              Build APK files (default: enabled).
   --no-apk           Skip building APK files.
-  --universal-apk    Build universal APK (includes all ABIs, default: disabled).
-  --split-apk        Build split APKs per ABI (default: enabled).
+  --universal-apk    Build universal APK for all ABIs (default: enabled).
+  --split-apk        Build split APKs per ABI (default: disabled).
   --clean            Clean build directory before building.
   --install-deps     Install dependencies before building.
   --auto-setup-android
@@ -126,12 +127,10 @@ Environment (optional overrides; defaults match deploy.sh Hesabix mirrors):
 
 Usage examples:
   ./build_android.sh
-  ./scripts/fix_android_sdk_hesabix_mirror.sh
   ./build_android.sh --mode release --clean
   ./build_android.sh --project hesabixUI/hesabix_ui
+  ./build_android.sh --aab --split-apk --no-universal-apk
   ./build_android.sh --api-base-url https://hsxn.hesabix.ir
-  ./build_android.sh --universal-apk --no-split-apk
-  ./build_android.sh --aab --no-apk
 EOF
 }
 
@@ -318,13 +317,12 @@ hesabix_mirror_curl_ok() {
 }
 
 check_gradle_mirror_health() {
-  local base="${HESABIX_GRADLE_MIRROR:-https://gradle.mirror.hesabix.ir}"
+  local base="${HESABIX_GRADLE_MIRROR:-https://maven.myket.ir}"
   base="${base%/}"
-  # نمونهٔ کوچک POM روی هر سه مسیر (پروکسی واقعی تا مایکت)
   local urls=(
-    "$base/maven2/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom"
-    "$base/android/maven2/androidx/activity/activity/1.8.2/activity-1.8.2.pom"
-    "$base/gradle-plugins/org/gradle/kotlin/gradle-kotlin-dsl-plugins/4.3.0/gradle-kotlin-dsl-plugins-4.3.0.pom"
+    "$base/com/google/guava/guava/33.0.0-jre/guava-33.0.0-jre.pom"
+    "$base/androidx/activity/activity/1.8.2/activity-1.8.2.pom"
+    "$base/org/gradle/kotlin/gradle-kotlin-dsl-plugins/5.1.2/gradle-kotlin-dsl-plugins-5.1.2.pom"
   )
   local u
   for u in "${urls[@]}"; do
@@ -678,6 +676,8 @@ while [[ $# -gt 0 ]]; do
       BUILD_APK=false; shift ;;
     --universal-apk)
       BUILD_UNIVERSAL_APK=true; shift ;;
+    --no-universal-apk)
+      BUILD_UNIVERSAL_APK=false; shift ;;
     --split-apk)
       BUILD_SPLIT_APK=true; shift ;;
     --no-split-apk)
