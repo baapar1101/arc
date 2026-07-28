@@ -4,18 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
+import '../../core/calendar_controller.dart';
 import '../../services/in_app_notifications_hub.dart';
 import '../../services/notification_tap_navigation.dart';
 
 /// Binds auth + lifecycle to [InAppNotificationsHub] and consumes notification taps.
 class InAppNotificationsBootstrap extends StatefulWidget {
   final AuthStore authStore;
+  final CalendarController? calendarController;
   final Widget child;
 
   const InAppNotificationsBootstrap({
     super.key,
     required this.authStore,
     required this.child,
+    this.calendarController,
   });
 
   @override
@@ -32,6 +35,8 @@ class _InAppNotificationsBootstrapState extends State<InAppNotificationsBootstra
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.authStore.addListener(_onAuthChanged);
+    widget.calendarController?.addListener(_onCalendarChanged);
+    _applyCalendar();
     unawaited(_sync());
   }
 
@@ -43,13 +48,26 @@ class _InAppNotificationsBootstrapState extends State<InAppNotificationsBootstra
       widget.authStore.addListener(_onAuthChanged);
       unawaited(_sync());
     }
+    if (oldWidget.calendarController != widget.calendarController) {
+      oldWidget.calendarController?.removeListener(_onCalendarChanged);
+      widget.calendarController?.addListener(_onCalendarChanged);
+      _applyCalendar();
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.authStore.removeListener(_onAuthChanged);
+    widget.calendarController?.removeListener(_onCalendarChanged);
     super.dispose();
+  }
+
+  void _onCalendarChanged() => _applyCalendar();
+
+  void _applyCalendar() {
+    final jalali = widget.calendarController?.isJalali ?? true;
+    InAppNotificationsHub.instance.setAppIsJalali(jalali);
   }
 
   @override
@@ -65,6 +83,7 @@ class _InAppNotificationsBootstrapState extends State<InAppNotificationsBootstra
   }
 
   Future<void> _sync() async {
+    _applyCalendar();
     final apiKey = widget.authStore.apiKey;
     if (apiKey == null || apiKey.isEmpty) {
       if (_started || _lastApiKey != null) {
@@ -81,7 +100,6 @@ class _InAppNotificationsBootstrapState extends State<InAppNotificationsBootstra
     _lastApiKey = apiKey;
     await InAppNotificationsHub.instance.startForApiKey(apiKey);
     _started = true;
-    // After hub is ready and user is logged in, apply cold-start / tap navigation.
     WidgetsBinding.instance.addPostFrameCallback((_) => _consumePendingTap());
   }
 
@@ -92,7 +110,6 @@ class _InAppNotificationsBootstrapState extends State<InAppNotificationsBootstra
     final apiKey = widget.authStore.apiKey;
     if (apiKey == null || apiKey.isEmpty) return;
 
-    // Prefer GoRouter when available.
     try {
       final router = GoRouter.maybeOf(context);
       if (router != null) {

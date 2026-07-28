@@ -11,6 +11,8 @@ class SystemNotificationsService {
     required String body,
     required Map<String, dynamic> payload,
     bool playSound = true,
+    bool appIsJalali = true,
+    bool enrichContent = true,
   }) async {}
 
   Future<Map<String, dynamic>?> consumeLaunchPayload() async => null;

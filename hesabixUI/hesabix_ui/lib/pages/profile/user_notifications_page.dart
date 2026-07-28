@@ -15,6 +15,7 @@ import '../../services/bale_integration_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/in_app_notification_behavior_section.dart';
+import '../../widgets/android_system_notification_settings_section.dart';
 
 class UserNotificationsPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -780,14 +781,23 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: InAppNotificationBehaviorSection(
-            enabled: option.enabled,
-            alertMode: _inappAlertMode,
-            soundEnabled: _inappSoundEnabled,
-            soundAssetId: _inappSoundAssetId,
-            onAlertModeChanged: (m) => setState(() => _inappAlertMode = m),
-            onSoundEnabledChanged: (v) => setState(() => _inappSoundEnabled = v),
-            onSoundAssetChanged: (id) => setState(() => _inappSoundAssetId = id),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InAppNotificationBehaviorSection(
+                enabled: option.enabled,
+                alertMode: _inappAlertMode,
+                soundEnabled: _inappSoundEnabled,
+                soundAssetId: _inappSoundAssetId,
+                onAlertModeChanged: (m) => setState(() => _inappAlertMode = m),
+                onSoundEnabledChanged: (v) => setState(() => _inappSoundEnabled = v),
+                onSoundAssetChanged: (id) => setState(() => _inappSoundAssetId = id),
+              ),
+              AndroidSystemNotificationSettingsSection(
+                enabled: option.enabled,
+                calendarController: widget.calendarController,
+              ),
+            ],
           ),
         ),
       ],

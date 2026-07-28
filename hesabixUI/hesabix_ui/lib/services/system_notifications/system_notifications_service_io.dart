@@ -1,10 +1,14 @@
+import 'dart:ui' show Color;
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../core/android_notification_prefs.dart';
 import '../../core/android_system_notifications_platform.dart';
+import 'android_notification_content_builder.dart';
 import 'notification_payload_codec.dart';
 
-const String _kAndroidChannelId = 'hesabix_inapp';
+const String _kAndroidChannelId = 'hesabix_inapp_v2';
 const String _kAndroidChannelName = 'اعلان‌های حسابیکس';
 const String _kAndroidChannelDescription = 'اعلان‌های درون‌برنامه‌ای حسابیکس';
 
@@ -69,11 +73,14 @@ class SystemNotificationsService {
     return result.isGranted;
   }
 
+  /// Shows a tray notification; enriches title/body from [AndroidNotificationPrefs].
   Future<void> showInAppNotification({
     required String title,
     required String body,
     required Map<String, dynamic> payload,
     bool playSound = true,
+    bool appIsJalali = true,
+    bool enrichContent = true,
   }) async {
     if (!supportsAndroidSystemNotifications) return;
     if (!_initialized) {
@@ -81,6 +88,26 @@ class SystemNotificationsService {
     }
     final allowed = await ensurePermission();
     if (!allowed) return;
+
+    var showTitle = title;
+    var showBody = body;
+    if (enrichContent) {
+      final built = await AndroidNotificationContentBuilder.build(
+        item: <String, dynamic>{
+          ...payload,
+          'title': title,
+          'body': body,
+        },
+        appIsJalali: appIsJalali,
+      );
+      showTitle = built.title;
+      showBody = built.body;
+    }
+
+    final accent = await AndroidNotificationPrefs.getAccentColor();
+    final led = await AndroidNotificationPrefs.getLedEnabled();
+    final vibrate = await AndroidNotificationPrefs.getVibrate();
+    final color = Color(accent);
 
     final id = _notificationIdFor(payload);
     final details = NotificationDetails(
@@ -91,16 +118,22 @@ class SystemNotificationsService {
         importance: Importance.high,
         priority: Priority.high,
         playSound: playSound,
-        enableVibration: playSound,
+        enableVibration: vibrate && playSound,
+        enableLights: led,
+        color: color,
+        ledColor: led ? color : null,
+        ledOnMs: led ? 800 : null,
+        ledOffMs: led ? 400 : null,
         icon: '@mipmap/ic_launcher',
-        styleInformation: BigTextStyleInformation(body, contentTitle: title),
+        styleInformation: BigTextStyleInformation(showBody, contentTitle: showTitle),
+        ticker: showTitle,
       ),
     );
 
     await _plugin.show(
       id: id,
-      title: title,
-      body: body,
+      title: showTitle,
+      body: showBody,
       notificationDetails: details,
       payload: NotificationPayloadCodec.encode(payload),
     );

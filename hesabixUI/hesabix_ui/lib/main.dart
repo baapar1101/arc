@@ -4341,6 +4341,7 @@ class _MyAppState extends State<MyApp> {
               final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle();
               return InAppNotificationsBootstrap(
                 authStore: _authStore!,
+                calendarController: _calendarController,
                 child: AndroidUpdateGate(
                   child: BiometricLockGate(
                     authStore: _authStore!,
