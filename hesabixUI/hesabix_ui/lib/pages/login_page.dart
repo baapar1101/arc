@@ -552,6 +552,8 @@ class _LoginPageState extends State<LoginPage> {
                 final user = verifyResult['user'] as Map<String, dynamic>?;
                 
                 if (apiKey != null && apiKey.isNotEmpty) {
+                  // Hold /login redirect until biometric opt-in finishes.
+                  widget.authStore.beginPostLoginFlow();
                   await widget.authStore.saveApiKey(apiKey);
                   
                   // ذخیره اطلاعات کاربر
@@ -658,6 +660,8 @@ class _LoginPageState extends State<LoginPage> {
             context,
             authStore: widget.authStore,
           );
+        } else if (verified == true) {
+          widget.authStore.endPostLoginFlow();
         }
       } else {
         SnackBarHelper.showError(context, message: 'خطا در ارسال کد ورود');
@@ -729,6 +733,8 @@ class _LoginPageState extends State<LoginPage> {
       }
       final apiKey = data != null ? data['api_key']?.toString() : null;
       if (apiKey != null && apiKey.isNotEmpty) {
+        // Hold /login redirect until biometric opt-in finishes.
+        widget.authStore.beginPostLoginFlow();
         await widget.authStore.saveApiKey(apiKey);
       }
       
@@ -775,7 +781,10 @@ class _LoginPageState extends State<LoginPage> {
         userMobile: userMobile,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        widget.authStore.endPostLoginFlow();
+        return;
+      }
       _showSnack(t.homeWelcome);
       // بعد از login موفق، به صفحه قبلی یا dashboard برود
       try {
@@ -799,6 +808,7 @@ class _LoginPageState extends State<LoginPage> {
         );
       }
     } catch (e) {
+      widget.authStore.endPostLoginFlow();
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
       _showSnack(msg);
       setState(() {
@@ -871,6 +881,8 @@ class _LoginPageState extends State<LoginPage> {
       }
       final apiKey = data != null ? data['api_key']?.toString() : null;
       if (apiKey != null && apiKey.isNotEmpty) {
+        // Hold /login redirect until biometric opt-in finishes.
+        widget.authStore.beginPostLoginFlow();
         await widget.authStore.saveApiKey(apiKey);
       }
       
@@ -924,8 +936,11 @@ class _LoginPageState extends State<LoginPage> {
           context,
           authStore: widget.authStore,
         );
+      } else {
+        widget.authStore.endPostLoginFlow();
       }
     } catch (e) {
+      widget.authStore.endPostLoginFlow();
       if (!mounted) return;
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
       _showSnack(msg.isEmpty ? t.registerFailed : msg);

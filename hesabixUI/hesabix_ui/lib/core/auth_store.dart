@@ -47,6 +47,19 @@ class AuthStore with ChangeNotifier {
   String? get currentUserMobile => _currentUserMobile;
   BusinessWithPermission? get currentBusiness => _currentBusiness;
 
+  /// When true, GoRouter must not leave `/login` after api key is saved.
+  /// Prevents racing the post-login biometric opt-in dialog / BiometricPrompt.
+  bool _deferLoginRedirect = false;
+  bool get deferLoginRedirect => _deferLoginRedirect;
+
+  void beginPostLoginFlow() {
+    _deferLoginRedirect = true;
+  }
+
+  void endPostLoginFlow() {
+    _deferLoginRedirect = false;
+  }
+
   /// کسب‌وکار فعلی چندارزی است (حداقل یک ارز فرعی).
   bool get isMultiCurrency => _currentBusiness?.isMultiCurrency ?? false;
 
@@ -235,6 +248,7 @@ class AuthStore with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     _apiKey = key;
     if (key == null) {
+      _deferLoginRedirect = false;
       if (kIsWeb) {
         await prefs.remove(_kApiKey);
       } else {

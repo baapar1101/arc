@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -13,6 +14,25 @@ import '../utils/snackbar_helper.dart';
 /// Post-login opt-in dialog and navigation helper for biometric lock.
 class BiometricPostLoginFlow {
   static final BiometricAuthService _biometric = createBiometricAuthService();
+
+  /// Android BiometricPrompt often fails if started while a Flutter dialog
+  /// route is still tearing down — wait for frames + a short settle delay.
+  static Future<void> _waitForUiSettle() async {
+    await SchedulerBinding.instance.endOfFrame;
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+    await SchedulerBinding.instance.endOfFrame;
+  }
+
+  static Future<BiometricAuthResult> _authenticateWithRetry(String reason) async {
+    final sw = Stopwatch()..start();
+    var result = await _biometric.authenticate(reason: reason);
+    // Instant failure usually means the system prompt never appeared (UI race).
+    if (!result.success && sw.elapsedMilliseconds < 500) {
+      await _waitForUiSettle();
+      result = await _biometric.authenticate(reason: reason);
+    }
+    return result;
+  }
 
   static Future<void> maybeShowOptInDialog(
     BuildContext context, {
@@ -64,7 +84,11 @@ class BiometricPostLoginFlow {
     if (!context.mounted) return;
 
     if (enable == true) {
-      final result = await _biometric.authenticate(reason: t.biometricOptInAuthReason);
+      // Dialog must fully dismiss before BiometricPrompt can attach.
+      await _waitForUiSettle();
+      if (!context.mounted) return;
+
+      final result = await _authenticateWithRetry(t.biometricOptInAuthReason);
       if (result.success) {
         await BiometricLockPrefs.setEnabled(userId, true);
         await BiometricLockPrefs.markPrompted(userId);
@@ -76,7 +100,9 @@ class BiometricPostLoginFlow {
         // next login / from settings.
         SnackBarHelper.showError(
           context,
-          message: t.biometricSettingsEnableFailed,
+          message: result.errorMessage?.isNotEmpty == true
+              ? '${t.biometricSettingsEnableFailed} (${result.errorCode ?? ''})'
+              : t.biometricSettingsEnableFailed,
         );
       }
       // If canceled: leave prompted=false so we can ask again later.
@@ -91,16 +117,24 @@ class BiometricPostLoginFlow {
     required AuthStore authStore,
     String? preferredPath,
   }) async {
-    await maybeShowOptInDialog(context, authStore: authStore);
+    // Keep user on /login until opt-in + navigation finish (see GoRouter redirect).
+    authStore.beginPostLoginFlow();
+    try {
+      await maybeShowOptInDialog(context, authStore: authStore);
 
-    final lockController = BiometricLockScope.maybeOf(context);
-    lockController?.markFreshLogin();
+      if (!context.mounted) return;
+      final lockController = BiometricLockScope.maybeOf(context);
+      lockController?.markFreshLogin();
 
-    if (!context.mounted) return;
+      final destination = preferredPath ??
+          await MobileLauncherPrefs.postAuthHomeLocation(authStore.currentUserId);
+      if (!context.mounted) return;
 
-    final destination = preferredPath ??
-        await MobileLauncherPrefs.postAuthHomeLocation(authStore.currentUserId);
-    if (!context.mounted) return;
-    context.go(destination);
+      // Clear deferral before go() so future /login visits redirect normally.
+      authStore.endPostLoginFlow();
+      context.go(destination);
+    } finally {
+      authStore.endPostLoginFlow();
+    }
   }
 }

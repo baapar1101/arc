@@ -915,7 +915,12 @@ class _MyAppState extends State<MyApp> {
         // اگر API key دارد
         
         // اگر در login است، ترجیح لانچر یا داشبورد پروفایل
+        // مگر اینکه post-login flow (دیالوگ اثر انگشت) هنوز تمام نشده باشد —
+        // در غیر این صورت redirect با BiometricPrompt رقابت می‌کند و فعال‌سازی شکست می‌خورد.
         if (currentPath == '/login') {
+          if (_authStore!.deferLoginRedirect) {
+            return null;
+          }
           final launcherLoc =
               await MobileLauncherPrefs.resumeHomeLocation(_authStore!.currentUserId);
           return launcherLoc ?? '/user/profile/dashboard';
