@@ -134,7 +134,7 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
         ),
         const SizedBox(height: 4),
         Text(
-          'شخصی‌سازی ظاهر اعلان در سینی گوشی و دریافت اعلان وقتی برنامه در پس‌زمینه است.',
+          'شخصی‌سازی ظاهر اعلان‌های دریافتی و اعلان دائمی پس‌زمینه (ساعت، تاریخ، برند و آیکون حسابیکس).',
           style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
         const SizedBox(height: 12),
@@ -173,6 +173,7 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
                 onTap: () async {
                   setState(() => _accent = c);
                   await AndroidNotificationPrefs.setAccentColor(c);
+                  await _refreshKeepAliveStatus();
                 },
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
@@ -192,10 +193,15 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
           ],
         ),
         const SizedBox(height: 16),
+        Text(
+          'محتوای اعلان (دریافتی و دائمی)',
+          style: theme.textTheme.labelLarge,
+        ),
+        const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: _dateStyle,
           decoration: const InputDecoration(
-            labelText: 'نمایش تاریخ در اعلان',
+            labelText: 'نمایش تاریخ',
             border: OutlineInputBorder(),
           ),
           items: const [
@@ -203,25 +209,30 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
             DropdownMenuItem(value: 'jalali', child: Text('فقط شمسی')),
             DropdownMenuItem(value: 'gregorian', child: Text('فقط میلادی')),
             DropdownMenuItem(value: 'app', child: Text('مطابق تقویم برنامه')),
+            DropdownMenuItem(value: 'none', child: Text('بدون تاریخ')),
           ],
           onChanged: (v) async {
             if (v == null) return;
             setState(() => _dateStyle = v);
             await AndroidNotificationPrefs.setDateStyle(v);
+            await _refreshKeepAliveStatus();
           },
         ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: const Text('نمایش ساعت'),
+          subtitle: const Text('روی اعلان‌های دریافتی و اعلان دائمی پس‌زمینه'),
           value: _showTime,
           onChanged: (v) async {
             setState(() => _showTime = v);
             await AndroidNotificationPrefs.setShowTime(v);
+            await _refreshKeepAliveStatus();
           },
         ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: const Text('برچسب نوع رویداد (مثلاً تیکت)'),
+          subtitle: const Text('فقط برای اعلان‌های دریافتی'),
           value: _showEventLabel,
           onChanged: (v) async {
             setState(() => _showEventLabel = v);
@@ -235,6 +246,7 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
           onChanged: (v) async {
             setState(() => _showAppBrand = v);
             await AndroidNotificationPrefs.setShowAppBrand(v);
+            await _refreshKeepAliveStatus();
           },
         ),
         SwitchListTile.adaptive(
@@ -257,10 +269,17 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
         ),
         const SizedBox(height: 4),
         Text(
-          'نکته: Force Stop از تنظیمات اندروید یا قاتل‌باتری برخی گوشی‌ها (شیائومی و …) سرویس را متوقف می‌کند.',
+          'آیکون اعلان: سیلوئت سفید حسابیکس در نوار وضعیت؛ لوگوی رنگی مطابق تم روشن/تاریک گوشی در پنل اعلان. Force Stop یا قاتل‌باتری برخی گوشی‌ها سرویس را متوقف می‌کند.',
           style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
       ],
+    );
+  }
+
+  Future<void> _refreshKeepAliveStatus() async {
+    if (!_keepAlive) return;
+    await createAndroidNotificationKeepAliveService().refreshStatusNotification(
+      appIsJalali: widget.calendarController.isJalali,
     );
   }
 }

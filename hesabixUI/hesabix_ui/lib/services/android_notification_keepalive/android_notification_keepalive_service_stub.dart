@@ -16,6 +16,8 @@ class AndroidNotificationKeepAliveService {
 
   Future<void> updateApiKey(String apiKey) async {}
 
+  Future<void> refreshStatusNotification({bool appIsJalali = true}) async {}
+
   void setOnNotificationMessage(void Function(Map<String, dynamic> msg)? handler) {}
 }
 

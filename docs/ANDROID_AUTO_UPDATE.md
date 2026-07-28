@@ -63,6 +63,27 @@ flutter build apk --build-name=70.9.911 --build-number=70009911
 ## نکات امنیتی / عملیاتی
 
 - APK باید با **همان keystore** قبلی امضا شود.
-- مخزن ریلیز عمومی است؛ توکن لازم نیست.
+- مخزن ریلیز عمومی است؛ کلاینت اپ برای خواندن `releases/latest` توکن لازم ندارد.
 - حجم APK حدود ۱۳۰MB+ است؛ progress و امکان لغو در UI دیده شده است.
 - وب و دسکتاپ این ماژول را اجرا نمی‌کنند (`supportsAndroidApkUpdate`).
+
+## انتشار خودکار ریلیز اندروید
+
+پس از بیلد APK، از ریشهٔ مخزن:
+
+```bash
+# ترجیحاً با توکن API
+FORGEJO_TOKEN='...' ./release_android_forgejo.sh
+
+# یا با یوزر/پسورد
+FORGEJO_USER='...' FORGEJO_PASSWORD='...' ./release_android_forgejo.sh
+
+# پیش‌نمایش بدون آپلود
+./release_android_forgejo.sh --dry-run
+
+# جایگزینی ریلیز هم‌تگ
+FORGEJO_TOKEN='...' ./release_android_forgejo.sh --force
+```
+
+اسکریپت نسخه را از `pubspec.yaml` می‌خواند، ریلیز با تگ `MAJOR.MINOR.PATCH` می‌سازد و
+`app-release.<version>.apk` را آپلود می‌کند. جزئیات: `./release_android_forgejo.sh --help`

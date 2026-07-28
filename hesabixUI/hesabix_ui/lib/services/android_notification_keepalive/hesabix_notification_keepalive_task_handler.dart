@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
 import '../notifications_ws_client.dart';
+import '../system_notifications/android_notification_content_builder.dart';
 import '../system_notifications/system_notifications_service.dart';
 import '../system_notifications/notification_payload_codec.dart';
 
@@ -21,6 +23,10 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
   bool _appIsJalali = true;
   String? _apiKey;
 
+  static const NotificationIcon _notificationIcon = NotificationIcon(
+    metaDataName: 'com.hesabix.notificationIcon',
+  );
+
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
     await _sys.initialize();
@@ -28,6 +34,7 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
     // Prefer false when missing so a restarted FGS does not suppress trays forever.
     _uiAttached = (await FlutterForegroundTask.getData<bool>(key: 'uiAttached')) ?? false;
     _appIsJalali = (await FlutterForegroundTask.getData<bool>(key: 'appIsJalali')) ?? true;
+    await _refreshKeepAliveNotification(timestamp);
     await _connectWs();
   }
 
@@ -80,9 +87,26 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
     );
   }
 
+  Future<void> _refreshKeepAliveNotification([DateTime? now]) async {
+    try {
+      final built = await AndroidNotificationContentBuilder.buildKeepAlive(
+        appIsJalali: _appIsJalali,
+        now: now ?? DateTime.now(),
+      );
+      await FlutterForegroundTask.updateService(
+        notificationTitle: built.title,
+        notificationText: built.body,
+        notificationIcon: _notificationIcon,
+      );
+    } catch (e, st) {
+      debugPrint('KeepAlive status notification update error: $e\n$st');
+    }
+  }
+
   @override
   void onRepeatEvent(DateTime timestamp) {
-    // Keep-alive heartbeat; WS client has its own ping.
+    // Refresh personalized clock/date on the persistent FGS notification.
+    unawaited(_refreshKeepAliveNotification(timestamp));
   }
 
   @override
@@ -118,6 +142,9 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
       } else if (type == 'appIsJalali') {
         _appIsJalali = map['value'] == true;
         FlutterForegroundTask.saveData(key: 'appIsJalali', value: _appIsJalali);
+        unawaited(_refreshKeepAliveNotification());
+      } else if (type == 'prefsChanged' || type == 'refreshStatus') {
+        unawaited(_refreshKeepAliveNotification());
       } else if (type == 'reconnect') {
         _connectWs();
       }

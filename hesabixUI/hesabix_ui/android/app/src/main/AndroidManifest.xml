@@ -54,6 +54,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- White silhouette used by flutter_foreground_task NotificationIcon. -->
+        <meta-data
+            android:name="com.hesabix.notificationIcon"
+            android:resource="@drawable/ic_stat_hesabix" />
         <!-- Keep-alive foreground service for in-app notification WebSocket (Android). -->
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"

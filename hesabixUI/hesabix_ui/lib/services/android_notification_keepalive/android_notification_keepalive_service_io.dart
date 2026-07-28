@@ -4,6 +4,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/android_notification_keepalive_platform.dart';
 import '../../core/android_notification_prefs.dart';
+import '../system_notifications/android_notification_content_builder.dart';
 import 'hesabix_notification_keepalive_task_handler.dart';
 
 /// Starts/stops Android foreground keep-alive for the notifications WebSocket.
@@ -12,6 +13,10 @@ class AndroidNotificationKeepAliveService {
 
   bool _initialized = false;
   void Function(Map<String, dynamic> msg)? _onMessage;
+
+  static const NotificationIcon notificationIcon = NotificationIcon(
+    metaDataName: 'com.hesabix.notificationIcon',
+  );
 
   Future<void> ensureInitialized() async {
     if (!supportsAndroidNotificationKeepAlive) return;
@@ -28,14 +33,15 @@ class AndroidNotificationKeepAliveService {
         channelImportance: NotificationChannelImportance.LOW,
         priority: NotificationPriority.LOW,
         onlyAlertOnce: true,
-        showWhen: false,
+        showWhen: true,
       ),
       iosNotificationOptions: const IOSNotificationOptions(
         showNotification: false,
         playSound: false,
       ),
       foregroundTaskOptions: ForegroundTaskOptions(
-        eventAction: ForegroundTaskEventAction.repeat(30000),
+        // Refresh keep-alive text (clock/date) about once a minute.
+        eventAction: ForegroundTaskEventAction.repeat(60000),
         autoRunOnBoot: false,
         autoRunOnMyPackageReplaced: false,
         allowWakeLock: true,
@@ -100,13 +106,16 @@ class AndroidNotificationKeepAliveService {
         'type': 'uiAttached',
         'value': uiAttached,
       });
+      await refreshStatusNotification();
       return;
     }
 
+    final status = await AndroidNotificationContentBuilder.buildKeepAlive(appIsJalali: appIsJalali);
     await FlutterForegroundTask.startService(
       serviceTypes: const [ForegroundServiceTypes.dataSync],
-      notificationTitle: 'حسابیکس · دریافت اعلان‌ها',
-      notificationText: 'اتصال پس‌زمینه فعال است. برای توقف از تنظیمات ناتیفیکیشن استفاده کنید.',
+      notificationTitle: status.title,
+      notificationText: status.body,
+      notificationIcon: notificationIcon,
       notificationInitialRoute: '/user/profile/notifications',
       callback: hesabixNotificationKeepAliveCallback,
     );
@@ -139,6 +148,25 @@ class AndroidNotificationKeepAliveService {
         'type': 'apiKey',
         'value': apiKey,
       });
+    }
+  }
+
+  /// Rebuild keep-alive title/body from personalization prefs (date/time/brand).
+  Future<void> refreshStatusNotification({bool appIsJalali = true}) async {
+    if (!supportsAndroidNotificationKeepAlive) return;
+    if (!await isRunning()) return;
+    try {
+      final status = await AndroidNotificationContentBuilder.buildKeepAlive(appIsJalali: appIsJalali);
+      await FlutterForegroundTask.updateService(
+        notificationTitle: status.title,
+        notificationText: status.body,
+        notificationIcon: notificationIcon,
+      );
+      FlutterForegroundTask.sendDataToTask(<String, dynamic>{
+        'type': 'prefsChanged',
+      });
+    } catch (e) {
+      debugPrint('KeepAlive refreshStatusNotification error: $e');
     }
   }
 }

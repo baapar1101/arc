@@ -28,7 +28,7 @@ class SystemNotificationsService {
     _onTap = onNotificationTap;
     if (_initialized) return;
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('@drawable/ic_stat_hesabix');
     const initSettings = InitializationSettings(android: androidInit);
 
     await _plugin.initialize(
@@ -125,6 +125,7 @@ class SystemNotificationsService {
     final color = Color(accent);
 
     final id = _notificationIdFor(payload);
+    final largeIconName = AndroidNotificationContentBuilder.largeIconDrawableForTheme();
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
         _kAndroidChannelId,
@@ -139,7 +140,8 @@ class SystemNotificationsService {
         ledColor: led ? color : null,
         ledOnMs: led ? 800 : null,
         ledOffMs: led ? 400 : null,
-        icon: '@mipmap/ic_launcher',
+        icon: '@drawable/${AndroidNotificationContentBuilder.smallIconDrawable}',
+        largeIcon: DrawableResourceAndroidBitmap(largeIconName),
         styleInformation: BigTextStyleInformation(showBody, contentTitle: showTitle),
         ticker: showTitle,
       ),
