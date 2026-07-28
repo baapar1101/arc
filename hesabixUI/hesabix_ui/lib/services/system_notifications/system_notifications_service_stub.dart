@@ -4,7 +4,7 @@ class SystemNotificationsService {
     void Function(Map<String, dynamic> item)? onNotificationTap,
   }) async {}
 
-  Future<bool> ensurePermission() async => false;
+  Future<bool> ensurePermission({bool requestIfNeeded = true}) async => false;
 
   Future<void> showInAppNotification({
     required String title,
@@ -13,6 +13,7 @@ class SystemNotificationsService {
     bool playSound = true,
     bool appIsJalali = true,
     bool enrichContent = true,
+    bool requestPermission = true,
   }) async {}
 
   Future<Map<String, dynamic>?> consumeLaunchPayload() async => null;

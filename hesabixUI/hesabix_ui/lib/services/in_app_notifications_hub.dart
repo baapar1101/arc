@@ -84,7 +84,7 @@ class InAppNotificationsHub extends ChangeNotifier {
       await _keepAlive.ensureInitialized();
       _keepAlive.setOnNotificationMessage((msg) {
         if ('${msg['type'] ?? ''}' == 'notification') {
-          _ingestNotification(msg, fromKeepAlive: true);
+          _ingestNotification(msg);
         }
       });
     }
@@ -104,7 +104,11 @@ class InAppNotificationsHub extends ChangeNotifier {
 
     if (keepAliveWanted) {
       try {
-        await _keepAlive.start(apiKey: apiKey, appIsJalali: _appIsJalali);
+        await _keepAlive.start(
+          apiKey: apiKey,
+          appIsJalali: _appIsJalali,
+          uiAttached: isForeground,
+        );
         final running = await _keepAlive.isRunning();
         if (running) {
           _usingKeepAlive = true;
@@ -197,7 +201,7 @@ class InAppNotificationsHub extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _ingestNotification(Map<String, dynamic> raw, {bool fromKeepAlive = false}) {
+  void _ingestNotification(Map<String, dynamic> raw) {
     final prefs = InAppNotificationPreferencesController.instance;
     final title = '${raw['title'] ?? 'پیام'}';
     final body = '${raw['body'] ?? ''}';
@@ -251,11 +255,10 @@ class InAppNotificationsHub extends ChangeNotifier {
       return;
     }
 
-    // Background: if keep-alive isolate already showed tray, skip duplicate.
-    if (fromKeepAlive && _usingKeepAlive) {
-      return;
-    }
-
+    // Background: always attempt tray from the UI isolate as a fallback.
+    // Keep-alive FGS also shows when uiAttached=false; same notification id replaces
+    // rather than duplicating. Skipping here previously caused silence when FGS still
+    // thought the UI was attached (stale uiAttached after background/kill).
     if (supportsAndroidSystemNotifications) {
       unawaited(
         _system.showInAppNotification(

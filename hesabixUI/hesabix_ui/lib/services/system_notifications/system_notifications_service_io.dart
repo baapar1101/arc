@@ -64,8 +64,13 @@ class SystemNotificationsService {
     _onTap?.call(item);
   }
 
-  Future<bool> ensurePermission() async {
+  Future<bool> ensurePermission({bool requestIfNeeded = true}) async {
     if (!supportsAndroidSystemNotifications) return false;
+    final androidPlugin =
+        _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final enabled = await androidPlugin?.areNotificationsEnabled();
+    if (enabled == true) return true;
+    if (!requestIfNeeded) return false;
     final status = await Permission.notification.status;
     if (status.isGranted) return true;
     if (status.isPermanentlyDenied) return false;
@@ -81,32 +86,42 @@ class SystemNotificationsService {
     bool playSound = true,
     bool appIsJalali = true,
     bool enrichContent = true,
+    bool requestPermission = true,
   }) async {
     if (!supportsAndroidSystemNotifications) return;
     if (!_initialized) {
       await initialize(onNotificationTap: _onTap);
     }
-    final allowed = await ensurePermission();
+    final allowed = await ensurePermission(requestIfNeeded: requestPermission);
     if (!allowed) return;
 
     var showTitle = title;
     var showBody = body;
     if (enrichContent) {
-      final built = await AndroidNotificationContentBuilder.build(
-        item: <String, dynamic>{
-          ...payload,
-          'title': title,
-          'body': body,
-        },
-        appIsJalali: appIsJalali,
-      );
-      showTitle = built.title;
-      showBody = built.body;
+      try {
+        final built = await AndroidNotificationContentBuilder.build(
+          item: <String, dynamic>{
+            ...payload,
+            'title': title,
+            'body': body,
+          },
+          appIsJalali: appIsJalali,
+        );
+        showTitle = built.title;
+        showBody = built.body;
+      } catch (_) {
+        // Prefer plain title/body over failing the whole notification.
+      }
     }
 
-    final accent = await AndroidNotificationPrefs.getAccentColor();
-    final led = await AndroidNotificationPrefs.getLedEnabled();
-    final vibrate = await AndroidNotificationPrefs.getVibrate();
+    var accent = AndroidNotificationPrefs.defaultAccentColor;
+    var led = true;
+    var vibrate = true;
+    try {
+      accent = await AndroidNotificationPrefs.getAccentColor();
+      led = await AndroidNotificationPrefs.getLedEnabled();
+      vibrate = await AndroidNotificationPrefs.getVibrate();
+    } catch (_) {}
     final color = Color(accent);
 
     final id = _notificationIdFor(payload);

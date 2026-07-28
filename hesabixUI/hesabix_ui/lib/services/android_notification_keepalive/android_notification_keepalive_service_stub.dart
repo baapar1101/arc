@@ -4,7 +4,11 @@ class AndroidNotificationKeepAliveService {
 
   Future<bool> isRunning() async => false;
 
-  Future<void> start({required String apiKey, required bool appIsJalali}) async {}
+  Future<void> start({
+    required String apiKey,
+    required bool appIsJalali,
+    bool uiAttached = false,
+  }) async {}
 
   Future<void> stop() async {}
 

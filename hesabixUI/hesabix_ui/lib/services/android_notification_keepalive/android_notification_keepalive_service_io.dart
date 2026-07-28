@@ -65,7 +65,11 @@ class AndroidNotificationKeepAliveService {
     return FlutterForegroundTask.isRunningService;
   }
 
-  Future<void> start({required String apiKey, required bool appIsJalali}) async {
+  Future<void> start({
+    required String apiKey,
+    required bool appIsJalali,
+    bool uiAttached = false,
+  }) async {
     if (!supportsAndroidNotificationKeepAlive) return;
     if (apiKey.isEmpty) return;
     final enabled = await AndroidNotificationPrefs.isKeepAliveEnabled();
@@ -77,8 +81,10 @@ class AndroidNotificationKeepAliveService {
       await Permission.notification.request();
     }
 
+    // Default uiAttached=false so a killed/restarted FGS still shows tray until
+    // the UI isolate explicitly confirms it is resumed.
     await FlutterForegroundTask.saveData(key: 'apiKey', value: apiKey);
-    await FlutterForegroundTask.saveData(key: 'uiAttached', value: true);
+    await FlutterForegroundTask.saveData(key: 'uiAttached', value: uiAttached);
     await FlutterForegroundTask.saveData(key: 'appIsJalali', value: appIsJalali);
 
     if (await FlutterForegroundTask.isRunningService) {
@@ -89,6 +95,10 @@ class AndroidNotificationKeepAliveService {
       FlutterForegroundTask.sendDataToTask(<String, dynamic>{
         'type': 'appIsJalali',
         'value': appIsJalali,
+      });
+      FlutterForegroundTask.sendDataToTask(<String, dynamic>{
+        'type': 'uiAttached',
+        'value': uiAttached,
       });
       return;
     }
