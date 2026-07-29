@@ -35,6 +35,8 @@ class AIChatMessageBody extends StatelessWidget {
     final scheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context);
     var agentTrace = extractAgentTraceFromResults(functionResults);
+    final agentBudget = extractAgentBudgetFromResults(functionResults);
+    final agentTodos = extractAgentTodosFromResults(functionResults);
     if (suppressApprovalToolChips) {
       agentTrace =
           agentTrace.where((s) => s.kind != 'approval').toList();
@@ -49,26 +51,26 @@ class AIChatMessageBody extends StatelessWidget {
       crossAxisAlignment:
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       children: [
-        if (agentTrace.isNotEmpty) ...[
+        if (!isUser &&
+            (agentTrace.isNotEmpty ||
+                toolActivities.isNotEmpty ||
+                agentBudget != null ||
+                (agentTodos != null && !agentTodos.isEmpty))) ...[
           AIReasoningPanel(
             steps: agentTrace,
+            toolActivities: toolActivities,
+            agentBudget: agentBudget,
+            todoSnapshot: agentTodos,
             compact: true,
-            initiallyExpanded: false,
+            initiallyExpanded: agentTodos?.hasActiveItem ?? false,
           ),
-          const SizedBox(height: 12),
-        ],
-        if (toolActivities.isNotEmpty) ...[
-          for (final activity in toolActivities)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _ToolActivityChip(activity: activity),
-            ),
+          const SizedBox(height: 8),
         ],
         if (content.trim().isNotEmpty) ...[
           isUser
               ? SelectableText(
                   content,
-                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -98,7 +100,8 @@ class AIChatMessageBody extends StatelessWidget {
 
     final results = functionResults is Map
         ? (Map<String, dynamic>.from(functionResults as Map)
-          ..remove(kAgentTraceStorageKey))
+          ..remove(kAgentTraceStorageKey)
+          ..remove(kAgentBudgetStorageKey))
         : <String, dynamic>{};
 
     return calls.map((call) {
@@ -177,7 +180,7 @@ class _AssistantRichContent extends StatelessWidget {
             AIChatTableWidget(spec: seg.tableSpec!)
           else if (seg.text.trim().isNotEmpty)
             MarkdownBody(
-              data: seg.text.trim(),
+              data: normalizeAssistantMarkdown(seg.text.trim()),
               selectable: true,
               styleSheet: _markdownStyle(theme, scheme),
               onTapLink: businessId != null
@@ -214,24 +217,73 @@ class _AssistantRichContent extends StatelessWidget {
   );
 
   static MarkdownStyleSheet _markdownStyle(ThemeData theme, ColorScheme scheme) {
+    final body = theme.textTheme.bodyMedium?.copyWith(height: 1.5);
     return MarkdownStyleSheet(
-      p: theme.textTheme.bodyLarge?.copyWith(height: 1.65, letterSpacing: 0.1),
-      h1: theme.textTheme.titleLarge,
-      h2: theme.textTheme.titleMedium,
-      h3: theme.textTheme.titleSmall,
-      code: theme.textTheme.bodyMedium?.copyWith(
+      p: body,
+      pPadding: const EdgeInsets.only(bottom: 2),
+      h1: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+      h2: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+      h3: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+      h1Padding: const EdgeInsets.only(top: 6, bottom: 2),
+      h2Padding: const EdgeInsets.only(top: 6, bottom: 2),
+      h3Padding: const EdgeInsets.only(top: 4, bottom: 2),
+      strong: const TextStyle(fontWeight: FontWeight.w700),
+      em: const TextStyle(fontStyle: FontStyle.italic),
+      code: theme.textTheme.bodySmall?.copyWith(
         fontFamily: 'monospace',
-        backgroundColor: scheme.surfaceContainerHighest,
+        color: scheme.onSurface,
+        backgroundColor: scheme.surfaceContainerHighest.withValues(alpha: 0.7),
       ),
+      codeblockPadding: const EdgeInsets.all(12),
       codeblockDecoration: BoxDecoration(
         color: scheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
+      blockquotePadding: const EdgeInsets.symmetric(horizontal: 12),
       blockquoteDecoration: BoxDecoration(
-        border: Border(right: BorderSide(color: scheme.primary, width: 3)),
+        border: BorderDirectional(
+          start: BorderSide(color: scheme.primary, width: 3),
+        ),
       ),
-      listBullet: theme.textTheme.bodyLarge,
+      listBullet: body,
+      listIndent: 20,
     );
+  }
+
+  /// نرمال‌سازی محافظه‌کارانه‌ی markdown دریافتی از هوش مصنوعی.
+  ///
+  /// مدل‌ها اغلب تأکید را با فاصله‌ی اضافه می‌نویسند (`** متن **`) که در
+  /// CommonMark معتبر نیست و bold نمی‌شود. اینجا فقط فاصله‌ی داخل دلیمیترهای
+  /// تأکید حذف می‌شود و محتوای بلوک کد و inline code دست‌نخورده می‌ماند.
+  static String normalizeAssistantMarkdown(String input) {
+    if (input.isEmpty) return input;
+    final codeSpans = RegExp(r'```[\s\S]*?```|`[^`\n]*`');
+    final buffer = StringBuffer();
+    var last = 0;
+    for (final m in codeSpans.allMatches(input)) {
+      if (m.start > last) {
+        buffer.write(_normalizeEmphasis(input.substring(last, m.start)));
+      }
+      buffer.write(m.group(0));
+      last = m.end;
+    }
+    if (last < input.length) {
+      buffer.write(_normalizeEmphasis(input.substring(last)));
+    }
+    return buffer.toString();
+  }
+
+  static final _boldSpaced = RegExp(r'\*\*[ \t]*(\S(?:.*?\S)?)[ \t]*\*\*');
+  static final _boldUnderscoreSpaced =
+      RegExp(r'__[ \t]*(\S(?:.*?\S)?)[ \t]*__');
+
+  static String _normalizeEmphasis(String s) {
+    var out = s.replaceAllMapped(_boldSpaced, (m) => '**${m[1]}**');
+    out = out.replaceAllMapped(_boldUnderscoreSpaced, (m) => '__${m[1]}__');
+    return out;
   }
 
   /// جدا کردن بلوک‌های ```chart / ```table / ```json از متن.
@@ -329,105 +381,4 @@ class _ContentSegment {
 
   factory _ContentSegment.table(AITableSpec spec) =>
       _ContentSegment(tableSpec: spec);
-}
-
-class AIChatToolActivityList extends StatelessWidget {
-  final List<AIToolActivity> activities;
-  final bool hideApprovalPending;
-
-  const AIChatToolActivityList({
-    super.key,
-    required this.activities,
-    this.hideApprovalPending = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final visible = hideApprovalPending
-        ? activities.where((a) => !a.approvalRequired).toList()
-        : activities;
-    if (visible.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final a in visible)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: _ToolActivityChip(activity: a),
-          ),
-      ],
-    );
-  }
-}
-
-class _ToolActivityChip extends StatelessWidget {
-  final AIToolActivity activity;
-
-  const _ToolActivityChip({required this.activity});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final l10n = AppLocalizations.of(context);
-
-    IconData icon;
-    Color? iconColor;
-    if (activity.running) {
-      icon = Icons.hourglass_top_rounded;
-      iconColor = scheme.primary;
-    } else if (activity.approvalRequired) {
-      icon = Icons.gpp_maybe_outlined;
-      iconColor = scheme.tertiary;
-    } else if (activity.success == true) {
-      icon = Icons.check_circle_outline_rounded;
-      iconColor = Colors.green.shade700;
-    } else if (activity.success == false) {
-      icon = Icons.error_outline_rounded;
-      iconColor = scheme.error;
-    } else {
-      icon = Icons.build_circle_outlined;
-      iconColor = scheme.onSurfaceVariant;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHigh.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.5),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (activity.running)
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: scheme.primary,
-              ),
-            )
-          else
-            Icon(icon, size: 18, color: iconColor),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              activity.running
-                  ? l10n.aiStatusRunningTool(activity.label)
-                  : activity.approvalRequired
-                      ? '${activity.label} — نیاز به تأیید'
-                      : activity.label,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }

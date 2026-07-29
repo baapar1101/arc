@@ -1051,7 +1051,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     try {
       final dateTime = DateTime.tryParse(timeStr);
       if (dateTime != null) {
-        return HesabixDateUtils.formatDateTime(dateTime, widget.calendarController.isJalali);
+        return MarkStreetDateUtils.formatDateTime(dateTime, widget.calendarController.isJalali);
       }
       return DateFormatters.formatServerDateTime(timeStr);
     } catch (_) {

@@ -65,7 +65,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       if (fiscal.title.trim().isEmpty || fiscal.title.trim().startsWith(autoPrefix)) {
         setState(() {
           final isJalali = widget.calendarController.isJalali;
-          final endStr = HesabixDateUtils.formatForDisplay(fiscal.endDate, isJalali);
+          final endStr = MarkStreetDateUtils.formatForDisplay(fiscal.endDate, isJalali);
           fiscal.title = '$autoPrefix $endStr';
           _fiscalTitleController.text = fiscal.title;
         });
@@ -259,7 +259,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       final isJalali = widget.calendarController.isJalali;
       final end = fiscal.endDate;
       if (end == null) return fiscal.title;
-      final endStr = HesabixDateUtils.formatForDisplay(end, isJalali);
+      final endStr = MarkStreetDateUtils.formatForDisplay(end, isJalali);
       return 'سال مالی منتهی به $endStr';
     }
 
@@ -318,7 +318,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                               setState(() {
                                 fiscal.startDate = d;
                                 if (fiscal.startDate != null) {
-                                  fiscal.endDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+                                  fiscal.endDate = MarkStreetDateUtils.fiscalYearInclusiveEndFromStart(
                                     fiscal.startDate!,
                                     widget.calendarController.isJalali,
                                   );

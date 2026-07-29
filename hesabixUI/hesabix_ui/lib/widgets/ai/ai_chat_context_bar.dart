@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'ai_chat_design.dart';
+
 /// نوار ظرفیت context گفت‌وگو (تخمینی از سرور).
 class AIChatContextBar extends StatelessWidget {
   final double? usageRatio;
@@ -17,6 +19,9 @@ class AIChatContextBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final ratio = usageRatio;
     if (ratio == null || ratio <= 0) {
+      return const SizedBox.shrink();
+    }
+    if (!historySummarized && ratio < AIChatDesign.contextBarMinRatio) {
       return const SizedBox.shrink();
     }
 

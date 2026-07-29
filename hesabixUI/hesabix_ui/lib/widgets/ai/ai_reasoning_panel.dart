@@ -2,19 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_agent_trace_timeline.dart';
+import 'ai_agent_todo_list.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_l10n.dart';
+import 'ai_chat_tool_activity_list.dart';
 
 /// پنل استدلال — traceهای لایه reasoning جدا از پاسخ نهایی.
 class AIReasoningPanel extends StatefulWidget {
   final List<AIAgentTraceStep> steps;
+  final List<AIToolActivity> toolActivities;
+  final AIStreamAgentBudget? agentBudget;
+  final AISessionTodoSnapshot? todoSnapshot;
   final bool compact;
   final bool initiallyExpanded;
 
   const AIReasoningPanel({
     super.key,
     required this.steps,
+    this.toolActivities = const [],
+    this.agentBudget,
+    this.todoSnapshot,
     this.compact = false,
-    this.initiallyExpanded = true,
+    this.initiallyExpanded = false,
   });
 
   static List<AIAgentTraceStep> reasoningOnly(List<AIAgentTraceStep> all) {
@@ -55,8 +64,12 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   @override
   void didUpdateWidget(covariant AIReasoningPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.compact && !_userControlledExpansion) {
-      _expanded = true;
+    if (!_userControlledExpansion) {
+      if (_hasActiveStep) {
+        _expanded = true;
+      } else if (!widget.initiallyExpanded) {
+        _expanded = false;
+      }
     }
     if (_hasActiveStep && !_pulseCtrl.isAnimating) {
       _pulseCtrl.repeat(reverse: true);
@@ -72,16 +85,38 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   }
 
   bool get _hasActiveStep =>
-      widget.steps.any((s) => s.isActive && s.layer != 'answer');
+      widget.steps.any((s) => s.isActive && s.layer != 'answer') ||
+      (widget.todoSnapshot?.hasActiveItem ?? false);
+
+  bool get _hasTodoPlan =>
+      widget.todoSnapshot != null && !widget.todoSnapshot!.isEmpty;
 
   @override
   Widget build(BuildContext context) {
     final reasoning = AIReasoningPanel.reasoningOnly(widget.steps);
-    if (reasoning.isEmpty) return const SizedBox.shrink();
+    final toolCount = widget.toolActivities.length;
+    final todoCount = widget.todoSnapshot?.items.length ?? 0;
+    if (reasoning.isEmpty &&
+        toolCount == 0 &&
+        widget.agentBudget == null &&
+        !_hasTodoPlan) {
+      return const SizedBox.shrink();
+    }
 
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final detailCount = reasoning.length +
+        toolCount +
+        todoCount +
+        (widget.agentBudget != null ? 1 : 0);
+    final title = _hasTodoPlan
+        ? aiSessionPlanReasoningTitle(l10n)
+        : reasoning.isNotEmpty
+            ? l10n.aiReasoningPanelTitle
+            : widget.agentBudget != null
+                ? 'بودجه تحلیل'
+                : 'ابزارهای استفاده‌شده';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -127,7 +162,7 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      l10n.aiReasoningPanelTitle,
+                      title,
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: scheme.primary,
                         fontWeight: FontWeight.w600,
@@ -144,7 +179,7 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      '${reasoning.length}',
+                      '$detailCount',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: scheme.primary,
                         fontWeight: FontWeight.w700,
@@ -180,10 +215,43 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
                     AIChatDesign.subtlePanel(theme, accent: scheme.primary),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-                  child: AIAgentTraceTimeline(
-                    steps: reasoning,
-                    compact: widget.compact,
-                    initiallyExpanded: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_hasTodoPlan)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: AIAgentTodoList(
+                            snapshot: widget.todoSnapshot!,
+                            compact: widget.compact,
+                            initiallyExpanded:
+                                widget.todoSnapshot!.hasActiveItem,
+                          ),
+                        ),
+                      if (widget.agentBudget != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            aiAgentBudgetSummary(l10n, budget: widget.agentBudget!),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      if (reasoning.isNotEmpty)
+                        AIAgentTraceTimeline(
+                          steps: reasoning,
+                          compact: widget.compact,
+                          initiallyExpanded: false,
+                        ),
+                      if (widget.toolActivities.isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(top: reasoning.isNotEmpty ? 8 : 0),
+                          child: AIChatToolActivityList(
+                            activities: widget.toolActivities,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),

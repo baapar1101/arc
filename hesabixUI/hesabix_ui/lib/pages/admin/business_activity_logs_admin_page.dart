@@ -292,7 +292,7 @@ class _BusinessActivityLogsAdminPageState
     final dt = value is DateTime ? value : DateTime.tryParse(value.toString());
     if (dt == null) return value.toString();
     final isJalali = _calendarController?.isJalali ?? false;
-    return HesabixDateUtils.formatForDisplay(dt, isJalali);
+    return MarkStreetDateUtils.formatForDisplay(dt, isJalali);
   }
 
   // ---------------- DataTable config ----------------

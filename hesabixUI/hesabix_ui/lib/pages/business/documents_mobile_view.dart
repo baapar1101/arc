@@ -182,8 +182,8 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
         businessId: widget.businessId,
         documentType: _documentType,
         fiscalYearId: _fiscalYearId,
-        fromDate: _fromDate == null ? null : HesabixDateUtils.formatForApiDate(_fromDate!),
-        toDate: _toDate == null ? null : HesabixDateUtils.formatForApiDate(_toDate!),
+        fromDate: _fromDate == null ? null : MarkStreetDateUtils.formatForApiDate(_fromDate!),
+        toDate: _toDate == null ? null : MarkStreetDateUtils.formatForApiDate(_toDate!),
         projectId: _projectId,
         personId: _filterPerson?.id,
         search: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
@@ -499,11 +499,11 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
     }
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? HesabixDateUtils.formatForDisplay(
+          ? MarkStreetDateUtils.formatForDisplay(
               _fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? HesabixDateUtils.formatForDisplay(
+          ? MarkStreetDateUtils.formatForDisplay(
               _toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(
@@ -655,7 +655,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                     ),
                   ),
                   Text(
-                    HesabixDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali),
+                    MarkStreetDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali),
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     textDirection: TextDirection.ltr,
                   ),

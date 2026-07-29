@@ -1531,13 +1531,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         TextSpan(
                                                           text: t.privacyPolicy,
                                                           style: TextStyle(color: Theme.of(context).colorScheme.primary),
-                                                          recognizer: _privacyTapRecognizer..onTap = () => launchUrlString('https://hesabix.ir/page/privacy/'),
+                                                          recognizer: _privacyTapRecognizer..onTap = () => launchUrlString('https://tamastore.ir/page/privacy/'),
                                                         ),
                                                         TextSpan(text: ' ${t.and} '),
                                                         TextSpan(
                                                           text: t.termsOfService,
                                                           style: TextStyle(color: Theme.of(context).colorScheme.primary),
-                                                          recognizer: _termsTapRecognizer..onTap = () => launchUrlString('https://hesabix.ir/page/terms/'),
+                                                          recognizer: _termsTapRecognizer..onTap = () => launchUrlString('https://tamastore.ir/page/terms/'),
                                                         ),
                                                         TextSpan(text: t.acceptTermsSuffix),
                                                       ],

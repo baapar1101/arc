@@ -460,10 +460,32 @@ class AIService {
         .toList();
   }
 
-  Future<AIChatSession> createChatSession({int? businessId}) async {
+  Future<AIChatSession> createChatSession({
+    int? businessId,
+    String? executionMode,
+  }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions',
-      data: {if (businessId != null) 'business_id': businessId},
+      data: {
+        if (businessId != null) 'business_id': businessId,
+        if (executionMode != null) 'execution_mode': executionMode,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIChatSession.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<AIChatSession> updateChatSession({
+    required int sessionId,
+    String? executionMode,
+    String? title,
+  }) async {
+    final res = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId',
+      data: {
+        if (executionMode != null) 'execution_mode': executionMode,
+        if (title != null) 'title': title,
+      },
     );
     final body = res.data as Map<String, dynamic>;
     return AIChatSession.fromJson(body['data'] as Map<String, dynamic>);
@@ -511,6 +533,7 @@ class AIService {
     required String content,
     bool approveWrites = false,
     String? explorationMode,
+    String? executionMode,
     String? model,
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
@@ -526,6 +549,8 @@ class AIService {
         'approve_writes': approveWrites,
         if (explorationMode != null && explorationMode.isNotEmpty)
           'mode': explorationMode,
+        if (executionMode != null && executionMode.isNotEmpty)
+          'execution_mode': executionMode,
         if (model != null && model.isNotEmpty) 'model': model,
       };
       final endpoint = '/api/v1/ai/chat/sessions/$sessionId/messages';
@@ -660,12 +685,38 @@ class AIService {
         ),
       );
     }
+    if (eventType == 'session_todo_snapshot') {
+      final rawItems = data['items'];
+      final items = rawItems is List
+          ? rawItems
+              .whereType<Map>()
+              .map((e) => AISessionTodoItem.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : <AISessionTodoItem>[];
+      final rawSummary = data['summary'];
+      return AIStreamChunk(
+        todoSnapshot: AISessionTodoSnapshot(
+          items: items,
+          summary: rawSummary is Map
+              ? AISessionTodoSummary.fromJson(
+                  Map<String, dynamic>.from(rawSummary),
+                )
+              : AISessionTodoSummary.fromItems(items),
+          planTitle: data['plan_title'] as String?,
+        ),
+      );
+    }
     if (eventType == 'trace_step' || eventType == 'trace_step_update') {
       final step = AIAgentTraceStep.fromJson(data);
       return AIStreamChunk(traceStep: step);
     }
     if (eventType == 'context_usage') {
       return AIStreamChunk(contextUsage: AIStreamContextUsage.fromJson(data));
+    }
+    if (eventType == 'agent_budget') {
+      return AIStreamChunk(
+        agentBudget: AIStreamAgentBudget.fromJson(data),
+      );
     }
 
     final done = data['done'] as bool? ?? false;
@@ -684,12 +735,19 @@ class AIService {
             .map((e) => AIAgentTraceStep.fromJson(Map<String, dynamic>.from(e)))
             .toList();
       }
+      AIStreamAgentBudget? agentBudget;
+      if (data['agent_budget'] is Map) {
+        agentBudget = AIStreamAgentBudget.fromJson(
+          Map<String, dynamic>.from(data['agent_budget'] as Map),
+        );
+      }
       return AIStreamChunk(
         done: true,
         messageId: data['message_id'] as int?,
         functionCalls: data['function_calls'],
         functionResults: data['function_results'],
         agentTrace: agentTrace,
+        agentBudget: agentBudget,
         requestedModel: data['requested_model'] as String?,
         resolvedModel: data['resolved_model'] as String?,
       );

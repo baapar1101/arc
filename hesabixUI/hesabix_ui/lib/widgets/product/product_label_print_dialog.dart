@@ -167,7 +167,7 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
   }
 
   Future<Uint8List> _buildPdfUnsafe(PdfPageFormat format) async {
-    // همان خانوادهٔ فونت خروجی PDF فاکتور (قالب‌های HTML / Hesabix API)
+    // همان خانوادهٔ فونت خروجی PDF فاکتور (قالب‌های HTML / MarkStreet API)
     pw.Font? fontRegular;
     pw.Font? fontBold;
     try {

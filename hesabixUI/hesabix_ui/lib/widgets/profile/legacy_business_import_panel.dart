@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/widgets/profile/legacy_import_wizard.dart';
 
-/// کارت ورود به ویزارد انتقال از نسخه قدیم حسابیکس.
+/// کارت ورود به ویزارد انتقال از نسخه قدیم مارک‌استریت.
 class LegacyBusinessImportPanel extends StatefulWidget {
   final bool isLoading;
   final ValueChanged<bool>? onLoadingChanged;
@@ -58,7 +58,7 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'انتقال از حسابیکس قبلی',
+                          'انتقال از مارک‌استریت قبلی',
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium

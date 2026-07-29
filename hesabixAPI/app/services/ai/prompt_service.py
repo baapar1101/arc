@@ -7,8 +7,13 @@ from sqlalchemy.orm import Session
 from adapters.db.models.ai_prompt import AIPrompt, PromptRole, PromptType
 from adapters.db.repositories.ai_prompt_repository import AIPromptRepository
 from adapters.db.seed_data.ai_default_prompts import (
+    ADMIN_CHAT_COMPOSITION_KEYS,
     AI_DEFAULT_PROMPT_ROWS,
     AI_PROMPT_FALLBACKS,
+    OPERATOR_CHAT_COMPOSITION_KEYS,
+    USER_CHAT_COMPOSITION_KEYS,
+    compose_admin_chat_prompt,
+    compose_operator_chat_prompt,
     compose_user_chat_prompt,
 )
 
@@ -36,23 +41,73 @@ def get_prompt_by_key(
     return render_prompt_template(template, variables)
 
 
-def _compose_user_chat_prompt(db: Session) -> str:
-    base = get_prompt_by_key(db, "chat.user.base")
-    query_block = get_prompt_by_key(db, "chat.query_filter")
-    visualization_block = get_prompt_by_key(db, "chat.visualization")
-    workflow_block = get_prompt_by_key(db, "chat.workflow")
-    return base + query_block + visualization_block + "\n\n" + workflow_block
+def _get_user_personal_addon(
+    repo: AIPromptRepository,
+    user_id: Optional[int],
+    role: PromptRole,
+    prompt_type: PromptType,
+) -> str:
+    if not user_id:
+        return ""
+    user_prompt = repo.get_user_prompt(user_id, role, prompt_type)
+    if user_prompt and user_prompt.content:
+        return user_prompt.content.strip()
+    return ""
 
 
-def _get_hardcoded_role_prompt(role: PromptRole) -> str:
+def _compose_from_keys(db: Session, keys: tuple[str, ...], *, separator: str = "\n\n") -> str:
+    parts = [get_prompt_by_key(db, key) for key in keys]
+    return separator.join(part for part in parts if part)
+
+
+def _compose_user_chat_prompt(db: Session, personal_addon: str = "") -> str:
+    return compose_user_chat_prompt(
+        base=get_prompt_by_key(db, "chat.user.base"),
+        accounting_block=get_prompt_by_key(db, "chat.accounting_domain"),
+        tool_routing_block=get_prompt_by_key(db, "chat.tool_routing"),
+        query_block=get_prompt_by_key(db, "chat.query_filter"),
+        visualization_block=get_prompt_by_key(db, "chat.visualization"),
+        workflow_block=get_prompt_by_key(db, "chat.workflow"),
+        personal_addon=personal_addon,
+    )
+
+
+def _compose_operator_chat_prompt(db: Session, personal_addon: str = "") -> str:
+    return compose_operator_chat_prompt(
+        base=get_prompt_by_key(db, "chat.operator"),
+        accounting_block=get_prompt_by_key(db, "chat.accounting_domain"),
+        tool_routing_block=get_prompt_by_key(db, "chat.tool_routing"),
+        security_block=get_prompt_by_key(db, "chat.operator_security"),
+        query_block=get_prompt_by_key(db, "chat.query_filter"),
+        visualization_block=get_prompt_by_key(db, "chat.visualization"),
+        personal_addon=personal_addon,
+    )
+
+
+def _compose_admin_chat_prompt(db: Session, personal_addon: str = "") -> str:
+    return compose_admin_chat_prompt(
+        base=get_prompt_by_key(db, "chat.admin"),
+        accounting_block=get_prompt_by_key(db, "chat.accounting_domain"),
+        tool_routing_block=get_prompt_by_key(db, "chat.tool_routing"),
+        security_block=get_prompt_by_key(db, "chat.admin_security"),
+        query_block=get_prompt_by_key(db, "chat.query_filter"),
+        visualization_block=get_prompt_by_key(db, "chat.visualization"),
+        workflow_block=get_prompt_by_key(db, "chat.workflow"),
+        personal_addon=personal_addon,
+    )
+
+
+def _has_composed_defaults(repo: AIPromptRepository, keys: tuple[str, ...]) -> bool:
+    return any(repo.get_default_by_key(key) for key in keys)
+
+
+def _get_hardcoded_role_prompt(role: PromptRole, personal_addon: str = "") -> str:
     if role == PromptRole.USER:
-        return compose_user_chat_prompt()
-    key = {
-        PromptRole.OPERATOR: "chat.operator",
-        PromptRole.ADMIN: "chat.admin",
-    }.get(role)
-    if key:
-        return AI_PROMPT_FALLBACKS.get(key, "")
+        return compose_user_chat_prompt(personal_addon=personal_addon)
+    if role == PromptRole.OPERATOR:
+        return compose_operator_chat_prompt(personal_addon=personal_addon)
+    if role == PromptRole.ADMIN:
+        return compose_admin_chat_prompt(personal_addon=personal_addon)
     return ""
 
 
@@ -64,24 +119,24 @@ def get_prompt(
 ) -> str:
     """
     دریافت prompt با اولویت:
-    1. Prompt شخصی کاربر (اگر user_id داده شده)
-    2. Prompt پیش‌فرض سیستم از DB
+    1. ترکیب بلوک‌های پیش‌فرض (+ افزودن ترجیحات شخصی کاربر در صورت وجود)
+    2. Prompt پیش‌فرض legacy از DB
     3. Prompt سخت‌کد شده
     """
     repo = AIPromptRepository(db)
-
-    if user_id:
-        user_prompt = repo.get_user_prompt(user_id, role, prompt_type)
-        if user_prompt:
-            return user_prompt.content
+    personal_addon = _get_user_personal_addon(repo, user_id, role, prompt_type)
 
     if role == PromptRole.USER and prompt_type == PromptType.SYSTEM:
-        has_db_parts = any(
-            repo.get_default_by_key(key)
-            for key in ("chat.user.base", "chat.query_filter", "chat.visualization", "chat.workflow")
-        )
-        if has_db_parts:
-            return _compose_user_chat_prompt(db)
+        if _has_composed_defaults(repo, USER_CHAT_COMPOSITION_KEYS):
+            return _compose_user_chat_prompt(db, personal_addon=personal_addon)
+
+    if role == PromptRole.OPERATOR and prompt_type == PromptType.SYSTEM:
+        if _has_composed_defaults(repo, OPERATOR_CHAT_COMPOSITION_KEYS):
+            return _compose_operator_chat_prompt(db, personal_addon=personal_addon)
+
+    if role == PromptRole.ADMIN and prompt_type == PromptType.SYSTEM:
+        if _has_composed_defaults(repo, ADMIN_CHAT_COMPOSITION_KEYS):
+            return _compose_admin_chat_prompt(db, personal_addon=personal_addon)
 
     role_key = {
         PromptRole.OPERATOR: "chat.operator",
@@ -90,16 +145,23 @@ def get_prompt(
     if role_key:
         row = repo.get_default_by_key(role_key)
         if row:
-            return row.content
+            base = row.content
+            if personal_addon:
+                return base + "\n\n--- ترجیحات شخصی ---\n" + personal_addon
+            return base
 
     legacy = repo.get_default_prompt(role, prompt_type)
     if legacy and legacy.content:
         if role == PromptRole.USER and prompt_type == PromptType.SYSTEM:
+            if personal_addon:
+                return legacy.content + "\n\n--- ترجیحات شخصی ---\n" + personal_addon
             return legacy.content
         if role != PromptRole.USER:
+            if personal_addon:
+                return legacy.content + "\n\n--- ترجیحات شخصی ---\n" + personal_addon
             return legacy.content
 
-    return _get_hardcoded_role_prompt(role)
+    return _get_hardcoded_role_prompt(role, personal_addon=personal_addon)
 
 
 def list_effective_default_prompts(

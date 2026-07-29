@@ -1689,6 +1689,17 @@ deploy_backend() {
     : > "${env_file}"
   fi
   merge_hesabix_api_env_file "${env_file}"
+  local ensure_secrets="${DEPLOY_SCRIPT_DIR}/scripts/ensure_api_production_secrets.sh"
+  if [[ -f "${ensure_secrets}" ]]; then
+    chmod +x "${ensure_secrets}" 2>/dev/null || true
+    log_info "Ensuring API production secrets in .env..."
+    if APP_ROOT="${APP_ROOT}" bash "${ensure_secrets}"; then
+      log_success "API production secrets verified."
+    else
+      log_error "Failed to ensure API production secrets."
+      exit 1
+    fi
+  fi
 
   if [[ "${INSTALL_VOICE:-N}" =~ ^[Yy]$ ]]; then
     local voice_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_voice_chat.sh"
@@ -2170,7 +2181,16 @@ ensure_flutter_sdk() {
       exit 1
     fi
   else
-    (cd /opt/flutter && git fetch --depth 1 origin stable && git reset --hard origin/stable) 2>/dev/null || true
+    local ensure_flutter_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_flutter_sdk_for_update.sh"
+    export HESABIX_UPDATE_FLUTTER_SDK="${HESABIX_UPDATE_FLUTTER_SDK:-1}"
+    if [[ -f "${ensure_flutter_script}" ]]; then
+      chmod +x "${ensure_flutter_script}" 2>/dev/null || true
+      if ! bash "${ensure_flutter_script}"; then
+        log_warning "Flutter SDK ensure failed after git update; trying flutter doctor..."
+      fi
+    else
+      (cd /opt/flutter && git fetch --depth 1 origin stable && git reset --hard origin/stable) 2>/dev/null || true
+    fi
   fi
   export PATH="/opt/flutter/bin:$PATH"
   git config --global --add safe.directory /opt/flutter 2>/dev/null || true

@@ -6,13 +6,14 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
-import 'ai_conversation_nav_sheet.dart';
-import 'ai_conversation_rail.dart';
 import 'ai_reasoning_panel.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_message_body.dart';
 import 'ai_chat_message_actions.dart';
 import 'ai_chat_context_bar.dart';
+import 'ai_error_recovery_banner.dart';
+import 'ai_write_approval_banner.dart';
+import 'ai_execution_mode.dart';
 typedef MessageActionCallback = void Function(AIChatMessage message);
 
 class AIChatThreadView extends StatelessWidget {
@@ -20,11 +21,13 @@ class AIChatThreadView extends StatelessWidget {
   final String? streamingContent;
   final List<AIToolActivity> streamingToolActivities;
   final List<AIAgentTraceStep> streamingTraceSteps;
+  final AISessionTodoSnapshot? streamingTodoSnapshot;
   final String? streamingStatusPhase;
   final String? streamingStatusStep;
   final int? streamingIteration;
   final int? streamingMaxIterations;
   final int? streamingElapsedSeconds;
+  final AIStreamAgentBudget? streamingAgentBudget;
   final DateTime? streamingTimestamp;
   final bool messagesLoading;
   final bool sending;
@@ -62,6 +65,21 @@ class AIChatThreadView extends StatelessWidget {
   final bool modelsLoading;
   final ValueChanged<String?>? onModelChanged;
   final String? modelPricingHint;
+  final String? streamErrorMessage;
+  final bool streamErrorRecoverable;
+  final VoidCallback? onRetryStreamError;
+  final VoidCallback? onDismissStreamError;
+  final bool showWriteApproval;
+  final List<Map<String, dynamic>> writeApprovalOps;
+  final bool writeApprovalLoading;
+  final bool canConfirmWriteApproval;
+  final String? writeApprovalBlockedReason;
+  final VoidCallback? onConfirmWriteApproval;
+  final VoidCallback? onDismissWriteApproval;
+  final String? creditWarningMessage;
+  final VoidCallback? onCreditUpgrade;
+  final String executionMode;
+  final ValueChanged<String>? onExecutionModeChanged;
 
   const AIChatThreadView({
     super.key,
@@ -71,11 +89,13 @@ class AIChatThreadView extends StatelessWidget {
     required this.streamingContent,
     this.streamingToolActivities = const [],
     this.streamingTraceSteps = const [],
+    this.streamingTodoSnapshot,
     this.streamingStatusPhase,
     this.streamingStatusStep,
     this.streamingIteration,
     this.streamingMaxIterations,
     this.streamingElapsedSeconds,
+    this.streamingAgentBudget,
     required this.streamingTimestamp,
     required this.messagesLoading,
     required this.sending,
@@ -111,25 +131,44 @@ class AIChatThreadView extends StatelessWidget {
     this.modelsLoading = false,
     this.onModelChanged,
     this.modelPricingHint,
+    this.streamErrorMessage,
+    this.streamErrorRecoverable = false,
+    this.onRetryStreamError,
+    this.onDismissStreamError,
+    this.showWriteApproval = false,
+    this.writeApprovalOps = const [],
+    this.writeApprovalLoading = false,
+    this.canConfirmWriteApproval = true,
+    this.writeApprovalBlockedReason,
+    this.onConfirmWriteApproval,
+    this.onDismissWriteApproval,
+    this.creditWarningMessage,
+    this.onCreditUpgrade,
+    this.executionMode = AIExecutionMode.analyzer,
+    this.onExecutionModeChanged,
   });
 
   Widget _buildMessageList(BuildContext context) {
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        AIChatDesign.showConversationRail(context) ? 40 : 16,
-        8,
-      ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       itemCount: messages.length +
-          ((streamingContent != null || streamingTraceSteps.isNotEmpty) ? 1 : 0),
+          ((streamingContent != null ||
+                  streamingTraceSteps.isNotEmpty ||
+                  (streamingTodoSnapshot != null &&
+                      !streamingTodoSnapshot!.isEmpty))
+              ? 1
+              : 0),
       itemBuilder: (context, index) {
         if (index < messages.length) {
           final rowKey =
               messageKeys != null && index < messageKeys!.length
                   ? messageKeys![index]
                   : null;
+          final message = messages[index];
+          final prev = index > 0 ? messages[index - 1] : null;
+          final showAvatar = message.role == MessageRole.assistant &&
+              prev?.role != MessageRole.assistant;
           return Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
@@ -141,19 +180,20 @@ class AIChatThreadView extends StatelessWidget {
                 child: _MessageRow(
                   businessId: businessId,
                   suppressApprovalToolChips: suppressApprovalToolChips,
-                  message: messages[index],
+                  message: message,
+                  showAvatar: showAvatar,
                   formatTime: formatTime,
-                  onLongPress: () => onMessageLongPress(messages[index]),
-                  onCopy: () => onCopyMessage(messages[index].content),
-                  onFeedback: messages[index].id != null
-                      ? (r) => onFeedback(messages[index], r)
+                  onLongPress: () => onMessageLongPress(message),
+                  onCopy: () => onCopyMessage(message.content),
+                  onFeedback: message.id != null
+                      ? (r) => onFeedback(message, r)
                       : null,
-                  feedbackRating: messages[index].id != null
-                      ? messageFeedbackRatings[messages[index].id!]
+                  feedbackRating: message.id != null
+                      ? messageFeedbackRatings[message.id!]
                       : null,
-                  onRegenerate: messages[index].id != null &&
-                          messages[index].id == lastAssistantMessageId &&
-                          messages[index].role == MessageRole.assistant
+                  onRegenerate: message.id != null &&
+                          message.id == lastAssistantMessageId &&
+                          message.role == MessageRole.assistant
                       ? onRegenerateLast
                       : null,
                 ),
@@ -162,22 +202,27 @@ class AIChatThreadView extends StatelessWidget {
           );
         }
         return Align(
+          key: const ValueKey('ai-streaming-row'),
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(
               maxWidth: AIChatDesign.contentMaxWidth,
             ),
             child: _StreamingRow(
+              showAvatar: messages.isEmpty ||
+                  messages.last.role != MessageRole.assistant,
               businessId: businessId,
               suppressApprovalToolChips: suppressApprovalToolChips,
               content: streamingContent ?? '',
               toolActivities: streamingToolActivities,
               traceSteps: streamingTraceSteps,
+              todoSnapshot: streamingTodoSnapshot,
               statusPhase: streamingStatusPhase,
               statusStep: streamingStatusStep,
               iteration: streamingIteration,
               maxIterations: streamingMaxIterations,
               elapsedSeconds: streamingElapsedSeconds,
+              agentBudget: streamingAgentBudget,
               formatTime: formatTime(streamingTimestamp),
             ),
           ),
@@ -191,57 +236,17 @@ class AIChatThreadView extends StatelessWidget {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
 
-    final canSync = messageKeys != null &&
-        messageKeys!.length == messages.length &&
-        messages.isNotEmpty;
-
-    Widget stackContent(int activeIndex, void Function(int) jumpToIndex) {
-      return Stack(
-        children: [
-          _buildMessageList(context),
-          if (showScrollToBottom)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 12,
-              child: Center(child: _ScrollFab(onPressed: onScrollToBottom)),
-            ),
-          if (AIChatDesign.showConversationRail(context) && canSync)
-            AIConversationRail(
-              messages: messages,
-              scrollController: scrollController,
-              messageKeys: messageKeys!,
-              activeIndex: activeIndex,
-              onJumpToIndex: jumpToIndex,
-            ),
-          if (AIChatDesign.showConversationNavFab(context) &&
-              canSync &&
-              messages.length >= 2)
-            AIConversationNavFab(
-              messageCount: messages.length,
-              activeIndex: activeIndex,
-              onTap: () => showAIConversationNavSheet(
-                context: context,
-                messages: messages,
-                messageKeys: messageKeys!,
-                activeIndex: activeIndex,
-                onJumpToIndex: jumpToIndex,
-              ),
-            ),
-        ],
-      );
-    }
-
-    if (!canSync) {
-      return stackContent(0, (_) {});
-    }
-
-    return AIConversationScrollScope(
-      scrollController: scrollController,
-      messageKeys: messageKeys!,
-      messageCount: messages.length,
-      builder: (ctx, activeIndex, jumpToIndex) =>
-          stackContent(activeIndex, jumpToIndex),
+    return Stack(
+      children: [
+        _buildMessageList(context),
+        if (showScrollToBottom)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 12,
+            child: Center(child: _ScrollFab(onPressed: onScrollToBottom)),
+          ),
+      ],
     );
   }
 
@@ -253,11 +258,38 @@ class AIChatThreadView extends StatelessWidget {
         Expanded(
           child: _buildMessageStack(context),
         ),
+        if (streamErrorMessage != null)
+          AIErrorRecoveryBanner(
+            inline: true,
+            message: streamErrorMessage!,
+            recoverable: streamErrorRecoverable,
+            onRetry: onRetryStreamError,
+            onDismiss: onDismissStreamError,
+          ),
+        if (showWriteApproval &&
+            onConfirmWriteApproval != null &&
+            onDismissWriteApproval != null)
+          AIWriteApprovalBanner(
+            inline: true,
+            pendingOps: writeApprovalOps,
+            loading: writeApprovalLoading,
+            canConfirm: canConfirmWriteApproval,
+            blockedReason: writeApprovalBlockedReason,
+            onConfirm: onConfirmWriteApproval!,
+            onDismiss: onDismissWriteApproval!,
+          ),
         AIChatContextBar(
           usageRatio: contextUsageRatio,
           usagePercent: contextUsagePercent,
           historySummarized: contextHistorySummarized,
         ),
+        if (creditWarningMessage != null)
+          AIChatCreditHint(
+            message: creditWarningMessage!,
+            onUpgrade: onCreditUpgrade,
+          ),
+        if (AIExecutionMode.normalize(executionMode) == AIExecutionMode.autonomous)
+          _AutonomousModeBanner(mode: executionMode),
         AIChatComposer(
           controller: messageController,
           focusNode: focusNode,
@@ -278,8 +310,51 @@ class AIChatThreadView extends StatelessWidget {
           modelsLoading: modelsLoading,
           onModelChanged: onModelChanged,
           modelPricingHint: modelPricingHint,
+          executionMode: executionMode,
+          onExecutionModeChanged: onExecutionModeChanged,
         ),
       ],
+    );
+  }
+}
+
+class _AutonomousModeBanner extends StatelessWidget {
+  final String mode;
+
+  const _AutonomousModeBanner({required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = AIExecutionMode.accentColor(context, mode);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AIChatDesign.contentMaxWidth),
+          child: Material(
+            color: accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.bolt_outlined, size: 18, color: accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'حالت خودکار فعال است — تغییرات معمولی بدون تأیید اجرا می‌شوند.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -288,6 +363,7 @@ class _MessageRow extends StatelessWidget {
   final int? businessId;
   final bool suppressApprovalToolChips;
   final AIChatMessage message;
+  final bool showAvatar;
   final String Function(DateTime?) formatTime;
   final VoidCallback onLongPress;
   final VoidCallback onCopy;
@@ -299,6 +375,7 @@ class _MessageRow extends StatelessWidget {
     this.businessId,
     this.suppressApprovalToolChips = false,
     required this.message,
+    this.showAvatar = true,
     required this.formatTime,
     required this.onLongPress,
     required this.onCopy,
@@ -311,53 +388,41 @@ class _MessageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     final isUser = message.role == MessageRole.user;
-    final timeText = formatTime(message.createdAt);
     final compact = AIChatDesign.isCompactWidth(context);
 
     if (isUser) {
       return Align(
         alignment: AlignmentDirectional.centerEnd,
         child: Padding(
-          padding: const EdgeInsets.only(bottom: 20),
+          padding: const EdgeInsets.only(bottom: 12),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: compact ? double.infinity : AIChatDesign.contentMaxWidth * 0.82,
+              maxWidth: compact
+                  ? double.infinity
+                  : AIChatDesign.contentMaxWidth * 0.82,
             ),
             child: GestureDetector(
               onLongPress: onLongPress,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.12),
+                  color: scheme.primary.withValues(alpha: isDark ? 0.22 : 0.10),
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(4),
+                    topLeft: Radius.circular(18),
+                    topRight: Radius.circular(18),
+                    bottomLeft: Radius.circular(18),
+                    bottomRight: Radius.circular(6),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    AIChatMessageBody(
-                      content: message.content,
-                      isUser: true,
-                      functionCalls: message.functionCalls,
-                      functionResults: message.functionResults,
-                      suppressApprovalToolChips: suppressApprovalToolChips,
-                    ),
-                    if (timeText.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        timeText,
-                        textDirection: TextDirection.ltr,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ],
+                child: AIChatMessageBody(
+                  content: message.content,
+                  isUser: true,
+                  functionCalls: message.functionCalls,
+                  functionResults: message.functionResults,
+                  suppressApprovalToolChips: suppressApprovalToolChips,
                 ),
               ),
             ),
@@ -367,57 +432,51 @@ class _MessageRow extends StatelessWidget {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.only(bottom: 14),
       child: GestureDetector(
         onLongPress: onLongPress,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _AssistantAvatar(scheme: scheme),
-            const SizedBox(width: 12),
+            SizedBox(
+              width: 28,
+              child: showAvatar ? _AssistantAvatar(scheme: scheme) : null,
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-                    decoration: AIChatDesign.elevatedCard(
-                      theme,
-                      alpha: theme.brightness == Brightness.dark ? 0.42 : 0.66,
-                    ).copyWith(
-                      boxShadow: [
-                        BoxShadow(
-                          color: scheme.shadow.withValues(alpha: 0.04),
-                          blurRadius: 18,
-                          offset: const Offset(0, 8),
+                  AIChatMessageBody(
+                    content: message.content,
+                    isUser: false,
+                    businessId: businessId,
+                    functionCalls: message.functionCalls,
+                    functionResults: message.functionResults,
+                    suppressApprovalToolChips: suppressApprovalToolChips,
+                  ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: AIChatMessageActions(
+                          onCopy: onCopy,
+                          onRegenerate: onRegenerate,
+                          onFeedback: onFeedback,
+                          currentRating: feedbackRating,
+                        ),
+                      ),
+                      if (!compact && message.createdAt != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          formatTime(message.createdAt),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant
+                                .withValues(alpha: 0.6),
+                          ),
                         ),
                       ],
-                    ),
-                    child: AIChatMessageBody(
-                      content: message.content,
-                      isUser: false,
-                      businessId: businessId,
-                      functionCalls: message.functionCalls,
-                      functionResults: message.functionResults,
-                      suppressApprovalToolChips: suppressApprovalToolChips,
-                    ),
+                    ],
                   ),
-                  AIChatMessageActions(
-                    onCopy: onCopy,
-                    onRegenerate: onRegenerate,
-                    onFeedback: onFeedback,
-                    currentRating: feedbackRating,
-                  ),
-                  if (timeText.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      timeText,
-                      textDirection: TextDirection.ltr,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant.withValues(alpha: 0.65),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -431,27 +490,33 @@ class _MessageRow extends StatelessWidget {
 class _StreamingRow extends StatelessWidget {
   final int? businessId;
   final bool suppressApprovalToolChips;
+  final bool showAvatar;
   final String content;
   final List<AIToolActivity> toolActivities;
   final List<AIAgentTraceStep> traceSteps;
+  final AISessionTodoSnapshot? todoSnapshot;
   final String? statusPhase;
   final String? statusStep;
   final int? iteration;
   final int? maxIterations;
   final int? elapsedSeconds;
+  final AIStreamAgentBudget? agentBudget;
   final String formatTime;
 
   const _StreamingRow({
     this.businessId,
     this.suppressApprovalToolChips = false,
+    this.showAvatar = true,
     required this.content,
     this.toolActivities = const [],
     this.traceSteps = const [],
+    this.todoSnapshot,
     this.statusPhase,
     this.statusStep,
     this.iteration,
     this.maxIterations,
     this.elapsedSeconds,
+    this.agentBudget,
     required this.formatTime,
   });
 
@@ -469,39 +534,46 @@ class _StreamingRow extends StatelessWidget {
             maxIterations: maxIterations,
           )
         : l10n.aiStatusThinking;
+    final hasReasoningPanel = (todoSnapshot != null && !todoSnapshot!.isEmpty) ||
+        traceSteps.isNotEmpty ||
+        toolActivities.isNotEmpty ||
+        agentBudget != null;
     final showStatusLine =
-        content.isEmpty && toolActivities.isEmpty && traceSteps.isEmpty;
+        content.isEmpty && !hasReasoningPanel;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 28),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AssistantAvatar(scheme: scheme),
-          const SizedBox(width: 12),
+          SizedBox(
+            width: 28,
+            child: showAvatar ? _AssistantAvatar(scheme: scheme) : null,
+          ),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (traceSteps.isNotEmpty) ...[
+                if (hasReasoningPanel)
                   AIReasoningPanel(
                     steps: traceSteps,
-                    initiallyExpanded: true,
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                if (toolActivities.isNotEmpty && traceSteps.isEmpty)
-                  AIChatToolActivityList(
-                    activities: toolActivities,
-                    hideApprovalPending: suppressApprovalToolChips,
+                    toolActivities: suppressApprovalToolChips
+                        ? toolActivities
+                            .where((a) => !a.approvalRequired)
+                            .toList()
+                        : toolActivities,
+                    agentBudget: agentBudget,
+                    todoSnapshot: todoSnapshot,
+                    compact: true,
+                    initiallyExpanded: todoSnapshot?.hasActiveItem == true ||
+                        traceSteps.any((s) => s.isActive),
                   ),
                 if (content.isNotEmpty)
-                  _StreamingAnswerCard(
-                    businessId: businessId,
+                  AIChatMessageBody(
                     content: content,
-                    theme: theme,
-                    scheme: scheme,
-                    showReasoningAbove: traceSteps.isNotEmpty,
+                    isUser: false,
+                    businessId: businessId,
                   )
                 else if (showStatusLine)
                   _StreamingStatusPulse(
@@ -509,90 +581,33 @@ class _StreamingRow extends StatelessWidget {
                     theme: theme,
                     scheme: scheme,
                   ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: scheme.primary,
+                if (content.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.primary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        content.isNotEmpty
-                            ? l10n.aiStatusWriting
-                            : statusLabel,
+                      const SizedBox(width: 8),
+                      Text(
+                        l10n.aiStatusWriting,
                         style: theme.textTheme.labelSmall?.copyWith(
                           color: scheme.onSurfaceVariant,
                         ),
                       ),
-                    ),
-                    if (elapsedSeconds != null && elapsedSeconds! > 0)
-                      Text(
-                        l10n.aiStatusElapsed(elapsedSeconds!),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: scheme.outline,
-                        ),
-                      ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-/// کارت پاسخ نهایی در حالت استریم (جدا از پنل استدلال).
-class _StreamingAnswerCard extends StatelessWidget {
-  final int? businessId;
-  final String content;
-  final ThemeData theme;
-  final ColorScheme scheme;
-  final bool showReasoningAbove;
-
-  const _StreamingAnswerCard({
-    this.businessId,
-    required this.content,
-    required this.theme,
-    required this.scheme,
-    required this.showReasoningAbove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (showReasoningAbove) const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-          decoration: AIChatDesign.elevatedCard(
-            theme,
-            alpha: theme.brightness == Brightness.dark ? 0.42 : 0.66,
-            accent: scheme.primary,
-          ).copyWith(
-            boxShadow: [
-              BoxShadow(
-                color: scheme.shadow.withValues(alpha: 0.04),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: AIChatMessageBody(
-            content: content,
-            isUser: false,
-            businessId: businessId,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -639,8 +654,8 @@ class _StreamingStatusPulseState extends State<_StreamingStatusPulse>
       ),
       child: Text(
         widget.label,
-        style: widget.theme.textTheme.bodyLarge?.copyWith(
-          height: 1.65,
+        style: widget.theme.textTheme.bodyMedium?.copyWith(
+          height: 1.5,
           color: widget.scheme.onSurfaceVariant,
         ),
       ),
@@ -656,27 +671,13 @@ class _AssistantAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 36,
-      height: 36,
+      width: 28,
+      height: 28,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-          colors: [
-            scheme.primary,
-            scheme.tertiary.withValues(alpha: 0.92),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.primary.withValues(alpha: 0.18),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        color: scheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Icon(Icons.auto_awesome_rounded, size: 19, color: scheme.onPrimary),
+      child: Icon(Icons.auto_awesome_rounded, size: 16, color: scheme.primary),
     );
   }
 }

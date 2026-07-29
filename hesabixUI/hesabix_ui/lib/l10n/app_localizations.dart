@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix'**
+  /// **'MarkStreet'**
   String get appTitle;
 
   /// No description provided for @login.
@@ -233,7 +233,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix Cloud Accounting'**
+  /// **'MarkStreet Cloud Accounting'**
   String get welcomeTitle;
 
   /// No description provided for @welcomeSubtitle.
@@ -4481,7 +4481,7 @@ abstract class AppLocalizations {
   /// No description provided for @pluginMarketplaceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Extend Hesabix with integrations and industry add-ons. Pay from your business wallet.'**
+  /// **'Extend MarkStreet with integrations and industry add-ons. Pay from your business wallet.'**
   String get pluginMarketplaceSubtitle;
 
   /// No description provided for @pluginMarketplaceBrowseTab.
@@ -9585,7 +9585,7 @@ abstract class AppLocalizations {
   /// No description provided for @reportTemplateNewVisual.
   ///
   /// In en, this message translates to:
-  /// **'New — visual builder'**
+  /// **'قالب جدید — استودیو'**
   String get reportTemplateNewVisual;
 
   /// No description provided for @reportTemplateNewHtml.
@@ -11475,7 +11475,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsChannelInAppDescription.
   ///
   /// In en, this message translates to:
-  /// **'Display notifications inside Hesabix web and mobile in real time.'**
+  /// **'Display notifications inside MarkStreet web and mobile in real time.'**
   String get notificationsChannelInAppDescription;
 
   /// No description provided for @notificationsSaveSuccess.
@@ -12921,7 +12921,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideIntroDescription.
   ///
   /// In en, this message translates to:
-  /// **'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new Hesabix version—from key generation to data quality checks and invoice submission.'**
+  /// **'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new MarkStreet version—from key generation to data quality checks and invoice submission.'**
   String get taxGuideIntroDescription;
 
   /// No description provided for @taxGuidePrereqTitle.
@@ -12951,7 +12951,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideStep1Title.
   ///
   /// In en, this message translates to:
-  /// **'1) Generate keys inside Hesabix'**
+  /// **'1) Generate keys inside MarkStreet'**
   String get taxGuideStep1Title;
 
   /// No description provided for @taxGuideStep1Description.
@@ -13035,13 +13035,13 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideStep3Bullet3.
   ///
   /// In en, this message translates to:
-  /// **'Copy the issued memory ID and paste it back into Hesabix.'**
+  /// **'Copy the issued memory ID and paste it back into MarkStreet.'**
   String get taxGuideStep3Bullet3;
 
   /// No description provided for @taxGuideStep4Title.
   ///
   /// In en, this message translates to:
-  /// **'4) Complete the connection form in Hesabix'**
+  /// **'4) Complete the connection form in MarkStreet'**
   String get taxGuideStep4Title;
 
   /// No description provided for @taxGuideStep4Description.
@@ -13095,7 +13095,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideStep5Bullet3.
   ///
   /// In en, this message translates to:
-  /// **'After in-person verification upload the issued certificate into Hesabix.'**
+  /// **'After in-person verification upload the issued certificate into MarkStreet.'**
   String get taxGuideStep5Bullet3;
 
   /// No description provided for @taxGuideStep6Title.
@@ -18725,6 +18725,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Query business data'**
   String get aiToolQueryBusinessData;
+
+  /// No description provided for @aiToolListQueryableFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Queryable fields'**
+  String get aiToolListQueryableFields;
+
+  /// No description provided for @aiToolResolveDateRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Resolve date range'**
+  String get aiToolResolveDateRange;
 
   /// No description provided for @aiToolSearchWarehouseDocuments.
   ///
@@ -24867,7 +24879,7 @@ abstract class AppLocalizations {
   /// No description provided for @basalamSettingsMonetaryUnitHelper.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix stores IRR only; toman amounts from Basalam are multiplied by 10.'**
+  /// **'MarkStreet stores IRR only; toman amounts from Basalam are multiplied by 10.'**
   String get basalamSettingsMonetaryUnitHelper;
 
   /// No description provided for @basalamSettingsMonetaryUnitRial.
@@ -25251,7 +25263,7 @@ abstract class AppLocalizations {
   /// No description provided for @wooBridgeFieldPluginVersion.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix ArcWOC plugin version'**
+  /// **'MarkStreet ArcWOC plugin version'**
   String get wooBridgeFieldPluginVersion;
 
   /// No description provided for @wooBridgeFieldGenericTitle.
@@ -25338,11 +25350,11 @@ abstract class AppLocalizations {
   /// **'Order type'**
   String get woocommerceColumnOrderType;
 
-  /// No description provided for @woocommerceColumnHesabixId.
+  /// No description provided for @woocommerceColumnMarkStreetId.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix ID'**
-  String get woocommerceColumnHesabixId;
+  /// **'MarkStreet ID'**
+  String get woocommerceColumnMarkStreetId;
 
   /// No description provided for @woocommerceColumnSyncStatus.
   ///
@@ -25551,7 +25563,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceSettingsBridgeIntroBody.
   ///
   /// In en, this message translates to:
-  /// **'Enter your WordPress site base URL and the bridge token generated in the Hesabix ArcWOC plugin. Leave the token field empty when saving to keep the existing secret.'**
+  /// **'Enter your WordPress site base URL and the bridge token generated in the MarkStreet ArcWOC plugin. Leave the token field empty when saving to keep the existing secret.'**
   String get woocommerceSettingsBridgeIntroBody;
 
   /// No description provided for @woocommerceStoreUrlLabel.
@@ -25665,7 +25677,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceControlIntroSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Mapping stats, Hesabix API health, plugin version, recent logs and bulk sync via the same secure bridge token as the operations hub.'**
+  /// **'Mapping stats, MarkStreet API health, plugin version, recent logs and bulk sync via the same secure bridge token as the operations hub.'**
   String get woocommerceControlIntroSubtitle;
 
   /// No description provided for @woocommerceControlRefreshTooltip.
@@ -25689,7 +25701,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceControlConnectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix API from the store'**
+  /// **'MarkStreet API from the store'**
   String get woocommerceControlConnectionTitle;
 
   /// No description provided for @woocommerceControlSettingsTitle.
@@ -25815,7 +25827,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSyncRowTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Sync to Hesabix'**
+  /// **'Sync to MarkStreet'**
   String get woocommerceHubSyncRowTooltip;
 
   /// No description provided for @woocommerceHubSyncColumnLabel.
@@ -25833,7 +25845,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSyncOrderConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The selected order will be pushed to Hesabix through the plugin API.'**
+  /// **'The selected order will be pushed to MarkStreet through the plugin API.'**
   String get woocommerceHubSyncOrderConfirmBody;
 
   /// No description provided for @woocommerceHubSyncProductConfirmTitle.
@@ -25845,7 +25857,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSyncProductConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The selected product will be pushed to Hesabix through the plugin API.'**
+  /// **'The selected product will be pushed to MarkStreet through the plugin API.'**
   String get woocommerceHubSyncProductConfirmBody;
 
   /// No description provided for @woocommerceHubSyncCustomerConfirmTitle.
@@ -25857,7 +25869,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSyncCustomerConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The selected customer will be pushed to Hesabix through the plugin API.'**
+  /// **'The selected customer will be pushed to MarkStreet through the plugin API.'**
   String get woocommerceHubSyncCustomerConfirmBody;
 
   /// No description provided for @woocommerceHubBulkSyncTitle.
@@ -25951,7 +25963,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceOpeningInvBridgeSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Run the same opening-balance job as the WooCommerce plugin, via the Hesabix store bridge. Use after products are synced and accounts/warehouse are configured on the store.'**
+  /// **'Run the same opening-balance job as the WooCommerce plugin, via the MarkStreet store bridge. Use after products are synced and accounts/warehouse are configured on the store.'**
   String get woocommerceOpeningInvBridgeSubtitle;
 
   /// No description provided for @woocommerceOpeningInvRefreshStatus.
@@ -26059,7 +26071,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceOpeningInvDoPostLabel.
   ///
   /// In en, this message translates to:
-  /// **'Post (lock) opening balance in Hesabix'**
+  /// **'Post (lock) opening balance in MarkStreet'**
   String get woocommerceOpeningInvDoPostLabel;
 
   /// No description provided for @woocommerceOpeningInvCostBasisLabel.
@@ -26341,7 +26353,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceSettingsArcwocPluginIntro.
   ///
   /// In en, this message translates to:
-  /// **'Mapping stats, Hesabix API status from the store, background queue, plugin version, settings summary, debug, bulk sync and logs.'**
+  /// **'Mapping stats, MarkStreet API status from the store, background queue, plugin version, settings summary, debug, bulk sync and logs.'**
   String get woocommerceSettingsArcwocPluginIntro;
 
   /// No description provided for @woocommerceBridgeTokenStored.
@@ -26557,7 +26569,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceSettingsOpeningInventoryLinkSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Create the job and run batches from Hesabix without wp-admin.'**
+  /// **'Create the job and run batches from MarkStreet without wp-admin.'**
   String get woocommerceSettingsOpeningInventoryLinkSubtitle;
 
   /// No description provided for @settingsWooCommerceTitle.
@@ -27265,7 +27277,7 @@ abstract class AppLocalizations {
   /// No description provided for @crmWebChatEmbedSnippet.
   ///
   /// In en, this message translates to:
-  /// **'// API base: {base}\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"{publicKey}\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the Hesabix repository for details.'**
+  /// **'// API base: {base}\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"{publicKey}\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the MarkStreet repository for details.'**
   String crmWebChatEmbedSnippet(String base, String publicKey);
 
   /// No description provided for @crmWebChatDefaultWidgetName.
@@ -28093,7 +28105,7 @@ abstract class AppLocalizations {
   /// No description provided for @mobileLauncherBrandName.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix'**
+  /// **'MarkStreet'**
   String get mobileLauncherBrandName;
 
   /// No description provided for @mobileLauncherBusinessFallback.
@@ -28515,6 +28527,336 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create ticket'**
   String get profileDashboardCreateTicket;
+
+  /// No description provided for @businessSettingsCategoryBusinessFinance.
+  ///
+  /// In en, this message translates to:
+  /// **'Business & finance'**
+  String get businessSettingsCategoryBusinessFinance;
+
+  /// No description provided for @businessSettingsCategoryBusinessFinanceDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Core info, currencies, fiscal year, and credit'**
+  String get businessSettingsCategoryBusinessFinanceDescription;
+
+  /// No description provided for @businessSettingsCategorySalesDocuments.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales & documents'**
+  String get businessSettingsCategorySalesDocuments;
+
+  /// No description provided for @businessSettingsCategorySalesDocumentsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sales, printing, numbering, and templates'**
+  String get businessSettingsCategorySalesDocumentsDescription;
+
+  /// No description provided for @businessSettingsCategoryIntegrations.
+  ///
+  /// In en, this message translates to:
+  /// **'Integrations'**
+  String get businessSettingsCategoryIntegrations;
+
+  /// No description provided for @businessSettingsCategoryIntegrationsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'External services and platform connectors'**
+  String get businessSettingsCategoryIntegrationsDescription;
+
+  /// No description provided for @businessSettingsCategoryModules.
+  ///
+  /// In en, this message translates to:
+  /// **'Plugins & modules'**
+  String get businessSettingsCategoryModules;
+
+  /// No description provided for @businessSettingsCategoryModulesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings for active business plugins'**
+  String get businessSettingsCategoryModulesDescription;
+
+  /// No description provided for @businessSettingsCategoryAdministration.
+  ///
+  /// In en, this message translates to:
+  /// **'Administration & security'**
+  String get businessSettingsCategoryAdministration;
+
+  /// No description provided for @businessSettingsCategoryAdministrationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Users, projects, notifications, and activity logs'**
+  String get businessSettingsCategoryAdministrationDescription;
+
+  /// No description provided for @businessSettingsCategoryPersonalization.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalization'**
+  String get businessSettingsCategoryPersonalization;
+
+  /// No description provided for @businessSettingsCategoryPersonalizationDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account appearance preferences'**
+  String get businessSettingsCategoryPersonalizationDescription;
+
+  /// No description provided for @businessSettingsCategoryAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced & backup'**
+  String get businessSettingsCategoryAdvanced;
+
+  /// No description provided for @businessSettingsCategoryAdvancedDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup, restore, and FTP destination'**
+  String get businessSettingsCategoryAdvancedDescription;
+
+  /// No description provided for @businessSettingsCategoryMembership.
+  ///
+  /// In en, this message translates to:
+  /// **'Membership'**
+  String get businessSettingsCategoryMembership;
+
+  /// No description provided for @businessSettingsCategoryMembershipDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Your membership in this business'**
+  String get businessSettingsCategoryMembershipDescription;
+
+  /// No description provided for @businessSettingsCategoryDangerZone.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger zone'**
+  String get businessSettingsCategoryDangerZone;
+
+  /// No description provided for @businessSettingsCategoryDangerZoneDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Irreversible actions — proceed with caution'**
+  String get businessSettingsCategoryDangerZoneDescription;
+
+  /// No description provided for @businessSettingsFiscalYearEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit current fiscal year'**
+  String get businessSettingsFiscalYearEdit;
+
+  /// No description provided for @businessSettingsFiscalYearEditDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit title and dates of the current fiscal year'**
+  String get businessSettingsFiscalYearEditDescription;
+
+  /// No description provided for @businessSettingsQuickSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick sales settings'**
+  String get businessSettingsQuickSales;
+
+  /// No description provided for @businessSettingsQuickSalesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Default settings for quick sales'**
+  String get businessSettingsQuickSalesDescription;
+
+  /// No description provided for @businessSettingsCrm.
+  ///
+  /// In en, this message translates to:
+  /// **'CRM settings'**
+  String get businessSettingsCrm;
+
+  /// No description provided for @businessSettingsCrmDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Web chat and visitor file uploads'**
+  String get businessSettingsCrmDescription;
+
+  /// No description provided for @businessSettingsProjects.
+  ///
+  /// In en, this message translates to:
+  /// **'Project management'**
+  String get businessSettingsProjects;
+
+  /// No description provided for @businessSettingsProjectsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Define and manage projects for cost and revenue tracking'**
+  String get businessSettingsProjectsDescription;
+
+  /// No description provided for @businessSettingsDocumentNumbering.
+  ///
+  /// In en, this message translates to:
+  /// **'Document numbering'**
+  String get businessSettingsDocumentNumbering;
+
+  /// No description provided for @businessSettingsDocumentNumberingDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure numbering for document types'**
+  String get businessSettingsDocumentNumberingDescription;
+
+  /// No description provided for @businessSettingsInvoiceSharePayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice link online payment'**
+  String get businessSettingsInvoiceSharePayment;
+
+  /// No description provided for @businessSettingsInvoiceSharePaymentDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Default gateway and public share link payment'**
+  String get businessSettingsInvoiceSharePaymentDescription;
+
+  /// No description provided for @businessSettingsTemplatesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Design and manage PDF report and print templates'**
+  String get businessSettingsTemplatesDescription;
+
+  /// No description provided for @businessSettingsRepairShop.
+  ///
+  /// In en, this message translates to:
+  /// **'Repair shop settings'**
+  String get businessSettingsRepairShop;
+
+  /// No description provided for @businessSettingsRepairShopDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Numbering, notifications, and repair shop defaults'**
+  String get businessSettingsRepairShopDescription;
+
+  /// No description provided for @businessSettingsWarrantyDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Warranty code format, serial, and security settings'**
+  String get businessSettingsWarrantyDescription;
+
+  /// No description provided for @businessSettingsNotificationTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification templates'**
+  String get businessSettingsNotificationTemplates;
+
+  /// No description provided for @businessSettingsNotificationTemplatesDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage SMS and email templates for events'**
+  String get businessSettingsNotificationTemplatesDescription;
+
+  /// No description provided for @businessSettingsAppearanceProfileDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Language, theme, and calendar — in user profile settings'**
+  String get businessSettingsAppearanceProfileDescription;
+
+  /// No description provided for @businessSettingsLeaveBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave business'**
+  String get businessSettingsLeaveBusiness;
+
+  /// No description provided for @businessSettingsLeaveBusinessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave this business and remove your access'**
+  String get businessSettingsLeaveBusinessDescription;
+
+  /// No description provided for @businessSettingsLeaveBusinessConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to leave this business?\n\nAfter leaving, your access to this business will be removed.'**
+  String get businessSettingsLeaveBusinessConfirm;
+
+  /// No description provided for @businessSettingsLeaveBusinessAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get businessSettingsLeaveBusinessAction;
+
+  /// No description provided for @businessSettingsLeaveBusinessFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to leave business'**
+  String get businessSettingsLeaveBusinessFailed;
+
+  /// No description provided for @businessSettingsDeleteBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete business'**
+  String get businessSettingsDeleteBusiness;
+
+  /// No description provided for @businessSettingsDeleteBusinessDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete business (recoverable for 30 days)'**
+  String get businessSettingsDeleteBusinessDescription;
+
+  /// No description provided for @businessSettingsFiscalYearRollback.
+  ///
+  /// In en, this message translates to:
+  /// **'Rollback current fiscal year'**
+  String get businessSettingsFiscalYearRollback;
+
+  /// No description provided for @businessSettingsFiscalYearRollbackDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete current year and reactivate the previous one (requires at least two fiscal years)'**
+  String get businessSettingsFiscalYearRollbackDescription;
+
+  /// No description provided for @businessSettingsHubDescriptionOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'You own this business and can manage all settings you have access to.'**
+  String get businessSettingsHubDescriptionOwner;
+
+  /// No description provided for @businessSettingsHubDescriptionMember.
+  ///
+  /// In en, this message translates to:
+  /// **'You are a member of this business; only settings you can access are shown.'**
+  String get businessSettingsHubDescriptionMember;
+
+  /// No description provided for @businessSettingsHubDescriptionGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage this business settings from this page.'**
+  String get businessSettingsHubDescriptionGeneric;
+
+  /// No description provided for @businessSettingsOwnerRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Business owner'**
+  String get businessSettingsOwnerRole;
+
+  /// No description provided for @businessSettingsMemberRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Business member'**
+  String get businessSettingsMemberRole;
+
+  /// No description provided for @businessSettingsSetupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick setup'**
+  String get businessSettingsSetupTitle;
+
+  /// No description provided for @businessSettingsSetupDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete these items to get started:'**
+  String get businessSettingsSetupDescription;
+
+  /// No description provided for @businessSettingsPluginsLoadingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading plugins…'**
+  String get businessSettingsPluginsLoadingHint;
+
+  /// No description provided for @businessSettingsPluginsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load plugins. Integrations and modules may be incomplete.'**
+  String get businessSettingsPluginsLoadFailed;
 }
 
 class _AppLocalizationsDelegate

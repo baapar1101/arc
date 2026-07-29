@@ -204,37 +204,15 @@ class AuthContext:
 	
 	def is_business_owner(self, business_id: int = None) -> bool:
 		"""بررسی اینکه آیا کاربر مالک کسب و کار است یا نه"""
-		import logging
-		logger = logging.getLogger(__name__)
-		
-		logger.info(f"=== is_business_owner START ===")
-		logger.info(f"Requested business_id: {business_id}")
-		logger.info(f"Context business_id: {self.business_id}")
-		logger.info(f"User ID: {self.user.id}")
-		logger.info(f"DB available: {self.db is not None}")
-		
 		target_business_id = business_id or self.business_id
-		logger.info(f"Target business_id: {target_business_id}")
-		
 		if not target_business_id or not self.db:
-			logger.info(f"is_business_owner: no business_id ({target_business_id}) or db ({self.db is not None})")
-			logger.info(f"=== is_business_owner END (no business_id or db) ===")
 			return False
 		
 		from adapters.db.models.business import Business
 		business = self.db.get(Business, target_business_id)
-		logger.info(f"Business lookup result: {business}")
-		
-		if business:
-			logger.info(f"Business owner_id: {business.owner_id}")
-			is_owner = business.owner_id == self.user.id
-			logger.info(f"is_owner: {is_owner}")
-		else:
-			logger.info("Business not found")
-			is_owner = False
-		
-		logger.info(f"=== is_business_owner END (result: {is_owner}) ===")
-		return is_owner
+		if not business:
+			return False
+		return business.owner_id == self.user.id
 	
 	def _business_permission_direct(self, section: str, action: str) -> bool:
 		"""بررسی مستقیم JSON دسترسی کسب‌وکار برای یک سکشن (بدون پل سازگاری)."""
@@ -362,23 +340,11 @@ class AuthContext:
 	
 	def can_manage_business_users(self, business_id: int = None) -> bool:
 		"""بررسی دسترسی مدیریت کاربران کسب و کار"""
-		import logging
-		logger = logging.getLogger(__name__)
-		
-		# SuperAdmin دسترسی کامل دارد
 		if self.is_superadmin():
-			logger.info(f"can_manage_business_users: user {self.user.id} is superadmin")
 			return True
-		
-		# مالک کسب و کار دسترسی کامل دارد
 		if self.is_business_owner(business_id):
-			logger.info(f"can_manage_business_users: user {self.user.id} is business owner")
 			return True
-		
-		# بررسی دسترسی در سطح کسب و کار
-		has_permission = self.has_business_permission("settings", "manage_users")
-		logger.info(f"can_manage_business_users: user {self.user.id} has permission: {has_permission}")
-		return has_permission
+		return self.has_business_permission("settings", "manage_users")
 	
 	# ترکیب دسترسی‌ها
 	def has_any_permission(self, section: str, action: str) -> bool:
@@ -392,91 +358,39 @@ class AuthContext:
 	
 	def can_access_business(self, business_id: int) -> bool:
 		"""بررسی دسترسی به کسب و کار خاص"""
-		import logging
-		logger = logging.getLogger(__name__)
-		
-		logger.info(f"=== can_access_business START ===")
-		logger.info(f"User ID: {self.user.id}")
-		logger.info(f"Requested business ID: {business_id}")
-		logger.info(f"User context business_id: {self.business_id}")
-		logger.info(f"User app permissions: {self.app_permissions}")
-		
-		# SuperAdmin دسترسی به همه کسب و کارها دارد
 		if self.is_superadmin():
-			logger.info(f"User {self.user.id} is superadmin, granting access to business {business_id}")
-			logger.info(f"=== can_access_business END (superadmin) ===")
 			return True
 		
-		# بررسی مالکیت کسب و کار
 		if self.db:
 			from adapters.db.models.business import Business
 			business = self.db.get(Business, business_id)
-			logger.info(f"Business lookup result: {business}")
 			if business:
-				# بررسی حذف‌شدگی کسب و کار
 				if business.deleted_at is not None:
-					logger.warning(f"Business {business_id} is deleted (deleted_at: {business.deleted_at}), denying access")
-					logger.info(f"=== can_access_business END (deleted) ===")
 					return False
-				
-				logger.info(f"Business owner ID: {business.owner_id}")
 				if business.owner_id == self.user.id:
-					logger.info(f"User {self.user.id} is business owner of {business_id}, granting access")
-					logger.info(f"=== can_access_business END (owner) ===")
 					return True
-		else:
-			logger.info("No database connection available for business lookup")
 		
-		# بررسی عضویت در کسب و کار
 		if self.db:
 			from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 			from app.core.business_membership import membership_is_active
 
 			permission_repo = BusinessPermissionRepository(self.db)
 			business_permission = permission_repo.get_by_user_and_business(self.user.id, business_id)
-			logger.info(f"Business permission lookup result: {business_permission}")
 			
 			if business_permission:
 				permissions = AuthContext._normalize_permissions_value(business_permission.business_permissions or {})
-				logger.info(f"User permissions for business {business_id}: {permissions}")
-				join_permission = permissions.get('join')
-				logger.info(f"Join permission: {join_permission}")
-				
-				if join_permission == True and membership_is_active(business_permission):
-					logger.info(f"User {self.user.id} is member of business {business_id}, granting access")
-					logger.info(f"=== can_access_business END (member) ===")
+				if permissions.get('join') is True and membership_is_active(business_permission):
 					return True
-				else:
-					logger.info(f"User {self.user.id} does not have active membership for business {business_id}")
-			else:
-				logger.info(f"No business permission found for user {self.user.id} and business {business_id}")
-		else:
-			logger.info("No database connection available for permission lookup")
 		
-		logger.info(f"User {self.user.id} does not have access to business {business_id}")
-		logger.info(f"=== can_access_business END (denied) ===")
 		return False
 	
 	def is_business_member(self, business_id: int) -> bool:
 		"""بررسی اینکه آیا کاربر عضو کسب و کار است یا نه (دسترسی join)"""
-		import logging
-		logger = logging.getLogger(__name__)
-		
-		logger.info(f"Checking business membership: user {self.user.id}, business {business_id}")
-		
-		# SuperAdmin عضو همه کسب و کارها محسوب می‌شود
 		if self.is_superadmin():
-			logger.info(f"User {self.user.id} is superadmin, is member of all businesses")
 			return True
-		
-		# اگر مالک کسب و کار است، عضو محسوب می‌شود
 		if self.is_business_owner() and business_id == self.business_id:
-			logger.info(f"User {self.user.id} is business owner of {business_id}, is member")
 			return True
-		
-		# بررسی دسترسی join در business_permissions
 		if not self.db:
-			logger.info(f"No database session available")
 			return False
 		
 		from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
@@ -486,14 +400,10 @@ class AuthContext:
 		permission_obj = repo.get_by_user_and_business(self.user.id, business_id)
 		
 		if not permission_obj:
-			logger.info(f"No business permission found for user {self.user.id} and business {business_id}")
 			return False
 		
-		# بررسی دسترسی join
 		business_perms = AuthContext._normalize_permissions_value(permission_obj.business_permissions)
-		has_join_access = business_perms.get('join', False)
-		logger.info(f"Business membership check: user {self.user.id} join access to business {business_id}: {has_join_access}")
-		if not has_join_access:
+		if not business_perms.get('join', False):
 			return False
 		return membership_is_active(permission_obj)
 	
@@ -541,10 +451,10 @@ def get_current_user(
 	
 	# Get authorization from request headers
 	auth_header = request.headers.get("Authorization")
-	logger.info(f"Auth header: {auth_header}")
+	logger.debug("Authorization header present: %s", bool(auth_header))
 	
 	if not auth_header or not auth_header.startswith("ApiKey "):
-		logger.warning(f"Invalid auth header: {auth_header}")
+		logger.warning("Missing or invalid Authorization header format")
 		raise ApiError("UNAUTHORIZED", "Missing or invalid API key", http_status=401)
 
 	api_key = auth_header[len("ApiKey ") :].strip()
@@ -732,7 +642,7 @@ def get_current_user(
 		# اگر خطا در تنظیم context بود، لاگ کن اما ادامه بده
 		logger.warning(f"Failed to set activity log context: {e}")
 	
-	logger.info(f"AuthContext created successfully")
+	logger.debug("AuthContext created for user_id=%s", user.id)
 	return auth_context
 
 

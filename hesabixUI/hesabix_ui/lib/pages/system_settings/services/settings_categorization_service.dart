@@ -479,7 +479,7 @@ class SettingsCategorizationService {
           SettingsItem(
             id: 'legacy_database_import',
             title: 'ایمپورت دیتابیس قدیمی',
-            description: 'انتقال داده از دامپ MySQL نسخه قدیمی Hesabix',
+            description: 'انتقال داده از دامپ MySQL نسخه قدیمی MarkStreet',
             icon: Icons.move_up_outlined,
             color: const Color(0xFF5D4037),
             route: '/user/profile/system-settings/legacy-import',

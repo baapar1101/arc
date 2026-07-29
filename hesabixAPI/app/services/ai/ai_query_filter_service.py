@@ -5,6 +5,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from app.core.calendar import CalendarType
+from app.core.date_input import DateParseError
+from app.services.ai.ai_date_resolver import normalize_query_dates
 from app.services.ai.ai_query_filter_catalog import (
     STANDARD_OPERATORS,
     get_entity_query_spec,
@@ -55,11 +58,13 @@ def merge_into_query_dict(
     filters: Dict[str, Any],
     *,
     entity: Optional[str] = None,
+    calendar_type: CalendarType = "jalali",
 ) -> Dict[str, Any]:
     """
     غنی‌سازی dict فیلتر AI برای ارسال به سرویس‌های list:
     - forward filters[], search_fields, sort
     - نرمال‌سازی advanced filters
+    - تبدیل تاریخ‌ها به ISO میلادی
     """
     q = dict(filters or {})
     if "filters" in q and q["filters"] is not None:
@@ -72,6 +77,10 @@ def merge_into_query_dict(
 
     if q.get("sort") and isinstance(q["sort"], list):
         pass  # multi-sort — سرویس‌های پشتیبان
+    try:
+        q = normalize_query_dates(q, calendar_type=calendar_type, entity=entity)
+    except (DateParseError, ValueError) as exc:
+        raise ValueError(str(exc)) from exc
     return q
 
 

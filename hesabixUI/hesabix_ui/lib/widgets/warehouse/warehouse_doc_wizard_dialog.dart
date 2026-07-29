@@ -342,7 +342,7 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
               if (dateStr == null || dateStr.isEmpty) return null;
               final date = DateTime.tryParse(dateStr);
               if (date == null) return null;
-              return HesabixDateUtils.formatForDisplay(date, isJalali);
+              return MarkStreetDateUtils.formatForDisplay(date, isJalali);
             },
           ),
           NumberColumn(

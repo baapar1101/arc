@@ -9,7 +9,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/business_route_paths.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
@@ -27,12 +27,11 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_knowledge_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_connectors_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_skills_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
-import 'package:hesabix_ui/widgets/ai/ai_chat_toolbar.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_onboarding_banner.dart';
-import 'package:hesabix_ui/widgets/ai/ai_error_recovery_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
-import 'package:hesabix_ui/widgets/ai/ai_write_approval_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_write_approval_helpers.dart';
+import 'package:hesabix_ui/widgets/ai/ai_execution_mode.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_execution_mode_store.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_l10n.dart';
 import 'package:share_plus/share_plus.dart';
@@ -126,6 +125,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   String? _lastResolvedModelLabel;
   bool _modelsLoading = false;
   bool _focusChatMode = false;
+  String _executionMode = AIExecutionMode.defaultMode;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
@@ -195,6 +195,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _scrollController.addListener(_onScrollChanged);
     _loadSessions();
     _loadSuggestions();
+    unawaited(_loadExecutionModePreference());
     if (widget.businessId != null) {
       unawaited(_loadProactiveAlerts());
       unawaited(_loadAvailableModels());
@@ -202,6 +203,67 @@ class _AIChatDialogState extends State<AIChatDialog> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _isHomeMode) _focusNode.requestFocus();
     });
+  }
+
+  Future<void> _loadExecutionModePreference() async {
+    final stored = await AIChatExecutionModeStore.load(widget.businessId);
+    if (!mounted) return;
+    setState(() => _executionMode = stored);
+  }
+
+  Future<void> _onExecutionModeChanged(String mode) async {
+    final next = AIExecutionMode.normalize(mode);
+    if (next == _executionMode) return;
+    if (_showWriteApprovalBanner) {
+      _showSnackbar(
+        'ابتدا عملیات در انتظار تأیید را تأیید یا لغو کنید، سپس حالت را تغییر دهید.',
+      );
+      return;
+    }
+    if (AIExecutionMode.requiresAutonomousConfirmation(_executionMode, next)) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('فعال‌سازی حالت خودکار'),
+          content: const Text(
+            'در این حالت دستیار می‌تواند تغییرات معمولی را بدون پرسیدن از شما '
+            'در سیستم اعمال کند. عملیات پرریسک (حذف، workflow و …) همچنان '
+            'نیاز به تأیید دارند.\n\nادامه می‌دهید؟',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('فعال‌سازی'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+    setState(() => _executionMode = next);
+    await AIChatExecutionModeStore.save(widget.businessId, next);
+    final sessionId = _currentSession?.id;
+    if (sessionId != null) {
+      try {
+        final updated = await _aiService.updateChatSession(
+          sessionId: sessionId,
+          executionMode: next,
+        );
+        if (!mounted) return;
+        setState(() {
+          _currentSession = updated;
+          _sessions = _sessions
+              .map((s) => s.id == updated.id ? updated : s)
+              .toList();
+        });
+      } catch (e) {
+        debugPrint('[AIChatDialog] update execution mode failed: $e');
+      }
+    }
   }
 
   Future<void> _loadAvailableModels() async {
@@ -294,16 +356,22 @@ class _AIChatDialogState extends State<AIChatDialog> {
     super.dispose();
   }
 
-  bool _isNearBottom() {
-    if (!_scrollController.hasClients) return true;
+  double _distanceFromBottom() {
+    if (!_scrollController.hasClients) return 0;
     final pos = _scrollController.position;
-    return (pos.maxScrollExtent - pos.pixels) < 140;
+    return pos.maxScrollExtent - pos.pixels;
   }
 
   void _onScrollChanged() {
-    final near = _isNearBottom();
-    if (near == _autoScrollEnabled) return;
-    setState(() => _autoScrollEnabled = near);
+    // هیسترزیس: آستانه‌های جدا برای فعال/غیرفعال شدن تا حین استریم نوسان نکند.
+    final distance = _distanceFromBottom();
+    final shouldEnable = distance < 80;
+    final shouldDisable = distance > 200;
+    if (_autoScrollEnabled && shouldDisable) {
+      setState(() => _autoScrollEnabled = false);
+    } else if (!_autoScrollEnabled && shouldEnable) {
+      setState(() => _autoScrollEnabled = true);
+    }
   }
 
   String _formatMessageTime(DateTime? date) {
@@ -312,7 +380,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final time =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     if (AIChatDesign.isCompactWidth(context)) return time;
-    return HesabixDateUtils.formatDateTime(local, _isJalali);
+    return MarkStreetDateUtils.formatDateTime(local, _isJalali);
   }
 
   Future<void> _showMessageActions(AIChatMessage msg) async {
@@ -622,6 +690,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     try {
       final session = await _aiService.createChatSession(
         businessId: widget.businessId,
+        executionMode: _executionMode,
       );
       if (!mounted) return false;
       setState(() {
@@ -651,6 +720,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _currentSession = session;
       _messages = [];
       _messagesLoading = true;
+      _executionMode = AIExecutionMode.normalize(session.executionMode);
       _clearWriteApprovalState();
     });
     try {
@@ -900,10 +970,31 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   void _scheduleSessionsRefreshForTitle() {
-    unawaited(_loadSessions());
-    Future<void>.delayed(const Duration(seconds: 3), () {
-      if (mounted) unawaited(_loadSessions());
+    unawaited(_syncAfterAssistantResponse());
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (mounted) unawaited(_syncAfterAssistantResponse());
     });
+  }
+
+  Future<void> _syncAfterAssistantResponse() async {
+    final sessionId = _currentSession?.id;
+    if (sessionId == null) return;
+    try {
+      final msgs = await _aiService.getSessionMessages(sessionId: sessionId);
+      if (!mounted) return;
+      setState(() {
+        _messages = msgs;
+        _syncMessageKeys();
+      });
+      await _loadSessions();
+      if (!mounted) return;
+      final updated = _sessions.where((s) => s.id == sessionId).firstOrNull;
+      if (updated != null) {
+        setState(() => _currentSession = updated);
+      }
+    } catch (e) {
+      debugPrint('[AIChatDialog] sync after response failed: $e');
+    }
   }
 
   Future<void> _goToHome() async {
@@ -1240,6 +1331,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
                 createdAt: _stream.timestamp,
               ),
             );
+        } else {
+          _streamErrorMessage =
+              'پاسخی از دستیار دریافت نشد. احتمالاً مشکل از سرویس AI یا اعتبار حساب است.';
+          _streamErrorRecoverable = true;
         }
         _syncPendingWriteApprovalFromMessages();
         if (!_pendingWriteApproval &&
@@ -1414,6 +1509,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sessionId: _currentSession!.id!,
         content: content,
         approveWrites: approveWrites,
+        executionMode: _executionMode,
         model: _selectedModelCode,
         onComplete: (usage, messageId) {
           finalUsage = usage;
@@ -1664,19 +1760,19 @@ class _AIChatDialogState extends State<AIChatDialog> {
   void _scrollToBottom({bool force = false}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!force && !_autoScrollEnabled) return;
-      if (_scrollController.hasClients) {
-        final target = _scrollController.position.maxScrollExtent;
-        final current = _scrollController.position.pixels;
-        final delta = (target - current).abs();
-        if (delta > 1200) {
-          _scrollController.jumpTo(target);
-        } else {
-          _scrollController.animateTo(
-            target,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-          );
-        }
+      if (!_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      final delta = (target - _scrollController.position.pixels).abs();
+      // حین استریم با دلتای کوچک به‌صورت نرم می‌چسبد؛ پرش‌های بزرگ
+      // (بارگذاری اولیه/تعویض گفت‌وگو) بدون انیمیشن انجام می‌شود.
+      if (force || delta < 8 || delta > 600) {
+        _scrollController.jumpTo(target);
+      } else {
+        _scrollController.animateTo(
+          target,
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOut,
+        );
       }
     });
   }
@@ -1892,36 +1988,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _buildAppBar(theme),
-                    AIChatToolbar(
-                      isHomeMode: _isHomeMode,
-                      hasSession: _currentSession != null,
-                      hasBusiness: widget.businessId != null,
-                      focusMode: _focusChatMode,
-                      showFocusToggle: AIChatDesign.showPersistentSidebar(context),
-                      onSearch: _openMessageSearch,
-                      onMemory: _openMemorySheet,
-                      onExport: _exportConversation,
-                      onConnectors: _openConnectorsSheet,
-                      onKnowledge: _openKnowledgeSheet,
-                      onSkills: _openSkillsSheet,
-                      onVoiceSettings: _openVoiceSettings,
-                      onToggleFocus: () =>
-                          setState(() => _focusChatMode = !_focusChatMode),
-                    ),
                     if (_isHomeMode)
                       AIChatOnboardingBanner(businessId: widget.businessId),
-                    if (_showCreditWarning) _buildCreditWarning(theme),
-                    if (_showWriteApprovalBanner)
-                      AIWriteApprovalBanner(
-                        pendingOps: _collectPendingApprovalOps(),
-                        loading: _sending,
-                        canConfirm: _canConfirmWriteApproval,
-                        blockedReason: _canConfirmWriteApproval
-                            ? null
-                            : 'برای تأیید، همان گفت‌وگویی را از تاریخچه باز کنید که دستیار در آن درخواست تأیید کرده است.',
-                        onConfirm: _confirmWriteApproval,
-                        onDismiss: () => setState(_clearWriteApprovalState),
-                      ),
                     if (_attachments.isNotEmpty && !_isHomeMode)
                       _buildAttachmentsBar(theme),
                     Expanded(
@@ -1961,101 +2029,119 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 onModelChanged:
                                     _sending ? null : _onModelChanged,
                                 modelPricingHint: _composerModelHint(),
+                                creditWarningMessage: _creditWarningText(),
+                                onCreditUpgrade: widget.businessId != null
+                                    ? _navigateToSubscription
+                                    : null,
+                                executionMode: _executionMode,
+                                onExecutionModeChanged:
+                                    _sending ? null : _onExecutionModeChanged,
                               )
-                            : Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (_streamErrorMessage != null)
-                                    AIErrorRecoveryBanner(
-                                      message: _streamErrorMessage!,
-                                      recoverable: _streamErrorRecoverable,
-                                      onRetry:
-                                          _streamErrorRecoverable &&
-                                              _pendingStreamRetry != null
-                                          ? () {
-                                              setState(() {
-                                                _streamErrorMessage = null;
-                                                _streamErrorRecoverable = false;
-                                              });
-                                              _pendingStreamRetry!();
-                                            }
-                                          : null,
-                                      onDismiss: () => setState(() {
-                                        _streamErrorMessage = null;
-                                        _streamErrorRecoverable = false;
-                                      }),
-                                    ),
-                                  Expanded(
-                                    child: AIChatThreadView(
-                                      key: ValueKey(
-                                        'thread-${_currentSession?.id}',
-                                      ),
-                                      businessId: widget.businessId,
-                                      suppressApprovalToolChips:
-                                          _showWriteApprovalBanner,
-                                      messages: _messages,
-                                      messageKeys: _messageKeys,
-                                      streamingContent: _stream.content,
-                                      streamingToolActivities:
-                                          _stream.toolActivities,
-                                      streamingTraceSteps: _stream.traceSteps,
-                                      streamingStatusPhase: _stream.statusPhase,
-                                      streamingStatusStep: _stream.statusStep,
-                                      streamingIteration: _stream.iteration,
-                                      streamingMaxIterations:
-                                          _stream.maxIterations,
-                                      streamingElapsedSeconds:
-                                          _stream.elapsedSeconds > 0
-                                          ? _stream.elapsedSeconds
-                                          : null,
-                                      streamingTimestamp: _stream.timestamp,
-                                      messageFeedbackRatings:
-                                          _messageFeedbackRatings,
-                                      onCopyMessage: _copyToClipboard,
-                                      onFeedback: _submitFeedback,
-                                      onRegenerateLast: _regenerateLastResponse,
-                                      lastAssistantMessageId:
-                                          _messages.isNotEmpty &&
-                                              _messages.last.role ==
-                                                  MessageRole.assistant
-                                          ? _messages.last.id
-                                          : null,
-                                      contextUsageRatio:
-                                          _stream.contextUsageRatio,
-                                      contextUsagePercent:
-                                          _stream.contextUsagePercent,
-                                      contextHistorySummarized:
-                                          _stream.contextHistorySummarized,
-                                      messagesLoading: _messagesLoading,
-                                      sending: _sending,
-                                      disabled: !_canUseAi,
-                                      voiceStarting: _voiceStarting,
-                                      voiceActive: _voice != null,
-                                      voicePhase: _voicePhase,
-                                      voiceStatusEvent: _voiceStatusEvent,
-                                      showScrollToBottom: !_autoScrollEnabled,
-                                      isGenerating: _isGenerating,
-                                      scrollController: _scrollController,
-                                      messageController: _messageCtrl,
-                                      focusNode: _focusNode,
-                                      formatTime: _formatMessageTime,
-                                      onSend: () => _sendMessage(),
-                                      onMic: _toggleVoice,
-                                      onStopVoice: _stopVoiceSession,
-                                      onStopGenerating: _stopGenerating,
-                                      onScrollToBottom: () =>
-                                          _scrollToBottom(force: true),
-                                      onMessageLongPress: _showMessageActions,
-                                      onAttach: _pickAndUploadAttachment,
-                                      availableModels: _availableModels,
-                                      selectedModelCode: _selectedModelCode,
-                                      modelsLoading: _modelsLoading,
-                                      onModelChanged:
-                                          _sending ? null : _onModelChanged,
-                                      modelPricingHint: _composerModelHint(),
-                                    ),
-                                  ),
-                                ],
+                            : AIChatThreadView(
+                                key: ValueKey(
+                                  'thread-${_currentSession?.id}',
+                                ),
+                                businessId: widget.businessId,
+                                suppressApprovalToolChips:
+                                    _showWriteApprovalBanner,
+                                messages: _messages,
+                                messageKeys: _messageKeys,
+                                streamingContent: _stream.content,
+                                streamingToolActivities:
+                                    _stream.toolActivities,
+                                streamingTraceSteps: _stream.traceSteps,
+                                streamingTodoSnapshot: _stream.todoSnapshot,
+                                streamingStatusPhase: _stream.statusPhase,
+                                streamingStatusStep: _stream.statusStep,
+                                streamingIteration: _stream.iteration,
+                                streamingMaxIterations:
+                                    _stream.maxIterations,
+                                streamingElapsedSeconds:
+                                    _stream.elapsedSeconds > 0
+                                    ? _stream.elapsedSeconds
+                                    : null,
+                                streamingAgentBudget: _stream.agentBudget,
+                                streamingTimestamp: _stream.timestamp,
+                                messageFeedbackRatings:
+                                    _messageFeedbackRatings,
+                                onCopyMessage: _copyToClipboard,
+                                onFeedback: _submitFeedback,
+                                onRegenerateLast: _regenerateLastResponse,
+                                lastAssistantMessageId:
+                                    _messages.isNotEmpty &&
+                                        _messages.last.role ==
+                                            MessageRole.assistant
+                                    ? _messages.last.id
+                                    : null,
+                                contextUsageRatio:
+                                    _stream.contextUsageRatio,
+                                contextUsagePercent:
+                                    _stream.contextUsagePercent,
+                                contextHistorySummarized:
+                                    _stream.contextHistorySummarized,
+                                messagesLoading: _messagesLoading,
+                                sending: _sending,
+                                disabled: !_canUseAi,
+                                voiceStarting: _voiceStarting,
+                                voiceActive: _voice != null,
+                                voicePhase: _voicePhase,
+                                voiceStatusEvent: _voiceStatusEvent,
+                                showScrollToBottom: !_autoScrollEnabled,
+                                isGenerating: _isGenerating,
+                                scrollController: _scrollController,
+                                messageController: _messageCtrl,
+                                focusNode: _focusNode,
+                                formatTime: _formatMessageTime,
+                                onSend: () => _sendMessage(),
+                                onMic: _toggleVoice,
+                                onStopVoice: _stopVoiceSession,
+                                onStopGenerating: _stopGenerating,
+                                onScrollToBottom: () =>
+                                    _scrollToBottom(force: true),
+                                onMessageLongPress: _showMessageActions,
+                                onAttach: _pickAndUploadAttachment,
+                                availableModels: _availableModels,
+                                selectedModelCode: _selectedModelCode,
+                                modelsLoading: _modelsLoading,
+                                onModelChanged:
+                                    _sending ? null : _onModelChanged,
+                                modelPricingHint: _composerModelHint(),
+                                streamErrorMessage: _streamErrorMessage,
+                                streamErrorRecoverable: _streamErrorRecoverable,
+                                onRetryStreamError:
+                                    _streamErrorRecoverable &&
+                                            _pendingStreamRetry != null
+                                        ? () {
+                                            setState(() {
+                                              _streamErrorMessage = null;
+                                              _streamErrorRecoverable = false;
+                                            });
+                                            _pendingStreamRetry!();
+                                          }
+                                        : null,
+                                onDismissStreamError: () => setState(() {
+                                  _streamErrorMessage = null;
+                                  _streamErrorRecoverable = false;
+                                }),
+                                showWriteApproval: _showWriteApprovalBanner,
+                                writeApprovalOps: _collectPendingApprovalOps(),
+                                writeApprovalLoading: _sending,
+                                canConfirmWriteApproval:
+                                    _canConfirmWriteApproval,
+                                writeApprovalBlockedReason:
+                                    _canConfirmWriteApproval
+                                    ? null
+                                    : 'برای تأیید، همان گفت‌وگویی را از تاریخچه باز کنید که دستیار در آن درخواست تأیید کرده است.',
+                                onConfirmWriteApproval: _confirmWriteApproval,
+                                onDismissWriteApproval: () =>
+                                    setState(_clearWriteApprovalState),
+                                creditWarningMessage: _creditWarningText(),
+                                onCreditUpgrade: widget.businessId != null
+                                    ? _navigateToSubscription
+                                    : null,
+                                executionMode: _executionMode,
+                                onExecutionModeChanged:
+                                    _sending ? null : _onExecutionModeChanged,
                               ),
                       ),
                     ),
@@ -2075,12 +2161,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final embedded = widget.embeddedInShell;
     final showHistoryBtn =
         !AIChatDesign.showPersistentSidebar(context) || _focusChatMode;
-    final showSubtitle = _isGenerating || (_isHomeMode && !embedded);
-    final title = _isHomeMode && !embedded
-        ? 'دستیار هوشمند حسابیکس'
-        : (_isHomeMode
-            ? 'دستیار هوشمند'
-            : (_currentSession?.title ?? 'گفت‌وگو'));
+    final showSubtitle = _isGenerating;
+    final title = _isHomeMode
+        ? 'دستیار هوشمند'
+        : (_currentSession?.title ?? 'گفت‌وگو');
 
     return Material(
       color: Colors.transparent,
@@ -2102,60 +2186,42 @@ class _AIChatDialogState extends State<AIChatDialog> {
               ),
             if (!embedded) ...[
               Container(
-                width: 34,
-                height: 34,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      scheme.primary,
-                      scheme.tertiary.withValues(alpha: 0.92),
-                    ],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: scheme.primary.withValues(alpha: 0.18),
-                      blurRadius: 18,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(10),
+                  color: scheme.primary.withValues(alpha: 0.12),
                 ),
                 child: Icon(
                   Icons.auto_awesome_rounded,
-                  size: 18,
-                  color: scheme.onPrimary,
+                  size: 16,
+                  color: scheme.primary,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
             ],
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: (embedded
-                            ? theme.textTheme.titleSmall
-                            : theme.textTheme.titleMedium)
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  if (showSubtitle)
-                    Text(
-                      _isGenerating
-                          ? 'در حال تحلیل و آماده‌سازی پاسخ'
-                          : 'تحلیل مالی، گزارش و راهنمایی عملیاتی',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: embedded ? TextAlign.center : TextAlign.start,
+                style: (embedded
+                        ? theme.textTheme.titleSmall
+                        : theme.textTheme.titleMedium)
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
+            if (showSubtitle)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: Text(
+                  'در حال پاسخ...',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
             if (_isGenerating) ...[
               const SizedBox(width: 4),
               compact
@@ -2181,30 +2247,33 @@ class _AIChatDialogState extends State<AIChatDialog> {
                     ),
             ],
             if (!compact)
-              TextButton.icon(
+              IconButton(
+                tooltip: 'گفتگوی جدید',
                 onPressed: _startNewConversation,
-                icon: const Icon(Icons.add_rounded, size: 20),
-                label: const Text('جدید'),
+                icon: const Icon(Icons.edit_outlined, size: 20),
               )
             else
               IconButton(
-                tooltip: 'گفت‌وگوی جدید',
+                tooltip: 'گفتگوی جدید',
                 onPressed: _startNewConversation,
-                icon: const Icon(Icons.add_comment_outlined),
+                icon: const Icon(Icons.edit_outlined),
               ),
-            if (!embedded)
-              _AiMoreMenu(
-                isHomeMode: _isHomeMode,
-                hasSession: _currentSession != null,
-                hasBusiness: widget.businessId != null,
-                onSearch: _openMessageSearch,
-                onMemory: _openMemorySheet,
-                onExport: _exportConversation,
-                onConnectors: _openConnectorsSheet,
-                onKnowledge: _openKnowledgeSheet,
-                onSkills: _openSkillsSheet,
-                onVoiceSettings: _openVoiceSettings,
-              ),
+            _AiMoreMenu(
+              isHomeMode: _isHomeMode,
+              hasSession: _currentSession != null,
+              hasBusiness: widget.businessId != null,
+              focusMode: _focusChatMode,
+              showFocusToggle: AIChatDesign.showPersistentSidebar(context),
+              onSearch: _openMessageSearch,
+              onMemory: _openMemorySheet,
+              onExport: _exportConversation,
+              onConnectors: _openConnectorsSheet,
+              onKnowledge: _openKnowledgeSheet,
+              onSkills: _openSkillsSheet,
+              onVoiceSettings: _openVoiceSettings,
+              onToggleFocus: () =>
+                  setState(() => _focusChatMode = !_focusChatMode),
+            ),
             if (!embedded)
               IconButton(
                 tooltip: 'بستن',
@@ -2265,53 +2334,19 @@ class _AIChatDialogState extends State<AIChatDialog> {
     );
   }
 
-  Widget _buildCreditWarning(ThemeData theme) {
+  String? _creditWarningText() {
     if (!_showCreditWarning || _availabilityInfo == null) {
-      return const SizedBox.shrink();
+      return null;
     }
 
     final details = _availabilityInfo!['details'] as Map<String, dynamic>?;
     final subscription = details?['subscription'] as Map<String, dynamic>?;
     final isUnlimited = subscription?['is_unlimited'] as bool? ?? false;
     if (isUnlimited) {
-      return const SizedBox.shrink();
+      return null;
     }
     final tokensRemaining = subscription?['tokens_remaining'] as int? ?? 0;
-    final scheme = theme.colorScheme;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: scheme.tertiaryContainer.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: scheme.tertiary.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.warning_amber_rounded,
-            color: scheme.onTertiaryContainer,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'اعتبار رو به اتمام — ${tokensRemaining.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} توکن باقی‌مانده',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onTertiaryContainer,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: widget.businessId != null
-                ? _navigateToSubscription
-                : null,
-            child: const Text('ارتقا'),
-          ),
-        ],
-      ),
-    );
+    return 'اعتبار رو به اتمام — ${tokensRemaining.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} توکن باقی‌مانده';
   }
 }
 
@@ -2319,6 +2354,8 @@ class _AiMoreMenu extends StatelessWidget {
   final bool isHomeMode;
   final bool hasSession;
   final bool hasBusiness;
+  final bool focusMode;
+  final bool showFocusToggle;
   final VoidCallback onSearch;
   final VoidCallback onMemory;
   final VoidCallback onExport;
@@ -2326,11 +2363,14 @@ class _AiMoreMenu extends StatelessWidget {
   final VoidCallback onKnowledge;
   final VoidCallback onSkills;
   final VoidCallback onVoiceSettings;
+  final VoidCallback? onToggleFocus;
 
   const _AiMoreMenu({
     required this.isHomeMode,
     required this.hasSession,
     required this.hasBusiness,
+    this.focusMode = false,
+    this.showFocusToggle = false,
     required this.onSearch,
     required this.onMemory,
     required this.onExport,
@@ -2338,6 +2378,7 @@ class _AiMoreMenu extends StatelessWidget {
     required this.onKnowledge,
     required this.onSkills,
     required this.onVoiceSettings,
+    this.onToggleFocus,
   });
 
   @override
@@ -2370,9 +2411,22 @@ class _AiMoreMenu extends StatelessWidget {
           case _AiMenuAction.voice:
             onVoiceSettings();
             break;
+          case _AiMenuAction.focus:
+            onToggleFocus?.call();
+            break;
         }
       },
       itemBuilder: (context) => [
+        if (showFocusToggle && onToggleFocus != null)
+          PopupMenuItem(
+            value: _AiMenuAction.focus,
+            child: _AiMenuItem(
+              icon: focusMode
+                  ? Icons.view_sidebar_rounded
+                  : Icons.crop_landscape_rounded,
+              label: focusMode ? 'نمای کامل' : 'حالت تمرکز',
+            ),
+          ),
         if (!isHomeMode && hasSession) ...[
           const PopupMenuItem(
             value: _AiMenuAction.search,
@@ -2425,7 +2479,16 @@ class _AiMoreMenu extends StatelessWidget {
   }
 }
 
-enum _AiMenuAction { search, memory, export, connectors, knowledge, skills, voice }
+enum _AiMenuAction {
+  search,
+  memory,
+  export,
+  connectors,
+  knowledge,
+  skills,
+  voice,
+  focus,
+}
 
 class _AiMenuItem extends StatelessWidget {
   final IconData icon;

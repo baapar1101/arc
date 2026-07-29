@@ -177,6 +177,12 @@ def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
 
+    from app.core.production_security import validate_production_security
+    from html import escape
+
+    validate_production_security(settings)
+    is_production = (settings.environment or "").strip().lower() in {"production", "prod"}
+
     # خواندن تنظیمات از DB در صورت امکان، در غیر این صورت از env
     app_name = settings.app_name
     app_version = settings.app_version
@@ -190,6 +196,8 @@ def create_app() -> FastAPI:
     except Exception:
         # در صورت خطا از env استفاده می‌شود
         pass
+
+    safe_app_name = escape(app_name)
 
     # تعریف tags برای دسته‌بندی بهتر endpoint ها در Swagger
     tags_metadata = [
@@ -473,7 +481,7 @@ def create_app() -> FastAPI:
             "defaultModelsExpandDepth": -1,  # بسته بودن Models به صورت پیش‌فرض
             "docExpansion": "list",           # نمایش لیستی endpoints
             "filter": True,                   # فعال‌سازی جستجو
-            "persistAuthorization": True,     # ذخیره توکن احراز هویت
+            "persistAuthorization": not is_production,     # ذخیره توکن فقط در محیط توسعه
             "displayRequestDuration": True,   # نمایش زمان پاسخ
             "tryItOutEnabled": True,          # فعال بودن Try it out
             "syntaxHighlight.theme": "monokai",  # تم Syntax Highlighting
@@ -674,7 +682,7 @@ def create_app() -> FastAPI:
         """صفحه سفارشی Swagger UI با پشتیبانی کامل از فارسی و RTL"""
         return get_local_swagger_ui_html(
             openapi_url=application.openapi_url,
-            title=f"{app_name} - مستندات API",
+            title=f"{safe_app_name} - مستندات API",
             oauth2_redirect_url=application.swagger_ui_oauth2_redirect_url,
             init_oauth=application.swagger_ui_init_oauth,
             swagger_ui_parameters=application.swagger_ui_parameters,
@@ -691,7 +699,7 @@ def create_app() -> FastAPI:
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>{app_name} - مستندات API</title>
+            <title>{safe_app_name} - مستندات API</title>
             <link rel="icon" type="image/png" href="/assets/logo-blue.png">
             <link rel="stylesheet" type="text/css" href="/assets/swagger/vendor/swagger-ui.css">
             <link rel="stylesheet" type="text/css" href="/assets/swagger/custom.css">
@@ -740,7 +748,7 @@ def create_app() -> FastAPI:
                         defaultModelsExpandDepth: -1,
                         docExpansion: "list",
                         filter: true,
-                        persistAuthorization: true,
+                        persistAuthorization: {"true" if not is_production else "false"},
                         displayRequestDuration: true,
                         tryItOutEnabled: true,
                         syntaxHighlight: {{

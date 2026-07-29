@@ -380,6 +380,16 @@ def get_dynamic_suggestions(
             "prompt": get_prompt_by_key(db, "insight.suggestion.invoice_guide"),
             "icon": "receipt",
         },
+        {
+            "label": "گزارش سود و زیان",
+            "prompt": get_prompt_by_key(db, "insight.suggestion.profit_loss"),
+            "icon": "menu_book",
+        },
+        {
+            "label": "کمک در حسابداری",
+            "prompt": get_prompt_by_key(db, "insight.suggestion.accounting_guide"),
+            "icon": "psychology",
+        },
     ]
 
     try:

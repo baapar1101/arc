@@ -12,7 +12,9 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.file_storage import FileStorage
 from adapters.db.session import get_db
+from app.core.rate_limiter import rate_limit
 from app.core.responses import ApiError, success_response
+from app.core.settings import get_settings
 from app.services.file_storage_service import FileStorageService
 from app.services.system_settings_service import resolve_public_app_base_url_for_public_links
 from app.services.file_storage_share_service import (
@@ -80,6 +82,12 @@ async def public_storage_share_info(
 @router.post(
 	"/api/v1/public/storage/shares/{token}/unlock",
 	summary="باز کردن لینک دارای رمز",
+)
+@rate_limit(
+	max_requests=10,
+	window_seconds=300,
+	key_func=lambda req: f"storage_share_unlock:{req.path_params.get('token', '')}:{req.client.host if req.client else 'unknown'}",
+	error_message="تعداد تلاش‌های باز کردن لینک بیش از حد مجاز است. لطفاً بعداً تلاش کنید.",
 )
 async def public_storage_share_unlock(
 	token: str,
@@ -166,6 +174,13 @@ async def redirect_public_storage_share(
 	db: Session = Depends(get_db),
 ):
 	configured = resolve_public_app_base_url_for_public_links(db).strip().rstrip("/")
+	settings = get_settings()
+	is_production = (settings.environment or "").strip().lower() in {"production", "prod"}
+	if is_production and not configured:
+		raise HTTPException(
+			status_code=500,
+			detail="Public app base URL is not configured",
+		)
 	same_origin = f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
 	base = configured or same_origin
 	target = f"{base.rstrip('/')}/public/storage-file/{token}"

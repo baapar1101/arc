@@ -9,7 +9,7 @@ class AppLocalizationsFa extends AppLocalizations {
   AppLocalizationsFa([String locale = 'fa']) : super(locale);
 
   @override
-  String get appTitle => 'حسابیکس';
+  String get appTitle => 'مارک‌استریت';
 
   @override
   String get login => 'ورود';
@@ -75,7 +75,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get dark => 'تاریک';
 
   @override
-  String get welcomeTitle => 'حسابداری ابری حسابیکس';
+  String get welcomeTitle => 'حسابداری ابری مارک‌استریت';
 
   @override
   String get welcomeSubtitle =>
@@ -2331,7 +2331,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get pluginMarketplaceSubtitle =>
-      'قابلیت‌های حسابیکس را با افزونه‌های یکپارچه‌سازی و تخصصی گسترش دهید. پرداخت از کیف‌پول کسب‌وکار.';
+      'قابلیت‌های مارک‌استریت را با افزونه‌های یکپارچه‌سازی و تخصصی گسترش دهید. پرداخت از کیف‌پول کسب‌وکار.';
 
   @override
   String get pluginMarketplaceBrowseTab => 'کاتالوگ';
@@ -5021,7 +5021,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get reportTemplatesScopeCustom => 'سفارشی (کلیدهای فنی)';
 
   @override
-  String get reportTemplateNewVisual => 'قالب جدید — سازندهٔ بصری';
+  String get reportTemplateNewVisual => 'قالب جدید — استودیو';
 
   @override
   String get reportTemplateNewHtml => 'قالب جدید — HTML (پیشرفته)';
@@ -6054,7 +6054,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get notificationsChannelInAppDescription =>
-      'نمایش اعلان داخل وب و موبایل حسابیکس در لحظه.';
+      'نمایش اعلان داخل وب و موبایل مارک‌استریت در لحظه.';
 
   @override
   String get notificationsSaveSuccess => 'تنظیمات اعلان ذخیره شد.';
@@ -6842,14 +6842,14 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get taxGuideIntroDescription =>
-      'این راهنما تمام مراحل اتصال کسب‌وکار به سامانه مودیان در نسخه جدید حسابیکس را مرور می‌کند؛ از تولید کلیدها تا کنترل کیفیت داده و ارسال صورتحساب.';
+      'این راهنما تمام مراحل اتصال کسب‌وکار به سامانه مودیان در نسخه جدید مارک‌استریت را مرور می‌کند؛ از تولید کلیدها تا کنترل کیفیت داده و ارسال صورتحساب.';
 
   @override
   String get taxGuidePrereqTitle => 'پیش‌نیازهای قبل از شروع';
 
   @override
   String get taxGuidePrereqItem1 =>
-      'دسترسی کاربر اصلی کسب‌وکار به منوی «سامانه مودیان» در حسابیکس';
+      'دسترسی کاربر اصلی کسب‌وکار به منوی «سامانه مودیان» در مارک‌استریت';
 
   @override
   String get taxGuidePrereqItem2 =>
@@ -6860,7 +6860,7 @@ class AppLocalizationsFa extends AppLocalizations {
       'دسترسی به کارپوشه مالیاتی در سامانه my.tax.gov.ir';
 
   @override
-  String get taxGuideStep1Title => '۱) ساخت کلیدها در حسابیکس';
+  String get taxGuideStep1Title => '۱) ساخت کلیدها در مارک‌استریت';
 
   @override
   String get taxGuideStep1Description =>
@@ -6914,10 +6914,10 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get taxGuideStep3Bullet3 =>
-      'شناسه یکتای نمایش داده شده را ذخیره و در حسابیکس وارد کنید.';
+      'شناسه یکتای نمایش داده شده را ذخیره و در مارک‌استریت وارد کنید.';
 
   @override
-  String get taxGuideStep4Title => '۴) تکمیل فرم اتصال در حسابیکس';
+  String get taxGuideStep4Title => '۴) تکمیل فرم اتصال در مارک‌استریت';
 
   @override
   String get taxGuideStep4Description =>
@@ -6952,7 +6952,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get taxGuideStep5Bullet3 =>
-      'پس از مراجعه حضوری، فایل گواهی صادره را در حسابیکس بارگذاری کنید.';
+      'پس از مراجعه حضوری، فایل گواهی صادره را در مارک‌استریت بارگذاری کنید.';
 
   @override
   String get taxGuideStep6Title => '۶) ثبت کد کالا و خدمت';
@@ -9977,6 +9977,12 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiToolQueryBusinessData => 'پرس‌وجوی داده';
+
+  @override
+  String get aiToolListQueryableFields => 'فیلدهای قابل جستجو';
+
+  @override
+  String get aiToolResolveDateRange => 'تبدیل بازهٔ تاریخ';
 
   @override
   String get aiToolSearchWarehouseDocuments => 'جستجوی حواله انبار';
@@ -13527,7 +13533,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get wooBridgeFieldWpVersion => 'نسخهٔ وردپرس در فروشگاه';
 
   @override
-  String get wooBridgeFieldPluginVersion => 'نسخهٔ افزونهٔ Hesabix ArcWOC';
+  String get wooBridgeFieldPluginVersion => 'نسخهٔ افزونهٔ MarkStreet ArcWOC';
 
   @override
   String wooBridgeFieldGenericTitle(String key) {
@@ -13578,7 +13584,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get woocommerceColumnOrderType => 'نوع سفارش';
 
   @override
-  String get woocommerceColumnHesabixId => 'شناسه در حسابیکس';
+  String get woocommerceColumnMarkStreetId => 'شناسه در مارک‌استریت';
 
   @override
   String get woocommerceColumnSyncStatus => 'وضعیت همگام‌سازی';
@@ -13692,7 +13698,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceSettingsBridgeIntroBody =>
-      'آدرس پایهٔ سایت وردپرس و توکن پل تولیدشده در افزونهٔ Hesabix ArcWOC را وارد کنید. برای حفظ توکن ذخیره‌شده، فیلد توکن را خالی بگذارید و ذخیره کنید.';
+      'آدرس پایهٔ سایت وردپرس و توکن پل تولیدشده در افزونهٔ MarkStreet ArcWOC را وارد کنید. برای حفظ توکن ذخیره‌شده، فیلد توکن را خالی بگذارید و ذخیره کنید.';
 
   @override
   String get woocommerceStoreUrlLabel => 'آدرس فروشگاه (WordPress)';
@@ -13754,7 +13760,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceControlIntroSubtitle =>
-      'آمار نگاشت، اتصال به حسابیکس، نسخهٔ افزونه، لاگ اخیر و همگام‌سازی دسته‌ای از طریق پل امن (همان توکن مرکز عملیات).';
+      'آمار نگاشت، اتصال به مارک‌استریت، نسخهٔ افزونه، لاگ اخیر و همگام‌سازی دسته‌ای از طریق پل امن (همان توکن مرکز عملیات).';
 
   @override
   String get woocommerceControlRefreshTooltip => 'به‌روزرسانی همهٔ بخش‌ها';
@@ -13767,7 +13773,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceControlConnectionTitle =>
-      'اتصال API حسابیکس از دید فروشگاه';
+      'اتصال API مارک‌استریت از دید فروشگاه';
 
   @override
   String get woocommerceControlSettingsTitle =>
@@ -13833,7 +13839,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get woocommerceControlColumnError => 'خطا';
 
   @override
-  String get woocommerceHubSyncRowTooltip => 'همگام‌سازی با حسابیکس';
+  String get woocommerceHubSyncRowTooltip => 'همگام‌سازی با مارک‌استریت';
 
   @override
   String get woocommerceHubSyncColumnLabel => 'همگام';
@@ -13843,21 +13849,21 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceHubSyncOrderConfirmBody =>
-      'سفارش انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.';
+      'سفارش انتخاب‌شده از طریق API افزونه به مارک‌استریت ارسال می‌شود.';
 
   @override
   String get woocommerceHubSyncProductConfirmTitle => 'همگام این محصول؟';
 
   @override
   String get woocommerceHubSyncProductConfirmBody =>
-      'محصول انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.';
+      'محصول انتخاب‌شده از طریق API افزونه به مارک‌استریت ارسال می‌شود.';
 
   @override
   String get woocommerceHubSyncCustomerConfirmTitle => 'همگام این مشتری؟';
 
   @override
   String get woocommerceHubSyncCustomerConfirmBody =>
-      'مشتری انتخاب‌شده از طریق API افزونه به حسابیکس ارسال می‌شود.';
+      'مشتری انتخاب‌شده از طریق API افزونه به مارک‌استریت ارسال می‌شود.';
 
   @override
   String get woocommerceHubBulkSyncTitle => 'همگام‌سازی دسته‌ای (مرکز عملیات)';
@@ -13919,7 +13925,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceOpeningInvBridgeSubtitle =>
-      'همان کار موجودی اولیهٔ افزونه روی فروشگاه، از طریق پل حسابیکس. پس از همگام کالاها و تنظیم انبار/حساب‌ها در وردپرس استفاده کنید.';
+      'همان کار موجودی اولیهٔ افزونه روی فروشگاه، از طریق پل مارک‌استریت. پس از همگام کالاها و تنظیم انبار/حساب‌ها در وردپرس استفاده کنید.';
 
   @override
   String get woocommerceOpeningInvRefreshStatus => 'به‌روزرسانی وضعیت';
@@ -13978,7 +13984,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceOpeningInvDoPostLabel =>
-      'نهایی‌سازی سند در حسابیکس (قفل)';
+      'نهایی‌سازی سند در مارک‌استریت (قفل)';
 
   @override
   String get woocommerceOpeningInvCostBasisLabel => 'مبنای بهای تمام‌شده';
@@ -14134,7 +14140,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceSettingsArcwocPluginIntro =>
-      'آمار نگاشت، اتصال افزونه به API حسابیکس، صف پس‌زمینه، نسخهٔ افزونه، خلاصهٔ تنظیمات، دیباگ، همگام‌سازی دسته‌ای و لاگ.';
+      'آمار نگاشت، اتصال افزونه به API مارک‌استریت، صف پس‌زمینه، نسخهٔ افزونه، خلاصهٔ تنظیمات، دیباگ، همگام‌سازی دسته‌ای و لاگ.';
 
   @override
   String get woocommerceBridgeTokenStored => 'توکن پل ذخیره شده';
@@ -14252,7 +14258,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get woocommerceSettingsOpeningInventoryLinkSubtitle =>
-      'ایجاد نشست و اجرای دسته‌ها از حسابیکس، بدون ورود به وردپرس.';
+      'ایجاد نشست و اجرای دسته‌ها از مارک‌استریت، بدون ورود به وردپرس.';
 
   @override
   String get settingsWooCommerceTitle => 'پل ووکامرس';
@@ -14681,7 +14687,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String crmWebChatEmbedSnippet(String base, String publicKey) {
-    return '// پایه API: $base\n// مرحله ۱: POST /api/v1/public/crm-chat/conversations/start\n// بدنه JSON باید public_key \"$publicKey\" و first_name و last_name و email و phone و page_url را داشته باشد.\n// مرحله ۲: با visitor_token و conversation_id به POST /api/v1/public/crm-chat/messages پیام بفرستید.\n// جزئیات: مستندات CRM_WEB_CHAT در مخزن Hesabix';
+    return '// پایه API: $base\n// مرحله ۱: POST /api/v1/public/crm-chat/conversations/start\n// بدنه JSON باید public_key \"$publicKey\" و first_name و last_name و email و phone و page_url را داشته باشد.\n// مرحله ۲: با visitor_token و conversation_id به POST /api/v1/public/crm-chat/messages پیام بفرستید.\n// جزئیات: مستندات CRM_WEB_CHAT در مخزن MarkStreet';
   }
 
   @override
@@ -15151,7 +15157,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get mobileLauncherExitAppHint => 'برای خروج دوباره بازگشت را بزنید';
 
   @override
-  String get mobileLauncherBrandName => 'حسابیکس';
+  String get mobileLauncherBrandName => 'مارک‌استریت';
 
   @override
   String get mobileLauncherBusinessFallback => 'کسب‌وکار';
@@ -15384,4 +15390,198 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get profileDashboardCreateTicket => 'ایجاد تیکت';
+
+  @override
+  String get businessSettingsCategoryBusinessFinance => 'کسب‌وکار و مالی';
+
+  @override
+  String get businessSettingsCategoryBusinessFinanceDescription =>
+      'اطلاعات پایه، ارزها، سال مالی و اعتبار';
+
+  @override
+  String get businessSettingsCategorySalesDocuments => 'فروش و اسناد';
+
+  @override
+  String get businessSettingsCategorySalesDocumentsDescription =>
+      'فروش سریع، چاپ، شماره‌گذاری و قالب‌ها';
+
+  @override
+  String get businessSettingsCategoryIntegrations => 'یکپارچه‌سازی‌ها';
+
+  @override
+  String get businessSettingsCategoryIntegrationsDescription =>
+      'اتصال به سرویس‌ها و پلتفرم‌های خارجی';
+
+  @override
+  String get businessSettingsCategoryModules => 'افزونه‌ها و ماژول‌ها';
+
+  @override
+  String get businessSettingsCategoryModulesDescription =>
+      'تنظیمات افزونه‌های فعال کسب‌وکار';
+
+  @override
+  String get businessSettingsCategoryAdministration => 'مدیریت و امنیت';
+
+  @override
+  String get businessSettingsCategoryAdministrationDescription =>
+      'کاربران، پروژه‌ها، اعلان‌ها و گزارش فعالیت';
+
+  @override
+  String get businessSettingsCategoryPersonalization => 'شخصی‌سازی';
+
+  @override
+  String get businessSettingsCategoryPersonalizationDescription =>
+      'تنظیمات ظاهری حساب کاربری شما';
+
+  @override
+  String get businessSettingsCategoryAdvanced => 'پیشرفته و پشتیبان';
+
+  @override
+  String get businessSettingsCategoryAdvancedDescription =>
+      'پشتیبان‌گیری، بازیابی و مقصد FTP';
+
+  @override
+  String get businessSettingsCategoryMembership => 'عضویت';
+
+  @override
+  String get businessSettingsCategoryMembershipDescription =>
+      'مدیریت عضویت شما در این کسب‌وکار';
+
+  @override
+  String get businessSettingsCategoryDangerZone => 'عملیات خطرناک';
+
+  @override
+  String get businessSettingsCategoryDangerZoneDescription =>
+      'اقدامات غیرقابل بازگشت — با احتیاط ادامه دهید';
+
+  @override
+  String get businessSettingsFiscalYearEdit => 'ویرایش سال مالی جاری';
+
+  @override
+  String get businessSettingsFiscalYearEditDescription =>
+      'ویرایش عنوان و تاریخ‌های سال مالی جاری';
+
+  @override
+  String get businessSettingsQuickSales => 'تنظیمات فروش سریع';
+
+  @override
+  String get businessSettingsQuickSalesDescription =>
+      'تنظیمات پیش‌فرض برای فروش سریع';
+
+  @override
+  String get businessSettingsCrm => 'تنظیمات CRM';
+
+  @override
+  String get businessSettingsCrmDescription =>
+      'چت وب و ارسال فایل توسط بازدیدکننده';
+
+  @override
+  String get businessSettingsProjects => 'مدیریت پروژه‌ها';
+
+  @override
+  String get businessSettingsProjectsDescription =>
+      'تعریف و مدیریت پروژه‌ها برای ردیابی هزینه‌ها و درآمدها';
+
+  @override
+  String get businessSettingsDocumentNumbering => 'شماره‌گذاری اسناد';
+
+  @override
+  String get businessSettingsDocumentNumberingDescription =>
+      'تنظیم نحوه شماره‌گذاری انواع اسناد';
+
+  @override
+  String get businessSettingsInvoiceSharePayment => 'پرداخت آنلاین لینک فاکتور';
+
+  @override
+  String get businessSettingsInvoiceSharePaymentDescription =>
+      'پیش‌فرض درگاه و فعال‌سازی برای لینک اشتراک عمومی';
+
+  @override
+  String get businessSettingsTemplatesDescription =>
+      'طراحی و مدیریت قالب‌های PDF گزارش و چاپ';
+
+  @override
+  String get businessSettingsRepairShop => 'تنظیمات تعمیرگاه';
+
+  @override
+  String get businessSettingsRepairShopDescription =>
+      'شماره‌گذاری، اعلان‌ها و پیش‌فرض‌های تعمیرگاه';
+
+  @override
+  String get businessSettingsWarrantyDescription =>
+      'تنظیمات فرمت کد، سریال و امنیت گارانتی';
+
+  @override
+  String get businessSettingsNotificationTemplates => 'قالب‌های نوتیفیکیشن';
+
+  @override
+  String get businessSettingsNotificationTemplatesDescription =>
+      'مدیریت قالب‌های پیامک و ایمیل برای رویدادهای مختلف';
+
+  @override
+  String get businessSettingsAppearanceProfileDescription =>
+      'زبان، تم و تقویم — در تنظیمات پروفایل کاربری';
+
+  @override
+  String get businessSettingsLeaveBusiness => 'خروج از کسب و کار';
+
+  @override
+  String get businessSettingsLeaveBusinessDescription =>
+      'خروج از این کسب و کار و حذف دسترسی‌های شما';
+
+  @override
+  String get businessSettingsLeaveBusinessConfirm =>
+      'آیا مطمئن هستید که می‌خواهید از این کسب و کار خارج شوید؟\n\nپس از خروج، دسترسی شما به این کسب و کار حذف خواهد شد.';
+
+  @override
+  String get businessSettingsLeaveBusinessAction => 'خروج';
+
+  @override
+  String get businessSettingsLeaveBusinessFailed => 'خطا در خروج از کسب و کار';
+
+  @override
+  String get businessSettingsDeleteBusiness => 'حذف کسب و کار';
+
+  @override
+  String get businessSettingsDeleteBusinessDescription =>
+      'حذف دائمی کسب و کار (۳۰ روز قابل بازیابی)';
+
+  @override
+  String get businessSettingsFiscalYearRollback => 'برگشت از سال مالی جاری';
+
+  @override
+  String get businessSettingsFiscalYearRollbackDescription =>
+      'حذف سال جاری و فعال‌سازی مجدد سال قبل (حداقل دو سال مالی)';
+
+  @override
+  String get businessSettingsHubDescriptionOwner =>
+      'شما مالک این کسب و کار هستید و می‌توانید همه تنظیمات مجاز را مدیریت کنید.';
+
+  @override
+  String get businessSettingsHubDescriptionMember =>
+      'شما عضو این کسب و کار هستید؛ فقط تنظیماتی که به آن‌ها دسترسی دارید نمایش داده می‌شود.';
+
+  @override
+  String get businessSettingsHubDescriptionGeneric =>
+      'تنظیمات این کسب و کار را از این صفحه مدیریت کنید.';
+
+  @override
+  String get businessSettingsOwnerRole => 'مالک کسب و کار';
+
+  @override
+  String get businessSettingsMemberRole => 'عضو کسب و کار';
+
+  @override
+  String get businessSettingsSetupTitle => 'راه‌اندازی سریع';
+
+  @override
+  String get businessSettingsSetupDescription =>
+      'برای شروع کار، این موارد را تکمیل کنید:';
+
+  @override
+  String get businessSettingsPluginsLoadingHint => 'در حال بارگذاری افزونه‌ها…';
+
+  @override
+  String get businessSettingsPluginsLoadFailed =>
+      'بارگذاری افزونه‌ها ناموفق بود. یکپارچه‌سازی‌ها و ماژول‌ها ممکن است کامل نمایش داده نشوند.';
 }

@@ -248,6 +248,7 @@ class AIChatSession {
   final int userId;
   final int? businessId;
   final String title;
+  final String executionMode;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -256,6 +257,7 @@ class AIChatSession {
     required this.userId,
     this.businessId,
     required this.title,
+    this.executionMode = 'analyzer',
     this.createdAt,
     this.updatedAt,
   });
@@ -266,6 +268,7 @@ class AIChatSession {
       userId: json['user_id'] as int,
       businessId: json['business_id'] as int?,
       title: json['title'] as String,
+      executionMode: (json['execution_mode'] as String?) ?? 'analyzer',
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -281,7 +284,28 @@ class AIChatSession {
       'user_id': userId,
       if (businessId != null) 'business_id': businessId,
       'title': title,
+      'execution_mode': executionMode,
     };
+  }
+
+  AIChatSession copyWith({
+    int? id,
+    int? userId,
+    int? businessId,
+    String? title,
+    String? executionMode,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return AIChatSession(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      businessId: businessId ?? this.businessId,
+      title: title ?? this.title,
+      executionMode: executionMode ?? this.executionMode,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
   }
 }
 
@@ -519,6 +543,8 @@ class AIModelCatalogItem {
   final String? tier;
   final bool supportsTools;
   final int maxTokensDefault;
+  final bool supportsReasoning;
+  final String? reasoningEffort;
   final bool isActive;
   final bool isDefault;
   final Map<String, dynamic>? pricing;
@@ -536,6 +562,8 @@ class AIModelCatalogItem {
     this.tier,
     this.supportsTools = true,
     this.maxTokensDefault = 4000,
+    this.supportsReasoning = false,
+    this.reasoningEffort,
     this.isActive = true,
     this.isDefault = false,
     this.pricing,
@@ -555,6 +583,8 @@ class AIModelCatalogItem {
       tier: json['tier'] as String?,
       supportsTools: json['supports_tools'] as bool? ?? true,
       maxTokensDefault: json['max_tokens_default'] as int? ?? 4000,
+      supportsReasoning: json['supports_reasoning'] as bool? ?? false,
+      reasoningEffort: json['reasoning_effort'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       isDefault: json['is_default'] as bool? ?? false,
       pricing: json['pricing'] is Map
@@ -578,6 +608,8 @@ class AIModelCatalogItem {
       if (tier != null) 'tier': tier,
       'supports_tools': supportsTools,
       'max_tokens_default': maxTokensDefault,
+      'supports_reasoning': supportsReasoning,
+      if (reasoningEffort != null) 'reasoning_effort': reasoningEffort,
       'is_active': isActive,
       'sort_order': 0,
     };

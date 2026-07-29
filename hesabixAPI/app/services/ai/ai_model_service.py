@@ -413,6 +413,40 @@ def get_max_tokens_for_model(
     return 4000
 
 
+def get_reasoning_effort_for_model(
+    db: Session,
+    model_code: str,
+    *,
+    complexity: Optional[str] = None,
+) -> Optional[str]:
+    """
+    سطح تلاش استدلال مؤثر برای یک مدل.
+
+    اولویت:
+      1) اگر مدل از reasoning پشتیبانی نکند → None
+      2) مقدار صریح reasoning_effort روی رکورد مدل
+      3) انتخاب خودکار بر اساس پیچیدگی سوال
+    """
+    from app.services.ai.ai_constants import (
+        REASONING_EFFORT_BY_COMPLEXITY,
+        REASONING_EFFORT_LEVELS,
+    )
+
+    record = resolve_model_record(db, model_code)
+    if not record or not getattr(record, "supports_reasoning", False):
+        return None
+
+    explicit = (record.reasoning_effort or "").strip().lower()
+    if explicit in REASONING_EFFORT_LEVELS:
+        return explicit
+
+    if complexity:
+        auto = REASONING_EFFORT_BY_COMPLEXITY.get(complexity)
+        if auto in REASONING_EFFORT_LEVELS:
+            return auto
+    return "medium"
+
+
 def estimate_auto_cost_range(
     plan: Optional[AIPlan],
     db: Session,
@@ -544,6 +578,8 @@ def serialize_model(model: AIModel, *, default: bool = False) -> Dict[str, Any]:
         "tier": model.tier,
         "supports_tools": model.supports_tools,
         "max_tokens_default": model.max_tokens_default,
+        "supports_reasoning": bool(getattr(model, "supports_reasoning", False)),
+        "reasoning_effort": model.reasoning_effort,
         "reference_input_cost_per_1k": float(model.reference_input_cost_per_1k)
         if model.reference_input_cost_per_1k is not None
         else None,

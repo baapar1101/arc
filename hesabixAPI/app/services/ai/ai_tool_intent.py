@@ -13,6 +13,7 @@ from app.services.ai.ai_constants import MAX_TOOLS_PER_REQUEST, QUERY_COMPLEXITY
 _CORE_TOOL_NAMES: frozenset[str] = frozenset({
     "query_business_data",
     "list_queryable_fields",
+    "resolve_date_range",
     "get_business_info",
     "get_business_dashboard",
     "search_persons",
@@ -134,6 +135,11 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "list_petty_cash",
         "get_person_transactions",
     }),
+    "agent": frozenset({
+        "create_session_plan",
+        "list_session_todos",
+        "update_session_todo",
+    }),
     "people": frozenset({
         "search_persons",
         "get_customer_info",
@@ -154,6 +160,7 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
     "query": frozenset({
         "query_business_data",
         "list_queryable_fields",
+        "resolve_date_range",
         "batch_query_business_data",
         "search_invoices",
         "search_persons",
@@ -199,10 +206,12 @@ _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"مالیات|مودیان|tax|کارپوشه", "tax"),
     (r"پروژه|project", "projects"),
     (r"ووکامرس|woocommerce|باسلام|basalam|کانکتور|connector|یکپارچه", "integration"),
+    (r"مرحله|گام|قدم|سناریو|چند\s*مرحله|گام\s*به\s*گام|برنامه\s*کار|checklist|todo", "agent"),
     (r"فروش\s*سریع|quick\s*sales|لیست\s*قیمت|price\s*list|لاگ|فعالیت\s*سیستم|workflow|تعمیر|گارانتی|توزیع|صندوق\s*خرد", "misc"),
     (r"شخص|مشتری|تامین|تأمین|supplier|customer|people|گروه\s*اشخاص", "people"),
     (r"دسته\s*بندی|category|ویژگی\s*کالا|attribute", "products_write"),
     (r"فیلتر\s*پیشرفته|عملگر|بزرگتر\s*از|کمتر\s*از|شامل|list_queryable|query_business", "query"),
+    (r"ماه\s*گذشته|هفته\s*اخیر|امروز|دیروز|فروردین|اردیبهشت|خرداد|مرداد|شهریور|آبان|اسفند|بازه\s*تاریخ|resolve_date|از\s*تاریخ|تا\s*تاریخ", "query"),
     (r"گزارش\s*یکپارچه|get_report|batch_query|list_available_reports", "reports_meta"),
     (r"خروجی|export|اکسل|excel|دانلود\s*لیست", "reports_meta"),
     (r"تراز\s*آزمایشی|دفتر\s*کل|دفتر\s*روزنامه|سود\s*و\s*زیان|مرور\s*حساب|trial\s*balance|ledger", "reports_meta"),
@@ -327,7 +336,7 @@ def estimate_query_complexity(
 ) -> str:
     """
     تخمین پیچیدگی سوال: simple / medium / complex.
-    از تاریخچه مکالمه برای بافت چندوجهی استفاده می‌کند.
+    از تاریخچه مکالمه، دسته‌بندی ابزار و الگوهای متنی استفاده می‌کند.
     """
     q = (user_query or "").strip()
     if not q:
@@ -336,6 +345,20 @@ def estimate_query_complexity(
     # سوال بسیار کوتاه یا خوش‌و‌بش
     if len(q) < 15 or _SIMPLE_PATTERNS.match(q):
         return "simple"
+
+    categories = detect_categories(q)
+    if len(categories) >= 3:
+        return "complex"
+    if len(categories) >= 2 and (
+        _MEDIUM_PATTERNS.search(q) or _COMPLEX_PATTERNS.search(q)
+    ):
+        return "complex"
+
+    # عملیات نوشتنی معمولاً چندمرحله‌ای است
+    if _WRITE_KEYWORDS.search(q):
+        if len(q) > 80 or len(categories) >= 2:
+            return "complex"
+        return "medium"
 
     # الگوهای صریحاً پیچیده
     if _COMPLEX_PATTERNS.search(q) or len(q) > 200:
@@ -349,10 +372,10 @@ def estimate_query_complexity(
 
     # بررسی تاریخچه: اگر مکالمه طولانی است سوال احتمالاً عمیق‌تر است
     if history_messages and len(history_messages) >= 6:
-        if _MEDIUM_PATTERNS.search(q):
+        if _MEDIUM_PATTERNS.search(q) or len(categories) >= 2:
             return "complex"
 
-    if _MEDIUM_PATTERNS.search(q) or len(q) > 60:
+    if _MEDIUM_PATTERNS.search(q) or len(q) > 60 or len(categories) >= 2:
         return "medium"
 
     return "simple"

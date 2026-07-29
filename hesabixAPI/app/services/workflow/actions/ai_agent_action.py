@@ -262,9 +262,11 @@ class AIAgentAction(ActionHandler):
                     summary[nid] = str(res)[:200] + "..." if len(str(res)) > 200 else res
             system_prompt += f"\n\nنتایج نودهای قبلی:\n```json\n{json.dumps(summary, ensure_ascii=False)}\n```"
 
-        # ساخت messages - دستورات سیستم و درخواست را در user message قرار می‌دهیم
-        user_content = f"{system_prompt}\n\n---\n\n{user_prompt or 'لطفاً پاسخ دهید.'}"
-        messages = [{"role": "user", "content": user_content}]
+        # ساخت messages با نقش system/user مجزا
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt or "لطفاً پاسخ دهید."},
+        ]
 
         # تنظیم ابزارها (tools)
         tools = None

@@ -915,7 +915,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                           child: Text(
                             _orderFilterDateAfter == null
                                 ? t.woocommerceOrderDatePickFrom
-                                : HesabixDateUtils.formatForDisplay(
+                                : MarkStreetDateUtils.formatForDisplay(
                                     _orderFilterDateAfter,
                                     isJalali,
                                   ),
@@ -931,7 +931,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                           child: Text(
                             _orderFilterDateBefore == null
                                 ? t.woocommerceOrderDatePickTo
-                                : HesabixDateUtils.formatForDisplay(
+                                : MarkStreetDateUtils.formatForDisplay(
                                     _orderFilterDateBefore,
                                     isJalali,
                                   ),
@@ -1266,7 +1266,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       TextColumn('billing_email', t.woocommerceColumnBillingEmail),
       TextColumn(
         'hesabix_id',
-        t.woocommerceColumnHesabixId,
+        t.woocommerceColumnMarkStreetId,
         sortable: false,
         formatter: (item) {
           if (item is! Map<String, dynamic>) return null;
@@ -1388,7 +1388,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       ),
       TextColumn(
         'hesabix_id',
-        t.woocommerceColumnHesabixId,
+        t.woocommerceColumnMarkStreetId,
         sortable: false,
         formatter: (item) {
           if (item is! Map<String, dynamic>) return null;
@@ -1504,7 +1504,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       TextColumn('username', t.woocommerceColumnUsername),
       TextColumn(
         'hesabix_id',
-        t.woocommerceColumnHesabixId,
+        t.woocommerceColumnMarkStreetId,
         sortable: false,
         formatter: (item) {
           if (item is! Map<String, dynamic>) return null;

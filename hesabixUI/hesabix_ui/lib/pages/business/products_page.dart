@@ -2669,7 +2669,7 @@ class _ProductStockTabWidgetState extends State<_ProductStockTabWidget> {
                           readOnly: true,
                           controller: TextEditingController(
                             text: _stockAsOfDate != null
-                                ? HesabixDateUtils.formatForDisplay(
+                                ? MarkStreetDateUtils.formatForDisplay(
                                     _stockAsOfDate,
                                     ApiClient.getCalendarController()?.isJalali ?? true,
                                   )

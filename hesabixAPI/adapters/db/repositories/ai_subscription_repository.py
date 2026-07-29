@@ -1,5 +1,5 @@
 from typing import Optional, List
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 from datetime import datetime, timedelta
 from adapters.db.models.ai_subscription import UserAISubscription
@@ -14,7 +14,6 @@ class AISubscriptionRepository(BaseRepository[UserAISubscription]):
         """قفل سطح ردیف برای به‌روزرسانی اتمی سهمیه."""
         return (
             self.db.query(self.model_class)
-            .options(joinedload(self.model_class.plan))
             .filter(self.model_class.id == subscription_id)
             .with_for_update()
             .first()

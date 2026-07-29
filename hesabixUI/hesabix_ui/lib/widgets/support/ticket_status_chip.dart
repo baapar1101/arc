@@ -68,7 +68,7 @@ class TicketStatusChip extends StatelessWidget {
     // Default colors based on status name
     switch (status.name.toLowerCase()) {
       case 'باز':
-        return Colors.blue;
+        return Colors.grey;
       case 'در حال پیگیری':
         return Colors.purple;
       case 'در انتظار کاربر':

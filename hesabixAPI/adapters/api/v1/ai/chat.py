@@ -19,6 +19,10 @@ from app.services.ai.chat_message_builder import (
 from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository, AIChatMessageRepository
 from adapters.db.models.ai_chat_session import AIChatSession
 from adapters.db.models.ai_chat_message import AIChatMessage, MessageRole
+from app.services.ai.ai_execution_policy import (
+    exploration_mode_for_execution,
+    resolve_execution_mode,
+)
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -74,6 +78,41 @@ def _usage_log_context(ai_service: AIService) -> Optional[Dict[str, Any]]:
     except Exception:
         return None
     return None
+
+
+def _session_needs_title(session: AIChatSession) -> bool:
+    title = (session.title or "").strip()
+    return not title or title == DEFAULT_CHAT_TITLE
+
+
+async def _maybe_generate_session_title(
+    db: Session,
+    session: AIChatSession,
+    ctx: AuthContext,
+    business_id: Optional[int],
+    message_content: str,
+) -> None:
+    if not _session_needs_title(session):
+        return
+    content = (message_content or "").strip()
+    if not content:
+        return
+    try:
+        ai_service = AIService(db, ctx, business_id or session.business_id)
+        generated_title = await ai_service.generate_chat_title(content)
+        if not generated_title:
+            logger.warning(
+                "Chat title generation returned empty for session %s",
+                session.id,
+            )
+            return
+        session.title = generated_title.strip()[:80]
+    except Exception as exc:
+        logger.warning(
+            "Chat title generation failed for session %s: %s",
+            session.id,
+            exc,
+        )
 
 
 def _schedule_session_title_generation(
@@ -154,11 +193,48 @@ def _extract_pending_write_approvals(messages: List[AIChatMessage]) -> List[Dict
     return []
 
 
+def _session_execution_mode(session: AIChatSession) -> str:
+    return resolve_execution_mode(getattr(session, "execution_mode", None))
+
+
+def _resolve_request_execution_mode(
+    session: AIChatSession,
+    request_mode: Optional[str],
+) -> str:
+    if request_mode and str(request_mode).strip():
+        return resolve_execution_mode(request_mode)
+    return _session_execution_mode(session)
+
+
+def _resolve_exploration_mode(
+    query_mode: Optional[str],
+    body_mode: Optional[str],
+    execution_mode: str,
+) -> str:
+    explicit = (query_mode or body_mode or "").strip().lower()
+    if explicit:
+        return explicit
+    return exploration_mode_for_execution(execution_mode)
+
+
+def _session_response_dict(session: AIChatSession) -> Dict[str, Any]:
+    return {
+        "id": session.id,
+        "user_id": session.user_id,
+        "title": session.title,
+        "business_id": session.business_id,
+        "execution_mode": _session_execution_mode(session),
+        "created_at": session.created_at.isoformat() if session.created_at else None,
+        "updated_at": session.updated_at.isoformat() if session.updated_at else None,
+    }
+
+
 class ChatMessageRequest(BaseModel):
     content: str
     session_id: Optional[int] = None
     approve_writes: bool = False
     mode: Optional[str] = None  # explore | auto | off
+    execution_mode: Optional[str] = None  # analyzer | supervised | autonomous
     model: Optional[str] = None
 
 
@@ -196,7 +272,14 @@ class ChatEditMessageRequest(BaseModel):
     content: str
     approve_writes: bool = False
     regenerate_after: bool = True
+    mode: Optional[str] = None
+    execution_mode: Optional[str] = None
     model: Optional[str] = None
+
+
+class ChatSessionUpdateRequest(BaseModel):
+    execution_mode: Optional[str] = None
+    title: Optional[str] = None
 
 
 class AIConnectorCreateRequest(BaseModel):
@@ -766,14 +849,7 @@ async def get_chat_sessions(
     
     result = []
     for session in sessions:
-        result.append({
-            "id": session.id,
-            "user_id": session.user_id,
-            "title": session.title,
-            "business_id": session.business_id,
-            "created_at": session.created_at.isoformat() if session.created_at else None,
-            "updated_at": session.updated_at.isoformat() if session.updated_at else None
-        })
+        result.append(_session_response_dict(session))
     
     return success_response(result, request)
 
@@ -783,6 +859,7 @@ async def create_chat_session(
     request: Request,
     title: Optional[str] = Body(None, embed=True),
     business_id: Optional[int] = Body(None, embed=True),
+    execution_mode: Optional[str] = Body(None, embed=True),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -795,20 +872,37 @@ async def create_chat_session(
     session = AIChatSession(
         user_id=ctx.get_user_id(),
         business_id=effective_business_id,
-        title=title or DEFAULT_CHAT_TITLE
+        title=title or DEFAULT_CHAT_TITLE,
+        execution_mode=resolve_execution_mode(execution_mode),
     )
     db.add(session)
     db.commit()
     db.refresh(session)
     
-    return success_response({
-        "id": session.id,
-        "user_id": session.user_id,
-        "title": session.title,
-        "business_id": session.business_id,
-        "created_at": session.created_at.isoformat() if session.created_at else None,
-        "updated_at": session.updated_at.isoformat() if session.updated_at else None
-    }, request, "جلسه چت با موفقیت ایجاد شد")
+    return success_response(_session_response_dict(session), request, "جلسه چت با موفقیت ایجاد شد")
+
+
+@router.patch("/sessions/{session_id}", summary="به‌روزرسانی گفت‌وگو")
+async def update_chat_session(
+    session_id: int = Path(...),
+    request: Request = None,
+    params: ChatSessionUpdateRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    session_repo = AIChatSessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session or session.user_id != ctx.get_user_id():
+        raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+    if params.title is not None and params.title.strip():
+        session.title = params.title.strip()[:255]
+    if params.execution_mode is not None:
+        session.execution_mode = resolve_execution_mode(params.execution_mode)
+    from datetime import datetime
+    session.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(session)
+    return success_response(_session_response_dict(session), request, "گفت‌وگو به‌روزرسانی شد")
 
 
 @router.get("/sessions/{session_id}/messages", summary="دریافت پیام‌های جلسه")
@@ -877,13 +971,19 @@ async def send_message(
     ctx: AuthContext = Depends(get_current_user),
 ):
     """ارسال پیام به AI و دریافت پاسخ (با یا بدون streaming)"""
-    exploration_mode = (mode or message_data.mode or "auto").strip().lower()
-    # بررسی دسترسی
     session_repo = AIChatSessionRepository(db)
     session = session_repo.get_by_id(session_id)
     
     if not session or session.user_id != ctx.get_user_id():
         raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+
+    execution_mode = _resolve_request_execution_mode(
+        session, message_data.execution_mode
+    )
+    exploration_mode = _resolve_exploration_mode(
+        mode, message_data.mode, execution_mode
+    )
+    session.execution_mode = execution_mode
     
     # دریافت پیام‌های قبلی
     message_repo = AIChatMessageRepository(db)
@@ -938,6 +1038,7 @@ async def send_message(
                 approve_writes=approve_writes,
                 approved_write_calls=approved_write_calls,
                 exploration_mode=exploration_mode,
+                execution_mode=execution_mode,
                 request_model=message_data.model,
             ),
             media_type="text/event-stream",
@@ -974,6 +1075,7 @@ async def send_message(
             approved_write_calls=approved_write_calls,
             user_query=message_data.content,
             request_model=message_data.model,
+            execution_mode=execution_mode,
         )
     
     response_content_preview = (response.get("message", {}).get("content") or "")[:500]
@@ -1042,16 +1144,22 @@ async def send_message(
         from datetime import datetime
         commit_session.updated_at = datetime.utcnow()
 
-        needs_title = (
-            (not commit_session.title or commit_session.title == DEFAULT_CHAT_TITLE)
-            and is_first_message
-        )
+        needs_title = _session_needs_title(commit_session) and is_first_message
+
+        if needs_title:
+            await _maybe_generate_session_title(
+                commit_db,
+                commit_session,
+                ctx,
+                business_id,
+                message_data.content,
+            )
 
         commit_db.commit()
         commit_db.refresh(assistant_message)
         message_id = assistant_message.id
 
-        if needs_title:
+        if needs_title and _session_needs_title(commit_session):
             _schedule_session_title_generation(
                 session_id,
                 message_data.content,
@@ -1108,6 +1216,7 @@ async def _stream_message_response(
     approve_writes: bool = False,
     approved_write_calls: Optional[List[Dict[str, Any]]] = None,
     exploration_mode: str = "auto",
+    execution_mode: str = "analyzer",
     request_model: Optional[str] = None,
 ):
     """Generator برای streaming response
@@ -1149,6 +1258,7 @@ async def _stream_message_response(
                     approve_writes=approve_writes,
                     approved_write_calls=approved_write_calls,
                     exploration_mode=exploration_mode,
+                    execution_mode=execution_mode,
                     user_query=message_content,
                     request_model=request_model,
                 ):
@@ -1205,37 +1315,41 @@ async def _stream_message_response(
             yield payload
 
         # اگر usage موجود نبود، از provider تخمین بزن
-        if not final_usage:
-            # تخمین tokens از accumulated_content
+        if not final_usage and stream_ai_config:
             from app.services.ai.ai_provider import create_provider
-            from app.services.ai.encryption import decrypt_api_key
-            
-            if stream_ai_config:
-                api_key = (
-                    decrypt_api_key(stream_ai_config.api_key)
-                    if stream_ai_config.api_key
-                    else None
-                )
-                if api_key:
-                    provider = create_provider(
-                        provider_type=stream_ai_config.provider,
-                        api_key=api_key,
-                        api_base_url=stream_ai_config.api_base_url,
+            from app.services.ai.ai_provider_service import resolve_provider_connection
+
+            api_key = None
+            api_base_url = stream_ai_config.api_base_url
+            provider_type = (stream_ai_config.provider or "openai").strip().lower()
+            try:
+                with get_db_session() as est_db:
+                    _, api_key, api_base_url, _ = resolve_provider_connection(
+                        est_db, provider_type, legacy_config=stream_ai_config
                     )
-                    
-                    # تخمین input tokens از messages
-                    input_tokens_estimate = 0
-                    for msg in messages:
-                        input_tokens_estimate += provider.estimate_tokens(msg.get("content", ""))
-                    
-                    # تخمین output tokens از accumulated_content
-                    output_tokens_estimate = provider.estimate_tokens(accumulated_content)
-                    
-                    final_usage = {
-                        "input_tokens": input_tokens_estimate,
-                        "output_tokens": output_tokens_estimate,
-                        "total_tokens": input_tokens_estimate + output_tokens_estimate
-                    }
+            except Exception:
+                api_key = None
+
+            if api_key:
+                provider = create_provider(
+                    provider_type=provider_type,
+                    api_key=api_key,
+                    api_base_url=api_base_url,
+                )
+
+                # تخمین input tokens از messages
+                input_tokens_estimate = 0
+                for msg in messages:
+                    input_tokens_estimate += provider.estimate_tokens(msg.get("content", ""))
+
+                # تخمین output tokens از accumulated_content
+                output_tokens_estimate = provider.estimate_tokens(accumulated_content)
+
+                final_usage = {
+                    "input_tokens": input_tokens_estimate,
+                    "output_tokens": output_tokens_estimate,
+                    "total_tokens": input_tokens_estimate + output_tokens_estimate,
+                }
         
         if final_usage:
             input_tokens = final_usage.get("input_tokens", 0)
@@ -1304,16 +1418,24 @@ async def _stream_message_response(
                 from datetime import datetime
                 updated_session.updated_at = datetime.utcnow()
 
-                needs_title = (
-                    (not updated_session.title or updated_session.title == DEFAULT_CHAT_TITLE)
-                    and len(previous_messages) == 0
-                )
+                needs_title = _session_needs_title(updated_session) and len(
+                    previous_messages
+                ) == 0
+
+                if needs_title:
+                    await _maybe_generate_session_title(
+                        new_db,
+                        updated_session,
+                        ctx,
+                        updated_session.business_id or business_id,
+                        message_content,
+                    )
 
                 new_db.commit()
                 new_db.refresh(assistant_message)
                 message_id = assistant_message.id
 
-                if needs_title:
+                if needs_title and _session_needs_title(updated_session):
                     _schedule_session_title_generation(
                         session_id,
                         message_content,
@@ -1427,6 +1549,8 @@ async def regenerate_last_response(
 
     business_id = session.business_id
     approved_write_calls = _extract_pending_write_approvals(remaining) if approve_writes else []
+    execution_mode = _session_execution_mode(session)
+    exploration_mode = exploration_mode_for_execution(execution_mode)
 
     if stream:
         db.close()
@@ -1440,6 +1564,8 @@ async def regenerate_last_response(
                 message_content=last_user.content,
                 approve_writes=approve_writes,
                 approved_write_calls=approved_write_calls,
+                exploration_mode=exploration_mode,
+                execution_mode=execution_mode,
                 request_model=model,
             ),
             media_type="text/event-stream",
@@ -1465,6 +1591,7 @@ async def regenerate_last_response(
             approved_write_calls=approved_write_calls,
             user_query=last_user.content,
             request_model=model,
+            execution_mode=execution_mode,
         )
 
     usage = response.get("usage", {})
@@ -1631,6 +1758,10 @@ async def edit_user_message(
         if params.approve_writes
         else []
     )
+    execution_mode = _resolve_request_execution_mode(session, params.execution_mode)
+    exploration_mode = _resolve_exploration_mode(None, params.mode, execution_mode)
+    session.execution_mode = execution_mode
+    db.commit()
 
     if not should_stream:
         return success_response(
@@ -1657,6 +1788,8 @@ async def edit_user_message(
                 message_content=user_text,
                 approve_writes=params.approve_writes,
                 approved_write_calls=approved_write_calls,
+                exploration_mode=exploration_mode,
+                execution_mode=execution_mode,
                 request_model=params.model,
             ),
             media_type="text/event-stream",
@@ -1682,6 +1815,7 @@ async def edit_user_message(
             approved_write_calls=approved_write_calls,
             user_query=user_text,
             request_model=params.model,
+            execution_mode=execution_mode,
         )
 
     usage = response.get("usage", {})
@@ -1780,6 +1914,7 @@ async def fork_chat_session(
         user_id=session.user_id,
         business_id=session.business_id,
         title=fork_title,
+        execution_mode=_session_execution_mode(session),
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
     )
@@ -1807,6 +1942,7 @@ async def fork_chat_session(
                 "id": new_session.id,
                 "title": new_session.title,
                 "business_id": new_session.business_id,
+                "execution_mode": _session_execution_mode(new_session),
                 "created_at": new_session.created_at.isoformat() if new_session.created_at else None,
             },
             "message_count": len(to_copy),

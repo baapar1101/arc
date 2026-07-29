@@ -147,7 +147,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
 
   String _activityDateDisplayLabel(DateTime date) {
     final isJalali = _calendarController?.isJalali ?? true;
-    return HesabixDateUtils.formatForDisplay(date.toLocal(), isJalali);
+    return MarkStreetDateUtils.formatForDisplay(date.toLocal(), isJalali);
   }
 
   Future<void> _initFinancialContext() async {
@@ -1044,7 +1044,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             Text('سریال: ${warranty.warrantySerial}'),
             Text('وضعیت: ${_getStatusLabel(warranty.status, t)}'),
             if (warranty.activatedAt != null)
-              Text('فعال شده: ${HesabixDateUtils.formatDateTime(warranty.activatedAt!, _calendarController?.isJalali ?? true)}'),
+              Text('فعال شده: ${MarkStreetDateUtils.formatDateTime(warranty.activatedAt!, _calendarController?.isJalali ?? true)}'),
           ],
         ),
         trailing: IconButton(
@@ -1608,8 +1608,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   Widget _buildActiveShareLinkCard(AppLocalizations t, ThemeData theme, PersonShareLink link, bool canEditPeople) {
     final formatter = NumberFormat('#,##0');
     final isJalali = _calendarController?.isJalali ?? true;
-    final expiryText = link.expiresAt != null ? HesabixDateUtils.formatDateTime(link.expiresAt, isJalali) : t.personShareNoExpiry;
-    final lastViewText = link.lastViewAt != null ? HesabixDateUtils.formatDateTime(link.lastViewAt, isJalali) : t.personShareNotSet;
+    final expiryText = link.expiresAt != null ? MarkStreetDateUtils.formatDateTime(link.expiresAt, isJalali) : t.personShareNoExpiry;
+    final lastViewText = link.lastViewAt != null ? MarkStreetDateUtils.formatDateTime(link.lastViewAt, isJalali) : t.personShareNotSet;
     final viewCount = formatter.format(link.viewCount);
 
     Color statusColor;

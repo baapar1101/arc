@@ -5,6 +5,8 @@ import '../../services/voice/voice_phase.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
 import 'ai_chat_suggestions.dart';
+import 'ai_error_recovery_banner.dart';
+import 'ai_execution_mode.dart';
 
 class AIChatHomeView extends StatelessWidget {
   final TextEditingController messageController;
@@ -30,6 +32,10 @@ class AIChatHomeView extends StatelessWidget {
   final bool modelsLoading;
   final ValueChanged<String?>? onModelChanged;
   final String? modelPricingHint;
+  final String? creditWarningMessage;
+  final VoidCallback? onCreditUpgrade;
+  final String executionMode;
+  final ValueChanged<String>? onExecutionModeChanged;
 
   const AIChatHomeView({
     super.key,
@@ -56,21 +62,26 @@ class AIChatHomeView extends StatelessWidget {
     this.modelsLoading = false,
     this.onModelChanged,
     this.modelPricingHint,
+    this.creditWarningMessage,
+    this.onCreditUpgrade,
+    this.executionMode = AIExecutionMode.analyzer,
+    this.onExecutionModeChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final compact = AIChatDesign.isCompactWidth(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final visibleSuggestions = suggestions
+        .take(AIChatDesign.homeSuggestionLimit)
+        .toList();
 
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 20 : 32,
-            vertical: compact ? 24 : 48,
+            horizontal: compact ? 16 : 24,
+            vertical: compact ? 32 : 56,
           ),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 48),
@@ -80,75 +91,70 @@ class AIChatHomeView extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _HeroIcon(isDark: isDark, scheme: scheme),
-                    SizedBox(height: compact ? 20 : 28),
                     Text(
-                      'امروز چه چیزی را در کسب‌وکارتان بررسی کنیم؟',
+                      'امروز چه کمکی از دستم برمی‌آید؟',
                       textAlign: TextAlign.center,
                       style: AIChatDesign.greetingStyle(theme),
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'از فروش و موجودی تا مالیات، بدهکاران و جریان نقدی؛ پاسخ‌ها را با داده‌های همین کسب‌وکار تحلیل می‌کنم.',
-                      textAlign: TextAlign.center,
-                      style: AIChatDesign.subtitleStyle(theme),
-                    ),
-                    if (!canUseAi && blockReason != null) ...[
-                      SizedBox(height: compact ? 20 : 28),
-                      _BlockedBanner(
-                        message: blockReason!,
-                        onUpgrade: onUpgradePlan,
-                      ),
-                    ],
                     if (proactiveAlerts.isNotEmpty && canUseAi) ...[
-                      SizedBox(height: compact ? 20 : 28),
-                      ...proactiveAlerts.take(3).map(
-                            (a) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: _ProactiveAlertCard(
-                                alert: a,
-                                onAction: onAlertAction,
-                              ),
-                            ),
-                          ),
-                    ],
-                    SizedBox(height: compact ? 24 : 36),
-                    AIChatComposer(
-                      controller: messageController,
-                      focusNode: focusNode,
-                      placement: AIChatComposerPlacement.center,
-                      sending: sending,
-                      disabled: disabled || !canUseAi,
-                      voiceStarting: voiceStarting,
-                      voiceActive: voiceActive,
-                      voicePhase: voicePhase,
-                      voiceStatusEvent: voiceStatusEvent,
-                      onSend: onSend,
-                      onMic: canUseAi ? onMic : null,
-                      onStopVoice: onStopVoice,
-                      availableModels: availableModels,
-                      selectedModelCode: selectedModelCode,
-                      modelsLoading: modelsLoading,
-                      onModelChanged: onModelChanged,
-                      modelPricingHint: modelPricingHint,
-                    ),
-                    SizedBox(height: compact ? 22 : 28),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Text(
-                        'شروع سریع',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      SizedBox(height: compact ? 16 : 20),
+                      _ProactiveAlertsSummary(
+                        alerts: proactiveAlerts,
+                        onAction: onAlertAction,
                       ),
+                    ],
+                    SizedBox(height: compact ? 24 : 32),
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            AIChatComposer(
+                              controller: messageController,
+                              focusNode: focusNode,
+                              placement: AIChatComposerPlacement.center,
+                              sending: sending,
+                              disabled: disabled || !canUseAi,
+                              voiceStarting: voiceStarting,
+                              voiceActive: voiceActive,
+                              voicePhase: voicePhase,
+                              voiceStatusEvent: voiceStatusEvent,
+                              onSend: onSend,
+                              onMic: canUseAi ? onMic : null,
+                              onStopVoice: onStopVoice,
+                              availableModels: availableModels,
+                              selectedModelCode: selectedModelCode,
+                              modelsLoading: modelsLoading,
+                              onModelChanged: onModelChanged,
+                              modelPricingHint: modelPricingHint,
+                              executionMode: executionMode,
+                              onExecutionModeChanged: onExecutionModeChanged,
+                            ),
+                            if (creditWarningMessage != null) ...[
+                              const SizedBox(height: 8),
+                              AIChatCreditHint(
+                                message: creditWarningMessage!,
+                                onUpgrade: onCreditUpgrade,
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (!canUseAi && blockReason != null)
+                          _ComposerBlockOverlay(
+                            message: blockReason!,
+                            onUpgrade: onUpgradePlan,
+                          ),
+                      ],
                     ),
-                    const SizedBox(height: 10),
-                    AIChatSuggestionChips(
-                      suggestions: suggestions,
-                      enabled: canUseAi && !disabled,
-                      onSelected: onSuggestionSelected,
-                    ),
+                    if (visibleSuggestions.isNotEmpty && canUseAi) ...[
+                      SizedBox(height: compact ? 18 : 24),
+                      AIChatSuggestionChips(
+                        suggestions: visibleSuggestions,
+                        enabled: canUseAi && !disabled,
+                        onSelected: onSuggestionSelected,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -160,141 +166,112 @@ class AIChatHomeView extends StatelessWidget {
   }
 }
 
-class _HeroIcon extends StatelessWidget {
-  final bool isDark;
-  final ColorScheme scheme;
-
-  const _HeroIcon({required this.isDark, required this.scheme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            scheme.primary.withValues(alpha: 0.9),
-            scheme.tertiary.withValues(alpha: 0.85),
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.primary.withValues(alpha: isDark ? 0.35 : 0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Icon(
-        Icons.auto_awesome_rounded,
-        size: 36,
-        color: scheme.onPrimary,
-      ),
-    );
-  }
-}
-
-class _ProactiveAlertCard extends StatelessWidget {
-  final Map<String, dynamic> alert;
+class _ProactiveAlertsSummary extends StatelessWidget {
+  final List<Map<String, dynamic>> alerts;
   final ValueChanged<String>? onAction;
 
-  const _ProactiveAlertCard({required this.alert, this.onAction});
-
-  Color _levelColor(ColorScheme scheme) {
-    switch (alert['level'] as String? ?? 'info') {
-      case 'warning':
-        return scheme.tertiary;
-      case 'success':
-        return scheme.primary;
-      case 'error':
-        return scheme.error;
-      default:
-        return scheme.secondary;
-    }
-  }
+  const _ProactiveAlertsSummary({
+    required this.alerts,
+    this.onAction,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final accent = _levelColor(scheme);
-    final title = alert['title'] as String? ?? '';
-    final message = alert['message'] as String? ?? '';
-    final actionPrompt = alert['action_prompt'] as String?;
+    final count = alerts.length;
+    final first = alerts.first;
+    final actionPrompt = first['action_prompt'] as String?;
+    final title = first['title'] as String? ?? '';
 
-    return Material(
-      color: accent.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: actionPrompt != null && onAction != null
-            ? () => onAction!(actionPrompt)
-            : null,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.notifications_active_outlined, color: accent, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: theme.textTheme.titleSmall),
-                    if (message.isNotEmpty && message != title)
-                      Text(message, style: theme.textTheme.bodySmall),
-                  ],
+    return InkWell(
+      onTap: actionPrompt != null && onAction != null
+          ? () => onAction!(actionPrompt)
+          : null,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.notifications_none_rounded,
+              size: 16,
+              color: scheme.tertiary,
+            ),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                count == 1
+                    ? title
+                    : '$count هشدار مالی · $title',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
-              if (actionPrompt != null)
-                Icon(Icons.chevron_left_rounded, color: scheme.outline),
+            ),
+            if (actionPrompt != null) ...[
+              const SizedBox(width: 4),
+              Icon(Icons.chevron_left_rounded, size: 18, color: scheme.outline),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _BlockedBanner extends StatelessWidget {
+class _ComposerBlockOverlay extends StatelessWidget {
   final String message;
   final VoidCallback? onUpgrade;
 
-  const _BlockedBanner({required this.message, this.onUpgrade});
+  const _ComposerBlockOverlay({
+    required this.message,
+    this.onUpgrade,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.errorContainer.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: scheme.error.withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        children: [
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onErrorContainer),
-          ),
-          if (onUpgrade != null) ...[
-            const SizedBox(height: 12),
-            FilledButton.tonal(
-              onPressed: onUpgrade,
-              child: const Text('مشاهده پلن‌ها'),
+    return Positioned.fill(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: scheme.surface.withValues(alpha: 0.82),
+          borderRadius: BorderRadius.circular(AIChatDesign.composerRadius),
+          border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_outline_rounded, color: scheme.error, size: 28),
+                const SizedBox(height: 10),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurface,
+                  ),
+                ),
+                if (onUpgrade != null) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.tonal(
+                    onPressed: onUpgrade,
+                    child: const Text('مشاهده پلن‌ها'),
+                  ),
+                ],
+              ],
             ),
-          ],
-        ],
+          ),
+        ),
       ),
     );
   }

@@ -1971,7 +1971,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
 
     if (picked != null && mounted) {
       setState(() {
-        _config[key] = date_utils.HesabixDateUtils.formatForApiDate(picked);
+        _config[key] = date_utils.MarkStreetDateUtils.formatForApiDate(picked);
         _disposeWorkflowTextController(key);
       });
     }
@@ -1998,7 +1998,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     DateTime? parsedDate;
     final strVal = currentValue?.toString();
     if (strVal != null && strVal.isNotEmpty && strVal != 'today') {
-      parsedDate = date_utils.HesabixDateUtils.parseFromAPI(strVal);
+      parsedDate = date_utils.MarkStreetDateUtils.parseFromAPI(strVal);
     } else if (strVal != 'today') {
       parsedDate = null;
     } else {
@@ -2006,7 +2006,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
 
     final displayText = parsedDate != null
-        ? date_utils.HesabixDateUtils.formatForDisplay(
+        ? date_utils.MarkStreetDateUtils.formatForDisplay(
             parsedDate,
             ApiClient.getCalendarController()?.isJalali ?? true,
           )

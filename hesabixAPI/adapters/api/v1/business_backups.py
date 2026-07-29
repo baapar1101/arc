@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field
 
 from adapters.db.session import get_db
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access_dep
+from app.core.permissions import require_business_access_dep, require_business_backup_restore_dep
+from app.services.business_backup_access import assert_backup_file_belongs_to_business
 from app.core.responses import success_response, ApiError
 from app.services.file_storage_service import FileStorageService
 from app.services.business_service import create_business
@@ -868,6 +869,7 @@ async def download_backup(
     دانلود فایل بکاپ.
     """
     from uuid import UUID
+    assert_backup_file_belongs_to_business(db, backup_id, business_id)
     storage = FileStorageService(db)
     try:
         file_data = await storage.download_file(UUID(backup_id))
@@ -943,7 +945,7 @@ async def delete_backup(
     return success_response({"deleted": True}, request=request)
 
 
-@router.post("/restore")
+@router.post("/restore", dependencies=[Depends(require_business_backup_restore_dep)])
 async def restore_backup(
     request: Request,
     business_id: int,
@@ -1012,20 +1014,19 @@ async def restore_backup(
     if mode not in ("replace", "new_business"):
         raise ApiError("INVALID_INPUT", "mode must be one of: replace, new_business")
 
+    if backup_id:
+        assert_backup_file_belongs_to_business(db, backup_id, business_id)
+
     # محدودسازی نرخ ساده (هر کاربر هر 60 ثانیه یکبار)
-    try:
-        _rate_limiter_key = ("restore", ctx.get_user_id())
-        if not hasattr(restore_backup, "_last_calls"):
-            restore_backup._last_calls = {}  # type: ignore[attr-defined]
-        last_calls = restore_backup._last_calls  # type: ignore[attr-defined]
-        from time import time
-        now = time()
-        if _rate_limiter_key in last_calls and (now - last_calls[_rate_limiter_key]) < 60:
-            raise ApiError("RATE_LIMIT", "Too many restore attempts. Please wait.", http_status=429)
-        last_calls[_rate_limiter_key] = now
-    except Exception:
-        # در صورت خطا در limiter، ادامه می‌دهیم ولی لاگ می‌کنیم
-        logger.warning("Restore rate limiter failure; continuing")
+    _rate_limiter_key = ("restore", ctx.get_user_id())
+    if not hasattr(restore_backup, "_last_calls"):
+        restore_backup._last_calls = {}  # type: ignore[attr-defined]
+    last_calls = restore_backup._last_calls  # type: ignore[attr-defined]
+    from time import time
+    now = time()
+    if _rate_limiter_key in last_calls and (now - last_calls[_rate_limiter_key]) < 60:
+        raise ApiError("RATE_LIMIT", "Too many restore attempts. Please wait.", http_status=429)
+    last_calls[_rate_limiter_key] = now
 
     if async_mode:
         jm = JobManager.instance()
@@ -1037,7 +1038,10 @@ async def restore_backup(
         file_bytes: bytes | None = None
         if file:
             try:
-                file_bytes = await file.read()
+                from app.services.system_settings_service import get_max_file_size_mb
+                from app.services.file_storage_service import read_upload_bounded
+                max_bytes = get_max_file_size_mb(db) * 1024 * 1024
+                file_bytes = await read_upload_bounded(file, max_bytes)
             except Exception as e:
                 logger.error(f"Error reading file: {e}")
                 raise ApiError("FILE_READ_ERROR", f"Failed to read uploaded file: {str(e)}")

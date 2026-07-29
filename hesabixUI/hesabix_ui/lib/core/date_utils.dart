@@ -1,7 +1,7 @@
 import 'package:shamsi_date/shamsi_date.dart';
 
 /// Utility class for date management and conversion
-class HesabixDateUtils {
+class MarkStreetDateUtils {
   /// Convert DateTime to Jalali string for display
   static String formatForDisplay(DateTime? date, bool isJalali) {
     if (date == null) return '';

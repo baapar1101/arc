@@ -9,6 +9,7 @@ class AIWriteApprovalBanner extends StatelessWidget {
   final String? blockedReason;
   final VoidCallback onConfirm;
   final VoidCallback onDismiss;
+  final bool inline;
 
   const AIWriteApprovalBanner({
     super.key,
@@ -18,6 +19,7 @@ class AIWriteApprovalBanner extends StatelessWidget {
     this.blockedReason,
     required this.onConfirm,
     required this.onDismiss,
+    this.inline = false,
   });
 
   @override
@@ -28,6 +30,37 @@ class AIWriteApprovalBanner extends StatelessWidget {
 
     final accent = scheme.primary;
     final surface = isDark ? scheme.surfaceContainerHigh : scheme.surface;
+
+    if (inline) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: AIChatDesign.contentMaxWidth),
+            child: Material(
+              color: surface,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: accent.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: _buildContent(
+                  context,
+                  theme: theme,
+                  scheme: scheme,
+                  accent: accent,
+                  compact: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final borderGradient = LinearGradient(
       colors: [
         accent.withValues(alpha: 0.55),
@@ -54,63 +87,88 @@ class AIWriteApprovalBanner extends StatelessWidget {
           color: surface,
           borderRadius: BorderRadius.circular(AIChatDesign.cardRadius - 1),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          accent.withValues(alpha: 0.18),
-                          scheme.tertiary.withValues(alpha: 0.14),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.verified_user_rounded,
-                      color: accent,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'تأیید عملیات',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurface,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          pendingOps.length <= 1
-                              ? 'دستیار می‌خواهد تغییری در داده‌های کسب‌وکار شما ثبت کند. قبل از اجرا، جزئیات را بررسی کنید.'
-                              : '${pendingOps.length} عملیات در صف اجرا منتظر تأیید شماست.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                            height: 1.45,
-                          ),
-                        ),
+        child: _buildContent(
+          context,
+          theme: theme,
+          scheme: scheme,
+          accent: accent,
+          compact: false,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context, {
+    required ThemeData theme,
+    required ColorScheme scheme,
+    required Color accent,
+    required bool compact,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            compact ? 14 : 18,
+            compact ? 12 : 16,
+            compact ? 14 : 18,
+            compact ? 8 : 12,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (!compact)
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        accent.withValues(alpha: 0.18),
+                        scheme.tertiary.withValues(alpha: 0.14),
                       ],
                     ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                ],
+                  child: Icon(
+                    Icons.verified_user_rounded,
+                    color: accent,
+                    size: 24,
+                  ),
+                )
+              else
+                Icon(Icons.verified_user_outlined, color: accent, size: 20),
+              SizedBox(width: compact ? 8 : 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'تأیید عملیات',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      pendingOps.length <= 1
+                          ? 'دستیار می‌خواهد تغییری در داده‌های کسب‌وکار ثبت کند.'
+                          : '${pendingOps.length} عملیات منتظر تأیید شماست.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
+          ),
+        ),
             if (!canConfirm && blockedReason != null) ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
@@ -212,12 +270,15 @@ class AIWriteApprovalBanner extends StatelessWidget {
             ),
             if (pendingOps.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
+                padding: EdgeInsets.fromLTRB(
+                  compact ? 14 : 18,
+                  0,
+                  compact ? 14 : 18,
+                  compact ? 10 : 14,
+                ),
                 child: _SecurityNote(scheme: scheme, theme: theme),
               ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }

@@ -11,7 +11,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/jalali_date_picker.dart';
-import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../core/date_utils.dart' show MarkStreetDateUtils;
 import '../../core/calendar_controller.dart';
 
 class WalletPayoutsAdminPage extends StatefulWidget {
@@ -318,7 +318,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                     filled: true,
                                   ),
                                   controller: TextEditingController(
-                                    text: HesabixDateUtils.formatForDisplay(
+                                    text: MarkStreetDateUtils.formatForDisplay(
                                       selectedDate,
                                       _calendarCtrl?.isJalali ?? true,
                                     ),
@@ -774,7 +774,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                           } else {
                             return v.toString();
                           }
-                          return HesabixDateUtils.formatForDisplay(date, isJalali);
+                          return MarkStreetDateUtils.formatForDisplay(date, isJalali);
                         },
                       ),
                       DateColumn('settlement_date', t.walletPayoutsAdminSettlementDate, 
@@ -793,7 +793,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                           } else {
                             return v.toString();
                           }
-                          return HesabixDateUtils.formatForDisplay(date, isJalali);
+                          return MarkStreetDateUtils.formatForDisplay(date, isJalali);
                         },
                       ),
                       TextColumn('bank_tracking_code', t.bankTrackingCode, 
@@ -856,7 +856,7 @@ class _PayoutDetailSheet extends StatelessWidget {
     if (dateStr == null || dateStr.isEmpty) return '-';
     try {
       final date = DateTime.parse(dateStr);
-      return HesabixDateUtils.formatForDisplay(date, isJalali);
+      return MarkStreetDateUtils.formatForDisplay(date, isJalali);
     } catch (_) {
       return dateStr;
     }

@@ -46,36 +46,36 @@ class AIChatSuggestion {
   }
 }
 
-/// پیشنهادهای شروع گفتگو (ثابت — قابل گسترش از API در آینده).
+/// پیشنهادهای شروع گفتگو — هم‌راستا با کلیدهای insight در API.
 const List<AIChatSuggestion> kDefaultAIChatSuggestions = [
   AIChatSuggestion(
-    label: 'خلاصه فروش امروز',
-    prompt: 'خلاصه‌ای از فروش و درآمد امروز کسب‌وکارم بده.',
-    icon: Icons.trending_up_rounded,
+    label: 'خلاصه وضعیت امروز',
+    prompt: 'با توجه به داده‌های لحظه‌ای و toolها، خلاصه وضعیت مالی امروز کسب‌وکارم را بده.',
+    icon: Icons.dashboard_outlined,
   ),
   AIChatSuggestion(
-    label: 'وضعیت موجودی انبار',
-    prompt: 'وضعیت کلی موجودی انبار و کالاهای کم‌موجود را بررسی کن.',
+    label: 'هشدار موجودی',
+    prompt: 'کالاهای کم‌موجود را با get_inventory_status لیست کن و پیشنهاد سفارش مجدد بده.',
     icon: Icons.inventory_2_outlined,
   ),
   AIChatSuggestion(
     label: 'راهنمای ثبت فاکتور',
-    prompt: 'گام‌به‌گام نحوه ثبت فاکتور فروش در حسابیکس را توضیح بده.',
+    prompt: 'گام‌به‌گام نحوه ثبت فاکتور فروش در مارک‌استریت را توضیح بده.',
     icon: Icons.receipt_long_outlined,
   ),
   AIChatSuggestion(
-    label: 'تحلیل بدهکاران',
-    prompt: 'لیست بدهکاران مهم و پیشنهاد پیگیری را ارائه کن.',
+    label: 'پیگیری بدهکاران',
+    prompt: 'مهم‌ترین بدهکاران را با get_debtors_report و aging بده و پیشنهاد پیگیری بده.',
     icon: Icons.people_outline_rounded,
   ),
   AIChatSuggestion(
     label: 'گزارش سود و زیان',
-    prompt: 'چطور گزارش سود و زیان دوره جاری را بخوانم و تفسیر کنم؟',
+    prompt: 'گزارش سود و زیان دوره جاری را با get_report(pnl_period) بخوان و به زبان ساده تفسیر کن.',
     icon: Icons.pie_chart_outline_rounded,
   ),
   AIChatSuggestion(
     label: 'کمک در حسابداری',
-    prompt: 'در ثبت سند حسابداری و انتخاب حساب‌ها راهنمایی‌ام کن.',
+    prompt: 'در ثبت سند حسابداری، انتخاب حساب‌ها و تفاوت سند با فاکتور در مارک‌استریت راهنمایی‌ام کن.',
     icon: Icons.account_balance_outlined,
   ),
 ];
@@ -98,8 +98,8 @@ class AIChatSuggestionChips extends StatelessWidget {
 
     return Wrap(
       alignment: compact ? WrapAlignment.start : WrapAlignment.center,
-      spacing: 10,
-      runSpacing: 10,
+      spacing: 8,
+      runSpacing: 8,
       children: [
         for (final s in suggestions)
           _SuggestionChip(
@@ -145,46 +145,25 @@ class _SuggestionChipState extends State<_SuggestionChip> {
           borderRadius: BorderRadius.circular(AIChatDesign.chipRadius),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: AIChatDesign.chipDecoration(theme).copyWith(
               color: _hovered && widget.enabled
-                  ? scheme.primaryContainer.withValues(alpha: 0.55)
-                  : null,
+                  ? scheme.surfaceContainerHigh
+                  : scheme.surfaceContainerHighest.withValues(alpha: 0.4),
               border: Border.all(
                 color: _hovered && widget.enabled
-                    ? scheme.primary.withValues(alpha: 0.35)
-                    : scheme.outlineVariant.withValues(alpha: 0.45),
+                    ? scheme.outlineVariant.withValues(alpha: 0.5)
+                    : Colors.transparent,
               ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: scheme.primary.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    widget.suggestion.icon,
-                    size: 16,
-                    color: widget.enabled
-                        ? scheme.primary
-                        : scheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  widget.suggestion.label,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w500,
-                    color: widget.enabled
-                        ? scheme.onSurface
-                        : scheme.onSurfaceVariant.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
+            child: Text(
+              widget.suggestion.label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w500,
+                color: widget.enabled
+                    ? scheme.onSurface
+                    : scheme.onSurfaceVariant.withValues(alpha: 0.5),
+              ),
             ),
           ),
         ),

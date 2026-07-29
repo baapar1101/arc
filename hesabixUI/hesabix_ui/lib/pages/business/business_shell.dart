@@ -31,6 +31,8 @@ import '../../widgets/warehouse/warehouse_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
 import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../services/invoice_service.dart';
+import '../../services/warehouse_service.dart';
+import '../../utils/warehouse_invoice_lines.dart';
 import '../../services/business_menu_preferences_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
@@ -1061,7 +1063,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
-  bool _isWooCommerceHesabixPluginActive() {
+  bool _isWooCommerceMarkStreetPluginActive() {
     try {
       final plug = _businessPlugins.firstWhere(
         (plugin) => plugin['plugin_code'] == 'woocommerce_hesabix',
@@ -2216,7 +2218,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final bool isMobile = ResponsiveHelper.isShellCompactWidth(context);
     final String businessName = currentBusiness?.name ?? '';
     final bool isJalali = widget.calendarController?.isJalali ?? true;
-    final String dateTimeStr = HesabixDateUtils.formatDateTimeWithWeekday(
+    final String dateTimeStr = MarkStreetDateUtils.formatDateTimeWithWeekday(
       DateTime.now(),
       isJalali,
       t.localeName,
@@ -3024,16 +3026,33 @@ class _BusinessShellState extends State<BusinessShell> {
         businessId: widget.businessId,
         invoiceId: wizardResult.invoiceId!,
       );
+      final warehouseService = WarehouseService(apiClient: apiClient);
+      final quantitiesData = await warehouseService.getInvoiceLineQuantities(
+        businessId: widget.businessId,
+        invoiceId: wizardResult.invoiceId!,
+      );
       dismissLoader();
       if (!mounted) return;
       
       final invoiceItem = Map<String, dynamic>.from(invoiceData['item'] ?? const {});
-      final initialLines = _extractLinesFromInvoice(invoiceItem, wizardResult.docType ?? 'issue');
+      final quantities = InvoiceLineQuantitiesIndex.fromApiResponse(quantitiesData);
+      final initialLines = extractWarehouseLinesFromInvoice(
+        invoiceItem,
+        wizardResult.docType ?? 'issue',
+        quantities: quantities,
+      );
       
       if (initialLines.isEmpty) {
         SnackBarHelper.showInfo(
           context,
           message: 'هیچ کالایی برای این فاکتور ثبت نشده است',
+        );
+        return;
+      }
+      if (!quantities.hasAnyRemaining) {
+        SnackBarHelper.showInfo(
+          context,
+          message: 'همه اقلام این فاکتور قبلاً حواله شده‌اند',
         );
         return;
       }
@@ -3063,44 +3082,6 @@ class _BusinessShellState extends State<BusinessShell> {
     } finally {
       dismissLoader();
     }
-  }
-
-  List<Map<String, dynamic>> _extractLinesFromInvoice(Map<String, dynamic> invoice, String docType) {
-    final movementFallback = docType == 'receipt' ? 'in' : 'out';
-    final rawLines = List<dynamic>.from(invoice['product_lines'] ?? const []);
-    final List<Map<String, dynamic>> result = [];
-    for (final raw in rawLines) {
-      if (raw is! Map) continue;
-      final map = Map<String, dynamic>.from(raw);
-      if (map['product_id'] == null) continue;
-      final qty = _toDouble(map['quantity']);
-      if (qty <= 0) continue;
-      final extra = Map<String, dynamic>.from(map['extra_info'] ?? const {});
-      final warehouseId = _toInt(map['warehouse_id'] ?? extra['warehouse_id']);
-      final movement = (extra['movement'] ?? movementFallback).toString();
-      result.add({
-        'product_id': map['product_id'],
-        'quantity': qty,
-        'warehouse_id': warehouseId,
-        'movement': movement,
-        'extra_info': extra,
-      });
-    }
-    return result;
-  }
-
-  double _toDouble(dynamic value) {
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0;
-    return 0;
-  }
-
-  int? _toInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String && value.isNotEmpty) return int.tryParse(value);
-    return null;
   }
 
   String _menuKey(_MenuItem item) {
@@ -3206,7 +3187,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final section = _sectionForLabel(item.label, AppLocalizations.of(context));
 
     if (item.path != null && item.path!.contains('/woocommerce')) {
-      if (!_isWooCommerceHesabixPluginActive()) {
+      if (!_isWooCommerceMarkStreetPluginActive()) {
         return false;
       }
       if (widget.authStore.currentBusiness?.isOwner == true) {

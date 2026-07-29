@@ -22,6 +22,7 @@ import '../inputs/frequent_description_text_field.dart';
 import '../../l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../core/date_utils.dart';
+import '../../utils/warehouse_invoice_lines.dart';
 
 class WarehouseDocumentFormDialog extends StatefulWidget {
   final int businessId;
@@ -86,8 +87,7 @@ class _WarehouseDocumentFormDialogState
   String? _recipientPhone;
   String? _trackingNumber;
   // اطلاعات مقادیر خطوط فاکتور (مورد نیاز، از قبل، باقی مانده)
-  Map<int, Map<String, double>> _lineQuantities =
-      {}; // product_id -> {required, processed, remaining}
+  InvoiceLineQuantitiesIndex? _lineQuantitiesIndex;
   bool _loadingQuantities = false;
   bool _loadingDocument = false; // برای بارگذاری حواله موجود در حالت ویرایش
   String? _documentStatus; // وضعیت حواله (draft, posted, cancelled)
@@ -96,6 +96,35 @@ class _WarehouseDocumentFormDialogState
   bool get _isDocTypeLocked =>
       widget.lockDocType || _isFromInvoice || _isEditMode;
   bool get _isPosted => _documentStatus == 'posted'; // آیا حواله قطعی شده است؟
+
+  Map<String, double>? _quantitiesForLine(Map<String, dynamic> line) {
+    if (_lineQuantitiesIndex == null) return null;
+    final lineId = line['invoice_item_line_id'];
+    final productId = line['product_id'];
+    return _lineQuantitiesIndex!.lookup(
+      invoiceItemLineId: lineId is int
+          ? lineId
+          : (lineId is num ? lineId.toInt() : null),
+      productId: productId is int
+          ? productId
+          : (productId is num ? productId.toInt() : null),
+    );
+  }
+
+  double _lineQuantity(Map<String, dynamic> line) {
+    return (line['quantity'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  bool _isLineActive(Map<String, dynamic> line) => _lineQuantity(line) > 0;
+
+  String? _quantityFieldValidator(String? value) {
+    final qty = parseFormattedNumber(value) ?? 0.0;
+    if (_isFromInvoice) {
+      if (qty < 0) return 'تعداد نمی‌تواند منفی باشد';
+      return null;
+    }
+    return qty <= 0 ? 'تعداد باید مثبت باشد' : null;
+  }
 
   // بررسی نیاز به نمایش فیلد نام باربری
   bool get _showCarrierName =>
@@ -212,7 +241,11 @@ class _WarehouseDocumentFormDialogState
   }
 
   List<Map<String, dynamic>> _buildLinePayloads() {
-    return _lines.map((line) {
+    final sourceLines = _isFromInvoice
+        ? _lines.where(_isLineActive).toList()
+        : _lines;
+
+    return sourceLines.map((line) {
       final movement =
           (line['movement'] as String?) ?? _movementForDocType(_docType);
       final extra = Map<String, dynamic>.from(line['extra_info'] ?? const {});
@@ -264,6 +297,8 @@ class _WarehouseDocumentFormDialogState
 
       return {
         'product_id': line['product_id'],
+        if (line['invoice_item_line_id'] != null)
+          'invoice_item_line_id': line['invoice_item_line_id'],
         'warehouse_id': warehouseResolved['warehouse_id'],
         'movement': movement,
         'quantity': line['quantity'],
@@ -579,22 +614,9 @@ class _WarehouseDocumentFormDialogState
         businessId: widget.businessId,
         invoiceId: widget.sourceInvoiceId!,
       );
-      final lines = (data['lines'] as List<dynamic>? ?? []);
-      final quantities = <int, Map<String, double>>{};
-      for (final line in lines) {
-        final map = Map<String, dynamic>.from(line as Map);
-        final productId = map['product_id'] as int?;
-        if (productId != null) {
-          quantities[productId] = {
-            'required': (map['required_quantity'] as num?)?.toDouble() ?? 0.0,
-            'processed': (map['processed_quantity'] as num?)?.toDouble() ?? 0.0,
-            'remaining': (map['remaining_quantity'] as num?)?.toDouble() ?? 0.0,
-          };
-        }
-      }
       if (mounted) {
         setState(() {
-          _lineQuantities = quantities;
+          _lineQuantitiesIndex = InvoiceLineQuantitiesIndex.fromApiResponse(data);
           _loadingQuantities = false;
         });
       }
@@ -1761,10 +1783,7 @@ class _WarehouseDocumentFormDialogState
 
   void _autoCompleteLine(int index) {
     final line = _lines[index];
-    final productId = line['product_id'] as int?;
-    if (productId == null) return;
-
-    final quantities = _lineQuantities[productId];
+    final quantities = _quantitiesForLine(line);
     if (quantities == null) return;
 
     final remaining = quantities['remaining'] ?? 0.0;
@@ -1776,10 +1795,7 @@ class _WarehouseDocumentFormDialogState
   void _autoCompleteAllLines() {
     for (var i = 0; i < _lines.length; i++) {
       final line = _lines[i];
-      final productId = line['product_id'] as int?;
-      if (productId == null) continue;
-
-      final quantities = _lineQuantities[productId];
+      final quantities = _quantitiesForLine(line);
       if (quantities == null) continue;
 
       final remaining = quantities['remaining'] ?? 0.0;
@@ -1829,8 +1845,13 @@ class _WarehouseDocumentFormDialogState
     }
 
     // اعتبارسنجی خطوط
+    var activeLineCount = 0;
     for (var i = 0; i < _lines.length; i++) {
       final line = _lines[i];
+      final qty = _lineQuantity(line);
+      if (_isFromInvoice && qty <= 0) {
+        continue;
+      }
       if (line['product_id'] == null) {
         SnackBarHelper.show(
           context,
@@ -1838,13 +1859,26 @@ class _WarehouseDocumentFormDialogState
         );
         return;
       }
-      if ((line['quantity'] as num?) == null ||
-          (line['quantity'] as num) <= 0) {
+      if (qty <= 0) {
         SnackBarHelper.show(
           context,
           message: 'خط ${i + 1}: تعداد باید مثبت باشد',
         );
         return;
+      }
+      activeLineCount++;
+
+      if (_isFromInvoice) {
+        final quantities = _quantitiesForLine(line);
+        final remaining = quantities?['remaining'] ?? 0.0;
+        if (qty > remaining) {
+          SnackBarHelper.show(
+            context,
+            message:
+                'خط ${i + 1}: تعداد ($qty) از باقی‌مانده ($remaining) بیشتر است',
+          );
+          return;
+        }
       }
 
       // بررسی تعداد instance ها برای کالاهای یونیک
@@ -1888,6 +1922,14 @@ class _WarehouseDocumentFormDialogState
       }
     }
 
+    if (_isFromInvoice && activeLineCount == 0) {
+      SnackBarHelper.show(
+        context,
+        message: 'حداقل یک خط با تعداد مثبت برای ثبت حواله لازم است',
+      );
+      return;
+    }
+
     setState(() => _saving = true);
     try {
       if (_isFromInvoice) {
@@ -1904,7 +1946,7 @@ class _WarehouseDocumentFormDialogState
           widget.calendarController ??
           ApiClient.getCalendarController();
       final isJalali = cc?.isJalali ?? true;
-      final errorMessage = HesabixDateUtils.formatIsoDatesInPlainText(
+      final errorMessage = MarkStreetDateUtils.formatIsoDatesInPlainText(
         extracted,
         isJalali,
       );
@@ -2003,10 +2045,7 @@ class _WarehouseDocumentFormDialogState
             if (_isFromInvoice && line['product_id'] != null)
               Builder(
                 builder: (context) {
-                  final productId = line['product_id'] as int?;
-                  final quantities = productId != null
-                      ? _lineQuantities[productId]
-                      : null;
+                  final quantities = _quantitiesForLine(line);
                   if (quantities == null) return const SizedBox.shrink();
 
                   final required = quantities['required'] ?? 0.0;
@@ -2680,9 +2719,12 @@ class _WarehouseDocumentFormDialogState
                         const SizedBox(height: 8),
                       ],
                       TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'تعداد *',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: _isFromInvoice ? 'تعداد' : 'تعداد *',
+                          helperText: _isFromInvoice
+                              ? 'صفر = ارسال نمی‌شود'
+                              : null,
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
@@ -2696,10 +2738,7 @@ class _WarehouseDocumentFormDialogState
                                 final qty = parseFormattedNumber(value) ?? 0.0;
                                 _updateLine(index, {'quantity': qty});
                               },
-                        validator: (value) {
-                          final qty = parseFormattedNumber(value) ?? 0.0;
-                          return qty <= 0 ? 'تعداد باید مثبت باشد' : null;
-                        },
+                        validator: _quantityFieldValidator,
                       ),
                     ],
                   );
@@ -2748,9 +2787,12 @@ class _WarehouseDocumentFormDialogState
                     ],
                     Expanded(
                       child: TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'تعداد *',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: _isFromInvoice ? 'تعداد' : 'تعداد *',
+                          helperText: _isFromInvoice
+                              ? 'صفر = ارسال نمی‌شود'
+                              : null,
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
@@ -2764,10 +2806,7 @@ class _WarehouseDocumentFormDialogState
                                 final qty = parseFormattedNumber(value) ?? 0.0;
                                 _updateLine(index, {'quantity': qty});
                               },
-                        validator: (value) {
-                          final qty = parseFormattedNumber(value) ?? 0.0;
-                          return qty <= 0 ? 'تعداد باید مثبت باشد' : null;
-                        },
+                        validator: _quantityFieldValidator,
                       ),
                     ),
                   ],

@@ -8,17 +8,17 @@ Wants=redis.service
 Type=simple
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/arc/hesabixAPI
+WorkingDirectory=/opt/hesabix/app/hesabixAPI
 
 # Environment
 Environment="PYTHONUNBUFFERED=1"
-Environment="PYTHONPATH=/var/www/arc/hesabixAPI"
-Environment="PATH=/var/www/arc/hesabixAPI/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/hesabix/app/hesabixAPI"
+Environment="PATH=/opt/hesabix/app/hesabixAPI/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 
 # اجرای Worker
-ExecStart=/var/www/arc/hesabixAPI/.venv/bin/python /var/www/arc/hesabixAPI/rq_worker.py
+ExecStart=/opt/hesabix/app/hesabixAPI/.venv/bin/python /opt/hesabix/app/hesabixAPI/rq_worker.py
 
-# Restart=on-failure: خروج عادی (مثلاً وقتی Redis در تنظیمات سیستم غیرفعال است) باعث حلقهٔ ری‌استارت نشود
+# خروج عادی (مثلاً Redis غیرفعال) نباید باعث ری‌استارت شود
 Restart=on-failure
 RestartSec=10
 StartLimitInterval=5min
@@ -33,11 +33,5 @@ SyslogIdentifier=hesabix-rq-worker
 NoNewPrivileges=true
 PrivateTmp=true
 
-# Resource limits - حذف محدودیت‌ها برای استفاده حداکثری از منابع
-# MemoryMax: حذف شده - استفاده از RAM مورد نیاز
-# CPUQuota: حذف شده - استفاده از CPU cores مورد نیاز
-# Worker می‌تواند از منابع لازم برای پردازش سریع‌تر jobs استفاده کند
-
 [Install]
 WantedBy=multi-user.target
-

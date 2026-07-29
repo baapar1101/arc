@@ -88,7 +88,7 @@ class SplashScreen extends StatelessWidget {
             
             // App Name
             Text(
-              'Hesabix',
+              'MarkStreet',
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface,

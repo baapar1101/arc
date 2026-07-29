@@ -19,6 +19,28 @@ from PIL import Image
 import io
 
 
+async def read_upload_bounded(file: UploadFile, max_bytes: int) -> bytes:
+    """خواندن آپلود با سقف حجم — بدون بارگذاری کل فایل قبل از اعتبارسنجی."""
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "error": "FILE_SIZE_EXCEEDED",
+                    "message": "حجم فایل از حداکثر مجاز تجاوز می‌کند",
+                    "max_bytes": max_bytes,
+                },
+            )
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 class FileStorageService:
     def __init__(self, db: Session):
         self.db = db
@@ -64,14 +86,14 @@ class FileStorageService:
             else:
                 raise HTTPException(status_code=400, detail="Unsupported storage type")
 
-            # خواندن محتوای فایل
-            file_content = await file.read()
-            file_size = len(file_content)
-            
-            # بررسی محدودیت حجم فایل سیستم
+            # خواندن محتوای فایل با سقف حجم
             from app.services.system_settings_service import get_max_file_size_mb
             max_file_size_mb = get_max_file_size_mb(self.db)
-            max_file_size_bytes = max_file_size_mb * 1024 * 1024  # تبدیل به بایت
+            max_file_size_bytes = max_file_size_mb * 1024 * 1024
+            file_content = await read_upload_bounded(file, max_file_size_bytes)
+            file_size = len(file_content)
+            
+            # بررسی محدودیت حجم فایل سیستم (پس از خواندن bounded)
             if file_size > max_file_size_bytes:
                 raise HTTPException(
                     status_code=400,

@@ -101,7 +101,7 @@ class _StockReportPageState extends State<StockReportPage> {
                           readOnly: true,
                           controller: TextEditingController(
                             text: _asOfDate != null
-                                ? HesabixDateUtils.formatForDisplay(
+                                ? MarkStreetDateUtils.formatForDisplay(
                                     _asOfDate,
                                     ApiClient.getCalendarController()?.isJalali ?? true,
                                   )

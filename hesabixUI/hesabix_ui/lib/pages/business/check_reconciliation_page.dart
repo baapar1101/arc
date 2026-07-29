@@ -50,7 +50,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
   }
 
   String _formatDate(dynamic value, {dynamic rawValue}) {
-    return HesabixDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
+    return MarkStreetDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
   }
 
   @override
@@ -732,7 +732,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     try {
       final result = await _checkService.calculateReconciliation(
         businessId: widget.businessId,
-        body: {'check_ids': _selectedCheckIds.toList(), 'base_date': HesabixDateUtils.formatForApiDate(_baseDate!)},
+        body: {'check_ids': _selectedCheckIds.toList(), 'base_date': MarkStreetDateUtils.formatForApiDate(_baseDate!)},
       );
       setState(() {
         _calculationResult = result;
@@ -801,7 +801,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         body: {
           'name': nameController.text.trim(),
           'check_ids': _selectedCheckIds.toList(),
-          'base_date': HesabixDateUtils.formatForApiDate(_baseDate!),
+          'base_date': MarkStreetDateUtils.formatForApiDate(_baseDate!),
           'description': descriptionController.text.trim().isEmpty ? null : descriptionController.text.trim(),
         },
       );

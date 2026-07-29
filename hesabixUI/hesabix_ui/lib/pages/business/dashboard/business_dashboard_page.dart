@@ -1121,7 +1121,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             final dateStr = it['document_date']?.toString();
             if (dateStr != null && dateStr.isNotEmpty) dateTime = DateTime.parse(dateStr.split('T')[0]);
           } catch (_) {}
-          final date = dateTime != null ? HesabixDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
+          final date = dateTime != null ? MarkStreetDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
           final totalAmount = (it['total_amount'] as num?) ?? 0;
           final currencyCode = (it['currency_code'] ?? '').toString();
           final personNames = it['person_names_str'] ?? it['person_names'] ?? '';
@@ -1316,7 +1316,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             final dateStr = it['document_date']?.toString();
             if (dateStr != null && dateStr.isNotEmpty) dateTime = DateTime.parse(dateStr);
           } catch (_) {}
-          final date = dateTime != null ? HesabixDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
+          final date = dateTime != null ? MarkStreetDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
           final net = formatWithThousands(it['net_amount']);
           final currency = (it['currency_code'] ?? '').toString();
           final itemsCount = (it['items_count'] ?? 0) as int;
@@ -1486,7 +1486,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                     // در صورت خطا، از فرمت قبلی استفاده می‌کنیم
                   }
                   final date = dateTime != null 
-                      ? HesabixDateUtils.formatForDisplay(dateTime, isJalali)
+                      ? MarkStreetDateUtils.formatForDisplay(dateTime, isJalali)
                       : DateFormatters.formatServerDateOnly(it['document_date']);
                   final net = formatWithThousands(it['net_amount']);
                   final currency = (it['currency_code'] ?? '').toString();

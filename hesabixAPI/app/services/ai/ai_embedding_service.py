@@ -128,19 +128,21 @@ def embed_texts(
 
 
 def get_ai_embedding_credentials(db: Session) -> Optional[Tuple[str, Optional[str]]]:
-    """API key فعال از تنظیمات AI."""
+    """API key فعال از credential provider یا تنظیمات legacy."""
     try:
         from adapters.db.repositories.ai_config_repository import AIConfigRepository
-        from app.services.ai.encryption import decrypt_api_key
+        from app.services.ai.ai_provider_service import resolve_provider_connection
 
-        repo = AIConfigRepository(db)
-        config = repo.get_active_config()
-        if not config or not config.is_active or not config.api_key:
+        legacy = AIConfigRepository(db).get_active_config()
+        if not legacy or not legacy.is_active:
             return None
-        key = decrypt_api_key(config.api_key)
-        if not key:
+        provider_type = (legacy.provider or "openai").strip().lower()
+        _, api_key, api_base_url, _ = resolve_provider_connection(
+            db, provider_type, legacy_config=legacy
+        )
+        if not api_key:
             return None
-        return key, config.api_base_url
+        return api_key, api_base_url
     except Exception as exc:
         logger.warning("embedding credentials unavailable: %s", exc)
         return None

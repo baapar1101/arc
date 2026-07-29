@@ -1,5 +1,7 @@
 /// کلید ذخیره trace در function_results (بک‌اند).
 const kAgentTraceStorageKey = '_agent_trace';
+const kAgentBudgetStorageKey = '_agent_budget';
+const kAgentTodosStorageKey = '_agent_todos';
 
 /// استخراج trace از function_results پیام ذخیره‌شده.
 List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
@@ -12,6 +14,21 @@ List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
       .toList();
 }
 
+AIStreamAgentBudget? extractAgentBudgetFromResults(Object? functionResults) {
+  if (functionResults is! Map) return null;
+  final raw = functionResults[kAgentBudgetStorageKey];
+  if (raw is! Map) return null;
+  return AIStreamAgentBudget.fromJson(Map<String, dynamic>.from(raw));
+}
+
+/// استخراج برنامهٔ کاری agent از function_results پیام ذخیره‌شده.
+AISessionTodoSnapshot? extractAgentTodosFromResults(Object? functionResults) {
+  if (functionResults is! Map) return null;
+  final raw = functionResults[kAgentTodosStorageKey];
+  if (raw is! Map) return null;
+  return AISessionTodoSnapshot.fromJson(Map<String, dynamic>.from(raw));
+}
+
 /// رویدادهای استریم SSE چت AI
 class AIStreamChunk {
   final String? contentDelta;
@@ -20,7 +37,9 @@ class AIStreamChunk {
   final AIAgentTraceStep? traceStep;
   final AIAgentTraceStep? traceStepUpdate;
   final AIStreamContextUsage? contextUsage;
+  final AIStreamAgentBudget? agentBudget;
   final int? heartbeatElapsedMs;
+  final AISessionTodoSnapshot? todoSnapshot;
   final bool done;
   final Map<String, dynamic>? usage;
   final int? messageId;
@@ -40,7 +59,9 @@ class AIStreamChunk {
     this.traceStep,
     this.traceStepUpdate,
     this.contextUsage,
+    this.agentBudget,
     this.heartbeatElapsedMs,
+    this.todoSnapshot,
     this.done = false,
     this.usage,
     this.messageId,
@@ -239,6 +260,67 @@ class AIStreamContextUsage {
   }
 }
 
+/// بودجهٔ یکپارچهٔ agent (توکن، زمان، استدلال).
+class AIStreamAgentBudget {
+  final int? iteration;
+  final int? maxIterations;
+  final int? tokensUsed;
+  final int? maxTotalTokens;
+  final double? elapsedSec;
+  final double? wallClockSec;
+  final int? unproductiveRounds;
+  final int? maxUnproductiveRounds;
+  final String? reasoningEffort;
+  final String? stopReason;
+  final String? stopMessageFa;
+
+  const AIStreamAgentBudget({
+    this.iteration,
+    this.maxIterations,
+    this.tokensUsed,
+    this.maxTotalTokens,
+    this.elapsedSec,
+    this.wallClockSec,
+    this.unproductiveRounds,
+    this.maxUnproductiveRounds,
+    this.reasoningEffort,
+    this.stopReason,
+    this.stopMessageFa,
+  });
+
+  factory AIStreamAgentBudget.fromJson(Map<String, dynamic> json) {
+    return AIStreamAgentBudget(
+      iteration: json['iteration'] as int?,
+      maxIterations: json['max_iterations'] as int?,
+      tokensUsed: json['tokens_used'] as int?,
+      maxTotalTokens: json['max_total_tokens'] as int?,
+      elapsedSec: (json['elapsed_sec'] as num?)?.toDouble(),
+      wallClockSec: (json['wall_clock_sec'] as num?)?.toDouble(),
+      unproductiveRounds: json['unproductive_rounds'] as int?,
+      maxUnproductiveRounds: json['max_unproductive_rounds'] as int?,
+      reasoningEffort: json['reasoning_effort'] as String?,
+      stopReason: json['stop_reason'] as String?,
+      stopMessageFa: json['stop_message_fa'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        if (iteration != null) 'iteration': iteration,
+        if (maxIterations != null) 'max_iterations': maxIterations,
+        if (tokensUsed != null) 'tokens_used': tokensUsed,
+        if (maxTotalTokens != null) 'max_total_tokens': maxTotalTokens,
+        if (elapsedSec != null) 'elapsed_sec': elapsedSec,
+        if (wallClockSec != null) 'wall_clock_sec': wallClockSec,
+        if (unproductiveRounds != null)
+          'unproductive_rounds': unproductiveRounds,
+        if (maxUnproductiveRounds != null)
+          'max_unproductive_rounds': maxUnproductiveRounds,
+        if (reasoningEffort != null) 'reasoning_effort': reasoningEffort,
+        if (stopReason != null) 'stop_reason': stopReason,
+        if (stopMessageFa != null) 'stop_message_fa': stopMessageFa,
+      };
+}
+
 class AIStreamStatusEvent {
   final String phase;
   final String? step;
@@ -310,4 +392,142 @@ class AIToolActivity {
       approvalRequired: approvalRequired ?? this.approvalRequired,
     );
   }
+}
+
+/// یک آیتم در برنامهٔ کاری agent.
+class AISessionTodoItem {
+  final String id;
+  final String title;
+  final String? description;
+  final String status;
+  final int order;
+  final String? linkedTool;
+  final String? errorMessage;
+
+  const AISessionTodoItem({
+    required this.id,
+    required this.title,
+    this.description,
+    this.status = 'pending',
+    this.order = 0,
+    this.linkedTool,
+    this.errorMessage,
+  });
+
+  bool get isPending => status == 'pending';
+  bool get isInProgress => status == 'in_progress';
+  bool get isDone => status == 'done';
+  bool get isSkipped => status == 'skipped';
+  bool get isError => status == 'error';
+  bool get isTerminal => isDone || isSkipped || isError;
+
+  factory AISessionTodoItem.fromJson(Map<String, dynamic> json) {
+    return AISessionTodoItem(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String?,
+      status: json['status'] as String? ?? 'pending',
+      order: json['order'] as int? ?? 0,
+      linkedTool: json['linked_tool'] as String?,
+      errorMessage: json['error_message'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        if (description != null) 'description': description,
+        'status': status,
+        'order': order,
+        if (linkedTool != null) 'linked_tool': linkedTool,
+        if (errorMessage != null) 'error_message': errorMessage,
+      };
+}
+
+/// خلاصهٔ برنامهٔ کاری agent (استریم یا ذخیره‌شده).
+class AISessionTodoSnapshot {
+  final List<AISessionTodoItem> items;
+  final AISessionTodoSummary summary;
+  final String? planTitle;
+
+  const AISessionTodoSnapshot({
+    required this.items,
+    required this.summary,
+    this.planTitle,
+  });
+
+  bool get isEmpty => items.isEmpty;
+  bool get hasActiveItem => items.any((i) => i.isInProgress);
+  bool get isFullyComplete =>
+      items.isNotEmpty && items.every((i) => i.isTerminal);
+
+  factory AISessionTodoSnapshot.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'];
+    final items = rawItems is List
+        ? rawItems
+            .whereType<Map>()
+            .map((e) => AISessionTodoItem.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : <AISessionTodoItem>[];
+    items.sort((a, b) => a.order.compareTo(b.order));
+    final rawSummary = json['summary'];
+    return AISessionTodoSnapshot(
+      items: items,
+      summary: rawSummary is Map
+          ? AISessionTodoSummary.fromJson(Map<String, dynamic>.from(rawSummary))
+          : AISessionTodoSummary.fromItems(items),
+      planTitle: json['plan_title'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'items': items.map((e) => e.toJson()).toList(),
+        'summary': summary.toJson(),
+        if (planTitle != null) 'plan_title': planTitle,
+      };
+}
+
+class AISessionTodoSummary {
+  final int total;
+  final int completed;
+  final int inProgress;
+  final int pending;
+
+  const AISessionTodoSummary({
+    required this.total,
+    required this.completed,
+    this.inProgress = 0,
+    this.pending = 0,
+  });
+
+  double get progress =>
+      total <= 0 ? 0 : (completed / total).clamp(0.0, 1.0);
+
+  factory AISessionTodoSummary.fromJson(Map<String, dynamic> json) {
+    return AISessionTodoSummary(
+      total: json['total'] as int? ?? 0,
+      completed: json['completed'] as int? ?? 0,
+      inProgress: json['in_progress'] as int? ?? 0,
+      pending: json['pending'] as int? ?? 0,
+    );
+  }
+
+  factory AISessionTodoSummary.fromItems(List<AISessionTodoItem> items) {
+    final total = items.length;
+    final completed = items.where((i) => i.isDone || i.isSkipped).length;
+    final inProgress = items.where((i) => i.isInProgress).length;
+    return AISessionTodoSummary(
+      total: total,
+      completed: completed,
+      inProgress: inProgress,
+      pending: total - completed - inProgress,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'total': total,
+        'completed': completed,
+        'in_progress': inProgress,
+        'pending': pending,
+      };
 }

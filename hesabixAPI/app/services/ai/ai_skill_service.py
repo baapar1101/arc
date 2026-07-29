@@ -74,6 +74,9 @@ def _compatibility_for_parsed(parsed: Any) -> CompatibilityReport:
     return report
 
 
+def _normalize_tags(raw: Any) -> List[str]:
+    if raw is None:
+        return []
     if not isinstance(raw, list):
         return []
     out: List[str] = []
@@ -591,13 +594,27 @@ def list_pending_packages(db: Session, skip: int = 0, take: int = 50) -> Tuple[L
 
 
 def seed_official_skills(db: Session) -> int:
-    """درج مهارت‌های رسمی ERP (idempotent)."""
+    """درج/به‌روزرسانی مهارت‌های رسمی ERP (idempotent)."""
     from adapters.db.models.ai_skill import AISkillSourceType, AISkillVisibility
     from adapters.db.seed_data.ai_official_skills_seed import OFFICIAL_ERP_SKILLS
     from app.services.ai.ai_skill_parser import compose_skill_md, parse_skill_md
 
-    created = 0
+    changed = 0
     for row in OFFICIAL_ERP_SKILLS:
+        md = compose_skill_md(
+            skill_slug=row["skill_slug"],
+            description=row["description"],
+            skill_body=row["skill_body"],
+            allowed_tool_names=row.get("allowed_tool_names"),
+        )
+        parsed = parse_skill_md(md)
+        compatibility = _compatibility_for_parsed(parsed)
+        fields = _parsed_to_package_fields(
+            parsed,
+            title=row["title"],
+            source_type=AISkillSourceType.HESABIX_NATIVE.value,
+            compatibility=compatibility,
+        )
         exists = (
             db.query(AISkillPackage)
             .filter(
@@ -607,22 +624,16 @@ def seed_official_skills(db: Session) -> int:
             .first()
         )
         if exists:
+            exists.title = row["title"]
+            exists.description = fields.get("description") or row["description"]
+            exists.skill_body = fields.get("skill_body") or row["skill_body"]
+            exists.allowed_tool_names = fields.get("allowed_tool_names")
+            exists.tags = _normalize_tags(row.get("tags"))
+            exists.compatibility_report = compatibility.to_dict()
+            changed += 1
             continue
-        md = compose_skill_md(
-            skill_slug=row["skill_slug"],
-            description=row["description"],
-            skill_body=row["skill_body"],
-            allowed_tool_names=row.get("allowed_tool_names"),
-        )
-        parsed = parse_skill_md(md)
-        compatibility = _compatibility_for_parsed(parsed)
         pkg = AISkillPackage(
-            **_parsed_to_package_fields(
-                parsed,
-                title=row["title"],
-                source_type=AISkillSourceType.HESABIX_NATIVE.value,
-                compatibility=compatibility,
-            ),
+            **fields,
             visibility=AISkillVisibility.PUBLISHED.value,
             version_label="1.0.0",
             tags=_normalize_tags(row.get("tags")),
@@ -630,10 +641,10 @@ def seed_official_skills(db: Session) -> int:
             published_at=datetime.utcnow(),
         )
         db.add(pkg)
-        created += 1
-    if created:
+        changed += 1
+    if changed:
         db.commit()
-    return created
+    return changed
 
 
 def publish_to_marketplace(

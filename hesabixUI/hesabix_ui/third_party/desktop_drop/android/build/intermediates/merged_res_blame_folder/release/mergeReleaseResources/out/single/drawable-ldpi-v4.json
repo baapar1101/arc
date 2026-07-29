@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-ldpi-v4/ic_call_answer_video.png",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-ldpi-v4/ic_call_answer_video.png"
+    },
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-ldpi-v4/ic_call_answer_video_low.png",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-ldpi-v4/ic_call_answer_video_low.png"
+    },
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-ldpi-v4/ic_call_decline.png",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-ldpi-v4/ic_call_decline.png"
+    },
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-ldpi-v4/ic_call_answer_low.png",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-ldpi-v4/ic_call_answer_low.png"
+    },
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-ldpi-v4/ic_call_answer.png",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-ldpi-v4/ic_call_answer.png"
+    },
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-ldpi-v4/ic_call_decline_low.png",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-ldpi-v4/ic_call_decline_low.png"
+    }
+]

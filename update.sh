@@ -219,6 +219,17 @@ if ! alembic upgrade head; then
   exit 1
 fi
 log_ok "Migrations done."
+ensure_secrets="${APP_ROOT}/app/scripts/ensure_api_production_secrets.sh"
+if [[ -f "${ensure_secrets}" ]]; then
+  chmod +x "${ensure_secrets}" 2>/dev/null || true
+  log_info "Ensuring API production secrets in .env..."
+  if bash "${ensure_secrets}"; then
+    log_ok "API production secrets verified."
+  else
+    log_err "Failed to ensure API production secrets."
+    exit 1
+  fi
+fi
 chown -R www-data:www-data "${api_dir}"
 systemctl daemon-reload
 systemctl restart hesabix-api hesabix-rq-worker hesabix-notification-moderation
@@ -234,21 +245,39 @@ log_ok "Backend services restarted."
 # --- 3. Flutter: update SDK, build web, deploy (PATH دائمی: /etc/profile.d/hesabix-flutter.sh) ---
 log_info "Step 3: Flutter – update SDK, build web, deploy..."
 export PATH="/opt/flutter/bin:/snap/bin:${PATH:-}"
-if [[ -d /opt/flutter ]]; then
-  (cd /opt/flutter && git fetch --depth 1 origin stable 2>/dev/null && git reset --hard origin/stable 2>/dev/null) || true
+ensure_flutter_sdk="${APP_ROOT}/app/scripts/ensure_flutter_sdk_for_update.sh"
+if [[ -f "${ensure_flutter_sdk}" ]]; then
+  chmod +x "${ensure_flutter_sdk}" 2>/dev/null || true
+  if declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
+    hesabix_apply_flutter_mirror_env
+  else
+    export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
+    export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://f.mirror.hesabix.ir/gcs}"
+  fi
+  log_info "Ensuring Flutter/Dart SDK (mirror fallbacks; git upgrade only if HESABIX_UPDATE_FLUTTER_SDK=1)..."
+  if ! bash "${ensure_flutter_sdk}"; then
+    log_err "Flutter/Dart SDK not ready. Set HESABIX_UPDATE_FLUTTER_SDK=0 or fix mirror access, then retry."
+    exit 1
+  fi
+else
+  if [[ -d /opt/flutter ]]; then
+    (cd /opt/flutter && git fetch --depth 1 origin stable 2>/dev/null && git reset --hard origin/stable 2>/dev/null) || true
+  fi
 fi
 if ! command -v flutter >/dev/null 2>&1; then
   log_err "Flutter not in PATH. Ensure Flutter is installed (e.g. run deploy.sh once)."
   exit 1
 fi
 persist_flutter_path_in_profile_d
-if declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
+if declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
+  hesabix_resolve_flutter_storage_base_url || true
+elif declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
   hesabix_apply_flutter_mirror_env
 else
   export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
   export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://f.mirror.hesabix.ir/gcs}"
 fi
-log_info "Flutter pub/storage: PUB_HOSTED_URL=${PUB_HOSTED_URL}"
+log_info "Flutter pub/storage: PUB_HOSTED_URL=${PUB_HOSTED_URL} FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL}"
 app_dir="${APP_ROOT}/app"
 build_script="${app_dir}/build_web.sh"
 if [[ ! -f "${build_script}" ]]; then

@@ -308,7 +308,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
   String _formatTicketDate(DateTime dateTime) {
     final localDateTime = dateTime.isUtc ? dateTime.toLocal() : dateTime;
     final isJalali = widget.calendarController?.isJalali ?? true;
-    return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
+    return date_utils.MarkStreetDateUtils.formatDateTime(localDateTime, isJalali);
   }
 
   Widget _buildConversationInfo(AppLocalizations l10n, ThemeData theme) {

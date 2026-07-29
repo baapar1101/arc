@@ -123,7 +123,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     if (s.isEmpty) return '—';
     final dt = DateTime.tryParse(s);
     if (dt == null) return s;
-    return HesabixDateUtils.formatForDisplay(dt.toLocal(), _useJalaliCalendar);
+    return MarkStreetDateUtils.formatForDisplay(dt.toLocal(), _useJalaliCalendar);
   }
 
   String _formatDateTimeField(dynamic raw) {
@@ -132,7 +132,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     if (s.isEmpty) return '—';
     final dt = DateTime.tryParse(s);
     if (dt == null) return s;
-    return HesabixDateUtils.formatDateTime(dt.toLocal(), _useJalaliCalendar);
+    return MarkStreetDateUtils.formatDateTime(dt.toLocal(), _useJalaliCalendar);
   }
 
   String _documentTypeLabel(String? type) {
@@ -403,7 +403,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                auth['message_fa']?.toString() ?? 'این فاکتور در سامانه حسابیکس (Hesabix) ثبت شده است.',
+                auth['message_fa']?.toString() ?? 'این فاکتور در سامانه مارک‌استریت (MarkStreet) ثبت شده است.',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -428,7 +428,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     if (expires != null && expires.isNotEmpty) {
       final dt = DateTime.tryParse(expires);
       if (dt != null) {
-        final label = HesabixDateUtils.formatDateTime(dt.toLocal(), _useJalaliCalendar);
+        final label = MarkStreetDateUtils.formatDateTime(dt.toLocal(), _useJalaliCalendar);
         if (remaining is num) {
           final h = _formatInt(remaining.round());
           expLine = 'انقضای لینک: $label (حدود $h ساعت باقی‌مانده)';

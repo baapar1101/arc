@@ -17,27 +17,57 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <!-- Purge legacy Flutter service workers once per deploy (old SW + cache can mismatch CanvasKit). -->
+  <script>
+    (function () {
+      if (!('serviceWorker' in navigator)) return;
+      var purgeKey = 'hesabix_sw_purged_for';
+      fetch('version.json?t=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          var build = j && typeof j.build === 'string' ? j.build : '';
+          if (build && localStorage.getItem(purgeKey) === build) return;
+          return navigator.serviceWorker.getRegistrations().then(function (regs) {
+            var hadSw = regs.length > 0;
+            var tasks = regs.map(function (reg) { return reg.unregister(); });
+            return Promise.all(tasks).then(function () {
+              if ('caches' in window) {
+                return caches.keys().then(function (keys) {
+                  return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                });
+              }
+            }).then(function () {
+              if (build) {
+                try { localStorage.setItem(purgeKey, build); } catch (e) {}
+              }
+              if (hadSw) window.location.reload();
+            });
+          });
+        })
+        .catch(function () {});
+    })();
+  </script>
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Hesabix - سیستم مدیریت مالی">
+  <meta name="description" content="MarkStreet - سیستم مدیریت مالی">
   <!-- viewport-fit=cover برای مدیریت بهتر فضای پایین صفحه روی موبایل (خصوصاً iOS) -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="Hesabix">
+  <meta name="apple-mobile-web-app-title" content="MarkStreet">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/x-icon" href="favicon.ico">
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>Hesabix</title>
+  <title>MarkStreet</title>
   <link rel="manifest" href="manifest.json">
   
   <!-- Preconnect and DNS prefetch for API to improve connection speed -->
-  <link rel="preconnect" href="https://hsxn.hesabix.ir" crossorigin>
-  <link rel="dns-prefetch" href="https://hsxn.hesabix.ir">
+  <link rel="preconnect" href="https://tamastore.ir" crossorigin>
+  <link rel="dns-prefetch" href="https://tamastore.ir">
   
   <!-- Preload critical resources for faster page loads -->
   <link rel="preload" href="flutter_bootstrap.js" as="script">
@@ -45,21 +75,22 @@
   <link rel="preload" href="assets/images/logo-light.svg" as="image" type="image/svg+xml">
   
   <!-- Initial Loading Screen Styles -->
-  <style>
-    /* پالت هماهنگ با گرادیان #0175C2 → #02579B */
+    <style>
+    /* Grayscale palette coordinated with Neutral/Metallic accents */
     #flutter-loading-screen {
       --loader-fg: rgba(255, 255, 255, 0.96);
-      --loader-fg-muted: rgba(230, 245, 255, 0.88);
-      --loader-fg-subtle: rgba(200, 230, 255, 0.72);
+      --loader-fg-muted: rgba(240, 240, 240, 0.88);
+      --loader-fg-subtle: rgba(225, 225, 225, 0.72);
       --loader-ring: rgba(255, 255, 255, 0.22);
-      --loader-ring-accent: #E1F5FE;
-      --loader-glow: rgba(0, 40, 80, 0.35);
+      --loader-ring-accent: #f0f0f0;
+      --loader-glow: rgba(40, 40, 40, 0.35);
+
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: #02579B;
+      background: #111111; /* Changed from deep blue-black to neutral dark gray */
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -78,12 +109,13 @@
       z-index: 0;
       background: linear-gradient(
         125deg,
-        #015a9e 0%,
-        #0175C2 35%,
-        #0288d1 55%,
-        #02579B 85%,
-        #014a82 100%
+        #222222 0%,
+        #444444 35%,
+        #888888 55%,
+        #333333 85%,
+        #1a1a1a 100%
       );
+
       background-size: 220% 220%;
       animation: loaderGradientShift 18s ease-in-out infinite;
       pointer-events: none;
@@ -104,7 +136,7 @@
       background: linear-gradient(165deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 100%);
       border: 1px solid rgba(255, 255, 255, 0.2);
       box-shadow:
-        0 4px 24px rgba(0, 20, 50, 0.25),
+        0 4px 24px rgba(0, 0, 0, 0.35), /* Replaced blue-tinted shadow with neutral black */
         inset 0 1px 0 rgba(255, 255, 255, 0.22);
     }
 
@@ -204,7 +236,7 @@
       margin: 0 auto 0.35rem;
       border-radius: 50%;
       border: 2px solid rgba(255, 255, 255, 0.28);
-      background: rgba(0, 30, 60, 0.15);
+      background: rgba(255, 255, 255, 0.05); /* Removed navy tint */
       display: flex;
       align-items: center;
       justify-content: center;
@@ -219,13 +251,13 @@
       border-color: var(--loader-ring-accent);
       background: rgba(255, 255, 255, 0.18);
       color: var(--loader-fg);
-      box-shadow: 0 0 0 3px rgba(225, 245, 254, 0.15);
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
     }
 
     .loading-step.is-done .loading-step__icon {
-      border-color: rgba(180, 230, 255, 0.55);
-      background: rgba(0, 80, 120, 0.35);
-      color: #b3e5fc;
+      border-color: rgba(255, 255, 255, 0.6); /* High contrast gray/white */
+      background: rgba(100, 100, 100, 0.35); /* Neutral gray fill */
+      color: #ffffff;
     }
 
     .loading-step.is-done .loading-step__icon::after {
@@ -252,7 +284,7 @@
     }
 
     .loading-step.is-done .loading-step__label {
-      color: rgba(200, 235, 255, 0.75);
+      color: rgba(255, 255, 255, 0.75);
     }
 
     .loading-quote {
@@ -273,7 +305,7 @@
     }
 
     .loading-quote__mark {
-      color: rgba(200, 230, 255, 0.55);
+      color: rgba(255, 255, 255, 0.55); /* White/Silver color */
       font-style: normal;
       font-size: 1.05em;
     }
@@ -295,7 +327,7 @@
       height: 6px;
       margin: 0 auto 12px;
       border-radius: 999px;
-      background: rgba(0, 30, 60, 0.35);
+      background: rgba(255, 255, 255, 0.1); /* Neutral background */
       overflow: hidden;
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
     }
@@ -304,8 +336,8 @@
       height: 100%;
       width: 0%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #b3e5fc, #e1f5fe, #ffffff);
-      box-shadow: 0 0 12px rgba(225, 245, 254, 0.45);
+      background: linear-gradient(90deg, #bbbbbb, #eeeeee, #ffffff); /* Metallic gradient */
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
       transition: width 0.18s ease-out;
     }
 
@@ -363,34 +395,27 @@
       }
     }
     
-    /* تنظیم پایه‌ای ارتفاع صفحه برای هماهنگی بهتر با موبایل */
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
     }
 
-    /* برای جلوگیری از flash محتوا و کنترل اسکرول اولیه */
     body {
       overflow: hidden;
-      /* در صورت بروز فضای سفید، حداقل پس‌زمینه یکدست داشته باشیم */
-      background-color: #ffffff;
-      /* استفاده از height پویا بر اساس متغیر محاسبه‌شده برای موبایل */
+      background-color: #111111; /* Neutral background color */
       min-height: var(--app-height, 100vh);
     }
     
-    /* وقتی Flutter لود شد، body را دوباره قابل اسکرول می‌کنیم */
     body.flutter-ready {
       overflow: auto;
     }
 
-    /* اطمینان از اینکه ریشه‌ی Flutter تمام ارتفاع در دسترس را پوشش می‌دهد */
     flt-glass-pane, flt-scene-host {
       width: 100% !important;
       height: 100% !important;
     }
 
-    /* در مرورگرهای مدرن، از 100dvh که با کیبورد سازگارتر است استفاده می‌کنیم */
     @supports (height: 100dvh) {
       body {
         min-height: 100dvh;
@@ -419,7 +444,7 @@
 </head>
 <body>
   <!-- Initial Loading Screen - نمایش داده می‌شود تا Flutter لود شود -->
-  <div id="flutter-loading-screen" role="status" aria-live="polite" aria-busy="true" aria-label="در حال بارگذاری حسابیکس">
+  <div id="flutter-loading-screen" role="status" aria-live="polite" aria-busy="true" aria-label="در حال بارگذاری مارک‌استریت">
     <div class="loading-screen-bg" aria-hidden="true"></div>
     <div class="loading-card">
       <div class="loading-inner">
@@ -428,12 +453,12 @@
           src="assets/images/logo-light.svg"
           width="88"
           height="88"
-          alt="Hesabix"
+          alt="MarkStreet"
           decoding="async"
           fetchpriority="high" />
         <div class="loading-title-row">
-          <div class="loading-title" role="heading" aria-level="1">HESABIX</div>
-          <p class="loading-brand-fa">حسابیکس</p>
+          <div class="loading-title" role="heading" aria-level="1">MARKSTREET</div>
+          <p class="loading-brand-fa">مارک‌استریت</p>
         </div>
         <p class="loading-subtitle">سامانه جامع مدیریت کسب و کار</p>
 
@@ -473,7 +498,7 @@
     (function () {
       var QUOTES = [
         'برای امنیت بیشتر، پس از کار حتماً از حساب خود خارج شوید.',
-        'نسخهٔ وب حسابیکس را در مرورگر به‌روز نگه دارید تا از آخرین بهبودها بهره ببرید.',
+        'نسخهٔ وب مارک‌استریت را در مرورگر به‌روز نگه دارید تا از آخرین بهبودها بهره ببرید.',
         'فاکتور و اسناد مالی را منظم ثبت کنید؛ گزارش دقیق از همین‌جا شروع می‌شود.',
         'از پشتیبان‌گیری منظم داده‌های کسب‌وکار خود غافل نشوید.',
         'میانبرهای صفحه‌کلید در بخش راهنما می‌تواند سرعت کار شما را بالا ببرد.'
@@ -564,7 +589,7 @@
           document.documentElement.style.setProperty('--app-height', height + 'px');
         } catch (e) {
           // در صورت بروز خطا، تغییری اعمال نکنیم تا رفتار پیش‌فرض حفظ شود
-          console.warn('[Hesabix] Failed to update app height', e);
+          console.warn('[MarkStreet] Failed to update app height', e);
         }
       }
 
@@ -727,7 +752,7 @@
         banner.style.bottom = '16px';
         banner.style.left = '50%';
         banner.style.transform = 'translateX(-50%)';
-        banner.style.background = '#0175C2';
+        banner.style.background = '#001422';
         banner.style.color = '#ffffff';
         banner.style.padding = '12px 16px';
         banner.style.borderRadius = '14px';
@@ -745,7 +770,7 @@
         banner.style.justifyContent = 'space-between';
 
         var text = document.createElement('span');
-        text.textContent = 'نسخه جدید حسابیکس در حال اعمال است، صفحه به زودی به‌روزرسانی می‌شود.';
+        text.textContent = 'نسخه جدید مارک‌استریت در حال اعمال است، صفحه به زودی به‌روزرسانی می‌شود.';
         text.style.flex = '1';
         text.style.fontFamily = 'inherit';
 

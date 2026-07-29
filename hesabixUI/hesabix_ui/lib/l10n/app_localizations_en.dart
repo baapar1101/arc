@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Hesabix';
+  String get appTitle => 'MarkStreet';
 
   @override
   String get login => 'Login';
@@ -75,7 +75,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dark => 'Dark';
 
   @override
-  String get welcomeTitle => 'Hesabix Cloud Accounting';
+  String get welcomeTitle => 'MarkStreet Cloud Accounting';
 
   @override
   String get welcomeSubtitle =>
@@ -2348,7 +2348,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pluginMarketplaceSubtitle =>
-      'Extend Hesabix with integrations and industry add-ons. Pay from your business wallet.';
+      'Extend MarkStreet with integrations and industry add-ons. Pay from your business wallet.';
 
   @override
   String get pluginMarketplaceBrowseTab => 'Catalog';
@@ -5053,7 +5053,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportTemplatesScopeCustom => 'Custom (technical keys)';
 
   @override
-  String get reportTemplateNewVisual => 'New — visual builder';
+  String get reportTemplateNewVisual => 'قالب جدید — استودیو';
 
   @override
   String get reportTemplateNewHtml => 'New — HTML (advanced)';
@@ -6093,7 +6093,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationsChannelInAppDescription =>
-      'Display notifications inside Hesabix web and mobile in real time.';
+      'Display notifications inside MarkStreet web and mobile in real time.';
 
   @override
   String get notificationsSaveSuccess => 'Notification settings saved.';
@@ -6888,7 +6888,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taxGuideIntroDescription =>
-      'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new Hesabix version—from key generation to data quality checks and invoice submission.';
+      'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new MarkStreet version—from key generation to data quality checks and invoice submission.';
 
   @override
   String get taxGuidePrereqTitle => 'Prerequisites before you begin';
@@ -6906,7 +6906,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Active access to your taxpayer workspace on my.tax.gov.ir';
 
   @override
-  String get taxGuideStep1Title => '1) Generate keys inside Hesabix';
+  String get taxGuideStep1Title => '1) Generate keys inside MarkStreet';
 
   @override
   String get taxGuideStep1Description =>
@@ -6961,10 +6961,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taxGuideStep3Bullet3 =>
-      'Copy the issued memory ID and paste it back into Hesabix.';
+      'Copy the issued memory ID and paste it back into MarkStreet.';
 
   @override
-  String get taxGuideStep4Title => '4) Complete the connection form in Hesabix';
+  String get taxGuideStep4Title =>
+      '4) Complete the connection form in MarkStreet';
 
   @override
   String get taxGuideStep4Description =>
@@ -7000,7 +7001,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taxGuideStep5Bullet3 =>
-      'After in-person verification upload the issued certificate into Hesabix.';
+      'After in-person verification upload the issued certificate into MarkStreet.';
 
   @override
   String get taxGuideStep6Title => '6) Assign product/service tax codes';
@@ -10033,6 +10034,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiToolQueryBusinessData => 'Query business data';
+
+  @override
+  String get aiToolListQueryableFields => 'Queryable fields';
+
+  @override
+  String get aiToolResolveDateRange => 'Resolve date range';
 
   @override
   String get aiToolSearchWarehouseDocuments => 'Search warehouse documents';
@@ -13398,7 +13405,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get basalamSettingsMonetaryUnitHelper =>
-      'Hesabix stores IRR only; toman amounts from Basalam are multiplied by 10.';
+      'MarkStreet stores IRR only; toman amounts from Basalam are multiplied by 10.';
 
   @override
   String get basalamSettingsMonetaryUnitRial => 'Rial (IRR)';
@@ -13603,7 +13610,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wooBridgeFieldWpVersion => 'WordPress version on the store';
 
   @override
-  String get wooBridgeFieldPluginVersion => 'Hesabix ArcWOC plugin version';
+  String get wooBridgeFieldPluginVersion => 'MarkStreet ArcWOC plugin version';
 
   @override
   String wooBridgeFieldGenericTitle(String key) {
@@ -13654,7 +13661,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get woocommerceColumnOrderType => 'Order type';
 
   @override
-  String get woocommerceColumnHesabixId => 'Hesabix ID';
+  String get woocommerceColumnMarkStreetId => 'MarkStreet ID';
 
   @override
   String get woocommerceColumnSyncStatus => 'Sync status';
@@ -13768,7 +13775,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceSettingsBridgeIntroBody =>
-      'Enter your WordPress site base URL and the bridge token generated in the Hesabix ArcWOC plugin. Leave the token field empty when saving to keep the existing secret.';
+      'Enter your WordPress site base URL and the bridge token generated in the MarkStreet ArcWOC plugin. Leave the token field empty when saving to keep the existing secret.';
 
   @override
   String get woocommerceStoreUrlLabel => 'Store base URL (WordPress)';
@@ -13831,7 +13838,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceControlIntroSubtitle =>
-      'Mapping stats, Hesabix API health, plugin version, recent logs and bulk sync via the same secure bridge token as the operations hub.';
+      'Mapping stats, MarkStreet API health, plugin version, recent logs and bulk sync via the same secure bridge token as the operations hub.';
 
   @override
   String get woocommerceControlRefreshTooltip => 'Refresh all sections';
@@ -13843,7 +13850,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get woocommerceControlPluginTitle => 'Plugin version & updates';
 
   @override
-  String get woocommerceControlConnectionTitle => 'Hesabix API from the store';
+  String get woocommerceControlConnectionTitle =>
+      'MarkStreet API from the store';
 
   @override
   String get woocommerceControlSettingsTitle =>
@@ -13909,7 +13917,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get woocommerceControlColumnError => 'Error';
 
   @override
-  String get woocommerceHubSyncRowTooltip => 'Sync to Hesabix';
+  String get woocommerceHubSyncRowTooltip => 'Sync to MarkStreet';
 
   @override
   String get woocommerceHubSyncColumnLabel => 'Sync';
@@ -13919,21 +13927,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceHubSyncOrderConfirmBody =>
-      'The selected order will be pushed to Hesabix through the plugin API.';
+      'The selected order will be pushed to MarkStreet through the plugin API.';
 
   @override
   String get woocommerceHubSyncProductConfirmTitle => 'Sync this product?';
 
   @override
   String get woocommerceHubSyncProductConfirmBody =>
-      'The selected product will be pushed to Hesabix through the plugin API.';
+      'The selected product will be pushed to MarkStreet through the plugin API.';
 
   @override
   String get woocommerceHubSyncCustomerConfirmTitle => 'Sync this customer?';
 
   @override
   String get woocommerceHubSyncCustomerConfirmBody =>
-      'The selected customer will be pushed to Hesabix through the plugin API.';
+      'The selected customer will be pushed to MarkStreet through the plugin API.';
 
   @override
   String get woocommerceHubBulkSyncTitle => 'Bulk sync (hub)';
@@ -13994,7 +14002,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceOpeningInvBridgeSubtitle =>
-      'Run the same opening-balance job as the WooCommerce plugin, via the Hesabix store bridge. Use after products are synced and accounts/warehouse are configured on the store.';
+      'Run the same opening-balance job as the WooCommerce plugin, via the MarkStreet store bridge. Use after products are synced and accounts/warehouse are configured on the store.';
 
   @override
   String get woocommerceOpeningInvRefreshStatus => 'Refresh status';
@@ -14054,7 +14062,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceOpeningInvDoPostLabel =>
-      'Post (lock) opening balance in Hesabix';
+      'Post (lock) opening balance in MarkStreet';
 
   @override
   String get woocommerceOpeningInvCostBasisLabel => 'Cost basis';
@@ -14212,7 +14220,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceSettingsArcwocPluginIntro =>
-      'Mapping stats, Hesabix API status from the store, background queue, plugin version, settings summary, debug, bulk sync and logs.';
+      'Mapping stats, MarkStreet API status from the store, background queue, plugin version, settings summary, debug, bulk sync and logs.';
 
   @override
   String get woocommerceBridgeTokenStored => 'Bridge token saved';
@@ -14331,7 +14339,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get woocommerceSettingsOpeningInventoryLinkSubtitle =>
-      'Create the job and run batches from Hesabix without wp-admin.';
+      'Create the job and run batches from MarkStreet without wp-admin.';
 
   @override
   String get settingsWooCommerceTitle => 'WooCommerce bridge';
@@ -14766,7 +14774,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String crmWebChatEmbedSnippet(String base, String publicKey) {
-    return '// API base: $base\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"$publicKey\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the Hesabix repository for details.';
+    return '// API base: $base\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"$publicKey\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the MarkStreet repository for details.';
   }
 
   @override
@@ -15237,7 +15245,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mobileLauncherExitAppHint => 'Press back again to exit';
 
   @override
-  String get mobileLauncherBrandName => 'Hesabix';
+  String get mobileLauncherBrandName => 'MarkStreet';
 
   @override
   String get mobileLauncherBusinessFallback => 'Business';
@@ -15472,4 +15480,201 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDashboardCreateTicket => 'Create ticket';
+
+  @override
+  String get businessSettingsCategoryBusinessFinance => 'Business & finance';
+
+  @override
+  String get businessSettingsCategoryBusinessFinanceDescription =>
+      'Core info, currencies, fiscal year, and credit';
+
+  @override
+  String get businessSettingsCategorySalesDocuments => 'Sales & documents';
+
+  @override
+  String get businessSettingsCategorySalesDocumentsDescription =>
+      'Quick sales, printing, numbering, and templates';
+
+  @override
+  String get businessSettingsCategoryIntegrations => 'Integrations';
+
+  @override
+  String get businessSettingsCategoryIntegrationsDescription =>
+      'External services and platform connectors';
+
+  @override
+  String get businessSettingsCategoryModules => 'Plugins & modules';
+
+  @override
+  String get businessSettingsCategoryModulesDescription =>
+      'Settings for active business plugins';
+
+  @override
+  String get businessSettingsCategoryAdministration =>
+      'Administration & security';
+
+  @override
+  String get businessSettingsCategoryAdministrationDescription =>
+      'Users, projects, notifications, and activity logs';
+
+  @override
+  String get businessSettingsCategoryPersonalization => 'Personalization';
+
+  @override
+  String get businessSettingsCategoryPersonalizationDescription =>
+      'Your account appearance preferences';
+
+  @override
+  String get businessSettingsCategoryAdvanced => 'Advanced & backup';
+
+  @override
+  String get businessSettingsCategoryAdvancedDescription =>
+      'Backup, restore, and FTP destination';
+
+  @override
+  String get businessSettingsCategoryMembership => 'Membership';
+
+  @override
+  String get businessSettingsCategoryMembershipDescription =>
+      'Your membership in this business';
+
+  @override
+  String get businessSettingsCategoryDangerZone => 'Danger zone';
+
+  @override
+  String get businessSettingsCategoryDangerZoneDescription =>
+      'Irreversible actions — proceed with caution';
+
+  @override
+  String get businessSettingsFiscalYearEdit => 'Edit current fiscal year';
+
+  @override
+  String get businessSettingsFiscalYearEditDescription =>
+      'Edit title and dates of the current fiscal year';
+
+  @override
+  String get businessSettingsQuickSales => 'Quick sales settings';
+
+  @override
+  String get businessSettingsQuickSalesDescription =>
+      'Default settings for quick sales';
+
+  @override
+  String get businessSettingsCrm => 'CRM settings';
+
+  @override
+  String get businessSettingsCrmDescription =>
+      'Web chat and visitor file uploads';
+
+  @override
+  String get businessSettingsProjects => 'Project management';
+
+  @override
+  String get businessSettingsProjectsDescription =>
+      'Define and manage projects for cost and revenue tracking';
+
+  @override
+  String get businessSettingsDocumentNumbering => 'Document numbering';
+
+  @override
+  String get businessSettingsDocumentNumberingDescription =>
+      'Configure numbering for document types';
+
+  @override
+  String get businessSettingsInvoiceSharePayment =>
+      'Invoice link online payment';
+
+  @override
+  String get businessSettingsInvoiceSharePaymentDescription =>
+      'Default gateway and public share link payment';
+
+  @override
+  String get businessSettingsTemplatesDescription =>
+      'Design and manage PDF report and print templates';
+
+  @override
+  String get businessSettingsRepairShop => 'Repair shop settings';
+
+  @override
+  String get businessSettingsRepairShopDescription =>
+      'Numbering, notifications, and repair shop defaults';
+
+  @override
+  String get businessSettingsWarrantyDescription =>
+      'Warranty code format, serial, and security settings';
+
+  @override
+  String get businessSettingsNotificationTemplates => 'Notification templates';
+
+  @override
+  String get businessSettingsNotificationTemplatesDescription =>
+      'Manage SMS and email templates for events';
+
+  @override
+  String get businessSettingsAppearanceProfileDescription =>
+      'Language, theme, and calendar — in user profile settings';
+
+  @override
+  String get businessSettingsLeaveBusiness => 'Leave business';
+
+  @override
+  String get businessSettingsLeaveBusinessDescription =>
+      'Leave this business and remove your access';
+
+  @override
+  String get businessSettingsLeaveBusinessConfirm =>
+      'Are you sure you want to leave this business?\n\nAfter leaving, your access to this business will be removed.';
+
+  @override
+  String get businessSettingsLeaveBusinessAction => 'Leave';
+
+  @override
+  String get businessSettingsLeaveBusinessFailed => 'Failed to leave business';
+
+  @override
+  String get businessSettingsDeleteBusiness => 'Delete business';
+
+  @override
+  String get businessSettingsDeleteBusinessDescription =>
+      'Permanently delete business (recoverable for 30 days)';
+
+  @override
+  String get businessSettingsFiscalYearRollback =>
+      'Rollback current fiscal year';
+
+  @override
+  String get businessSettingsFiscalYearRollbackDescription =>
+      'Delete current year and reactivate the previous one (requires at least two fiscal years)';
+
+  @override
+  String get businessSettingsHubDescriptionOwner =>
+      'You own this business and can manage all settings you have access to.';
+
+  @override
+  String get businessSettingsHubDescriptionMember =>
+      'You are a member of this business; only settings you can access are shown.';
+
+  @override
+  String get businessSettingsHubDescriptionGeneric =>
+      'Manage this business settings from this page.';
+
+  @override
+  String get businessSettingsOwnerRole => 'Business owner';
+
+  @override
+  String get businessSettingsMemberRole => 'Business member';
+
+  @override
+  String get businessSettingsSetupTitle => 'Quick setup';
+
+  @override
+  String get businessSettingsSetupDescription =>
+      'Complete these items to get started:';
+
+  @override
+  String get businessSettingsPluginsLoadingHint => 'Loading plugins…';
+
+  @override
+  String get businessSettingsPluginsLoadFailed =>
+      'Failed to load plugins. Integrations and modules may be incomplete.';
 }

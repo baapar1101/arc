@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import Dict, Any
-import os
 import hmac
 import hashlib
 import json
@@ -11,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
 from app.core.responses import success_response, ApiError
+from app.core.settings import get_settings
 from app.services.wallet_service import confirm_top_up
 from adapters.db.models.wallet import WalletTransaction
 
@@ -28,8 +28,15 @@ def wallet_webhook_endpoint(
 	payload: Dict[str, Any] = Body(...),
 	db: Session = Depends(get_db),
 ) -> dict:
-	# امضای وبهوک (اختیاری بر اساس تنظیم محیط)
-	secret = os.getenv("WALLET_WEBHOOK_SECRET", "").strip()
+	settings = get_settings()
+	secret = (settings.wallet_webhook_secret or "").strip()
+	is_production = (settings.environment or "").strip().lower() in {"production", "prod"}
+	if is_production and not secret:
+		raise ApiError(
+			"WEBHOOK_NOT_CONFIGURED",
+			"Webhook secret is required in production",
+			http_status=500,
+		)
 	if secret:
 		signature = request.headers.get("x-signature") or request.headers.get("X-Signature")
 		if not signature:

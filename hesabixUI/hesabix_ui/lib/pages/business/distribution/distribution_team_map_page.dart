@@ -129,7 +129,7 @@ class _DistributionTeamMapPageState extends State<DistributionTeamMapPage> {
                     }
                   },
                   icon: const Icon(Icons.calendar_month),
-                  label: Text(Hd.HesabixDateUtils.formatForDisplay(_day, jalali)),
+                  label: Text(Hd.MarkStreetDateUtils.formatForDisplay(_day, jalali)),
                 ),
                 const Spacer(),
                 IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),

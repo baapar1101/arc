@@ -226,7 +226,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
 
   void _openMemorialDialog() {
     _openShortcutDialog(
-      dialog: const HesabixDevelopersMemorialDialog(),
+      dialog: const MarkStreetDevelopersMemorialDialog(),
       barrierDismissible: true,
     );
   }

@@ -1,0 +1,34 @@
+{
+    "logs": [
+        {
+            "outputFile": "one.mixin.desktop.drop.desktop_drop-mergeReleaseResources-22:/values-hy/values-hy.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\Albert\\.gradle\\caches\\8.14.5\\transforms\\b65a1cf93b3a1582db179429064d7f8b\\transformed\\core-1.13.1\\res\\values-hy\\values-hy.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,155,260,358,457,562,664,775",
+                        "endColumns": "99,104,97,98,104,101,110,100",
+                        "endOffsets": "150,255,353,452,557,659,770,871"
+                    }
+                }
+            ]
+        },
+        {
+            "outputFile": "one.mixin.desktop.drop.desktop_drop-release-24:/values-hy/values-hy.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\Albert\\.gradle\\caches\\8.14.5\\transforms\\b65a1cf93b3a1582db179429064d7f8b\\transformed\\core-1.13.1\\res\\values-hy\\values-hy.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,155,260,358,457,562,664,775",
+                        "endColumns": "99,104,97,98,104,101,110,100",
+                        "endOffsets": "150,255,353,452,557,659,770,871"
+                    }
+                }
+            ]
+        }
+    ]
+}

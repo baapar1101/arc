@@ -12,10 +12,11 @@ import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../models/warehouse_document_model.dart';
 import '../../core/calendar_controller.dart';
-import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../core/date_utils.dart' show MarkStreetDateUtils;
 import '../../utils/error_extractor.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/warehouse_invoice_lines.dart';
 import '../../services/list_filter_preferences_service.dart';
 
 class WarehouseDocsPage extends StatefulWidget {
@@ -149,13 +150,28 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         businessId: widget.businessId,
         invoiceId: wizardResult.invoiceId!,
       );
+      final quantitiesData = await _svc.getInvoiceLineQuantities(
+        businessId: widget.businessId,
+        invoiceId: wizardResult.invoiceId!,
+      );
       dismissLoader();
       if (!mounted) return;
       final invoiceItem = Map<String, dynamic>.from(invoiceData['item'] ?? const {});
-      final initialLines = _extractLinesFromInvoice(invoiceItem, wizardResult.docType ?? 'issue');
+      final quantities = InvoiceLineQuantitiesIndex.fromApiResponse(quantitiesData);
+      final initialLines = extractWarehouseLinesFromInvoice(
+        invoiceItem,
+        wizardResult.docType ?? 'issue',
+        quantities: quantities,
+      );
       if (initialLines.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('هیچ کالایی برای این فاکتور ثبت نشده است')),
+        );
+        return;
+      }
+      if (!quantities.hasAnyRemaining) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('همه اقلام این فاکتور قبلاً حواله شده‌اند')),
         );
         return;
       }
@@ -186,44 +202,6 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     } finally {
       dismissLoader();
     }
-  }
-
-  List<Map<String, dynamic>> _extractLinesFromInvoice(Map<String, dynamic> invoice, String docType) {
-    final movementFallback = docType == 'receipt' ? 'in' : 'out';
-    final rawLines = List<dynamic>.from(invoice['product_lines'] ?? const []);
-    final List<Map<String, dynamic>> result = [];
-    for (final raw in rawLines) {
-      if (raw is! Map) continue;
-      final map = Map<String, dynamic>.from(raw);
-      if (map['product_id'] == null) continue;
-      final qty = _toDouble(map['quantity']);
-      if (qty <= 0) continue;
-      final extra = Map<String, dynamic>.from(map['extra_info'] ?? const {});
-      final warehouseId = _toInt(map['warehouse_id'] ?? extra['warehouse_id']);
-      final movement = (extra['movement'] ?? movementFallback).toString();
-      result.add({
-        'product_id': map['product_id'],
-        'quantity': qty,
-        'warehouse_id': warehouseId,
-        'movement': movement,
-        'extra_info': extra,
-      });
-    }
-    return result;
-  }
-
-  double _toDouble(dynamic value) {
-    if (value is num) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0;
-    return 0;
-  }
-
-  int? _toInt(dynamic value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String && value.isNotEmpty) return int.tryParse(value);
-    return null;
   }
 
   String _warehouseMovementSummary(WarehouseDocument d) {
@@ -647,7 +625,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
               formatter: (item) {
                 final doc = item as WarehouseDocument;
                 if (doc.documentDate == null) return '';
-                return HesabixDateUtils.formatForDisplay(
+                return MarkStreetDateUtils.formatForDisplay(
                   doc.documentDate,
                   _calendarController?.isJalali ?? false,
                 );

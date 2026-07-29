@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import hashlib
-import random
+import secrets
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 
@@ -28,12 +28,13 @@ from adapters.db.repositories.api_key_repo import ApiKeyRepository
 def _hash_otp(otp: str) -> str:
 	"""Hash کردن OTP برای ذخیره امن"""
 	settings = get_settings()
-	return hashlib.sha256(f"{settings.captcha_secret}:{otp}".encode("utf-8")).hexdigest()
+	pepper = (settings.otp_pepper or settings.captcha_secret).strip()
+	return hashlib.sha256(f"{pepper}:{otp}".encode("utf-8")).hexdigest()
 
 
 def generate_otp() -> str:
 	"""تولید کد OTP 6 رقمی"""
-	return str(random.randint(100000, 999999))
+	return str(secrets.randbelow(900000) + 100000)
 
 
 # پیام یکسان برای خطاهای کانال / عدم امکان ارسال — بدون افشای وجود کاربر یا جزئیات داخلی
@@ -42,6 +43,25 @@ OTP_LOGIN_CHANNEL_PUBLIC_MESSAGE = (
 	"شناسه، روش دریافت کد و کد امنیتی را بررسی کنید؛ در صورت نیاز روش دیگری را انتخاب کنید."
 )
 
+
+def _mask_identifier(value: str | None) -> str:
+	if not value:
+		return ""
+	text = str(value).strip()
+	if "@" in text:
+		local, _, domain = text.partition("@")
+		prefix = local[:1] if local else ""
+		return f"{prefix}***@{domain}"
+	digits = "".join(ch for ch in text if ch.isdigit())
+	if len(digits) >= 4:
+		return f"***{digits[-4:]}"
+	return "***"
+
+
+def _mask_user_ref(user: User | None) -> str:
+	if not user:
+		return "none"
+	return f"user#{user.id}"
 
 def _otp_login_channel_not_supported_error() -> ApiError:
 	return ApiError("CHANNEL_NOT_SUPPORTED", OTP_LOGIN_CHANNEL_PUBLIC_MESSAGE, http_status=400)
@@ -56,7 +76,7 @@ def _resolve_identifier_for_otp(identifier: str):
 	import structlog
 	logger = structlog.get_logger()
 	kind, email, mobile = _detect_identifier(identifier)
-	logger.info(f"resolve_otp_identifier - identifier: {identifier}, kind: {kind}, email: {email}, mobile: {mobile}")
+	logger.debug("resolve_otp_identifier kind=%s id=%s", kind, _mask_identifier(identifier))
 	if (kind == "invalid" or (kind == "mobile" and mobile is None)) and "@" not in identifier:
 		identifier_clean = identifier.strip().replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
 		if len(identifier_clean) >= 10 and any(c.isdigit() for c in identifier_clean):
@@ -64,7 +84,7 @@ def _resolve_identifier_for_otp(identifier: str):
 				normalized_fallback = normalize_phone_number(identifier)
 				mobile = normalized_fallback
 				kind = "mobile"
-				logger.info(f"resolve_otp_identifier - fallback normalize_phone_number: {normalized_fallback}")
+				logger.debug("resolve_otp_identifier phone fallback applied")
 			except ValueError as e:
 				logger.debug(f"resolve_otp_identifier - normalize_phone_number failed: {e}")
 		else:
@@ -139,7 +159,7 @@ class OtpLoginService:
 		logger = structlog.get_logger()
 		
 		kind, email, mobile = _resolve_identifier_for_otp(identifier)
-		logger.info(f"get_available_channels - identifier: {identifier}, kind: {kind}, email: {email}, mobile: {mobile}")
+		logger.debug("get_available_channels kind=%s id=%s", kind, _mask_identifier(identifier))
 		
 		if kind == "invalid" or (kind == "mobile" and mobile is None):
 			logger.warning(f"get_available_channels - invalid identifier: {identifier}")
@@ -150,7 +170,7 @@ class OtpLoginService:
 		user = None
 		if email:
 			user = self.user_repo.get_by_email(email)
-			logger.info(f"get_available_channels - searched user by email {email}, found: {user is not None}")
+			logger.debug("get_available_channels user lookup by email found=%s", user is not None)
 		elif mobile:
 			# لیست فرمت‌های ممکن برای جستجو
 			search_formats = [mobile]  # فرمت اصلی
@@ -176,7 +196,7 @@ class OtpLoginService:
 			for search_format in search_formats:
 				user = self.user_repo.get_by_mobile(search_format)
 				if user:
-					logger.info(f"get_available_channels - found user with format {search_format}, user_id: {user.id}, telegram_chat_id: {user.telegram_chat_id}")
+					logger.debug("get_available_channels user matched %s", _mask_user_ref(user))
 					break
 			
 			if not user:
@@ -196,21 +216,21 @@ class OtpLoginService:
 		email_configured = self.email_provider.is_configured()
 		if user and getattr(user, "email", None) and email_configured:
 			available_channels.append("email")
-			logger.info(f"get_available_channels - Email channel added for user_id: {user.id}")
+			logger.debug("get_available_channels email channel added %s", _mask_user_ref(user))
 		
 		# بررسی Telegram
 		telegram_configured = self.telegram_provider.is_configured()
 		logger.info(f"get_available_channels - Telegram provider configured: {telegram_configured}")
 		if user:
-			logger.info(f"get_available_channels - user found: id={user.id}, telegram_chat_id={user.telegram_chat_id}")
+			logger.debug("get_available_channels telegram check %s", _mask_user_ref(user))
 			if user.telegram_chat_id:
 				if telegram_configured:
 					available_channels.append("telegram")
-					logger.info(f"get_available_channels - Telegram channel added for user_id: {user.id}, chat_id: {user.telegram_chat_id}")
+					logger.debug("get_available_channels telegram channel added %s", _mask_user_ref(user))
 				else:
-					logger.warning(f"get_available_channels - user has telegram_chat_id but telegram_provider not configured")
+					logger.warning("get_available_channels user has telegram_chat_id but provider not configured")
 			else:
-				logger.warning(f"get_available_channels - user found but no telegram_chat_id - user_id: {user.id}")
+				logger.warning("get_available_channels user found without telegram_chat_id %s", _mask_user_ref(user))
 		else:
 			logger.warning(f"get_available_channels - user not found, cannot add telegram channel")
 		
@@ -218,7 +238,7 @@ class OtpLoginService:
 		bale_configured = self.bale_provider.is_configured()
 		if user and getattr(user, "bale_chat_id", None) and bale_configured:
 			available_channels.append("bale")
-			logger.info(f"get_available_channels - Bale channel added for user_id: {user.id}")
+			logger.debug("get_available_channels bale channel added %s", _mask_user_ref(user))
 		
 		return {
 			"available_channels": available_channels,
@@ -260,7 +280,7 @@ class OtpLoginService:
 		
 		# تشخیص نوع identifier
 		kind, email, mobile = _detect_identifier(identifier)
-		logger.info(f"send_login_otp - identifier: {identifier}, kind: {kind}, email: {email}, mobile: {mobile}")
+		logger.debug("send_login_otp kind=%s id=%s", kind, _mask_identifier(identifier))
 		
 		# اگر _detect_identifier شماره را تشخیص نداد یا mobile None است، سعی می‌کنیم با normalize_phone_number
 		if (kind == "invalid" or (kind == "mobile" and mobile is None)) and "@" not in identifier:
@@ -307,7 +327,7 @@ class OtpLoginService:
 			for search_format in search_formats:
 				user = self.user_repo.get_by_mobile(search_format)
 				if user:
-					logger.info(f"send_login_otp - found user with format {search_format}, user_id: {user.id}, telegram_chat_id: {user.telegram_chat_id}")
+					logger.debug("send_login_otp user matched %s", _mask_user_ref(user))
 					break
 			
 			if not user:
@@ -344,12 +364,12 @@ class OtpLoginService:
 				logger.warning("send_login_otp email provider not configured")
 				raise _otp_login_channel_not_supported_error()
 		if channel == "telegram":
-			logger.info(f"send_login_otp - checking telegram channel - user: {user is not None}, user_id: {user.id if user else None}, telegram_chat_id: {user.telegram_chat_id if user else None}")
+			logger.debug("send_login_otp telegram channel check %s", _mask_user_ref(user))
 			if not user:
 				logger.info("send_login_otp telegram rejected (no user)")
 				raise _otp_login_channel_not_supported_error()
 			if not user.telegram_chat_id:
-				logger.info(f"send_login_otp telegram rejected (no chat id) user_id={user.id}")
+				logger.debug("send_login_otp telegram rejected (no chat id) %s", _mask_user_ref(user))
 				raise _otp_login_channel_not_supported_error()
 			if not self.telegram_provider.is_configured():
 				logger.warning("send_login_otp telegram provider not configured")
@@ -359,7 +379,7 @@ class OtpLoginService:
 				logger.info("send_login_otp bale rejected (no user)")
 				raise _otp_login_channel_not_supported_error()
 			if not getattr(user, "bale_chat_id", None):
-				logger.info(f"send_login_otp bale rejected (no chat id) user_id={user.id}")
+				logger.debug("send_login_otp bale rejected (no chat id) %s", _mask_user_ref(user))
 				raise _otp_login_channel_not_supported_error()
 			if not self.bale_provider.is_configured():
 				logger.warning("send_login_otp bale provider not configured")
@@ -452,7 +472,7 @@ class OtpLoginService:
 						body_text=message
 					)
 					if not success:
-						logger.error("email_login_otp_send_failed", user_id=user.id, email=email)
+						logger.error("email_login_otp_send_failed user=%s", _mask_user_ref(user))
 			
 			elif channel == "telegram":
 				if not user or not user.telegram_chat_id:
@@ -463,7 +483,7 @@ class OtpLoginService:
 					text=message
 				)
 				if not success:
-					logger.error("telegram_login_otp_send_failed", user_id=user.id, chat_id=user.telegram_chat_id)
+					logger.error("telegram_login_otp_send_failed user=%s", _mask_user_ref(user))
 			elif channel == "bale":
 				if not user or not getattr(user, "bale_chat_id", None):
 					logger.warning(f"send_login_otp bale fallback missing link user_id={getattr(user, 'id', None)}")
@@ -473,7 +493,7 @@ class OtpLoginService:
 					text=message
 				)
 				if not success:
-					logger.error("bale_login_otp_send_failed", user_id=user.id, chat_id=user.bale_chat_id)
+					logger.error("bale_login_otp_send_failed user=%s", _mask_user_ref(user))
 		
 		# به‌روزرسانی last_otp_sent_at پس از تلاش ارسال
 		if otp_session:

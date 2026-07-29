@@ -141,7 +141,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
       final data = await _service.getSystemConfiguration();
       if (mounted) {
         setState(() {
-          _appName = data['app_name']?.toString() ?? 'Hesabix';
+          _appName = data['app_name']?.toString() ?? 'MarkStreet';
           _appVersion = data['app_version']?.toString() ?? '1.0.23';
           _defaultLanguage = data['default_language']?.toString() ?? 'fa';
           _defaultTheme = data['default_theme']?.toString() ?? 'system';

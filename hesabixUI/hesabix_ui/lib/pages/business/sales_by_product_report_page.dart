@@ -173,7 +173,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
 
   String _formatDate(dynamic value) {
     if (value == null) return '';
-    return HesabixDateUtils.formatForDisplay(
+    return MarkStreetDateUtils.formatForDisplay(
       value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
       widget.calendarController.isJalali,
     );

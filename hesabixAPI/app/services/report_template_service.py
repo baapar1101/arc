@@ -15,7 +15,9 @@ from adapters.db.models.report_template import ReportTemplate
 from adapters.db.models.report_template_status_event import ReportTemplateStatusEvent
 from app.core.responses import ApiError
 from app.services.template_builder_compiler import compile_design_to_jinja_html
+from app.services.template_design_v2_compiler import compile_v2_design_to_jinja_html
 from app.services.report_template_scope_registry import get_scope_meta, is_known_scope
+from app.services.report_template_v2_service import validate_v2_design
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +28,7 @@ _MAX_NAME_LEN = 160
 _MAX_DESC_LEN = 512
 _MAX_MODULE_LEN = 64
 _MAX_ASSETS_JSON_LEN = 2_000_000
-_ALLOWED_ENGINES = frozenset({"jinja2", "builder"})
+_ALLOWED_ENGINES = frozenset({"jinja2", "builder", "template_v2"})
 _ALLOWED_STATUS = frozenset({"draft", "in_review", "approved", "published", "deprecated"})
 _ALLOWED_ORIENTATION = frozenset({"portrait", "landscape"})
 _MAX_PAPER_LEN = 32
@@ -209,6 +211,14 @@ class ReportTemplateService:
 			if "totals" not in found_types:
 				warnings.append("Invoice detail template usually needs a totals block")
 		return {"errors": errors, "warnings": warnings}
+
+	@staticmethod
+	def validate_template_v2_design_scope(
+		module_key: str,
+		subtype: Optional[str],
+		design: Dict[str, Any],
+	) -> Dict[str, List[str]]:
+		return validate_v2_design(module_key, subtype, design)
 
 	@staticmethod
 	def validate_template_payload(data: Dict[str, Any], *, is_update: bool) -> None:
@@ -509,27 +519,35 @@ class ReportTemplateService:
 		page_paper_size: Optional[str] = None,
 		page_orientation: Optional[str] = None,
 	) -> str:
-		# اگر engine=builder باشد، ابتدا از design داخل assets خروجی HTML/CSS/Header/Footer تولید می‌کنیم
-		try:
-			if str(getattr(template, "engine", "") or "").lower() == "builder":
+		engine_name = str(getattr(template, "engine", "") or "").lower()
+		# اگر engine=builder/template_v2 باشد، از design داخل assets خروجی HTML/CSS/Header/Footer تولید می‌کنیم
+		if engine_name in ("builder", "template_v2"):
+			try:
 				assets = getattr(template, "assets", None) or {}
-				design = assets.get("builder_design") or assets.get("design") or {}
-				html, css, header_html, footer_html = compile_design_to_jinja_html(design)
-				# یک نمونه موقت با مقادیر تولیدی
+				if engine_name == "template_v2":
+					design = assets.get("template_design") or assets.get("design") or {}
+					html, css, header_html, footer_html = compile_v2_design_to_jinja_html(design)
+				else:
+					design = assets.get("builder_design") or assets.get("design") or {}
+					html, css, header_html, footer_html = compile_design_to_jinja_html(design)
 				class _Temp:
 					pass
 				tmp = _Temp()
 				tmp.content_html = html
-				tmp.content_css = css or template.content_css
-				tmp.header_html = header_html or template.header_html
-				tmp.footer_html = footer_html or template.footer_html
-				tmp.paper_size = template.paper_size
-				tmp.orientation = template.orientation
-				tmp.margins = template.margins
+				tmp.content_css = css or getattr(template, "content_css", None)
+				tmp.header_html = header_html or getattr(template, "header_html", None)
+				tmp.footer_html = footer_html or getattr(template, "footer_html", None)
+				tmp.paper_size = getattr(template, "paper_size", None)
+				tmp.orientation = getattr(template, "orientation", None)
+				tmp.margins = getattr(template, "margins", None)
 				template = tmp  # type: ignore[assignment]
-		except Exception:
-			# مشکلی در کامپایل: اجازه می‌دهیم مسیر معمول اجرا شود تا خطا در مرحله رندر گزارش گردد
-			pass
+			except Exception as ex:
+				logger.error("Template compile error (engine=%s): %s", engine_name, ex)
+				raise ApiError(
+					"TEMPLATE_COMPILE_ERROR",
+					f"خطا در کامپایل قالب: {ex}",
+					http_status=400,
+				) from ex
 		"""رندر امن Jinja2"""
 		if not template or not template.content_html:
 			raise ApiError("INVALID_TEMPLATE", "Template HTML is empty", http_status=400)

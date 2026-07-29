@@ -135,6 +135,22 @@ def create_or_update_credential(
             function_calling_enabled=function_calling_enabled,
         )
         db.add(cred)
+    db.flush()
+    _sync_legacy_ai_config(db, cred)
     db.commit()
     db.refresh(cred)
     return cred
+
+
+def _sync_legacy_ai_config(db: Session, cred: AIProviderCredential) -> None:
+    """همگام‌سازی credential جدید با رکورد legacy `ai_configs` برای همان provider."""
+    from adapters.db.repositories.ai_config_repository import AIConfigRepository
+
+    config = AIConfigRepository(db).get_active_config()
+    if not config or config.provider != cred.provider:
+        return
+    config.api_base_url = cred.api_base_url
+    if cred.api_key:
+        config.api_key = cred.api_key
+    config.is_active = bool(cred.is_active)
+    config.function_calling_enabled = bool(cred.function_calling_enabled)

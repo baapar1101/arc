@@ -504,7 +504,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
             FilterOption(value: 'azure', label: 'Azure OpenAI'),
             FilterOption(value: 'anthropic', label: 'Anthropic'),
             FilterOption(value: 'local', label: 'Local'),
-            FilterOption(value: 'hesabix', label: 'Hesabix'),
+            FilterOption(value: 'hesabix', label: 'MarkStreet'),
           ],
           formatter: (item) => _providerLabel((item as AIUsageLog).provider),
         ),
@@ -647,7 +647,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
       case 'local':
         return 'مدل محلی';
       case 'hesabix':
-        return 'Hesabix';
+        return 'MarkStreet';
       default:
         return provider ?? '-';
     }

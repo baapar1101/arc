@@ -30,14 +30,17 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
   @override
   void initState() {
     super.initState();
-    _expanded = widget.initiallyExpanded || widget.compact;
+    _expanded = widget.initiallyExpanded;
   }
 
   @override
   void didUpdateWidget(covariant AIAgentTraceTimeline oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.compact) {
+    final hasActive = widget.steps.any((s) => s.isActive);
+    if (hasActive) {
       _expanded = true;
+    } else if (!widget.initiallyExpanded) {
+      _expanded = false;
     }
   }
 
@@ -50,7 +53,7 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
     final activeCount =
         widget.steps.where((s) => s.isActive).length;
 
-    final visibleSteps = _expanded
+    final visibleSteps = (_expanded || widget.compact)
         ? widget.steps
         : widget.steps
             .where((s) => s.isActive || s.isError)

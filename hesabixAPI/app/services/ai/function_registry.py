@@ -31,6 +31,7 @@ class AIFunction:
     requires_approval: bool = False   # نیاز به تأیید صریح کاربر قبل از اجرا
     risk_level: str = "safe"          # safe / medium / high
     is_readonly: bool = True          # قابل کش شدن — عملیات read-only
+    is_agent_internal: bool = False   # state داخلی agent — در حالت تحلیلگر هم مجاز
 
 
 def _has_filter_property(query: Dict[str, Any], prop: str) -> bool:
@@ -119,9 +120,19 @@ class AIFunctionRegistry:
         )
 
         register_phase10_business_functions(self)
+        from app.services.ai.ai_function_extensions_phase11 import (
+            register_phase11_business_functions,
+        )
+
+        register_phase11_business_functions(self)
         from app.services.ai.ai_function_extensions_memory import register_memory_functions
 
         register_memory_functions(self)
+        from app.services.ai.ai_function_extensions_session_todos import (
+            register_session_todo_functions,
+        )
+
+        register_session_todo_functions(self)
         from app.services.ai.ai_function_extensions_workflow import (
             register_workflow_ai_functions,
         )
@@ -1676,6 +1687,26 @@ class AIFunctionRegistry:
         def handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
             db: Session = context["db"]
             user_context: AuthContext = context["user_context"]
+
+            from app.services.ai.ai_date_resolver import (
+                calendar_type_from_context,
+                enrich_tool_result_dates,
+                normalize_query_dates,
+            )
+
+            calendar_type = calendar_type_from_context(context)
+            context["calendar_type"] = calendar_type
+
+            _date_keys = frozenset({
+                "from_date", "to_date", "date_from", "date_to",
+                "as_of_date", "document_date", "filters",
+            })
+            if any(k in args for k in _date_keys):
+                try:
+                    normalized = normalize_query_dates(dict(args), calendar_type=calendar_type)
+                    args.update(normalized)
+                except ValueError as exc:
+                    raise ValueError(str(exc)) from exc
             
             # دریافت business_id از session (اولویت) یا context
             session_business_id = context.get("session_business_id")
@@ -1710,7 +1741,8 @@ class AIFunctionRegistry:
                 args["user_id"] = user_context.get_user_id()
             
             try:
-                return service_func(db=db, **args)
+                result = service_func(db=db, **args)
+                return enrich_tool_result_dates(result, calendar_type=calendar_type)
             except Exception:
                 try:
                     db.rollback()

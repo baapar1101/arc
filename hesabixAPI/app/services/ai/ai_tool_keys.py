@@ -117,6 +117,7 @@ TOOL_L10N_KEYS: Dict[str, str] = {
     "poll_workflow_execution": "aiToolPollWorkflowExecution",
     "export_business_data": "aiToolExportBusinessData",
     "list_queryable_fields": "aiToolListQueryableFields",
+    "resolve_date_range": "aiToolResolveDateRange",
     "get_user_memory": "aiToolGetUserMemory",
     "update_user_memory": "aiToolUpdateUserMemory",
     "list_available_reports": "aiToolListAvailableReports",
@@ -246,6 +247,7 @@ TOOL_LABELS_FA: Dict[str, str] = {
     "poll_workflow_execution": "پیگیری اجرای workflow",
     "export_business_data": "خروجی داده",
     "list_queryable_fields": "فیلدهای قابل جستجو",
+    "resolve_date_range": "تبدیل بازهٔ تاریخ",
     "get_user_memory": "خواندن حافظه دستیار",
     "update_user_memory": "به‌روزرسانی حافظه دستیار",
     "list_available_reports": "فهرست گزارش‌های مجاز",
@@ -261,6 +263,9 @@ TOOL_LABELS_FA: Dict[str, str] = {
     "adjust_customer_club_points": "تنظیم امتیاز باشگاه",
     "recalculate_customer_club_rfm": "محاسبه مجدد RFM",
     "update_customer_club_settings": "تنظیمات باشگاه مشتری",
+    "create_session_plan": "ساخت برنامهٔ کاری",
+    "list_session_todos": "فهرست برنامهٔ کاری",
+    "update_session_todo": "به‌روزرسانی مرحله",
 }
 
 

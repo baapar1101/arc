@@ -349,6 +349,37 @@ const _toolLabelFallbackFa = <String, String>{
   'update_user_memory': 'به‌روزرسانی حافظه دستیار',
 };
 
+/// خلاصهٔ بودجه agent برای نمایش در استریم.
+String aiAgentBudgetSummary(
+  AppLocalizations l10n, {
+  required AIStreamAgentBudget budget,
+}) {
+  final parts = <String>[];
+  final used = budget.tokensUsed;
+  final maxTok = budget.maxTotalTokens;
+  if (used != null && maxTok != null && maxTok > 0) {
+    parts.add('${formatCompactInt(used)}/${formatCompactInt(maxTok)} tok');
+  }
+  final elapsed = budget.elapsedSec;
+  if (elapsed != null) {
+    parts.add('${elapsed.toStringAsFixed(0)}s');
+  }
+  final effort = budget.reasoningEffort;
+  if (effort != null && effort.isNotEmpty) {
+    parts.add('reasoning: $effort');
+  }
+  if (budget.stopReason != null && budget.stopReason!.isNotEmpty) {
+    parts.add(budget.stopMessageFa ?? budget.stopReason!);
+  }
+  return parts.join(' · ');
+}
+
+String formatCompactInt(int value) {
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+  return value.toString();
+}
+
 /// متن وضعیت استریم AI از phase/step.
 String aiStreamStatusLabel(
   AppLocalizations l10n, {
@@ -507,3 +538,27 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       return l10n.aiStatusThinking;
   }
 }
+
+bool _isFaLocale(AppLocalizations l10n) =>
+    l10n.localeName.toLowerCase().startsWith('fa');
+
+String aiSessionPlanDefaultTitle(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'برنامهٔ کاری' : 'Work plan';
+
+String aiSessionPlanReasoningTitle(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'تحلیل و برنامهٔ کاری' : 'Analysis & work plan';
+
+String aiSessionPlanProgressLabel(
+  AppLocalizations l10n, {
+  required int completed,
+  required int total,
+}) =>
+    _isFaLocale(l10n)
+        ? '$completed از $total مرحله انجام شد'
+        : '$completed of $total steps done';
+
+String aiSessionPlanLinkedToolLabel(AppLocalizations l10n, String tool) =>
+    _isFaLocale(l10n) ? 'ابزار: $tool' : 'Tool: $tool';
+
+String aiStatusLoadingSessionPlan(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'بارگذاری برنامهٔ کاری…' : 'Loading work plan…';
