@@ -281,7 +281,7 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
           controller: _tabController,
           tabs: const [
             Tab(text: 'جامعه'),
-            Tab(text: 'حسابیکس'),
+            Tab(text: 'مارک‌استریت'),
             Tab(text: 'Anthropic'),
           ],
         ),
@@ -332,7 +332,7 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
                           isOfficial: true,
                           emptyTitle: 'مهارت رسمی یافت نشد',
                           emptySubtitle:
-                              'مهارت‌های رسمی حسابیکس به‌زودی اینجا نمایش داده می‌شوند.',
+                              'مهارت‌های رسمی مارک‌استریت به‌زودی اینجا نمایش داده می‌شوند.',
                         ),
                         _buildAnthropicList(),
                       ],

@@ -1025,7 +1025,7 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                     title: Text('تاریخ پیش‌بینی بسته شدن'),
                     subtitle: Text(
                       _expectedCloseDate != null
-                          ? HesabixDateUtils.formatForDisplay(
+                          ? MarkStreetDateUtils.formatForDisplay(
                               _expectedCloseDate,
                               widget.calendarController?.isJalali ??
                                   ApiClient.getCalendarController()?.isJalali ??
@@ -1055,7 +1055,7 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                   title: Text(
                     _nextFollowUpAt == null
                         ? 'یادآور پیگیری: تعیین نشده'
-                        : 'یادآور پیگیری: ${HesabixDateUtils.formatDateTime(
+                        : 'یادآور پیگیری: ${MarkStreetDateUtils.formatDateTime(
                             _nextFollowUpAt,
                             widget.calendarController?.isJalali ??
                                 ApiClient.getCalendarController()?.isJalali ??

@@ -218,7 +218,7 @@ class SnackBarHelper {
     show(
       context,
       message: message,
-      backgroundColor: Colors.blue,
+      backgroundColor: Colors.grey,
       duration: duration,
     );
   }

@@ -125,7 +125,7 @@ class MessageBubble extends StatelessWidget {
 
   Color _getSenderColor(ThemeData theme) {
     if (message.isFromOperator) {
-      return Colors.blue;
+      return Colors.grey;
     } else if (message.isFromSystem) {
       return Colors.grey;
     }
@@ -190,7 +190,7 @@ class MessageBubble extends StatelessWidget {
     // For messages older than 24 hours, always show full date and time
     if (totalDays > 0 || totalHours >= 24) {
       final isJalali = calendarController?.isJalali ?? true;
-      return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
+      return date_utils.MarkStreetDateUtils.formatDateTime(localDateTime, isJalali);
     }
 
     // For recent messages (less than 24 hours), show relative time

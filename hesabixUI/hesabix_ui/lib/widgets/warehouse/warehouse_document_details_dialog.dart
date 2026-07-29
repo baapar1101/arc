@@ -13,7 +13,7 @@ import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 
 import '../../utils/web/web_utils.dart' as web_utils;
-import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../core/date_utils.dart' show MarkStreetDateUtils;
 import 'warehouse_postal_label_print_dialog.dart';
 import '../../utils/error_extractor.dart';
 
@@ -456,7 +456,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                       ),
                       if (doc['document_date'] != null && _calendarController != null)
                         _buildHeaderChip(
-                          '${t.warehouseDocumentDate}: ${HesabixDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date']), _calendarController!.isJalali)}',
+                          '${t.warehouseDocumentDate}: ${MarkStreetDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date']), _calendarController!.isJalali)}',
                           theme,
                           icon: Icons.calendar_today,
                         ),
@@ -581,7 +581,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                     _buildInfoRow(
                       theme,
                       t.warehouseDocumentDate,
-                      HesabixDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date'] as String), _calendarController!.isJalali),
+                      MarkStreetDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date'] as String), _calendarController!.isJalali),
                     ),
                   if (doc['fiscal_year_title'] != null)
                     _buildInfoRow(theme, 'سال مالی', doc['fiscal_year_title'].toString()),
@@ -1011,7 +1011,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
     if (dt == null) return iso;
     final cal = _calendarController;
     if (cal != null) {
-      return HesabixDateUtils.formatForDisplay(dt, cal.isJalali);
+      return MarkStreetDateUtils.formatForDisplay(dt, cal.isJalali);
     }
     final mm = dt.minute.toString().padLeft(2, '0');
     final hh = dt.hour.toString().padLeft(2, '0');

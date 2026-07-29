@@ -60,7 +60,7 @@ const List<AIChatSuggestion> kDefaultAIChatSuggestions = [
   ),
   AIChatSuggestion(
     label: 'راهنمای ثبت فاکتور',
-    prompt: 'گام‌به‌گام نحوه ثبت فاکتور فروش در حسابیکس را توضیح بده.',
+    prompt: 'گام‌به‌گام نحوه ثبت فاکتور فروش در مارک‌استریت را توضیح بده.',
     icon: Icons.receipt_long_outlined,
   ),
   AIChatSuggestion(
@@ -75,7 +75,7 @@ const List<AIChatSuggestion> kDefaultAIChatSuggestions = [
   ),
   AIChatSuggestion(
     label: 'کمک در حسابداری',
-    prompt: 'در ثبت سند حسابداری، انتخاب حساب‌ها و تفاوت سند با فاکتور در حسابیکس راهنمایی‌ام کن.',
+    prompt: 'در ثبت سند حسابداری، انتخاب حساب‌ها و تفاوت سند با فاکتور در مارک‌استریت راهنمایی‌ام کن.',
     icon: Icons.account_balance_outlined,
   ),
 ];

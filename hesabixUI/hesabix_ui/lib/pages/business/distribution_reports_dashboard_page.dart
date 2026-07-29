@@ -122,7 +122,7 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
                   child: OutlinedButton.icon(
                     onPressed: () => _pickDate(true),
                     icon: const Icon(Icons.date_range),
-                    label: Text(Hd.HesabixDateUtils.formatForDisplay(_from, _jalali)),
+                    label: Text(Hd.MarkStreetDateUtils.formatForDisplay(_from, _jalali)),
                   ),
                 ),
                 const Padding(
@@ -133,7 +133,7 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
                   child: OutlinedButton.icon(
                     onPressed: () => _pickDate(false),
                     icon: const Icon(Icons.date_range),
-                    label: Text(Hd.HesabixDateUtils.formatForDisplay(_to, _jalali)),
+                    label: Text(Hd.MarkStreetDateUtils.formatForDisplay(_to, _jalali)),
                   ),
                 ),
               ],

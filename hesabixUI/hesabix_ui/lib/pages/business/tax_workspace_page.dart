@@ -12,7 +12,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/errors/api_error.dart';
@@ -643,7 +643,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               dt = raw;
             }
             if (dt == null) return '-';
-            return HesabixDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+            return MarkStreetDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
           },
         ),
         TextColumn(
@@ -711,7 +711,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               dt = raw;
             }
             if (dt == null) return '-';
-            return HesabixDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+            return MarkStreetDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
           },
         ),
       ],
@@ -725,8 +725,8 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       },
       additionalParams: {
         'document_type': _selectedInvoiceType,
-        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
         'tax_status': _selectedTaxStatus,
       },
       emptyStateMessage: t.taxWorkspaceEmpty,

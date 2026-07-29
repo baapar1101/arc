@@ -804,7 +804,7 @@ class _MyAppState extends State<MyApp> {
       );
 
       return MaterialApp.router(
-        title: 'Hesabix',
+        title: 'MarkStreet',
         routerConfig: loadingRouter,
         locale: _controller?.locale ?? const Locale('fa'),
         supportedLocales: const [Locale('en'), Locale('fa')],
@@ -3812,7 +3812,7 @@ class _MyAppState extends State<MyApp> {
           child: UserActivityHeartbeat(
             authStore: _authStore!,
             child: MaterialApp.router(
-            title: 'Hesabix',
+            title: 'MarkStreet',
             theme: AppTheme.build(
               isDark: false,
               locale: controller.locale,

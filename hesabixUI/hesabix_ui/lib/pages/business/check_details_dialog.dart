@@ -819,7 +819,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
   }
 
   String _formatDate(dynamic value, {dynamic rawValue}) {
-    return HesabixDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
+    return MarkStreetDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
   }
 
   String _formatStatus(String status) {

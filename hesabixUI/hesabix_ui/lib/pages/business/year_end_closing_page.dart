@@ -265,7 +265,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
               // تاریخ شروع: یک روز بعد از پایان سال مالی فعلی
               final newStartDate = endDate.add(const Duration(days: 1));
               // تاریخ پایان: سالگرد یک سال بعد از شروع، منهای یک روز (بازهٔ شامل)
-              final newEndDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+              final newEndDate = MarkStreetDateUtils.fiscalYearInclusiveEndFromStart(
                 newStartDate,
                 _calendarController!.isJalali,
               );
@@ -912,7 +912,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     final whToMove =
         (closingOpts?['post_cutoff_warehouse_documents_to_relocate'] as num?)?.toInt() ?? 0;
     final calendarEndLabel = calendarEnd != null
-        ? HesabixDateUtils.formatForDisplay(calendarEnd, cal.isJalali)
+        ? MarkStreetDateUtils.formatForDisplay(calendarEnd, cal.isJalali)
         : '—';
 
     return Card(
@@ -1041,7 +1041,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
       final startDateStr = fiscalYear['start_date'].toString();
       final startDate = DateTime.tryParse(startDateStr);
       if (startDate != null) {
-        startDateFormatted = HesabixDateUtils.formatForDisplay(startDate, isJalali);
+        startDateFormatted = MarkStreetDateUtils.formatForDisplay(startDate, isJalali);
       } else {
         startDateFormatted = startDateStr;
       }
@@ -1062,7 +1062,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
       final endDateStr = fiscalYear['end_date'].toString();
       final endDate = DateTime.tryParse(endDateStr);
       if (endDate != null) {
-        endDateFormatted = HesabixDateUtils.formatForDisplay(endDate, isJalali);
+        endDateFormatted = MarkStreetDateUtils.formatForDisplay(endDate, isJalali);
       } else {
         endDateFormatted = endDateStr;
       }
@@ -1650,7 +1650,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                           _newFiscalYearStartDate = date;
                           // تنظیم خودکار تاریخ پایان (سالگرد یک سال بعد منهای یک روز)
                           if (date != null) {
-                            _newFiscalYearEndDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+                            _newFiscalYearEndDate = MarkStreetDateUtils.fiscalYearInclusiveEndFromStart(
                               date,
                               _calendarController!.isJalali,
                             );

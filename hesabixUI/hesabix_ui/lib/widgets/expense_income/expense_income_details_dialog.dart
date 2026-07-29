@@ -6,7 +6,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/expense_income_document.dart';
 import 'package:hesabix_ui/services/expense_income_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -135,8 +135,8 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
             ),
             const SizedBox(height: 12),
             _buildInfoRow('نوع سند', doc.documentTypeName),
-            _buildInfoRow('تاریخ سند', HesabixDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali)),
-            _buildInfoRow('تاریخ ثبت', HesabixDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
+            _buildInfoRow('تاریخ سند', MarkStreetDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali)),
+            _buildInfoRow('تاریخ ثبت', MarkStreetDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
             _buildInfoRow('ارز', doc.currencyCode ?? 'نامشخص'),
             _buildInfoRow('ایجادکننده', doc.createdByName ?? 'نامشخص'),
             _buildInfoRow('مبلغ کل', '${formatWithThousands(doc.totalAmount)} ریال'),
@@ -289,7 +289,7 @@ class _ExpenseIncomeDetailsDialogState extends State<ExpenseIncomeDetailsDialog>
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     Text(
-                      'تاریخ: ${HesabixDateUtils.formatForDisplay(line.transactionDate, widget.calendarController.isJalali)}',
+                      'تاریخ: ${MarkStreetDateUtils.formatForDisplay(line.transactionDate, widget.calendarController.isJalali)}',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],

@@ -63,7 +63,7 @@ val resolvedNdkVersion: String = run {
         val best = pickNewestNdk(complete)
         if (best != null) {
             logger.lifecycle(
-                "Hesabix: preferred NDK '$preferredNdk' not under Sdk/ndk (or incomplete); " +
+                "MarkStreet: preferred NDK '$preferredNdk' not under Sdk/ndk (or incomplete); " +
                     "using newest local kit with source.properties: $best",
             )
             return@run best

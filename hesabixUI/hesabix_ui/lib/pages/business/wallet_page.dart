@@ -13,7 +13,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import '../../core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
-import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../core/date_utils.dart' show MarkStreetDateUtils;
 import '../../widgets/wallet/wallet_top_up_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -557,7 +557,7 @@ class _WalletPageState extends State<WalletPage> {
                                     
                                     // استفاده از تقویم کاربر برای فرمت کردن
                                     final isJalali = _calendarCtrl?.isJalali ?? false;
-                                    return HesabixDateUtils.formatForDisplay(date, isJalali);
+                                    return MarkStreetDateUtils.formatForDisplay(date, isJalali);
                                   }),
                                   TextColumn('type', t.type, formatter: (it) => _typeLabel((it['type'] ?? '').toString())),
                                   TextColumn('status', t.status, formatter: (it) => _statusLabel((it['status'] ?? '').toString())),

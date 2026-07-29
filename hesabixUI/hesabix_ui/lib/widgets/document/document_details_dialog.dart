@@ -12,7 +12,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
 import 'package:hesabix_ui/services/receipt_payment_service.dart';
 import 'package:hesabix_ui/models/receipt_payment_document.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
@@ -1372,7 +1372,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       try {
         final dt = DateTime.tryParse(expRaw);
         if (dt != null) {
-          expiryText = HesabixDateUtils.formatDateTime(dt, isJalali);
+          expiryText = MarkStreetDateUtils.formatDateTime(dt, isJalali);
         }
       } catch (_) {
         expiryText = expRaw;
@@ -1387,7 +1387,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       try {
         final dt = DateTime.tryParse(lv);
         if (dt != null) {
-          lastViewText = HesabixDateUtils.formatDateTime(dt, isJalali);
+          lastViewText = MarkStreetDateUtils.formatDateTime(dt, isJalali);
         }
       } catch (_) {
         lastViewText = lv;
@@ -1636,7 +1636,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     if (s.isEmpty) return '-';
     try {
       final d = DateTime.parse(s.split('T').first);
-      return HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali == true);
+      return MarkStreetDateUtils.formatForDisplay(d, widget.calendarController.isJalali == true);
     } catch (_) {
       return s;
     }
@@ -2690,7 +2690,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     }
 
     String fmtDue(dynamic v) {
-      return HesabixDateUtils.formatApiDateForDisplay(
+      return MarkStreetDateUtils.formatApiDateForDisplay(
         v,
         widget.calendarController.isJalali == true,
         rawValue: v is Map ? (v['raw'] ?? v['gregorian'] ?? v['iso']) : null,
@@ -4066,7 +4066,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 Expanded(
                   child: _buildPaymentInfoRow(
                     'تاریخ:',
-                    HesabixDateUtils.formatForDisplay(
+                    MarkStreetDateUtils.formatForDisplay(
                       doc.documentDate,
                       widget.calendarController.isJalali == true,
                     ),

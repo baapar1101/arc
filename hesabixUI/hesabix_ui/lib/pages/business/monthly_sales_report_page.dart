@@ -204,7 +204,7 @@ class _MonthlySalesReportPageState extends State<MonthlySalesReportPage> {
                       }
                     } catch (_) {
                       // Fallback: نمایش تاریخ
-                      return HesabixDateUtils.formatForDisplay(dt, true);
+                      return MarkStreetDateUtils.formatForDisplay(dt, true);
                     }
                   } else {
                     // میلادی

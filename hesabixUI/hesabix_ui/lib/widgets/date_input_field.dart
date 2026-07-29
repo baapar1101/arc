@@ -109,7 +109,7 @@ class _DateInputFieldState extends State<DateInputField> {
   }
 
   void _updateDisplayValue() {
-    final displayValue = HesabixDateUtils.formatForDisplay(
+    final displayValue = MarkStreetDateUtils.formatForDisplay(
       widget.value,
       widget.calendarController.isJalali == true,
     );
@@ -147,18 +147,18 @@ class _DateInputFieldState extends State<DateInputField> {
       }
       return;
     }
-    final parsed = HesabixDateUtils.parseFromDisplay(text, isJalali);
+    final parsed = MarkStreetDateUtils.parseFromDisplay(text, isJalali);
     if (parsed == null) {
       return;
     }
-    if (!HesabixDateUtils.isDateOnlyInRange(
+    if (!MarkStreetDateUtils.isDateOnlyInRange(
       parsed,
       _effectiveFirst(),
       _effectiveLast(),
     )) {
       return;
     }
-    final n = HesabixDateUtils.toDateOnlyLocal(parsed);
+    final n = MarkStreetDateUtils.toDateOnlyLocal(parsed);
     if (!_sameDateOnly(widget.value, n)) {
       widget.onChanged?.call(n);
     }
@@ -171,11 +171,11 @@ class _DateInputFieldState extends State<DateInputField> {
     }
     final t = AppLocalizations.of(context);
     final isJalali = widget.calendarController.isJalali == true;
-    final parsed = HesabixDateUtils.parseFromDisplay(text, isJalali);
+    final parsed = MarkStreetDateUtils.parseFromDisplay(text, isJalali);
     if (parsed == null) {
       return t.dateInputInvalidFormat;
     }
-    if (!HesabixDateUtils.isDateOnlyInRange(
+    if (!MarkStreetDateUtils.isDateOnlyInRange(
       parsed,
       _effectiveFirst(),
       _effectiveLast(),
@@ -209,9 +209,9 @@ class _DateInputFieldState extends State<DateInputField> {
     var initialDate = widget.value ?? now;
     final fieldText = _controller.text.trim();
     if (fieldText.isNotEmpty) {
-      final fromField = HesabixDateUtils.parseFromDisplay(fieldText, isJalali);
+      final fromField = MarkStreetDateUtils.parseFromDisplay(fieldText, isJalali);
       if (fromField != null &&
-          HesabixDateUtils.isDateOnlyInRange(fromField, firstDate, lastDate)) {
+          MarkStreetDateUtils.isDateOnlyInRange(fromField, firstDate, lastDate)) {
         initialDate = fromField;
       }
     }

@@ -470,7 +470,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       final isJalali = widget.calendarController?.isJalali ??
           ApiClient.getCalendarController()?.isJalali ??
           true;
-      return HesabixDateUtils.formatDateTime(dateTime, isJalali);
+      return MarkStreetDateUtils.formatDateTime(dateTime, isJalali);
     } catch (_) {
       return DateFormatters.formatServerDateTime(dateTime.toIso8601String());
     }

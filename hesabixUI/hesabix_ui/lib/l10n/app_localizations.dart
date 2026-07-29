@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix'**
+  /// **'MarkStreet'**
   String get appTitle;
 
   /// No description provided for @login.
@@ -233,7 +233,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix Cloud Accounting'**
+  /// **'MarkStreet Cloud Accounting'**
   String get welcomeTitle;
 
   /// No description provided for @welcomeSubtitle.
@@ -4481,7 +4481,7 @@ abstract class AppLocalizations {
   /// No description provided for @pluginMarketplaceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Extend Hesabix with integrations and industry add-ons. Pay from your business wallet.'**
+  /// **'Extend MarkStreet with integrations and industry add-ons. Pay from your business wallet.'**
   String get pluginMarketplaceSubtitle;
 
   /// No description provided for @pluginMarketplaceBrowseTab.
@@ -11475,7 +11475,7 @@ abstract class AppLocalizations {
   /// No description provided for @notificationsChannelInAppDescription.
   ///
   /// In en, this message translates to:
-  /// **'Display notifications inside Hesabix web and mobile in real time.'**
+  /// **'Display notifications inside MarkStreet web and mobile in real time.'**
   String get notificationsChannelInAppDescription;
 
   /// No description provided for @notificationsSaveSuccess.
@@ -12921,7 +12921,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideIntroDescription.
   ///
   /// In en, this message translates to:
-  /// **'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new Hesabix version—from key generation to data quality checks and invoice submission.'**
+  /// **'This guide walks through the entire integration flow with the Iranian Taxpayers System in the new MarkStreet version—from key generation to data quality checks and invoice submission.'**
   String get taxGuideIntroDescription;
 
   /// No description provided for @taxGuidePrereqTitle.
@@ -12951,7 +12951,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideStep1Title.
   ///
   /// In en, this message translates to:
-  /// **'1) Generate keys inside Hesabix'**
+  /// **'1) Generate keys inside MarkStreet'**
   String get taxGuideStep1Title;
 
   /// No description provided for @taxGuideStep1Description.
@@ -13035,13 +13035,13 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideStep3Bullet3.
   ///
   /// In en, this message translates to:
-  /// **'Copy the issued memory ID and paste it back into Hesabix.'**
+  /// **'Copy the issued memory ID and paste it back into MarkStreet.'**
   String get taxGuideStep3Bullet3;
 
   /// No description provided for @taxGuideStep4Title.
   ///
   /// In en, this message translates to:
-  /// **'4) Complete the connection form in Hesabix'**
+  /// **'4) Complete the connection form in MarkStreet'**
   String get taxGuideStep4Title;
 
   /// No description provided for @taxGuideStep4Description.
@@ -13095,7 +13095,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxGuideStep5Bullet3.
   ///
   /// In en, this message translates to:
-  /// **'After in-person verification upload the issued certificate into Hesabix.'**
+  /// **'After in-person verification upload the issued certificate into MarkStreet.'**
   String get taxGuideStep5Bullet3;
 
   /// No description provided for @taxGuideStep6Title.
@@ -24879,7 +24879,7 @@ abstract class AppLocalizations {
   /// No description provided for @basalamSettingsMonetaryUnitHelper.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix stores IRR only; toman amounts from Basalam are multiplied by 10.'**
+  /// **'MarkStreet stores IRR only; toman amounts from Basalam are multiplied by 10.'**
   String get basalamSettingsMonetaryUnitHelper;
 
   /// No description provided for @basalamSettingsMonetaryUnitRial.
@@ -25263,7 +25263,7 @@ abstract class AppLocalizations {
   /// No description provided for @wooBridgeFieldPluginVersion.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix ArcWOC plugin version'**
+  /// **'MarkStreet ArcWOC plugin version'**
   String get wooBridgeFieldPluginVersion;
 
   /// No description provided for @wooBridgeFieldGenericTitle.
@@ -25350,11 +25350,11 @@ abstract class AppLocalizations {
   /// **'Order type'**
   String get woocommerceColumnOrderType;
 
-  /// No description provided for @woocommerceColumnHesabixId.
+  /// No description provided for @woocommerceColumnMarkStreetId.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix ID'**
-  String get woocommerceColumnHesabixId;
+  /// **'MarkStreet ID'**
+  String get woocommerceColumnMarkStreetId;
 
   /// No description provided for @woocommerceColumnSyncStatus.
   ///
@@ -25563,7 +25563,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceSettingsBridgeIntroBody.
   ///
   /// In en, this message translates to:
-  /// **'Enter your WordPress site base URL and the bridge token generated in the Hesabix ArcWOC plugin. Leave the token field empty when saving to keep the existing secret.'**
+  /// **'Enter your WordPress site base URL and the bridge token generated in the MarkStreet ArcWOC plugin. Leave the token field empty when saving to keep the existing secret.'**
   String get woocommerceSettingsBridgeIntroBody;
 
   /// No description provided for @woocommerceStoreUrlLabel.
@@ -25677,7 +25677,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceControlIntroSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Mapping stats, Hesabix API health, plugin version, recent logs and bulk sync via the same secure bridge token as the operations hub.'**
+  /// **'Mapping stats, MarkStreet API health, plugin version, recent logs and bulk sync via the same secure bridge token as the operations hub.'**
   String get woocommerceControlIntroSubtitle;
 
   /// No description provided for @woocommerceControlRefreshTooltip.
@@ -25701,7 +25701,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceControlConnectionTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix API from the store'**
+  /// **'MarkStreet API from the store'**
   String get woocommerceControlConnectionTitle;
 
   /// No description provided for @woocommerceControlSettingsTitle.
@@ -25827,7 +25827,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSyncRowTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Sync to Hesabix'**
+  /// **'Sync to MarkStreet'**
   String get woocommerceHubSyncRowTooltip;
 
   /// No description provided for @woocommerceHubSyncColumnLabel.
@@ -25845,7 +25845,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSyncOrderConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The selected order will be pushed to Hesabix through the plugin API.'**
+  /// **'The selected order will be pushed to MarkStreet through the plugin API.'**
   String get woocommerceHubSyncOrderConfirmBody;
 
   /// No description provided for @woocommerceHubSyncProductConfirmTitle.
@@ -25857,7 +25857,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSyncProductConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The selected product will be pushed to Hesabix through the plugin API.'**
+  /// **'The selected product will be pushed to MarkStreet through the plugin API.'**
   String get woocommerceHubSyncProductConfirmBody;
 
   /// No description provided for @woocommerceHubSyncCustomerConfirmTitle.
@@ -25869,7 +25869,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceHubSyncCustomerConfirmBody.
   ///
   /// In en, this message translates to:
-  /// **'The selected customer will be pushed to Hesabix through the plugin API.'**
+  /// **'The selected customer will be pushed to MarkStreet through the plugin API.'**
   String get woocommerceHubSyncCustomerConfirmBody;
 
   /// No description provided for @woocommerceHubBulkSyncTitle.
@@ -25963,7 +25963,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceOpeningInvBridgeSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Run the same opening-balance job as the WooCommerce plugin, via the Hesabix store bridge. Use after products are synced and accounts/warehouse are configured on the store.'**
+  /// **'Run the same opening-balance job as the WooCommerce plugin, via the MarkStreet store bridge. Use after products are synced and accounts/warehouse are configured on the store.'**
   String get woocommerceOpeningInvBridgeSubtitle;
 
   /// No description provided for @woocommerceOpeningInvRefreshStatus.
@@ -26071,7 +26071,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceOpeningInvDoPostLabel.
   ///
   /// In en, this message translates to:
-  /// **'Post (lock) opening balance in Hesabix'**
+  /// **'Post (lock) opening balance in MarkStreet'**
   String get woocommerceOpeningInvDoPostLabel;
 
   /// No description provided for @woocommerceOpeningInvCostBasisLabel.
@@ -26353,7 +26353,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceSettingsArcwocPluginIntro.
   ///
   /// In en, this message translates to:
-  /// **'Mapping stats, Hesabix API status from the store, background queue, plugin version, settings summary, debug, bulk sync and logs.'**
+  /// **'Mapping stats, MarkStreet API status from the store, background queue, plugin version, settings summary, debug, bulk sync and logs.'**
   String get woocommerceSettingsArcwocPluginIntro;
 
   /// No description provided for @woocommerceBridgeTokenStored.
@@ -26569,7 +26569,7 @@ abstract class AppLocalizations {
   /// No description provided for @woocommerceSettingsOpeningInventoryLinkSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Create the job and run batches from Hesabix without wp-admin.'**
+  /// **'Create the job and run batches from MarkStreet without wp-admin.'**
   String get woocommerceSettingsOpeningInventoryLinkSubtitle;
 
   /// No description provided for @settingsWooCommerceTitle.
@@ -27277,7 +27277,7 @@ abstract class AppLocalizations {
   /// No description provided for @crmWebChatEmbedSnippet.
   ///
   /// In en, this message translates to:
-  /// **'// API base: {base}\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"{publicKey}\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the Hesabix repository for details.'**
+  /// **'// API base: {base}\n// Step 1: POST /api/v1/public/crm-chat/conversations/start\n// JSON body must include public_key \"{publicKey}\" and first_name, last_name, email, phone, page_url.\n// Step 2: with visitor_token and conversation_id, POST to /api/v1/public/crm-chat/messages.\n// See CRM_WEB_CHAT in the MarkStreet repository for details.'**
   String crmWebChatEmbedSnippet(String base, String publicKey);
 
   /// No description provided for @crmWebChatDefaultWidgetName.
@@ -28105,7 +28105,7 @@ abstract class AppLocalizations {
   /// No description provided for @mobileLauncherBrandName.
   ///
   /// In en, this message translates to:
-  /// **'Hesabix'**
+  /// **'MarkStreet'**
   String get mobileLauncherBrandName;
 
   /// No description provided for @mobileLauncherBusinessFallback.

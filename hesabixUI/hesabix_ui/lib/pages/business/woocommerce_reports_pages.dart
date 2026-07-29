@@ -345,7 +345,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
         TextColumn('billing_email', t.woocommerceColumnBillingEmail),
         TextColumn(
           'hesabix_id',
-          t.woocommerceColumnHesabixId,
+          t.woocommerceColumnMarkStreetId,
           sortable: false,
           formatter: (item) {
             if (item is! Map<String, dynamic>) return null;
@@ -501,7 +501,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
         ),
         TextColumn(
           'hesabix_id',
-          t.woocommerceColumnHesabixId,
+          t.woocommerceColumnMarkStreetId,
           sortable: false,
           formatter: (item) {
             if (item is! Map<String, dynamic>) return null;

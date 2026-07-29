@@ -8,8 +8,8 @@ class ThemeController extends ChangeNotifier {
   static const String _seedKey = 'theme_seed';
 
   ThemeMode _mode = ThemeMode.system;
-  // Classic Blue (formal corporate): #0F4C81
-  Color _seed = const Color(0xFF0F4C81);
+  // Neutral gray theme: #6B7280
+  Color _seed = const Color(0xFF6B7280);
 
   ThemeMode get mode => _mode;
   Color get seedColor => _seed;
@@ -50,8 +50,16 @@ class ThemeController extends ChangeNotifier {
       }
     }
     
+    const legacyBlueSeed = Color(0xFF6B7280);
+    const defaultSeed = Color(0xFF6B7280);
+
     final seed = p.getInt(_seedKey);
-    if (seed != null) _seed = Color(seed);
+    if (seed != null) {
+      final loadedSeed = Color(seed);
+      _seed = loadedSeed == legacyBlueSeed ? defaultSeed : loadedSeed;
+    } else {
+      _seed = defaultSeed;
+    }
     notifyListeners();
   }
 

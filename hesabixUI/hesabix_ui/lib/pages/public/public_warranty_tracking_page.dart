@@ -349,21 +349,21 @@ class _PublicWarrantyTrackingPageState extends State<PublicWarrantyTrackingPage>
               context,
               theme,
               t.warrantyGeneratedAt,
-              HesabixDateUtils.formatDateTime(info.generatedAt, calendarController?.isJalali ?? true),
+              MarkStreetDateUtils.formatDateTime(info.generatedAt, calendarController?.isJalali ?? true),
             ),
             if (info.activatedAt != null)
               _buildInfoRow(
                 context,
                 theme,
                 t.warrantyActivatedAt,
-                HesabixDateUtils.formatDateTime(info.activatedAt!, calendarController?.isJalali ?? true),
+                MarkStreetDateUtils.formatDateTime(info.activatedAt!, calendarController?.isJalali ?? true),
               ),
             if (info.expiresAt != null)
               _buildInfoRow(
                 context,
                 theme,
                 t.warrantyExpiresAt,
-                HesabixDateUtils.formatDateTime(info.expiresAt!, calendarController?.isJalali ?? true),
+                MarkStreetDateUtils.formatDateTime(info.expiresAt!, calendarController?.isJalali ?? true),
               ),
             if (info.trackingEvents.isNotEmpty) ...[
               const SizedBox(height: 24),
@@ -423,7 +423,7 @@ class _PublicWarrantyTrackingPageState extends State<PublicWarrantyTrackingPage>
         title: Text(_getEventTypeLabel(event.eventType)),
         subtitle: event.description != null ? Text(event.description!) : null,
         trailing: Text(
-          HesabixDateUtils.formatDateTime(event.createdAt, calendarController?.isJalali ?? true),
+          MarkStreetDateUtils.formatDateTime(event.createdAt, calendarController?.isJalali ?? true),
           style: theme.textTheme.bodySmall,
         ),
       ),

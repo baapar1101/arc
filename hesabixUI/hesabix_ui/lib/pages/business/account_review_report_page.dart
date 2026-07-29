@@ -1174,7 +1174,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                                                 return DataRow(
                                                   cells: [
                                                     DataCell(Text(
-                                                      HesabixDateUtils.formatForDisplay(
+                                                      MarkStreetDateUtils.formatForDisplay(
                                                         DateTime.tryParse(detail['document_date']?.toString() ?? ''),
                                                         widget.calendarController.isJalali,
                                                       ),

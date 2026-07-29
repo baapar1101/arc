@@ -660,7 +660,7 @@ class _WorkflowMarketCard extends StatelessWidget {
     final parsed = pub == null ? null : DateTime.tryParse(pub)?.toLocal();
     final dateStr = parsed == null
         ? '-'
-        : HesabixDateUtils.formatDateTime(parsed, calendarController.isJalali);
+        : MarkStreetDateUtils.formatDateTime(parsed, calendarController.isJalali);
     final tags = (item['tags'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
     final statusStr = (item['status'] ?? 'published').toString().toLowerCase();
     final isHidden = statusStr == 'hidden';
