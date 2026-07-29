@@ -641,7 +641,7 @@ def create_app() -> FastAPI:
         - **اسکیمای باز:** `/openapi.json`
         """,
         contact={
-            "name": "Hesabix Team",
+            "name": "MarkStreet Team",
             "email": "support@hesabix.ir",
             "url": "https://hesabix.ir",
         },

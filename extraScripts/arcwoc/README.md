@@ -291,6 +291,6 @@ GPL-3.0+
 
 ## 🙏 Credits
 
-**Developer:** Hesabix Team  
+**Developer:** MarkStreet Team  
 **Website:** [hesabix.ir](https://hesabix.ir)
 

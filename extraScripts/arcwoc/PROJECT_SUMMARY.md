@@ -597,7 +597,7 @@ wp plugin activate hesabix-v2
 
 ---
 
-**پروژه توسط:** Hesabix Team  
+**پروژه توسط:** MarkStreet Team  
 **تاریخ تکمیل:** 5 دسامبر 2024  
 **نسخه:** 2.0.0 Beta  
 **وضعیت:** ✅ آماده تست

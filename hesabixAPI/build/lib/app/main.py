@@ -222,7 +222,7 @@ def create_app() -> FastAPI:
         - **ReDoc**: `/redoc`
         """,
         contact={
-            "name": "Hesabix Team",
+            "name": "MarkStreet Team",
             "email": "support@hesabix.ir",
             "url": "https://hesabix.ir",
         },
