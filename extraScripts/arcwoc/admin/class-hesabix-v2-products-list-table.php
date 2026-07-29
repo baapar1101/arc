@@ -1,6 +1,6 @@
 <?php
 /**
- * فهرست محصولات ووکامرس برای پنل حسابیکس.
+ * فهرست محصولات ووکامرس برای پنل مارک‌استریت.
  *
  * @package    Hesabix_V2
  * @subpackage Hesabix_V2/admin
@@ -158,7 +158,7 @@ class Hesabix_V2_Products_List_Table extends WP_List_Table
 			'product' => __('محصول', 'hesabix-v2'),
 			'sku_col' => __('SKU', 'hesabix-v2'),
 			'type_col' => __('نوع', 'hesabix-v2'),
-			'hesabix' => __('حسابیکس', 'hesabix-v2'),
+			'hesabix' => __('مارک‌استریت', 'hesabix-v2'),
 			'actions' => __('عملیات', 'hesabix-v2'),
 		);
 	}
@@ -240,7 +240,7 @@ class Hesabix_V2_Products_List_Table extends WP_List_Table
 	 */
 	protected function column_actions($item)
 	{
-		$label = __('همگام‌سازی با حسابیکس', 'hesabix-v2');
+		$label = __('همگام‌سازی با مارک‌استریت', 'hesabix-v2');
 		return sprintf(
 			'<button type="button" class="button button-small hesabix-v2-product-sync" data-product-id="%d" %s>%s</button>',
 			(int) $item->get_id(),
@@ -284,7 +284,7 @@ class Hesabix_V2_Products_List_Table extends WP_List_Table
 		);
 
 		echo '<div class="alignleft actions hesabix-v2-product-filters">';
-		echo '<label for="hx_prod_filter" class="screen-reader-text">' . esc_html__('فیلتر حسابیکس', 'hesabix-v2') . '</label>';
+		echo '<label for="hx_prod_filter" class="screen-reader-text">' . esc_html__('فیلتر مارک‌استریت', 'hesabix-v2') . '</label>';
 		echo '<select name="hx_prod_filter" id="hx_prod_filter">';
 		foreach ($opts as $val => $lab) {
 			printf(

@@ -8,7 +8,7 @@
 | **Header ها** | `API-KEY`, `activeBid`, `activeYear` | `Authorization: Bearer`, `X-Business-ID`, `X-Fiscal-Year-ID` | استاندارد HTTP |
 | **مدیریت Business** | در Header | در URL + Header | RESTful |
 | **انقضا** | ندارد | دارد (optional) | کنترل بهتر |
-| **Revoke** | دشوار | آسان (از پنل حسابیکس) | مدیریت آسان‌تر |
+| **Revoke** | دشوار | آسان (از پنل مارک‌استریت) | مدیریت آسان‌تر |
 | **چندین کلید** | خیر | بله | انعطاف بیشتر |
 | **IP Whitelist** | خیر | بله | امنیت بیشتر |
 

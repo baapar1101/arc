@@ -470,7 +470,7 @@ class Hesabix_Chat_Updater {
 		if ( ! empty( $info['source'] ) && 'raw' === $info['source'] ) {
 			$sections['description'] = esc_html__( 'منبع به‌روزرسانی: نسخه از فایل اصلی در مخزن و بسته zip همان شاخه.', 'hesabix-chat' );
 		} elseif ( empty( $sections['description'] ) ) {
-			$sections['description'] = esc_html__( 'اتصال سایت وردپرس به چت وب CRM حسابیکس.', 'hesabix-chat' );
+			$sections['description'] = esc_html__( 'اتصال سایت وردپرس به چت وب CRM مارک‌استریت.', 'hesabix-chat' );
 		}
 
 		$out = (object) array(

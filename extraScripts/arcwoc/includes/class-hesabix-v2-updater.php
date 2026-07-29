@@ -501,7 +501,7 @@ class Hesabix_V2_Updater {
 		if (!empty($info['source']) && 'raw' === $info['source']) {
 			$sections['description'] = esc_html__('منبع به‌روزرسانی: نسخه از فایل اصلی hesabix-v2.php در مخزن و بستهٔ zip همان شاخه.', 'hesabix-v2');
 		} elseif (empty($sections['description'])) {
-			$sections['description'] = esc_html__('اتصال ووکامرس به نسخهٔ جدید حسابیکس با API پیشرفته.', 'hesabix-v2');
+			$sections['description'] = esc_html__('اتصال ووکامرس به نسخهٔ جدید مارک‌استریت با API پیشرفته.', 'hesabix-v2');
 		}
 
 		$out = (object) array(

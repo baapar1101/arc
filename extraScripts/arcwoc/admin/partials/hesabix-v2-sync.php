@@ -33,7 +33,7 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 
 		<table class="form-table hesabix-v2-bulk-form-table">
 			<tr>
-				<th scope="row"><label for="wc_product_parents_per_ajax"><?php esc_html_e('تعداد محصول والد به‌ازای هر درخواست (وکامرس → حسابیکس)', 'hesabix-v2'); ?></label></th>
+				<th scope="row"><label for="wc_product_parents_per_ajax"><?php esc_html_e('تعداد محصول والد به‌ازای هر درخواست (وکامرس → مارک‌استریت)', 'hesabix-v2'); ?></label></th>
 				<td>
 					<input type="number" min="5" max="<?php echo esc_attr((string) $bulk_wc_max); ?>" step="1" name="wc_product_parents_per_ajax" id="wc_product_parents_per_ajax" value="<?php echo esc_attr((string) $bulk_opts['wc_product_parents_per_ajax']); ?>" class="small-text">
 					<p class="description"><?php esc_html_e('هر مرحله این تعداد محصول والد انتخاب می‌شود؛ واریانت‌ها داخل هر مرحله در چند تماس bulk کالا تقسیم می‌شوند؛ مقدار کمتر هر مرحلهٔ AJAX سبک‌تر است.', 'hesabix-v2'); ?></p>
@@ -50,7 +50,7 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 				<th scope="row"><label for="wc_customers_per_ajax"><?php esc_html_e('تعداد مشتری به‌ازای هر درخواست AJAX (ادمین ووکامرس)', 'hesabix-v2'); ?></label></th>
 				<td>
 					<input type="number" min="5" max="<?php echo esc_attr((string) $bulk_wc_max); ?>" step="1" name="wc_customers_per_ajax" id="wc_customers_per_ajax" value="<?php echo esc_attr((string) $bulk_opts['wc_customers_per_ajax']); ?>" class="small-text">
-					<p class="description"><?php esc_html_e('چند کاربر همزمان از مرورگر برای یک درخواست admin-ajax ارسال شود؛ داخل هر درخواست، شخص‌ها در دستهٔ کوچک‌تر برای API حسابیکس شکسته می‌شوند.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php esc_html_e('چند کاربر همزمان از مرورگر برای یک درخواست admin-ajax ارسال شود؛ داخل هر درخواست، شخص‌ها در دستهٔ کوچک‌تر برای API مارک‌استریت شکسته می‌شوند.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -60,18 +60,18 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="api_bulk_persons_per_request"><?php esc_html_e('حداکثر مشتری در هر تماس bulk API (حسابیکس)', 'hesabix-v2'); ?></label></th>
+				<th scope="row"><label for="api_bulk_persons_per_request"><?php esc_html_e('حداکثر مشتری در هر تماس bulk API (مارک‌استریت)', 'hesabix-v2'); ?></label></th>
 				<td>
 					<input type="number" min="5" max="<?php echo esc_attr((string) $bulk_api_max_person); ?>" step="1" name="api_bulk_persons_per_request" id="api_bulk_persons_per_request" value="<?php echo esc_attr((string) ($bulk_opts['api_bulk_persons_per_request'] ?? $bulk_defs['api_bulk_persons_per_request'])); ?>" class="small-text">
 					<p class="description"><?php echo esc_html(sprintf(
 						/* translators: %d: max items per bulk request (aligned with Hesabix API). */
-						__('یک درخواست HTTP به اندپوینت bulk اشخاص؛ حداکثر %d آیتم در هر بدنه مطابق حسابیکس؛ مقادیر بسیار بالا خطر تایم‌اوت دارند.', 'hesabix-v2'),
+						__('یک درخواست HTTP به اندپوینت bulk اشخاص؛ حداکثر %d آیتم در هر بدنه مطابق مارک‌استریت؛ مقادیر بسیار بالا خطر تایم‌اوت دارند.', 'hesabix-v2'),
 						$bulk_api_max_person
 					)); ?></p>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="api_bulk_invoices_per_request"><?php esc_html_e('حداکثر فاکتور در هر تماس bulk API (حسابیکس)', 'hesabix-v2'); ?></label></th>
+				<th scope="row"><label for="api_bulk_invoices_per_request"><?php esc_html_e('حداکثر فاکتور در هر تماس bulk API (مارک‌استریت)', 'hesabix-v2'); ?></label></th>
 				<td>
 					<input type="number" min="1" max="<?php echo esc_attr((string) $bulk_api_max_invoice); ?>" step="1" name="api_bulk_invoices_per_request" id="api_bulk_invoices_per_request" value="<?php echo esc_attr((string) ($bulk_opts['api_bulk_invoices_per_request'] ?? $bulk_defs['api_bulk_invoices_per_request'])); ?>" class="small-text">
 					<p class="description"><?php echo esc_html(sprintf(
@@ -82,18 +82,18 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="api_bulk_products_per_request"><?php esc_html_e('حداکثر کالا در هر تماس bulk API (حسابیکس)', 'hesabix-v2'); ?></label></th>
+				<th scope="row"><label for="api_bulk_products_per_request"><?php esc_html_e('حداکثر کالا در هر تماس bulk API (مارک‌استریت)', 'hesabix-v2'); ?></label></th>
 				<td>
 					<input type="number" min="3" max="<?php echo esc_attr((string) $bulk_api_max_product); ?>" step="1" name="api_bulk_products_per_request" id="api_bulk_products_per_request" value="<?php echo esc_attr((string) ($bulk_opts['api_bulk_products_per_request'] ?? $bulk_defs['api_bulk_products_per_request'])); ?>" class="small-text">
 					<p class="description"><?php echo esc_html(sprintf(
 						/* translators: %d: max product rows per bulk request. */
-						__('هر تماس شامل سطرهای همگام (محصول ساده یا واریانت) است؛ حسابیکس تا %d سطر قبول می‌کند؛ برای تایم‌اوت کمتر مقدار کوچک‌تر بهتر است.', 'hesabix-v2'),
+						__('هر تماس شامل سطرهای همگام (محصول ساده یا واریانت) است؛ مارک‌استریت تا %d سطر قبول می‌کند؛ برای تایم‌اوت کمتر مقدار کوچک‌تر بهتر است.', 'hesabix-v2'),
 						$bulk_api_max_product
 					)); ?></p>
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><label for="hesabix_person_take"><?php esc_html_e('اندازهٔ صفحهٔ API اشخاص (حسابیکس → ووکامرس)', 'hesabix-v2'); ?></label></th>
+				<th scope="row"><label for="hesabix_person_take"><?php esc_html_e('اندازهٔ صفحهٔ API اشخاص (مارک‌استریت → ووکامرس)', 'hesabix-v2'); ?></label></th>
 				<td>
 					<input type="number" min="10" max="200" step="1" name="hesabix_person_take" id="hesabix_person_take" value="<?php echo esc_attr((string) $bulk_opts['hesabix_person_take']); ?>" class="small-text">
 				</td>
@@ -118,7 +118,7 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 
 	<div class="hesabix-v2-card">
 		<h2><?php esc_html_e('همگام‌سازی محصولات', 'hesabix-v2'); ?></h2>
-		<p><?php esc_html_e('تمام محصولات منتشرشدهٔ ووکامرس به حسابیکس؛ به‌صورت چند مرحله.', 'hesabix-v2'); ?></p>
+		<p><?php esc_html_e('تمام محصولات منتشرشدهٔ ووکامرس به مارک‌استریت؛ به‌صورت چند مرحله.', 'hesabix-v2'); ?></p>
 		<button id="sync-products" type="button" class="button button-primary"><?php esc_html_e('همگام‌سازی همهٔ محصولات', 'hesabix-v2'); ?></button>
 		<button id="abort-sync-products" type="button" class="button" style="display:none;" aria-live="polite"><?php esc_html_e('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2'); ?></button>
 		<div id="products-progress" class="hesabix-v2-sync-progress" aria-live="polite"></div>
@@ -127,8 +127,8 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 
 	<div class="hesabix-v2-card">
 		<h2><?php esc_html_e('همگام‌سازی دسته‌های محصول ووکامرس', 'hesabix-v2'); ?></h2>
-		<p><?php esc_html_e('همهٔ ترم‌های دستهٔ محصول (product_cat)، از جمله دسته‌های بدون کالا، به حسابیکس نگاشت یا به‌روز می‌شوند؛ به‌صورت چند مرحله.', 'hesabix-v2'); ?></p>
-		<p class="description"><?php esc_html_e('اگر در تنظیمات «تطبیق دسته با نام موجود در حسابیکس» را فعال کرده باشید، قبل از ایجاد دستهٔ جدید، درخت حسابیکس برای همان نام و والد بررسی می‌شود.', 'hesabix-v2'); ?></p>
+		<p><?php esc_html_e('همهٔ ترم‌های دستهٔ محصول (product_cat)، از جمله دسته‌های بدون کالا، به مارک‌استریت نگاشت یا به‌روز می‌شوند؛ به‌صورت چند مرحله.', 'hesabix-v2'); ?></p>
+		<p class="description"><?php esc_html_e('اگر در تنظیمات «تطبیق دسته با نام موجود در مارک‌استریت» را فعال کرده باشید، قبل از ایجاد دستهٔ جدید، درخت مارک‌استریت برای همان نام و والد بررسی می‌شود.', 'hesabix-v2'); ?></p>
 		<button id="sync-wc-categories" type="button" class="button button-primary"><?php esc_html_e('همگام‌سازی همهٔ دسته‌ها', 'hesabix-v2'); ?></button>
 		<button id="abort-sync-wc-categories" type="button" class="button" style="display:none;" aria-live="polite"><?php esc_html_e('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2'); ?></button>
 		<div id="wc-categories-progress" class="hesabix-v2-sync-progress" aria-live="polite"></div>
@@ -137,13 +137,13 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 
 	<div class="hesabix-v2-card">
 		<h2><?php esc_html_e('همگام‌سازی مشتریان', 'hesabix-v2'); ?></h2>
-		<p><?php esc_html_e('کاربران با نقش مشتری یا مشترک به حسابیکس؛ مرحله‌ای.', 'hesabix-v2'); ?></p>
+		<p><?php esc_html_e('کاربران با نقش مشتری یا مشترک به مارک‌استریت؛ مرحله‌ای.', 'hesabix-v2'); ?></p>
 		<p class="description">
 			<?php
 			echo wp_kses_post(
 				sprintf(
-					/* translators: 1: opening <a>, 2: closing </a> — link wraps «صفحهٔ مشتریان و حسابیکس». */
-					__('برای انتخاب مشتریان مشخص، مشاهدهٔ وضعیت هر کاربر و همگام‌سازی تکی یا گروهی، به %1$sصفحهٔ مشتریان و حسابیکس%2$s بروید.', 'hesabix-v2'),
+					/* translators: 1: opening <a>, 2: closing </a> — link wraps «صفحهٔ مشتریان و مارک‌استریت». */
+					__('برای انتخاب مشتریان مشخص، مشاهدهٔ وضعیت هر کاربر و همگام‌سازی تکی یا گروهی، به %1$sصفحهٔ مشتریان و مارک‌استریت%2$s بروید.', 'hesabix-v2'),
 					'<a href="' . esc_url(admin_url('admin.php?page=hesabix-v2-customers')) . '">',
 					'</a>'
 				)
@@ -157,8 +157,8 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 	</div>
 
 	<div class="hesabix-v2-card">
-		<h2><?php esc_html_e('واردات مشتریان از حسابیکس', 'hesabix-v2'); ?></h2>
-		<p><?php esc_html_e('اشخاص حسابیکس با ایمیل یا موبایل معتبر با کاربر ووکامرس تطبیق داده می‌شوند.', 'hesabix-v2'); ?></p>
+		<h2><?php esc_html_e('واردات مشتریان از مارک‌استریت', 'hesabix-v2'); ?></h2>
+		<p><?php esc_html_e('اشخاص مارک‌استریت با ایمیل یا موبایل معتبر با کاربر ووکامرس تطبیق داده می‌شوند.', 'hesabix-v2'); ?></p>
 		<p>
 			<label>
 				<input type="checkbox" id="hesabix-import-create-missing" value="1">
@@ -167,7 +167,7 @@ $bulk_api_max_product = (int) Hesabix_V2_Sync_Service::BULK_API_ITEMS_MAX_PRODUC
 		</p>
 		<p class="description"><?php esc_html_e('رمز تصادفی ساخته می‌شود؛ ممکن است ووکامرس ایمیل ارسال کند.', 'hesabix-v2'); ?></p>
 		<p>
-			<button type="button" id="import-customers-from-hesabix" class="button button-primary"><?php esc_html_e('واردات از حسابیکس', 'hesabix-v2'); ?></button>
+			<button type="button" id="import-customers-from-hesabix" class="button button-primary"><?php esc_html_e('واردات از مارک‌استریت', 'hesabix-v2'); ?></button>
 			<button id="abort-import-customers" type="button" class="button" style="display:none;"><?php esc_html_e('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2'); ?></button>
 		</p>
 		<div id="import-customers-progress" class="hesabix-v2-sync-progress" aria-live="polite"></div>
@@ -427,7 +427,7 @@ jQuery(function($) {
 
 	$('#sync-wc-categories').on('click', async function() {
 		if (!ajaxUrl || !nonce) return;
-		if (!confirm('<?php echo esc_js(__('همهٔ دسته‌های محصول ووکامرس (حتی بدون کالا) با حسابیکس همگام شوند. ادامه می‌دهید؟', 'hesabix-v2')); ?>')) return;
+		if (!confirm('<?php echo esc_js(__('همهٔ دسته‌های محصول ووکامرس (حتی بدون کالا) با مارک‌استریت همگام شوند. ادامه می‌دهید؟', 'hesabix-v2')); ?>')) return;
 
 		var $btn = $('#sync-wc-categories');
 		var $abort = $('#abort-sync-wc-categories');
@@ -511,7 +511,7 @@ jQuery(function($) {
 		$abort.hide().prop('disabled', false).text('<?php echo esc_js(__('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2')); ?>');
 	});
 
-	// --- مشتریان (به حسابیکس) ---
+	// --- مشتریان (به مارک‌استریت) ---
 	var abortCustomers = false;
 	$('#abort-sync-customers').on('click', function() {
 		abortCustomers = true;
@@ -601,7 +601,7 @@ jQuery(function($) {
 		$abort.hide().prop('disabled', false).text('<?php echo esc_js(__('توقف پس از پایان مرحلهٔ جاری', 'hesabix-v2')); ?>');
 	});
 
-	// --- واردات از حسابیکس ---
+	// --- واردات از مارک‌استریت ---
 	var abortImport = false;
 	$('#abort-import-customers').on('click', function() {
 		abortImport = true;

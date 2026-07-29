@@ -77,7 +77,7 @@ class Hesabix_Chat_Admin {
 			'operator_unified_display_name' => __( 'پشتیبان', 'hesabix-chat' ),
 			'show_powered_by_hesabix'        => 1,
 			'powered_by_hesabix_url'       => 'https://hesabix.ir',
-			'powered_by_hesabix_text'      => __( 'قدرت گرفته از حسابیکس', 'hesabix-chat' ),
+			'powered_by_hesabix_text'      => __( 'قدرت گرفته از مارک‌استریت', 'hesabix-chat' ),
 			'widget_debug_logging'          => 0,
 			'widget_custom_css'             => '',
 			'widget_tpl_classes_host'       => '',
@@ -529,8 +529,8 @@ class Hesabix_Chat_Admin {
 
 	public function add_menu() {
 		add_options_page(
-			__( 'چت حسابیکس', 'hesabix-chat' ),
-			__( 'چت حسابیکس', 'hesabix-chat' ),
+			__( 'چت مارک‌استریت', 'hesabix-chat' ),
+			__( 'چت مارک‌استریت', 'hesabix-chat' ),
 			'manage_options',
 			'hesabix-chat',
 			array( $this, 'render_page' )
@@ -584,13 +584,13 @@ class Hesabix_Chat_Admin {
 		$notice_class = ! empty( $upd['update_available'] ) ? 'notice-info' : 'notice-warning';
 		if ( ! empty( $upd['update_available'] ) ) {
 			/* translators: 1: installed version, 2: newer remote version */
-			$body = sprintf( __( 'افزونهٔ «چت حسابیکس» را الان نسخهٔ %1$s دارید؛ نسخهٔ %2$s در منبع به‌روزرسانی موجود است. از تنظیمات افزونه و تب «به‌روزرسانی افزونه» می‌توانید آن را نصب کنید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
+			$body = sprintf( __( 'افزونهٔ «چت مارک‌استریت» را الان نسخهٔ %1$s دارید؛ نسخهٔ %2$s در منبع به‌روزرسانی موجود است. از تنظیمات افزونه و تب «به‌روزرسانی افزونه» می‌توانید آن را نصب کنید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
 		} elseif ( empty( $upd['env_compatible'] ) ) {
 			/* translators: 1: installed version, 2: remote version */
-			$body = sprintf( __( 'نسخهٔ %2$s «چت حسابیکس» در منبع منتشر شده؛ نصب‌شدهٔ شما %1$s است، اما نسخهٔ وردپرس یا PHP با الزامات اعلام‌شده جور نیست. از تب «به‌روزرسانی افزونه» جزئیات را ببینید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
+			$body = sprintf( __( 'نسخهٔ %2$s «چت مارک‌استریت» در منبع منتشر شده؛ نصب‌شدهٔ شما %1$s است، اما نسخهٔ وردپرس یا PHP با الزامات اعلام‌شده جور نیست. از تب «به‌روزرسانی افزونه» جزئیات را ببینید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
 		} else {
 			/* translators: 1: installed version, 2: remote version */
-			$body = sprintf( __( 'نسخهٔ %2$s «چت حسابیکس» در منبع دیده می‌شود (شما %1$s). اگر ابزار نصب در دسترس نباشد از تب «به‌روزرسانی افزونه» کمک بگیرید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
+			$body = sprintf( __( 'نسخهٔ %2$s «چت مارک‌استریت» در منبع دیده می‌شود (شما %1$s). اگر ابزار نصب در دسترس نباشد از تب «به‌روزرسانی افزونه» کمک بگیرید.', 'hesabix-chat' ), $local_ver !== '' ? $local_ver : '—', $remote_ver );
 		}
 
 		$dismiss_base = wp_nonce_url(
@@ -599,7 +599,7 @@ class Hesabix_Chat_Admin {
 		);
 
 		echo '<div class="' . esc_attr( 'notice ' . $notice_class . ' hesabix-chat-dashboard-update-notice' ) . '"><p><strong>'
-			. esc_html__( 'به‌روزرسانی افزونه چت حسابیکس', 'hesabix-chat' )
+			. esc_html__( 'به‌روزرسانی افزونه چت مارک‌استریت', 'hesabix-chat' )
 			. '</strong></p><p>' . esc_html( $body ) . '</p><p style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;">'
 			. '<a href="' . esc_url( $settings_update_url ) . '" class="button button-primary">' . esc_html__( 'رفتن به به‌روزرسانی افزونه', 'hesabix-chat' ) . '</a>'
 			. '<a href="' . esc_url( $dismiss_base ) . '" class="button button-secondary">' . esc_html__( 'بی‌خیال تا نسخهٔ بعد', 'hesabix-chat' ) . '</a>'
@@ -1050,7 +1050,7 @@ class Hesabix_Chat_Admin {
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
-			<p><?php esc_html_e( 'اتصال به سرور حسابیکس: آدرس پایه API و کلید عمومی ویجت چت را از پنل CRM > چت وب وارد کنید. دامنه سایت وردپرس باید در «دامنه‌های مجاز» همان ویجت ثبت شده باشد.', 'hesabix-chat' ); ?></p>
+			<p><?php esc_html_e( 'اتصال به سرور مارک‌استریت: آدرس پایه API و کلید عمومی ویجت چت را از پنل CRM > چت وب وارد کنید. دامنه سایت وردپرس باید در «دامنه‌های مجاز» همان ویجت ثبت شده باشد.', 'hesabix-chat' ); ?></p>
 			<form method="post" action="options.php">
 				<?php settings_fields( 'hesabix_chat_group' ); ?>
 				<style>
@@ -1416,7 +1416,7 @@ class Hesabix_Chat_Admin {
 							</label><br />
 							<label>
 								<input name="<?php echo esc_attr( self::OPTION_NAME . '[show_agent_attendance_on_read]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['show_agent_attendance_on_read'] ?? 0 ) ); ?> />
-								<?php esc_html_e( 'وقتی پیام بازدیدکننده در پنل به‌صورت خوانده‌شده ثبت شد (اولین بار پس از ارسال شما). نیازمند حسابیکس هم‌نسخه با فیلد reader_display_name در رویداد messages.read است.', 'hesabix-chat' ); ?>
+								<?php esc_html_e( 'وقتی پیام بازدیدکننده در پنل به‌صورت خوانده‌شده ثبت شد (اولین بار پس از ارسال شما). نیازمند مارک‌استریت هم‌نسخه با فیلد reader_display_name در رویداد messages.read است.', 'hesabix-chat' ); ?>
 							</label>
 							<p>
 								<label for="hesabix_agent_join_tpl"><?php esc_html_e( 'متن اعلام (اتصال وب‌سوکت پشتیبان)', 'hesabix-chat' ); ?></label><br />
@@ -1435,7 +1435,7 @@ class Hesabix_Chat_Admin {
 							<fieldset style="margin:0;padding:0;border:0;">
 								<label>
 									<input name="<?php echo esc_attr( self::OPTION_NAME . '[operator_label_mode]' ); ?>" type="radio" value="real" <?php checked( (string) ( $o['operator_label_mode'] ?? 'real' ), 'real' ); ?> />
-									<?php esc_html_e( 'نام واقعی هر اپراتور (آن چه حسابیکس یا CRM می‌فرستد)', 'hesabix-chat' ); ?>
+									<?php esc_html_e( 'نام واقعی هر اپراتور (آن چه مارک‌استریت یا CRM می‌فرستد)', 'hesabix-chat' ); ?>
 								</label><br />
 								<label>
 									<input name="<?php echo esc_attr( self::OPTION_NAME . '[operator_label_mode]' ); ?>" type="radio" value="unified" <?php checked( (string) ( $o['operator_label_mode'] ?? 'real' ), 'unified' ); ?> />
@@ -1450,7 +1450,7 @@ class Hesabix_Chat_Admin {
 						</td>
 					</tr>
 					<tr>
-						<th scope="row"><?php esc_html_e( 'اعتبار به حسابیکس (صفحهٔ شروع گفتگو)', 'hesabix-chat' ); ?></th>
+						<th scope="row"><?php esc_html_e( 'اعتبار به مارک‌استریت (صفحهٔ شروع گفتگو)', 'hesabix-chat' ); ?></th>
 						<td>
 							<label>
 								<input name="<?php echo esc_attr( self::OPTION_NAME . '[show_powered_by_hesabix]' ); ?>" type="checkbox" value="1" <?php checked( 1, (int) ( $o['show_powered_by_hesabix'] ?? 1 ) ); ?> />

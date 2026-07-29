@@ -7,7 +7,7 @@
  * @wordpress-plugin
  * Plugin Name:       Hesabix V2: WooCommerce
  * Plugin URI:        https://hesabix.ir/
- * Description:       اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید
+ * Description:       اتصال ووکامرس به نسخه جدید مارک‌استریت با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید
  * Version:           4.6.1
  * Author:            Hesabix Team
  * Author URI:        https://hesabix.ir
@@ -156,7 +156,7 @@ function hesabix_v2_bootstrap()
 			echo '<div class="notice notice-info is-dismissible">';
 			echo '<p><strong>' . __('توجه:', 'hesabix-v2') . '</strong> ';
 			echo sprintf(
-				__('نسخه قدیمی افزونه حسابیکس نیز فعال است. برای مایگریشن به <a href="%s">صفحه مایگریشن</a> بروید.', 'hesabix-v2'),
+				__('نسخه قدیمی افزونه مارک‌استریت نیز فعال است. برای مایگریشن به <a href="%s">صفحه مایگریشن</a> بروید.', 'hesabix-v2'),
 				admin_url('admin.php?page=hesabix-v2-migration')
 			);
 			echo '</p></div>';

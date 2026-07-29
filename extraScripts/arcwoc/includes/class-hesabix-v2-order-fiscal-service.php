@@ -1,6 +1,6 @@
 <?php
 /**
- * بازهٔ سال مالی جاری حسابیکس و اعمال سیاست تاریخ روی همگام‌سازی سفارش.
+ * بازهٔ سال مالی جاری مارک‌استریت و اعمال سیاست تاریخ روی همگام‌سازی سفارش.
  *
  * @package    Hesabix_V2
  * @subpackage Hesabix_V2/includes
@@ -84,7 +84,7 @@ class Hesabix_V2_Order_Fiscal_Service
 				'ok' => false,
 				'start' => null,
 				'end' => null,
-				'message' => __('تاریخ شروع سال مالی در پاسخ حسابیکس نیست.', 'hesabix-v2'),
+				'message' => __('تاریخ شروع سال مالی در پاسخ مارک‌استریت نیست.', 'hesabix-v2'),
 			);
 		}
 
@@ -259,7 +259,7 @@ class Hesabix_V2_Order_Fiscal_Service
 			if ($adjusted) {
 				$note = sprintf(
 					/* translators: 1: original order date, 2: document date sent to Hesabix */
-					__('تاریخ فاکتور حسابیکس از %1$s به %2$s (مطابق بازهٔ سال مالی جاری) اصلاح شد.', 'hesabix-v2'),
+					__('تاریخ فاکتور مارک‌استریت از %1$s به %2$s (مطابق بازهٔ سال مالی جاری) اصلاح شد.', 'hesabix-v2'),
 					$created,
 					$doc
 				);

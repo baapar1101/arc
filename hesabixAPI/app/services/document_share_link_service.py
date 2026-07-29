@@ -415,7 +415,7 @@ def build_public_payload(
         "online_payment": online_payment,
         "authenticity": {
             "verified": True,
-            "message_fa": "این فاکتور در سامانه حسابیکس (Hesabix) ثبت شده است.",
+            "message_fa": "این فاکتور در سامانه مارک‌استریت (Hesabix) ثبت شده است.",
             "message_en": "This invoice is registered in Hesabix.",
         },
     }

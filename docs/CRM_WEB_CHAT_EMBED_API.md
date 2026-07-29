@@ -140,7 +140,7 @@
 
 - **اقدام لازم:** ارسال توکن بازدیدکننده **در هدر** (روش جدید، توصیه‌شده): `X-Visitor-Token: <token>` **یا** `Authorization: Bearer <token>`.  
 - **سازگاری:** همچنان می‌توان `?visitor_token=<token>` فرستاد (الویت: هدر).  
-- **CORS preflight:** هدر `X-Visitor-Token` (یا `Authorization`) باید در `Access-Control-Allow-Headers` اجازه داشته باشد (بک‌اند حسابیکس `allow_headers` را باز دارد).
+- **CORS preflight:** هدر `X-Visitor-Token` (یا `Authorization`) باید در `Access-Control-Allow-Headers` اجازه داشته باشد (بک‌اند مارک‌استریت `allow_headers` را باز دارد).
 
 ساختار آیتم‌ها: بخش [شکل پاسخ پیام‌ها](#شکل-پاسخ-پیام‌ها-شامل-فایل).
 

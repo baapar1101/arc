@@ -19,7 +19,7 @@
 - ✨ IP Whitelist Support
 
 #### API Integration
-- ✨ اتصال کامل به API V2 حسابیکس
+- ✨ اتصال کامل به API V2 مارک‌استریت
 - ✨ پشتیبانی از تمام RESTful endpoints جدید
 - ✨ Headers استاندارد (Authorization, X-Business-ID, X-Fiscal-Year-ID)
 - ✨ Error handling پیشرفته

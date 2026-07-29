@@ -1,6 +1,6 @@
 <?php
 /**
- * فهرست مشتریان ووکامرس برای پنل حسابیکس.
+ * فهرست مشتریان ووکامرس برای پنل مارک‌استریت.
  *
  * @package    Hesabix_V2
  * @subpackage Hesabix_V2/admin
@@ -109,7 +109,7 @@ class Hesabix_V2_Customers_List_Table extends WP_List_Table
 			'customer' => __('مشتری', 'hesabix-v2'),
 			'phone' => __('تلفن صورتحساب', 'hesabix-v2'),
 			'roles_col' => __('نقش', 'hesabix-v2'),
-			'hesabix' => __('حسابیکس', 'hesabix-v2'),
+			'hesabix' => __('مارک‌استریت', 'hesabix-v2'),
 			'actions' => __('عملیات', 'hesabix-v2'),
 		);
 	}
@@ -159,7 +159,7 @@ class Hesabix_V2_Customers_List_Table extends WP_List_Table
 	/** @param WP_User $item */
 	protected function column_actions($item)
 	{
-		$label = __('همگام‌سازی با حسابیکس', 'hesabix-v2');
+		$label = __('همگام‌سازی با مارک‌استریت', 'hesabix-v2');
 		return sprintf(
 			'<button type="button" class="button button-small hesabix-v2-customer-sync" data-customer-id="%d" %s>%s</button>',
 			(int) $item->ID,
@@ -187,14 +187,14 @@ class Hesabix_V2_Customers_List_Table extends WP_List_Table
 
 		$opts = array(
 			'all' => __('همهٔ مشتریان', 'hesabix-v2'),
-			'synced' => __('همگام‌شده با حسابیکس', 'hesabix-v2'),
+			'synced' => __('همگام‌شده با مارک‌استریت', 'hesabix-v2'),
 			'not_synced' => __('همگام‌نشده', 'hesabix-v2'),
 			'error' => __('خطای همگام‌سازی', 'hesabix-v2'),
 			'pending' => __('در انتظار (نگاشت)', 'hesabix-v2'),
 		);
 
 		echo '<div class="alignleft actions hesabix-v2-customer-filters">';
-		echo '<label for="hx_cust_filter" class="screen-reader-text">' . esc_html__('فیلتر حسابیکس', 'hesabix-v2') . '</label>';
+		echo '<label for="hx_cust_filter" class="screen-reader-text">' . esc_html__('فیلتر مارک‌استریت', 'hesabix-v2') . '</label>';
 		echo '<select name="hx_cust_filter" id="hx_cust_filter">';
 		foreach ($opts as $val => $lab) {
 			printf(

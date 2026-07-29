@@ -10,7 +10,7 @@
 	"author": "Hesabix Team",
 	"last_updated": "2026-05-08",
 	"sections": {
-		"description": "اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید",
+		"description": "اتصال ووکامرس به نسخه جدید مارک‌استریت با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید",
 		"changelog": "<h4>2.0.0</h4>\n<ul>\n<li>نسخه اولیه با پشتیبانی کامل از API V2</li>\n<li>Personal API Keys</li>\n<li>Setup Wizard</li>\n<li>Sync Queue System</li>\n<li>همگام‌سازی محصولات، مشتریان و سفارشات</li>\n</ul>"
 	}
 }

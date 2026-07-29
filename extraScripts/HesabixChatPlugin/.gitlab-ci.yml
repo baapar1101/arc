@@ -121,7 +121,7 @@ manifest_commit:
         homepage: $home,
         last_updated: $d,
         sections: {
-          description: "اتصال سایت وردپرس به چت وب CRM حسابیکس.",
+          description: "اتصال سایت وردپرس به چت وب CRM مارک‌استریت.",
           changelog: ("<p>انتشار " + $ver + ".</p>")
         }
       }' | jq . > "tmp-m.json" && install -D "tmp-m.json" "${HESABIX_MANIFEST_FILE}"
