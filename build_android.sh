@@ -1644,7 +1644,7 @@ if [ "$BUILD_AAB" = true ]; then
   fi
 fi
 
-if [ "$BUILD_APK" = true ]; then
+if [ "$BUILD_APK" = true ] && [ "$BUILD_FAILED" != true ]; then
   apk_dir="$APP_DIR/build/app/outputs/flutter-apk"
   if [ "$BUILD_UNIVERSAL_APK" = true ]; then
     apk_path="$apk_dir/app-${MODE}.apk"
@@ -1665,6 +1665,10 @@ if [ "$BUILD_APK" = true ]; then
       echo ""
     fi
   fi
+elif [ "$BUILD_FAILED" = true ]; then
+  echo "⚠️  Build failed — any existing APK/AAB on disk may be from a previous successful build."
+  echo "   Do not run ./release_android_forgejo.sh until this build succeeds."
+  echo ""
 fi
 
 echo "Build outputs are located at:"

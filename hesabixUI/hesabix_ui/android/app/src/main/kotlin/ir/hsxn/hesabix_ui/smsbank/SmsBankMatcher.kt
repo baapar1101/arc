@@ -53,7 +53,7 @@ object SmsBankMatcher {
             results.add(result)
         }
 
-        if (results.isEmpty) {
+        if (results.isEmpty()) {
             val h = heuristic(normBody, normSender, patterns) ?: return null
             results.add(h)
         }

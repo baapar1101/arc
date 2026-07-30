@@ -122,6 +122,42 @@ print(name)
 PY
 )"
 
+# Guard against publishing a stale APK after a failed build (common when
+# assembleRelease fails but an older app-release.apk still sits on disk).
+APK_VERSION_NAME="$(
+  APK_PATH="$APK_PATH" ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/opt/android-sdk}}" python3 <<'PY'
+import glob, os, re, shutil, subprocess, sys
+apk = os.environ["APK_PATH"]
+candidates = []
+for tool in ("aapt", "aapt2"):
+    path = shutil.which(tool)
+    if path:
+        candidates.append(path)
+sdk = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT") or ""
+if sdk:
+    candidates.extend(sorted(glob.glob(os.path.join(sdk, "build-tools", "*", "aapt")), reverse=True))
+    candidates.extend(sorted(glob.glob(os.path.join(sdk, "build-tools", "*", "aapt2")), reverse=True))
+seen = set()
+for path in candidates:
+    if not path or path in seen or not os.path.isfile(path):
+        continue
+    seen.add(path)
+    try:
+        out = subprocess.check_output([path, "dump", "badging", apk], text=True, stderr=subprocess.DEVNULL)
+    except Exception:
+        continue
+    m = re.search(r"versionName='([^']+)'", out)
+    if m:
+        print(m.group(1))
+        raise SystemExit(0)
+raise SystemExit("could not read versionName from APK (need aapt in PATH or ANDROID_HOME/build-tools)")
+PY
+)" || die "Could not read versionName from APK: $APK_PATH"
+
+if [[ "$APK_VERSION_NAME" != "$VERSION_NAME" ]]; then
+  die "APK versionName is ${APK_VERSION_NAME} but pubspec is ${VERSION_NAME}. Rebuild succeeded APK first (do not release after a failed build)."
+fi
+
 ASSET_NAME="app-release.${VERSION_NAME}.apk"
 BODY="${BODY:-- انتشار نسخه اندروید ${VERSION_NAME}
 - به‌روزرسانی از ریلیزهای رسمی حسابیکس}"

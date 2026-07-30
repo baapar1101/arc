@@ -84,18 +84,10 @@ class _UniqueProductInstanceSelectorDialogState
       // Load product attributes if product has attribute_ids
       final attributeIds = product['attribute_ids'] as List<dynamic>? ?? [];
       if (attributeIds.isNotEmpty) {
-        final attrsResult = await _attributeService.search(
+        final productAttrs = await _attributeService.getByIds(
           businessId: widget.businessId,
-          limit: 1000,
+          ids: attributeIds,
         );
-        final allAttributes = (attrsResult['items'] as List<dynamic>?) ?? [];
-        final productAttrs = allAttributes
-            .where((attr) {
-              final attrId = attr['id'] as int?;
-              return attrId != null && attributeIds.contains(attrId);
-            })
-            .map((attr) => Map<String, dynamic>.from(attr as Map))
-            .toList();
 
         // Create map by title
         final attrsMap = <String, Map<String, dynamic>>{};

@@ -1621,18 +1621,10 @@ class _WarehouseDocumentFormDialogState
         final attrIds = (product['attribute_ids'] as List<dynamic>?) ?? [];
         if (attrIds.isNotEmpty) {
           try {
-            final result = await _attributeService.search(
+            final productAttrs = await _attributeService.getByIds(
               businessId: widget.businessId,
-              limit: 1000, // دریافت همه ویژگی‌ها
+              ids: attrIds,
             );
-            final allAttributes = (result['items'] as List<dynamic>?) ?? [];
-            final productAttrs = allAttributes
-                .where((attr) {
-                  final attrId = attr['id'] as int?;
-                  return attrId != null && attrIds.contains(attrId);
-                })
-                .map((attr) => Map<String, dynamic>.from(attr as Map))
-                .toList();
             _productAttributesCache[productId] = productAttrs;
           } catch (e) {
             debugPrint('Error loading product attributes: $e');
