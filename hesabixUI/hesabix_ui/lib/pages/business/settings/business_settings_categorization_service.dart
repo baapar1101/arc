@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/android_sms_bank_platform.dart';
 import '../../system_settings/models/settings_category.dart';
 import '../../system_settings/models/settings_item.dart';
 import 'business_settings_context.dart';
@@ -513,6 +514,18 @@ class BusinessSettingsCategorizationService {
           categoryId: 'personalization',
           order: 1,
         ),
+        if (supportsAndroidSmsBankAssistant && ctx.canJoinSettings)
+          _item(
+            id: 'sms_bank_assistant',
+            title: 'smsBankAssistantSettingsTitle',
+            description: 'smsBankAssistantSettingsDescription',
+            icon: Icons.sms_outlined,
+            color: const Color(0xFF00838F),
+            route: ctx.panelRoute('settings/sms-bank'),
+            categoryId: 'personalization',
+            order: 2,
+            tags: const ['android', 'new'],
+          ),
       ],
     );
   }

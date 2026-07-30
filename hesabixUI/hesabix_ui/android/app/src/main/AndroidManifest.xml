@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <!-- Android-only SMS bank assistant (event-driven receive while app is killed). -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS"/>
+    <uses-permission android:name="android.permission.READ_SMS"/>
     <application
         android:label="@string/app_name"
         android:name="${applicationName}"
@@ -47,8 +50,25 @@
                 <data android:scheme="hesabix" android:host="dashboard" />
                 <data android:scheme="hesabix" android:host="wallet" />
                 <data android:scheme="hesabix" android:host="support" />
+                <data android:scheme="hesabix" android:host="sms-bank" />
             </intent-filter>
         </activity>
+        <!-- SMS bank: wake on SMS_RECEIVED even when Flutter UI is not running. -->
+        <receiver
+            android:name=".smsbank.SmsBankReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+        <receiver
+            android:name=".smsbank.SmsBankActionReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ir.hsxn.hesabix_ui.SMS_BANK_DISMISS" />
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -8,6 +8,7 @@ import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import ir.hsxn.hesabix_ui.smsbank.SmsBankPlugin
 import java.io.File
 
 /// local_auth requires FragmentActivity (BiometricPrompt).
@@ -17,6 +18,7 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        SmsBankPlugin.register(flutterEngine, this)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             apkInstallerChannel,
@@ -61,6 +63,17 @@ class MainActivity : FlutterFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        SmsBankPlugin.consumeIntent(applicationContext, intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        SmsBankPlugin.consumeIntent(applicationContext, intent)
     }
 
     private fun installApk(path: String) {

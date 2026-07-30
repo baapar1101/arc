@@ -1399,6 +1399,12 @@ class BulkSettlementDialog extends StatefulWidget {
   final ApiClient apiClient;
   final ReceiptPaymentDocument? initialDocument;
   final AuthStore? authStore;
+  /// Prefill from SMS bank assistant (create mode only).
+  final double? initialAmount;
+  final String? initialBankId;
+  final String? initialBankName;
+  final String? initialDescription;
+
   const BulkSettlementDialog({
     super.key,
     required this.businessId,
@@ -1408,6 +1414,10 @@ class BulkSettlementDialog extends StatefulWidget {
     required this.apiClient,
     this.initialDocument,
     this.authStore,
+    this.initialAmount,
+    this.initialBankId,
+    this.initialBankName,
+    this.initialDescription,
   });
 
   @override
@@ -1551,6 +1561,23 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
       _docDate = DateTime.now();
       _isReceipt = widget.isReceipt;
       _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
+      final seedAmount = widget.initialAmount;
+      if (seedAmount != null && seedAmount > 0) {
+        if (widget.initialDescription != null && widget.initialDescription!.trim().isNotEmpty) {
+          _descriptionController.text = widget.initialDescription!.trim();
+        }
+        _centerTransactions.add(
+          InvoiceTransaction(
+            id: 'sms_seed_${DateTime.now().millisecondsSinceEpoch}',
+            type: TransactionType.bank,
+            bankId: widget.initialBankId,
+            bankName: widget.initialBankName,
+            transactionDate: _docDate,
+            amount: seedAmount,
+            description: widget.initialDescription,
+          ),
+        );
+      }
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadBusinessCurrenciesForBulkDialog());
   }

@@ -57,6 +57,8 @@ class BusinessSettingsLocalizationHelper {
         return t.businessSettingsNotificationTemplates;
       case 'businessSettingsAppearanceProfile':
         return t.appearanceSettingsPageTitle;
+      case 'smsBankAssistantSettingsTitle':
+        return 'دستیار پیامک بانکی';
       case 'dataBackup':
         return t.dataBackup;
       case 'ftpBackupSettingsTitle':
@@ -130,6 +132,8 @@ class BusinessSettingsLocalizationHelper {
         return t.businessSettingsNotificationTemplatesDescription;
       case 'businessSettingsAppearanceProfileDescription':
         return t.businessSettingsAppearanceProfileDescription;
+      case 'smsBankAssistantSettingsDescription':
+        return 'تشخیص خودکار پیامک بانک و ثبت سریع دریافت/پرداخت، هزینه و درآمد';
       case 'dataBackupDescription':
         return t.dataBackupDescription;
       case 'ftpBackupSettingsDescription':

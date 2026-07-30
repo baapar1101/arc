@@ -16,6 +16,8 @@ class NotificationPayloadCodec {
       if (item['ticket_id'] != null) 'ticket_id': item['ticket_id'],
       if (item['event_key'] != null && '${item['event_key']}'.isNotEmpty)
         'event_key': '${item['event_key']}',
+      if (item['sms_bank_event_id'] != null && '${item['sms_bank_event_id']}'.isNotEmpty)
+        'sms_bank_event_id': '${item['sms_bank_event_id']}',
       'is_read': item['is_read'] == true,
     });
   }
@@ -44,6 +46,8 @@ class NotificationPayloadCodec {
       if (data['ticket_id'] != null) 'ticket_id': data['ticket_id'],
       if (data['event_key'] != null && '${data['event_key']}'.isNotEmpty)
         'event_key': '${data['event_key']}',
+      if (data['sms_bank_event_id'] != null && '${data['sms_bank_event_id']}'.isNotEmpty)
+        'sms_bank_event_id': '${data['sms_bank_event_id']}',
       'is_read': false,
     };
   }

@@ -204,6 +204,8 @@ import 'core/android_update_platform.dart';
 import 'widgets/biometric/biometric_lock_gate.dart';
 import 'widgets/android_update/android_update_gate.dart';
 import 'widgets/notification/in_app_notifications_bootstrap.dart';
+import 'widgets/sms_bank/sms_bank_bootstrap.dart';
+import 'pages/business/sms_bank_assistant_settings_page.dart';
 import 'core/permission_guard.dart';
 import 'core/keyboard_shortcut_listener.dart';
 import 'core/route_registry.dart';
@@ -3812,6 +3814,22 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: 'settings/sms-bank',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                if (!_authStore!.hasBusinessPermission('settings', 'join')) {
+                  return hesabixNoTransitionPage(
+                    state,
+                    PermissionGuard.buildAccessDeniedPage(),
+                  );
+                }
+                return hesabixNoTransitionPage(
+                  state,
+                  SmsBankAssistantSettingsPage(businessId: businessId),
+                );
+              },
+            ),
+            GoRoute(
               path: 'document-monetization',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
@@ -4342,14 +4360,18 @@ class _MyAppState extends State<MyApp> {
               return InAppNotificationsBootstrap(
                 authStore: _authStore!,
                 calendarController: _calendarController,
-                child: AndroidUpdateGate(
-                  child: BiometricLockGate(
-                    authStore: _authStore!,
-                    lockController: _biometricLockController,
-                    child: DefaultTextStyle(
-                      style: baseStyle,
-                      child: KeyboardShortcutListener(
-                        child: child ?? const SizedBox(),
+                child: SmsBankBootstrap(
+                  authStore: _authStore!,
+                  calendarController: _calendarController,
+                  child: AndroidUpdateGate(
+                    child: BiometricLockGate(
+                      authStore: _authStore!,
+                      lockController: _biometricLockController,
+                      child: DefaultTextStyle(
+                        style: baseStyle,
+                        child: KeyboardShortcutListener(
+                          child: child ?? const SizedBox(),
+                        ),
                       ),
                     ),
                   ),

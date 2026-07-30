@@ -82,9 +82,16 @@ class _TransferFormDialogState extends State<TransferFormDialog> {
           _transferDate = DateTime.tryParse(docDate) ?? _transferDate;
         }
         _descriptionController.text = (init['description'] as String?) ?? '';
-        final amount = (init['total_amount'] as num?)?.toDouble();
+        final amount = (init['total_amount'] as num?)?.toDouble() ??
+            (init['amount'] as num?)?.toDouble();
         if (amount != null && amount > 0) {
           _amountController.text = formatNumberForInput(amount);
+        }
+        // Lightweight SMS seed (create mode without full document lines)
+        final seedFromBank = init['from_bank_account_id'];
+        if (seedFromBank != null && init['account_lines'] == null) {
+          _fromType = 'bank';
+          _fromId = seedFromBank.toString();
         }
         _currencyId = (init['currency_id'] as int?);
         // Infer commission from lines
