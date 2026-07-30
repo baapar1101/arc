@@ -207,13 +207,20 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                   final v = e.value;
                   final status = v is Map ? v['status']?.toString() : null;
                   final message = v is Map ? v['message']?.toString() : v?.toString();
-                  final ok = status == 'ok';
+                  final ok = status == 'ok' || status == 'info' || status == 'skipped';
+                  final isInfo = status == 'info' || status == 'skipped';
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
                     leading: Icon(
-                      ok ? Icons.check_circle_outline : Icons.error_outline,
-                      color: ok ? const Color(0xFF047857) : Theme.of(context).colorScheme.error,
+                      ok
+                          ? (isInfo ? Icons.info_outline : Icons.check_circle_outline)
+                          : Icons.error_outline,
+                      color: ok
+                          ? (isInfo
+                              ? Theme.of(context).colorScheme.primary
+                              : const Color(0xFF047857))
+                          : Theme.of(context).colorScheme.error,
                     ),
                     title: Text(e.key.toString()),
                     subtitle: message != null ? Text(message) : null,

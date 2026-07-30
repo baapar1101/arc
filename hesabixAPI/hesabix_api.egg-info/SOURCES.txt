@@ -439,6 +439,7 @@ app/integrations/moadian/__init__.py
 app/integrations/moadian/certificate.py
 app/integrations/moadian/client.py
 app/integrations/moadian/dto.py
+app/integrations/moadian/error_playbook.py
 app/integrations/moadian/invoice_builder.py
 app/integrations/moadian/utils.py
 app/integrations/moadian/v1_client.py

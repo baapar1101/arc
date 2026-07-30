@@ -74,6 +74,18 @@ class MoadianClient:
     def login(self) -> str:
         return self._inner.login()
 
+    def ensure_authenticated(self) -> str:
+        """اطمینان از توکن معتبر؛ بدون Redis هم با لاگین مستقیم کار می‌کند."""
+        ensure = getattr(self._inner, "_ensure_authenticated", None)
+        if callable(ensure):
+            ensure()
+        else:
+            self._inner.login()
+        token = getattr(self._inner, "_auth_token", None)
+        if not token:
+            token = self._inner.login()
+        return str(token)
+
     def close(self) -> None:
         self._inner.close()
 
