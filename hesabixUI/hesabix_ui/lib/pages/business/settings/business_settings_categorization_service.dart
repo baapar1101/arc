@@ -178,6 +178,18 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 7,
         ),
+      if (supportsAndroidSmsBankAssistant && ctx.canJoinSettings)
+        _item(
+          id: 'sms_bank_assistant',
+          title: 'smsBankAssistantSettingsTitle',
+          description: 'smsBankAssistantSettingsDescription',
+          icon: Icons.sms_outlined,
+          color: const Color(0xFF00838F),
+          route: ctx.panelRoute('settings/sms-bank'),
+          categoryId: 'business_finance',
+          order: 8,
+          tags: const ['android', 'new'],
+        ),
     ];
 
     return SettingsCategory(
@@ -514,9 +526,10 @@ class BusinessSettingsCategorizationService {
           categoryId: 'personalization',
           order: 1,
         ),
+        // Also listed under business_finance for discoverability; keep here as Android device feature.
         if (supportsAndroidSmsBankAssistant && ctx.canJoinSettings)
           _item(
-            id: 'sms_bank_assistant',
+            id: 'sms_bank_assistant_personalization',
             title: 'smsBankAssistantSettingsTitle',
             description: 'smsBankAssistantSettingsDescription',
             icon: Icons.sms_outlined,
