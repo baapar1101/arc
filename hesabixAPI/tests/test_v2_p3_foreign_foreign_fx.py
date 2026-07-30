@@ -106,7 +106,97 @@ def test_foreign_to_foreign_transfer_plan(monkeypatch):
 	assert plan["fx_diff"] == Decimal("150000.00")
 
 
-def test_cross_currency_no_longer_raises_base_required(monkeypatch):
+def test_auto_corrects_unconverted_payment_amount_copied_from_settles(monkeypatch):
+	"""۱۰ دلار تسویه + ۱۰ ریال پرداخت (کپی اشتباه) → تبدیل به معادل ریالی صحیح."""
+	invoice = SimpleNamespace(
+		currency_id=2,
+		document_date=datetime(2026, 7, 31, tzinfo=timezone.utc),
+		extra_info={"fx": {"rate": "1879850"}},
+	)
+	payment = {
+		"transaction_type": "bank",
+		"bank_id": 1,
+		"amount": Decimal("10"),  # اشتباه: همان عدد دلاری در فیلد ریال
+		"settles_amount": Decimal("10"),
+		"fx_rate": Decimal("1879850"),
+	}
+
+	monkeypatch.setattr(
+		"app.services.cross_currency_settlement_service.business_is_multi_currency",
+		lambda db, bid: True,
+	)
+	monkeypatch.setattr(
+		"app.services.cross_currency_settlement_service.get_payment_item_account_currency_id",
+		lambda db, p: 1,  # IRR base
+	)
+
+	class FakeBiz:
+		default_currency_id = 1
+
+	class FakeDB:
+		def get(self, model, pk):
+			return FakeBiz()
+
+	monkeypatch.setattr(
+		"app.services.cross_currency_settlement_service.get_currency_quant_and_round",
+		lambda db, cid: (Decimal("1"), True),
+	)
+
+	plan = resolve_cross_currency_payment_plan(
+		FakeDB(), business_id=1, invoice=invoice, payment_item=payment
+	)
+	assert plan is not None
+	assert plan["payment_auto_corrected"] is True
+	assert plan["payment_amount"] == Decimal("18798500")
+	assert plan["cash_base"] == Decimal("18798500")
+	assert plan["ar_base"] == Decimal("18798500")
+	assert plan["fx_diff"] == Decimal("0")
+
+
+def test_rejects_large_fx_diff_without_flag(monkeypatch):
+	invoice = SimpleNamespace(
+		currency_id=2,
+		document_date=datetime(2026, 7, 31, tzinfo=timezone.utc),
+		extra_info={},
+	)
+	# عمداً مبلغ خیلی کم ولی متفاوت از settles تا auto-correct نشود
+	payment = {
+		"transaction_type": "bank",
+		"bank_id": 1,
+		"amount": Decimal("100"),  # ریال — خیلی کمتر از expected
+		"settles_amount": Decimal("10"),
+		"fx_rate": Decimal("1879850"),
+	}
+
+	monkeypatch.setattr(
+		"app.services.cross_currency_settlement_service.business_is_multi_currency",
+		lambda db, bid: True,
+	)
+	monkeypatch.setattr(
+		"app.services.cross_currency_settlement_service.get_payment_item_account_currency_id",
+		lambda db, p: 1,
+	)
+
+	class FakeBiz:
+		default_currency_id = 1
+
+	class FakeDB:
+		def get(self, model, pk):
+			return FakeBiz()
+
+	monkeypatch.setattr(
+		"app.services.cross_currency_settlement_service.get_currency_quant_and_round",
+		lambda db, cid: (Decimal("1"), True),
+	)
+
+	with pytest.raises(ApiError) as ei:
+		resolve_cross_currency_payment_plan(
+			FakeDB(), business_id=1, invoice=invoice, payment_item=payment
+		)
+	detail = ei.value.detail if isinstance(ei.value.detail, dict) else {}
+	err = detail.get("error") if isinstance(detail, dict) else {}
+	assert err.get("code") == "FX_PAYMENT_AMOUNT_MISMATCH"
+
 	invoice = SimpleNamespace(
 		currency_id=2,
 		document_date=datetime(2024, 1, 15, tzinfo=timezone.utc),

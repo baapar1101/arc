@@ -208,12 +208,68 @@ def resolve_cross_currency_settlement_plan(
 	)
 
 	base_quant, round_on = get_currency_quant_and_round(db, base_id)
+	pay_quant, pay_round = get_currency_quant_and_round(db, int(payment_currency_id))
 	ar_base = quantize_money(settles_amount * r_settle, base_quant, round_on=round_on)
+
+	# مبلغ پرداخت مورد انتظار به ارز حساب پرداخت برای تسویه بدون سود/زیان تسعیر
+	# (ارزش پایهٔ تسویه ÷ نرخ پرداخت به پایه).
+	if r_pay <= 0:
+		raise ApiError("INVALID_PAYMENT_RATE", "نرخ ارز پرداخت نامعتبر است", http_status=400)
+	expected_payment = quantize_money(ar_base / r_pay, pay_quant, round_on=pay_round)
+
+	cross_rate = quantize_money(r_settle / r_pay, Decimal("0.00000001"), round_on=False)
+	payment_auto_corrected = False
+
+	# باگ رایج UI: کپی مبلغ تسویهٔ ارزی در فیلد مبلغ پرداخت بدون تبدیل نرخ
+	# (مثلاً ۱۰ دلار → ۱۰ ریال). در این حالت مبلغ را به معادل صحیح تبدیل می‌کنیم.
+	keep_raw = bool(
+		payment_item.get("keep_raw_payment_amount")
+		or (isinstance(fx_meta, dict) and fx_meta.get("keep_raw_payment_amount"))
+	)
+	same_number_tol = max(Decimal("0.01"), abs(settles_amount) * Decimal("0.0001"))
+	rates_differ = abs(r_settle - r_pay) > max(Decimal("0.0001"), abs(r_settle) * Decimal("0.001"))
+	if (
+		not keep_raw
+		and rates_differ
+		and abs(payment_amount - settles_amount) <= same_number_tol
+		and expected_payment > 0
+		and abs(expected_payment - payment_amount) > same_number_tol
+	):
+		payment_amount = expected_payment
+		payment_auto_corrected = True
+
 	cash_base = quantize_money(payment_amount * r_pay, base_quant, round_on=round_on)
 	fx_diff = ar_base - cash_base
-	cross_rate = None
-	if r_pay > 0:
-		cross_rate = quantize_money(r_settle / r_pay, Decimal("0.00000001"), round_on=False)
+
+	# دفاع در عمق: اختلاف تسعیر غیرعادی (مثلاً >۲۵٪ ارزش تسویه) بدون تأیید صریح رد شود.
+	allow_large = bool(
+		payment_item.get("allow_large_fx_diff")
+		or (isinstance(fx_meta, dict) and fx_meta.get("allow_large_fx_diff"))
+	)
+	if ar_base > 0 and not allow_large:
+		ratio = abs(fx_diff) / ar_base
+		if ratio > Decimal("0.25"):
+			raise ApiError(
+				"FX_PAYMENT_AMOUNT_MISMATCH",
+				(
+					"مبلغ پرداخت با ارزش تسویه در نرخ اعلام‌شده هم‌خوانی ندارد. "
+					f"مبلغ پرداخت مورد انتظار حدود {expected_payment} است "
+					f"(ارزش تسویه پایه {ar_base}، اختلاف تسعیر {fx_diff}). "
+					"اگر اختلاف عمدی است allow_large_fx_diff=true ارسال کنید."
+				),
+				http_status=400,
+				details={
+					"settles_amount": str(settles_amount),
+					"payment_amount": str(payment_amount),
+					"expected_payment_amount": str(expected_payment),
+					"ar_base": str(ar_base),
+					"cash_base": str(cash_base),
+					"fx_diff": str(fx_diff),
+					"invoice_rate_to_base": str(r_settle),
+					"payment_rate_to_base": str(r_pay),
+					"cross_rate": str(cross_rate),
+				},
+			)
 
 	return {
 		"invoice_currency_id": settle_id,  # سازگاری با build_fx_settlement_extra
@@ -223,6 +279,8 @@ def resolve_cross_currency_settlement_plan(
 		"document_currency_id": base_id,
 		"settles_amount": settles_amount,
 		"payment_amount": payment_amount,
+		"expected_payment_amount": expected_payment,
+		"payment_auto_corrected": payment_auto_corrected,
 		"tx_rate": cross_rate if cross_rate is not None else r_settle,
 		"invoice_rate_to_base": r_settle,
 		"payment_rate_to_base": r_pay,

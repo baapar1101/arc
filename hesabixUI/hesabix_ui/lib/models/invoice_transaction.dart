@@ -50,6 +50,8 @@ class InvoiceTransaction {
   final num? fxRate;
   /// ارز حساب پرداخت (برای نمایش و تشخیص بین‌ارزی در UI).
   final int? paymentCurrencyId;
+  /// تأیید صریح اختلاف تسعیر بزرگ (>۲۵٪) برای عبور از گارد بک‌اند.
+  final bool allowLargeFxDiff;
 
   const InvoiceTransaction({
     required this.id,
@@ -73,6 +75,7 @@ class InvoiceTransaction {
     this.settlesAmount,
     this.fxRate,
     this.paymentCurrencyId,
+    this.allowLargeFxDiff = false,
   });
 
   /// مبلغ مؤثر برای مانده فاکتور (به ارز فاکتور).
@@ -103,6 +106,7 @@ class InvoiceTransaction {
     Object? settlesAmount = _unset,
     Object? fxRate = _unset,
     Object? paymentCurrencyId = _unset,
+    bool? allowLargeFxDiff,
   }) {
     return InvoiceTransaction(
       id: id ?? this.id,
@@ -130,6 +134,7 @@ class InvoiceTransaction {
       paymentCurrencyId: identical(paymentCurrencyId, _unset)
           ? this.paymentCurrencyId
           : paymentCurrencyId as int?,
+      allowLargeFxDiff: allowLargeFxDiff ?? this.allowLargeFxDiff,
     );
   }
 
@@ -163,6 +168,9 @@ class InvoiceTransaction {
     if (paymentCurrencyId != null) {
       map['payment_currency_id'] = paymentCurrencyId;
     }
+    if (allowLargeFxDiff) {
+      map['allow_large_fx_diff'] = true;
+    }
     return map;
   }
 
@@ -189,6 +197,7 @@ class InvoiceTransaction {
       settlesAmount: json['settles_amount'] as num?,
       fxRate: json['fx_rate'] as num? ?? json['exchange_rate'] as num?,
       paymentCurrencyId: (json['payment_currency_id'] as num?)?.toInt(),
+      allowLargeFxDiff: json['allow_large_fx_diff'] == true,
     );
   }
 }
