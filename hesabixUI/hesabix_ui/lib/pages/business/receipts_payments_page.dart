@@ -23,6 +23,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/currency_display_utils.dart';
+import '../../utils/invoice_payment_tx_from_receipt.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/money/amount_field_words_tooltip.dart';
 import '../../constants/frequent_description_scope.dart';
@@ -1155,12 +1156,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 final doc = await receiptPaymentService.getById(docId);
                 if (doc == null) continue;
                 
-                // مجموع account_lines (بدون کارمزد داخلی پذیرنده)
-                for (final accountLine in doc.accountLines) {
-                  if (!accountLine.isCommissionLine) {
-                    totalPaid += accountLine.amount;
-                  }
-                }
+                totalPaid += paidTowardInvoiceCurrencyFromReceiptDoc(doc);
               } catch (e) {
                 // ادامه در صورت خطا
               }
@@ -1228,12 +1224,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             
             processedDocIds.add(docId);
             
-            // مجموع account_lines (بدون کارمزد داخلی پذیرنده)
-            for (final accountLine in doc.accountLines) {
-              if (!accountLine.isCommissionLine) {
-                totalPaid += accountLine.amount;
-              }
-            }
+            totalPaid += paidTowardInvoiceCurrencyFromReceiptDoc(doc);
           } catch (e) {
             // ادامه در صورت خطا
           }

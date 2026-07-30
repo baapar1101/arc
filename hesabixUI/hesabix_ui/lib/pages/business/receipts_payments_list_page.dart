@@ -38,6 +38,7 @@ import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/currency_display_utils.dart';
+import 'package:hesabix_ui/utils/invoice_payment_tx_from_receipt.dart';
 import '../../services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
@@ -1528,34 +1529,9 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
           }
         }
       }
-      // تبدیل خطوط حساب‌ها (حذف خطوط کارمزد داخلی — هزینه پذیرنده، نه پرداخت مشتری)
+      // تبدیل خطوط حساب‌ها با حفظ اطلاعات تسویه بین‌ارزی
       _centerTransactions.clear();
-      for (final al in initial.accountLines) {
-        if (al.isCommissionLine) continue;
-        final t = TransactionType.fromValue(al.transactionType ?? '') ?? TransactionType.person;
-        _centerTransactions.add(
-          InvoiceTransaction(
-            id: al.id.toString(),
-            type: t,
-            bankId: al.extraInfo?['bank_id']?.toString(),
-            bankName: al.extraInfo?['bank_name']?.toString(),
-            cashRegisterId: al.extraInfo?['cash_register_id']?.toString(),
-            cashRegisterName: al.extraInfo?['cash_register_name']?.toString(),
-            pettyCashId: al.extraInfo?['petty_cash_id']?.toString(),
-            pettyCashName: al.extraInfo?['petty_cash_name']?.toString(),
-            checkId: al.extraInfo?['check_id']?.toString(),
-            checkNumber: al.extraInfo?['check_number']?.toString(),
-            personId: al.extraInfo?['person_id']?.toString(),
-            personName: al.extraInfo?['person_name']?.toString(),
-            accountId: al.accountId.toString(),
-            accountName: al.accountName,
-            transactionDate: al.transactionDate ?? _docDate,
-            amount: al.amount,
-            commission: al.commission,
-            description: al.description,
-          ),
-        );
-      }
+      _centerTransactions.addAll(invoiceTransactionsFromReceiptPaymentDoc(initial));
     } else {
       // حالت ایجاد
       _docDate = DateTime.now();
@@ -3189,12 +3165,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 final doc = await receiptPaymentService.getById(docId);
                 if (doc == null) continue;
                 
-                // مجموع account_lines (بدون کارمزد داخلی پذیرنده)
-                for (final accountLine in doc.accountLines) {
-                  if (!accountLine.isCommissionLine) {
-                    totalPaid += accountLine.amount;
-                  }
-                }
+                totalPaid += paidTowardInvoiceCurrencyFromReceiptDoc(doc);
               } catch (e) {
                 // ادامه در صورت خطا
               }
@@ -3273,12 +3244,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             
             processedDocIds.add(docId);
             
-            // مجموع account_lines (بدون کارمزد داخلی پذیرنده)
-            for (final accountLine in doc.accountLines) {
-              if (!accountLine.isCommissionLine) {
-                totalPaid += accountLine.amount;
-              }
-            }
+            totalPaid += paidTowardInvoiceCurrencyFromReceiptDoc(doc);
           } catch (e) {
             // ادامه در صورت خطا
           }

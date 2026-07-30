@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
@@ -28,6 +27,7 @@ import '../../services/business_api_service.dart';
 import '../../services/currency_service.dart';
 import '../../services/business_currency_rate_service.dart';
 import '../../utils/currency_display_utils.dart';
+import '../../utils/invoice_payment_tx_from_receipt.dart';
 import '../../utils/number_normalizer.dart';
 import '../../widgets/invoice/invoice_installments_editor.dart';
 import '../../widgets/invoice/keep_alive_tab_child.dart';
@@ -668,35 +668,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
       final List<InvoiceTransaction> transactions = [];
       for (final doc in paymentDocs) {
-        for (final accountLine in doc.accountLines) {
-          // کارمزد تسویه درگاه هزینه پذیرنده است؛ نباید به‌عنوان تراکنش پرداخت مشتری نمایش/ذخیره شود.
-          if (accountLine.isCommissionLine) continue;
-          if (accountLine.transactionType == null) continue;
-
-          final transactionType = TransactionType.fromValue(accountLine.transactionType ?? '');
-          if (transactionType == null) continue;
-
-          transactions.add(InvoiceTransaction(
-            id: const Uuid().v4(),
-            type: transactionType,
-            amount: accountLine.amount,
-            transactionDate: accountLine.transactionDate ?? doc.documentDate,
-            description: accountLine.description,
-            commission: accountLine.commission,
-            bankId: accountLine.extraInfo?['bank_id']?.toString(),
-            bankName: accountLine.extraInfo?['bank_name'] as String?,
-            cashRegisterId: accountLine.extraInfo?['cash_register_id']?.toString(),
-            cashRegisterName: accountLine.extraInfo?['cash_register_name'] as String?,
-            pettyCashId: accountLine.extraInfo?['petty_cash_id']?.toString(),
-            pettyCashName: accountLine.extraInfo?['petty_cash_name'] as String?,
-            checkId: accountLine.extraInfo?['check_id']?.toString(),
-            checkNumber: accountLine.extraInfo?['check_number'] as String?,
-            personId: accountLine.extraInfo?['person_id']?.toString(),
-            personName: accountLine.extraInfo?['person_name'] as String?,
-            accountId: accountLine.accountId.toString(),
-            accountName: accountLine.accountName,
-          ));
-        }
+        transactions.addAll(invoiceTransactionsFromReceiptPaymentDoc(doc));
       }
       
       transactions.sort((a, b) => a.transactionDate.compareTo(b.transactionDate));
