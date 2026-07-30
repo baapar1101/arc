@@ -153,17 +153,6 @@ def resolve_cross_currency_settlement_plan(
 	if payment_amount <= 0:
 		raise ApiError("INVALID_AMOUNT", "مبلغ پرداخت نامعتبر است", http_status=400)
 
-	settles_raw = payment_item.get("settles_amount")
-	if settles_raw is None:
-		raise ApiError(
-			"SETTLES_AMOUNT_REQUIRED",
-			"برای پرداخت با ارز متفاوت، settles_amount (مبلغ تسویه) الزامی است",
-			http_status=400,
-		)
-	settles_amount = _d(settles_raw)
-	if settles_amount <= 0:
-		raise ApiError("INVALID_SETTLES_AMOUNT", "مبلغ تسویه ارزی نامعتبر است", http_status=400)
-
 	fx_meta = payment_item.get("fx") if isinstance(payment_item.get("fx"), dict) else {}
 	legacy_fx = payment_item.get("fx_rate") or payment_item.get("exchange_rate")
 	if legacy_fx is None and fx_meta.get("rate") is not None:
@@ -207,6 +196,20 @@ def resolve_cross_currency_settlement_plan(
 		label="ارز پرداخت",
 	)
 
+	settles_raw = payment_item.get("settles_amount")
+	settles_inferred_from_amount = False
+	if settles_raw is None:
+		# سازگاری با کلاینت قدیمی/ناقص: ارز حساب ≠ ارز تسویه است ولی settles نیامده.
+		# «amount» را مبلغ تسویه به ارز فاکتور می‌گیریم (مثلاً ۱۰ دلار) و بعداً
+		# مبلغ پرداخت را با نرخ به ارز حساب تبدیل می‌کنیم.
+		# (حتی اگر نرخ‌ها به‌اشتباه یکسان resolve شوند، استنتاج بهتر از 400 است.)
+		settles_amount = payment_amount
+		settles_inferred_from_amount = True
+	else:
+		settles_amount = _d(settles_raw)
+	if settles_amount <= 0:
+		raise ApiError("INVALID_SETTLES_AMOUNT", "مبلغ تسویه ارزی نامعتبر است", http_status=400)
+
 	base_quant, round_on = get_currency_quant_and_round(db, base_id)
 	pay_quant, pay_round = get_currency_quant_and_round(db, int(payment_currency_id))
 	ar_base = quantize_money(settles_amount * r_settle, base_quant, round_on=round_on)
@@ -222,6 +225,7 @@ def resolve_cross_currency_settlement_plan(
 
 	# باگ رایج UI: کپی مبلغ تسویهٔ ارزی در فیلد مبلغ پرداخت بدون تبدیل نرخ
 	# (مثلاً ۱۰ دلار → ۱۰ ریال). در این حالت مبلغ را به معادل صحیح تبدیل می‌کنیم.
+	# همچنین وقتی settles از amount استنتاج شده، همیشه مبلغ پرداخت را به معادل نرخ‌دار برسان.
 	keep_raw = bool(
 		payment_item.get("keep_raw_payment_amount")
 		or (isinstance(fx_meta, dict) and fx_meta.get("keep_raw_payment_amount"))
@@ -231,9 +235,12 @@ def resolve_cross_currency_settlement_plan(
 	if (
 		not keep_raw
 		and rates_differ
-		and abs(payment_amount - settles_amount) <= same_number_tol
 		and expected_payment > 0
 		and abs(expected_payment - payment_amount) > same_number_tol
+		and (
+			settles_inferred_from_amount
+			or abs(payment_amount - settles_amount) <= same_number_tol
+		)
 	):
 		payment_amount = expected_payment
 		payment_auto_corrected = True
@@ -268,6 +275,7 @@ def resolve_cross_currency_settlement_plan(
 					"invoice_rate_to_base": str(r_settle),
 					"payment_rate_to_base": str(r_pay),
 					"cross_rate": str(cross_rate),
+					"settles_inferred_from_amount": settles_inferred_from_amount,
 				},
 			)
 
@@ -281,6 +289,7 @@ def resolve_cross_currency_settlement_plan(
 		"payment_amount": payment_amount,
 		"expected_payment_amount": expected_payment,
 		"payment_auto_corrected": payment_auto_corrected,
+		"settles_inferred_from_amount": settles_inferred_from_amount,
 		"tx_rate": cross_rate if cross_rate is not None else r_settle,
 		"invoice_rate_to_base": r_settle,
 		"payment_rate_to_base": r_pay,

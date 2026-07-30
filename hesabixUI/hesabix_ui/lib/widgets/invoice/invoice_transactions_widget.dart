@@ -2054,11 +2054,41 @@ class _TransactionDialogState extends State<TransactionDialog> {
       }
     }
 
+    // قبل از اعتبارسنجی بین‌ارزی، ارز حساب را از انتخاب فعلی دوباره بخوان
+    _syncPaymentCurrencyFromSelection();
+
     num? settlesAmount;
     num? fxRate;
     var allowLargeFxDiff = false;
-    if (_isMultiCurrency && _isCrossCurrencyPayment) {
-      final settlesText = _settlesAmountController.text.replaceAll(',', '').trim();
+    // تشخیص بین‌ارزی حتی اگر فلگ MC در کلاینت دیر به‌روز شده باشد
+    final payCur = _selectedPaymentCurrencyId;
+    final invCur = widget.selectedCurrencyId;
+    final isCross = invCur != null && payCur != null && invCur != payCur;
+    // فاکتور ارزی با ارز حساب نامشخص: settles را بفرست تا بک‌اند تبدیل کند
+    final foreignInvoiceNeedsSettles = !isCross &&
+        invCur != null &&
+        _baseCurrencyId != null &&
+        invCur != _baseCurrencyId;
+
+    if (isCross || foreignInvoiceNeedsSettles) {
+      // اگر فیلد تسویه خالی است، مبلغ واردشده را تسویهٔ ارزی فاکتور بگیر
+      var settlesText = _settlesAmountController.text.replaceAll(',', '').trim();
+      if (settlesText.isEmpty) {
+        settlesText = amountRaw.isNotEmpty ? amountRaw : '';
+        if (settlesText.isNotEmpty) {
+          _settlesAmountController.text = formatWithThousands(
+            double.tryParse(settlesText) ?? 0,
+            decimalPlaces: 2,
+          );
+        }
+      }
+      if (settlesText.isEmpty && widget.initialAmount != null) {
+        settlesText = widget.initialAmount!.toString();
+        _settlesAmountController.text = formatWithThousands(
+          widget.initialAmount!,
+          decimalPlaces: 2,
+        );
+      }
       if (settlesText.isEmpty) {
         SnackBarHelper.showError(
           context,
@@ -2071,54 +2101,58 @@ class _TransactionDialogState extends State<TransactionDialog> {
         SnackBarHelper.showError(context, message: 'مبلغ تسویه نامعتبر است');
         return;
       }
+      if (_fxRateController.text.trim().isEmpty && widget.invoiceFxRate != null) {
+        _fxRateController.text = formatFxRateForDisplay(widget.invoiceFxRate);
+      }
       final rateText = _fxRateController.text.replaceAll(',', '').trim();
       fxRate = double.tryParse(rateText);
-      if (fxRate == null || fxRate <= 0) {
-        SnackBarHelper.showError(context, message: 'نرخ تبدیل نامعتبر است');
-        return;
-      }
+      // نرخ خالی: بک‌اند از نرخ فاکتور/دفتر نرخ استفاده می‌کند؛ اینجا settles را می‌فرستیم
 
-      // اگر مبلغ پرداخت هنوز خالی یا برابر عدد تسویه (بدون تبدیل) است، اصلاح کن
-      final expected = settlesAmount * fxRate;
-      final looksUnconverted = amount > 0 &&
-          (amount - settlesAmount).abs() < 0.0001 &&
-          (expected - amount).abs() > 0.01;
-      if (amount <= 0 || looksUnconverted) {
-        amount = expected.toDouble();
-        _syncingPaymentAmount = true;
-        _amountController.text = formatWithThousands(expected, decimalPlaces: 0);
-        _syncingPaymentAmount = false;
-      } else {
-        // هشدار اختلاف تسعیر بزرگ
-        final fxDiffRatio =
-            expected == 0 ? 0.0 : (expected - amount).abs() / expected;
-        if (fxDiffRatio > 0.25) {
-          final cont = await showDialog<bool>(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('اختلاف تسعیر غیرعادی'),
-              content: Text(
-                'مبلغ پرداخت (${formatWithThousands(amount, decimalPlaces: 0)}) '
-                'با معادل نرخ‌دار تسویه (${formatWithThousands(expected, decimalPlaces: 0)}) '
-                'بیش از ۲۵٪ اختلاف دارد.\n'
-                'آیا عمداً همین مبلغ را ثبت می‌کنید؟',
+      if (isCross && fxRate != null && fxRate > 0) {
+        // اگر مبلغ پرداخت هنوز خالی یا برابر عدد تسویه (بدون تبدیل) است، اصلاح کن
+        final expected = settlesAmount * fxRate;
+        final looksUnconverted = amount > 0 &&
+            (amount - settlesAmount).abs() < 0.0001 &&
+            (expected - amount).abs() > 0.01;
+        if (amount <= 0 || looksUnconverted) {
+          amount = expected.toDouble();
+          _syncingPaymentAmount = true;
+          _amountController.text = formatWithThousands(expected, decimalPlaces: 0);
+          _syncingPaymentAmount = false;
+        } else {
+          final fxDiffRatio =
+              expected == 0 ? 0.0 : (expected - amount).abs() / expected;
+          if (fxDiffRatio > 0.25) {
+            final cont = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('اختلاف تسعیر غیرعادی'),
+                content: Text(
+                  'مبلغ پرداخت (${formatWithThousands(amount, decimalPlaces: 0)}) '
+                  'با معادل نرخ‌دار تسویه (${formatWithThousands(expected, decimalPlaces: 0)}) '
+                  'بیش از ۲۵٪ اختلاف دارد.\n'
+                  'آیا عمداً همین مبلغ را ثبت می‌کنید؟',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('انصراف'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('ثبت با همین مبلغ'),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('انصراف'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('ثبت با همین مبلغ'),
-                ),
-              ],
-            ),
-          );
-          if (cont != true) return;
-          if (!mounted) return;
-          allowLargeFxDiff = true;
+            );
+            if (cont != true) return;
+            if (!mounted) return;
+            allowLargeFxDiff = true;
+          }
         }
+      } else if (amount <= 0) {
+        // بدون نرخ یا ارز حساب نامشخص: حداقل settles را به‌عنوان amount بفرست تا بک‌اند تبدیل کند
+        amount = settlesAmount.toDouble();
       }
       if (amount <= 0) {
         SnackBarHelper.showError(context, message: 'مبلغ پرداخت نامعتبر است');
@@ -2149,8 +2183,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
           : _descriptionController.text.trim(),
       settlesAmount: settlesAmount,
       fxRate: fxRate,
-      paymentCurrencyId:
-          _isCrossCurrencyPayment ? _selectedPaymentCurrencyId : null,
+      paymentCurrencyId: isCross ? payCur : null,
       allowLargeFxDiff: allowLargeFxDiff,
     );
     

@@ -1511,7 +1511,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     
     // تراکنش‌های پرداخت برای فاکتور قطعی؛ همیشه آرایه بفرست تا حذف همهٔ تراکنش‌ها در سرور اعمال شود
     if (!_isProforma) {
-      payload['payments'] = _transactions.map((t) => t.toJson()).toList();
+      payload['payments'] = _transactions
+          .map(
+            (t) => t.toPaymentPayload(
+              invoiceCurrencyId: _selectedCurrencyId,
+              baseCurrencyId: _defaultBusinessCurrencyId,
+              invoiceFxRate: _previewFxRate,
+            ),
+          )
+          .toList();
     }
 
     return payload;

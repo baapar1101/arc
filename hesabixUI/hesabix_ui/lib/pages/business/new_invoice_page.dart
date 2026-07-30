@@ -2938,7 +2938,16 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     
     // تراکنش‌ها فقط برای فاکتور قطعی (هم‌راستا با بک‌اند و edit_invoice_page)
     if (!_isDraft && _transactions.isNotEmpty) {
-      payload['payments'] = _transactions.map((t) => t.toJson()).toList();
+      final baseCur = _defaultBusinessCurrencyId;
+      payload['payments'] = _transactions
+          .map(
+            (t) => t.toPaymentPayload(
+              invoiceCurrencyId: _selectedCurrencyId,
+              baseCurrencyId: baseCur,
+              invoiceFxRate: _previewFxRate,
+            ),
+          )
+          .toList();
     }
     
     return payload;

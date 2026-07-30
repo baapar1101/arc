@@ -174,6 +174,28 @@ class InvoiceTransaction {
     return map;
   }
 
+  /// برای فاکتور ارزی، اگر کلاینت settles را جا انداخته باشد، از amount پر می‌کند
+  /// تا بک‌اند SETTLES_AMOUNT_REQUIRED ندهد (تبدیل نرخ در بک‌اند انجام می‌شود).
+  Map<String, dynamic> toPaymentPayload({
+    int? invoiceCurrencyId,
+    int? baseCurrencyId,
+    num? invoiceFxRate,
+  }) {
+    final map = toJson();
+    final foreignInvoice = invoiceCurrencyId != null &&
+        baseCurrencyId != null &&
+        invoiceCurrencyId != baseCurrencyId;
+    if (foreignInvoice) {
+      map.putIfAbsent('settles_amount', () => settlesAmount ?? amount);
+      if (map['fx_rate'] == null &&
+          invoiceFxRate != null &&
+          invoiceFxRate > 0) {
+        map['fx_rate'] = invoiceFxRate;
+      }
+    }
+    return map;
+  }
+
   factory InvoiceTransaction.fromJson(Map<String, dynamic> json) {
     return InvoiceTransaction(
       id: json['id'] as String,
