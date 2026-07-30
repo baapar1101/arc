@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/multi_currency_gate.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/currency_display_utils.dart';
 
 /// نمایش جمع دوگانه فاکتور ارزی (ارز سند + معادل پایه) — فقط وقتی MC=ON و showDual.
 class InvoiceFxDualTotalsBanner extends StatelessWidget {
@@ -51,16 +52,22 @@ class InvoiceFxDualTotalsBanner extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'معادل ارز پایه',
+                        'جمع و معادل پایه',
                         style: Theme.of(context).textTheme.labelLarge?.copyWith(
                               fontWeight: FontWeight.w600,
                             ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${formatWithThousands(foreignPayable, decimalPlaces: foreignDecimalPlaces)} $foreignCurrencyLabel'
-                        '  ≈  '
-                        '${formatWithThousands(basePayable, decimalPlaces: baseDecimalPlaces)} $baseCurrencyLabel',
+                        formatDualCurrencyAmount(
+                          baseAmount: basePayable,
+                          baseUnit: baseCurrencyLabel,
+                          originalAmount: foreignPayable,
+                          originalUnit: foreignCurrencyLabel,
+                          baseDecimalPlaces: baseDecimalPlaces,
+                          originalDecimalPlaces: foreignDecimalPlaces,
+                          showOriginalEvenIfZero: true,
+                        ),
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const SizedBox(height: 2),

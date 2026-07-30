@@ -491,34 +491,50 @@ class _PersonsPageState extends State<PersonsPage> {
 
             final fxCodes = person.foreignCurrencyCodes;
             final showFx = widget.authStore.isMultiCurrency && fxCodes.isNotEmpty;
+            final baseLabel = widget.authStore.currentBusiness?.defaultCurrency?.symbol
+                    ?? widget.authStore.currentBusiness?.defaultCurrency?.code
+                    ?? 'ریال';
             
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  formattedBalance,
-                  style: TextStyle(
-                    color: balanceColor,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                if (showFx)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      fxCodes.join(' · '),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            return Tooltip(
+              message: showFx
+                  ? 'مانده معادل پایه ($baseLabel)\nفعال در ارزها: ${fxCodes.join(' · ')}\nبرای جزئیات هر ارز، جزئیات شخص را باز کنید.'
+                  : 'مانده به $baseLabel',
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    formattedBalance,
+                    style: TextStyle(
+                      color: balanceColor,
+                      fontWeight: FontWeight.bold,
                     ),
+                    textAlign: TextAlign.center,
                   ),
-              ],
+                  Text(
+                    baseLabel,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (showFx)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'چندارزی: ${fxCodes.join(' · ')}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
             );
           },
         ),

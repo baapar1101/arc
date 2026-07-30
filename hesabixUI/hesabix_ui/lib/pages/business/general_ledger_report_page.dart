@@ -21,6 +21,7 @@ import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/currency_display_utils.dart';
 
 class GeneralLedgerReportPage extends StatefulWidget {
   final int businessId;
@@ -291,6 +292,35 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     return DataTableUtils.formatNumber(n);
   }
 
+  String get _baseCurrencyUnit {
+    Map<String, dynamic>? def;
+    for (final c in _currencies) {
+      if (c['is_default'] == true) {
+        def = c;
+        break;
+      }
+    }
+    def ??= _currencies.isNotEmpty ? _currencies.first : null;
+    if (def == null) return 'ریال';
+    return currencyUnitLabelFromBusinessCurrencyMap(def);
+  }
+
+  String _formatLedgerAmount(Map<String, dynamic> m, String amountKey, String nativeKey) {
+    final amountsInBase = m['amounts_in_base'] == true || _selectedCurrencyId == null;
+    final unit = (m['document_currency_symbol'] ?? m['document_currency_code'] ?? '')
+        .toString();
+    final dp = (m['document_currency_decimal_places'] as num?)?.toInt() ?? 2;
+    return formatReportLedgerAmount(
+      amount: m[amountKey],
+      amountsInBase: amountsInBase,
+      nativeAmount: m[nativeKey],
+      documentCurrencyUnit: unit,
+      baseUnit: _baseCurrencyUnit,
+      baseDecimalPlaces: 0,
+      nativeDecimalPlaces: dp,
+    );
+  }
+
   String _formatBalance(dynamic balance, dynamic balanceType) {
     if (balance == null) return '0';
     final b = balance is num ? balance.toDouble() : double.tryParse(balance.toString()) ?? 0.0;
@@ -357,12 +387,20 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
         NumberColumn(
           'debit',
           'بدهکار',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['debit']),
+          formatter: (item) => _formatLedgerAmount(
+            item as Map<String, dynamic>,
+            'debit',
+            'native_debit',
+          ),
         ),
         NumberColumn(
           'credit',
           'بستانکار',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['credit']),
+          formatter: (item) => _formatLedgerAmount(
+            item as Map<String, dynamic>,
+            'credit',
+            'native_credit',
+          ),
         ),
         TextColumn(
           'balance',
@@ -482,7 +520,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
             ),
             cell(
               _currencies.length > 1
-                  ? DropdownButtonFormField<int>(
+                  ? DropdownButtonFormField<int?>(
                 value: _selectedCurrencyId,
                 decoration: InputDecoration(
                   hintText: 'ارز',
@@ -493,13 +531,13 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                 ),
                 isExpanded: true,
                 items: [
-                  const DropdownMenuItem<int>(value: null, child: Text('همه ارزها')),
-                  ..._currencies.map<DropdownMenuItem<int>>((c) {
+                  const DropdownMenuItem<int?>(value: null, child: Text('همه ارزها (معادل پایه)')),
+                  ..._currencies.map<DropdownMenuItem<int?>>((c) {
                     final id = c['id'] as int?;
                     final code = (c['code'] ?? '').toString();
-                    final name = (c['name'] ?? '').toString();
+                    final name = (c['title'] ?? c['name'] ?? '').toString();
                     final displayName = code.isNotEmpty ? '$code - $name' : name;
-                    return DropdownMenuItem<int>(
+                    return DropdownMenuItem<int?>(
                       key: ValueKey('currency_$id'),
                       value: id,
                       child: Text(displayName, overflow: TextOverflow.ellipsis, maxLines: 1),

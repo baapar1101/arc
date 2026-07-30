@@ -15,6 +15,7 @@ import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/currency_display_utils.dart';
 
 class JournalLedgerReportPage extends StatefulWidget {
   final int businessId;
@@ -237,6 +238,35 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
     return DataTableUtils.formatNumber(n);
   }
 
+  String get _baseCurrencyUnit {
+    Map<String, dynamic>? def;
+    for (final c in _currencies) {
+      if (c['is_default'] == true) {
+        def = c;
+        break;
+      }
+    }
+    def ??= _currencies.isNotEmpty ? _currencies.first : null;
+    if (def == null) return 'ریال';
+    return currencyUnitLabelFromBusinessCurrencyMap(def);
+  }
+
+  String _formatLedgerAmount(Map<String, dynamic> m, String amountKey, String nativeKey) {
+    final amountsInBase = m['amounts_in_base'] == true || _selectedCurrencyId == null;
+    final unit = (m['document_currency_symbol'] ?? m['document_currency_code'] ?? '')
+        .toString();
+    final dp = (m['document_currency_decimal_places'] as num?)?.toInt() ?? 2;
+    return formatReportLedgerAmount(
+      amount: m[amountKey],
+      amountsInBase: amountsInBase,
+      nativeAmount: m[nativeKey],
+      documentCurrencyUnit: unit,
+      baseUnit: _baseCurrencyUnit,
+      baseDecimalPlaces: 0,
+      nativeDecimalPlaces: dp,
+    );
+  }
+
   String _formatAccount(dynamic code, dynamic name) {
     if (code == null && name == null) return '-';
     if (code == null) return name?.toString() ?? '-';
@@ -320,7 +350,11 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
         NumberColumn(
           'debit_amount',
           'مبلغ بدهکار',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['debit_amount']),
+          formatter: (item) => _formatLedgerAmount(
+            item as Map<String, dynamic>,
+            'debit_amount',
+            'native_debit_amount',
+          ),
         ),
         TextColumn(
           'credit_account',
@@ -333,7 +367,11 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
         NumberColumn(
           'credit_amount',
           'مبلغ بستانکار',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['credit_amount']),
+          formatter: (item) => _formatLedgerAmount(
+            item as Map<String, dynamic>,
+            'credit_amount',
+            'native_credit_amount',
+          ),
         ),
         TextColumn(
           'person_name',
@@ -478,8 +516,8 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
                                   // Currency — فقط چندارزی
                                   if (_currencies.length > 1)
                                   SizedBox(
-                                    width: 200,
-                                    child: DropdownButtonFormField<int>(
+                                    width: 220,
+                                    child: DropdownButtonFormField<int?>(
                                       value: _selectedCurrencyId,
                                       decoration: InputDecoration(
                                         labelText: 'ارز',
@@ -487,16 +525,16 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                                       ),
                                       items: [
-                                        const DropdownMenuItem<int>(
+                                        const DropdownMenuItem<int?>(
                                           value: null,
-                                          child: Text('همه ارزها'),
+                                          child: Text('همه ارزها (معادل پایه)'),
                                         ),
-                                        ..._currencies.map<DropdownMenuItem<int>>((c) {
+                                        ..._currencies.map<DropdownMenuItem<int?>>((c) {
                                           final id = c['id'] as int?;
                                           final code = (c['code'] ?? '').toString();
-                                          final name = (c['name'] ?? '').toString();
+                                          final name = (c['title'] ?? c['name'] ?? '').toString();
                                           final displayName = code.isNotEmpty ? '$code - $name' : name;
-                                          return DropdownMenuItem<int>(
+                                          return DropdownMenuItem<int?>(
                                             key: ValueKey('currency_$id'),
                                             value: id,
                                             child: Text(

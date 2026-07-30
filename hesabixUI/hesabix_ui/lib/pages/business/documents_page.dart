@@ -20,6 +20,7 @@ import '../../services/business_dashboard_service.dart';
 import '../../models/person_model.dart';
 import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/person_combobox_widget.dart';
+import '../../widgets/fx/report_currency_filter_dropdown.dart';
 import '../../services/list_filter_preferences_service.dart';
 
 /// صفحه لیست اسناد حسابداری (عمومی و اتوماتیک)
@@ -69,6 +70,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   int? _selectedProjectId;
   Person? _filterPerson;
+  /// null = همه ارزها (فقط وقتی چندارزی فعال است معنا دارد)
+  int? _filterCurrencyId;
+  bool _currencyFilterTouched = false;
 
   bool _showDesktopFilters = false;
 
@@ -346,7 +350,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
         _toDate != null ||
         _selectedFiscalYearId != null ||
         _selectedProjectId != null ||
-        _filterPerson != null;
+        _filterPerson != null ||
+        (_currencyFilterTouched && widget.authStore.isMultiCurrency);
   }
 
   void _clearExternalFilters() {
@@ -356,6 +361,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
       _toDate = null;
       _selectedProjectId = null;
       _filterPerson = null;
+      _filterCurrencyId = null;
+      _currencyFilterTouched = false;
     });
   }
 
@@ -404,6 +411,15 @@ class _DocumentsPageState extends State<DocumentsPage> {
       chips.add(Chip(
         label: Text(_filterPerson!.displayName),
         avatar: const Icon(Icons.person_outline, size: 16),
+      ));
+    }
+
+    if (widget.authStore.isMultiCurrency && _currencyFilterTouched) {
+      chips.add(Chip(
+        label: Text(
+          _filterCurrencyId == null ? 'همه ارزها' : 'ارز انتخاب‌شده',
+        ),
+        avatar: const Icon(Icons.currency_exchange, size: 16),
       ));
     }
 
@@ -516,6 +532,21 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 searchHint: 'جست‌وجو در اشخاص...',
               ),
             ),
+            if (widget.authStore.isMultiCurrency)
+              ReportCurrencyFilterDropdown(
+                businessId: widget.businessId,
+                isMultiCurrency: true,
+                selectedCurrencyId: _filterCurrencyId,
+                width: 280,
+                dense: true,
+                onChanged: (id) {
+                  setState(() {
+                    _filterCurrencyId = id;
+                    _currencyFilterTouched = true;
+                  });
+                  _refreshData();
+                },
+              ),
           ],
         ),
         const SizedBox(height: 8),
@@ -633,6 +664,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
+        if (_filterCurrencyId != null) 'currency_id': _filterCurrencyId,
       },
       additionalParams: {
         if (_selectedDocumentType != null)
@@ -644,6 +676,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
+        if (_filterCurrencyId != null) 'currency_id': _filterCurrencyId!,
       },
       columns: [
         // شماره سند

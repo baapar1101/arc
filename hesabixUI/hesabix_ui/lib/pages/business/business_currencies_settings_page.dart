@@ -113,6 +113,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
   }
 
   Future<void> _addCurrency(int currencyId) async {
+    final wasFirstSecondary = _businessCurrencies.isEmpty;
     try {
       await _currencyService.addBusinessCurrency(
         businessId: widget.businessId,
@@ -125,6 +126,9 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       
       if (mounted) {
         SnackBarHelper.show(context, message: 'ارز با موفقیت اضافه شد');
+        if (wasFirstSecondary && _businessCurrencies.isNotEmpty) {
+          await _showMultiCurrencyOnboarding();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -134,6 +138,90 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
         );
       }
     }
+  }
+
+  Future<void> _showMultiCurrencyOnboarding() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          title: const Text('چندارزی فعال شد'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'از این لحظه قابلیت‌های ارزی در نوار ابزار، فاکتور، پرداخت، انتقال بانکی، اشخاص و گزارش‌ها ظاهر می‌شود.',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 14),
+                _onboardingStep(
+                  theme,
+                  Icons.currency_exchange,
+                  '۱. نرخ مرجع روز',
+                  'از چیپ «نرخ ارز» در نوار ابزار بالا، نرخ را دستی ثبت کنید یا از اسنپ‌شات مرکزی بگیرید.',
+                ),
+                _onboardingStep(
+                  theme,
+                  Icons.receipt_long,
+                  '۲. فاکتور و پرداخت',
+                  'در فاکتور ارز و نرخ را انتخاب کنید؛ پرداخت می‌تواند با ارز دیگر و نرخ جداگانه ثبت شود.',
+                ),
+                _onboardingStep(
+                  theme,
+                  Icons.filter_alt_outlined,
+                  '۳. اسناد و گزارش‌ها',
+                  'در بالای صفحه فیلتر ارز (یا «همه ارزها») را بزنید تا اسناد ارزی شفاف بمانند.',
+                ),
+                _onboardingStep(
+                  theme,
+                  Icons.people_outline,
+                  '۴. اشخاص',
+                  'مانده هر ارز جداگانه و جمع معادل پایه در جزئیات شخص نمایش داده می‌شود.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('بعداً'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx),
+              icon: const Icon(Icons.check),
+              label: const Text('متوجه شدم'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _onboardingStep(ThemeData theme, IconData icon, String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(body, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _removeCurrency(int currencyId, String currencyTitle) async {

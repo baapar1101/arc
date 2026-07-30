@@ -1991,6 +1991,59 @@ async def export_single_invoice_pdf(
                         "amount": ln.get("amount", 0),
                         "description": description,
                     })
+
+                # اطلاعات تسویه بین‌ارزی از person_lines / extra_info سند
+                fx_display = None
+                try:
+                    fx_src = None
+                    for pl in (rp.get("person_lines") or []):
+                        if not isinstance(pl, dict):
+                            continue
+                        if pl.get("fx_settlement"):
+                            fx_src = pl.get("fx_settlement")
+                            break
+                        extra_pl = pl.get("extra_info")
+                        if isinstance(extra_pl, dict) and extra_pl.get("fx_settlement"):
+                            fx_src = extra_pl.get("fx_settlement")
+                            break
+                    doc_extra = rp.get("extra_info") if isinstance(rp.get("extra_info"), dict) else {}
+                    if fx_src is None and isinstance(doc_extra, dict):
+                        if isinstance(doc_extra.get("fx_settlement"), dict):
+                            fx_src = doc_extra.get("fx_settlement")
+                        elif isinstance(doc_extra.get("settlements"), list) and doc_extra["settlements"]:
+                            first_st = doc_extra["settlements"][0]
+                            if isinstance(first_st, dict) and first_st.get("fx_settlement"):
+                                fx_src = first_st.get("fx_settlement")
+                    if isinstance(fx_src, dict):
+                        settles_amount = fx_src.get("settles_amount")
+                        payment_amount = fx_src.get("payment_amount") or rp.get("total_amount")
+                        rate = fx_src.get("rate") or fx_src.get("tx_rate")
+                        settles_cur_id = fx_src.get("settles_currency_id")
+                        pay_cur_id = fx_src.get("payment_currency_id")
+                        base_cur_id = fx_src.get("base_currency_id")
+                        from adapters.db.models.currency import Currency as _Cur
+
+                        def _cur_label(cid):
+                            if not cid:
+                                return ""
+                            c = db.query(_Cur).filter(_Cur.id == int(cid)).first()
+                            if not c:
+                                return ""
+                            return (c.symbol or c.code or "") or ""
+
+                        settles_unit = _cur_label(settles_cur_id) or (item.get("currency_code") if isinstance(item, dict) else "") or ""
+                        pay_unit = _cur_label(pay_cur_id)
+                        base_unit = _cur_label(base_cur_id) or "ریال"
+                        fx_display = {
+                            "settles_amount": settles_amount,
+                            "settles_unit": settles_unit,
+                            "payment_amount": payment_amount,
+                            "payment_unit": pay_unit or base_unit,
+                            "rate": rate,
+                            "base_unit": base_unit,
+                        }
+                except Exception:
+                    fx_display = None
                 
                 payments.append(
                     {
@@ -2003,6 +2056,7 @@ async def export_single_invoice_pdf(
                         "methods": ", ".join(methods),
                         "account_details": account_details,
                         "description": rp.get("description") or "",
+                        "fx_display": fx_display,
                     }
                 )
         logger.info(

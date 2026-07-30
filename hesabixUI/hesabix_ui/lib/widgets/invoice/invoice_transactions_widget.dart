@@ -27,6 +27,7 @@ import '../../widgets/date_input_field.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/invoice_transaction_preferences.dart';
 import '../../widgets/money/amount_field_words_tooltip.dart';
+import '../../utils/currency_display_utils.dart';
 
 class InvoiceTransactionsWidget extends StatefulWidget {
   final List<InvoiceTransaction> transactions;
@@ -68,6 +69,7 @@ class InvoiceTransactionsWidget extends StatefulWidget {
 class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   final CurrencyService _currencyService = CurrencyService(ApiClient());
   String? _currencySymbol;
+  Map<int, Map<String, dynamic>> _currencyById = {};
   
   @override
   void initState() {
@@ -84,30 +86,38 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   }
   
   Future<void> _loadCurrencyInfo() async {
-    if (widget.selectedCurrencyId == null) {
-      setState(() {
-        _currencySymbol = null;
-      });
-      return;
-    }
-    
     try {
       final currencies = await _currencyService.listBusinessCurrencies(
         businessId: widget.businessId,
       );
-      final currency = currencies.firstWhere(
-        (c) => (c['id'] as num?)?.toInt() == widget.selectedCurrencyId,
-        orElse: () => <String, dynamic>{},
-      );
-      
+      final byId = <int, Map<String, dynamic>>{};
+      for (final c in currencies) {
+        final id = (c['id'] as num?)?.toInt();
+        if (id != null) byId[id] = Map<String, dynamic>.from(c);
+      }
+      String? symbol;
+      if (widget.selectedCurrencyId != null && byId.containsKey(widget.selectedCurrencyId)) {
+        final currency = byId[widget.selectedCurrencyId]!;
+        symbol = currency['symbol']?.toString() ?? currency['code']?.toString() ?? 'ریال';
+      }
+      if (!mounted) return;
       setState(() {
-        _currencySymbol = currency['symbol']?.toString() ?? currency['code']?.toString() ?? 'ریال';
+        _currencyById = byId;
+        _currencySymbol = symbol;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _currencySymbol = 'ریال'; // fallback
+        _currencySymbol = widget.selectedCurrencyId != null ? 'ریال' : null;
       });
     }
+  }
+
+  String _unitForCurrencyId(int? id, {String fallback = 'ریال'}) {
+    if (id == null) return fallback;
+    final c = _currencyById[id];
+    if (c == null) return fallback;
+    return currencyUnitLabelFromBusinessCurrencyMap(c, fallback: fallback);
   }
   
   // مجموع مبالغ تسویه به ارز فاکتور (پرداخت بین‌ارزی از settles_amount استفاده می‌کند)
@@ -586,7 +596,16 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             Expanded(
               child: _buildDetailRow(
                 transaction.settlesAmount != null ? 'مبلغ پرداخت:' : 'مبلغ:',
-                formatWithThousands(transaction.amount, decimalPlaces: 0),
+                transaction.settlesAmount != null
+                    ? formatAmountWithCurrencyUnit(
+                        transaction.amount,
+                        unit: _unitForCurrencyId(
+                          transaction.paymentCurrencyId,
+                          fallback: '',
+                        ),
+                        decimalPlaces: 0,
+                      )
+                    : formatWithThousands(transaction.amount, decimalPlaces: 0),
               ),
             ),
             if (transaction.commission != null)
@@ -599,13 +618,53 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
           ],
         ),
         if (transaction.settlesAmount != null) ...[
-          const SizedBox(height: 4),
-          _buildDetailRow(
-            'تسویه (ارز فاکتور):',
-            formatWithThousands(transaction.settlesAmount!, decimalPlaces: 0),
+          const SizedBox(height: 6),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Theme.of(context)
+                  .colorScheme
+                  .secondaryContainer
+                  .withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'تسویه بین‌ارزی',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    formatCrossCurrencyPaymentDisplay(
+                      settlesAmount: transaction.settlesAmount,
+                      invoiceCurrencyUnit: _currencySymbol ?? 'ارز فاکتور',
+                      paymentAmount: transaction.amount,
+                      paymentCurrencyUnit: _unitForCurrencyId(
+                        transaction.paymentCurrencyId,
+                        fallback: 'ارز پرداخت',
+                      ),
+                      fxRate: transaction.fxRate,
+                      settlesDecimalPlaces: 2,
+                      paymentDecimalPlaces: 0,
+                      rateDisplayUnit: widget.authStore?.currentBusiness
+                          ?.fxRevaluationPolicy?['rate_display_unit']
+                          ?.toString(),
+                      baseCurrencyCode: widget
+                          .authStore?.currentBusiness?.defaultCurrency?.code,
+                    ),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
+              ),
+            ),
           ),
-          if (transaction.fxRate != null)
-            _buildDetailRow('نرخ:', transaction.fxRate.toString()),
         ],
         
         // توضیحات

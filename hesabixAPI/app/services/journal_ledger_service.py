@@ -12,6 +12,7 @@ from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.account import Account
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.person import Person
+from adapters.db.models.currency import Currency
 from app.services.opening_balance_service import _ensure_fiscal_year
 
 
@@ -343,6 +344,19 @@ def get_journal_ledger_report(
                 'name': person.alias_name or person.name or '',
             }
     
+    # نقشه کد/نماد ارز اسناد (برای نمایش مبلغ اصلی کنار معادل پایه)
+    currency_ids = {int(doc.currency_id) for _, doc in all_lines if doc.currency_id}
+    currencies_map: Dict[int, Dict[str, Any]] = {}
+    if currency_ids:
+        for cur in db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all():
+            currencies_map[int(cur.id)] = {
+                'id': int(cur.id),
+                'code': cur.code or '',
+                'symbol': cur.symbol or cur.code or '',
+                'title': cur.title or cur.code or '',
+                'decimal_places': int(getattr(cur, 'decimal_places', None) or 0),
+            }
+
     # ساخت آیتم‌ها
     items = []
     total_debit = Decimal(0)
@@ -452,6 +466,18 @@ def get_journal_ledger_report(
             'native_debit_amount': float(native_debit),
             'native_credit_amount': float(native_credit),
             'document_currency_id': int(doc.currency_id) if doc.currency_id else None,
+            'document_currency_code': (
+                currencies_map.get(int(doc.currency_id), {}).get('code')
+                if doc.currency_id else None
+            ),
+            'document_currency_symbol': (
+                currencies_map.get(int(doc.currency_id), {}).get('symbol')
+                if doc.currency_id else None
+            ),
+            'document_currency_decimal_places': (
+                currencies_map.get(int(doc.currency_id), {}).get('decimal_places', 0)
+                if doc.currency_id else 0
+            ),
             'amounts_in_base': use_base_amounts,
             'person_id': person_info['id'] if person_info else None,
             'person_name': person_info['name'] if person_info else None,

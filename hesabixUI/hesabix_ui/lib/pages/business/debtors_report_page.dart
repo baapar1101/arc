@@ -83,14 +83,8 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // پیش‌فرض: همه ارزها → معادل پایه در بک‌اند
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -302,8 +296,8 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
                     ),
                   ),
                   SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<int>(
+                    width: 240,
+                    child: DropdownButtonFormField<int?>(
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: t.currency,
@@ -311,20 +305,26 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
-                      items: _currencies.map<DropdownMenuItem<int>>((c) {
-                        final id = c['id'] as int?;
-                        final code = (c['code'] ?? '').toString();
-                        final title = (c['title'] ?? code).toString();
-                        final isDefault = c['is_default'] == true;
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text(
-                            isDefault ? '$title (پیش‌فرض)' : title,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        );
-                      }).toList(),
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
+                        ..._currencies.map<DropdownMenuItem<int?>>((c) {
+                          final id = c['id'] as int?;
+                          final code = (c['code'] ?? '').toString();
+                          final title = (c['title'] ?? code).toString();
+                          final isDefault = c['is_default'] == true;
+                          return DropdownMenuItem<int?>(
+                            value: id,
+                            child: Text(
+                              isDefault ? '$title (پایه)' : title,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          );
+                        }),
+                      ],
                       menuMaxHeight: 300,
                       onChanged: (val) {
                         setState(() {

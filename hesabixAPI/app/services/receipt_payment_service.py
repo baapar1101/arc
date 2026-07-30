@@ -2665,6 +2665,8 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
                 line_dict["invoice_code"] = line.extra_info["invoice_code"]
             if "link_to_invoice" in line.extra_info:
                 line_dict["link_to_invoice"] = line.extra_info["link_to_invoice"]
+            if "fx_settlement" in line.extra_info:
+                line_dict["fx_settlement"] = line.extra_info["fx_settlement"]
         
         # اگر person_id موجود است، نام شخص را از دیتابیس دریافت کن
         if line.person_id and "person_name" not in line_dict:

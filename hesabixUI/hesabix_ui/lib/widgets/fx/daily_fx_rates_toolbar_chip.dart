@@ -461,6 +461,14 @@ class _FxRatesSheetState extends State<_FxRatesSheet> {
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'ثبت دستی یا دریافت از اسنپ‌شات مرکزی نرخ روز',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -491,6 +499,24 @@ class _FxRatesSheetState extends State<_FxRatesSheet> {
                     final id = (it['currency_id'] as num?)?.toInt();
                     final missing = it['missing'] == true;
                     final age = (it['age_hours'] as num?)?.toDouble();
+                    final note = (it['note'] ?? '').toString().trim();
+                    final effectiveAtRaw = it['effective_at'];
+                    String? effectiveLabel;
+                    if (effectiveAtRaw != null) {
+                      final dt = DateTime.tryParse(effectiveAtRaw.toString());
+                      if (dt != null) {
+                        final local = dt.toLocal();
+                        effectiveLabel =
+                            '${local.year}/${local.month.toString().padLeft(2, '0')}/${local.day.toString().padLeft(2, '0')}'
+                            ' ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+                      }
+                    }
+                    String sourceLabel = 'ثبت‌شده';
+                    if (note.contains('اسنپ') || note.contains('نرخ روز') || note.contains('global') || note.contains('auto')) {
+                      sourceLabel = 'از اسنپ‌شات / همگام‌سازی';
+                    } else if (note.contains('نوار ابزار') || note.contains('دستی') || note.isNotEmpty) {
+                      sourceLabel = note.length > 42 ? '${note.substring(0, 42)}…' : (note.isEmpty ? 'ثبت دستی' : note);
+                    }
                     final ctrl = id != null ? _controllers[id] : null;
                     return Card(
                       margin: const EdgeInsets.only(bottom: 10),
@@ -552,6 +578,29 @@ class _FxRatesSheetState extends State<_FxRatesSheet> {
                                   ),
                               ],
                             ),
+                            if (!missing) ...[
+                              const SizedBox(height: 6),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  if (effectiveLabel != null)
+                                    Text(
+                                      'مؤثر از: $effectiveLabel',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  Text(
+                                    sourceLabel,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                             const SizedBox(height: 10),
                             TextField(
                               controller: ctrl,

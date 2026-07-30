@@ -758,6 +758,16 @@
                     <span>{{ p.code or '-' }}</span>
                     —
                     <span class="amount" style="font-weight: 700;">{{ (p.total_amount or 0) | format_amount(0) | ltr | safe }}</span>
+                    {% if p.fx_display %}
+                      <div style="margin-top: 3px; font-size: 9.5px; color: #1a1a1a; font-weight: 600;">
+                        {% set fx = p.fx_display %}
+                        {{ (fx.settles_amount or 0) | format_amount(2) | ltr | safe }}{{ fx.settles_unit or '' }}
+                        ({{ (fx.payment_amount or 0) | format_amount(0) | ltr | safe }}{{ fx.payment_unit or '' }}
+                        {% if fx.rate %}
+                          {{ 'با نرخ' if is_fa else 'at rate' }} {{ fx.rate | format_amount(0) | ltr | safe }}
+                        {% endif %})
+                      </div>
+                    {% endif %}
                     {% if p.account_details and p.account_details|length > 0 %}
                       <div style="margin-top: 2px; font-size: 9px; color: #333;">
                         {% for acc in p.account_details %}
