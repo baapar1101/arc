@@ -635,14 +635,14 @@ def create_app() -> FastAPI:
 
         ## راهنما و تماس
 
-        - **ایمیل:** support@hesabix.ir
+        - **ایمیل:** support@markstreet.co
         - **Swagger UI:** همین صفحه (`/docs`)
         - **ReDoc:** `/redoc`
         - **اسکیمای باز:** `/openapi.json`
         """,
         contact={
             "name": "MarkStreet Team",
-            "email": "support@hesabix.ir",
+            "email": "support@markstreet.co",
             "url": "https://hesabix.ir",
         },
         license_info={

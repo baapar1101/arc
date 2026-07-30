@@ -6,7 +6,7 @@
   "authors": [
     {
       "name": "MarkStreet Team",
-      "email": "support@hesabix.ir",
+      "email": "support@markstreet.co",
       "homepage": "https://hesabix.ir"
     }
   ],
@@ -21,7 +21,7 @@
   ],
   "homepage": "https://hesabix.ir",
   "support": {
-    "email": "support@hesabix.ir",
+    "email": "support@markstreet.co",
     "issues": "https://hesabix.ir/support"
   },
   "require": {

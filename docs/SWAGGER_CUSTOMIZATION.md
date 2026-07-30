@@ -296,7 +296,7 @@ location /assets/swagger/ {
 ## 🆘 پشتیبانی
 
 برای سوالات یا مشکلات:
-- **ایمیل:** support@hesabix.ir
+- **ایمیل:** support@markstreet.co
 - **تیکت:** در سیستم پشتیبانی مارک‌استریت
 
 ---

@@ -241,7 +241,7 @@ swagger_ui_parameters={
 ## 📞 پشتیبانی
 
 برای سوالات یا مشکلات:
-- **ایمیل:** support@hesabix.ir
+- **ایمیل:** support@markstreet.co
 - **تیکت:** سیستم پشتیبانی مارک‌استریت
 - **مستندات:** [SWAGGER_CUSTOMIZATION.md](./SWAGGER_CUSTOMIZATION.md)
 

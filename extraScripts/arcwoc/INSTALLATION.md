@@ -392,7 +392,7 @@ Hesabix_V2_Activator::activate();
 ### تماس با پشتیبانی
 
 - 🌐 وب‌سایت: [hesabix.ir/support](https://hesabix.ir/support)
-- 📧 ایمیل: support@hesabix.ir
+- 📧 ایمیل: support@markstreet.co
 - 📱 تلگرام: @HesabixSupport
 
 ---
