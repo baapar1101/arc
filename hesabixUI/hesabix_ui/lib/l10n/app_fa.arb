@@ -3110,10 +3110,57 @@
   "taxHelpQuickActionInquireSent": "استعلام همه ارسال شده: بررسی وضعیت فاکتورهای ارسال شده",
   "taxHelpQuickActionRetryFailed": "تلاش مجدد همه ناموفق: تلاش مجدد برای فاکتورهای ناموفق",
   "taxHelpSectionImportantNotes": "نکات مهم",
-  "taxHelpNoteValidateBeforeSend": "قبل از ارسال، فاکتورها را اعتبارسنجی کنید",
-  "taxHelpNoteFailedInDLQ": "فاکتورهای ناموفق در صف خطا ذخیره می‌شوند",
-  "taxHelpNoteTimeline": "می‌توانید تاریخچه تغییرات هر فاکتور را مشاهده کنید",
-  "taxHelpNoteExport": "گزارش‌های ارسال را می‌توانید خروجی بگیرید",
+  "taxHelpNoteValidateBeforeSend": "قبل از ارسال، فاکتورها را اعتبارسنجی کنید؛ خطاهای اعتبارسنجی جلوی رد سامانه را می‌گیرد",
+  "taxHelpNoteFailedInDLQ": "فاکتورهای ناموفق با جزئیات قابل‌فهم خطا در همین صفحه نمایش داده می‌شوند",
+  "taxHelpNoteTimeline": "مهلت ارسال معمولاً حدود ۱۲ روز از تاریخ صدور است؛ فاکتور قدیمی را دوباره نسازید مگر طبق اطلاعیه سازمان",
+  "taxHelpNoteExport": "نرخ مالیات هر کالا باید با شناسه stuffid یکی باشد (مثلاً ۱۰٪، نه صفر مگر معاف)",
+  "taxHelpNoteType1vs2": "نوع اول فقط با هویت کامل خریدار (کد اقتصادی/ملی)؛ مصرف‌کننده نهایی را نوع دوم بفرستید",
+  "taxHelpNoteConnection": "اگر اتصال قطع است، ابتدا تنظیمات مودیان و تست اتصال را بررسی کنید",
+  "taxKpiAll": "همه",
+  "taxKpiQueue": "آماده ارسال",
+  "taxKpiPending": "در صف",
+  "taxKpiFailed": "ناموفق",
+  "taxKpiSuccess": "ارسال‌شده",
+  "taxHealthChecking": "بررسی اتصال…",
+  "taxHealthConnected": "اتصال مودیان برقرار",
+  "taxHealthDisconnected": "اتصال مودیان قطع",
+  "taxHealthUnknown": "وضعیت اتصال",
+  "taxSettingsOpen": "تنظیمات مودیان",
+  "taxEmptyStateTitle": "کارپوشه خالی است",
+  "taxEmptyStateHint": "از لیست فاکتورها، فاکتور فروش را به کارپوشه اضافه کنید؛ سپس اینجا بررسی و ارسال کنید.",
+  "taxEmptyStateGoInvoices": "رفتن به فاکتورها",
+  "taxStickySelected": "{count} انتخاب‌شده",
+  "@taxStickySelected": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "taxStickySend": "ارسال",
+  "taxFixNow": "رفع خطا",
+  "taxErrorPlaybookWhat": "یعنی چه؟",
+  "taxErrorPlaybookHow": "چه کار کنید؟",
+  "taxPreflightTitle": "بررسی قبل از ارسال",
+  "taxPreflightChecking": "در حال اعتبارسنجی فاکتورها…",
+  "taxPreflightOk": "همه فاکتورهای انتخاب‌شده آماده ارسال هستند.",
+  "taxPreflightIssues": "{count} فاکتور مشکل دارد و ارسال نمی‌شود مگر رفع شود.",
+  "@taxPreflightIssues": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "taxPreflightContinueValid": "ارسال موارد معتبر ({count})",
+  "@taxPreflightContinueValid": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "taxPreflightCancel": "انصراف",
+  "taxMobileQuickActions": "عملیات سریع",
+  "taxOpenInvoice": "باز کردن فاکتور",
+  "taxStatusCancelled": "ابطال‌شده",
+  "taxHealthDetailsTitle": "وضعیت اتصال سامانه مودیان",
+  "taxHealthGoSettings": "رفتن به تنظیمات",
+  "taxHealthRetry": "تست مجدد",
   "taxOperationSuccess": "عملیات با موفقیت انجام شد",
   "taxOperationError": "خطا در انجام عملیات: {error}",
   "@taxOperationError": {

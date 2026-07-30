@@ -3072,6 +3072,14 @@ async def search_tax_workspace_endpoint(
     requested_status = requested_status.strip() if isinstance(requested_status, str) else None
 
     workspace_docs: List[Document] = []
+    status_counts: Dict[str, int] = {
+        "not_sent": 0,
+        "pending": 0,
+        "success": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "all": 0,
+    }
     for d in all_docs:
         extra = d.extra_info or {}
         in_workspace = bool(extra.get("tax_workspace"))
@@ -3082,6 +3090,11 @@ async def search_tax_workspace_endpoint(
             status = status.strip()
         if not status:
             status = "not_sent"
+        status_counts["all"] += 1
+        if status in status_counts:
+            status_counts[status] += 1
+        else:
+            status_counts[status] = status_counts.get(status, 0) + 1
         if requested_status and status != requested_status:
             continue
         workspace_docs.append(d)
@@ -3160,6 +3173,8 @@ async def search_tax_workspace_endpoint(
             "page": page,
             "limit": take,
             "total_pages": total_pages,
+            "status_counts": status_counts,
+            "summary": {"status_counts": status_counts},
         },
         request=request,
         message="INVOICE_TAX_WORKSPACE_LIST",

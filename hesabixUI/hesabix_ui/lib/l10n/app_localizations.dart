@@ -14511,26 +14511,218 @@ abstract class AppLocalizations {
   /// No description provided for @taxHelpNoteValidateBeforeSend.
   ///
   /// In en, this message translates to:
-  /// **'Validate invoices before sending'**
+  /// **'Validate invoices before sending; validation errors prevent platform rejection'**
   String get taxHelpNoteValidateBeforeSend;
 
   /// No description provided for @taxHelpNoteFailedInDLQ.
   ///
   /// In en, this message translates to:
-  /// **'Failed invoices are stored in the error queue'**
+  /// **'Failed invoices show actionable error details on this page'**
   String get taxHelpNoteFailedInDLQ;
 
   /// No description provided for @taxHelpNoteTimeline.
   ///
   /// In en, this message translates to:
-  /// **'You can view the change history of each invoice'**
+  /// **'Submission window is usually about 12 days from issue date; do not recreate old invoices unless the tax authority extends the window'**
   String get taxHelpNoteTimeline;
 
   /// No description provided for @taxHelpNoteExport.
   ///
   /// In en, this message translates to:
-  /// **'You can export sending reports'**
+  /// **'Each product VAT rate must match its stuffid code (e.g. 10%, not 0 unless exempt)'**
   String get taxHelpNoteExport;
+
+  /// No description provided for @taxHelpNoteType1vs2.
+  ///
+  /// In en, this message translates to:
+  /// **'Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2'**
+  String get taxHelpNoteType1vs2;
+
+  /// No description provided for @taxHelpNoteConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'If connection is down, check Moadian settings and run a connection test first'**
+  String get taxHelpNoteConnection;
+
+  /// No description provided for @taxKpiAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get taxKpiAll;
+
+  /// No description provided for @taxKpiQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to send'**
+  String get taxKpiQueue;
+
+  /// No description provided for @taxKpiPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get taxKpiPending;
+
+  /// No description provided for @taxKpiFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get taxKpiFailed;
+
+  /// No description provided for @taxKpiSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted'**
+  String get taxKpiSuccess;
+
+  /// No description provided for @taxHealthChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking connection…'**
+  String get taxHealthChecking;
+
+  /// No description provided for @taxHealthConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Moadian connected'**
+  String get taxHealthConnected;
+
+  /// No description provided for @taxHealthDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Moadian disconnected'**
+  String get taxHealthDisconnected;
+
+  /// No description provided for @taxHealthUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection status'**
+  String get taxHealthUnknown;
+
+  /// No description provided for @taxSettingsOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Moadian settings'**
+  String get taxSettingsOpen;
+
+  /// No description provided for @taxEmptyStateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace is empty'**
+  String get taxEmptyStateTitle;
+
+  /// No description provided for @taxEmptyStateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add sales invoices from the invoice list to this workspace, then review and submit here.'**
+  String get taxEmptyStateHint;
+
+  /// No description provided for @taxEmptyStateGoInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to invoices'**
+  String get taxEmptyStateGoInvoices;
+
+  /// No description provided for @taxStickySelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String taxStickySelected(int count);
+
+  /// No description provided for @taxStickySend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get taxStickySend;
+
+  /// No description provided for @taxFixNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix now'**
+  String get taxFixNow;
+
+  /// No description provided for @taxErrorPlaybookWhat.
+  ///
+  /// In en, this message translates to:
+  /// **'What does this mean?'**
+  String get taxErrorPlaybookWhat;
+
+  /// No description provided for @taxErrorPlaybookHow.
+  ///
+  /// In en, this message translates to:
+  /// **'What should you do?'**
+  String get taxErrorPlaybookHow;
+
+  /// No description provided for @taxPreflightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preflight check'**
+  String get taxPreflightTitle;
+
+  /// No description provided for @taxPreflightChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Validating invoices…'**
+  String get taxPreflightChecking;
+
+  /// No description provided for @taxPreflightOk.
+  ///
+  /// In en, this message translates to:
+  /// **'All selected invoices are ready to send.'**
+  String get taxPreflightOk;
+
+  /// No description provided for @taxPreflightIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} invoices have issues and will not be sent until fixed.'**
+  String taxPreflightIssues(int count);
+
+  /// No description provided for @taxPreflightContinueValid.
+  ///
+  /// In en, this message translates to:
+  /// **'Send valid ones ({count})'**
+  String taxPreflightContinueValid(int count);
+
+  /// No description provided for @taxPreflightCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get taxPreflightCancel;
+
+  /// No description provided for @taxMobileQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick actions'**
+  String get taxMobileQuickActions;
+
+  /// No description provided for @taxOpenInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Open invoice'**
+  String get taxOpenInvoice;
+
+  /// No description provided for @taxStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get taxStatusCancelled;
+
+  /// No description provided for @taxHealthDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Moadian connection status'**
+  String get taxHealthDetailsTitle;
+
+  /// No description provided for @taxHealthGoSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get taxHealthGoSettings;
+
+  /// No description provided for @taxHealthRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry test'**
+  String get taxHealthRetry;
 
   /// No description provided for @taxOperationSuccess.
   ///

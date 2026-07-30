@@ -7829,18 +7829,124 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taxHelpNoteValidateBeforeSend =>
-      'Validate invoices before sending';
+      'Validate invoices before sending; validation errors prevent platform rejection';
 
   @override
   String get taxHelpNoteFailedInDLQ =>
-      'Failed invoices are stored in the error queue';
+      'Failed invoices show actionable error details on this page';
 
   @override
   String get taxHelpNoteTimeline =>
-      'You can view the change history of each invoice';
+      'Submission window is usually about 12 days from issue date; do not recreate old invoices unless the tax authority extends the window';
 
   @override
-  String get taxHelpNoteExport => 'You can export sending reports';
+  String get taxHelpNoteExport =>
+      'Each product VAT rate must match its stuffid code (e.g. 10%, not 0 unless exempt)';
+
+  @override
+  String get taxHelpNoteType1vs2 =>
+      'Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2';
+
+  @override
+  String get taxHelpNoteConnection =>
+      'If connection is down, check Moadian settings and run a connection test first';
+
+  @override
+  String get taxKpiAll => 'All';
+
+  @override
+  String get taxKpiQueue => 'Ready to send';
+
+  @override
+  String get taxKpiPending => 'Queued';
+
+  @override
+  String get taxKpiFailed => 'Failed';
+
+  @override
+  String get taxKpiSuccess => 'Submitted';
+
+  @override
+  String get taxHealthChecking => 'Checking connection…';
+
+  @override
+  String get taxHealthConnected => 'Moadian connected';
+
+  @override
+  String get taxHealthDisconnected => 'Moadian disconnected';
+
+  @override
+  String get taxHealthUnknown => 'Connection status';
+
+  @override
+  String get taxSettingsOpen => 'Moadian settings';
+
+  @override
+  String get taxEmptyStateTitle => 'Workspace is empty';
+
+  @override
+  String get taxEmptyStateHint =>
+      'Add sales invoices from the invoice list to this workspace, then review and submit here.';
+
+  @override
+  String get taxEmptyStateGoInvoices => 'Go to invoices';
+
+  @override
+  String taxStickySelected(int count) {
+    return '$count selected';
+  }
+
+  @override
+  String get taxStickySend => 'Send';
+
+  @override
+  String get taxFixNow => 'Fix now';
+
+  @override
+  String get taxErrorPlaybookWhat => 'What does this mean?';
+
+  @override
+  String get taxErrorPlaybookHow => 'What should you do?';
+
+  @override
+  String get taxPreflightTitle => 'Preflight check';
+
+  @override
+  String get taxPreflightChecking => 'Validating invoices…';
+
+  @override
+  String get taxPreflightOk => 'All selected invoices are ready to send.';
+
+  @override
+  String taxPreflightIssues(int count) {
+    return '$count invoices have issues and will not be sent until fixed.';
+  }
+
+  @override
+  String taxPreflightContinueValid(int count) {
+    return 'Send valid ones ($count)';
+  }
+
+  @override
+  String get taxPreflightCancel => 'Cancel';
+
+  @override
+  String get taxMobileQuickActions => 'Quick actions';
+
+  @override
+  String get taxOpenInvoice => 'Open invoice';
+
+  @override
+  String get taxStatusCancelled => 'Cancelled';
+
+  @override
+  String get taxHealthDetailsTitle => 'Moadian connection status';
+
+  @override
+  String get taxHealthGoSettings => 'Open settings';
+
+  @override
+  String get taxHealthRetry => 'Retry test';
 
   @override
   String get taxOperationSuccess => 'Operation completed successfully';

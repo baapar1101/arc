@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -11,13 +10,13 @@ import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/widgets/tax/tax_workspace_widgets.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/errors/api_error.dart';
 import '../../utils/responsive_helper.dart';
-import '../../services/job_service.dart';
 import '../../widgets/marketplace/moadian_plugin_gate.dart';
 
 /// صفحه کارپوشه مودیان (لیست فاکتورهای موجود در کارپوشه و وضعیت ارسال به سامانه)
@@ -41,12 +40,26 @@ class TaxWorkspacePage extends StatefulWidget {
 
 class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
   final GlobalKey _tableKey = GlobalKey();
+  static const double _mobileCardRowHeight = 176;
 
   DateTime? _fromDate;
   DateTime? _toDate;
   String? _selectedInvoiceType;
   String? _selectedTaxStatus;
   int _selectedCount = 0;
+  Map<String, int> _statusCounts = const {};
+  bool _healthLoading = false;
+  bool? _healthHealthy;
+  String? _healthMessage;
+  Map<String, dynamic>? _healthDetails;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadTaxHealth();
+    });
+  }
 
   void _refreshData() {
     final state = _tableKey.currentState;
@@ -60,6 +73,177 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _loadTaxHealth() async {
+    if (!mounted) return;
+    setState(() => _healthLoading = true);
+    try {
+      final res = await widget.apiClient.get<Map<String, dynamic>>(
+        '/invoices/business/${widget.businessId}/tax-workspace/health',
+      );
+      final data = (res.data?['data'] as Map<String, dynamic>?) ?? const {};
+      final healthy = data['healthy'] == true;
+      final checks = data['checks'];
+      String? msg;
+      if (checks is Map) {
+        final parts = <String>[];
+        for (final entry in checks.entries) {
+          final v = entry.value;
+          if (v is Map && v['message'] != null) {
+            parts.add(v['message'].toString());
+          }
+        }
+        if (parts.isNotEmpty) msg = parts.join(' · ');
+      }
+      if (!mounted) return;
+      setState(() {
+        _healthHealthy = healthy;
+        _healthMessage = msg;
+        _healthDetails = data;
+        _healthLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _healthHealthy = false;
+        _healthMessage = ErrorExtractor.forContext(e, context);
+        _healthLoading = false;
+      });
+    }
+  }
+
+  void _onStatusCountsFromResponse(Map<String, dynamic> data) {
+    Map<String, dynamic>? counts;
+    final summary = data['summary'];
+    if (summary is Map && summary['status_counts'] is Map) {
+      counts = Map<String, dynamic>.from(summary['status_counts'] as Map);
+    } else if (data['status_counts'] is Map) {
+      counts = Map<String, dynamic>.from(data['status_counts'] as Map);
+    }
+    if (counts == null) return;
+    final parsed = <String, int>{};
+    counts.forEach((k, v) {
+      parsed[k.toString()] = v is int ? v : int.tryParse(v.toString()) ?? 0;
+    });
+    if (!mounted) return;
+    setState(() => _statusCounts = parsed);
+  }
+
+  void _goTaxSettings() {
+    BusinessNamedRoutes.goNamed(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_settings_tax',
+      pathParameters: {'business_id': widget.businessId.toString()},
+    );
+  }
+
+  void _goInvoices() {
+    BusinessNamedRoutes.goNamed(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_invoice',
+      pathParameters: {'business_id': widget.businessId.toString()},
+    );
+  }
+
+  void _openInvoice(int? invoiceId) {
+    if (invoiceId == null) return;
+    BusinessNamedRoutes.pushNamed(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_edit_invoice',
+      pathParameters: {
+        'business_id': widget.businessId.toString(),
+        'invoice_id': invoiceId.toString(),
+      },
+    );
+  }
+
+  void _navigatePlaybookRoute(String? route, {int? invoiceId}) {
+    switch (route) {
+      case 'tax_settings':
+        _goTaxSettings();
+        break;
+      case 'invoice':
+        _openInvoice(invoiceId);
+        break;
+      case 'person':
+        BusinessNamedRoutes.pushNamed(
+          context,
+          businessId: widget.businessId,
+          routeName: 'business_persons',
+          pathParameters: {'business_id': widget.businessId.toString()},
+        );
+        break;
+      case 'product':
+        BusinessNamedRoutes.pushNamed(
+          context,
+          businessId: widget.businessId,
+          routeName: 'business_products',
+          pathParameters: {'business_id': widget.businessId.toString()},
+        );
+        break;
+      default:
+        if (invoiceId != null) _openInvoice(invoiceId);
+    }
+  }
+
+  void _showHealthDetails() {
+    final t = AppLocalizations.of(context);
+    final checks = _healthDetails?['checks'];
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.taxHealthDetailsTitle),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(_healthMessage ?? (_healthHealthy == true ? t.taxHealthConnected : t.taxHealthDisconnected)),
+              if (checks is Map) ...[
+                const SizedBox(height: 12),
+                ...checks.entries.map((e) {
+                  final v = e.value;
+                  final status = v is Map ? v['status']?.toString() : null;
+                  final message = v is Map ? v['message']?.toString() : v?.toString();
+                  final ok = status == 'ok';
+                  return ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: Icon(
+                      ok ? Icons.check_circle_outline : Icons.error_outline,
+                      color: ok ? const Color(0xFF047857) : Theme.of(context).colorScheme.error,
+                    ),
+                    title: Text(e.key.toString()),
+                    subtitle: message != null ? Text(message) : null,
+                  );
+                }),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(t.close)),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _loadTaxHealth();
+            },
+            child: Text(t.taxHealthRetry),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _goTaxSettings();
+            },
+            child: Text(t.taxHealthGoSettings),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -70,25 +254,108 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       body: MoadianPluginGate(
         businessId: widget.businessId,
         child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(t, isMobile),
-            _buildFilters(t, isMobile),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: DataTableWidget<Map<String, dynamic>>(
-                  key: _tableKey,
-                  config: _buildTableConfig(t),
-                  fromJson: (json) => Map<String, dynamic>.from(json),
-                  calendarController: widget.calendarController,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildHeader(t, isMobile),
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: ResponsiveHelper.getPadding(context),
+                ),
+                child: TaxWorkspaceKpiStrip(
+                  counts: _statusCounts,
+                  selectedStatus: _selectedTaxStatus,
+                  onSelect: (status) {
+                    setState(() => _selectedTaxStatus = status);
+                    _refreshData();
+                  },
+                  t: t,
                 ),
               ),
+              _buildFilters(t, isMobile),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: DataTableWidget<Map<String, dynamic>>(
+                    key: _tableKey,
+                    config: _buildTableConfig(t, isMobile: isMobile),
+                    fromJson: (json) => Map<String, dynamic>.from(json),
+                    calendarController: widget.calendarController,
+                  ),
+                ),
+              ),
+              if (isMobile)
+                TaxWorkspaceStickyBar(
+                  selectedCount: _selectedCount,
+                  t: t,
+                  onSend: _selectedCount > 0 ? _onSendSelectedToSystem : null,
+                  onInquire: _selectedCount > 0 ? _onInquireSelectedStatus : null,
+                  onRemove: _selectedCount > 0 ? _onRemoveSelectedFromWorkspace : null,
+                ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: isMobile && _selectedCount == 0
+          ? FloatingActionButton.extended(
+              onPressed: () => _showMobileQuickActionsSheet(t),
+              icon: const Icon(Icons.bolt_outlined),
+              label: Text(t.taxMobileQuickActions),
+            )
+          : null,
+    );
+  }
+
+  void _showMobileQuickActionsSheet(AppLocalizations t) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.send),
+              title: Text(t.taxQuickActionSendAllPending),
+              onTap: () {
+                Navigator.pop(context);
+                _onQuickAction('send_all_pending');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.search),
+              title: Text(t.taxQuickActionInquireAllSent),
+              onTap: () {
+                Navigator.pop(context);
+                _onQuickAction('inquire_all_sent');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.refresh),
+              title: Text(t.taxQuickActionRetryAllFailed),
+              onTap: () {
+                Navigator.pop(context);
+                _onQuickAction('retry_all_failed');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.settings_outlined),
+              title: Text(t.taxSettingsOpen),
+              onTap: () {
+                Navigator.pop(context);
+                _goTaxSettings();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.help_outline),
+              title: Text(t.taxHelpTooltip),
+              onTap: () {
+                Navigator.pop(context);
+                _showHelpDialog();
+              },
             ),
           ],
         ),
-      ),
       ),
     );
   }
@@ -98,30 +365,66 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     final padding = ResponsiveHelper.getPadding(context);
     return Container(
       padding: EdgeInsets.fromLTRB(padding, padding, padding, 8),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  t.taxWorkspaceTitle,
-                  style: theme.textTheme.titleLarge,
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      t.taxWorkspaceTitle,
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      t.taxWorkspaceSubtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  t.taxWorkspaceSubtitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+              ),
+              if (!isMobile) ...[
+                TaxHealthChip(
+                  healthy: _healthHealthy,
+                  loading: _healthLoading,
+                  message: _healthMessage,
+                  onTap: _showHealthDetails,
+                  t: t,
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: t.taxSettingsOpen,
+                  onPressed: _goTaxSettings,
+                  icon: const Icon(Icons.settings_outlined),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.help_outline),
+                  tooltip: t.taxHelpTooltip,
+                  onPressed: () => _showHelpDialog(),
                 ),
               ],
-            ),
+            ],
           ),
-          // Quick Actions و Help
-          if (!isMobile)
-            Row(
-              mainAxisSize: MainAxisSize.min,
+          if (isMobile) ...[
+            const SizedBox(height: 8),
+            TaxHealthChip(
+              healthy: _healthHealthy,
+              loading: _healthLoading,
+              message: _healthMessage,
+              onTap: _showHealthDetails,
+              t: t,
+            ),
+          ],
+          if (!isMobile) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 _buildQuickActionButton(
                   context,
@@ -129,28 +432,21 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                   Icons.send,
                   () => _onQuickAction('send_all_pending'),
                 ),
-                const SizedBox(width: 8),
                 _buildQuickActionButton(
                   context,
                   t.taxQuickActionInquireAllSent,
                   Icons.search,
                   () => _onQuickAction('inquire_all_sent'),
                 ),
-                const SizedBox(width: 8),
                 _buildQuickActionButton(
                   context,
                   t.taxQuickActionRetryAllFailed,
                   Icons.refresh,
                   () => _onQuickAction('retry_all_failed'),
                 ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.help_outline),
-                  tooltip: t.taxHelpTooltip,
-                  onPressed: () => _showHelpDialog(),
-                ),
               ],
             ),
+          ],
         ],
       ),
     );
@@ -237,12 +533,21 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                   t.taxHelpNoteFailedInDLQ,
                   t.taxHelpNoteTimeline,
                   t.taxHelpNoteExport,
+                  t.taxHelpNoteType1vs2,
+                  t.taxHelpNoteConnection,
                 ],
               ),
             ],
           ),
         ),
         actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _goTaxSettings();
+            },
+            child: Text(t.taxSettingsOpen),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(t.close),
@@ -497,7 +802,66 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     );
   }
 
-  DataTableConfig<Map<String, dynamic>> _buildTableConfig(AppLocalizations t) {
+  DataTableConfig<Map<String, dynamic>> _buildTableConfig(AppLocalizations t, {required bool isMobile}) {
+    if (isMobile) {
+      return DataTableConfig<Map<String, dynamic>>(
+        endpoint: '/invoices/business/${widget.businessId}/tax-workspace/search',
+        title: null,
+        businessId: widget.businessId,
+        persistTableFiltersPageId: ListFilterPageIds.taxWorkspaceTable,
+        reportModuleKey: 'tax_workspace',
+        reportSubtype: 'list',
+        enableColumnSettings: false,
+        showColumnSettingsButton: false,
+        showColumnHeaders: false,
+        enableRowSelection: true,
+        enableMultiRowSelection: true,
+        showSearch: true,
+        showFilters: true,
+        showPagination: true,
+        showColumnSearch: false,
+        showRefreshButton: true,
+        showClearFiltersButton: true,
+        defaultPageSize: 20,
+        pageSizeOptions: const [10, 20, 50, 100],
+        dataRowHeight: _mobileCardRowHeight,
+        padding: const EdgeInsets.all(8),
+        columns: [
+          CustomColumn(
+            'summary',
+            t.taxWorkspaceTitle,
+            sortable: false,
+            searchable: false,
+            width: ColumnWidth.extraLarge,
+            builder: (dynamic item, int index) => _buildMobileTaxCard(item as Map<String, dynamic>, t),
+          ),
+        ],
+        searchFields: const ['code'],
+        filterFields: const ['document_type', 'tax_status'],
+        dateRangeField: 'document_date',
+        onRowSelectionChanged: (rows) {
+          setState(() => _selectedCount = rows.length);
+        },
+        onResponseData: _onStatusCountsFromResponse,
+        additionalParams: {
+          'document_type': _selectedInvoiceType,
+          if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+          if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+          'tax_status': _selectedTaxStatus,
+        },
+        emptyStateMessage: t.taxWorkspaceEmpty,
+        emptyStateWidget: TaxWorkspaceEmptyState(
+          t: t,
+          onRefresh: _refreshData,
+          onOpenInvoices: _goInvoices,
+          onOpenSettings: _goTaxSettings,
+        ),
+        loadingMessage: t.taxWorkspaceLoading,
+        errorMessage: t.taxWorkspaceError,
+        expandBodyHeightToFitRows: true,
+      );
+    }
+
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/invoices/business/${widget.businessId}/tax-workspace/search',
       title: t.taxWorkspaceTitle,
@@ -600,7 +964,6 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               enabled: (item) {
                 final map = item as Map<String, dynamic>;
                 final status = map['tax_status']?.toString() ?? 'not_sent';
-                // غیرفعال کردن برای فاکتورهای ارسال شده یا قطعی شده
                 return status != 'sent' && status != 'finalized';
               },
             ),
@@ -609,6 +972,15 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               label: t.taxViewFailureDetails,
               onTap: (item) => _showTaxFailureFromRow(item as Map<String, dynamic>),
               enabled: (item) => _rowHasTaxFailureDetails(item as Map<String, dynamic>),
+            ),
+            DataTableAction(
+              icon: Icons.open_in_new,
+              label: t.taxOpenInvoice,
+              onTap: (item) {
+                final map = item as Map<String, dynamic>;
+                final id = map['id'] is int ? map['id'] as int : int.tryParse(map['id']?.toString() ?? '');
+                _openInvoice(id);
+              },
             ),
           ],
         ),
@@ -658,27 +1030,19 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
             return '${v.toString()} $currencyCode';
           },
         ),
-        TextColumn(
+        CustomColumn(
           'tax_status',
           t.taxStatus,
-          formatter: (item) {
+          width: ColumnWidth.medium,
+          builder: (item, index) {
             final map = item as Map<String, dynamic>;
             final status = map['tax_status']?.toString() ?? 'not_sent';
-            switch (status) {
-              case 'pending':
-                return t.taxStatusPending;
-              case 'sent':
-                return t.taxStatusSent;
-              case 'finalized':
-                return t.taxStatusFinalized;
-              case 'failed':
-                return t.taxStatusFailed;
-              case 'not_sent':
-              default:
-                return t.taxStatusNotSent;
-            }
+            return TaxStatusChip(
+              status: status,
+              t: t,
+              onTap: _rowHasTaxFailureDetails(map) ? () => _showTaxFailureFromRow(map) : null,
+            );
           },
-          width: ColumnWidth.medium,
         ),
         TextColumn(
           'tax_error_message',
@@ -723,6 +1087,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
           _selectedCount = rows.length;
         });
       },
+      onResponseData: _onStatusCountsFromResponse,
       additionalParams: {
         'document_type': _selectedInvoiceType,
         if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
@@ -730,9 +1095,52 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         'tax_status': _selectedTaxStatus,
       },
       emptyStateMessage: t.taxWorkspaceEmpty,
+      emptyStateWidget: TaxWorkspaceEmptyState(
+        t: t,
+        onRefresh: _refreshData,
+        onOpenInvoices: _goInvoices,
+        onOpenSettings: _goTaxSettings,
+      ),
       loadingMessage: t.taxWorkspaceLoading,
       errorMessage: t.taxWorkspaceError,
       expandBodyHeightToFitRows: true,
+    );
+  }
+
+  Widget _buildMobileTaxCard(Map<String, dynamic> item, AppLocalizations t) {
+    final id = item['id'] is int ? item['id'] as int : int.tryParse(item['id']?.toString() ?? '');
+    final status = item['tax_status']?.toString() ?? 'not_sent';
+    final canSend = status != 'sent' && status != 'finalized' && item['tax_cancelled_in_modian'] != true;
+
+    return TaxWorkspaceMobileCard(
+      item: item,
+      t: t,
+      isJalali: widget.calendarController.isJalali,
+      formatDate: (dt, jalali) => dt == null ? '-' : HesabixDateUtils.formatForDisplay(dt, jalali),
+      onSend: canSend ? () => _onSendSingleToSystem(item) : null,
+      onDetails: _rowHasTaxFailureDetails(item) ? () => _showTaxFailureFromRow(item) : null,
+      onOpenInvoice: () => _openInvoice(id),
+      onRemove: canSend ? () => _onRemoveSingleFromWorkspace(item) : null,
+      moreActions: () => [
+        if (_taxIsSubmitted(item) && item['tax_cancelled_in_modian'] != true)
+          PopupMenuItem(value: 'cancel', child: Text(t.taxCancelInModian)),
+        if (_taxIsSubmitted(item) && item['tax_cancelled_in_modian'] != true)
+          PopupMenuItem(value: 'corrective', child: Text(t.taxSendCorrective)),
+        PopupMenuItem(value: 'open', child: Text(t.taxOpenInvoice)),
+      ],
+      onMoreSelected: (value) {
+        switch (value) {
+          case 'cancel':
+            _onCancelInModian(item);
+            break;
+          case 'corrective':
+            _onSendCorrective(item);
+            break;
+          case 'open':
+            _openInvoice(id);
+            break;
+        }
+      },
     );
   }
 
@@ -1089,12 +1497,15 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       if (confirmed != true || !mounted) return;
     }
 
+    final preflightIds = await _runSendPreflight(sendableItems);
+    if (preflightIds == null || !mounted) return;
+    if (preflightIds.isEmpty) return;
+
     try {
       final api = widget.apiClient;
-      final ids = sendableItems.map((e) => e['id']).toList();
       final response = await api.post<Map<String, dynamic>>(
         '/invoices/business/${widget.businessId}/tax-workspace/send-to-system-batch',
-        data: {'invoice_ids': ids, 'use_background': true},
+        data: {'invoice_ids': preflightIds, 'use_background': true},
       );
       final body = response.data;
       final result = (body?['data'] as Map<String, dynamic>?) ?? const {};
@@ -1104,7 +1515,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       if (jobId != null && jobId.isNotEmpty) {
         // نمایش progress dialog با polling
         if (!mounted) return;
-        _showJobProgressDialog(jobId, sendableItems.length);
+        _showJobProgressDialog(jobId, preflightIds.length);
       } else {
         // Fallback: synchronous processing
         final failed = (result['failed'] as List<dynamic>?) ?? const [];
@@ -1125,6 +1536,120 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         SnackBarHelper.showError(context, message: t.taxSendSelectedErrorWithMessage(ErrorExtractor.forContext(e, context)));
       }
     }
+  }
+
+  /// اعتبارسنجی قبل از ارسال گروهی. null = انصراف کاربر، [] = هیچ مورد معتبری نیست.
+  Future<List<dynamic>?> _runSendPreflight(List<Map<String, dynamic>> sendableItems) async {
+    final t = AppLocalizations.of(context);
+    final ids = sendableItems.map((e) => e['id']).toList();
+
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      useRootNavigator: true,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: Text(t.taxPreflightChecking)),
+          ],
+        ),
+      ),
+    );
+
+    List<dynamic> validated = ids;
+    List<dynamic> invalid = const [];
+    try {
+      final res = await widget.apiClient.post<Map<String, dynamic>>(
+        '/invoices/business/${widget.businessId}/tax-workspace/validate-batch',
+        data: {'invoice_ids': ids},
+      );
+      final data = (res.data?['data'] as Map<String, dynamic>?) ?? const {};
+      validated = (data['validated'] as List<dynamic>?) ?? ids;
+      invalid = (data['invalid'] as List<dynamic>?) ?? const [];
+    } catch (_) {
+      // اگر اعتبارسنجی در دسترس نبود، همه را بفرست
+      validated = ids;
+      invalid = const [];
+    } finally {
+      if (navigator.canPop()) navigator.pop();
+    }
+
+    if (!mounted) return null;
+
+    if (invalid.isEmpty) {
+      return validated;
+    }
+
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(t.taxPreflightTitle),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(t.taxPreflightIssues(invalid.length)),
+                const SizedBox(height: 12),
+                ...invalid.take(8).map((item) {
+                  final map = item is Map<String, dynamic>
+                      ? item
+                      : (item is Map ? Map<String, dynamic>.from(item) : <String, dynamic>{});
+                  final id = map['id'];
+                  final message = map['message']?.toString() ?? '';
+                  final issues = map['issues'];
+                  String detail = message;
+                  if (issues is List && issues.isNotEmpty) {
+                    final first = issues.first;
+                    if (first is Map) {
+                      detail = first['message']?.toString() ?? first['code']?.toString() ?? detail;
+                    }
+                  }
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.error_outline, color: Theme.of(context).colorScheme.error),
+                    title: Text('#$id'),
+                    subtitle: Text(detail),
+                    onTap: () {
+                      Navigator.pop(context, 'open:$id');
+                    },
+                  );
+                }),
+                if (validated.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(t.taxPreflightOk, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, 'cancel'),
+            child: Text(t.taxPreflightCancel),
+          ),
+          if (validated.isNotEmpty)
+            FilledButton(
+              onPressed: () => Navigator.pop(context, 'continue'),
+              child: Text(t.taxPreflightContinueValid(validated.length)),
+            ),
+        ],
+      ),
+    );
+
+    if (choice == null || choice == 'cancel') return null;
+    if (choice.startsWith('open:')) {
+      final rawId = choice.substring(5);
+      _openInvoice(int.tryParse(rawId));
+      return null;
+    }
+    return validated;
   }
 
   void _showJobProgressDialog(String jobId, int totalCount) {
@@ -1492,12 +2017,19 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       'tax_error_message': row['tax_error_message'],
       'moadian_errors': row['tax_moadian_errors'],
     };
+    final firstCode = () {
+      final errs = row['tax_moadian_errors'];
+      if (errs is List && errs.isNotEmpty && errs.first is Map) {
+        return (errs.first as Map)['code']?.toString();
+      }
+      return null;
+    }();
     _showTaxFailureDialog(
       title: AppLocalizations.of(context).taxSubmissionFailedTitle,
       message: row['tax_error_message']?.toString(),
       details: details,
       invoiceId: row['id'] is int ? row['id'] as int : int.tryParse(row['id']?.toString() ?? ''),
-      errorCode: 'TAX_SUBMISSION_REJECTED',
+      errorCode: firstCode ?? 'TAX_SUBMISSION_REJECTED',
     );
   }
 
@@ -1513,9 +2045,25 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     final trackingCode = resolvedDetails['tax_tracking_code']?.toString()
         ?? resolvedDetails['tracking_code']?.toString();
     final moadianErrors = _normalizeMoadianErrors(
-      resolvedDetails['moadian_errors'],
+      resolvedDetails['moadian_errors'] ?? resolvedDetails['tax_moadian_errors'],
       resolvedDetails['tax_error_message']?.toString() ?? message,
     );
+    if (moadianErrors.isEmpty && errorCode != null && errorCode.isNotEmpty) {
+      moadianErrors.add({
+        'code': errorCode,
+        'message': message ?? title,
+        'title': message ?? title,
+        'explanation': message ?? title,
+        'action': AppLocalizations.of(context).taxHelpNoteConnection,
+        'action_route': errorCode.toUpperCase().contains('SETTINGS') || errorCode.toUpperCase().contains('NETWORK')
+            ? 'tax_settings'
+            : 'invoice',
+        'action_label': errorCode.toUpperCase().contains('SETTINGS') || errorCode.toUpperCase().contains('NETWORK')
+            ? AppLocalizations.of(context).taxSettingsOpen
+            : AppLocalizations.of(context).taxOpenInvoice,
+        'severity': 'error',
+      });
+    }
     final technicalJson = _pickTechnicalJson(resolvedDetails);
 
     showDialog<void>(
@@ -1557,18 +2105,6 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                     const SizedBox(height: 8),
                     SelectableText('${t.taxTrackingCode}: $trackingCode'),
                   ],
-                  if (message != null && message.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.35),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(message),
-                    ),
-                  ],
                   const SizedBox(height: 12),
                   Text(
                     t.taxMoadianResponseTitle,
@@ -1576,9 +2112,23 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                   ),
                   const SizedBox(height: 8),
                   if (moadianErrors.isEmpty)
-                    Text(t.taxNoErrorDetails)
+                    Text(
+                      (message != null && message.isNotEmpty) ? message : t.taxNoErrorDetails,
+                    )
                   else
-                    ...moadianErrors.map((e) => _buildMoadianErrorTile(context, e, t)),
+                    ...moadianErrors.map(
+                      (e) => TaxErrorPlaybookCard(
+                        error: e,
+                        t: t,
+                        onAction: () {
+                          Navigator.pop(context);
+                          _navigatePlaybookRoute(
+                            e['action_route']?.toString(),
+                            invoiceId: invoiceId,
+                          );
+                        },
+                      ),
+                    ),
                   if (technicalJson != null) ...[
                     const SizedBox(height: 12),
                     ExpansionTile(
@@ -1602,6 +2152,14 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
             ),
           ),
           actions: [
+            if (invoiceId != null)
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _openInvoice(invoiceId);
+                },
+                child: Text(t.taxOpenInvoice),
+              ),
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(t.close),

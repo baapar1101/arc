@@ -81,13 +81,21 @@ def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
                             "meta": {"person_id": person.id, "national_id": national_id},
                         })
                 
-                # اعتبارسنجی کد اقتصادی
+                # کد اقتصادی نامعتبر را بلاک نکن اگر کد ملی معتبر داریم.
+                # برای حقیقی معمولاً bid=کد ملی کافی است؛ کد اقتصادی خراب فقط نادیده گرفته می‌شود.
                 if economic_code and not validate_economic_code(economic_code):
-                    issues.append({
-                        "code": "PERSON_ECONOMIC_CODE_INVALID",
-                        "message": f"کد اقتصادی طرف حساب '{person_name}' نامعتبر است (باید 11 یا 14 رقم باشد).",
-                        "meta": {"person_id": person.id, "economic_code": economic_code},
-                    })
+                    national_ok = False
+                    if national_id:
+                        national_ok, _ = validate_national_id(national_id)
+                    if not national_ok:
+                        issues.append({
+                            "code": "PERSON_ECONOMIC_CODE_INVALID",
+                            "message": (
+                                f"کد اقتصادی طرف حساب '{person_name}' نامعتبر است "
+                                f"(باید 11 یا 14 رقم باشد) و کد ملی معتبری هم ثبت نشده است."
+                            ),
+                            "meta": {"person_id": person.id, "economic_code": economic_code},
+                        })
 
     # 2. بررسی اقلام فاکتور
     item_lines: List[InvoiceItemLine] = (

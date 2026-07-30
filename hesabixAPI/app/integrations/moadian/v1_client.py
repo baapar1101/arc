@@ -772,45 +772,23 @@ class MoadianV1Client:
         fiscal_id: str,
     ) -> Dict[str, Any]:
         """
-        ساخت Packet مطابق SDK PHP:
-        - symmetricKey و iv تصادفی و با کلید عمومی سازمان رمز می‌شوند
-        - dataSignature امضای RSA روی normalized(header+packet) است
-        
-        نکته: برای GET_SERVER_INFORMATION نیازی به رمزگذاری نیست
+        ساخت Packet مطابق SDK PHP (Packet::toArray).
+
+        برای درخواست‌های sync (GET_TOKEN، GET_SERVER_INFORMATION، INQUIRY، ...)
+        رمزنگاری انجام نمی‌شود؛ فیلدهای encryption خالی می‌مانند.
+        رمزنگاری AES فقط در _send_async_packet هنگام ارسال فاکتور اعمال می‌شود.
         """
-        uid = str(uuid.uuid4())
-
-        # برای GET_SERVER_INFORMATION نیازی به رمزگذاری نیست
-        if packet_type == "GET_SERVER_INFORMATION":
-            packet = {
-                "uid": uid,
-                "packetType": packet_type,
-                "retry": False,
-                "data": packet_data,
-                "fiscalId": fiscal_id or "",
-            }
-            return packet
-
-        # کلید متقارن و IV تصادفی
-        symmetric_key = os.urandom(32)  # 256-bit AES
-        iv = os.urandom(16)
-
-        # رمزگذاری symmetric_key و iv با کلید عمومی سازمان
-        enc_symmetric = self._encrypt_with_server_public_key(symmetric_key)
-        enc_iv = self._encrypt_with_server_public_key(iv)
-
-        packet = {
-            "uid": uid,
+        return {
+            "uid": str(uuid.uuid4()),
             "packetType": packet_type,
             "retry": False,
             "data": packet_data,
-            "encryptionKeyId": self._server_key_id or "",
-            "symmetricKey": enc_symmetric,
-            "iv": enc_iv,
+            "encryptionKeyId": "",
+            "symmetricKey": "",
+            "iv": "",
             "fiscalId": fiscal_id or "",
             "dataSignature": "",
         }
-        return packet
 
     def _php_flatten(self, value: Any, prefix: str = "") -> Dict[str, Any]:
         """
@@ -863,56 +841,66 @@ class MoadianV1Client:
         if not self.private_key:
             raise ApiError("TAX_SETTINGS_INCOMPLETE", "کلید خصوصی برای امضا الزامی است.", http_status=400)
         try:
-            logger.debug(f"[TAX_DEBUG] Signing text (length: {len(text)}): {text}")
-            logger.debug(f"[TAX_DEBUG] Private key (first 200 chars): {self.private_key[:200] if self.private_key else None}...")
             private_key_obj = self._load_private_key_obj()
             signature = private_key_obj.sign(
                 text.encode("utf-8"),
                 padding.PKCS1v15(),
                 hashes.SHA256(),
             )
-            signature_b64 = base64.b64encode(signature).decode("utf-8")
-            logger.info(f"[TAX_DEBUG] Signature generated (FULL base64): {signature_b64}")
-            return signature_b64
+            return base64.b64encode(signature).decode("utf-8")
         except Exception as exc:
-            logger.error(f"[TAX_DEBUG] Signature failed: {str(exc)}", exc_info=True)
+            logger.error("Signature failed: %s", str(exc), exc_info=True)
             raise ApiError("TAX_SIGNATURE_FAILED", f"خطا در امضای درخواست: {str(exc)}", http_status=500) from exc
 
     def _encrypt_with_server_public_key(self, data: bytes) -> str:
         """
-        رمزگذاری داده (symmetricKey/iv) با کلید عمومی سازمان مالیاتی.
+        رمزگذاری کلید AES با کلید عمومی سازمان مالیاتی.
+        مطابق phpseclib3 در SDK PHP: RSA-OAEP با SHA-256 (نه PKCS1v15).
         خروجی: base64
-        
-        نکته: این متد نباید در حین دریافت اطلاعات سرور فراخوانی شود
-        (برای جلوگیری از حلقه بازگشتی)
         """
-        # اگر در حال دریافت اطلاعات سرور هستیم، نباید دوباره فراخوانی کنیم
         if self._fetching_server_info:
             logger.error("در حال دریافت اطلاعات سرور، نمی‌توان کلید عمومی را استفاده کرد")
-            raise ApiError("TAX_SERVER_PUBLIC_KEY_MISSING", "کلید عمومی سازمان در حال دریافت است، لطفاً صبر کنید.", http_status=502)
-        
-        # اطمینان از وجود کلید عمومی قبل از استفاده
+            raise ApiError(
+                "TAX_SERVER_PUBLIC_KEY_MISSING",
+                "کلید عمومی سازمان در حال دریافت است، لطفاً صبر کنید.",
+                http_status=502,
+            )
+
         if not self._server_public_key or not self._server_key_id:
             logger.warning("کلید عمومی سازمان موجود نیست، تلاش برای دریافت...")
             self._ensure_server_information()
-        
+
         if not self._server_public_key:
             logger.error("کلید عمومی سازمان پس از تلاش برای دریافت هنوز موجود نیست")
-            raise ApiError("TAX_SERVER_PUBLIC_KEY_MISSING", "کلید عمومی سازمان دریافت نشده است.", http_status=502)
+            raise ApiError(
+                "TAX_SERVER_PUBLIC_KEY_MISSING",
+                "کلید عمومی سازمان دریافت نشده است.",
+                http_status=502,
+            )
         try:
             pub_raw = self._server_public_key
             pub_raw = pub_raw.replace("\r\n", "\n").replace("\r", "\n")
             if "-----BEGIN" not in pub_raw:
-                # اگر بدون هدر باشد، PEM را اضافه می‌کنیم
                 pub_raw = "-----BEGIN PUBLIC KEY-----\n" + pub_raw + "\n-----END PUBLIC KEY-----"
-            public_key_obj = serialization.load_pem_public_key(pub_raw.encode("utf-8"), backend=default_backend())
+            public_key_obj = serialization.load_pem_public_key(
+                pub_raw.encode("utf-8"), backend=default_backend()
+            )
+            # phpseclib3 default: ENCRYPTION_OAEP + SHA-256 / MGF1-SHA256
             encrypted = public_key_obj.encrypt(
                 data,
-                padding.PKCS1v15(),
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None,
+                ),
             )
             return base64.b64encode(encrypted).decode("utf-8")
         except Exception as exc:
-            raise ApiError("TAX_ENCRYPTION_FAILED", f"خطا در رمزگذاری کلید متقارن: {str(exc)}", http_status=500) from exc
+            raise ApiError(
+                "TAX_ENCRYPTION_FAILED",
+                f"خطا در رمزگذاری کلید متقارن: {str(exc)}",
+                http_status=500,
+            ) from exc
 
     def _load_private_key_obj(self):
         """
@@ -1126,13 +1114,12 @@ class MoadianV1Client:
             clone_header["Authorization"] = str(clone_header["Authorization"]).replace("Bearer ", "", 1)
         
         # ساخت body مطابق sendPackets در PHP
-        # در PHP: array_merge(['packets' => [array_map(fn ($p) => $p->toArray(), $packets)]], $cloneHeader)
-        # نکته: packets باید به صورت array در array باشد: ['packets' => [packet1, packet2, ...]]
+        # نکته SDK PHP: برای normalize از ['packets' => [array_map(...)]] (یک لایه اضافه)
+        # استفاده می‌کند، ولی body ارسالی همان [packet, ...] است.
         packets_array = [packet]
-        # ساختار normalize: {'packets': [packet1, packet2, ...], ...headers}
         data_for_normalize = {
-            "packets": packets_array,
-            **clone_header
+            "packets": [packets_array],
+            **clone_header,
         }
         logger.info(f"[TAX_DEBUG] Data for normalize (packets count: {len(packets_array)}, headers: {list(clone_header.keys())})")
         logger.debug(f"[TAX_DEBUG] Data for normalize (full): {json.dumps(data_for_normalize, ensure_ascii=False, indent=2)}")

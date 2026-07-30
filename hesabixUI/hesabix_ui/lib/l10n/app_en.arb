@@ -3068,10 +3068,57 @@
   "taxHelpQuickActionInquireSent": "Inquire all sent: Check status of sent invoices",
   "taxHelpQuickActionRetryFailed": "Retry all failed: Retry failed invoices",
   "taxHelpSectionImportantNotes": "Important notes",
-  "taxHelpNoteValidateBeforeSend": "Validate invoices before sending",
-  "taxHelpNoteFailedInDLQ": "Failed invoices are stored in the error queue",
-  "taxHelpNoteTimeline": "You can view the change history of each invoice",
-  "taxHelpNoteExport": "You can export sending reports",
+  "taxHelpNoteValidateBeforeSend": "Validate invoices before sending; validation errors prevent platform rejection",
+  "taxHelpNoteFailedInDLQ": "Failed invoices show actionable error details on this page",
+  "taxHelpNoteTimeline": "Submission window is usually about 12 days from issue date; do not recreate old invoices unless the tax authority extends the window",
+  "taxHelpNoteExport": "Each product VAT rate must match its stuffid code (e.g. 10%, not 0 unless exempt)",
+  "taxHelpNoteType1vs2": "Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2",
+  "taxHelpNoteConnection": "If connection is down, check Moadian settings and run a connection test first",
+  "taxKpiAll": "All",
+  "taxKpiQueue": "Ready to send",
+  "taxKpiPending": "Queued",
+  "taxKpiFailed": "Failed",
+  "taxKpiSuccess": "Submitted",
+  "taxHealthChecking": "Checking connection…",
+  "taxHealthConnected": "Moadian connected",
+  "taxHealthDisconnected": "Moadian disconnected",
+  "taxHealthUnknown": "Connection status",
+  "taxSettingsOpen": "Moadian settings",
+  "taxEmptyStateTitle": "Workspace is empty",
+  "taxEmptyStateHint": "Add sales invoices from the invoice list to this workspace, then review and submit here.",
+  "taxEmptyStateGoInvoices": "Go to invoices",
+  "taxStickySelected": "{count} selected",
+  "@taxStickySelected": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "taxStickySend": "Send",
+  "taxFixNow": "Fix now",
+  "taxErrorPlaybookWhat": "What does this mean?",
+  "taxErrorPlaybookHow": "What should you do?",
+  "taxPreflightTitle": "Preflight check",
+  "taxPreflightChecking": "Validating invoices…",
+  "taxPreflightOk": "All selected invoices are ready to send.",
+  "taxPreflightIssues": "{count} invoices have issues and will not be sent until fixed.",
+  "@taxPreflightIssues": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "taxPreflightContinueValid": "Send valid ones ({count})",
+  "@taxPreflightContinueValid": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "taxPreflightCancel": "Cancel",
+  "taxMobileQuickActions": "Quick actions",
+  "taxOpenInvoice": "Open invoice",
+  "taxStatusCancelled": "Cancelled",
+  "taxHealthDetailsTitle": "Moadian connection status",
+  "taxHealthGoSettings": "Open settings",
+  "taxHealthRetry": "Retry test",
   "taxOperationSuccess": "Operation completed successfully",
   "taxOperationError": "Error performing operation: {error}",
   "@taxOperationError": {

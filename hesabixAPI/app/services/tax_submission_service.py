@@ -14,7 +14,10 @@ from adapters.db.models.tax_setting import TaxSetting
 from app.core.responses import ApiError
 from app.core.settings import get_settings
 from app.integrations.moadian.client import MoadianClient
-from app.integrations.moadian.invoice_builder import build_invoice_for_moadian
+from app.integrations.moadian.invoice_builder import (
+    build_invoice_for_moadian,
+    ensure_person_snapshot_on_document_dict,
+)
 from app.services.invoice_service import invoice_document_to_dict, refresh_invoice_line_tax_snapshots
 from app.services.tax_validation_service import validate_document_for_tax, validate_tax_submission_scenario
 from app.integrations.moadian.utils import extract_moadian_error_message
@@ -166,6 +169,7 @@ def send_document_to_tax_system(
         irtaxid = compute_taxid_for_document(document, tax_setting)
 
     raw_document = invoice_document_to_dict(db, document)
+    raw_document = ensure_person_snapshot_on_document_dict(db, raw_document)
     if mode in ("cancel", "corrective"):
         # صورتحساب ابطال/اصلاح باید taxid جدید داشته باشد؛ مرجع در irtaxid است.
         raw_document["_tax_internal_id_override"] = int(
@@ -578,7 +582,9 @@ def extract_moadian_errors_from_extra(extra: dict | None) -> List[Dict[str, Any]
         if str(top_status or "").upper() == "FAILED" and not errors:
             _add(raw.get("errorCode"), raw.get("errorDetail"))
 
-    return errors
+    from app.integrations.moadian.error_playbook import enrich_moadian_errors
+
+    return enrich_moadian_errors(errors)
 
 
 def build_tax_status_fields_for_api(extra: dict | None) -> Dict[str, Any]:
@@ -620,7 +626,9 @@ def build_tax_failure_details(
         if not details["moadian_errors"]:
             err = _extract_inquiry_error_message(inquiry)
             if err:
-                details["moadian_errors"] = [{"code": None, "message": err}]
+                from app.integrations.moadian.error_playbook import enrich_moadian_errors
+
+                details["moadian_errors"] = enrich_moadian_errors([{"code": None, "message": err}])
     raw_inquiry = extra.get("tax_last_inquiry_response")
     if isinstance(raw_inquiry, dict):
         details["inquiry_response"] = raw_inquiry

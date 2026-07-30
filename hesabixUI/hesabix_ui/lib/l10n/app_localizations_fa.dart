@@ -7779,18 +7779,124 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get taxHelpNoteValidateBeforeSend =>
-      'قبل از ارسال، فاکتورها را اعتبارسنجی کنید';
+      'قبل از ارسال، فاکتورها را اعتبارسنجی کنید؛ خطاهای اعتبارسنجی جلوی رد سامانه را می‌گیرد';
 
   @override
   String get taxHelpNoteFailedInDLQ =>
-      'فاکتورهای ناموفق در صف خطا ذخیره می‌شوند';
+      'فاکتورهای ناموفق با جزئیات قابل‌فهم خطا در همین صفحه نمایش داده می‌شوند';
 
   @override
   String get taxHelpNoteTimeline =>
-      'می‌توانید تاریخچه تغییرات هر فاکتور را مشاهده کنید';
+      'مهلت ارسال معمولاً حدود ۱۲ روز از تاریخ صدور است؛ فاکتور قدیمی را دوباره نسازید مگر طبق اطلاعیه سازمان';
 
   @override
-  String get taxHelpNoteExport => 'گزارش‌های ارسال را می‌توانید خروجی بگیرید';
+  String get taxHelpNoteExport =>
+      'نرخ مالیات هر کالا باید با شناسه stuffid یکی باشد (مثلاً ۱۰٪، نه صفر مگر معاف)';
+
+  @override
+  String get taxHelpNoteType1vs2 =>
+      'نوع اول فقط با هویت کامل خریدار (کد اقتصادی/ملی)؛ مصرف‌کننده نهایی را نوع دوم بفرستید';
+
+  @override
+  String get taxHelpNoteConnection =>
+      'اگر اتصال قطع است، ابتدا تنظیمات مودیان و تست اتصال را بررسی کنید';
+
+  @override
+  String get taxKpiAll => 'همه';
+
+  @override
+  String get taxKpiQueue => 'آماده ارسال';
+
+  @override
+  String get taxKpiPending => 'در صف';
+
+  @override
+  String get taxKpiFailed => 'ناموفق';
+
+  @override
+  String get taxKpiSuccess => 'ارسال‌شده';
+
+  @override
+  String get taxHealthChecking => 'بررسی اتصال…';
+
+  @override
+  String get taxHealthConnected => 'اتصال مودیان برقرار';
+
+  @override
+  String get taxHealthDisconnected => 'اتصال مودیان قطع';
+
+  @override
+  String get taxHealthUnknown => 'وضعیت اتصال';
+
+  @override
+  String get taxSettingsOpen => 'تنظیمات مودیان';
+
+  @override
+  String get taxEmptyStateTitle => 'کارپوشه خالی است';
+
+  @override
+  String get taxEmptyStateHint =>
+      'از لیست فاکتورها، فاکتور فروش را به کارپوشه اضافه کنید؛ سپس اینجا بررسی و ارسال کنید.';
+
+  @override
+  String get taxEmptyStateGoInvoices => 'رفتن به فاکتورها';
+
+  @override
+  String taxStickySelected(int count) {
+    return '$count انتخاب‌شده';
+  }
+
+  @override
+  String get taxStickySend => 'ارسال';
+
+  @override
+  String get taxFixNow => 'رفع خطا';
+
+  @override
+  String get taxErrorPlaybookWhat => 'یعنی چه؟';
+
+  @override
+  String get taxErrorPlaybookHow => 'چه کار کنید؟';
+
+  @override
+  String get taxPreflightTitle => 'بررسی قبل از ارسال';
+
+  @override
+  String get taxPreflightChecking => 'در حال اعتبارسنجی فاکتورها…';
+
+  @override
+  String get taxPreflightOk => 'همه فاکتورهای انتخاب‌شده آماده ارسال هستند.';
+
+  @override
+  String taxPreflightIssues(int count) {
+    return '$count فاکتور مشکل دارد و ارسال نمی‌شود مگر رفع شود.';
+  }
+
+  @override
+  String taxPreflightContinueValid(int count) {
+    return 'ارسال موارد معتبر ($count)';
+  }
+
+  @override
+  String get taxPreflightCancel => 'انصراف';
+
+  @override
+  String get taxMobileQuickActions => 'عملیات سریع';
+
+  @override
+  String get taxOpenInvoice => 'باز کردن فاکتور';
+
+  @override
+  String get taxStatusCancelled => 'ابطال‌شده';
+
+  @override
+  String get taxHealthDetailsTitle => 'وضعیت اتصال سامانه مودیان';
+
+  @override
+  String get taxHealthGoSettings => 'رفتن به تنظیمات';
+
+  @override
+  String get taxHealthRetry => 'تست مجدد';
 
   @override
   String get taxOperationSuccess => 'عملیات با موفقیت انجام شد';

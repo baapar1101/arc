@@ -910,8 +910,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
       // Extract summary from API response if available
       Map<String, dynamic>? summaryData;
+      Map<String, dynamic>? responseDataMap;
       if (body['data'] is Map<String, dynamic>) {
-        summaryData = body['data']['summary'] as Map<String, dynamic>?;
+        responseDataMap = Map<String, dynamic>.from(body['data'] as Map);
+        summaryData = responseDataMap['summary'] as Map<String, dynamic>?;
+        if (summaryData == null && responseDataMap['status_counts'] is Map) {
+          summaryData = {
+            'status_counts': responseDataMap['status_counts'],
+          };
+        }
       }
 
       if (mounted) {
@@ -928,6 +935,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           _lastSelectedRowIndex = null;
         });
         _notifyTableDataChanged();
+        if (responseDataMap != null) {
+          widget.config.onResponseData?.call(responseDataMap);
+        }
       }
 
       // Auto-fit columns on first load if configured

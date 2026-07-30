@@ -17,6 +17,7 @@ from app.integrations.moadian.utils import (
     coerce_to_datetime,
     generate_tax_id,
     normalize_invoice_number,
+    normalize_moadian_unit_code,
     timestamp_to_unix_ms,
     round_to_int,
     calculate_vat_rate,
@@ -34,6 +35,61 @@ def _clean_digits(value: str | None) -> str:
     return re.sub(r"[\s\-]", "", str(value).strip())
 
 
+def build_person_snapshot_from_person(person: Any) -> Dict[str, Any]:
+    """ساخت person_snapshot از مدل Person برای ارسال به مودیان."""
+    if not person:
+        return {}
+    name = (
+        getattr(person, "alias_name", None)
+        or (
+            f"{getattr(person, 'first_name', '') or ''} {getattr(person, 'last_name', '') or ''}".strip()
+            if getattr(person, "first_name", None) or getattr(person, "last_name", None)
+            else None
+        )
+        or getattr(person, "company_name", None)
+        or ""
+    )
+    return {
+        "person_id": getattr(person, "id", None),
+        "name": name,
+        "national_id": (getattr(person, "national_id", None) or "").strip() or None,
+        "economic_code": (getattr(person, "economic_id", None) or "").strip() or None,
+        "postal_code": (getattr(person, "postal_code", None) or "").strip() or None,
+        "address": getattr(person, "address", None),
+        "phone": getattr(person, "mobile", None) or getattr(person, "phone", None),
+        "legal_entity_type": getattr(person, "legal_entity_type", None),
+    }
+
+
+def ensure_person_snapshot_on_document_dict(db: Any, document_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    اگر person_snapshot در extra_info نباشد، از person_id طرف‌حساب می‌سازد.
+    بدون این کار فاکتور همیشه به‌اشتباه به‌صورت نوع ۲ (بدون خریدار) می‌رود.
+    """
+    extra = dict(document_dict.get("extra_info") or {})
+    snap = extra.get("person_snapshot") or extra.get("person_info")
+    if isinstance(snap, dict) and (snap.get("national_id") or snap.get("economic_code")):
+        return document_dict
+
+    person_id = extra.get("person_id")
+    if not person_id:
+        return document_dict
+
+    try:
+        from adapters.db.models.person import Person
+
+        person = db.query(Person).filter(Person.id == int(person_id)).first()
+    except Exception:
+        person = None
+
+    built = build_person_snapshot_from_person(person)
+    if built:
+        extra["person_snapshot"] = built
+        document_dict = dict(document_dict)
+        document_dict["extra_info"] = extra
+    return document_dict
+
+
 def _resolve_buyer_tin(national_id: str, economic_code: str) -> str | None:
     """شناسهٔ خریدار برای tinb: اولویت با کد اقتصادی معتبر، سپس کد/شناسه ملی."""
     ec = _clean_digits(economic_code)
@@ -47,19 +103,20 @@ def _resolve_buyer_tin(national_id: str, economic_code: str) -> str | None:
 
 def _resolve_buyer_tob(national_id: str, economic_code: str) -> int | None:
     """
-    نوع خریدار (tob): ۱ حقوقی، ۲ حقیقی.
+    نوع خریدار (tob) مطابق مستند رسمی مودیان:
+    ۱ حقیقی، ۲ حقوقی، ۳ مشارکت مدنی، ۴ اتباع غیر ایرانی.
     """
     nid = _clean_digits(national_id)
     if nid:
         valid, ptype = validate_national_id(nid)
-        if valid and ptype == "legal":
-            return 1
         if valid and ptype == "natural":
+            return 1
+        if valid and ptype == "legal":
             return 2
     ec = _clean_digits(economic_code)
     if ec and validate_economic_code(ec) and not nid:
-        return 1
-    return 2 if nid else None
+        return 2
+    return 1 if nid else None
 
 
 class InvoiceBuilder:
@@ -124,7 +181,11 @@ class InvoiceBuilder:
             submission_mode=submission_mode,
             irtaxid=irtaxid,
         )
-        payments = self._build_payments(document)
+        # در صورتحساب ساده، vop و payments معمولاً خارج از الگو هستند
+        if header.inty == 2:
+            for item in body:
+                item.vop = None
+        payments = self._build_payments(document, inty=header.inty)
 
         return InvoiceDto(
             header=header,
@@ -169,17 +230,26 @@ class InvoiceBuilder:
         """ساخت Header فاکتور"""
 
         doc_date = coerce_to_datetime(document.get("document_date"))
+        # اگر فقط تاریخ روز موجود است، ساعت را از registered_at بگیر تا midnights اشتباه ایجاد نشود
+        registered_at = document.get("registered_at") or document.get("created_at")
+        if registered_at and getattr(doc_date, "hour", 0) == 0 and getattr(doc_date, "minute", 0) == 0:
+            try:
+                reg_dt = coerce_to_datetime(registered_at)
+                if reg_dt.date() == doc_date.date():
+                    doc_date = reg_dt
+            except Exception:
+                pass
 
         timestamp_ms = timestamp_to_unix_ms(doc_date)
 
         client_id = tax_setting.tax_memory_id or tax_setting.economic_code
+        internal_id = document.get("_tax_internal_id_override") or document.get("id", 0)
         taxid = generate_tax_id(
             client_id=client_id,
             timestamp=doc_date,
-            internal_id=document.get("id", 0),
+            internal_id=int(internal_id),
         )
 
-        internal_id = document.get("_tax_internal_id_override") or document.get("id", 0)
         inno = normalize_invoice_number(internal_id)
 
         document_type = document.get("document_type", "")
@@ -191,8 +261,23 @@ class InvoiceBuilder:
 
         buyer_national_id = (person_snapshot.get("national_id") or "").strip()
         buyer_economic_code = (person_snapshot.get("economic_code") or "").strip()
+        # کد اقتصادی نامعتبر را مثل نبودن در نظر بگیر
+        if buyer_economic_code and not validate_economic_code(buyer_economic_code):
+            buyer_economic_code = ""
 
-        has_buyer_info = bool(buyer_national_id) and validate_economic_code(buyer_economic_code)
+        nid_clean = _clean_digits(buyer_national_id)
+        nid_valid, nid_type = validate_national_id(nid_clean) if nid_clean else (False, None)
+        has_valid_economic = bool(buyer_economic_code and validate_economic_code(buyer_economic_code))
+        postal_code = _clean_digits(person_snapshot.get("postal_code") or "")
+
+        # صورتحساب نوع ۱ فقط وقتی هویت خریدار برای مودیان قابل قبول است:
+        # - کد اقتصادی معتبر (tinb) داشته باشیم، یا
+        # - حقیقی با کد ملی معتبر + کد پستی (الزام رایج نوع ۱)
+        # در غیر این صورت نوع ۲ (ساده/مصرف‌کننده) بدون اطلاعات خریدار.
+        has_buyer_info = has_valid_economic or (
+            nid_valid and nid_type == "natural" and len(postal_code) >= 10
+        )
+
         inty = 1 if has_buyer_info else 2
         inp = map_invoice_pattern(
             is_return=is_return,
@@ -214,19 +299,26 @@ class InvoiceBuilder:
             tins=tins,
         )
 
-        tinb = _resolve_buyer_tin(buyer_national_id, buyer_economic_code)
-        if tinb:
-            header.tinb = tinb
-
         tob = _resolve_buyer_tob(buyer_national_id, buyer_economic_code)
-        if tob is not None:
-            header.tob = tob
+
+        if inty == 1:
+            if tob is not None:
+                header.tob = tob
+            if has_valid_economic:
+                header.tinb = buyer_economic_code
+            if tob == 1 and nid_valid and nid_type == "natural":
+                header.bid = nid_clean
+                if postal_code:
+                    header.bpc = postal_code
+            elif tob == 2 and nid_valid and nid_type == "legal" and not has_valid_economic:
+                header.bid = nid_clean
+        # else: نوع ۲ — بدون فیلد خریدار
 
         resolved_irtaxid = irtaxid or (document.get("extra_info") or {}).get("reference_tax_id")
         if resolved_irtaxid and inp in (2, 3, 4):
             header.irtaxid = str(resolved_irtaxid).strip()
 
-        # جمع‌های هدر + روش تسویه (الگوی moadian-full)
+        # جمع‌های هدر
         header.tprdis = body_totals["tprdis"]
         header.tdis = body_totals["tdis"]
         header.tadis = body_totals["tadis"]
@@ -234,11 +326,18 @@ class InvoiceBuilder:
         header.tbill = body_totals["tbill"]
         header.todam = 0
         header.tax17 = 0
-        header.setm = setm
-        header.tvop = body_totals["tvam"]
-        header.insp = body_totals["tadis"]
-        if setm == 1:
-            header.cap = body_totals["tbill"]
+
+        # روش تسویه فقط برای صورتحساب نوع اول
+        if inty == 1:
+            header.setm = setm
+            if body_totals["tvam"] > 0:
+                header.tvop = body_totals["tvam"]
+            if setm == 1:
+                header.cap = body_totals["tbill"]
+            elif setm == 2:
+                header.insp = body_totals["tbill"]
+            else:
+                header.cap = body_totals["tbill"]
 
         return header
 
@@ -273,13 +372,14 @@ class InvoiceBuilder:
 
             product_name = line.get("product_name", "محصول")
 
-            # واحد اندازه‌گیری مالیاتی؛ ۱۶۴ = عدد (رایج در نمونه‌های مودیان)
-            tax_unit_code = (
+            # واحد اندازه‌گیری مالیاتی باید کد عددی مودیان باشد (نه نام فارسی)
+            tax_unit_raw = (
                 tax_snapshot.get("tax_unit_code")
                 or tax_snapshot.get("product_main_unit")
                 or line.get("product_main_unit")
-                or "164"
+                or "1627"
             )
+            tax_unit_code = normalize_moadian_unit_code(tax_unit_raw)
 
             quantity = round_to_int(line.get("quantity", 0))
 
@@ -316,8 +416,8 @@ class InvoiceBuilder:
                     pass
 
             vra = calculate_vat_rate(tax_rate)
-            # vra به صورت «درصد × ۱۰۰» (۹٪ → ۹۰۰)؛ مالیات = پایه × درصد / ۱۰۰
-            vam = round_to_int((adis * vra) / 10000) if vra > 0 else 0
+            # vra درصد واقعی (۹٪ → ۹)؛ مالیات = پایه × درصد / ۱۰۰
+            vam = round_to_int((adis * vra) / 100) if vra > 0 else 0
 
             tsstam = adis + vam
 
@@ -333,42 +433,61 @@ class InvoiceBuilder:
                 vra=vra,
                 vam=vam,
                 tsstam=tsstam,
-                vop=vam,
+                vop=vam if vam > 0 else None,
             )
 
-            product_type = tax_snapshot.get("product_type", "product")
-            body_item.ssrv = 1 if product_type == "service" else 0
+            # توجه: ssrv در سامانه مودیان «ارزش ریالی» است (نه پرچم کالا/خدمت).
+            # ارسال ssrv=0 باعث خطای 0107305 می‌شود؛ فقط در صورت مقدار واقعی ست شود.
+            ssrv_raw = tax_snapshot.get("ssrv")
+            if ssrv_raw is not None:
+                try:
+                    ssrv_val = round_to_int(ssrv_raw)
+                    if ssrv_val > 0:
+                        body_item.ssrv = ssrv_val
+                except (TypeError, ValueError):
+                    pass
 
             body_items.append(body_item)
 
         return body_items
 
-    def _build_payments(self, document: Dict[str, Any]) -> List[InvoicePaymentDto]:
+    def _build_payments(self, document: Dict[str, Any], *, inty: int = 1) -> List[InvoicePaymentDto]:
         """
-        ساخت اطلاعات پرداخت (اختیاری)
-        در صورتی که اطلاعات پرداخت موجود نباشد، لیست خالی برمی‌گردد
+        ساخت اطلاعات پرداخت مطابق SDK PHP / نسخه قدیمی حسابیکس.
+        برای صورتحساب ساده (inty=2) معمولاً payments خالی است.
         """
-
-        payments: List[InvoicePaymentDto] = []
+        if inty == 2:
+            return []
 
         extra_info = document.get("extra_info") or {}
         payment_info = extra_info.get("payment_info")
 
         if payment_info and isinstance(payment_info, dict):
-            payment = InvoicePaymentDto(
-                iinn=payment_info.get("iinn", ""),
-                acn=payment_info.get("account_number", ""),
-                trmn=payment_info.get("terminal", ""),
-                trn=payment_info.get("transaction_ref", ""),
-                pcn=payment_info.get("card_number", ""),
-                pid=payment_info.get("payment_id", ""),
-                pdt=payment_info.get("payment_date", timestamp_to_unix_ms(datetime.utcnow())),
-                pv=round_to_int(payment_info.get("amount", 0)),
-                pt=payment_info.get("payment_type", 1),
-            )
-            payments.append(payment)
+            return [
+                InvoicePaymentDto(
+                    iinn=payment_info.get("iinn") or None,
+                    acn=payment_info.get("account_number") or payment_info.get("acn") or None,
+                    trmn=payment_info.get("terminal") or payment_info.get("trmn") or None,
+                    trn=payment_info.get("transaction_ref") or payment_info.get("trn") or None,
+                    pcn=payment_info.get("card_number") or payment_info.get("pcn") or None,
+                    pid=payment_info.get("payment_id") or payment_info.get("pid") or None,
+                    pdt=payment_info.get("payment_date") or payment_info.get("pdt"),
+                    pmt=payment_info.get("payment_type") or payment_info.get("pmt"),
+                )
+            ]
 
-        return payments
+        return [
+            InvoicePaymentDto(
+                iinn=None,
+                acn=None,
+                trmn=None,
+                trn=None,
+                pcn=None,
+                pid=None,
+                pdt=None,
+                pmt=None,
+            )
+        ]
 
 
 def build_invoice_for_moadian(

@@ -308,6 +308,9 @@ class DataTableConfig<T> {
   final void Function(List<Map<String, dynamic>> currentPageRawItems)?
   onTableDataChanged;
 
+  /// پس از دریافت موفق پاسخ API؛ برای خواندن فیلدهای جانبی مثل summary / status_counts
+  final void Function(Map<String, dynamic> responseData)? onResponseData;
+
   /// وقتی کاربر «پاک کردن فیلترها» را می‌زند (هم‌گام با نوار فیلتر سریع مثل دسته در صفحهٔ کالاها)
   final VoidCallback? onAllFiltersCleared;
 
@@ -424,6 +427,7 @@ class DataTableConfig<T> {
     this.dataRowHeight,
     this.onRefresh,
     this.onTableDataChanged,
+    this.onResponseData,
     this.onAllFiltersCleared,
     this.persistTableFiltersPageId,
     this.autoFitColumnsOnFirstLoad = true,
