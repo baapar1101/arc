@@ -500,10 +500,17 @@ app/services/catalog_spec_field_service.py
 app/services/check_reconciliation_service.py
 app/services/check_service.py
 app/services/credit_service.py
+app/services/crm_automation_service.py
+app/services/crm_background_jobs.py
 app/services/crm_calendar_note_service.py
 app/services/crm_chat_realtime.py
 app/services/crm_chat_realtime_fanout.py
 app/services/crm_chat_service.py
+app/services/crm_close_reason_service.py
+app/services/crm_custom_field_service.py
+app/services/crm_customer_360_service.py
+app/services/crm_deal_line_service.py
+app/services/crm_tag_service.py
 app/services/cross_currency_settlement_service.py
 app/services/currency_admin_service.py
 app/services/currency_quant.py
@@ -1083,6 +1090,7 @@ migrations/versions/20260725_000002_product_fx_prices.py
 migrations/versions/20260726_000001_business_ai_provider_configs.py
 migrations/versions/20260726_000002_hscript_schedules.py
 migrations/versions/20260727_000001_business_print_settings_tax_discount_display.py
+migrations/versions/20260731_000001_crm_sales_automation_upgrade.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py

@@ -189,39 +189,53 @@ def get_customer_360(db: Session, business_id: int, person_id: int) -> Dict[str,
         ]
 
     # اسناد اخیر (فاکتورها) از طریق خطوط سند
-    doc_rows = (
-        db.query(Document)
+    # توجه: Document.extra_info از نوع JSON است؛ DISTINCT روی کل ردیف در PostgreSQL خطا می‌دهد.
+    doc_id_rows = (
+        db.query(Document.id, Document.document_date)
         .join(DocumentLine, DocumentLine.document_id == Document.id)
         .filter(Document.business_id == business_id, DocumentLine.person_id == person_id)
+        .group_by(Document.id, Document.document_date)
         .order_by(Document.document_date.desc(), Document.id.desc())
-        .distinct()
         .limit(20)
         .all()
     )
-    documents = [
-        {
-            "id": d.id,
-            "code": d.code,
-            "document_type": d.document_type,
-            "document_date": d.document_date.isoformat() if d.document_date else None,
-            "is_proforma": bool(d.is_proforma),
-            "description": d.description,
+    doc_ids = [row[0] for row in doc_id_rows]
+    documents: List[Dict[str, Any]] = []
+    if doc_ids:
+        doc_by_id = {
+            d.id: d
+            for d in db.query(Document).filter(Document.id.in_(doc_ids)).all()
         }
-        for d in doc_rows
-    ]
+        for did in doc_ids:
+            d = doc_by_id.get(did)
+            if not d:
+                continue
+            documents.append(
+                {
+                    "id": d.id,
+                    "code": d.code,
+                    "document_type": d.document_type,
+                    "document_date": d.document_date.isoformat() if d.document_date else None,
+                    "is_proforma": bool(d.is_proforma),
+                    "description": d.description,
+                }
+            )
 
     # برچسب‌ها از معاملات متصل
     deal_ids = [d.id for d in deals]
     tags: List[Dict[str, Any]] = []
     if deal_ids:
-        tag_rows = (
-            db.query(CrmTag)
+        tag_id_rows = (
+            db.query(CrmTag.id)
             .join(CrmDealTagLink, CrmDealTagLink.tag_id == CrmTag.id)
             .filter(CrmDealTagLink.deal_id.in_(deal_ids), CrmTag.business_id == business_id)
-            .distinct()
+            .group_by(CrmTag.id)
             .all()
         )
-        tags = [{"id": t.id, "name": t.name, "color": t.color} for t in tag_rows]
+        tag_ids = [r[0] for r in tag_id_rows]
+        if tag_ids:
+            tag_rows = db.query(CrmTag).filter(CrmTag.id.in_(tag_ids)).order_by(CrmTag.sort_order.asc(), CrmTag.id.asc()).all()
+            tags = [{"id": t.id, "name": t.name, "color": t.color} for t in tag_rows]
 
     # تایم‌لاین رویدادهای ترکیبی مرتب‌شده نزولی بر اساس تاریخ
     timeline: List[Dict[str, Any]] = []
