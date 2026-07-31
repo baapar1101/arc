@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/api_client.dart';
 import '../services/announcements_service.dart';
+import '../services/sms_bank/sms_bank_launch_navigation.dart';
 
 /// Unified navigation + read-state handling for in-app announcements.
 class AnnouncementNavigation {
@@ -33,6 +34,8 @@ class AnnouncementNavigation {
       if (raw['ticket_id'] != null) 'ticket_id': raw['ticket_id'],
       if (raw['event_key'] != null && '${raw['event_key']}'.isNotEmpty)
         'event_key': '${raw['event_key']}',
+      if (raw['sms_bank_event_id'] != null && '${raw['sms_bank_event_id']}'.isNotEmpty)
+        'sms_bank_event_id': '${raw['sms_bank_event_id']}',
     };
   }
 
@@ -70,7 +73,9 @@ class AnnouncementNavigation {
     bool? isSupportOperator,
   }) {
     final explicit = item['deep_link']?.toString();
-    if (explicit != null && explicit.isNotEmpty) return explicit;
+    if (explicit != null && explicit.isNotEmpty) {
+      return SmsBankLaunchNavigation.resolveAnnouncementDeepLink(explicit);
+    }
 
     final eventKey = item['event_key']?.toString() ?? '';
     final ticketId = parseTicketId(item['ticket_id']);

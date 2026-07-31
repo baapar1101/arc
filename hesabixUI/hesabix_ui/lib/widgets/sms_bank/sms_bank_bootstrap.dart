@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/android_sms_bank_platform.dart';
 import '../../core/auth_store.dart';
@@ -8,6 +9,7 @@ import '../../core/calendar_controller.dart';
 import '../../services/notification_tap_navigation.dart';
 import '../../services/sms_bank/sms_bank_assistant_service.dart';
 import '../../services/sms_bank/sms_bank_capture_navigation.dart';
+import '../../services/sms_bank/sms_bank_launch_navigation.dart';
 import '../../services/sms_bank/sms_bank_models.dart';
 import 'sms_quick_capture_sheet.dart';
 
@@ -85,42 +87,24 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
 
     // Intercept tray notification taps for SMS bank before GoRouter tries hesabix://
     final pendingTap = NotificationTapNavigation.instance.peek();
-    if (pendingTap != null) {
-      final deep = '${pendingTap['deep_link'] ?? ''}';
-      final eventKey = '${pendingTap['event_key'] ?? ''}';
-      final smsId = '${pendingTap['sms_bank_event_id'] ?? ''}';
-      if (eventKey == 'sms_bank_capture' || deep.contains('sms-bank') || smsId.isNotEmpty) {
-        NotificationTapNavigation.instance.clear();
-        final id = smsId.isNotEmpty
-            ? smsId
-            : Uri.tryParse(deep)?.queryParameters['id'];
-        if (id != null && id.isNotEmpty) {
-          final event = await _service.getEvent(id);
-          if (event != null) {
-            await _present(event);
-            return;
-          }
+    if (pendingTap != null &&
+        SmsBankLaunchNavigation.isSmsBankCaptureNotification(pendingTap)) {
+      NotificationTapNavigation.instance.clear();
+      final id = SmsBankLaunchNavigation.extractEventIdFromNotification(pendingTap);
+      if (id != null && id.isNotEmpty) {
+        final event = await _resolveEvent(id);
+        if (event != null) {
+          await _present(event);
+          return;
         }
       }
     }
 
     final launchId = await _service.consumeLaunchEventId();
     if (launchId != null && launchId.isNotEmpty) {
-      final event = await _service.getEvent(launchId);
+      final event = await _resolveEvent(launchId);
       if (event != null) {
         await _present(event);
-        return;
-      }
-      final pending = await _service.drainPendingEvents();
-      SmsBankEvent? found;
-      for (final e in pending) {
-        if (e.id == launchId) {
-          found = e;
-          break;
-        }
-      }
-      if (found != null) {
-        await _present(found);
         return;
       }
     }
@@ -135,6 +119,24 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
       await _present(newest);
     } else {
       SmsBankCaptureNavigation.instance.enqueue(newest);
+    }
+  }
+
+  Future<SmsBankEvent?> _resolveEvent(String id) async {
+    final cached = await _service.getEvent(id);
+    if (cached != null) return cached;
+    final pending = await _service.drainPendingEvents();
+    for (final e in pending) {
+      if (e.id == id) return e;
+    }
+    return _service.getEvent(id);
+  }
+
+  void _ensureSafeRouteForCapture() {
+    final router = GoRouter.maybeOf(context);
+    if (router == null) return;
+    if (SmsBankLaunchNavigation.shouldRedirectAwayFromCapture(router.state.uri)) {
+      router.go('/');
     }
   }
 
@@ -157,6 +159,8 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
 
     await Future<void>.delayed(Duration.zero);
     if (!mounted) return;
+
+    _ensureSafeRouteForCapture();
 
     _showing = true;
     _lastShownId = event.id;

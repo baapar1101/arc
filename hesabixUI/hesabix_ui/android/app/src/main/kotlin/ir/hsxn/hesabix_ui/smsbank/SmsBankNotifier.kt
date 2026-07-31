@@ -64,12 +64,13 @@ object SmsBankNotifier {
         if (bizName.isNotEmpty()) body += " · $bizName"
         else if (needsChoice) body += " · چند کسب‌وکار محتمل"
 
+        // Do not set intent.data — Flutter GoRouter would map hesabix://sms-bank/capture
+        // to /capture (no route → 404). Event id is delivered via EXTRA_EVENT_ID.
         val openIntent = Intent(context, MainActivity::class.java).apply {
             action = ACTION_OPEN
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra(EXTRA_EVENT_ID, eventId)
             putExtra(EXTRA_ACTION, "open")
-            data = android.net.Uri.parse("hesabix://sms-bank/capture?id=$eventId")
         }
         val openPending = PendingIntent.getActivity(
             context,

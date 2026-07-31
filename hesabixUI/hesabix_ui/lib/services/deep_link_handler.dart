@@ -83,6 +83,9 @@ class DeepLinkHandler {
         return '/wallet';
       case 'support':
         return '/support';
+      case 'sms-bank':
+        // Quick-capture sheet — handled by SmsBankBootstrap, not a page route.
+        return null;
     }
     
     return null;

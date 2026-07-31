@@ -205,6 +205,7 @@ import 'widgets/biometric/biometric_lock_gate.dart';
 import 'widgets/android_update/android_update_gate.dart';
 import 'widgets/notification/in_app_notifications_bootstrap.dart';
 import 'widgets/sms_bank/sms_bank_bootstrap.dart';
+import 'services/sms_bank/sms_bank_launch_navigation.dart';
 import 'pages/business/sms_bank_assistant_settings_page.dart';
 import 'core/permission_guard.dart';
 import 'core/keyboard_shortcut_listener.dart';
@@ -889,18 +890,17 @@ class _MyAppState extends State<MyApp> {
       navigatorKey: navigatorKey,
       observers: [routeObserver],
       refreshListenable: _authStore,
-      initialLocation: () {
-        final base = Uri.base;
-        final path = base.path.isNotEmpty ? base.path : '/';
-        final query = base.hasQuery ? '?${base.query}' : '';
-        final fragment = base.fragment.isNotEmpty ? '#${base.fragment}' : '';
-        return '$path$query$fragment';
-      }(),
+      initialLocation: SmsBankLaunchNavigation.normalizeInitialLocation(Uri.base),
       redirect: (context, state) async {
         final currentPath = state.uri.path;
         final isPublicRoute = currentPath.startsWith('/public');
         final isShortPublicSharePath =
             currentPath.startsWith('/i/') || currentPath.startsWith('/p/');
+
+        // SMS bank notification deep links map to /capture — not a real page.
+        if (SmsBankLaunchNavigation.shouldRedirectAwayFromCapture(state.uri)) {
+          return '/';
+        }
         
         // اگر authStore هنوز load نشده، منتظر بمان
         if (_authStore == null) {

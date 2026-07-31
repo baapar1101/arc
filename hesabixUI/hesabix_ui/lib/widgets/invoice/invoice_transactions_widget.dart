@@ -14,6 +14,8 @@ import '../../services/petty_cash_service.dart';
 import '../../services/person_service.dart';
 import '../../services/account_service.dart';
 import '../../services/currency_service.dart';
+import '../../services/business_currency_rate_service.dart';
+import '../../services/business_fx_global_rate_service.dart';
 import 'person_combobox_widget.dart';
 import 'bank_account_combobox_widget.dart';
 import 'cash_register_combobox_widget.dart';
@@ -25,6 +27,7 @@ import '../../utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../widgets/date_input_field.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/error_extractor.dart';
 import '../../utils/invoice_transaction_preferences.dart';
 import '../../widgets/money/amount_field_words_tooltip.dart';
 import '../../utils/currency_display_utils.dart';
@@ -1186,6 +1189,15 @@ class _TransactionDialogState extends State<TransactionDialog> {
   /// اگر کاربر مبلغ پرداخت را دستی عوض کرده، همگام خودکار بازنویسی نکند.
   bool _paymentAmountManuallyEdited = false;
   bool _syncingPaymentAmount = false;
+  /// کاربر نرخ را دستی عوض کرده؛ resolve خودکار بازنویسی نکند.
+  bool _fxRateManuallyEdited = false;
+  bool _syncingFxRate = false;
+  bool _fxRateLoading = false;
+  bool _fxRateRefreshing = false;
+  String? _fxRateSourceHint;
+  /// نرخ‌های resolve‌شده به پایه (برای محاسبه صحیح فرعی↔فرعی).
+  double? _resolvedSettleRateToBase;
+  double? _resolvedPayRateToBase;
   
   // سرویس‌ها
   final BankAccountService _bankService = BankAccountService();
@@ -1193,7 +1205,12 @@ class _TransactionDialogState extends State<TransactionDialog> {
   final PettyCashService _pettyCashService = PettyCashService();
   final PersonService _personService = PersonService();
   final AccountService _accountService = AccountService();
-  final CurrencyService _currencyService = CurrencyService(ApiClient());
+  final ApiClient _apiClient = ApiClient();
+  late final CurrencyService _currencyService = CurrencyService(_apiClient);
+  late final BusinessCurrencyRateService _rateService =
+      BusinessCurrencyRateService(_apiClient);
+  late final BusinessFxGlobalRateService _globalFxService =
+      BusinessFxGlobalRateService(_apiClient);
   
   // فیلدهای خاص هر نوع تراکنش
   String? _selectedBankId;
@@ -1258,12 +1275,15 @@ class _TransactionDialogState extends State<TransactionDialog> {
     }
     if (widget.transaction?.fxRate != null) {
       _fxRateController.text = formatFxRateForDisplay(widget.transaction!.fxRate);
+      _fxRateManuallyEdited = true;
+      _fxRateSourceHint = 'نرخ ثبت‌شده روی تراکنش';
     } else if (widget.invoiceFxRate != null) {
       _fxRateController.text = formatFxRateForDisplay(widget.invoiceFxRate);
+      _fxRateSourceHint = 'نرخ تسعیر سند';
     }
 
     _settlesAmountController.addListener(_onSettlesOrRateChanged);
-    _fxRateController.addListener(_onSettlesOrRateChanged);
+    _fxRateController.addListener(_onFxRateEdited);
     _amountController.addListener(_onAmountEdited);
     
     // تنظیم فیلدهای خاص
@@ -1372,6 +1392,13 @@ class _TransactionDialogState extends State<TransactionDialog> {
     _paymentAmountManuallyEdited = true;
   }
 
+  void _onFxRateEdited() {
+    if (_syncingFxRate) return;
+    _fxRateManuallyEdited = true;
+    _fxRateSourceHint = 'نرخ دستی';
+    _onSettlesOrRateChanged();
+  }
+
   void _onSettlesOrRateChanged() {
     if (!_isCrossCurrencyPayment) return;
     if (_paymentAmountManuallyEdited) return;
@@ -1384,13 +1411,47 @@ class _TransactionDialogState extends State<TransactionDialog> {
     return double.tryParse(t);
   }
 
-  /// مبلغ پرداخت مورد انتظار = تسویه × نرخ (وقتی حساب پرداخت ارز پایه است)
-  /// یا تسویه × (نرخ‌تسویه / نرخ‌پرداخت) برای فرعی↔فرعی — در UI ساده: تسویه × نرخ فیلد.
+  bool get _paymentIsBase {
+    final base = _baseCurrencyId;
+    final pay = _selectedPaymentCurrencyId;
+    return base != null && pay != null && pay == base;
+  }
+
+  bool get _settleIsBase {
+    final base = _baseCurrencyId;
+    final inv = widget.selectedCurrencyId;
+    return base != null && inv != null && inv == base;
+  }
+
+  String get _fxRateHelperText {
+    if (_paymentIsBase) {
+      return '۱ واحد ارز فاکتور = نرخ × ارز پایه (حساب پرداخت)';
+    }
+    if (_settleIsBase) {
+      return '۱ واحد ارز حساب پرداخت = نرخ × ارز پایه';
+    }
+    return 'نرخ متقاطع: ۱ واحد ارز فاکتور ≈ نرخ × ارز حساب پرداخت';
+  }
+
+  /// مبلغ پرداخت مورد انتظار مطابق بک‌اند: تسویه × (نرخ‌تسویه / نرخ‌پرداخت).
   double? _expectedPaymentAmount() {
     final settles = _parseMoneyField(_settlesAmountController.text);
+    if (settles == null || settles <= 0) return null;
+
     final rate = _parseMoneyField(_fxRateController.text);
-    if (settles == null || rate == null || settles <= 0 || rate <= 0) return null;
-    return settles * rate;
+    if (rate != null && rate > 0) {
+      if (_paymentIsBase) return settles * rate;
+      if (_settleIsBase) return settles / rate;
+      // فرعی↔فرعی: فیلد نرخ = متقاطع
+      return settles * rate;
+    }
+
+    final rSettle = _resolvedSettleRateToBase;
+    final rPay = _resolvedPayRateToBase;
+    if (rSettle != null && rPay != null && rSettle > 0 && rPay > 0) {
+      return settles * rSettle / rPay;
+    }
+    return null;
   }
 
   void _recalcPaymentAmountFromSettles({bool force = false}) {
@@ -1405,8 +1466,201 @@ class _TransactionDialogState extends State<TransactionDialog> {
     if (mounted) setState(() {});
   }
 
+  String _asOfIso() {
+    final d = _transactionDate.toUtc();
+    return d.toIso8601String();
+  }
+
+  Future<double?> _resolveRateToBase(int currencyId) async {
+    final base = _baseCurrencyId;
+    if (base != null && currencyId == base) return 1.0;
+    try {
+      final out = await _rateService.resolve(
+        businessId: widget.businessId,
+        currencyId: currencyId,
+        asOfIso: _asOfIso(),
+      );
+      final r = out['rate'];
+      if (r == null) return null;
+      return double.tryParse(r.toString().replaceAll(',', ''));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// پر کردن نرخ از آخرین سند تسعیر (resolve دفتر نرخ).
+  Future<void> _loadFxRateFromLedger({bool force = false}) async {
+    if (!_isCrossCurrencyPayment) return;
+    if (!force && _fxRateManuallyEdited && _fxRateController.text.trim().isNotEmpty) {
+      return;
+    }
+    if (!force &&
+        widget.transaction?.fxRate != null &&
+        _fxRateController.text.trim().isNotEmpty) {
+      return;
+    }
+
+    final inv = widget.selectedCurrencyId;
+    final pay = _selectedPaymentCurrencyId;
+    if (inv == null || pay == null) return;
+
+    if (mounted) setState(() => _fxRateLoading = true);
+    try {
+      final rSettle = await _resolveRateToBase(inv);
+      final rPay = await _resolveRateToBase(pay);
+      if (!mounted) return;
+
+      _resolvedSettleRateToBase = rSettle;
+      _resolvedPayRateToBase = rPay;
+
+      double? displayRate;
+      String? hint;
+      if (rSettle != null && rPay != null && rSettle > 0 && rPay > 0) {
+        if (_paymentIsBase) {
+          displayRate = rSettle;
+          hint = 'از آخرین نرخ تسعیر ارز فاکتور';
+        } else if (_settleIsBase) {
+          displayRate = rPay;
+          hint = 'از آخرین نرخ تسعیر ارز حساب پرداخت';
+        } else {
+          displayRate = rSettle / rPay;
+          hint = 'نرخ متقاطع از آخرین تسعیر هر دو ارز';
+        }
+      } else if (widget.invoiceFxRate != null) {
+        displayRate = widget.invoiceFxRate!.toDouble();
+        hint = 'نرخ تسعیر سند (نرخ دفتر برای این ارز یافت نشد)';
+      }
+
+      if (displayRate != null && displayRate > 0) {
+        _syncingFxRate = true;
+        _fxRateController.text = formatFxRateForDisplay(displayRate);
+        _syncingFxRate = false;
+        if (force) _fxRateManuallyEdited = false;
+        _fxRateSourceHint = hint;
+      } else if (_fxRateController.text.trim().isEmpty) {
+        _fxRateSourceHint = 'نرخی در دفتر تسعیر یافت نشد — دستی وارد کنید یا از اسنپ‌شات بگیرید';
+      }
+
+      _recalcPaymentAmountFromSettles(
+        force: force || !_paymentAmountManuallyEdited,
+      );
+    } finally {
+      if (mounted) setState(() => _fxRateLoading = false);
+    }
+  }
+
+  /// گرفتن آخرین نرخ از اسنپ‌شات مرکزی، ثبت در دفتر تسعیر، و اعمال در فیلد.
+  Future<void> _refreshFxRateFromGlobal() async {
+    if (!_isCrossCurrencyPayment) return;
+    final canAdd =
+        widget.authStore?.hasBusinessPermission('currency_revaluation', 'add') ??
+            false;
+    if (!canAdd) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: 'مجوز ثبت نرخ تسعیر ندارید',
+        );
+      }
+      return;
+    }
+
+    final inv = widget.selectedCurrencyId;
+    final pay = _selectedPaymentCurrencyId;
+    final base = _baseCurrencyId;
+    if (inv == null || pay == null || base == null) return;
+
+    final foreignIds = <int>{};
+    if (inv != base) foreignIds.add(inv);
+    if (pay != base) foreignIds.add(pay);
+    if (foreignIds.isEmpty) return;
+
+    if (mounted) setState(() => _fxRateRefreshing = true);
+    try {
+      final latest =
+          await _globalFxService.latest(businessId: widget.businessId);
+      final globalItems = (latest['items'] as List? ?? const [])
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
+      if (globalItems.isEmpty) {
+        if (!mounted) return;
+        SnackBarHelper.showError(
+          context,
+          message:
+              'اسنپ‌شات مرکزی خالی است. ابتدا از مدیریت کل، واکشی نرخ را انجام دهید.',
+        );
+        return;
+      }
+
+      if (latest['stale'] == true && mounted) {
+        final age = latest['max_age_hours'];
+        final cont = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('اسنپ‌شات قدیمی'),
+            content: Text(
+              'آخرین واکشی مرکزی حدود ${age ?? '—'} ساعت پیش بوده است. ادامه می‌دهید؟',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('انصراف'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('ادامه'),
+              ),
+            ],
+          ),
+        );
+        if (cont != true) return;
+      }
+
+      final applyItems = <Map<String, dynamic>>[];
+      for (final g in globalItems) {
+        final cid = (g['business_currency_id'] as num?)?.toInt();
+        if (cid == null || !foreignIds.contains(cid)) continue;
+        applyItems.add({
+          'currency_id': cid,
+          'symbol': g['symbol'],
+        });
+      }
+      if (applyItems.isEmpty) {
+        if (!mounted) return;
+        SnackBarHelper.showError(
+          context,
+          message: 'برای ارز(های) این تراکنش نرخی در اسنپ‌شات مرکزی نیست',
+        );
+        return;
+      }
+
+      await _globalFxService.applyFromGlobal(
+        businessId: widget.businessId,
+        items: applyItems,
+        note: 'از دیالوگ تراکنش دریافت/پرداخت',
+      );
+
+      _fxRateManuallyEdited = false;
+      await _loadFxRateFromLedger(force: true);
+      if (!mounted) return;
+      SnackBarHelper.show(
+        context,
+        message: 'نرخ از اسنپ‌شات مرکزی ثبت و اعمال شد',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    } finally {
+      if (mounted) setState(() => _fxRateRefreshing = false);
+    }
+  }
+
   void _setPaymentCurrency(int? currencyId) {
     final wasCross = _isCrossCurrencyPayment;
+    final prevPay = _selectedPaymentCurrencyId;
     _selectedPaymentCurrencyId = currencyId;
     if (currencyId != null && _currencyById.containsKey(currencyId)) {
       final c = _currencyById[currencyId]!;
@@ -1416,9 +1670,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
       _paymentCurrencyUnit = null;
     }
     if (_isCrossCurrencyPayment) {
-      if (_fxRateController.text.trim().isEmpty && widget.invoiceFxRate != null) {
-        _fxRateController.text = formatFxRateForDisplay(widget.invoiceFxRate);
-      }
       if (_settlesAmountController.text.trim().isEmpty &&
           widget.initialAmount != null) {
         _settlesAmountController.text = formatWithThousands(
@@ -1427,8 +1678,22 @@ class _TransactionDialogState extends State<TransactionDialog> {
         );
       }
       // ورود به حالت بین‌ارزی یا تغییر ارز حساب → مبلغ پرداخت را از تسویه×نرخ بساز
-      final shouldForce = !wasCross || !_paymentAmountManuallyEdited;
-      _recalcPaymentAmountFromSettles(force: shouldForce || _amountController.text.trim().isEmpty);
+      final shouldForce = !wasCross ||
+          prevPay != currencyId ||
+          !_paymentAmountManuallyEdited;
+      final enteredCross = !wasCross || prevPay != currencyId;
+      if (enteredCross) {
+        // نرخ را از دفتر تسعیر بگیر (مگر ویرایش دستی قبلی روی همین تراکنش)
+        _loadFxRateFromLedger(force: widget.transaction == null);
+      } else if (_fxRateController.text.trim().isEmpty &&
+          widget.invoiceFxRate != null) {
+        _syncingFxRate = true;
+        _fxRateController.text = formatFxRateForDisplay(widget.invoiceFxRate);
+        _syncingFxRate = false;
+      }
+      _recalcPaymentAmountFromSettles(
+        force: shouldForce || _amountController.text.trim().isEmpty,
+      );
     }
   }
 
@@ -1479,7 +1744,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
   @override
   void dispose() {
     _settlesAmountController.removeListener(_onSettlesOrRateChanged);
-    _fxRateController.removeListener(_onSettlesOrRateChanged);
+    _fxRateController.removeListener(_onFxRateEdited);
     _amountController.removeListener(_onAmountEdited);
     _amountController.dispose();
     _commissionController.dispose();
@@ -1496,7 +1761,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
     return Dialog(
       child: Container(
         width: 600,
-        constraints: const BoxConstraints(maxHeight: 600),
+        constraints: const BoxConstraints(maxHeight: 680),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1595,40 +1860,36 @@ class _TransactionDialogState extends State<TransactionDialog> {
                       ),
                       const SizedBox(height: 16),
                       
-                      // مبلغ و کارمزد
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _TransactionDialogMoneyField(
-                              key: const ValueKey('transaction_amount_field'),
-                              controller: _amountController,
-                              label: _isCrossCurrencyPayment
-                                  ? 'مبلغ پرداخت *'
-                                  : 'مبلغ *',
-                              currencyUnit: _isCrossCurrencyPayment
-                                  ? (_paymentCurrencyUnit ?? widget.currencyUnit)
-                                  : widget.currencyUnit,
-                              isRequired: true,
+                      // مبلغ و کارمزد — در حالت بین‌ارزی مبلغ پرداخت داخل باکس پایین است
+                      if (!(_isMultiCurrency && _isCrossCurrencyPayment))
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _TransactionDialogMoneyField(
+                                key: const ValueKey('transaction_amount_field'),
+                                controller: _amountController,
+                                label: 'مبلغ *',
+                                currencyUnit: widget.currencyUnit,
+                                isRequired: true,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: _TransactionDialogMoneyField(
-                              key: const ValueKey('transaction_commission_field'),
-                              controller: _commissionController,
-                              label: 'کارمزد',
-                              currencyUnit: widget.currencyUnit,
-                              isRequired: false,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _TransactionDialogMoneyField(
+                                key: const ValueKey('transaction_commission_field'),
+                                controller: _commissionController,
+                                label: 'کارمزد',
+                                currencyUnit: widget.currencyUnit,
+                                isRequired: false,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                       if (_isMultiCurrency && _isCrossCurrencyPayment) ...[
-                        const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.secondaryContainer.withOpacity(0.35),
+                            color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.35),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: theme.colorScheme.outlineVariant,
@@ -1645,9 +1906,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'مبلغ پرداخت باید به ارز حساب باشد و معمولاً برابر '
-                                '«مبلغ تسویه × نرخ» است. این مقدار به‌صورت خودکار پر می‌شود؛ '
-                                'فقط اگر نرخ پرداخت با نرخ فاکتور فرق دارد آن را دستی تغییر دهید.',
+                                'فقط «مبلغ تسویه» را وارد کنید؛ مبلغ پرداخت با نرخ '
+                                'به‌صورت خودکار محاسبه می‌شود. نرخ از آخرین تسعیر پر می‌شود '
+                                'و در صورت نیاز قابل ویرایش است.',
                                 style: theme.textTheme.bodySmall,
                               ),
                               const SizedBox(height: 12),
@@ -1661,11 +1922,25 @@ class _TransactionDialogState extends State<TransactionDialog> {
                               const SizedBox(height: 12),
                               TextFormField(
                                 controller: _fxRateController,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   labelText: 'نرخ تبدیل *',
-                                  border: OutlineInputBorder(),
-                                  helperText:
-                                      '۱ واحد ارز فاکتور = نرخ × ارز پایه',
+                                  border: const OutlineInputBorder(),
+                                  helperText: _fxRateSourceHint != null
+                                      ? '$_fxRateHelperText\n$_fxRateSourceHint'
+                                      : _fxRateHelperText,
+                                  helperMaxLines: 3,
+                                  suffixIcon: (_fxRateLoading || _fxRateRefreshing)
+                                      ? const Padding(
+                                          padding: EdgeInsets.all(12),
+                                          child: SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                        )
+                                      : null,
                                 ),
                                 keyboardType: const TextInputType.numberWithOptions(
                                   decimal: true,
@@ -1686,44 +1961,98 @@ class _TransactionDialogState extends State<TransactionDialog> {
                                   return null;
                                 },
                               ),
-                              if (_expectedPaymentAmount() != null) ...[
-                                const SizedBox(height: 10),
-                                DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primaryContainer
-                                        .withValues(alpha: 0.45),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 8,
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            'معادل پیشنهادی پرداخت: '
-                                            '${formatWithThousands(_expectedPaymentAmount(), decimalPlaces: 0)}'
-                                            ' ${_paymentCurrencyUnit ?? ''}',
-                                            style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                              fontWeight: FontWeight.w700,
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 4,
+                                children: [
+                                  OutlinedButton.icon(
+                                    onPressed: (_fxRateLoading ||
+                                            _fxRateRefreshing)
+                                        ? null
+                                        : () => _loadFxRateFromLedger(
+                                              force: true,
                                             ),
-                                          ),
-                                        ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              _recalcPaymentAmountFromSettles(
-                                            force: true,
-                                          ),
-                                          child: const Text('اعمال'),
-                                        ),
-                                      ],
+                                    icon: const Icon(Icons.history, size: 18),
+                                    label: const Text('آخرین تسعیر'),
+                                  ),
+                                  FilledButton.tonalIcon(
+                                    onPressed: (_fxRateLoading ||
+                                            _fxRateRefreshing)
+                                        ? null
+                                        : _refreshFxRateFromGlobal,
+                                    icon: const Icon(
+                                      Icons.cloud_download_outlined,
+                                      size: 18,
                                     ),
+                                    label: const Text('اسنپ‌شات مرکزی'),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _TransactionDialogMoneyField(
+                                      key: const ValueKey(
+                                        'transaction_amount_field_cross',
+                                      ),
+                                      controller: _amountController,
+                                      label: _paymentAmountManuallyEdited
+                                          ? 'مبلغ پرداخت (دستی) *'
+                                          : 'مبلغ پرداخت (محاسبه‌شده) *',
+                                      currencyUnit:
+                                          _paymentCurrencyUnit ??
+                                              widget.currencyUnit,
+                                      isRequired: true,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Column(
+                                    children: [
+                                      IconButton(
+                                        tooltip:
+                                            'بازنشانی مبلغ پرداخت از تسویه × نرخ',
+                                        onPressed: () =>
+                                            _recalcPaymentAmountFromSettles(
+                                          force: true,
+                                        ),
+                                        icon: const Icon(Icons.calculate_outlined),
+                                      ),
+                                      if (_paymentAmountManuallyEdited)
+                                        Text(
+                                          'دستی',
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                            color: theme.colorScheme.tertiary,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              if (_expectedPaymentAmount() != null &&
+                                  _paymentAmountManuallyEdited) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'معادل نرخ‌دار: '
+                                  '${formatWithThousands(_expectedPaymentAmount(), decimalPlaces: 0)}'
+                                  ' ${_paymentCurrencyUnit ?? ''}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
                                   ),
                                 ),
                               ],
+                              const SizedBox(height: 12),
+                              _TransactionDialogMoneyField(
+                                key: const ValueKey(
+                                  'transaction_commission_field_cross',
+                                ),
+                                controller: _commissionController,
+                                label: 'کارمزد',
+                                currencyUnit: widget.currencyUnit,
+                                isRequired: false,
+                              ),
                             ],
                           ),
                         ),
@@ -1949,6 +2278,10 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
 
   Future<void> _saveTransaction() async {
+    // قبل از validate: مبلغ پرداخت را از تسویه×نرخ همگام کن تا فیلد خالی نماند
+    if (_isCrossCurrencyPayment && !_paymentAmountManuallyEdited) {
+      _recalcPaymentAmountFromSettles(force: true);
+    }
     if (!_formKey.currentState!.validate()) return;
     
     // اعتبارسنجی انتخاب فیلدهای خاص هر نوع تراکنش
@@ -2110,7 +2443,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
       if (isCross && fxRate != null && fxRate > 0) {
         // اگر مبلغ پرداخت هنوز خالی یا برابر عدد تسویه (بدون تبدیل) است، اصلاح کن
-        final expected = settlesAmount * fxRate;
+        final expected = _expectedPaymentAmount() ?? (settlesAmount * fxRate);
         final looksUnconverted = amount > 0 &&
             (amount - settlesAmount).abs() < 0.0001 &&
             (expected - amount).abs() > 0.01;

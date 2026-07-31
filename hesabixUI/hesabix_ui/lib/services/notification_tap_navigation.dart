@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../utils/announcement_navigation.dart';
+import '../services/sms_bank/sms_bank_launch_navigation.dart';
 
 /// Queues notification-tap navigation until GoRouter / auth are ready.
 class NotificationTapNavigation {
@@ -23,6 +24,11 @@ class NotificationTapNavigation {
     final item = _pending;
     if (item == null || _consuming) return false;
     if (!context.mounted) return false;
+
+    // SMS bank capture is handled by SmsBankBootstrap — keep pending until then.
+    if (SmsBankLaunchNavigation.isSmsBankCaptureNotification(item)) {
+      return false;
+    }
 
     final route = AnnouncementNavigation.resolveDeepLink(item);
     if (route == null || route.isEmpty) {
@@ -54,6 +60,11 @@ class NotificationTapNavigation {
   Future<bool> tryConsumeWithRouter(GoRouter router) async {
     final item = _pending;
     if (item == null || _consuming) return false;
+
+    if (SmsBankLaunchNavigation.isSmsBankCaptureNotification(item)) {
+      return false;
+    }
+
     final route = AnnouncementNavigation.resolveDeepLink(item);
     if (route == null || route.isEmpty) {
       _pending = null;

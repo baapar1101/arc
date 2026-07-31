@@ -2298,6 +2298,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
           if (tx.fxRate != null) 'fx_rate': tx.fxRate,
           if (tx.paymentCurrencyId != null)
             'payment_currency_id': tx.paymentCurrencyId,
+          if (tx.allowLargeFxDiff) 'allow_large_fx_diff': true,
         };
         return map;
       }).toList();
