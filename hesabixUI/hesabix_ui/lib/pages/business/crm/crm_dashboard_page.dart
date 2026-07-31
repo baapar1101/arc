@@ -186,12 +186,31 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
                           ),
                         );
 
+                        final quickLinks = rowPair(
+                          _SummaryCard(
+                            icon: Icons.task_alt,
+                            title: 'صف کار',
+                            value: 'باز کردن',
+                            subtitle: 'تسک‌ها و پیگیری‌های من',
+                            onTap: () => context.go('/business/${widget.businessId}/crm/tasks'),
+                          ),
+                          _SummaryCard(
+                            icon: Icons.person_search,
+                            title: 'نمای ۳۶۰ مشتری',
+                            value: 'باز کردن',
+                            subtitle: 'دید کامل مشتری',
+                            onTap: () => context.go('/business/${widget.businessId}/crm/customer-360'),
+                          ),
+                        );
+
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             p1,
                             SizedBox(height: gap),
                             p2,
+                            SizedBox(height: gap),
+                            quickLinks,
                             SizedBox(height: maxW < 400 ? 14 : 20),
                             _FollowUpsCard(
                               businessId: widget.businessId,

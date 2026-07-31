@@ -182,6 +182,16 @@ from .crm import (  # noqa: F401
     CrmNoteAclUser,
     CrmNoteComment,
     CrmNoteAuditEvent,
+    CrmCloseReason,
+    CrmDealLine,
+    CrmTag,
+    CrmLeadTagLink,
+    CrmDealTagLink,
+    CrmCustomFieldDefinition,
+    CrmSequence,
+    CrmSequenceStep,
+    CrmSequenceEnrollment,
+    CrmReminderDedup,
 )
 from .customer_club import (  # noqa: F401
 	CustomerClubSettings,

@@ -265,6 +265,9 @@ import 'pages/business/crm/crm_leads_page.dart';
 import 'pages/business/crm/crm_deals_page.dart';
 import 'pages/business/crm/crm_activities_page.dart';
 import 'pages/business/crm/crm_reports_page.dart';
+import 'pages/business/crm/crm_tasks_page.dart';
+import 'pages/business/crm/crm_customer_360_page.dart';
+import 'pages/business/crm/crm_sequences_page.dart';
 import 'pages/business/crm/crm_notes_calendar_page.dart';
 import 'pages/business/crm/crm_web_chat_page.dart';
 import 'pages/business/crm/business_crm_settings_page.dart';
@@ -2719,6 +2722,48 @@ class _MyAppState extends State<MyApp> {
                 return MaterialPage(
                   key: state.pageKey,
                   child: CrmReportsPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'crm/tasks',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmTasksPage(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'crm/customer-360',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final pidRaw = state.uri.queryParameters['personId'] ?? state.uri.queryParameters['person_id'];
+                final personId = pidRaw != null ? int.tryParse(pidRaw) : null;
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmCustomer360Page(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    initialPersonId: personId,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'crm/sequences',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmSequencesPage(
                     businessId: businessId,
                     authStore: _authStore!,
                   ),

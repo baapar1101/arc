@@ -14,6 +14,7 @@ import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/crm/crm_tag_selector.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -469,6 +470,11 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                                 final personId = item['person_id'] as int?;
                                 final personName = item['person_name']?.toString();
                                 final isConverted = convertedAt != null || personId != null;
+                                final score = (item['score'] as num?)?.toInt();
+                                final slaDueRaw = item['sla_due_at']?.toString();
+                                final slaDue = (slaDueRaw != null && slaDueRaw.isNotEmpty) ? DateTime.tryParse(slaDueRaw) : null;
+                                final slaOverdue = slaDue != null && slaDue.isBefore(DateTime.now()) && !isConverted;
+                                final subtitleLine = [if (code.isNotEmpty) code, companyName.isNotEmpty ? companyName : null, mobile.isNotEmpty ? mobile : null, stageName].whereType<String>().join(' · ');
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
@@ -482,6 +488,15 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                                     title: Row(
                                       children: [
                                         Expanded(child: Text(name)),
+                                        if (score != null && score > 0)
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: 4),
+                                            child: Chip(
+                                              avatar: Icon(Icons.local_fire_department, size: 16, color: Theme.of(context).colorScheme.primary),
+                                              label: Text('$score', style: const TextStyle(fontSize: 12)),
+                                              visualDensity: VisualDensity.compact,
+                                            ),
+                                          ),
                                         if (isConverted)
                                           Chip(
                                             label: Text(personName ?? 'تبدیل شده', style: const TextStyle(fontSize: 12)),
@@ -490,7 +505,17 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                                           ),
                                       ],
                                     ),
-                                    subtitle: Text([if (code.isNotEmpty) code, companyName.isNotEmpty ? companyName : null, mobile.isNotEmpty ? mobile : null, stageName].whereType<String>().join(' · ')),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (subtitleLine.isNotEmpty) Text(subtitleLine),
+                                        if (slaOverdue)
+                                          Text(
+                                            'مهلت SLA گذشته است',
+                                            style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                                          ),
+                                      ],
+                                    ),
                                     trailing: widget.authStore.hasBusinessPermission('crm', 'write')
                                         ? PopupMenuButton<String>(
                                             onSelected: (v) {
@@ -1024,11 +1049,18 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
   List<dynamic> _changeHistory = [];
   bool _historyLoading = false;
   bool _saving = false;
+  List<int> _selectedTagIds = [];
 
   @override
   void initState() {
     super.initState();
     final i = widget.initial;
+    if (i != null && i['tags'] is List) {
+      _selectedTagIds = (i['tags'] as List)
+          .map((e) => (e is Map ? (e['id'] as num?)?.toInt() : null))
+          .whereType<int>()
+          .toList();
+    }
     _nameController = TextEditingController(text: i?['name']?.toString() ?? '');
     _codeController = TextEditingController(text: i?['code']?.toString() ?? '');
     _codeAuto = i == null;
@@ -1260,6 +1292,16 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
               ),
               const SizedBox(height: 16),
               CrmSectionCard(
+                title: 'برچسب‌ها',
+                child: CrmTagSelector(
+                  businessId: widget.businessId,
+                  crmService: widget.crmService,
+                  initialTagIds: _selectedTagIds,
+                  onChanged: (ids) => _selectedTagIds = ids,
+                ),
+              ),
+              const SizedBox(height: 16),
+              CrmSectionCard(
                 title: t.crmSectionAssignmentFollowup,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1426,6 +1468,7 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
           assignedToUserId: _selectedAssignedToUserId,
           nextFollowUpAt: _nextFollowUpAt,
+          tagIds: _selectedTagIds,
         );
       } else {
         await widget.crmService.createLead(
@@ -1441,6 +1484,7 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
           assignedToUserId: _selectedAssignedToUserId,
           nextFollowUpAt: _nextFollowUpAt,
+          tagIds: _selectedTagIds,
         );
       }
       if (!mounted) return;

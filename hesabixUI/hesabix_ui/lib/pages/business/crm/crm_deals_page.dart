@@ -15,10 +15,12 @@ import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/crm/crm_tag_selector.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -467,15 +469,44 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
                                 final amount = (item['amount'] is num) ? (item['amount'] as num).toDouble() : 0.0;
                                 final formatter = NumberFormat('#,##0');
                                 final id = item['id'] as int?;
+                                final wonReason = item['won_reason_code']?.toString();
+                                final lostReason = item['lost_reason_code']?.toString();
+                                final tags = item['tags'] is List ? (item['tags'] as List) : const [];
+                                String? reasonLine;
+                                if (wonReason != null && wonReason.isNotEmpty) {
+                                  reasonLine = 'برد: $wonReason';
+                                } else if (lostReason != null && lostReason.isNotEmpty) {
+                                  reasonLine = 'باخت: $lostReason';
+                                }
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
+                                    isThreeLine: tags.isNotEmpty || reasonLine != null,
                                     leading: CircleAvatar(
                                       backgroundColor: Theme.of(context).colorScheme.primaryContainer,
                                       child: Icon(Icons.trending_up, color: Theme.of(context).colorScheme.onPrimaryContainer),
                                     ),
                                     title: Text(title),
-                                    subtitle: Text([if (code.isNotEmpty) code, personName, stageName, '${formatter.format(amount)} ریال'].join(' · ')),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text([if (code.isNotEmpty) code, personName, stageName, '${formatter.format(amount)} ریال'].join(' · ')),
+                                        if (reasonLine != null)
+                                          Text(reasonLine, style: Theme.of(context).textTheme.bodySmall),
+                                        if (tags.isNotEmpty)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 4),
+                                            child: Wrap(
+                                              spacing: 4,
+                                              runSpacing: 4,
+                                              children: tags.map<Widget>((tg) {
+                                                final m = tg is Map ? Map<String, dynamic>.from(tg) : <String, dynamic>{};
+                                                return _DealTagChip(name: m['name']?.toString() ?? '', colorHex: m['color']?.toString());
+                                              }).toList(),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                     trailing: widget.authStore.hasBusinessPermission('crm', 'write')
                                         ? PopupMenuButton<String>(
                                             onSelected: (v) {
@@ -635,6 +666,7 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
       context: context,
       builder: (ctx) => _DealFormDialog(
         businessId: widget.businessId,
+        authStore: widget.authStore,
         processDefs: _processDefs,
         crmService: _crmService,
         personService: _personService,
@@ -649,6 +681,7 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
       context: context,
       builder: (ctx) => _DealFormDialog(
         businessId: widget.businessId,
+        authStore: widget.authStore,
         processDefs: _processDefs,
         crmService: _crmService,
         personService: _personService,
@@ -679,6 +712,32 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
   }
 }
 
+class _DealTagChip extends StatelessWidget {
+  final String name;
+  final String? colorHex;
+  const _DealTagChip({required this.name, this.colorHex});
+
+  @override
+  Widget build(BuildContext context) {
+    Color? col;
+    if (colorHex != null && colorHex!.isNotEmpty) {
+      try {
+        col = Color(int.parse(colorHex!.replaceFirst('#', '0xFF')));
+      } catch (_) {}
+    }
+    final base = col ?? Theme.of(context).colorScheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: base.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: base.withValues(alpha: 0.4)),
+      ),
+      child: Text(name, style: const TextStyle(fontSize: 11)),
+    );
+  }
+}
+
 /// شخص حداقلی برای نمایش در انتخاب‌گر (فقط id و نام)
 Person _minimalPersonForDisplay(int businessId, int? id, String? name) {
   return Person(
@@ -693,6 +752,7 @@ Person _minimalPersonForDisplay(int businessId, int? id, String? name) {
 
 class _DealFormDialog extends StatefulWidget {
   final int businessId;
+  final AuthStore authStore;
   final List<Map<String, dynamic>> processDefs;
   final CrmService crmService;
   final PersonService personService;
@@ -702,6 +762,7 @@ class _DealFormDialog extends StatefulWidget {
 
   const _DealFormDialog({
     required this.businessId,
+    required this.authStore,
     required this.processDefs,
     required this.crmService,
     required this.personService,
@@ -738,11 +799,26 @@ class _DealFormDialogState extends State<_DealFormDialog> {
   int? _selectedDocumentId;
   List<dynamic> _changeHistory = [];
   bool _historyLoading = false;
+  List<int> _selectedTagIds = [];
+  List<_DealLineDraft> _lines = [];
+  bool _loadingLines = false;
+  String? _wonReasonCode;
+  String? _lostReasonCode;
+  String? _competitorName;
 
   @override
   void initState() {
     super.initState();
     final i = widget.initial;
+    if (i != null && i['tags'] is List) {
+      _selectedTagIds = (i['tags'] as List)
+          .map((e) => (e is Map ? (e['id'] as num?)?.toInt() : null))
+          .whereType<int>()
+          .toList();
+    }
+    _wonReasonCode = i?['won_reason_code']?.toString();
+    _lostReasonCode = i?['lost_reason_code']?.toString();
+    _competitorName = i?['competitor_name']?.toString();
     _titleController = TextEditingController(text: i?['title']?.toString() ?? '');
     _codeController = TextEditingController(text: i?['code']?.toString() ?? '');
     _codeAuto = i == null;
@@ -779,6 +855,160 @@ class _DealFormDialogState extends State<_DealFormDialog> {
     if (i != null && i['closed_at'] == null && (i['person_id'] as int?) != null) {
       _loadPersonDocuments((i['person_id'] as int?)!);
       _selectedDocumentId = (i['document_id'] as num?)?.toInt();
+    }
+    if (i != null && (i['id'] as num?) != null) {
+      _loadLines((i['id'] as num).toInt());
+    }
+  }
+
+  Future<void> _loadLines(int dealId) async {
+    setState(() => _loadingLines = true);
+    try {
+      final lines = await widget.crmService.getDealLines(businessId: widget.businessId, dealId: dealId);
+      if (!mounted) return;
+      setState(() {
+        _lines = lines
+            .map((l) {
+              final pid = (l['product_id'] as num?)?.toInt();
+              final desc = l['description']?.toString() ?? '';
+              Map<String, dynamic>? product;
+              if (pid != null) {
+                product = {
+                  'id': pid,
+                  'name': desc.isNotEmpty ? desc : 'کالا #$pid',
+                };
+              }
+              return _DealLineDraft(
+                productId: pid,
+                product: product,
+                description: desc,
+                quantity: (l['quantity'] as num?)?.toDouble() ?? 1,
+                unitPrice: (l['unit_price'] as num?)?.toDouble() ?? 0,
+              );
+            })
+            .toList();
+        _loadingLines = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingLines = false);
+    }
+  }
+
+  bool _isWinStage(int? stageId) {
+    if (stageId == null) return false;
+    final s = _stages.cast<Map<String, dynamic>?>().firstWhere((e) => e?['id'] == stageId, orElse: () => null);
+    return s?['is_win'] == true;
+  }
+
+  bool _isLostStage(int? stageId) {
+    if (stageId == null) return false;
+    final s = _stages.cast<Map<String, dynamic>?>().firstWhere((e) => e?['id'] == stageId, orElse: () => null);
+    return s?['is_lost'] == true;
+  }
+
+  Future<void> _onStageChanged(int? v) async {
+    setState(() => _selectedStageId = v);
+    if (_isWinStage(v)) {
+      await _pickCloseReason(isWon: true);
+    } else if (_isLostStage(v)) {
+      await _pickCloseReason(isWon: false);
+    }
+  }
+
+  Future<void> _pickCloseReason({required bool isWon}) async {
+    List<Map<String, dynamic>> reasons = [];
+    try {
+      reasons = await widget.crmService.listCloseReasons(
+        businessId: widget.businessId,
+        reasonType: isWon ? 'won' : 'lost',
+      );
+    } catch (_) {}
+    if (!mounted) return;
+    String? selectedCode = isWon ? _wonReasonCode : _lostReasonCode;
+    final competitorController = TextEditingController(text: _competitorName ?? '');
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) {
+        String? localCode = selectedCode;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: Text(isWon ? 'دلیل برد' : 'دلیل باخت'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (reasons.isEmpty)
+                  const Text('دلیلی تعریف نشده است. می‌توانید از تنظیمات CRM اضافه کنید.')
+                else
+                  DropdownButtonFormField<String?>(
+                    value: localCode,
+                    decoration: const InputDecoration(labelText: 'دلیل', border: OutlineInputBorder()),
+                    items: [
+                      const DropdownMenuItem<String?>(value: null, child: Text('انتخاب نشده')),
+                      ...reasons.map((r) => DropdownMenuItem<String?>(
+                            value: r['code']?.toString(),
+                            child: Text(r['name']?.toString() ?? r['code']?.toString() ?? ''),
+                          )),
+                    ],
+                    onChanged: (v) => setLocal(() => localCode = v),
+                  ),
+                if (!isWon) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: competitorController,
+                    decoration: const InputDecoration(labelText: 'نام رقیب (اختیاری)', border: OutlineInputBorder()),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('انصراف')),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop({'code': localCode, 'competitor': competitorController.text.trim()}),
+                child: const Text('تأیید'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    competitorController.dispose();
+    if (result == null || !mounted) return;
+    setState(() {
+      if (isWon) {
+        _wonReasonCode = result['code']?.toString();
+      } else {
+        _lostReasonCode = result['code']?.toString();
+        _competitorName = (result['competitor']?.toString().isEmpty ?? true) ? null : result['competitor']?.toString();
+      }
+    });
+  }
+
+  Future<void> _issueProforma() async {
+    final id = widget.initial?['id'] as int?;
+    if (id == null) return;
+    setState(() => _saving = true);
+    try {
+      final result = await widget.crmService.convertDealToInvoice(
+        businessId: widget.businessId,
+        dealId: id,
+        isProforma: true,
+        closeAsWon: false,
+      );
+      if (!mounted) return;
+      final invoice = result['invoice'];
+      final invCode = invoice is Map ? (invoice['code']?.toString() ?? invoice['id']?.toString()) : null;
+      SnackBarHelper.show(context, message: 'پیش‌فاکتور صادر شد${invCode != null ? ' ($invCode)' : ''}');
+      Navigator.of(context).pop();
+      widget.onSaved();
+    } catch (e) {
+      if (!mounted) return;
+      final msg = ErrorExtractor.forContext(e, context);
+      final display = msg.contains('CRM_DEAL_NO_INVOICEABLE_LINES') || msg.contains('خط دارای کالا')
+          ? 'برای صدور پیش‌فاکتور، حداقل یک خط دارای کالا لازم است. ابتدا خطوط فرصت فروش را با کالا کامل کنید.'
+          : 'خطا: $msg';
+      SnackBarHelper.show(context, message: display, isError: true);
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -949,8 +1179,33 @@ class _DealFormDialogState extends State<_DealFormDialog> {
                   value: _selectedStageId,
                   decoration: const InputDecoration(labelText: 'مرحله', border: OutlineInputBorder()),
                   items: _stages.map((s) => DropdownMenuItem<int?>(value: s['id'] as int?, child: Text(s['name']?.toString() ?? ''))).toList(),
-                  onChanged: (v) => setState(() => _selectedStageId = v),
+                  onChanged: (v) => _onStageChanged(v),
                 ),
+                if (_wonReasonCode != null && _wonReasonCode!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Chip(
+                      avatar: const Icon(Icons.emoji_events_outlined, size: 16),
+                      label: Text('دلیل برد: $_wonReasonCode'),
+                      onDeleted: () => setState(() => _wonReasonCode = null),
+                    ),
+                  ),
+                ],
+                if (_lostReasonCode != null && _lostReasonCode!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Chip(
+                      avatar: const Icon(Icons.sentiment_dissatisfied_outlined, size: 16),
+                      label: Text('دلیل باخت: $_lostReasonCode${_competitorName != null ? ' · رقیب: $_competitorName' : ''}'),
+                      onDeleted: () => setState(() {
+                        _lostReasonCode = null;
+                        _competitorName = null;
+                      }),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _titleController,
@@ -1111,6 +1366,116 @@ class _DealFormDialogState extends State<_DealFormDialog> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          CrmSectionCard(
+            title: 'برچسب‌ها',
+            child: CrmTagSelector(
+              businessId: widget.businessId,
+              crmService: widget.crmService,
+              initialTagIds: _selectedTagIds,
+              onChanged: (ids) => _selectedTagIds = ids,
+            ),
+          ),
+          if (isEdit) ...[
+            const SizedBox(height: 16),
+            CrmSectionCard(
+              title: 'خطوط فرصت فروش',
+              subtitle: 'برای صدور پیش‌فاکتور، حداقل یک خط دارای کالا لازم است.',
+              child: _loadingLines
+                  ? const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))))
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_lines.isEmpty)
+                          const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Text('خطی اضافه نشده است.'))
+                        else
+                          ...List.generate(_lines.length, (index) {
+                            final line = _lines[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ProductComboboxWidget(
+                                          businessId: widget.businessId,
+                                          authStore: widget.authStore,
+                                          selectedProduct: line.product,
+                                          label: 'کالا/خدمت',
+                                          onChanged: (p) {
+                                            setState(() {
+                                              line.product = p;
+                                              line.productId = (p?['id'] as num?)?.toInt();
+                                              final name = p?['name']?.toString() ?? p?['title']?.toString() ?? '';
+                                              if (name.isNotEmpty) line.description = name;
+                                              final price = p?['sale_price'] ?? p?['price'] ?? p?['unit_price'];
+                                              if (price is num && line.unitPrice == 0) {
+                                                line.unitPrice = price.toDouble();
+                                              }
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.delete_outline),
+                                        onPressed: () => setState(() => _lines.removeAt(index)),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextFormField(
+                                    initialValue: line.description,
+                                    decoration: const InputDecoration(labelText: 'شرح', isDense: true, border: OutlineInputBorder()),
+                                    onChanged: (v) => line.description = v,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: TextFormField(
+                                          initialValue: line.quantity == line.quantity.roundToDouble() ? line.quantity.toInt().toString() : line.quantity.toString(),
+                                          decoration: const InputDecoration(labelText: 'تعداد', isDense: true, border: OutlineInputBorder()),
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (v) => line.quantity = double.tryParse(v.trim()) ?? line.quantity,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: TextFormField(
+                                          initialValue: line.unitPrice == 0 ? '' : line.unitPrice.toInt().toString(),
+                                          decoration: const InputDecoration(labelText: 'قیمت واحد', isDense: true, border: OutlineInputBorder()),
+                                          keyboardType: TextInputType.number,
+                                          onChanged: (v) => line.unitPrice = double.tryParse(v.trim()) ?? 0,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => setState(() => _lines.add(_DealLineDraft(quantity: 1, unitPrice: 0))),
+                              icon: const Icon(Icons.add),
+                              label: const Text('افزودن خط'),
+                            ),
+                            const Spacer(),
+                            FilledButton.tonalIcon(
+                              onPressed: _saving ? null : _issueProforma,
+                              icon: const Icon(Icons.request_quote_outlined, size: 18),
+                              label: const Text('صدور پیش‌فاکتور'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+            ),
+          ],
               if (isEdit && widget.initial!['closed_at'] == null) ...[
                 const SizedBox(height: 16),
                 const Divider(),
@@ -1293,7 +1658,18 @@ class _DealFormDialogState extends State<_DealFormDialog> {
           expectedCloseDate: _expectedCloseDate,
           nextFollowUpAt: _nextFollowUpAt,
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+          wonReasonCode: _wonReasonCode,
+          lostReasonCode: _lostReasonCode,
+          competitorName: _competitorName,
+          tagIds: _selectedTagIds,
         );
+        try {
+          await widget.crmService.replaceDealLines(
+            businessId: widget.businessId,
+            dealId: id,
+            lines: _lines.map((l) => l.toJson()).toList(),
+          );
+        } catch (_) {}
       } else {
         await widget.crmService.createDeal(
           businessId: widget.businessId,
@@ -1308,6 +1684,7 @@ class _DealFormDialogState extends State<_DealFormDialog> {
           expectedCloseDate: _expectedCloseDate,
           nextFollowUpAt: _nextFollowUpAt,
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+          tagIds: _selectedTagIds,
         );
       }
       if (!mounted) return;
@@ -1353,4 +1730,27 @@ class _DealFormDialogState extends State<_DealFormDialog> {
       if (mounted) setState(() => _saving = false);
     }
   }
+}
+
+class _DealLineDraft {
+  int? productId;
+  Map<String, dynamic>? product;
+  String description;
+  double quantity;
+  double unitPrice;
+
+  _DealLineDraft({
+    this.productId,
+    this.product,
+    this.description = '',
+    this.quantity = 1,
+    this.unitPrice = 0,
+  });
+
+  Map<String, dynamic> toJson() => {
+        if (productId != null) 'product_id': productId,
+        'description': description,
+        'quantity': quantity,
+        'unit_price': unitPrice,
+      };
 }

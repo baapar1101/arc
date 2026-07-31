@@ -99,6 +99,8 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'group:ai': ['ai/chat', 'ai/subscription', 'ai/usage'],
     'group:crm': [
       'crm/dashboard',
+      'crm/tasks',
+      'crm/customer-360',
       'crm/notes-calendar',
       'crm/web-chat',
       'crm/process-definitions',
@@ -106,6 +108,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       'crm/deals',
       'crm/activities',
       'crm/reports',
+      'crm/sequences',
     ],
   };
 
@@ -161,6 +164,8 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'ai/subscription': 'اشتراک AI',
     'ai/usage': 'آمار استفاده',
     'crm/dashboard': 'داشبورد CRM',
+    'crm/tasks': 'صف کار',
+    'crm/customer-360': 'نمای ۳۶۰ مشتری',
     'crm/notes-calendar': 'یادداشت‌ها و تقویم',
     'crm/web-chat': 'چت وب',
     'crm/process-definitions': 'فرایندها و مراحل قیف',
@@ -168,6 +173,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'crm/deals': 'فرصت‌های فروش',
     'crm/activities': 'فعالیت‌ها',
     'crm/reports': 'گزارشات CRM',
+    'crm/sequences': 'توالی‌های خودکار',
   };
 
   /// نگاشت کلیدهای قدیمی (در صورت ذخیره قبلی) به کلیدهای فعلی.

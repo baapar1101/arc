@@ -111,6 +111,8 @@ class LeadCreate(BaseModel):
     assigned_to_user_id: Optional[int] = None
     next_follow_up_at: Optional[datetime] = None
     extra_info: Optional[dict] = None
+    custom_fields: Optional[Dict[str, object]] = Field(None, description="مقادیر فیلدهای سفارشی")
+    tag_ids: Optional[List[int]] = Field(None, description="شناسه برچسب‌ها")
 
 
 class LeadUpdate(BaseModel):
@@ -126,6 +128,8 @@ class LeadUpdate(BaseModel):
     assigned_to_user_id: Optional[int] = None
     next_follow_up_at: Optional[datetime] = None
     extra_info: Optional[dict] = None
+    custom_fields: Optional[Dict[str, object]] = None
+    tag_ids: Optional[List[int]] = None
 
 
 class LeadConvertDealOption(BaseModel):
@@ -164,7 +168,13 @@ class LeadResponse(BaseModel):
     assigned_to_name: Optional[str] = None
     next_follow_up_at: Optional[str] = None
     person_id: Optional[int] = None
+    person_name: Optional[str] = None
     converted_at: Optional[str] = None
+    score: Optional[int] = None
+    sla_due_at: Optional[str] = None
+    first_touched_at: Optional[str] = None
+    last_activity_at: Optional[str] = None
+    tags: Optional[List[dict]] = None
     created_at: str
     updated_at: str
     created_by_user_id: int
@@ -192,6 +202,8 @@ class DealCreate(BaseModel):
     assigned_to_user_id: Optional[int] = None
     description: Optional[str] = None
     extra_info: Optional[dict] = None
+    custom_fields: Optional[Dict[str, object]] = None
+    tag_ids: Optional[List[int]] = None
 
 
 class DealUpdate(BaseModel):
@@ -209,6 +221,11 @@ class DealUpdate(BaseModel):
     description: Optional[str] = None
     extra_info: Optional[dict] = None
     closed_at: Optional[datetime] = None
+    won_reason_code: Optional[str] = Field(None, max_length=50)
+    lost_reason_code: Optional[str] = Field(None, max_length=50)
+    competitor_name: Optional[str] = Field(None, max_length=255)
+    custom_fields: Optional[Dict[str, object]] = None
+    tag_ids: Optional[List[int]] = None
 
 
 class DealResponse(BaseModel):
@@ -231,6 +248,11 @@ class DealResponse(BaseModel):
     document_id: Optional[int] = None
     assigned_to_user_id: Optional[int] = None
     assigned_to_name: Optional[str] = None
+    won_reason_code: Optional[str] = None
+    lost_reason_code: Optional[str] = None
+    competitor_name: Optional[str] = None
+    stage_entered_at: Optional[str] = None
+    tags: Optional[List[dict]] = None
     created_at: str
     updated_at: str
     created_by_user_id: int
@@ -254,6 +276,14 @@ class CrmActivityCreate(BaseModel):
     activity_date: datetime
     deal_id: Optional[int] = None
     extra_info: Optional[dict] = None
+    # --- وظیفه/پیگیری ---
+    is_task: bool = False
+    due_at: Optional[datetime] = None
+    status: Optional[str] = Field(None, max_length=20, description="open | done | cancelled")
+    assigned_to_user_id: Optional[int] = None
+    outcome: Optional[str] = Field(None, max_length=100)
+    priority: Optional[str] = Field(None, max_length=20, description="low | normal | high | urgent")
+    custom_fields: Optional[Dict[str, object]] = None
 
     @model_validator(mode="after")
     def require_person_or_lead(self) -> "CrmActivityCreate":
@@ -271,6 +301,13 @@ class CrmActivityUpdate(BaseModel):
     activity_date: Optional[datetime] = None
     deal_id: Optional[int] = None
     extra_info: Optional[dict] = None
+    is_task: Optional[bool] = None
+    due_at: Optional[datetime] = None
+    status: Optional[str] = Field(None, max_length=20)
+    assigned_to_user_id: Optional[int] = None
+    outcome: Optional[str] = Field(None, max_length=100)
+    priority: Optional[str] = Field(None, max_length=20)
+    custom_fields: Optional[Dict[str, object]] = None
 
 
 class CrmActivityResponse(BaseModel):
@@ -287,6 +324,14 @@ class CrmActivityResponse(BaseModel):
     description: Optional[str] = None
     activity_date: str
     deal_id: Optional[int] = None
+    is_task: Optional[bool] = None
+    due_at: Optional[str] = None
+    status: Optional[str] = None
+    completed_at: Optional[str] = None
+    assigned_to_user_id: Optional[int] = None
+    assigned_to_name: Optional[str] = None
+    outcome: Optional[str] = None
+    priority: Optional[str] = None
     created_by_user_id: int
     created_by_name: Optional[str] = None
     created_at: str
@@ -346,3 +391,131 @@ class CrmNoteUpdate(BaseModel):
 
 class CrmNoteCommentCreate(BaseModel):
     body: str = Field(..., min_length=1)
+
+
+# --- برچسب‌ها (Tags) ---
+
+
+class CrmTagCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    color: Optional[str] = Field(None, max_length=20)
+    sort_order: int = Field(default=0, ge=0)
+
+
+class CrmTagUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=120)
+    color: Optional[str] = Field(None, max_length=20)
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+
+
+class CrmSetTagsRequest(BaseModel):
+    tag_ids: List[int] = Field(default_factory=list)
+
+
+# --- دلایل بستن معامله ---
+
+
+class CrmCloseReasonCreate(BaseModel):
+    reason_type: str = Field(..., description="won | lost", max_length=20)
+    code: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=255)
+    sort_order: int = Field(default=0, ge=0)
+
+
+class CrmCloseReasonUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+
+
+# --- فیلدهای سفارشی ---
+
+
+class CrmCustomFieldCreate(BaseModel):
+    entity_type: str = Field(..., description="lead | deal | activity", max_length=20)
+    field_key: str = Field(..., min_length=1, max_length=80)
+    label: str = Field(..., min_length=1, max_length=255)
+    field_type: str = Field(..., description="text | number | date | select | boolean", max_length=20)
+    options: Optional[List[str]] = Field(None, description="گزینه‌ها برای نوع select")
+    is_required: bool = False
+    sort_order: int = Field(default=0, ge=0)
+
+
+class CrmCustomFieldUpdate(BaseModel):
+    label: Optional[str] = Field(None, min_length=1, max_length=255)
+    options: Optional[List[str]] = None
+    is_required: Optional[bool] = None
+    sort_order: Optional[int] = Field(None, ge=0)
+    is_active: Optional[bool] = None
+
+
+# --- خطوط فرصت فروش ---
+
+
+class CrmDealLineInput(BaseModel):
+    product_id: Optional[int] = Field(None, gt=0)
+    description: Optional[str] = Field(None, max_length=500)
+    quantity: Decimal = Field(..., gt=0)
+    unit_price: Decimal = Field(default=Decimal(0), ge=0)
+    discount_percent: Decimal = Field(default=Decimal(0), ge=0, le=100)
+    sort_order: int = Field(default=0, ge=0)
+
+
+class CrmDealLinesReplaceRequest(BaseModel):
+    lines: List[CrmDealLineInput] = Field(default_factory=list)
+
+
+# --- توالی‌های خودکار ---
+
+
+class CrmSequenceStepInput(BaseModel):
+    step_order: int = Field(..., ge=0)
+    delay_hours: int = Field(default=0, ge=0)
+    action_type: str = Field(
+        ...,
+        description="create_task | send_sms | notify_assignee | update_lead_stage | update_deal_stage",
+        max_length=50,
+    )
+    action_config: Optional[dict] = None
+
+
+class CrmSequenceCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    is_active: bool = True
+    steps: Optional[List[CrmSequenceStepInput]] = Field(default_factory=list)
+
+
+class CrmSequenceUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+    steps: Optional[List[CrmSequenceStepInput]] = None
+
+
+class CrmSequenceEnrollRequest(BaseModel):
+    entity_type: str = Field(..., description="lead | deal", max_length=20)
+    entity_id: int = Field(..., gt=0)
+
+
+# --- تبدیل فرصت فروش به فاکتور ---
+
+
+class CrmDealConvertToInvoiceRequest(BaseModel):
+    is_proforma: bool = Field(default=True, description="پیش‌فاکتور یا فاکتور نهایی")
+    close_as_won: bool = Field(default=False, description="بستن معامله به‌عنوان برد پس از ایجاد فاکتور")
+    won_reason_code: Optional[str] = Field(None, max_length=50)
+    warehouse_id: Optional[int] = Field(None, description="انبار برای خطوط دارای کالا (اختیاری)")
+
+
+# --- تنظیمات اتوماسیون CRM ---
+
+
+class CrmAutomationSettingsUpdate(BaseModel):
+    lead_sla_hours: Optional[int] = Field(None, ge=0)
+    auto_assign_enabled: Optional[bool] = None
+    auto_assign_user_ids: Optional[List[int]] = None
+    follow_up_notify_enabled: Optional[bool] = None
+    stale_deal_days: Optional[int] = Field(None, ge=0)
+    score_rules: Optional[dict] = None

@@ -1278,6 +1278,10 @@ def create_app() -> FastAPI:
         from app.services.workflow.workflow_background_jobs import workflow_automation_background_loop
         asyncio.create_task(workflow_automation_background_loop(60))
 
+        # CRM: یادآوری پیگیری/وظایف/SLA + پردازش توالی‌های خودکار
+        from app.services.crm_background_jobs import crm_automation_background_loop
+        asyncio.create_task(crm_automation_background_loop(60))
+
         from app.services.support.support_background_jobs import (
             support_sla_breach_check_loop,
             support_subscription_status_loop,

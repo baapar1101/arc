@@ -855,10 +855,10 @@ def complete_visit(
 		_validate_document_for_business(db, business_id, doc_id, v.person_id)
 		v.document_id = doc_id
 	if payload.get("deal_id"):
-		from adapters.db.models.crm import CrmDeal
+		from adapters.db.models.crm import Deal
 
 		deal_id = int(payload["deal_id"])
-		deal = db.query(CrmDeal).filter(CrmDeal.id == deal_id, CrmDeal.business_id == business_id).first()
+		deal = db.query(Deal).filter(Deal.id == deal_id, Deal.business_id == business_id).first()
 		if not deal:
 			raise ApiError("VALIDATION_ERROR", "deal_id not found in this business", http_status=400)
 		v.deal_id = deal_id
