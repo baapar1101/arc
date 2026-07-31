@@ -80,7 +80,7 @@ class _CrmProcessDefinitionsPageState extends State<CrmProcessDefinitionsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('فرایندها و زون ارجاعات'),
+        title: const Text('فرایندها و مراحل قیف'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {

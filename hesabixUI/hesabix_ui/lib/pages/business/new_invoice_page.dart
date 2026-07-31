@@ -3232,6 +3232,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                     businessId: widget.businessId,
                     authStore: widget.authStore,
                     selectedCurrencyId: _selectedCurrencyId,
+                    defaultCurrencyId: _defaultBusinessCurrencyId,
                     currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
                     currencyUnitLabel: _invoiceCurrencyUnitLabel,
                     invoiceType: (_selectedInvoiceType?.value ?? 'sales'),

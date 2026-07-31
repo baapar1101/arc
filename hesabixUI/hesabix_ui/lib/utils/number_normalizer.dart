@@ -250,11 +250,16 @@ String formatNumberForInput(num? value, {int? decimalPlaces}) {
 /// تبدیل رشته فرمت‌شده با جداکننده هزارگان به عدد
 num? parseFormattedNumber(String? value) {
   if (value == null || value.isEmpty) return null;
-  
-  // حذف جداکننده‌های هزارگان و تبدیل به عدد
-  final cleanValue = value.replaceAll(',', '').trim();
+
+  // حذف جداکننده‌های هزارگان و یکسان‌سازی جداکننده اعشار فارسی/عربی
+  final cleanValue = value
+      .replaceAll(',', '')
+      .replaceAll('٫', '.')
+      .replaceAll('،', '.')
+      .replaceAll('/', '.')
+      .trim();
   if (cleanValue.isEmpty) return null;
-  
+
   return num.tryParse(cleanValue);
 }
 
@@ -330,8 +335,13 @@ double? parseJsonDoubleOrNull(dynamic value) {
 /// TextInputFormatter برای افزودن جداکننده هزارگان به اعداد
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   final bool allowDecimal;
-  
-  const ThousandsSeparatorInputFormatter({this.allowDecimal = true});
+  /// حداکثر ارقام اعشار؛ null یعنی بدون سقف (وقتی allowDecimal=true).
+  final int? maxDecimalPlaces;
+
+  const ThousandsSeparatorInputFormatter({
+    this.allowDecimal = true,
+    this.maxDecimalPlaces,
+  });
 
   @override
   TextEditingValue formatEditUpdate(
@@ -343,22 +353,32 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
       return newValue;
     }
 
+    // جداکننده اعشار رایج در صفحه‌کلید فارسی/عربی (/ و ٫) را به نقطه تبدیل کن
+    String normalized = newValue.text
+        .replaceAll('٫', '.')
+        .replaceAll('،', '.')
+        .replaceAll('/', '.');
+
     // حذف کاراکترهای غیرمجاز (فقط اعداد، نقطه اعشار و علامت منفی)
-    String cleanText = newValue.text.replaceAll(RegExp(r'[^\d.\-]'), '');
-    
+    String cleanText = normalized.replaceAll(RegExp(r'[^\d.\-]'), '');
+
     // اگر اعشار مجاز نیست، نقطه را حذف کن
     if (!allowDecimal) {
       cleanText = cleanText.replaceAll('.', '');
     }
-    
+
     // مدیریت نقطه اعشار (فقط یک نقطه)
     final dotIndex = cleanText.indexOf('.');
     if (dotIndex != -1) {
       final beforeDot = cleanText.substring(0, dotIndex);
-      final afterDot = cleanText.substring(dotIndex + 1).replaceAll('.', '');
+      var afterDot = cleanText.substring(dotIndex + 1).replaceAll('.', '');
+      final maxDp = maxDecimalPlaces;
+      if (maxDp != null && maxDp >= 0 && afterDot.length > maxDp) {
+        afterDot = afterDot.substring(0, maxDp);
+      }
       cleanText = '$beforeDot.$afterDot';
     }
-    
+
     // مدیریت علامت منفی (فقط در ابتدا)
     bool isNegative = cleanText.startsWith('-');
     if (isNegative) {
@@ -375,7 +395,7 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
     // محاسبه موقعیت جدید مکان‌نما
     int selectionOffset = _calculateCursorPosition(
       oldValue.text,
-      newValue.text,
+      normalized,
       formattedText,
       newValue.selection.baseOffset,
     );
@@ -397,11 +417,11 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
     // شمارش کاراکترهای عددی قبل از موقعیت مکان‌نما در متن جدید
     int digitsBeforeCursor = 0;
     for (int i = 0; i < oldCursorPosition && i < newText.length; i++) {
-      if (RegExp(r'[\d.\-]').hasMatch(newText[i])) {
+      if (RegExp(r'[\d.\-/٫،\-]').hasMatch(newText[i])) {
         digitsBeforeCursor++;
       }
     }
-    
+
     // پیدا کردن موقعیت در متن فرمت‌شده
     int digitsCounted = 0;
     for (int i = 0; i < formattedText.length; i++) {
@@ -412,7 +432,7 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
         }
       }
     }
-    
+
     return formattedText.length;
   }
 }

@@ -62,6 +62,30 @@ class CrmService {
     return data is List ? data : [];
   }
 
+  /// جزئیات یک سرنخ
+  Future<Map<String, dynamic>> getLead({
+    required int businessId,
+    required int leadId,
+  }) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/leads/$leadId',
+    );
+    final data = _extractData(res.data);
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
+  /// جزئیات یک فرصت فروش
+  Future<Map<String, dynamic>> getDeal({
+    required int businessId,
+    required int dealId,
+  }) async {
+    final res = await _apiClient.get<dynamic>(
+      '/api/v1/crm/businesses/$businessId/deals/$dealId',
+    );
+    final data = _extractData(res.data);
+    return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
+  }
+
   /// خلاصه CRM
   Future<Map<String, dynamic>> getSummary({required int businessId}) async {
     final res = await _apiClient.get<dynamic>(

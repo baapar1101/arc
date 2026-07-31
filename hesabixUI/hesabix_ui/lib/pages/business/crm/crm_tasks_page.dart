@@ -110,9 +110,9 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
   void _navigateForEntity({int? dealId, int? leadId, int? personId}) {
     final base = '/business/${widget.businessId}/crm';
     if (dealId != null) {
-      context.go('$base/deals?dealId=$dealId');
+      context.go('$base/deals/$dealId');
     } else if (leadId != null) {
-      context.go('$base/leads?leadId=$leadId');
+      context.go('$base/leads/$leadId');
     } else if (personId != null) {
       context.go('$base/customer-360?personId=$personId');
     }
@@ -130,6 +130,26 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
       );
       if (!mounted) return;
       SnackBarHelper.show(context, message: 'تسک تکمیل شد');
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  Future<void> _snoozeTask(Map<String, dynamic> task) async {
+    final id = (task['id'] as num?)?.toInt();
+    if (id == null) return;
+    final tomorrow = DateTime.now().add(const Duration(days: 1));
+    final due = DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 10, 0);
+    try {
+      await _crmService.updateActivity(
+        businessId: widget.businessId,
+        activityId: id,
+        dueAt: due,
+      );
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'سررسید به فردا ۱۰:۰۰ موکول شد');
       _load();
     } catch (e) {
       if (!mounted) return;
@@ -303,10 +323,20 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
                       style: TextStyle(color: overdue ? Colors.red : null),
                     ),
               trailing: canWrite
-                  ? IconButton(
-                      icon: const Icon(Icons.done),
-                      tooltip: 'تکمیل تسک',
-                      onPressed: () => _completeTask(task),
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.snooze_outlined),
+                          tooltip: 'به فردا موکول',
+                          onPressed: () => _snoozeTask(task),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.done),
+                          tooltip: 'تکمیل تسک',
+                          onPressed: () => _completeTask(task),
+                        ),
+                      ],
                     )
                   : null,
               onTap: () => _navigateForEntity(dealId: dealId, leadId: leadId, personId: personId),

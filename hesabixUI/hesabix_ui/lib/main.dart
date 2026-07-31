@@ -271,6 +271,8 @@ import 'pages/business/crm/crm_sequences_page.dart';
 import 'pages/business/crm/crm_notes_calendar_page.dart';
 import 'pages/business/crm/crm_web_chat_page.dart';
 import 'pages/business/crm/business_crm_settings_page.dart';
+import 'pages/business/crm/crm_lead_record_page.dart';
+import 'pages/business/crm/crm_deal_record_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -2688,6 +2690,22 @@ class _MyAppState extends State<MyApp> {
               },
             ),
             GoRoute(
+              path: 'crm/leads/:leadId',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final leadId = int.parse(state.pathParameters['leadId']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmLeadRecordPage(
+                    businessId: businessId,
+                    leadId: leadId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
               path: 'crm/deals',
               pageBuilder: (context, state) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
@@ -2695,6 +2713,22 @@ class _MyAppState extends State<MyApp> {
                   key: state.pageKey,
                   child: CrmDealsPage(
                     businessId: businessId,
+                    authStore: _authStore!,
+                    calendarController: _calendarController!,
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'crm/deals/:dealId',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                final dealId = int.parse(state.pathParameters['dealId']!);
+                return MaterialPage(
+                  key: state.pageKey,
+                  child: CrmDealRecordPage(
+                    businessId: businessId,
+                    dealId: dealId,
                     authStore: _authStore!,
                     calendarController: _calendarController!,
                   ),

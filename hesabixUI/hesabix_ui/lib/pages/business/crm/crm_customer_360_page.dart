@@ -135,6 +135,34 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
               },
             ),
           ),
+          if (_personId != null && widget.authStore.hasBusinessPermission('crm', 'write'))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    FilledButton.tonalIcon(
+                      onPressed: () => context.go('/business/${widget.businessId}/crm/deals?openAdd=1'),
+                      icon: const Icon(Icons.trending_up, size: 18),
+                      label: const Text('فرصت جدید'),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/business/${widget.businessId}/crm/activities?openAdd=1'),
+                      icon: const Icon(Icons.add_task, size: 18),
+                      label: const Text('ثبت فعالیت'),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/business/${widget.businessId}/crm/notes-calendar'),
+                      icon: const Icon(Icons.calendar_month_outlined, size: 18),
+                      label: const Text('یادداشت'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           Expanded(child: _buildBody()),
         ],
       ),
@@ -369,7 +397,7 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
         '${_money(m['amount'])} ریال',
       ].join(' · ')),
       trailing: const Icon(Icons.chevron_left, size: 18),
-      onTap: id == null ? null : () => context.go('/business/${widget.businessId}/crm/deals?dealId=$id'),
+      onTap: id == null ? null : () => context.go('/business/${widget.businessId}/crm/deals/$id'),
     );
   }
 

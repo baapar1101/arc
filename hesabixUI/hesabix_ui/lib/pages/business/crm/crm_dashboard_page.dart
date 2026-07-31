@@ -206,11 +206,23 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            Text(
+                              'امروز من',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'پیگیری‌ها، صف کار و میانبرهای سریع فروش',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            SizedBox(height: gap),
+                            quickLinks,
+                            SizedBox(height: gap),
                             p1,
                             SizedBox(height: gap),
                             p2,
-                            SizedBox(height: gap),
-                            quickLinks,
                             SizedBox(height: maxW < 400 ? 14 : 20),
                             _FollowUpsCard(
                               businessId: widget.businessId,
@@ -291,7 +303,7 @@ class _FollowUpsCard extends StatelessWidget {
                   leading: const Icon(Icons.person_outline, size: 20),
                   title: Text(m['name']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                   subtitle: Text('سرنخ • $dateStr', style: Theme.of(context).textTheme.bodySmall),
-                  onTap: () => context.go('/business/$businessId/crm/leads?leadId=${m['id']}'),
+                  onTap: () => context.go('/business/$businessId/crm/leads/${m['id']}'),
                 );
               }),
               ...deals.take(5).map((e) {
@@ -305,7 +317,7 @@ class _FollowUpsCard extends StatelessWidget {
                   leading: const Icon(Icons.handshake_outlined, size: 20),
                   title: Text(m['title']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                   subtitle: Text('${m['person_name'] ?? ''} • $dateStr', style: Theme.of(context).textTheme.bodySmall, overflow: TextOverflow.ellipsis),
-                  onTap: () => context.go('/business/$businessId/crm/deals?dealId=${m['id']}'),
+                  onTap: () => context.go('/business/$businessId/crm/deals/${m['id']}'),
                 );
               }),
               if (total > 5)

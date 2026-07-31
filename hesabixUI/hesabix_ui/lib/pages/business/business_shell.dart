@@ -1695,39 +1695,13 @@ class _BusinessShellState extends State<BusinessShell> {
         path: _bu('crm/dashboard'),
         type: _MenuItemType.expandable,
         children: [
-          _MenuItem(
-            key: 'crm/dashboard',
-            label: 'داشبورد',
-            icon: Icons.dashboard_outlined,
-            selectedIcon: Icons.dashboard,
-            path: _bu('crm/dashboard'),
-            type: _MenuItemType.simple,
-            hasAddButton: false,
-          ),
+          // کار روزانه
           _MenuItem(
             key: 'crm/tasks',
             label: 'صف کار',
             icon: Icons.task_alt_outlined,
             selectedIcon: Icons.task_alt,
             path: _bu('crm/tasks'),
-            type: _MenuItemType.simple,
-            hasAddButton: false,
-          ),
-          _MenuItem(
-            key: 'crm/customer-360',
-            label: 'نمای ۳۶۰ مشتری',
-            icon: Icons.person_search_outlined,
-            selectedIcon: Icons.person_search,
-            path: _bu('crm/customer-360'),
-            type: _MenuItemType.simple,
-            hasAddButton: false,
-          ),
-          _MenuItem(
-            key: 'crm/notes-calendar',
-            label: t.crmMenuNotesCalendar,
-            icon: Icons.calendar_month_outlined,
-            selectedIcon: Icons.calendar_month,
-            path: _bu('crm/notes-calendar'),
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
@@ -1741,14 +1715,15 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: false,
           ),
           _MenuItem(
-            key: 'crm/process-definitions',
-            label: 'فرایندها و مراحل قیف',
-            icon: Icons.account_tree_outlined,
-            selectedIcon: Icons.account_tree,
-            path: _bu('crm/process-definitions'),
+            key: 'crm/notes-calendar',
+            label: t.crmMenuNotesCalendar,
+            icon: Icons.calendar_month_outlined,
+            selectedIcon: Icons.calendar_month,
+            path: _bu('crm/notes-calendar'),
             type: _MenuItemType.simple,
-            hasAddButton: true,
+            hasAddButton: false,
           ),
+          // قیف فروش
           _MenuItem(
             key: 'crm/leads',
             label: 'سرنخ‌ها',
@@ -1777,6 +1752,25 @@ class _BusinessShellState extends State<BusinessShell> {
             hasAddButton: true,
           ),
           _MenuItem(
+            key: 'crm/customer-360',
+            label: 'نمای ۳۶۰ مشتری',
+            icon: Icons.person_search_outlined,
+            selectedIcon: Icons.person_search,
+            path: _bu('crm/customer-360'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          // بینش
+          _MenuItem(
+            key: 'crm/dashboard',
+            label: 'داشبورد',
+            icon: Icons.dashboard_outlined,
+            selectedIcon: Icons.dashboard,
+            path: _bu('crm/dashboard'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
+          _MenuItem(
             key: 'crm/reports',
             label: 'گزارشات',
             icon: Icons.assessment_outlined,
@@ -1784,6 +1778,16 @@ class _BusinessShellState extends State<BusinessShell> {
             path: _bu('crm/reports'),
             type: _MenuItemType.simple,
             hasAddButton: false,
+          ),
+          // پیکربندی
+          _MenuItem(
+            key: 'crm/process-definitions',
+            label: 'فرایندها و مراحل قیف',
+            icon: Icons.account_tree_outlined,
+            selectedIcon: Icons.account_tree,
+            path: _bu('crm/process-definitions'),
+            type: _MenuItemType.simple,
+            hasAddButton: true,
           ),
           _MenuItem(
             key: 'crm/sequences',
@@ -2668,7 +2672,7 @@ class _BusinessShellState extends State<BusinessShell> {
                                             showAddWarehouseDocumentDialog();
                                           } else if (child.label == 'کالای هزینه/درآمد شده') {
                                             context.go(_bu('goods-expense-income'));
-                                          } else if (child.label == 'فرایندها و زون ارجاعات') {
+                                          } else if (child.label == 'فرایندها و مراحل قیف') {
                                             context.go('${_bu('crm/process-definitions')}?openAdd=1');
                                           } else if (child.label == 'سرنخ‌ها') {
                                             context.go('${_bu('crm/leads')}?openAdd=1');
@@ -3088,7 +3092,7 @@ class _BusinessShellState extends State<BusinessShell> {
                             } else if (child.label == 'حواله‌های انبار') {
                               // Show add warehouse document dialog
                               showAddWarehouseDocumentDialog();
-                            } else if (child.label == 'فرایندها و زون ارجاعات') {
+                            } else if (child.label == 'فرایندها و مراحل قیف') {
                               context.go('${_bu('crm/process-definitions')}?openAdd=1');
                             } else if (child.label == 'سرنخ‌ها') {
                               context.go('${_bu('crm/leads')}?openAdd=1');
@@ -3493,7 +3497,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (label == t.people) return 'people';
     if (label == 'CRM' ||
         label == 'داشبورد' ||
-        label == 'فرایندها و زون ارجاعات' ||
+        label == 'فرایندها و مراحل قیف' ||
         label == 'فرایندها و مراحل قیف' ||
         label == 'سرنخ‌ها' ||
         label == 'فرصت‌های فروش' ||

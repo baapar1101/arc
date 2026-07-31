@@ -1020,6 +1020,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     businessId: widget.businessId,
                     authStore: widget.authStore,
                     selectedCurrencyId: _selectedCurrencyId,
+                    defaultCurrencyId: _defaultBusinessCurrencyId,
                     currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
                     currencyUnitLabel: _invoiceCurrencyUnitLabel,
                     invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
