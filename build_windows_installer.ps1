@@ -172,10 +172,10 @@ $edits = @(
 )
 
 Write-Host "[step] Configuring AIP..." -ForegroundColor Cyan
-foreach ($args in $edits) {
-    $code = Invoke-AdvInst -Exe $AdvInst -Args $args
+foreach ($editArgs in $edits) {
+    $code = Invoke-AdvInst -Exe $AdvInst -Args $editArgs
     if ($code -ne 0) {
-        Write-Host "[warn] Command returned $code: $($args -join ' ')" -ForegroundColor Yellow
+        Write-Host "[warn] Command returned ${code}: $($editArgs -join ' ')" -ForegroundColor Yellow
         # Some DelFolder/NewShortcut calls are best-effort on first create.
     }
 }
