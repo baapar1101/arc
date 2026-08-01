@@ -17,6 +17,7 @@ param(
     [string]$ProductName = "Hesabix",
     [string]$Manufacturer = "Hesabix",
     [string]$ExeName = "hesabix_ui.exe",
+    [string]$ProjectType = "professional",
     [switch]$SkipNewProject,
     [switch]$DryRun,
     [switch]$Help
@@ -37,6 +38,7 @@ Options:
   -AdvInstPath PATH    Path to AdvancedInstaller.com
   -AipPath PATH        Advanced Installer project (.aip)
   -OutDir PATH         Output directory for MSI
+  -ProjectType TYPE    Advanced Installer project type (default: professional)
   -SkipNewProject      Do not recreate AIP; only edit version/files and build
   -DryRun              Print actions only
   -Help                Show help
@@ -146,7 +148,7 @@ if ($needNew -or -not (Test-Path -LiteralPath $AipPath)) {
     Write-Host "[step] Creating Advanced Installer project..." -ForegroundColor Cyan
     $code = Invoke-AdvInst -Exe $AdvInst -CliArgs @(
         "/newproject", $AipPath,
-        "-type", "simple",
+        "-type", $ProjectType,
         "-lang", "en",
         "-overwrite"
     )
@@ -155,20 +157,21 @@ if ($needNew -or -not (Test-Path -LiteralPath $AipPath)) {
     Write-Host "[info] Reusing existing AIP: $AipPath" -ForegroundColor DarkGray
 }
 
+$msiPath = Join-Path $OutDir $ASSET_NAME
+
 # Configure product metadata + package the Release folder.
 $edits = @(
     @("/edit", $AipPath, "/SetVersion", $VERSION),
     @("/edit", $AipPath, "/SetProperty", "ProductName=$ProductName"),
     @("/edit", $AipPath, "/SetProperty", "Manufacturer=$Manufacturer"),
-    @("/edit", $AipPath, "/SetPackageType", "x64"),
     @("/edit", $AipPath, "/SetAppdir", "-buildname", "DefaultBuild", "-path", "[ProgramFiles64Folder][Manufacturer]\[ProductName]"),
     @("/edit", $AipPath, "/SetShortcutdir", "-buildname", "DefaultBuild", "-path", "[ProgramMenuFolder][ProductName]"),
     # Sync Application Folder with Flutter Release output
     @("/edit", $AipPath, "/DelFolder", "APPDIR"),
     @("/edit", $AipPath, "/AddFolder", "APPDIR", $ReleaseDir),
     @("/edit", $AipPath, "/NewShortcut", "-name", $ProductName, "-dir", "SHORTCUTDIR", "-target", "APPDIR\$ExeName", "-wkdir", "APPDIR"),
-    @("/edit", $AipPath, "/SetOutput", "-buildname", "DefaultBuild", "-path", $OutDir),
-    @("/edit", $AipPath, "/SetPackageName", ($ASSET_NAME -replace '\.msi$', ''))
+    @("/edit", $AipPath, "/SetOutputLocation", "-buildname", "DefaultBuild", "-path", $OutDir),
+    @("/edit", $AipPath, "/SetPackageName", $msiPath)
 )
 
 Write-Host "[step] Configuring AIP..." -ForegroundColor Cyan
@@ -184,7 +187,6 @@ Write-Host "[step] Building MSI..." -ForegroundColor Cyan
 $code = Invoke-AdvInst -Exe $AdvInst -CliArgs @("/build", $AipPath)
 if ($code -ne 0) { throw "Advanced Installer build failed (exit $code)" }
 
-$msiPath = Join-Path $OutDir $ASSET_NAME
 if (-not $DryRun) {
     if (-not (Test-Path -LiteralPath $msiPath)) {
         # AI may emit a slightly different name; pick newest MSI in OutDir.

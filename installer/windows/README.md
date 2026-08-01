@@ -30,6 +30,8 @@ The script:
 - Sets Product Version from `pubspec.yaml` (`MAJOR.MINOR.PATCH`)
 - Builds `hesabix-windows.<version>.msi` under `installer\windows\dist\`
 
+Uses an Advanced Installer **professional** project (CLI `-type professional`).
+
 Useful flags:
 
 ```powershell
