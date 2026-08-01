@@ -22,8 +22,8 @@ $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 $REPO_ROOT = $SCRIPT_DIR
 
 # Same URLs as deploy.sh set_flutter_mirror_env()
-$HESABIX_PUB_HOSTED_URL = "https://f.mirror.hesabix.ir/pub"
-$HESABIX_FLUTTER_STORAGE_BASE_URL = "https://f.mirror.hesabix.ir/gcs"
+$HESABIX_PUB_HOSTED_URL = "https://dart.devneeds.ir"
+$HESABIX_FLUTTER_STORAGE_BASE_URL = "https://flutter.devneeds.ir"
 
 function Print-Usage {
     Write-Host "Usage: .\build_windows.ps1 [-Project <path>] [-Mode <debug|profile|release>] [-ApiBaseUrl <url>] [-PubHostedUrl <url>] [-FlutterStorageBaseUrl <url>] [-PreferEnvFlutterMirror] [-Clean] [-InstallDeps] [-Help]"
@@ -412,6 +412,7 @@ if ($EXECUTABLE -and (Test-Path -LiteralPath $EXECUTABLE)) {
     Write-Host "  data/assets:    $(if ($hasData) { 'present' } else { 'MISSING - run with -Clean and rebuild' })"
     Write-Host ""
     Write-Host "Tip: Run hesabix_ui.exe from the folder above. Distribute the whole folder (exe + all DLLs + data/), not the .exe alone." -ForegroundColor DarkGray
+    Write-Host "      For MSI + auto-update: .\build_windows_installer.ps1 then .\release_windows_forgejo.ps1" -ForegroundColor DarkGray
     Write-Host ""
 } else {
     Write-Host ""

@@ -34,6 +34,7 @@ Flutter به طور خودکار این نسخه را به پلتفرم‌های
 - `versionName` / تگ ریلیز باید یکسان باشد: `MAJOR.MINOR.PATCH` (مثلاً `70.9.911`)
 - `versionCode` پیشنهادی: `MAJOR * 1000000 + MINOR * 1000 + PATCH`
 - جزئیات به‌روزرسانی خودکار: [`docs/ANDROID_AUTO_UPDATE.md`](./ANDROID_AUTO_UPDATE.md)
+- به‌روزرسانی خودکار ویندوز (همان تگ ریلیز، asset جدا): [`docs/WINDOWS_AUTO_UPDATE.md`](./WINDOWS_AUTO_UPDATE.md)
 
 مثال در `pubspec.yaml`:
 

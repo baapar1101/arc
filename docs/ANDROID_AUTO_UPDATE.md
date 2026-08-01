@@ -66,6 +66,7 @@ flutter build apk --build-name=70.9.911 --build-number=70009911
 - مخزن ریلیز عمومی است؛ کلاینت اپ برای خواندن `releases/latest` توکن لازم ندارد.
 - حجم APK حدود ۱۳۰MB+ است؛ progress و امکان لغو در UI دیده شده است.
 - وب و دسکتاپ این ماژول را اجرا نمی‌کنند (`supportsAndroidApkUpdate`).
+- ریلیزهای مشترک می‌توانند هم‌زمان asset اندروید و ویندوز داشته باشند؛ کلاینت اندروید فقط `.apk` را برمی‌دارد. جزئیات ویندوز: [`WINDOWS_AUTO_UPDATE.md`](./WINDOWS_AUTO_UPDATE.md).
 
 ## انتشار خودکار ریلیز اندروید
 

@@ -23770,6 +23770,226 @@ abstract class AppLocalizations {
   /// **'Could not start install: {error}'**
   String androidUpdateInstallFailed(String error);
 
+  /// No description provided for @accountSettingsWindowsUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Update (Windows)'**
+  String get accountSettingsWindowsUpdateTitle;
+
+  /// No description provided for @accountSettingsWindowsUpdateDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Check, download and install new Windows releases'**
+  String get accountSettingsWindowsUpdateDescription;
+
+  /// No description provided for @windowsUpdateSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Update'**
+  String get windowsUpdateSettingsTitle;
+
+  /// No description provided for @windowsUpdateSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'New versions are fetched from official Hesabix releases. This feature is Windows-only.'**
+  String get windowsUpdateSettingsDescription;
+
+  /// No description provided for @windowsUpdateUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic updates are only supported on the Windows desktop app.'**
+  String get windowsUpdateUnsupported;
+
+  /// No description provided for @windowsUpdateInstalledVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed version'**
+  String get windowsUpdateInstalledVersion;
+
+  /// No description provided for @windowsUpdateLatestVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest published version'**
+  String get windowsUpdateLatestVersion;
+
+  /// No description provided for @windowsUpdateAvailableBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'New version'**
+  String get windowsUpdateAvailableBadge;
+
+  /// No description provided for @windowsUpdateLastChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Last checked'**
+  String get windowsUpdateLastChecked;
+
+  /// No description provided for @windowsUpdateAutoCheckTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check on startup'**
+  String get windowsUpdateAutoCheckTitle;
+
+  /// No description provided for @windowsUpdateAutoCheckSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Look for a new version after the app opens'**
+  String get windowsUpdateAutoCheckSubtitle;
+
+  /// No description provided for @windowsUpdateAutoDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt download when found'**
+  String get windowsUpdateAutoDownloadTitle;
+
+  /// No description provided for @windowsUpdateAutoDownloadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When a new version is found, show an update notice ready for download'**
+  String get windowsUpdateAutoDownloadSubtitle;
+
+  /// No description provided for @windowsUpdateCheckNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get windowsUpdateCheckNow;
+
+  /// No description provided for @windowsUpdateDownloadAndInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Download & install'**
+  String get windowsUpdateDownloadAndInstall;
+
+  /// No description provided for @windowsUpdateInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get windowsUpdateInfoTitle;
+
+  /// No description provided for @windowsUpdateInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates are installed via an MSI/setup package (Advanced Installer). Windows may ask for administrator approval (UAC). The app version should match the release tag (e.g. 70.9.911).'**
+  String get windowsUpdateInfoBody;
+
+  /// No description provided for @windowsUpdateAvailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get windowsUpdateAvailableTitle;
+
+  /// No description provided for @windowsUpdateAvailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {latest} is available. Your current version: {current}'**
+  String windowsUpdateAvailableMessage(String latest, String current);
+
+  /// No description provided for @windowsUpdateChangelogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Release notes'**
+  String get windowsUpdateChangelogTitle;
+
+  /// No description provided for @windowsUpdateInstallerSizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate file size: {size}'**
+  String windowsUpdateInstallerSizeHint(String size);
+
+  /// No description provided for @windowsUpdateInstallWillCloseApp.
+  ///
+  /// In en, this message translates to:
+  /// **'The app will close after the installer starts so files can be replaced.'**
+  String get windowsUpdateInstallWillCloseApp;
+
+  /// No description provided for @windowsUpdateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get windowsUpdateLater;
+
+  /// No description provided for @windowsUpdateAutoDownloadStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm to start download and install.'**
+  String get windowsUpdateAutoDownloadStarting;
+
+  /// No description provided for @windowsUpdateDownloadingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update'**
+  String get windowsUpdateDownloadingTitle;
+
+  /// No description provided for @windowsUpdateDownloadingPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing download…'**
+  String get windowsUpdateDownloadingPreparing;
+
+  /// No description provided for @windowsUpdateDownloadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% — {received} of {total}'**
+  String windowsUpdateDownloadProgress(
+    int percent,
+    String received,
+    String total,
+  );
+
+  /// No description provided for @windowsUpdateDownloadCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Download cancelled'**
+  String get windowsUpdateDownloadCancelled;
+
+  /// No description provided for @windowsUpdateDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed: {error}'**
+  String windowsUpdateDownloadFailed(String error);
+
+  /// No description provided for @windowsUpdateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You are on the latest version'**
+  String get windowsUpdateUpToDate;
+
+  /// No description provided for @windowsUpdateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update check failed. Please check your internet connection.'**
+  String get windowsUpdateCheckFailed;
+
+  /// No description provided for @windowsUpdateReadyToInstallTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to install'**
+  String get windowsUpdateReadyToInstallTitle;
+
+  /// No description provided for @windowsUpdateReadyToInstallMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The installer will open next. Confirm UAC if prompted. Hesabix will close so the update can finish.'**
+  String get windowsUpdateReadyToInstallMessage;
+
+  /// No description provided for @windowsUpdateLaunchInstaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Install now'**
+  String get windowsUpdateLaunchInstaller;
+
+  /// No description provided for @windowsUpdateInstallStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Installer started. Confirm the install if Windows asks.'**
+  String get windowsUpdateInstallStarted;
+
+  /// No description provided for @windowsUpdateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start install: {error}'**
+  String windowsUpdateInstallFailed(String error);
+
   /// No description provided for @biometricOptInTitle.
   ///
   /// In en, this message translates to:

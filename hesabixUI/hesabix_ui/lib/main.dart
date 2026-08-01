@@ -29,6 +29,7 @@ import 'pages/profile/marketing_page.dart';
 import 'pages/profile/account_settings_page.dart';
 import 'pages/profile/biometric_lock_settings_page.dart';
 import 'pages/profile/android_update_settings_page.dart';
+import 'pages/profile/windows_update_settings_page.dart';
 import 'pages/profile/appearance_settings_page.dart';
 import 'pages/profile/verification_page.dart';
 import 'pages/profile/operator/operator_tickets_page.dart';
@@ -201,8 +202,10 @@ import 'core/mobile_launcher_prefs.dart';
 import 'core/biometric_lock_controller.dart';
 import 'core/biometric_platform.dart';
 import 'core/android_update_platform.dart';
+import 'core/windows_update_platform.dart';
 import 'widgets/biometric/biometric_lock_gate.dart';
 import 'widgets/android_update/android_update_gate.dart';
+import 'widgets/windows_update/windows_update_gate.dart';
 import 'widgets/notification/in_app_notifications_bootstrap.dart';
 import 'widgets/sms_bank/sms_bank_bootstrap.dart';
 import 'services/sms_bank/sms_bank_launch_navigation.dart';
@@ -1312,6 +1315,17 @@ class _MyAppState extends State<MyApp> {
                 return null;
               },
               builder: (context, state) => const AndroidUpdateSettingsPage(),
+            ),
+            GoRoute(
+              path: '/user/profile/windows-update-settings',
+              name: 'profile_windows_update_settings',
+              redirect: (context, state) {
+                if (!supportsWindowsDesktopUpdate) {
+                  return '/user/profile/account-settings';
+                }
+                return null;
+              },
+              builder: (context, state) => const WindowsUpdateSettingsPage(),
             ),
             GoRoute(
               path: '/user/profile/appearance-settings',
@@ -4443,13 +4457,15 @@ class _MyAppState extends State<MyApp> {
                   authStore: _authStore!,
                   calendarController: _calendarController,
                   child: AndroidUpdateGate(
-                    child: BiometricLockGate(
-                      authStore: _authStore!,
-                      lockController: _biometricLockController,
-                      child: DefaultTextStyle(
-                        style: baseStyle,
-                        child: KeyboardShortcutListener(
-                          child: child ?? const SizedBox(),
+                    child: WindowsUpdateGate(
+                      child: BiometricLockGate(
+                        authStore: _authStore!,
+                        lockController: _biometricLockController,
+                        child: DefaultTextStyle(
+                          style: baseStyle,
+                          child: KeyboardShortcutListener(
+                            child: child ?? const SizedBox(),
+                          ),
                         ),
                       ),
                     ),

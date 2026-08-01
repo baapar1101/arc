@@ -4956,6 +4956,70 @@
       "error": { "type": "String" }
     }
   },
+  "accountSettingsWindowsUpdateTitle": "به‌روزرسانی برنامه (ویندوز)",
+  "accountSettingsWindowsUpdateDescription": "بررسی، دانلود و نصب نسخه‌های جدید ویندوز",
+  "windowsUpdateSettingsTitle": "به‌روزرسانی برنامه",
+  "windowsUpdateSettingsDescription": "نسخه‌های جدید از ریلیزهای رسمی حسابیکس دریافت می‌شوند. این قابلیت فقط روی ویندوز دسکتاپ در دسترس است.",
+  "windowsUpdateUnsupported": "به‌روزرسانی خودکار فقط در نسخه ویندوز پشتیبانی می‌شود.",
+  "windowsUpdateInstalledVersion": "نسخه نصب‌شده",
+  "windowsUpdateLatestVersion": "آخرین نسخه منتشرشده",
+  "windowsUpdateAvailableBadge": "نسخه جدید",
+  "windowsUpdateLastChecked": "آخرین بررسی",
+  "windowsUpdateAutoCheckTitle": "بررسی خودکار هنگام شروع",
+  "windowsUpdateAutoCheckSubtitle": "پس از باز شدن اپلیکیشن، وجود نسخه جدید بررسی شود",
+  "windowsUpdateAutoDownloadTitle": "دانلود پس از تأیید",
+  "windowsUpdateAutoDownloadSubtitle": "در صورت یافتن نسخه جدید، اعلان نمایش داده شود و آمادگی دانلود اعلام گردد",
+  "windowsUpdateCheckNow": "بررسی به‌روزرسانی",
+  "windowsUpdateDownloadAndInstall": "دانلود و نصب",
+  "windowsUpdateInfoTitle": "نکته",
+  "windowsUpdateInfoBody": "به‌روزرسانی از طریق بستهٔ MSI/Setup (Advanced Installer) نصب می‌شود. ویندوز ممکن است تأیید مدیر (UAC) بخواهد. نسخه برنامه باید با تگ ریلیز (مثلاً 70.9.911) هم‌خوان باشد.",
+  "windowsUpdateAvailableTitle": "نسخه جدید آماده است",
+  "windowsUpdateAvailableMessage": "نسخه {latest} در دسترس است. نسخه فعلی شما: {current}",
+  "@windowsUpdateAvailableMessage": {
+    "placeholders": {
+      "latest": { "type": "String" },
+      "current": { "type": "String" }
+    }
+  },
+  "windowsUpdateChangelogTitle": "تغییرات این نسخه",
+  "windowsUpdateInstallerSizeHint": "حجم تقریبی فایل: {size}",
+  "@windowsUpdateInstallerSizeHint": {
+    "placeholders": {
+      "size": { "type": "String" }
+    }
+  },
+  "windowsUpdateInstallWillCloseApp": "پس از شروع نصب‌کننده، برنامه بسته می‌شود تا فایل‌ها قابل جایگزینی باشند.",
+  "windowsUpdateLater": "بعداً",
+  "windowsUpdateAutoDownloadStarting": "با تأیید، دانلود و نصب آغاز می‌شود.",
+  "windowsUpdateDownloadingTitle": "در حال دانلود به‌روزرسانی",
+  "windowsUpdateDownloadingPreparing": "آماده‌سازی دانلود…",
+  "windowsUpdateDownloadProgress": "{percent}% — {received} از {total}",
+  "@windowsUpdateDownloadProgress": {
+    "placeholders": {
+      "percent": { "type": "int" },
+      "received": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "windowsUpdateDownloadCancelled": "دانلود لغو شد",
+  "windowsUpdateDownloadFailed": "دانلود ناموفق بود: {error}",
+  "@windowsUpdateDownloadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "windowsUpdateUpToDate": "شما از آخرین نسخه استفاده می‌کنید",
+  "windowsUpdateCheckFailed": "بررسی به‌روزرسانی ناموفق بود. اتصال اینترنت را بررسی کنید.",
+  "windowsUpdateReadyToInstallTitle": "آماده نصب",
+  "windowsUpdateReadyToInstallMessage": "در مرحله بعد نصب‌کننده باز می‌شود. در صورت درخواست UAC تأیید کنید. حسابیکس بسته می‌شود تا به‌روزرسانی کامل شود.",
+  "windowsUpdateLaunchInstaller": "نصب اکنون",
+  "windowsUpdateInstallStarted": "نصب‌کننده شروع شد. در صورت درخواست ویندوز، نصب را تأیید کنید.",
+  "windowsUpdateInstallFailed": "شروع نصب ناموفق بود: {error}",
+  "@windowsUpdateInstallFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "biometricOptInTitle": "ورود با اثر انگشت",
   "biometricOptInMessage": "آیا می‌خواهید از این پس برای باز کردن اپلیکیشن از اثر انگشت استفاده کنید؟ می‌توانید هر زمان از تنظیمات حساب این گزینه را تغییر دهید.",
   "biometricOptInEnable": "فعال‌سازی",

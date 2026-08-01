@@ -1,0 +1,5 @@
+# Generated / local Advanced Installer outputs
+dist/
+*.msi
+*.exe
+hesabix.aip.bak

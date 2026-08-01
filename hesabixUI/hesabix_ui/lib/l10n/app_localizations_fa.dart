@@ -12741,6 +12741,139 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get accountSettingsWindowsUpdateTitle => 'به‌روزرسانی برنامه (ویندوز)';
+
+  @override
+  String get accountSettingsWindowsUpdateDescription =>
+      'بررسی، دانلود و نصب نسخه‌های جدید ویندوز';
+
+  @override
+  String get windowsUpdateSettingsTitle => 'به‌روزرسانی برنامه';
+
+  @override
+  String get windowsUpdateSettingsDescription =>
+      'نسخه‌های جدید از ریلیزهای رسمی حسابیکس دریافت می‌شوند. این قابلیت فقط روی ویندوز دسکتاپ در دسترس است.';
+
+  @override
+  String get windowsUpdateUnsupported =>
+      'به‌روزرسانی خودکار فقط در نسخه ویندوز پشتیبانی می‌شود.';
+
+  @override
+  String get windowsUpdateInstalledVersion => 'نسخه نصب‌شده';
+
+  @override
+  String get windowsUpdateLatestVersion => 'آخرین نسخه منتشرشده';
+
+  @override
+  String get windowsUpdateAvailableBadge => 'نسخه جدید';
+
+  @override
+  String get windowsUpdateLastChecked => 'آخرین بررسی';
+
+  @override
+  String get windowsUpdateAutoCheckTitle => 'بررسی خودکار هنگام شروع';
+
+  @override
+  String get windowsUpdateAutoCheckSubtitle =>
+      'پس از باز شدن اپلیکیشن، وجود نسخه جدید بررسی شود';
+
+  @override
+  String get windowsUpdateAutoDownloadTitle => 'دانلود پس از تأیید';
+
+  @override
+  String get windowsUpdateAutoDownloadSubtitle =>
+      'در صورت یافتن نسخه جدید، اعلان نمایش داده شود و آمادگی دانلود اعلام گردد';
+
+  @override
+  String get windowsUpdateCheckNow => 'بررسی به‌روزرسانی';
+
+  @override
+  String get windowsUpdateDownloadAndInstall => 'دانلود و نصب';
+
+  @override
+  String get windowsUpdateInfoTitle => 'نکته';
+
+  @override
+  String get windowsUpdateInfoBody =>
+      'به‌روزرسانی از طریق بستهٔ MSI/Setup (Advanced Installer) نصب می‌شود. ویندوز ممکن است تأیید مدیر (UAC) بخواهد. نسخه برنامه باید با تگ ریلیز (مثلاً 70.9.911) هم‌خوان باشد.';
+
+  @override
+  String get windowsUpdateAvailableTitle => 'نسخه جدید آماده است';
+
+  @override
+  String windowsUpdateAvailableMessage(String latest, String current) {
+    return 'نسخه $latest در دسترس است. نسخه فعلی شما: $current';
+  }
+
+  @override
+  String get windowsUpdateChangelogTitle => 'تغییرات این نسخه';
+
+  @override
+  String windowsUpdateInstallerSizeHint(String size) {
+    return 'حجم تقریبی فایل: $size';
+  }
+
+  @override
+  String get windowsUpdateInstallWillCloseApp =>
+      'پس از شروع نصب‌کننده، برنامه بسته می‌شود تا فایل‌ها قابل جایگزینی باشند.';
+
+  @override
+  String get windowsUpdateLater => 'بعداً';
+
+  @override
+  String get windowsUpdateAutoDownloadStarting =>
+      'با تأیید، دانلود و نصب آغاز می‌شود.';
+
+  @override
+  String get windowsUpdateDownloadingTitle => 'در حال دانلود به‌روزرسانی';
+
+  @override
+  String get windowsUpdateDownloadingPreparing => 'آماده‌سازی دانلود…';
+
+  @override
+  String windowsUpdateDownloadProgress(
+    int percent,
+    String received,
+    String total,
+  ) {
+    return '$percent% — $received از $total';
+  }
+
+  @override
+  String get windowsUpdateDownloadCancelled => 'دانلود لغو شد';
+
+  @override
+  String windowsUpdateDownloadFailed(String error) {
+    return 'دانلود ناموفق بود: $error';
+  }
+
+  @override
+  String get windowsUpdateUpToDate => 'شما از آخرین نسخه استفاده می‌کنید';
+
+  @override
+  String get windowsUpdateCheckFailed =>
+      'بررسی به‌روزرسانی ناموفق بود. اتصال اینترنت را بررسی کنید.';
+
+  @override
+  String get windowsUpdateReadyToInstallTitle => 'آماده نصب';
+
+  @override
+  String get windowsUpdateReadyToInstallMessage =>
+      'در مرحله بعد نصب‌کننده باز می‌شود. در صورت درخواست UAC تأیید کنید. حسابیکس بسته می‌شود تا به‌روزرسانی کامل شود.';
+
+  @override
+  String get windowsUpdateLaunchInstaller => 'نصب اکنون';
+
+  @override
+  String get windowsUpdateInstallStarted =>
+      'نصب‌کننده شروع شد. در صورت درخواست ویندوز، نصب را تأیید کنید.';
+
+  @override
+  String windowsUpdateInstallFailed(String error) {
+    return 'شروع نصب ناموفق بود: $error';
+  }
+
+  @override
   String get biometricOptInTitle => 'ورود با اثر انگشت';
 
   @override

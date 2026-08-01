@@ -12810,6 +12810,139 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get accountSettingsWindowsUpdateTitle => 'App Update (Windows)';
+
+  @override
+  String get accountSettingsWindowsUpdateDescription =>
+      'Check, download and install new Windows releases';
+
+  @override
+  String get windowsUpdateSettingsTitle => 'App Update';
+
+  @override
+  String get windowsUpdateSettingsDescription =>
+      'New versions are fetched from official Hesabix releases. This feature is Windows-only.';
+
+  @override
+  String get windowsUpdateUnsupported =>
+      'Automatic updates are only supported on the Windows desktop app.';
+
+  @override
+  String get windowsUpdateInstalledVersion => 'Installed version';
+
+  @override
+  String get windowsUpdateLatestVersion => 'Latest published version';
+
+  @override
+  String get windowsUpdateAvailableBadge => 'New version';
+
+  @override
+  String get windowsUpdateLastChecked => 'Last checked';
+
+  @override
+  String get windowsUpdateAutoCheckTitle => 'Check on startup';
+
+  @override
+  String get windowsUpdateAutoCheckSubtitle =>
+      'Look for a new version after the app opens';
+
+  @override
+  String get windowsUpdateAutoDownloadTitle => 'Prompt download when found';
+
+  @override
+  String get windowsUpdateAutoDownloadSubtitle =>
+      'When a new version is found, show an update notice ready for download';
+
+  @override
+  String get windowsUpdateCheckNow => 'Check for updates';
+
+  @override
+  String get windowsUpdateDownloadAndInstall => 'Download & install';
+
+  @override
+  String get windowsUpdateInfoTitle => 'Note';
+
+  @override
+  String get windowsUpdateInfoBody =>
+      'Updates are installed via an MSI/setup package (Advanced Installer). Windows may ask for administrator approval (UAC). The app version should match the release tag (e.g. 70.9.911).';
+
+  @override
+  String get windowsUpdateAvailableTitle => 'Update available';
+
+  @override
+  String windowsUpdateAvailableMessage(String latest, String current) {
+    return 'Version $latest is available. Your current version: $current';
+  }
+
+  @override
+  String get windowsUpdateChangelogTitle => 'Release notes';
+
+  @override
+  String windowsUpdateInstallerSizeHint(String size) {
+    return 'Approximate file size: $size';
+  }
+
+  @override
+  String get windowsUpdateInstallWillCloseApp =>
+      'The app will close after the installer starts so files can be replaced.';
+
+  @override
+  String get windowsUpdateLater => 'Later';
+
+  @override
+  String get windowsUpdateAutoDownloadStarting =>
+      'Confirm to start download and install.';
+
+  @override
+  String get windowsUpdateDownloadingTitle => 'Downloading update';
+
+  @override
+  String get windowsUpdateDownloadingPreparing => 'Preparing download…';
+
+  @override
+  String windowsUpdateDownloadProgress(
+    int percent,
+    String received,
+    String total,
+  ) {
+    return '$percent% — $received of $total';
+  }
+
+  @override
+  String get windowsUpdateDownloadCancelled => 'Download cancelled';
+
+  @override
+  String windowsUpdateDownloadFailed(String error) {
+    return 'Download failed: $error';
+  }
+
+  @override
+  String get windowsUpdateUpToDate => 'You are on the latest version';
+
+  @override
+  String get windowsUpdateCheckFailed =>
+      'Update check failed. Please check your internet connection.';
+
+  @override
+  String get windowsUpdateReadyToInstallTitle => 'Ready to install';
+
+  @override
+  String get windowsUpdateReadyToInstallMessage =>
+      'The installer will open next. Confirm UAC if prompted. Hesabix will close so the update can finish.';
+
+  @override
+  String get windowsUpdateLaunchInstaller => 'Install now';
+
+  @override
+  String get windowsUpdateInstallStarted =>
+      'Installer started. Confirm the install if Windows asks.';
+
+  @override
+  String windowsUpdateInstallFailed(String error) {
+    return 'Could not start install: $error';
+  }
+
+  @override
   String get biometricOptInTitle => 'Fingerprint Login';
 
   @override

@@ -4914,6 +4914,70 @@
       "error": { "type": "String" }
     }
   },
+  "accountSettingsWindowsUpdateTitle": "App Update (Windows)",
+  "accountSettingsWindowsUpdateDescription": "Check, download and install new Windows releases",
+  "windowsUpdateSettingsTitle": "App Update",
+  "windowsUpdateSettingsDescription": "New versions are fetched from official Hesabix releases. This feature is Windows-only.",
+  "windowsUpdateUnsupported": "Automatic updates are only supported on the Windows desktop app.",
+  "windowsUpdateInstalledVersion": "Installed version",
+  "windowsUpdateLatestVersion": "Latest published version",
+  "windowsUpdateAvailableBadge": "New version",
+  "windowsUpdateLastChecked": "Last checked",
+  "windowsUpdateAutoCheckTitle": "Check on startup",
+  "windowsUpdateAutoCheckSubtitle": "Look for a new version after the app opens",
+  "windowsUpdateAutoDownloadTitle": "Prompt download when found",
+  "windowsUpdateAutoDownloadSubtitle": "When a new version is found, show an update notice ready for download",
+  "windowsUpdateCheckNow": "Check for updates",
+  "windowsUpdateDownloadAndInstall": "Download & install",
+  "windowsUpdateInfoTitle": "Note",
+  "windowsUpdateInfoBody": "Updates are installed via an MSI/setup package (Advanced Installer). Windows may ask for administrator approval (UAC). The app version should match the release tag (e.g. 70.9.911).",
+  "windowsUpdateAvailableTitle": "Update available",
+  "windowsUpdateAvailableMessage": "Version {latest} is available. Your current version: {current}",
+  "@windowsUpdateAvailableMessage": {
+    "placeholders": {
+      "latest": { "type": "String" },
+      "current": { "type": "String" }
+    }
+  },
+  "windowsUpdateChangelogTitle": "Release notes",
+  "windowsUpdateInstallerSizeHint": "Approximate file size: {size}",
+  "@windowsUpdateInstallerSizeHint": {
+    "placeholders": {
+      "size": { "type": "String" }
+    }
+  },
+  "windowsUpdateInstallWillCloseApp": "The app will close after the installer starts so files can be replaced.",
+  "windowsUpdateLater": "Later",
+  "windowsUpdateAutoDownloadStarting": "Confirm to start download and install.",
+  "windowsUpdateDownloadingTitle": "Downloading update",
+  "windowsUpdateDownloadingPreparing": "Preparing download…",
+  "windowsUpdateDownloadProgress": "{percent}% — {received} of {total}",
+  "@windowsUpdateDownloadProgress": {
+    "placeholders": {
+      "percent": { "type": "int" },
+      "received": { "type": "String" },
+      "total": { "type": "String" }
+    }
+  },
+  "windowsUpdateDownloadCancelled": "Download cancelled",
+  "windowsUpdateDownloadFailed": "Download failed: {error}",
+  "@windowsUpdateDownloadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "windowsUpdateUpToDate": "You are on the latest version",
+  "windowsUpdateCheckFailed": "Update check failed. Please check your internet connection.",
+  "windowsUpdateReadyToInstallTitle": "Ready to install",
+  "windowsUpdateReadyToInstallMessage": "The installer will open next. Confirm UAC if prompted. Hesabix will close so the update can finish.",
+  "windowsUpdateLaunchInstaller": "Install now",
+  "windowsUpdateInstallStarted": "Installer started. Confirm the install if Windows asks.",
+  "windowsUpdateInstallFailed": "Could not start install: {error}",
+  "@windowsUpdateInstallFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "biometricOptInTitle": "Fingerprint Login",
   "biometricOptInMessage": "Would you like to use your fingerprint to unlock the app from now on? You can change this anytime in account settings.",
   "biometricOptInEnable": "Enable",

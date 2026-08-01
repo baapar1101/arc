@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/auth_store.dart';
 import 'android_update_settings_page.dart';
+import 'windows_update_settings_page.dart';
 import 'biometric_lock_settings_page.dart';
 
 class AccountSettingsPage extends StatelessWidget {
@@ -113,6 +114,14 @@ class AccountSettingsPage extends StatelessWidget {
                         icon: Icons.system_update_alt,
                         color: Colors.cyan,
                         onTap: () => context.go('/user/profile/android-update-settings'),
+                      ),
+                    if (showWindowsUpdateSettingsEntry())
+                      _SettingsCard(
+                        title: t.accountSettingsWindowsUpdateTitle,
+                        description: t.accountSettingsWindowsUpdateDescription,
+                        icon: Icons.system_update_alt,
+                        color: Colors.teal,
+                        onTap: () => context.go('/user/profile/windows-update-settings'),
                       ),
                     _SettingsCard(
                       title: t.changePassword,
