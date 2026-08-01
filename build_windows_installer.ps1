@@ -93,11 +93,11 @@ function Get-PubspecVersionName {
 function Invoke-AdvInst {
     param(
         [string]$Exe,
-        [string[]]$Args
+        [string[]]$CliArgs
     )
-    Write-Host "[advinst] $Exe $($Args -join ' ')" -ForegroundColor DarkGray
+    Write-Host "[advinst] $Exe $($CliArgs -join ' ')" -ForegroundColor DarkGray
     if ($DryRun) { return 0 }
-    $p = Start-Process -FilePath $Exe -ArgumentList $Args -Wait -PassThru -NoNewWindow
+    $p = Start-Process -FilePath $Exe -ArgumentList @($CliArgs) -Wait -PassThru -NoNewWindow
     return $p.ExitCode
 }
 
@@ -144,7 +144,7 @@ New-Item -ItemType Directory -Force -Path $aipDir | Out-Null
 $needNew = -not $SkipNewProject
 if ($needNew -or -not (Test-Path -LiteralPath $AipPath)) {
     Write-Host "[step] Creating Advanced Installer project..." -ForegroundColor Cyan
-    $code = Invoke-AdvInst -Exe $AdvInst -Args @(
+    $code = Invoke-AdvInst -Exe $AdvInst -CliArgs @(
         "/newproject", $AipPath,
         "-type", "simple",
         "-lang", "en",
@@ -173,7 +173,7 @@ $edits = @(
 
 Write-Host "[step] Configuring AIP..." -ForegroundColor Cyan
 foreach ($editArgs in $edits) {
-    $code = Invoke-AdvInst -Exe $AdvInst -Args $editArgs
+    $code = Invoke-AdvInst -Exe $AdvInst -CliArgs $editArgs
     if ($code -ne 0) {
         Write-Host "[warn] Command returned ${code}: $($editArgs -join ' ')" -ForegroundColor Yellow
         # Some DelFolder/NewShortcut calls are best-effort on first create.
@@ -181,7 +181,7 @@ foreach ($editArgs in $edits) {
 }
 
 Write-Host "[step] Building MSI..." -ForegroundColor Cyan
-$code = Invoke-AdvInst -Exe $AdvInst -Args @("/build", $AipPath)
+$code = Invoke-AdvInst -Exe $AdvInst -CliArgs @("/build", $AipPath)
 if ($code -ne 0) { throw "Advanced Installer build failed (exit $code)" }
 
 $msiPath = Join-Path $OutDir $ASSET_NAME
