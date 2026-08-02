@@ -49,14 +49,44 @@ class SmsBankLaunchNavigation {
   }
 
   /// GoRouter [initialLocation]: never start on the synthetic `/capture` path.
+  ///
+  /// On desktop (especially Windows), [Uri.base] is a `file://` URI to the
+  /// executable / working directory (e.g. `/C:/Program Files/Hesabix/...`).
+  /// Using that as the initial route lands on the 404 page. Web uses http(s)
+  /// and keeps the real path; Android typically has `file:///` with path `/`.
   static String normalizeInitialLocation(Uri base) {
     if (isSmsBankCaptureUri(base) || isSmsBankCaptureGoRoutePath(base.path, base)) {
+      return '/';
+    }
+    if (_isDesktopFilesystemBase(base)) {
       return '/';
     }
     final path = base.path.isNotEmpty ? base.path : '/';
     final query = base.hasQuery ? '?${base.query}' : '';
     final fragment = base.fragment.isNotEmpty ? '#${base.fragment}' : '';
     return '$path$query$fragment';
+  }
+
+  /// Whether GoRouter must ignore the platform default route (mirrors [Uri.base]
+  /// on desktop) so a filesystem path does not override [normalizeInitialLocation].
+  static bool shouldOverridePlatformDefault(Uri base) {
+    return _isDesktopFilesystemBase(base);
+  }
+
+  /// True for paths that came from a desktop filesystem location, not an app route
+  /// (e.g. `/C:/Program Files/Hesabix/...`).
+  static bool isFilesystemRoutePath(String path) {
+    if (path.isEmpty || path == '/') return false;
+    // Windows drive letter as first segment: /C:/... or /C:\...
+    if (RegExp(r'^/[A-Za-z]:').hasMatch(path)) return true;
+    if (path.contains(r'\') || path.toLowerCase().endsWith('.exe')) return true;
+    return false;
+  }
+
+  static bool _isDesktopFilesystemBase(Uri base) {
+    if (base.scheme != 'file') return false;
+    return isFilesystemRoutePath(base.path) ||
+        (base.path.isNotEmpty && base.path != '/');
   }
 
   static bool shouldRedirectAwayFromCapture(Uri uri) {

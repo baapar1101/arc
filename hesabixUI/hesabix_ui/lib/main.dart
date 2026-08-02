@@ -893,7 +893,10 @@ class _MyAppState extends State<MyApp> {
       navigatorKey: navigatorKey,
       observers: [routeObserver],
       refreshListenable: _authStore,
+      // Windows desktop: Uri.base is file://…/exe dir; must not become the route.
       initialLocation: SmsBankLaunchNavigation.normalizeInitialLocation(Uri.base),
+      overridePlatformDefaultLocation:
+          SmsBankLaunchNavigation.shouldOverridePlatformDefault(Uri.base),
       redirect: (context, state) async {
         final currentPath = state.uri.path;
         final isPublicRoute = currentPath.startsWith('/public');
@@ -902,6 +905,11 @@ class _MyAppState extends State<MyApp> {
 
         // SMS bank notification deep links map to /capture — not a real page.
         if (SmsBankLaunchNavigation.shouldRedirectAwayFromCapture(state.uri)) {
+          return '/';
+        }
+
+        // Desktop filesystem paths (e.g. /C:/Program Files/...) must not stick as routes.
+        if (SmsBankLaunchNavigation.isFilesystemRoutePath(currentPath)) {
           return '/';
         }
         
