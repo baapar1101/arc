@@ -15348,6 +15348,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get woocommerceControlSettingsApplied => 'Plugin settings updated';
 
   @override
+  String get woocommerceControlStockTitle => 'Inventory sync status';
+
+  @override
+  String get woocommerceControlStockSourceLabel => 'Source of truth';
+
+  @override
+  String get woocommerceControlStockPullNow => 'Pull stock to WooCommerce';
+
+  @override
+  String get woocommerceControlStockConflicts => 'Check stock conflicts';
+
+  @override
+  String woocommerceControlStockPullDone(String message) {
+    return 'Stock pull finished: $message';
+  }
+
+  @override
+  String woocommerceControlStockConflictsDone(String count) {
+    return 'Conflicts found: $count';
+  }
+
+  @override
+  String get woocommerceSettingsPushStockOnWarehousePost =>
+      'After posting a warehouse document, push stock to WooCommerce';
+
+  @override
+  String get woocommerceSettingsPushStockOnWarehousePostHelp =>
+      'Requires an active bridge and “accept remote push” in the plugin. Store source of truth should be Hesabix.';
+
+  @override
   String woocommerceControlQueueProcessDone(String delta) {
     return 'Processed one queue batch; about $delta fewer pending row(s).';
   }

@@ -18,6 +18,8 @@ class Hesabix_V2_Stock_Pull_Service
 
 	const OPTION_KEY = 'hesabix_v2_stock_pull';
 
+	const LAST_RESULT_KEY = 'hesabix_v2_stock_pull_last';
+
 	const SCHEDULE_KEY = 'hesabix_v2_pull_stock_ivl';
 
 	/** @var int تعداد کالا در هر درخواست گزارش (محدودیت ~۵۰۰ سطر = کالا×انبار) */
@@ -38,6 +40,8 @@ class Hesabix_V2_Stock_Pull_Service
 			'force_manage_stock' => true,
 			// وقتی فعال است، موجودی با سفارش در ووکامرس کم نمی‌شود (مرجع: حسابیکس / کشش موجودی).
 			'disable_wc_stock_reduction' => false,
+			// اگر حسابیکس ۰ گزارش کند ولی WC > 0 باشد، موجودی فروشگاه را صفر نکن (مگر force_zero).
+			'skip_zero_overwrite' => true,
 		);
 
 		$raw = get_option(self::OPTION_KEY, array());
@@ -67,6 +71,7 @@ class Hesabix_V2_Stock_Pull_Service
 		$o['cron_minutes'] = max(5, min(180, absint($o['cron_minutes'])));
 		$o['force_manage_stock'] = !empty($o['force_manage_stock']);
 		$o['disable_wc_stock_reduction'] = !empty($o['disable_wc_stock_reduction']);
+		$o['skip_zero_overwrite'] = !isset($o['skip_zero_overwrite']) || !empty($o['skip_zero_overwrite']);
 
 		return $o;
 	}
@@ -162,13 +167,20 @@ class Hesabix_V2_Stock_Pull_Service
 	/**
 	 * اجرای اصلی کشش موجودی.
 	 *
-	 * @param array{source?:string} $ctx
-	 * @return array{success:bool, message:string, updated?:int, skipped?:int, errors?:int, execution_time?:float}
+	 * @param array{
+	 *   source?:string,
+	 *   product_ids?:int[],
+	 *   force_zero?:bool,
+	 *   ignore_source_policy?:bool
+	 * } $ctx
+	 * @return array{success:bool, message:string, updated?:int, skipped?:int, errors?:int, guarded_zero?:int, execution_time?:float}
 	 */
 	public static function execute_pull($ctx = array())
 	{
 		$start = microtime(true);
 		$source = isset($ctx['source']) ? (string) $ctx['source'] : 'manual';
+		// ajax و hesabix_push مثل manual عمل می‌کنند تا «اجرا هم‌اکنون» و پوش از حسابیکس بدون Cron ممکن باشد.
+		$is_manual_like = in_array($source, array('manual', 'ajax', 'hesabix_push'), true);
 
 		if (!class_exists('WooCommerce')) {
 			return array(
@@ -187,10 +199,32 @@ class Hesabix_V2_Stock_Pull_Service
 		}
 
 		$opts = self::get_options();
-		if (empty($opts['enabled']) && $source !== 'manual') {
+		if (empty($opts['enabled']) && !$is_manual_like) {
 			return array(
 				'success' => false,
 				'message' => __('کشش موجودی غیرفعال است.', 'hesabix-v2'),
+				'execution_time' => microtime(true) - $start,
+			);
+		}
+
+		if ($source === 'hesabix_push' && !Hesabix_V2_Inventory_Policy::accept_remote_stock_push()) {
+			return array(
+				'success' => false,
+				'message' => __('پوش موجودی از حسابیکس در سیاست فروشگاه پذیرفته نمی‌شود (منبع حقیقت یا گزینهٔ مربوطه).', 'hesabix-v2'),
+				'execution_time' => microtime(true) - $start,
+			);
+		}
+
+		if (
+			empty($ctx['ignore_source_policy'])
+			&& !Hesabix_V2_Inventory_Policy::should_apply_hesabix_qty_to_wc()
+			&& $source !== 'manual'
+			&& $source !== 'ajax'
+		) {
+			// Cron و push خودکار فقط وقتی منبع حقیقت حسابیکس است؛ دستی از ادمین مجاز می‌ماند.
+			return array(
+				'success' => false,
+				'message' => __('منبع حقیقت موجودی حسابیکس نیست؛ کشش خودکار اعمال نشد.', 'hesabix-v2'),
 				'execution_time' => microtime(true) - $start,
 			);
 		}
@@ -204,27 +238,72 @@ class Hesabix_V2_Stock_Pull_Service
 		}
 		set_transient(self::LOCK_TRANSIENT, 1, 15 * MINUTE_IN_SECONDS);
 
+		$force_zero = !empty($ctx['force_zero']);
+		$filter_hids = array();
+		if (!empty($ctx['product_ids']) && is_array($ctx['product_ids'])) {
+			foreach ($ctx['product_ids'] as $pid) {
+				$i = absint($pid);
+				if ($i > 0) {
+					$filter_hids[] = $i;
+				}
+			}
+			$filter_hids = array_values(array_unique($filter_hids));
+		}
+
 		try {
 			$wh_filter = self::resolve_warehouse_ids_for_api($opts);
 			if (is_wp_error($wh_filter)) {
-				return array(
-					'success' => false,
-					'message' => $wh_filter->get_error_message(),
-					'execution_time' => microtime(true) - $start,
+				return self::finish_result(
+					array(
+						'success' => false,
+						'message' => $wh_filter->get_error_message(),
+						'execution_time' => microtime(true) - $start,
+					),
+					$source
 				);
 			}
 
 			$db = new Hesabix_V2_DB_Service();
 			$mappings = $db->get_all_product_mappings();
 			if (empty($mappings)) {
-				return array(
-					'success' => true,
-					'message' => __('نگاشت محصولی برای به‌روزرسانی موجودی وجود ندارد.', 'hesabix-v2'),
-					'updated' => 0,
-					'skipped' => 0,
-					'errors' => 0,
-					'execution_time' => microtime(true) - $start,
+				return self::finish_result(
+					array(
+						'success' => true,
+						'message' => __('نگاشت محصولی برای به‌روزرسانی موجودی وجود ندارد.', 'hesabix-v2'),
+						'updated' => 0,
+						'skipped' => 0,
+						'errors' => 0,
+						'guarded_zero' => 0,
+						'execution_time' => microtime(true) - $start,
+					),
+					$source
 				);
+			}
+
+			if (!empty($filter_hids)) {
+				$mappings = array_values(
+					array_filter(
+						$mappings,
+						function ($row) use ($filter_hids) {
+							$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
+							return $hid > 0 && in_array($hid, $filter_hids, true);
+						}
+					)
+				);
+				if (empty($mappings)) {
+					return self::finish_result(
+						array(
+							'success' => true,
+							'message' => __('هیچ نگاشتی برای شناسه‌های درخواستی یافت نشد.', 'hesabix-v2'),
+							'updated' => 0,
+							'skipped' => 0,
+							'errors' => 0,
+							'guarded_zero' => 0,
+							'execution_time' => microtime(true) - $start,
+						),
+						$source
+					);
+				}
 			}
 
 			$hesabix_ids = array();
@@ -240,86 +319,116 @@ class Hesabix_V2_Stock_Pull_Service
 			$totals = self::fetch_quantities_for_product_ids($api, $hesabix_ids, $wh_filter);
 
 			if (is_wp_error($totals)) {
-				return array(
-					'success' => false,
-					'message' => $totals->get_error_message(),
-					'execution_time' => microtime(true) - $start,
+				return self::finish_result(
+					array(
+						'success' => false,
+						'message' => $totals->get_error_message(),
+						'execution_time' => microtime(true) - $start,
+					),
+					$source
 				);
 			}
 
 			$updated = 0;
 			$skipped = 0;
 			$errors = 0;
+			$guarded_zero = 0;
 
 			$sync_pull = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
 			$pinv = isset($sync_pull['track_inventory_policy']) ? sanitize_key((string) $sync_pull['track_inventory_policy']) : 'wc';
 			$policy_auto_manage_stock = !empty($sync_pull['sync_product_stock'])
 				&& in_array($pinv, array('physical_always', 'always_on'), true);
 
-			foreach ($mappings as $row) {
-				$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
-				$wc_id = isset($row['wc_id']) ? (int) $row['wc_id'] : 0;
-				$wc_parent = isset($row['wc_parent_id']) && $row['wc_parent_id'] !== null && $row['wc_parent_id'] !== ''
-					? (int) $row['wc_parent_id']
-					: null;
+			Hesabix_V2_Stock_Push_Service::set_stock_pull_applying(true);
 
-				if ($hid < 1 || $wc_id < 1) {
-					$skipped++;
-					continue;
-				}
+			try {
+				foreach ($mappings as $row) {
+					$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
+					$wc_id = isset($row['wc_id']) ? (int) $row['wc_id'] : 0;
 
-				if (!array_key_exists($hid, $totals)) {
-					$skipped++;
-					continue;
-				}
-
-				$qty = (float) $totals[ $hid ];
-
-				$product = wc_get_product($wc_id);
-				if (!$product) {
-					$skipped++;
-					continue;
-				}
-
-				if ($product->is_virtual()) {
-					$skipped++;
-					continue;
-				}
-
-				if ($product->is_type('variable')) {
-					$skipped++;
-					continue;
-				}
-
-				if (!apply_filters('hesabix_v2_stock_pull_apply_to_product', true, $product, $row, $qty, $opts)) {
-					$skipped++;
-					continue;
-				}
-
-				try {
-					if (!empty($opts['force_manage_stock']) || $policy_auto_manage_stock) {
-						$product->set_manage_stock(true);
-					} elseif (!$product->managing_stock()) {
+					if ($hid < 1 || $wc_id < 1) {
 						$skipped++;
 						continue;
 					}
 
-					$product->set_stock_quantity($qty);
-					$product->save();
+					if (!array_key_exists($hid, $totals)) {
+						$skipped++;
+						continue;
+					}
 
-					$updated++;
-				} catch (Exception $e) {
-					$errors++;
-					Hesabix_V2_Log_Service::error(
-						'Stock pull: failed to update WooCommerce product',
-						array(
-							'entity_type' => 'stock_pull',
-							'entity_id' => $wc_id,
-							'hesabix_id' => $hid,
-							'error' => $e->getMessage(),
-						)
-					);
+					$qty = (float) $totals[ $hid ];
+
+					$product = wc_get_product($wc_id);
+					if (!$product) {
+						$skipped++;
+						continue;
+					}
+
+					if ($product->is_virtual()) {
+						$skipped++;
+						continue;
+					}
+
+					if ($product->is_type('variable')) {
+						$skipped++;
+						continue;
+					}
+
+					if (!apply_filters('hesabix_v2_stock_pull_apply_to_product', true, $product, $row, $qty, $opts)) {
+						$skipped++;
+						continue;
+					}
+
+					$current_qty = $product->managing_stock() ? (float) $product->get_stock_quantity() : null;
+
+					if (
+						!$force_zero
+						&& !empty($opts['skip_zero_overwrite'])
+						&& abs($qty) < 0.00001
+						&& $current_qty !== null
+						&& $current_qty > 0.00001
+					) {
+						$guarded_zero++;
+						Hesabix_V2_Log_Service::warning(
+							'Stock pull skipped zero overwrite (WC has positive qty)',
+							array(
+								'entity_type' => 'stock_pull',
+								'entity_id' => $wc_id,
+								'hesabix_id' => $hid,
+								'wc_qty' => $current_qty,
+								'hesabix_qty' => $qty,
+							)
+						);
+						continue;
+					}
+
+					try {
+						if (!empty($opts['force_manage_stock']) || $policy_auto_manage_stock) {
+							$product->set_manage_stock(true);
+						} elseif (!$product->managing_stock()) {
+							$skipped++;
+							continue;
+						}
+
+						$product->set_stock_quantity($qty);
+						$product->save();
+
+						$updated++;
+					} catch (Exception $e) {
+						$errors++;
+						Hesabix_V2_Log_Service::error(
+							'Stock pull: failed to update WooCommerce product',
+							array(
+								'entity_type' => 'stock_pull',
+								'entity_id' => $wc_id,
+								'hesabix_id' => $hid,
+								'error' => $e->getMessage(),
+							)
+						);
+					}
 				}
+			} finally {
+				Hesabix_V2_Stock_Push_Service::set_stock_pull_applying(false);
 			}
 
 			$elapsed = microtime(true) - $start;
@@ -332,24 +441,30 @@ class Hesabix_V2_Stock_Pull_Service
 					'updated' => $updated,
 					'skipped' => $skipped,
 					'errors' => $errors,
+					'guarded_zero' => $guarded_zero,
 					'execution_time' => $elapsed,
 					'warehouse_scope' => $opts['warehouse_scope'],
 				)
 			);
 
-			return array(
-				'success' => true,
-				/* translators: 1: updated count, 2: skipped, 3: errors */
-				'message' => sprintf(
-					__('موجودی به‌روز شد: %1$d مورد، رد شد %2$d، خطا %3$d', 'hesabix-v2'),
-					$updated,
-					$skipped,
-					$errors
+			return self::finish_result(
+				array(
+					'success' => true,
+					/* translators: 1: updated, 2: skipped, 3: errors, 4: guarded zeros */
+					'message' => sprintf(
+						__('موجودی به‌روز شد: %1$d مورد، رد شد %2$d، خطا %3$d، محافظ صفر %4$d', 'hesabix-v2'),
+						$updated,
+						$skipped,
+						$errors,
+						$guarded_zero
+					),
+					'updated' => $updated,
+					'skipped' => $skipped,
+					'errors' => $errors,
+					'guarded_zero' => $guarded_zero,
+					'execution_time' => $elapsed,
 				),
-				'updated' => $updated,
-				'skipped' => $skipped,
-				'errors' => $errors,
-				'execution_time' => $elapsed,
+				$source
 			);
 		} finally {
 			delete_transient(self::LOCK_TRANSIENT);
@@ -357,8 +472,107 @@ class Hesabix_V2_Stock_Pull_Service
 	}
 
 	/**
+	 * نمونه اختلاف موجودی WC و حسابیکس برای عیب‌یابی.
+	 *
+	 * @param int $limit
+	 * @return array{success:bool, message?:string, items?:array, checked?:int}
+	 */
+	public static function detect_conflicts($limit = 25)
+	{
+		$limit = max(5, min(100, absint($limit)));
+		if (!class_exists('WooCommerce') || !get_option('hesabix_v2_enabled')) {
+			return array('success' => false, 'message' => __('افزونه یا ووکامرس آماده نیست.', 'hesabix-v2'));
+		}
+
+		$opts = self::get_options();
+		$wh_filter = self::resolve_warehouse_ids_for_api($opts);
+		if (is_wp_error($wh_filter)) {
+			return array('success' => false, 'message' => $wh_filter->get_error_message());
+		}
+
+		$db = new Hesabix_V2_DB_Service();
+		$mappings = $db->get_all_product_mappings();
+		$hesabix_ids = array();
+		foreach ($mappings as $row) {
+			$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
+			if ($hid > 0) {
+				$hesabix_ids[] = $hid;
+			}
+		}
+		$hesabix_ids = array_values(array_unique($hesabix_ids));
+		if (empty($hesabix_ids)) {
+			return array('success' => true, 'items' => array(), 'checked' => 0);
+		}
+
+		$api = new Hesabix_V2_Api();
+		$totals = self::fetch_quantities_for_product_ids($api, $hesabix_ids, $wh_filter);
+		if (is_wp_error($totals)) {
+			return array('success' => false, 'message' => $totals->get_error_message());
+		}
+
+		$items = array();
+		$checked = 0;
+		foreach ($mappings as $row) {
+			if (count($items) >= $limit) {
+				break;
+			}
+			$hid = isset($row['hesabix_id']) ? (int) $row['hesabix_id'] : 0;
+			$wc_id = isset($row['wc_id']) ? (int) $row['wc_id'] : 0;
+			if ($hid < 1 || $wc_id < 1 || !array_key_exists($hid, $totals)) {
+				continue;
+			}
+			$product = wc_get_product($wc_id);
+			if (!$product || $product->is_type('variable') || $product->is_virtual() || !$product->managing_stock()) {
+				continue;
+			}
+			$checked++;
+			$wc_qty = (float) $product->get_stock_quantity();
+			$hx_qty = (float) $totals[ $hid ];
+			if (abs($wc_qty - $hx_qty) < 0.00001) {
+				continue;
+			}
+			$items[] = array(
+				'wc_id' => $wc_id,
+				'hesabix_id' => $hid,
+				'name' => $product->get_name(),
+				'wc_qty' => $wc_qty,
+				'hesabix_qty' => $hx_qty,
+				'diff' => $wc_qty - $hx_qty,
+			);
+		}
+
+		return array(
+			'success' => true,
+			'items' => $items,
+			'checked' => $checked,
+			'conflict_count' => count($items),
+		);
+	}
+
+	/**
+	 * @param array<string, mixed> $result
+	 * @param string               $source
+	 * @return array<string, mixed>
+	 */
+	private static function finish_result(array $result, $source)
+	{
+		$store = array(
+			'at' => gmdate('c'),
+			'source' => (string) $source,
+			'success' => !empty($result['success']),
+			'message' => isset($result['message']) ? (string) $result['message'] : '',
+			'updated' => isset($result['updated']) ? (int) $result['updated'] : null,
+			'skipped' => isset($result['skipped']) ? (int) $result['skipped'] : null,
+			'errors' => isset($result['errors']) ? (int) $result['errors'] : null,
+			'guarded_zero' => isset($result['guarded_zero']) ? (int) $result['guarded_zero'] : null,
+		);
+		update_option(self::LAST_RESULT_KEY, $store, false);
+		return $result;
+	}
+
+	/**
 	 * @param array<string, mixed> $opts
-	 * @return array<int>|null|null به‌صورت null یعنی حذف فیلتر (همه انبارها)؛ WP_Error در خطا
+	 * @return array<int>|null|WP_Error
 	 */
 	private static function resolve_warehouse_ids_for_api($opts)
 	{
@@ -392,9 +606,9 @@ class Hesabix_V2_Stock_Pull_Service
 	}
 
 	/**
-	 * @param Hesabix_V2_Api        $api
-	 * @param array<int>            $hesabix_product_ids
-	 * @param array<int>|null       $warehouse_ids null = همه انبارها
+	 * @param Hesabix_V2_Api  $api
+	 * @param array<int>      $hesabix_product_ids
+	 * @param array<int>|null $warehouse_ids null = همه انبارها
 	 * @return array<int, float>|WP_Error
 	 */
 	private static function fetch_quantities_for_product_ids($api, $hesabix_product_ids, $warehouse_ids)

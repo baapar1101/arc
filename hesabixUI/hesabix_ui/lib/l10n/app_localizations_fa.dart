@@ -15264,6 +15264,36 @@ class AppLocalizationsFa extends AppLocalizations {
   String get woocommerceControlSettingsApplied => 'تنظیمات افزونه به‌روز شد';
 
   @override
+  String get woocommerceControlStockTitle => 'وضعیت همگام‌سازی موجودی';
+
+  @override
+  String get woocommerceControlStockSourceLabel => 'منبع حقیقت';
+
+  @override
+  String get woocommerceControlStockPullNow => 'کشش موجودی به ووکامرس';
+
+  @override
+  String get woocommerceControlStockConflicts => 'بررسی اختلاف موجودی';
+
+  @override
+  String woocommerceControlStockPullDone(String message) {
+    return 'کشش موجودی انجام شد: $message';
+  }
+
+  @override
+  String woocommerceControlStockConflictsDone(String count) {
+    return 'تعداد اختلاف‌ها: $count';
+  }
+
+  @override
+  String get woocommerceSettingsPushStockOnWarehousePost =>
+      'پس از قطعی‌شدن حواله انبار، موجودی را به ووکامرس بفرست';
+
+  @override
+  String get woocommerceSettingsPushStockOnWarehousePostHelp =>
+      'نیاز به پل فعال و تنظیم «پذیرش پوش» در افزونه دارد. منبع حقیقت فروشگاه باید حسابیکس باشد.';
+
+  @override
   String woocommerceControlQueueProcessDone(String delta) {
     return 'یک مرحله از صف اجرا شد؛ حدود $delta ردیف کمتر در وضعیت «در انتظار».';
   }

@@ -119,6 +119,17 @@ class Hesabix_V2_Activator
 				'cron_minutes' => 15,
 				'force_manage_stock' => true,
 				'disable_wc_stock_reduction' => false,
+				'skip_zero_overwrite' => true,
+			)
+		);
+
+		add_option(
+			'hesabix_v2_inventory_policy',
+			array(
+				'source_of_truth' => 'hesabix',
+				'push_wc_qty_to_hesabix' => false,
+				'accept_remote_stock_push' => true,
+				'conflict_sample_limit' => 25,
 			)
 		);
 

@@ -41,6 +41,7 @@ class _WoocommercePluginSettingsBodyState
   bool _hasStoredBridgeToken = false;
   bool _tokenObscured = true;
   Map<String, dynamic>? _lastBridgeTest;
+  bool _pushStockOnWarehousePost = true;
 
   bool _canWooCommerceView() {
     if (widget.authStore.currentBusiness?.isOwner == true) return true;
@@ -78,6 +79,8 @@ class _WoocommercePluginSettingsBodyState
       final tok = (m['bridge_token'] ?? '').toString();
       _hasStoredBridgeToken = tok == '***' || tok.isNotEmpty;
       _tokenCtl.text = tok == '***' ? '' : tok;
+      _pushStockOnWarehousePost =
+          m['push_stock_to_wc_on_warehouse_post'] != false;
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -102,6 +105,7 @@ class _WoocommercePluginSettingsBodyState
           'bridge_token': _tokenCtl.text.trim().isEmpty
               ? '***'
               : _tokenCtl.text.trim(),
+          'push_stock_to_wc_on_warehouse_post': _pushStockOnWarehousePost,
         },
       );
       if (mounted) {
@@ -289,6 +293,16 @@ class _WoocommercePluginSettingsBodyState
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.outline,
           ),
+        ),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t.woocommerceSettingsPushStockOnWarehousePost),
+          subtitle: Text(t.woocommerceSettingsPushStockOnWarehousePostHelp),
+          value: _pushStockOnWarehousePost,
+          onChanged: !canManage
+              ? null
+              : (v) => setState(() => _pushStockOnWarehousePost = v),
         ),
         const SizedBox(height: 16),
         Wrap(

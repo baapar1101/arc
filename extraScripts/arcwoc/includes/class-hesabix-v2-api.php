@@ -716,6 +716,45 @@ class Hesabix_V2_Api
 	}
 
 	/**
+	 * ایجاد حواله انبار دستی (رسید / خروج / تعدیل / …).
+	 * POST /warehouse-docs/business/{business_id}/create
+	 *
+	 * @since 4.8.0
+	 * @param array $data
+	 * @param int   $timeout
+	 * @return array
+	 */
+	public function create_warehouse_document($data, $timeout = 60)
+	{
+		return $this->request(
+			'POST',
+			'/warehouse-docs/business/' . (int) $this->business_id . '/create',
+			$data,
+			(int) max(25, min(180, $timeout))
+		);
+	}
+
+	/**
+	 * قطعی‌سازی حواله انبار.
+	 * POST /warehouse-docs/business/{business_id}/{wh_id}/post
+	 *
+	 * @since 4.8.0
+	 * @param int $warehouse_document_id
+	 * @param int $timeout
+	 * @return array
+	 */
+	public function post_warehouse_document($warehouse_document_id, $timeout = 60)
+	{
+		$wid = absint($warehouse_document_id);
+		return $this->request(
+			'POST',
+			'/warehouse-docs/business/' . (int) $this->business_id . '/' . $wid . '/post',
+			array(),
+			(int) max(25, min(180, $timeout))
+		);
+	}
+
+	/**
 	 * Delete product
 	 *
 	 * @since    2.0.0

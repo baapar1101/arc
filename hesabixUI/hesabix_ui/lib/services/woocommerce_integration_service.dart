@@ -253,6 +253,35 @@ class WoocommerceIntegrationService {
     return _dataMap(res.data);
   }
 
+  Future<Map<String, dynamic>> postControlStockPullRun({
+    required int businessId,
+    Map<String, dynamic>? payload,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/stock-pull/run',
+      data: payload ?? const <String, dynamic>{'source': 'manual'},
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> controlStockStatus({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/stock-status',
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> controlStockConflicts({
+    required int businessId,
+    int limit = 25,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/woocommerce/business/$businessId/bridge/control/stock-conflicts',
+      queryParameters: <String, dynamic>{'limit': limit},
+    );
+    return _dataMap(res.data);
+  }
+
   Future<Map<String, dynamic>> controlOpeningInventoryStatus({
     required int businessId,
   }) async {

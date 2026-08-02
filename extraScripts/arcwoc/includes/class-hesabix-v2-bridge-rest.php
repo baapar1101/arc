@@ -371,6 +371,36 @@ class Hesabix_V2_Bridge_Rest
 				'permission_callback' => array(__CLASS__, 'permission_with_token'),
 			)
 		);
+
+		register_rest_route(
+			self::NS,
+			'/control/stock-pull/run',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array(__CLASS__, 'route_control_stock_pull_run'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/stock-status',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array(__CLASS__, 'route_control_stock_status'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/stock-conflicts',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array(__CLASS__, 'route_control_stock_conflicts'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
 	}
 
 	/**
@@ -1002,6 +1032,12 @@ class Hesabix_V2_Bridge_Rest
 			'sync_settings'                => $sync,
 			'bulk_sync_options'          => is_array($bulk) ? $bulk : array(),
 			'stock_pull'                 => is_array($stock) ? $stock : array(),
+			'inventory_policy'           => class_exists('Hesabix_V2_Inventory_Policy')
+				? Hesabix_V2_Inventory_Policy::get_options()
+				: array(),
+			'inventory_status'           => class_exists('Hesabix_V2_Inventory_Policy')
+				? Hesabix_V2_Inventory_Policy::status_summary()
+				: array(),
 		);
 
 		return new WP_REST_Response(array('success' => true, 'data' => $data), 200);
@@ -1566,10 +1602,47 @@ class Hesabix_V2_Bridge_Rest
 			update_option('hesabix_v2_debug_mode', $applied['hesabix_v2_debug_mode'], false);
 		}
 
+		if (array_key_exists('inventory_policy', $params) && is_array($params['inventory_policy']) && class_exists('Hesabix_V2_Inventory_Policy')) {
+			$applied['inventory_policy'] = Hesabix_V2_Inventory_Policy::sanitize_and_save($params['inventory_policy']);
+		}
+
+		if (array_key_exists('stock_pull', $params) && is_array($params['stock_pull']) && class_exists('Hesabix_V2_Stock_Pull_Service')) {
+			$cur = Hesabix_V2_Stock_Pull_Service::get_options();
+			$sp = $params['stock_pull'];
+			$scope = isset($sp['warehouse_scope']) ? sanitize_key((string) $sp['warehouse_scope']) : $cur['warehouse_scope'];
+			if (!in_array($scope, array('default', 'selected', 'all'), true)) {
+				$scope = $cur['warehouse_scope'];
+			}
+			$wh_ids = $cur['warehouse_ids'];
+			if (isset($sp['warehouse_ids']) && is_array($sp['warehouse_ids'])) {
+				$wh_ids = array();
+				foreach ($sp['warehouse_ids'] as $wid) {
+					$i = absint($wid);
+					if ($i > 0) {
+						$wh_ids[] = $i;
+					}
+				}
+				$wh_ids = array_values(array_unique($wh_ids));
+			}
+			$cron_min = isset($sp['cron_minutes']) ? max(5, min(180, absint($sp['cron_minutes']))) : (int) $cur['cron_minutes'];
+			$next = array(
+				'enabled' => array_key_exists('enabled', $sp) ? !empty($sp['enabled']) : !empty($cur['enabled']),
+				'warehouse_scope' => $scope,
+				'warehouse_ids' => $wh_ids,
+				'cron_minutes' => $cron_min,
+				'force_manage_stock' => array_key_exists('force_manage_stock', $sp) ? !empty($sp['force_manage_stock']) : !empty($cur['force_manage_stock']),
+				'disable_wc_stock_reduction' => array_key_exists('disable_wc_stock_reduction', $sp) ? !empty($sp['disable_wc_stock_reduction']) : !empty($cur['disable_wc_stock_reduction']),
+				'skip_zero_overwrite' => array_key_exists('skip_zero_overwrite', $sp) ? !empty($sp['skip_zero_overwrite']) : !empty($cur['skip_zero_overwrite']),
+			);
+			update_option('hesabix_v2_stock_pull', $next, false);
+			Hesabix_V2_Stock_Pull_Service::reschedule_cron();
+			$applied['stock_pull'] = $next;
+		}
+
 		if (empty($applied)) {
 			return new WP_Error(
 				'no_allowed_keys',
-				__('هیچ فیلد مجاز برای به‌روزرسانی ارسال نشد. در حال حاضر فقط hesabix_v2_debug_mode پشتیبانی می‌شود.', 'hesabix-v2'),
+				__('هیچ فیلد مجاز برای به‌روزرسانی ارسال نشد. کلیدهای مجاز: hesabix_v2_debug_mode، inventory_policy، stock_pull.', 'hesabix-v2'),
 				array('status' => 400)
 			);
 		}
@@ -1578,6 +1651,106 @@ class Hesabix_V2_Bridge_Rest
 			array(
 				'success' => true,
 				'data'    => array('applied' => $applied),
+			),
+			200
+		);
+	}
+
+	/**
+	 * کشش موجودی از حسابیکس به ووکامرس (از راه دور / پس از حواله انبار).
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_stock_pull_run($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+		if (!class_exists('Hesabix_V2_Stock_Pull_Service')) {
+			return new WP_Error('missing_service', __('سرویس کشش موجودی در دسترس نیست.', 'hesabix-v2'), array('status' => 500));
+		}
+
+		$params = self::read_json_body($request);
+		$source = isset($params['source']) ? sanitize_key((string) $params['source']) : 'hesabix_push';
+		if (!in_array($source, array('manual', 'ajax', 'hesabix_push'), true)) {
+			$source = 'hesabix_push';
+		}
+
+		$product_ids = array();
+		if (!empty($params['product_ids']) && is_array($params['product_ids'])) {
+			foreach ($params['product_ids'] as $pid) {
+				$i = absint($pid);
+				if ($i > 0) {
+					$product_ids[] = $i;
+				}
+			}
+			$product_ids = array_values(array_unique($product_ids));
+		}
+
+		$ctx = array(
+			'source' => $source,
+			'force_zero' => !empty($params['force_zero']),
+		);
+		if (!empty($product_ids)) {
+			$ctx['product_ids'] = $product_ids;
+		}
+		if (!empty($params['ignore_source_policy'])) {
+			$ctx['ignore_source_policy'] = true;
+		}
+
+		$result = Hesabix_V2_Stock_Pull_Service::execute_pull($ctx);
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'data'    => $result,
+				'message' => isset($result['message']) ? (string) $result['message'] : '',
+			),
+			200
+		);
+	}
+
+	/**
+	 * خلاصه سیاست و وضعیت موجودی.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_stock_status($request)
+	{
+		if (!class_exists('Hesabix_V2_Inventory_Policy')) {
+			return new WP_Error('missing_service', __('سیاست موجودی در دسترس نیست.', 'hesabix-v2'), array('status' => 500));
+		}
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'data'    => Hesabix_V2_Inventory_Policy::status_summary(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * نمونه اختلاف موجودی.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_stock_conflicts($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+		$limit = absint($request->get_param('limit'));
+		if ($limit < 1) {
+			$limit = 25;
+		}
+		$result = Hesabix_V2_Stock_Pull_Service::detect_conflicts($limit);
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'data'    => $result,
+				'message' => isset($result['message']) ? (string) $result['message'] : '',
 			),
 			200
 		);

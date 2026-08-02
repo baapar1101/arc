@@ -925,9 +925,22 @@ class Hesabix_V2_Admin
 				'cron_minutes' => $cron_min,
 				'force_manage_stock' => isset($_POST['stock_pull_force_manage_stock']),
 				'disable_wc_stock_reduction' => isset($_POST['stock_pull_disable_wc_reduce']),
+				'skip_zero_overwrite' => isset($_POST['stock_pull_skip_zero_overwrite']),
 			)
 		);
 		Hesabix_V2_Stock_Pull_Service::reschedule_cron();
+
+		if (isset($_POST['hesabix_v2_inventory_policy_fields'])) {
+			Hesabix_V2_Inventory_Policy::sanitize_and_save(
+				array(
+					'source_of_truth' => isset($_POST['inventory_source_of_truth'])
+						? sanitize_key(wp_unslash($_POST['inventory_source_of_truth']))
+						: 'hesabix',
+					'push_wc_qty_to_hesabix' => isset($_POST['push_wc_qty_to_hesabix']),
+					'accept_remote_stock_push' => isset($_POST['accept_remote_stock_push']),
+				)
+			);
+		}
 
 		$inv_resolution = isset($_POST['invoice_wh_resolution'])
 			? sanitize_key(wp_unslash($_POST['invoice_wh_resolution']))
@@ -2595,6 +2608,32 @@ class Hesabix_V2_Admin
 		$result = Hesabix_V2_Stock_Pull_Service::execute_pull(array('source' => 'ajax'));
 
 		wp_send_json($result);
+	}
+
+	/**
+	 * AJAX: نمونه اختلاف موجودی WC و حسابیکس
+	 *
+	 * @since 4.8.0
+	 */
+	public function ajax_stock_conflicts()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json(array(
+				'success' => false,
+				'message' => __('ابتدا اتصال به حسابیکس را تکمیل کنید.', 'hesabix-v2'),
+			));
+		}
+
+		$limit = 25;
+		if (class_exists('Hesabix_V2_Inventory_Policy')) {
+			$o = Hesabix_V2_Inventory_Policy::get_options();
+			$limit = isset($o['conflict_sample_limit']) ? (int) $o['conflict_sample_limit'] : 25;
+		}
+
+		wp_send_json(Hesabix_V2_Stock_Pull_Service::detect_conflicts($limit));
 	}
 
 	// ==================== Setup Wizard AJAX ====================

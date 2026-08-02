@@ -133,6 +133,8 @@ def _default_settings() -> Dict[str, Any]:
 		"store_base_url": "",
 		"bridge_token": "",
 		"updated_at": None,
+		# پس از قطعی حواله انبار، موجودی به ووکامرس پوش شود (از طریق پل ArcWOC).
+		"push_stock_to_wc_on_warehouse_post": True,
 	}
 
 
@@ -167,6 +169,14 @@ def _normalize_settings(payload: Dict[str, Any], previous: Optional[Dict[str, An
 			base["bridge_token"] = str(prev.get("bridge_token") or "")
 		else:
 			base["bridge_token"] = tok_s
+
+	if "push_stock_to_wc_on_warehouse_post" in payload:
+		base["push_stock_to_wc_on_warehouse_post"] = bool(payload.get("push_stock_to_wc_on_warehouse_post"))
+	elif "push_stock_to_wc_on_warehouse_post" not in base:
+		base["push_stock_to_wc_on_warehouse_post"] = True
+	else:
+		base["push_stock_to_wc_on_warehouse_post"] = bool(base.get("push_stock_to_wc_on_warehouse_post"))
+
 	base["updated_at"] = datetime.utcnow().isoformat()
 	return base
 
@@ -632,6 +642,33 @@ def post_control_settings_patch(db: Session, business_id: int, payload: Dict[str
 		business_id=business_id,
 		path="/control/settings/patch",
 	)
+
+
+def post_control_stock_pull_run(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	body = payload if isinstance(payload, dict) else {}
+	# پاسخ پل بعد از unwrap همان نتیجهٔ execute_pull است (success/message/updated/…).
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/stock-pull/run", body, timeout_sec=180.0),
+		business_id=business_id,
+		path="/control/stock-pull/run",
+	)
+
+
+def control_stock_status(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/stock-status", {}),
+		business_id=business_id,
+		path="/control/stock-status",
+	)
+
+
+def control_stock_conflicts(db: Session, business_id: int, *, limit: int = 25) -> Dict[str, Any]:
+	raw = _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/stock-conflicts", {"limit": max(5, min(100, int(limit)))}),
+		business_id=business_id,
+		path="/control/stock-conflicts",
+	)
+	return raw if isinstance(raw, dict) else {"raw": raw}
 
 
 def control_opening_inventory_status(db: Session, business_id: int) -> Dict[str, Any]:

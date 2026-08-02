@@ -129,6 +129,8 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-orphan-product-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-opening-inventory-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-queue-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-inventory-policy.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-stock-push-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-stock-pull-service.php';
 
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-order-stock-control.php';
@@ -159,6 +161,7 @@ class Hesabix_V2
 	private function define_admin_hooks()
 	{
 		Hesabix_V2_Stock_Pull_Service::register_hooks();
+		Hesabix_V2_Stock_Push_Service::register_hooks();
 
 		$this->loader->add_action('woocommerce_init', 'Hesabix_V2_Order_Stock_Control', 'boot');
 
@@ -202,6 +205,7 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_import_customers_from_hesabix', $plugin_admin, 'ajax_import_customers_from_hesabix');
 		$this->loader->add_action('wp_ajax_hesabix_v2_get_warehouses_and_banks', $plugin_admin, 'ajax_get_warehouses_and_banks');
 		$this->loader->add_action('wp_ajax_hesabix_v2_pull_stock_now', $plugin_admin, 'ajax_pull_stock_now');
+		$this->loader->add_action('wp_ajax_hesabix_v2_stock_conflicts', $plugin_admin, 'ajax_stock_conflicts');
 		$this->loader->add_action('wp_ajax_hesabix_v2_get_invoice_tags', $plugin_admin, 'ajax_get_invoice_tags');
 		$this->loader->add_action('wp_ajax_hesabix_v2_orders_sync_batch', $plugin_admin, 'ajax_orders_sync_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_customers_sync_batch', $plugin_admin, 'ajax_customers_sync_batch');

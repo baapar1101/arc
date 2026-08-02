@@ -3009,6 +3009,27 @@ def post_warehouse_document(
 			exc_info=True,
 		)
 
+	try:
+		from app.services.woocommerce_stock_push_hook import (
+			collect_product_ids_from_warehouse_lines,
+			schedule_woocommerce_stock_push_after_warehouse_post,
+		)
+
+		schedule_woocommerce_stock_push_after_warehouse_post(
+			db,
+			business_id=int(business_id),
+			warehouse_document_id=int(wh.id),
+			product_ids=collect_product_ids_from_warehouse_lines(lines),
+			extra_info=wh.extra_info if isinstance(wh.extra_info, dict) else {},
+		)
+	except Exception as woo_push_err:
+		logger.warning(
+			"warehouse_post woocommerce stock push schedule failed wh_id=%s err=%s",
+			getattr(wh, "id", None),
+			woo_push_err,
+			exc_info=True,
+		)
+
 	return {"id": wh.id, "status": wh.status}
 
 

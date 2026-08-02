@@ -28374,6 +28374,54 @@ abstract class AppLocalizations {
   /// **'Plugin settings updated'**
   String get woocommerceControlSettingsApplied;
 
+  /// No description provided for @woocommerceControlStockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory sync status'**
+  String get woocommerceControlStockTitle;
+
+  /// No description provided for @woocommerceControlStockSourceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Source of truth'**
+  String get woocommerceControlStockSourceLabel;
+
+  /// No description provided for @woocommerceControlStockPullNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull stock to WooCommerce'**
+  String get woocommerceControlStockPullNow;
+
+  /// No description provided for @woocommerceControlStockConflicts.
+  ///
+  /// In en, this message translates to:
+  /// **'Check stock conflicts'**
+  String get woocommerceControlStockConflicts;
+
+  /// No description provided for @woocommerceControlStockPullDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock pull finished: {message}'**
+  String woocommerceControlStockPullDone(String message);
+
+  /// No description provided for @woocommerceControlStockConflictsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Conflicts found: {count}'**
+  String woocommerceControlStockConflictsDone(String count);
+
+  /// No description provided for @woocommerceSettingsPushStockOnWarehousePost.
+  ///
+  /// In en, this message translates to:
+  /// **'After posting a warehouse document, push stock to WooCommerce'**
+  String get woocommerceSettingsPushStockOnWarehousePost;
+
+  /// No description provided for @woocommerceSettingsPushStockOnWarehousePostHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires an active bridge and “accept remote push” in the plugin. Store source of truth should be Hesabix.'**
+  String get woocommerceSettingsPushStockOnWarehousePostHelp;
+
   /// No description provided for @woocommerceControlQueueProcessDone.
   ///
   /// In en, this message translates to:

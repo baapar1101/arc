@@ -429,6 +429,104 @@ class _WooArcwocPluginSettingsPanelState
     );
   }
 
+  Map<String, dynamic> get _inventoryStatus {
+    final raw = _settingsSummary['inventory_status'];
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return const {};
+  }
+
+  Widget _stockBlock(BuildContext context, AppLocalizations t) {
+    final st = _inventoryStatus;
+    final source = '${st['source_of_truth'] ?? '—'}';
+    final last = st['last_stock_pull'];
+    final warnings = st['warnings'];
+    final lastMsg = last is Map ? '${last['message'] ?? ''}'.trim() : '';
+    final lastAt = last is Map ? '${last['at'] ?? ''}'.trim() : '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('${t.woocommerceControlStockSourceLabel}: $source'),
+        if (lastAt.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text('$lastAt — $lastMsg', style: Theme.of(context).textTheme.bodySmall),
+        ],
+        if (warnings is List && warnings.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            warnings.join(', '),
+            style: TextStyle(color: Theme.of(context).colorScheme.tertiary),
+          ),
+        ],
+        if (_canWooCommerceManage()) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: _loading ? null : () => _onStockPullNow(context, t),
+                icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                label: Text(t.woocommerceControlStockPullNow),
+              ),
+              OutlinedButton.icon(
+                onPressed: _loading ? null : () => _onStockConflicts(context, t),
+                icon: const Icon(Icons.compare_arrows, size: 20),
+                label: Text(t.woocommerceControlStockConflicts),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _onStockPullNow(BuildContext context, AppLocalizations t) async {
+    if (!_canWooCommerceManage()) {
+      SnackBarHelper.showError(
+        context,
+        message: t.woocommerceControlManageRequiredHint,
+      );
+      return;
+    }
+    try {
+      final r = await _svc.postControlStockPullRun(
+        businessId: widget.businessId,
+        payload: const <String, dynamic>{'source': 'manual'},
+      );
+      if (!context.mounted) return;
+      final msg = '${r['message'] ?? ''}'.trim();
+      SnackBarHelper.showSuccess(
+        context,
+        message: t.woocommerceControlStockPullDone(msg.isEmpty ? 'OK' : msg),
+      );
+      await _loadAll();
+    } catch (e) {
+      if (!context.mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  Future<void> _onStockConflicts(BuildContext context, AppLocalizations t) async {
+    try {
+      final r = await _svc.controlStockConflicts(businessId: widget.businessId);
+      if (!context.mounted) return;
+      final count = int.tryParse('${r['conflict_count'] ?? (r['items'] is List ? (r['items'] as List).length : 0)}') ?? 0;
+      SnackBarHelper.showSuccess(
+        context,
+        message: t.woocommerceControlStockConflictsDone('$count'),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
   Widget _queueBlock(BuildContext context, AppLocalizations t) {
     final by = _queueSnapshot['by_status'];
     final batch = '${_queueSnapshot['batch_size'] ?? '—'}';
@@ -607,6 +705,11 @@ class _WooArcwocPluginSettingsPanelState
           context,
           title: t.woocommerceControlConnectionTitle,
           child: _connectionBlock(context, t),
+        ),
+        _sectionCard(
+          context,
+          title: t.woocommerceControlStockTitle,
+          child: _stockBlock(context, t),
         ),
         _sectionCard(
           context,
